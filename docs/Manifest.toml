@@ -276,6 +276,12 @@ git-tree-sha1 = "a3f24677c21f5bbe9d2a714f95dcd58337fb2856"
 uuid = "82899510-4779-5014-852e-03e436cf321d"
 version = "1.0.0"
 
+[[JRRTMGP]]
+deps = ["Compat", "Coverage", "DifferentialEquations", "DocStringExtensions", "Documenter", "MbedTLS", "Pkg", "Requires", "Test"]
+path = ".."
+uuid = "a01a1ee8-cea4-48fc-987c-fc7878d79da1"
+version = "0.1.0"
+
 [[JSON]]
 deps = ["Dates", "Mmap", "Parsers", "Unicode"]
 git-tree-sha1 = "b34d7cef7b337321e97d22242c3c2b91f476748e"
