@@ -29,7 +29,6 @@ jobs:
   - bash: |
       set -o xtrace
       sudo apt-get update
-      sudo apt-get install cmake gfortran mpich libmpich-dev
     displayName: 'Install dependencies'
   - bash: |
       set -o xtrace
@@ -76,7 +75,6 @@ jobs:
       set -o xtrace
       brew update
       brew upgrade
-      brew install mpich cmake
     displayName: 'Install dependencies'
   - bash: |
       set -o xtrace
@@ -106,8 +104,6 @@ jobs:
     displayName: 'Download and extract Julia'
   - powershell: |
       Set-PSDebug -Trace 1
-      wget https://download.microsoft.com/download/2/E/C/2EC96D7F-687B-4613-80F6-E10F670A2D97/msmpisetup.exe -OutFile MSMpiSetup.exe
-      Start-Process -FilePath .\MSMpiSetup.exe "-unattend -minimal"
     displayName: 'Install dependencies'
   - powershell: |
       Set-PSDebug -Trace 1
@@ -136,7 +132,6 @@ jobs:
   - bash: |
       set -o xtrace
       sudo apt-get update
-      sudo apt-get install cmake gfortran mpich libmpich-dev
     displayName: 'Install dependencies'
   - bash: |
       set -o xtrace
