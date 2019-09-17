@@ -13,6 +13,7 @@ makedocs(
   modules = [Documenter, JRRTMGP],
   pages = Any[
     "Home" => "index.md",
+    "Radiative Transfer Equation (RTE)" => "RTE.md",
   ],
 )
 
