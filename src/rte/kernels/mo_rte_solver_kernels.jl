@@ -32,20 +32,6 @@ module mo_rte_solver_kernels
 
 include("../fortranfuncs.jl")
 
-  interface apply_BC
-    module procedure apply_BC_gpt, apply_BC_factor, apply_BC_0
-  end interface apply_BC
-
-  public :: apply_BC,
-            lw_solver_noscat, lw_solver_noscat_GaussQuad, lw_solver_2stream,
-            sw_solver_noscat,                             sw_solver_2stream
-
-  # These routines don't really need to be visible but making them so is useful for testing.
-  public :: lw_source_noscat, lw_combine_sources,
-            lw_source_2str, sw_source_2str,
-            lw_two_stream, sw_two_stream,
-            adding
-
 # -------------------------------------------------------------------------------------------------
 #
 # Top-level long-wave kernels
