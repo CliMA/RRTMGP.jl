@@ -399,7 +399,7 @@ real(wp), dimension(ngpt) :: tau_minor
           # This check skips individual columns with no pressures in range
           #
           if layer_limits[icol,1] > 0
-            for ilay in layer_limits[icol,1], layer_limits[icol,2]
+            for ilay in layer_limits[icol,1]:layer_limits[icol,2]
               #
               # Scaling of minor gas absortion coefficient begins with column amount of minor gas
               #
@@ -541,7 +541,7 @@ real(wp) :: planck_function(nbnd,nlay+1,ncol)
       for ilay in 1:nlay
         # itropo = 1 lower atmosphere; itropo = 2 upper atmosphere
         itropo = fmerge(1,2,tropo[icol,ilay])
-        for ibnd = 1, nbnd
+        for ibnd = 1:nbnd
           gptS = band_lims_gpt[1, ibnd]
           gptE = band_lims_gpt[2, ibnd]
           iflav = gpoint_flavor[itropo, gptS] #eta interpolation depends on band's flavor
@@ -747,7 +747,7 @@ integer :: igpt
     # each code block is for a different reference temperature
     DT = eltype(k)
     res = Vector{DT}(undef, gptE-gptS+1)
-    for igpt = 1, gptE-gptS+1
+    for igpt = 1:gptE-gptS+1
       res[igpt] =
         scaling[1] *
         ( fmajor[1,1,1] * k[gptS+igpt-1, jeta[1]  , jpress-1, jtemp  ] +
@@ -783,7 +783,7 @@ real(wp) :: t
         for igpt in 1:ngpt
            t = tau_abs[igpt,ilay,icol] + tau_rayleigh[igpt,ilay,icol]
            tau[icol,ilay,igpt] = t
-           g  (icol,ilay,igpt) = DT(0)
+           g[icol,ilay,igpt] = DT(0)
            if (t > DT(2) * realmin(DT))
              ssa[icol,ilay,igpt] = tau_rayleigh[igpt,ilay,icol] / t
            else
@@ -826,9 +826,11 @@ real(wp) :: t
           for imom = 1:nmom
             p[imom,icol,ilay,igpt] = DT(0)
           end
-          if (nmom >= 2) p[2,icol,ilay,igpt] = DT(0.1)
+          if (nmom >= 2)
+            p[2,icol,ilay,igpt] = DT(0.1)
+          end
         end
       end
     end
   end
-end module mo_gas_optics_kernels
+end
