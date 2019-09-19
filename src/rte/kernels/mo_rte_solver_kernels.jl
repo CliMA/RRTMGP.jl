@@ -427,7 +427,7 @@ real(wp), parameter :: tau_thresh = sqrt(epsilon(tau))
       #
       source_dn[icol,ilay] = (DT(1) - trans[icol,ilay]) * lev_source_dn[icol,ilay] +
                               DT(2) * fact * (lay_source[icol,ilay] - lev_source_dn[icol,ilay])
-      source_up[icol,ilay] = (DT(1) - trans[icol,ilay]) * lev_source_up[icol,ilay] ) +
+      source_up[icol,ilay] = (DT(1) - trans[icol,ilay]) * lev_source_up[icol,ilay] +
                               DT(2) * fact * (lay_source[icol,ilay] - lev_source_up[icol,ilay])
       end
     end
@@ -557,7 +557,7 @@ real(wp), parameter :: LW_diff_sec = 1.66  # 1./cos(diffusivity angle)
         exp_minus2ktau[i] = exp_minusktau[i] * exp_minusktau[i]
 
         # Refactored to avoid rounding errors when k, gamma1 are of very different magnitudes
-        RT_term[i] = DT(1) / (k     (i  ) * (DT(1) + exp_minus2ktau[i])  +
+        RT_term[i] = DT(1) / (k[i] * (DT(1) + exp_minus2ktau[i])  +
                               gamma1[i,j] * (DT(1) - exp_minus2ktau[i]) )
 
         # Equation 25
@@ -596,7 +596,7 @@ real(wp), parameter :: LW_diff_sec = 1.66  # 1./cos(diffusivity angle)
       lev_source[icol, ilay] =        lev_src_dec[icol, ilay]
     end
     for ilay in 2:nlay
-      for icol in 1,ncol
+      for icol in 1:ncol
         lev_source[icol, ilay] = sqrt(lev_src_dec[icol, ilay] *
                                       lev_src_inc[icol, ilay-1])
       end
