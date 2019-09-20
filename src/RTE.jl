@@ -1,5 +1,6 @@
 module RTE
 
-greet() = print("Hello World!")
+include(joinpath("rte","mo_util_array.jl"))
+include(joinpath("rte","mo_optical_props.jl"))
 
 end # module
