@@ -43,6 +43,28 @@ module mo_optical_props
 using mo_util_array
 using mo_optical_props_kernels
 
+export init!,
+       init_base_from_copy!,
+       finalize!,
+       alloc!,
+       init_and_alloc!,
+       copy_and_alloc!,
+       delta_scale!,
+       validate!,
+       subset_range!,
+       increment!,
+       convert_band2gpt,
+       get_band_lims_wavenumber,
+       get_band_lims_wavelength,
+       get_gpoint_bands,
+       expand,
+       bands_are_equal,
+       gpoints_are_equal
+
+export ty_optical_props_1scl,
+       ty_optical_props_2str,
+       ty_optical_props_nstr
+
 any_vals_less_than(a, t) = a .< t
 any_vals_outside(a,t1,t2) = !(t1<a<t2)
 trim(s) = strip(s)
