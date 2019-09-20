@@ -628,15 +628,15 @@ end
     # Seems like the deallocation statements should be needed under Fortran 2003
     #   but Intel compiler doesn't run without them
 
-    if typeof(subset) == ty_optical_props_1scl
+    if subset isa ty_optical_props_1scl
         err_message = alloc!(subset, n, nlay)
         err_message ≠ "" && return
-    elseif typeof(subset) == ty_optical_props_2str
+    elseif subset isa ty_optical_props_2str
         err_message = alloc!(subset,n, nlay)
         err_message ≠ "" && return
         subset.ssa[1:n,:,:] = DT(0)
         subset.g[1:n,:,:] = DT(0)
-    elseif typeof(subset) == ty_optical_props_nstr
+    elseif subset isa ty_optical_props_nstr
         if allocated(subset.p)
           nmom = subset.name
         else
@@ -682,17 +682,17 @@ end
     is_initialized(subset) && finalize!(subset)
     err_message = init(subset, full)
 
-    if typeof(subset) <: ty_optical_props_1scl # TODO: check logic
+    if subset isa ty_optical_props_1scl # TODO: check logic
       err_message = alloc!(subset, n, nlay)
       err_message ≠ "" && return err_message
       extract_subset!(ncol, nlay, ngpt, full.tau, full.ssa, start, start+n-1, subset.tau)
-    elseif typeof(subset) <: ty_optical_props_2str
+    elseif subset isa ty_optical_props_2str
       err_message = alloc!(subset, n, nlay)
       err_message ≠ "" && return
       extract_subset!(ncol, nlay, ngpt, full.tau, start, start+n-1, subset.tau)
       extract_subset!(ncol, nlay, ngpt, full.ssa, start, start+n-1, subset.ssa)
       extract_subset!(ncol, nlay, ngpt, full.g  , start, start+n-1, subset.g  )
-    elseif typeof(subset) <: ty_optical_props_nstr
+    elseif subset isa ty_optical_props_nstr
       nmom = allocated(subset.p) ? get_nmom(subset) : 1
       err_message = alloc!(subset, nmom, n, nlay)
       err_message ≠ "" && return
@@ -734,17 +734,17 @@ end
     is_initialized(subset) && finalize!(subset)
     err_message = init!(subset, full)
 
-    if typeof(subset) <: ty_optical_props_1scl # TODO: check logic
+    if subset isa ty_optical_props_1scl # TODO: check logic
       err_message = alloc!(subset, n, nlay)
       err_message ≠ "" && return
       extract_subset!(ncol, nlay, ngpt, full.tau, full.ssa, start, start+n-1, subset.tau)
-    elseif typeof(subset) <: ty_optical_props_2str
+    elseif subset isa ty_optical_props_2str
       err_message = alloc!(subset, n, nlay)
       err_message ≠ "" && return
       extract_subset!(ncol, nlay, ngpt, full.tau, start, start+n-1, subset.tau)
       extract_subset!(ncol, nlay, ngpt, full.ssa, start, start+n-1, subset.ssa)
       subset.g[1:n,:,:] = full.p[1,start:start+n-1,:,:]
-    elseif typeof(subset) <: ty_optical_props_nstr
+    elseif subset isa ty_optical_props_nstr
       err_message = alloc!(subset, nmom, n, nlay)
       err_message ≠ "" && return
       extract_subset!(      ncol, nlay, ngpt, full.tau, start, start+n-1, subset.tau)
@@ -785,37 +785,37 @@ end
       # Increment by gpoint
       #   (or by band if both op_in and op_io are defined that way)
       #
-      if typeof(op_io) <: ty_optical_props_1scl
+      if op_io isa ty_optical_props_1scl
 
-        if typeof(op_in) <: ty_optical_props_1scl
+        if op_in isa ty_optical_props_1scl
           increment_1scalar_by_1scalar!(ncol, nlay, ngpt, op_io.tau, op_in.tau)
-        elseif typeof(op_in) <: ty_optical_props_2str
+        elseif op_in isa ty_optical_props_2str
            increment_1scalar_by_2stream!(ncol, nlay, ngpt, op_io.tau, op_in.tau, op_in.ssa)
-        elseif typeof(op_in) <: ty_optical_props_nstr
+        elseif op_in isa ty_optical_props_nstr
            increment_1scalar_by_nstream!(ncol, nlay, ngpt, op_io.tau, op_in.tau, op_in.ssa)
         else
           error("Uncaught case 1 in increment!(op_in, op_io)")
         end
 
-      elseif typeof(op_io) <: ty_optical_props_2str
+      elseif op_io isa ty_optical_props_2str
 
-        if typeof(op_in) <: ty_optical_props_1scl
+        if op_in isa ty_optical_props_1scl
           increment_2stream_by_1scalar!(ncol, nlay, ngpt, op_io.tau, op_io.ssa, op_in.tau)
-        elseif typeof(op_in) <: ty_optical_props_2str
+        elseif op_in isa ty_optical_props_2str
           increment_2stream_by_2stream!(ncol, nlay, ngpt, op_io.tau, op_io.ssa, op_io.g, op_in.tau, op_in.ssa, op_in.g)
-        elseif typeof(op_in) <: ty_optical_props_nstr
+        elseif op_in isa ty_optical_props_nstr
           increment_2stream_by_nstream!(ncol, nlay, ngpt, get_nmom(op_in), op_io.tau, op_io.ssa, op_io.g, op_in.tau, op_in.ssa, op_in.p)
         else
           error("Uncaught case 1 in increment!(op_in, op_io)")
         end
 
-      elseif typeof(op_io) <: ty_optical_props_nstr
+      elseif op_io isa ty_optical_props_nstr
 
-        if typeof(op_in) <: ty_optical_props_1scl
+        if op_in isa ty_optical_props_1scl
           increment_nstream_by_1scalar!(ncol, nlay, ngpt, op_io.tau, op_io.ssa, op_in.tau)
-        elseif typeof(op_in) <: ty_optical_props_2str
+        elseif op_in isa ty_optical_props_2str
           increment_nstream_by_2stream!(ncol, nlay, ngpt, get_nmom(op_io), op_io.tau, op_io.ssa, op_io.p, op_in.tau, op_in.ssa, op_in.g)
-        elseif typeof(op_in) <: ty_optical_props_nstr
+        elseif op_in isa ty_optical_props_nstr
           increment_nstream_by_nstream!(ncol, nlay, ngpt, get_nmom(op_io), get_nmom(op_in), op_io.tau, op_io.ssa, op_io.p, op_in.tau, op_in.ssa, op_in.p)
         else
           error("Uncaught case 1 in increment!(op_in, op_io)")
@@ -838,36 +838,36 @@ end
       #
       # Increment by band
       #
-      if typeof(op_io) <: ty_optical_props_1scl
+      if op_io isa ty_optical_props_1scl
 
-        if typeof(op_in) <: ty_optical_props_1scl
+        if op_in isa ty_optical_props_1scl
           inc_1scalar_by_1scalar_bybnd!(ncol, nlay, ngpt, op_io.tau, op_in.tau, get_nband(op_io), get_band_lims_gpoint(op_io))
-        elseif typeof(op_in) <: ty_optical_props_2str
+        elseif op_in isa ty_optical_props_2str
           inc_1scalar_by_2stream_bybnd!(ncol, nlay, ngpt, op_io.tau, op_in.tau, op_in.ssa, get_nband(op_io), get_band_lims_gpoint(op_io))
-        elseif typeof(op_in) <: ty_optical_props_nstr
+        elseif op_in isa ty_optical_props_nstr
           inc_1scalar_by_nstream_bybnd!(ncol, nlay, ngpt, op_io.tau, op_in.tau, op_in.ssa, get_nband(op_io), get_band_lims_gpoint(op_io))
         else
           error("Uncaught case 1 in increment!(op_in, op_io)")
         end
 
-      elseif typeof(op_io) <: ty_optical_props_2str
+      elseif op_io isa ty_optical_props_2str
 
-        if typeof(op_in) <: ty_optical_props_1scl
+        if op_in isa ty_optical_props_1scl
           inc_2stream_by_1scalar_bybnd!(ncol, nlay, ngpt, op_io.tau, op_io.ssa, op_in.tau, get_nband(op_io), get_band_lims_gpoint(op_io))
-        elseif typeof(op_in) <: ty_optical_props_2str
+        elseif op_in isa ty_optical_props_2str
           inc_2stream_by_2stream_bybnd!(ncol, nlay, ngpt, op_io.tau, op_io.ssa, op_io.g, op_in.tau, op_in.ssa, op_in.g, get_nband(op_io), get_band_lims_gpoint(op_io))
-        elseif typeof(op_in) <: ty_optical_props_nstr
+        elseif op_in isa ty_optical_props_nstr
           inc_2stream_by_nstream_bybnd!(ncol, nlay, ngpt, get_nmom(op_in), op_io.tau, op_io.ssa, op_io.g, op_in.tau, op_in.ssa, op_in.p, get_nband(op_io), get_band_lims_gpoint(op_io))
         else
           error("Uncaught case 1 in increment!(op_in, op_io)")
         end
 
-      elseif typeof(op_io) <: ty_optical_props_nstr
-        if typeof(op_in) <: ty_optical_props_1scl
+      elseif op_io isa ty_optical_props_nstr
+        if op_in isa ty_optical_props_1scl
           inc_nstream_by_1scalar_bybnd!(ncol, nlay, ngpt, op_io.tau, op_io.ssa, op_in.tau, get_nband(op_io), get_band_lims_gpoint(op_io))
-        elseif typeof(op_in) <: ty_optical_props_2str
+        elseif op_in isa ty_optical_props_2str
           inc_nstream_by_2stream_bybnd!(ncol, nlay, ngpt, get_nmom(op_io), op_io.tau, op_io.ssa, op_io.p, op_in.tau, op_in.ssa, op_in.g, get_nband(op_io), get_band_lims_gpoint(op_io))
-        elseif typeof(op_in) <: ty_optical_props_nstr
+        elseif op_in isa ty_optical_props_nstr
           inc_nstream_by_nstream_bybnd!(ncol, nlay, ngpt, get_nmom(op_io), get_nmom(op_in), op_io.tau, op_io.ssa, op_io.p, op_in.tau, op_in.ssa, op_in.p, get_nband(op_io), get_band_lims_gpoint(op_io))
         else
           error("Uncaught case 1 in increment!(op_in, op_io)")
