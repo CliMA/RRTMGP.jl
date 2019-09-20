@@ -61,7 +61,8 @@ export init!,
        bands_are_equal,
        gpoints_are_equal
 
-export ty_optical_props_1scl,
+export ty_optical_props,
+       ty_optical_props_1scl,
        ty_optical_props_2str,
        ty_optical_props_nstr
 
