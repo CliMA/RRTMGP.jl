@@ -14,48 +14,33 @@
 # Description: Kernels to permute arrays
 
 module mo_reorder_kernels
-  use mo_rte_kind,      only: wp
-  implicit none
-contains
-  # ----------------------------------------------------------------------------
-  subroutine reorder_123x312_kernel(d1, d2, d3, array_in, array_out) &
-      bind(C, name = "reorder_123x312_kernel")
-    integer,                         intent( in) :: d1, d2, d3
-    real(wp), dimension(d1, d2, d3), intent( in) :: array_in
-    real(wp), dimension(d3, d1, d2), intent(out) :: array_out
 
-    integer :: i1, i2, i3
+export reorder_123x312_kernel, reorder_123x321_kernel
 
-    #$acc parallel loop collapse(3) &
-    #$acc&     copyout(array_out(:d3,:d1,:d2)) &
-    #$acc&     copyin(array_in(:d1,:d2,:d3))
-    do i2 = 1, d2
-      do i1 = 1, d1
-        do i3 = 1, d3
-          array_out(i3,i1,i2) = array_in(i1,i2,i3)
-        end do
-      end do
-    end do
-  end subroutine reorder_123x312_kernel
-  # ----------------------------------------------------------------------------
-  subroutine reorder_123x321_kernel(d1, d2, d3, array_in, array_out) & 
-      bind(C, name="reorder_123x321_kernel")
-    integer,                         intent( in) :: d1, d2, d3
-    real(wp), dimension(d1, d2, d3), intent( in) :: array_in
-    real(wp), dimension(d3, d2, d1), intent(out) :: array_out
+# ----------------------------------------------------------------------------
+function reorder_123x312_kernel(d1, d2, d3, array_in, array_out)
 
-    integer :: i1, i2, i3
+  for i2 = 1:d2
+    for i1 = 1:d1
+      for i3 = 1:d3
+        array_out[i3,i1,i2] = array_in[i1,i2,i3]
+      end
+    end
+  end
 
-    #$acc parallel loop collapse(3) &
-    #$acc&     copyout(array_out(:d3,:d2,:d1)) &
-    #$acc&     copyin(array_in(:d1,:d2,:d3))
-    do i1 = 1, d1
-      do i2 = 1, d2
-        do i3 = 1, d3
-          array_out(i3,i2,i1) = array_in(i1,i2,i3)
-        end do
-      end do
-    end do
-  end subroutine reorder_123x321_kernel
-  # ----------------------------------------------------------------------------
-end module mo_reorder_kernels
+end
+# ----------------------------------------------------------------------------
+function reorder_123x321_kernel(d1, d2, d3, array_in, array_out) & 
+
+  for i1 = 1:d1
+    for i2 = 1:d2
+      for i3 = 1:d3
+        array_out[i3,i2,i1] = array_in[i1,i2,i3]
+      end
+    end
+  end
+
+end
+# ----------------------------------------------------------------------------
+
+end
