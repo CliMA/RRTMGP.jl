@@ -18,8 +18,8 @@
 # -------------------------------------------------------------------------------------------------
 module mo_fluxes
 
-# using mo_optical_props
-# using mo_fluxes_broadband_kernels
+using ..mo_optical_props
+using ..mo_fluxes_broadband_kernels
 
 
   # -----------------------------------------------------------------------------------------------
