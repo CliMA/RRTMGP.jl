@@ -15,52 +15,75 @@
 #
 # -------------------------------------------------------------------------------------------------
 module mo_source_functions
-  use mo_rte_kind,      only: wp
-  use mo_optical_props, only: ty_optical_props
-  implicit none
+
+  using ..mo_optical_props
+
   # -------------------------------------------------------------------------------------------------
   #
   # Type for longwave sources: computed at layer center, at layer edges using
   #   spectral mapping in each direction separately, and at the surface
-  #
-  type, extends(ty_optical_props), public :: ty_source_func_lw
-    real(wp), allocatable, dimension(:,:,:) :: lay_source,     & # Planck source at layer average temperature
-                                                                 # [W/m2] (ncol, nlay, ngpt)
-                                               lev_source_inc, &  # Planck source at layer edge,
-                                               lev_source_dec     # [W/m2] (ncol, nlay+1, ngpt)
-                                                                  # in increasing/decreasing ilay direction
-                                                                  # Includes spectral weighting that accounts for state-dependent
-                                                                  # frequency to g-space mapping
-    real(wp), allocatable, dimension(:,:  ) :: sfc_source
-  contains
-    generic,   public :: alloc => alloc_lw, copy_and_alloc_lw
-    procedure, private:: alloc_lw
-    procedure, private:: copy_and_alloc_lw
-    procedure, public :: is_allocated => is_allocated_lw
-    procedure, public :: finalize => finalize_lw
-    procedure, public :: get_subset => get_subset_range_lw
-    procedure, public :: get_ncol => get_ncol_lw
-    procedure, public :: get_nlay => get_nlay_lw
-    # validate?
-  end type ty_source_func_lw
+
+
+  struct ty_source_func_lw{T, I} <: ty_optical_props{T, I}
+    band2gpt::Array{T,2}        # (begin g-point, end g-point) = band2gpt(2,band)
+    gpt2band::Array{I,1}        # band = gpt2band(g-point)
+    band_lims_wvn::Array{T,2}   # (upper and lower wavenumber by band) = band_lims_wvn(2,band)
+    name::String
+    tau::Array{T,3}
+    #
+    lay_source     # Planck source at layer average temperature [W/m2] (ncol, nlay, ngpt)
+    lev_source_inc # Planck source at layer edge in increasing ilay direction [W/m2] (ncol, nlay+1, ngpt)
+    lev_source_dec # Planck source at layer edge in decreasing ilay direction [W/m2] (ncol, nlay+1, ngpt)
+    sfc_source
+  end
+  struct ty_source_func_sw{T, I} <: ty_optical_props{T, I}
+    band2gpt::Array{T,2}        # (begin g-point, end g-point) = band2gpt(2,band)
+    gpt2band::Array{I,1}        # band = gpt2band(g-point)
+    band_lims_wvn::Array{T,2}   # (upper and lower wavenumber by band) = band_lims_wvn(2,band)
+    name::String
+    tau::Array{T,3}
+    #
+    toa_source
+    lev_source_inc
+    lev_source_dec
+  end
+  # type, extends(ty_optical_props), public :: ty_source_func_lw
+  #   real(wp), allocatable, dimension(:,:,:) :: lay_source,       # Planck source at layer average temperature [W/m2] (ncol, nlay, ngpt)
+  #                                              lev_source_inc,   # Planck source at layer edge in increasing ilay direction [W/m2] (ncol, nlay+1, ngpt)
+  #                                              lev_source_dec     # Planck source at layer edge in decreasing ilay direction [W/m2] (ncol, nlay+1, ngpt)
+  #                                                                 # in increasing/decreasing ilay direction
+  #                                                                 # Includes spectral weighting that accounts for state-dependent
+  #                                                                 # frequency to g-space mapping
+  #   real(wp), allocatable, dimension(:,:  ) :: sfc_source
+  # contains
+  #   generic,   public :: alloc => alloc_lw, copy_and_alloc_lw
+  #   procedure, private:: alloc_lw
+  #   procedure, private:: copy_and_alloc_lw
+  #   procedure, public :: is_allocated => is_allocated_lw
+  #   procedure, public :: finalize => finalize_lw
+  #   procedure, public :: get_subset => get_subset_range_lw
+  #   procedure, public :: get_ncol => get_ncol_lw
+  #   procedure, public :: get_nlay => get_nlay_lw
+  #   # validate?
+  # end type ty_source_func_lw
   # -------------------------------------------------------------------------------------------------
   #
   # Type for shortave sources: top-of-domain spectrally-resolved flux
   #
-  type, extends(ty_optical_props), public :: ty_source_func_sw
-    real(wp), allocatable, dimension(:,:  ) :: toa_source
-  contains
-    generic,   public :: alloc => alloc_sw, copy_and_alloc_sw
-    procedure, private:: alloc_sw
-    procedure, private:: copy_and_alloc_sw
-    procedure, public :: is_allocated => is_allocated_sw
-    procedure, public :: finalize => finalize_sw
-    procedure, public :: get_subset => get_subset_range_sw
-    procedure, public :: get_ncol => get_ncol_sw
-    # validate?
-  end type ty_source_func_sw
+  # type, extends(ty_optical_props), public :: ty_source_func_sw
+  #   real(wp), allocatable, dimension(:,:  ) :: toa_source
+  # contains
+  #   generic,   public :: alloc => alloc_sw, copy_and_alloc_sw
+  #   procedure, private:: alloc_sw
+  #   procedure, private:: copy_and_alloc_sw
+  #   procedure, public :: is_allocated => is_allocated_sw
+  #   procedure, public :: finalize => finalize_sw
+  #   procedure, public :: get_subset => get_subset_range_sw
+  #   procedure, public :: get_ncol => get_ncol_sw
+  #   # validate?
+  # end type ty_source_func_sw
   # -------------------------------------------------------------------------------------------------
-contains
+# contains
   # ------------------------------------------------------------------------------------------
   #
   #  Routines for initialization, validity checking, finalization
@@ -70,211 +93,217 @@ contains
   # Longwave
   #
   # ------------------------------------------------------------------------------------------
-  pure function is_allocated_lw(this)
-    class(ty_source_func_lw), intent(in) :: this
-    logical                              :: is_allocated_lw
+  is_allocated_lw(this::ty_source_func_lw) = is_initialized(this) && allocated(this.sfc_source)
+    # class(ty_source_func_lw), intent(in) :: this
+    # logical                              :: is_allocated_lw
 
-    is_allocated_lw = this%is_initialized() .and. &
-                      allocated(this%sfc_source)
-  end function is_allocated_lw
   # --------------------------------------------------------------
-  function alloc_lw(this, ncol, nlay) result(err_message)
-    class(ty_source_func_lw),    intent(inout) :: this
-    integer,                     intent(in   ) :: ncol, nlay
-    character(len = 128)                       :: err_message
+  function alloc_lw!(this::ty_source_func_lw{DT}, ncol, nlay) where DT
+    # class(ty_source_func_lw),    intent(inout) :: this
+    # integer,                     intent(in   ) :: ncol, nlay
+    # character(len = 128)                       :: err_message
 
-    integer :: ngpt
+    # integer :: ngpt
 
     err_message = ""
-    if(.not. this%is_initialized()) &
+    if !is_initialized(this)
       err_message = "source_func_lw%alloc: not initialized so can't allocate"
-    if(any([ncol, nlay] <= 0)) &
+    end
+    if any([ncol, nlay] <= 0)
       err_message = "source_func_lw%alloc: must provide positive extents for ncol, nlay"
-    if (err_message /= "") return
+    end
+    err_message ≠ "" && return err_message
 
-    if(allocated(this%sfc_source)) deallocate(this%sfc_source)
-    if(allocated(this%lay_source)) deallocate(this%lay_source)
-    if(allocated(this%lev_source_inc)) deallocate(this%lev_source_inc)
-    if(allocated(this%lev_source_dec)) deallocate(this%lev_source_dec)
+    ngpt = get_ngpt(this)
+    this.sfc_source = zeros(DT, ncol,ngpt)
+    this.lay_source = zeros(DT, ncol,nlay,ngpt)
+    this.lev_source_inc = zeros(DT, ncol,nlay,ngpt)
+    this.lev_source_dec = zeros(DT, ncol,nlay,ngpt)
+  end
 
-    ngpt = this%get_ngpt()
-    allocate(this%sfc_source    (ncol,     ngpt), this%lay_source    (ncol,nlay,ngpt), &
-             this%lev_source_inc(ncol,nlay,ngpt), this%lev_source_dec(ncol,nlay,ngpt))
-  end function alloc_lw
   # --------------------------------------------------------------
-  function copy_and_alloc_lw(this, ncol, nlay, spectral_desc) result(err_message)
-    class(ty_source_func_lw),    intent(inout) :: this
-    integer,                     intent(in   ) :: ncol, nlay
-    class(ty_optical_props ),    intent(in   ) :: spectral_desc
-    character(len = 128)                       :: err_message
+  function copy_and_alloc_lw(this::ty_source_func_lw{DT}, ncol, nlay, spectral_desc) where DT
+    # class(ty_source_func_lw),    intent(inout) :: this
+    # integer,                     intent(in   ) :: ncol, nlay
+    # class(ty_optical_props ),    intent(in   ) :: spectral_desc
+    # character(len = 128)                       :: err_message
 
     err_message = ""
-    if(.not. spectral_desc%is_initialized()) then
+    if !is_initialized(spectral_desc)
       err_message = "source_func_lw%alloc: spectral_desc not initialized"
       return
-    end if
-    call this%finalize()
-    err_message = this%init(spectral_desc)
-    if (err_message /= "") return
-    err_message = this%alloc(ncol,nlay)
-  end function copy_and_alloc_lw
+    end
+    finalize!(this)
+    err_message = init!(this, spectral_desc)
+    err_message ≠ "" && return err_message
+    err_message = alloc!(this, ncol,nlay)
+  end
   # ------------------------------------------------------------------------------------------
   #
   # Shortwave
   #
   # ------------------------------------------------------------------------------------------
-  pure function is_allocated_sw(this)
-    class(ty_source_func_sw), intent(in) :: this
-    logical                              :: is_allocated_sw
+  function is_allocated_sw(this::ty_source_func_sw)
+    # class(ty_source_func_sw), intent(in) :: this
+    # logical                              :: is_allocated_sw
 
-    is_allocated_sw = this%ty_optical_props%is_initialized() .and. &
-                      allocated(this%toa_source)
-  end function is_allocated_sw
+    return is_initialized(this) && allocated(this.toa_source)
+  end
   # --------------------------------------------------------------
-  function alloc_sw(this, ncol) result(err_message)
-    class(ty_source_func_sw),    intent(inout) :: this
-    integer,                     intent(in   ) :: ncol
-    character(len = 128)                       :: err_message
+  function alloc_sw(this::ty_source_func_sw{DT}, ncol) where DT
+    # class(ty_source_func_sw),    intent(inout) :: this
+    # integer,                     intent(in   ) :: ncol
+    # character(len = 128)                       :: err_message
 
     err_message = ""
-    if(.not. this%is_initialized()) &
+    if (!is_initialized(this))
       err_message = "source_func_sw%alloc: not initialized so can't allocate"
-    if(ncol <= 0) &
+    end
+    if (ncol <= 0)
       err_message = "source_func_sw%alloc: must provide positive extents for ncol"
-    if (err_message /= "") return
+    end
+    err_message ≠ "" && return err_message
 
-    if(allocated(this%toa_source)) deallocate(this%toa_source)
-
-    allocate(this%toa_source(ncol, this%get_ngpt()))
-  end function alloc_sw
+    this.toa_source = zeros(DT, ncol, get_ngpt(this))
+  end
   # --------------------------------------------------------------
-  function copy_and_alloc_sw(this, ncol, spectral_desc) result(err_message)
-    class(ty_source_func_sw),    intent(inout) :: this
-    integer,                     intent(in   ) :: ncol
-    class(ty_optical_props ),    intent(in   ) :: spectral_desc
-    character(len = 128)                       :: err_message
+  function copy_and_alloc_sw!(this::ty_source_func_sw, ncol, spectral_desc)
+    # class(ty_source_func_sw),    intent(inout) :: this
+    # integer,                     intent(in   ) :: ncol
+    # class(ty_optical_props ),    intent(in   ) :: spectral_desc
+    # character(len = 128)                       :: err_message
 
     err_message = ""
-    if(.not. spectral_desc%is_initialized()) then
+    if !is_initialized(spectral_desc)
       err_message = "source_func_sw%alloc: spectral_desc not initialized"
       return
-    end if
-    err_message = this%init(spectral_desc)
-    if(err_message /= "") return
-    err_message = this%alloc(ncol)
-  end function copy_and_alloc_sw
+    end
+    err_message = init(this, spectral_desc)
+    if (err_message ≠ "")
+      return
+    end
+    err_message = alloc!(this, ncol)
+  end
   # ------------------------------------------------------------------------------------------
   #
   # Finalization (memory deallocation)
   #
   # ------------------------------------------------------------------------------------------
-  subroutine finalize_lw(this)
-    class(ty_source_func_lw),    intent(inout) :: this
+  function finalize_lw!(this::ty_source_func_lw)
+    # class(ty_source_func_lw),    intent(inout) :: this
 
-    if(allocated(this%lay_source    )) deallocate(this%lay_source)
-    if(allocated(this%lev_source_inc)) deallocate(this%lev_source_inc)
-    if(allocated(this%lev_source_dec)) deallocate(this%lev_source_dec)
-    if(allocated(this%sfc_source    )) deallocate(this%sfc_source)
-    call this%ty_optical_props%finalize()
-  end subroutine finalize_lw
+    finalize!(this)
+  end
   # --------------------------------------------------------------
-  subroutine finalize_sw(this)
-    class(ty_source_func_sw),    intent(inout) :: this
+  function finalize_sw!(this::ty_source_func_lw)
+    # class(ty_source_func_sw),    intent(inout) :: this
 
-    if(allocated(this%toa_source    )) deallocate(this%toa_source)
-    call this%ty_optical_props%finalize()
-  end subroutine finalize_sw
+    # if (allocated(this%toa_source    )) deallocate(this%toa_source)
+    finalize!(this)
+  end
   # ------------------------------------------------------------------------------------------
   #
   #  Routines for finding the problem size
   #
   # ------------------------------------------------------------------------------------------
-  pure function get_ncol_lw(this)
-    class(ty_source_func_lw), intent(in) :: this
-    integer :: get_ncol_lw
+  function get_ncol_lw(this::ty_source_func_lw)
+    # class(ty_source_func_lw), intent(in) :: this
+    # integer :: get_ncol_lw
 
-    if(this%is_allocated()) then
-      get_ncol_lw = size(this%lay_source,1)
+    if is_allocated(this)
+      get_ncol_lw = size(this.lay_source,1)
     else
       get_ncol_lw = 0
-    end if
-  end function get_ncol_lw
+    end
+  end
   # --------------------------------------------------------------
-  pure function get_nlay_lw(this)
-    class(ty_source_func_lw), intent(in) :: this
-    integer :: get_nlay_lw
+  function get_nlay_lw(this)
+    # class(ty_source_func_lw), intent(in) :: this
+    # integer :: get_nlay_lw
 
-    if(this%is_allocated()) then
-      get_nlay_lw = size(this%lay_source,2)
+    if is_allocated(this)
+      get_nlay_lw = size(this.lay_source,2)
     else
       get_nlay_lw = 0
-    end if
-  end function get_nlay_lw
+    end
+  end
   # --------------------------------------------------------------
-  pure function get_ncol_sw(this)
-    class(ty_source_func_sw), intent(in) :: this
-    integer :: get_ncol_sw
+  function get_ncol_sw(this)
+    # class(ty_source_func_sw), intent(in) :: this
+    # integer :: get_ncol_sw
 
-    if(this%is_allocated()) then
-      get_ncol_sw = size(this%toa_source,1)
+    if is_allocated(this)
+      get_ncol_sw = size(this.toa_source,1)
     else
       get_ncol_sw = 0
-    end if
-  end function get_ncol_sw
+    end
+  end
   # ------------------------------------------------------------------------------------------
   #
   #  Routines for subsetting
   #
   # ------------------------------------------------------------------------------------------
-  function get_subset_range_lw(full, start, n, subset) result(err_message)
-    class(ty_source_func_lw), intent(inout) :: full
-    integer,                  intent(in   ) :: start, n
-    class(ty_source_func_lw), intent(inout) :: subset
-    character(128)                          :: err_message
+  function get_subset_range_lw(full::ty_source_func_lw, start, n, subset::ty_source_func_lw)
+    # class(ty_source_func_lw), intent(inout) :: full
+    # integer,                  intent(in   ) :: start, n
+    # class(ty_source_func_lw), intent(inout) :: subset
+    # character(128)                          :: err_message
 
     err_message = ""
-    if(.not. full%is_allocated()) then
+    if (!is_allocated(full))
       err_message = "source_func_lw%subset: Asking for a subset of unallocated data"
       return
-    end if
-    if(start < 1 .or. start + n-1 > full%get_ncol()) &
+    end
+    if (start < 1 || start + n-1 > get_ncol(full))
        err_message = "optical_props%subset: Asking for columns outside range"
-    if(err_message /= "") return
+     end
+    if (err_message ≠ "")
+      return
+    end
 
     #
     # Could check to see if subset is correctly sized, has consistent spectral discretization
     #
-    if(subset%is_allocated()) call subset%finalize()
-    err_message = subset%alloc(n, full%get_nlay(), full)
-    if(err_message /= "") return
-    subset%sfc_source    (1:n,  :) = full%sfc_source    (start:start+n-1,  :)
-    subset%lay_source    (1:n,:,:) = full%lay_source    (start:start+n-1,:,:)
-    subset%lev_source_inc(1:n,:,:) = full%lev_source_inc(start:start+n-1,:,:)
-    subset%lev_source_dec(1:n,:,:) = full%lev_source_dec(start:start+n-1,:,:)
-  end function get_subset_range_lw
+    if (is_allocated(subset))
+      finalize!(subset)
+    end
+    err_message = alloc!(subset, n, get_nlay(full), full)
+    if (err_message ≠ "")
+      return
+    end
+    subset.sfc_source[1:n,  :] = full.sfc_source[start:start+n-1,  :]
+    subset.lay_source[1:n,:,:] = full.lay_source[start:start+n-1,:,:]
+    subset.lev_source_inc[1:n,:,:] = full.lev_source_inc[start:start+n-1,:,:]
+    subset.lev_source_dec[1:n,:,:] = full.lev_source_dec[start:start+n-1,:,:]
+  end
   # ------------------------------------------------------------------------------------------
-  function get_subset_range_sw(full, start, n, subset) result(err_message)
-    class(ty_source_func_sw), intent(inout) :: full
-    integer,                  intent(in   ) :: start, n
-    class(ty_source_func_sw), intent(inout) :: subset
-    character(128)                          :: err_message
+  function get_subset_range_sw(full, start, n, subset)
+    # class(ty_source_func_sw), intent(inout) :: full
+    # integer,                  intent(in   ) :: start, n
+    # class(ty_source_func_sw), intent(inout) :: subset
+    # character(128)                          :: err_message
 
     err_message = ""
-    if(.not. full%is_allocated()) then
+    if (!is_allocated(full))
       err_message = "source_func_sw%subset: Asking for a subset of unallocated data"
       return
-    end if
-    if(start < 1 .or. start + n-1 > full%get_ncol()) &
+    end
+    if (start < 1 || start + n-1 > get_ncol(full))
        err_message = "optical_props%subset: Asking for columns outside range"
-    if(err_message /= "") return
+    end
+    if (err_message ≠ "")
+      return
+    end
 
     #
     # Could check to see if subset is correctly sized, has consistent spectral discretization
     #
-    if(subset%is_allocated()) call subset%finalize()
+    if (is_allocated(subset))
+      finalize!(subset)
+    end
     # Seems like I should be able to call "alloc" generically but the compilers are complaining
-    err_message = subset%copy_and_alloc_sw(n, full)
+    err_message = copy_and_alloc_sw!(subset, n, full)
 
-    subset%toa_source(1:n,  :) = full%toa_source(start:start+n-1,  :)
-  end function get_subset_range_sw
-end module mo_source_functions
+    subset.toa_source[1:n,  :] = full.toa_source[start:start+n-1,  :]
+  end
+end # module

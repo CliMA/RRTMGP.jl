@@ -1,6 +1,6 @@
 module JRRTMGP
 
-include("fortranfuncs.jl")
+include("fortran_intrinsics.jl")
 include("RTE.jl")
 include("RRTMGP.jl")
 
