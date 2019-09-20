@@ -78,7 +78,7 @@ export delta_scale_2str_f_k,
 #    real(wp) :: wf
 #    integer  :: icol, ilay, igpt
 
-    wp = eltype(wf)
+    wp = eltype(tau)
 
     for igpt = 1:ngpt
       for ilay = 1:nlay
