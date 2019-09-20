@@ -40,8 +40,8 @@ Subsets of optical properties held as arrays may be extracted along the column d
 """
 module mo_optical_props
 
-using mo_util_array
-using mo_optical_props_kernels
+using ..mo_util_array
+using ..mo_optical_props_kernels
 
 export init!,
        init_base_from_copy!,
