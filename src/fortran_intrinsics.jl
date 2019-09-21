@@ -38,8 +38,9 @@ TODO: FIX IMPLEMENTATION
 spread(source, dim, ncopies) = ...
 
 associated(a::Array) = length(a)>0
-is_initialized(a::Array) = length(a)>0
-allocated(a::Array) = is_initialized(a)
+allocated(a::Array) = a ≠ nothing
+deallocate!(a) = (a = nothing)
+is_initialized(a::Array) = allocated(a) && length(a)>0
 present(arg) = arg ≠ nothing
 
 end
