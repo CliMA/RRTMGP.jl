@@ -215,7 +215,7 @@ module mo_gas_concentrations
     if igas == GAS_NOT_IN_LIST
       error_msg = "ty_gas_concs%get_vmr; gas " * trim(gas) * " not found"
       array[:] .= DT(0)
-    elseif (size(this.concs(igas).conc, 1) > 1 # Are we requesting a single profile when many are present?
+    elseif size(this.concs(igas).conc, 1) > 1 # Are we requesting a single profile when many are present?
       error_msg = "ty_gas_concs%get_vmr; gas " * trim(gas) * " requesting single profile but many are available"
       array[:] .= DT(0)
     end
@@ -264,11 +264,13 @@ module mo_gas_concentrations
       error_msg = "ty_gas_concs%get_vmr; gas " * trim(gas) * " array is wrong size (nlay)"
       array[:,:] .= DT(0)
     end
-    if (error_msg ≠ "") return
+    if (error_msg ≠ "")
+      return
+    end
 
     if size(this.concs[igas].conc, 1) > 1      # Concentration stored as 2D
       array[:,:] .= this.concs[igas].conc[:,:]
-    elseif (size(this.concs(igas).conc, 2) > 1 # Concentration stored as 1D
+    elseif size(this.concs(igas).conc, 2) > 1 # Concentration stored as 1D
       array[:,:] .= spread(this.concs(igas).conc(1,:), dim=1, ncopies=max(this.ncol, size(array,1)))
     else                                                   # Concentration stored as scalar
       array[:,:] .= this.concs[igas].conc[1,1]
@@ -290,12 +292,17 @@ module mo_gas_concentrations
     # # ---------------------
     error_msg = ""
     if (n <= 0)
-           error_msg = "gas_concs%get_vmr: Asking for 0 or fewer columns "
+      error_msg = "gas_concs%get_vmr: Asking for 0 or fewer columns "
+    end
     if (start < 1 )
-           error_msg = "gas_concs%get_vmr: Asking for columns outside range"
+      error_msg = "gas_concs%get_vmr: Asking for columns outside range"
+    end
     if (this.ncol > 0 && start > this.ncol || start+n-1 > this.ncol )
-           error_msg = "gas_concs%get_vmr: Asking for columns outside range"
-    if (error_msg ≠ "") return
+      error_msg = "gas_concs%get_vmr: Asking for columns outside range"
+    end
+    if (error_msg ≠ "")
+      return
+    end
 
     reset!(subset)
     # These two arrays should be the same length
@@ -364,42 +371,45 @@ module mo_gas_concentrations
   # This routine is called when adding a new concentration if the
   #   the gas isn't in the list already
   #
-  function increase_list_size(this)
-    class(ty_gas_concs), intent(inout) :: this
-    # -----------------
-    character(len=32), dimension(:), allocatable :: new_names
-    type(conc_field),  dimension(:), allocatable :: new_concs
-    # -----------------
+  function increase_list_size(this::ty_gas_concs{DT}) where DT
+    # class(ty_gas_concs), intent(inout) :: this
+    # # -----------------
+    # character(len=32), dimension(:), allocatable :: new_names
+    # type(conc_field),  dimension(:), allocatable :: new_concs
+    # # -----------------
 
-    if allocated(this%gas_name)
-      allocate(new_names(size(this.gas_name)+1), new_concs(size(this.gas_name)+1))
-      new_names(1:size(this.gas_name)) = this%gas_name(:)
-      new_concs(1:size(this.gas_name)) = this%concs(:)
-      call move_alloc(new_names, this%gas_name)
-      call move_alloc(new_concs, this%concs)
+    if allocated(this.gas_name)
+      new_names = Array{DT}(undef, size(this.gas_name)+1)
+      new_concs = Array{DT}(undef, size(this.gas_name)+1)
+      new_names[1:size(this.gas_name)] = this.gas_name[:]
+      new_concs[1:size(this.gas_name)] = this.concs[:]
+      move_alloc!(new_names, this.gas_name)
+      move_alloc!(new_concs, this.concs)
     else
-      allocate(this%gas_name(1))
-      allocate(this%concs(1))
+      this.gas_name = Array{DT}(undef, 1)
+      this.concs = Array{DT}(undef, 1)
     end
   end
   # -------------------------------------------------------------------------------------
   #
   # find gas in list; GAS_NOT_IN_LIST if not found
   #
-  function find_gas(this, gas)
-    character(len=*),   intent(in) :: gas
-    class(ty_gas_concs), intent(in) :: this
-    integer                        :: find_gas
-    # -----------------
-    integer :: igas
-    # -----------------
+  function find_gas(this::ty_gas_concs, gas)
+    # character(len=*),   intent(in) :: gas
+    # class(ty_gas_concs), intent(in) :: this
+    # integer                        :: find_gas
+    # # -----------------
+    # integer :: igas
+    # # -----------------
     find_gas = GAS_NOT_IN_LIST
-    if (.not. allocated(this%gas_name)) return
+    if !allocated(this.gas_name)
+      return
+    end
     for igas = 1:size(this.gas_name)
-      if lower_case(trim(this%gas_name(igas))) == lower_case(trim(gas))
+      if lowercase(trim(this.gas_name[igas])) == lowercase(trim(gas))
         find_gas = igas
       end
     end
   end
-  # -------------------------------------------------------------------------------------
-end module mo_gas_concentrations
+
+end # module
