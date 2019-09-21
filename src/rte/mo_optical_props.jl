@@ -168,7 +168,7 @@ end
         return
       end
 
-      band_lims_gpt_lcl[:,:] = band_lims_gpt[:,:]
+      band_lims_gpt_lcl[:,:] .= band_lims_gpt[:,:]
     else
       #
       # Assume that values are defined by band, one g-point per band
@@ -180,6 +180,8 @@ end
     #
     # Assignment
     #
+    allocated(this.band2gpt     ) && deallocate!(this.band2gpt)
+    allocated(this.band_lims_wvn) && deallocate!(this.band_lims_wvn)
     this.band2gpt = Array(undef, 2,size(band_lims_wvn,2))
     this.band_lims_wvn = Array(undef, 2,size(band_lims_wvn,2))
     this.band2gpt      = band_lims_gpt_lcl
@@ -193,6 +195,7 @@ end
     #   Efficient only when g-point indexes start at 1 and are contiguous.
     #
 
+    allocated(this.gpt2band) && deallocate!(this.gpt2band)
     this.gpt2band = Array(undef, maxval(band_lims_gpt_lcl))
     for iband in 1:size(band_lims_gpt_lcl, dim=2)
       this.gpt2band[band_lims_gpt_lcl[1,iband]:band_lims_gpt_lcl[2,iband]] = iband
@@ -222,7 +225,7 @@ end
     class(ty_optical_props), intent(in) :: this
     logical                             :: is_initialized_base
 """
-  is_initialized(this::ty_optical_props) = length(this.band2gpt)>0
+  is_initialized(this::ty_optical_props) = allocated(this.band2gpt)
   #-------------------------------------------------------------------------------------------------
   #
   # Base class: finalize (deallocate memory)
@@ -234,9 +237,9 @@ end
     class(ty_optical_props),    intent(inout) :: this
 """
   function finalize!(this::ty_optical_props)
-    this.band2gpt .= 0
-    this.gpt2band .= 0
-    this.band_lims_wvn .= 0
+    allocated(this.band2gpt) && deallocate!(this.band2gpt)
+    allocated(this.gpt2band) && deallocate!(this.gpt2band)
+    allocated(this.band_lims_wvn) && deallocate!(this.band_lims_wvn)
     this.name = ""
   end
   # ------------------------------------------------------------------------------------------
@@ -261,6 +264,7 @@ end
     if any([ncol, nlay] .<= 0)
       err_message = "alloc_only_1scl!: must provide positive extents for ncol, nlay"
     else
+      allocated(this.tau) && deallocate!(this.tau)
       this.tau = Array(undef, ncol, nlay, get_ngpt(this))
     end
     return err_message
@@ -280,9 +284,12 @@ end
     if any([ncol, nlay] .<= 0)
       err_message = "alloc_only_2str!: must provide positive extents for ncol, nlay"
     else
+      allocated(this.tau) && deallocate!(this.tau)
       this.tau = Array(undef, ncol,nlay,get_ngpt(this))
     end
+    allocated(this.ssa) && deallocate!(this.ssa)
     this.ssa = Array(undef, ncol,nlay,get_ngpt(this))
+    allocated(this.g) && deallocate!(this.g)
     this.g = Array(undef, ncol,nlay,get_ngpt(this))
     return err_message
   end
@@ -302,14 +309,16 @@ end
     if any([ncol, nlay] .<= 0)
       err_message = "optical_props%alloc: must provide positive extents for ncol, nlay"
     else
+      allocated(this.tau) && deallocate!(this.tau)
       this.tau = Array(undef, ncol,nlay,get_ngpt(this))
     end
+    allocated(this.ssa) && deallocate!(this.ssa)
     this.ssa = Array(undef, ncol,nlay,get_ngpt(this))
+    allocated(this.p) && deallocate!(this.p)
     this.p = Array(undef, nmom,ncol,nlay,get_ngpt(this))
     return err_message
   end
 
-  allocated(this::ty_optical_props) = is_initialized(this)
   # ------------------------------------------------------------------------------------------
   #
   # Combined allocation/initialization routines
@@ -628,24 +637,29 @@ end
     # Seems like the deallocation statements should be needed under Fortran 2003
     #   but Intel compiler doesn't run without them
 
+    allocated(subset.tau) && deallocate!(subset.tau)
     if subset isa ty_optical_props_1scl
         err_message = alloc!(subset, n, nlay)
         err_message ≠ "" && return
     elseif subset isa ty_optical_props_2str
-        err_message = alloc!(subset,n, nlay)
+        allocated(subset.ssa) && deallocate!(subset.ssa)
+        allocated(subset.g  ) && deallocate!(subset.g  )
+        err_message = alloc!(subset, n, nlay)
         err_message ≠ "" && return
-        subset.ssa[1:n,:,:] = DT(0)
-        subset.g[1:n,:,:] = DT(0)
+        subset.ssa[1:n,:,:] .= DT(0)
+        subset.g[1:n,:,:] .= DT(0)
     elseif subset isa ty_optical_props_nstr
+        allocated(subset.ssa) && deallocate!(subset.ssa)
         if allocated(subset.p)
-          nmom = subset.name
+          nmom = get_nmom(subset)
+          allocated(subset.p  ) && deallocate!(subset.p  )
         else
           nmom = 1
         end
         err_message = alloc!(subset, nmom, n, nlay)
         err_message ≠ "" && return
-        subset.ssa[1:n,:,:] = DT(0)
-        subset.p[:,1:n,:,:] = DT(0)
+        subset.ssa[1:n,:,:] .= DT(0)
+        subset.p[:,1:n,:,:] .= DT(0)
     else
       error("Uncaught case in subset_range!(full::ty_optical_props_1scl{DT}")
     end
@@ -687,19 +701,27 @@ end
       err_message ≠ "" && return err_message
       extract_subset!(ncol, nlay, ngpt, full.tau, full.ssa, start, start+n-1, subset.tau)
     elseif subset isa ty_optical_props_2str
+      allocated(subset.ssa) && deallocate!(subset.ssa)
+      allocated(subset.g  ) && deallocate!(subset.g  )
       err_message = alloc!(subset, n, nlay)
       err_message ≠ "" && return
       extract_subset!(ncol, nlay, ngpt, full.tau, start, start+n-1, subset.tau)
       extract_subset!(ncol, nlay, ngpt, full.ssa, start, start+n-1, subset.ssa)
       extract_subset!(ncol, nlay, ngpt, full.g  , start, start+n-1, subset.g  )
     elseif subset isa ty_optical_props_nstr
-      nmom = allocated(subset.p) ? get_nmom(subset) : 1
+      allocated(subset.ssa) && deallocate!(subset.ssa)
+      if allocated(subset.p)
+        nmom = get_nmom(subset)
+        allocated(subset.p  ) && deallocate!(subset.p  )
+      else
+        nmom = 1
+      end
       err_message = alloc!(subset, nmom, n, nlay)
       err_message ≠ "" && return
       extract_subset!(ncol, nlay, ngpt, full.tau, start, start+n-1, subset.tau)
       extract_subset!(ncol, nlay, ngpt, full.ssa, start, start+n-1, subset.ssa)
-      subset.p[1,1:n,:,:] = full.g[start:start+n-1,:,:]
-      subset.p[2:end,:, :,:] = DT(0) # TODO Verify this line
+      subset.p[1,1:n,:,:] .= full.g[start:start+n-1,:,:]
+      subset.p[2:end,:, :,:] .= DT(0) # TODO Verify this line
     else
       error("Uncaught case in subset_range!(full::ty_optical_props_2str{DT}")
     end
@@ -734,17 +756,22 @@ end
     is_initialized(subset) && finalize!(subset)
     err_message = init!(subset, full)
 
+    allocated(subset.tau) && deallocate!(subset.tau)
     if subset isa ty_optical_props_1scl # TODO: check logic
       err_message = alloc!(subset, n, nlay)
       err_message ≠ "" && return
       extract_subset!(ncol, nlay, ngpt, full.tau, full.ssa, start, start+n-1, subset.tau)
     elseif subset isa ty_optical_props_2str
+      allocated(subset.ssa) && deallocate!(subset.ssa)
+      allocated(subset.g  ) && deallocate!(subset.g  )
       err_message = alloc!(subset, n, nlay)
       err_message ≠ "" && return
       extract_subset!(ncol, nlay, ngpt, full.tau, start, start+n-1, subset.tau)
       extract_subset!(ncol, nlay, ngpt, full.ssa, start, start+n-1, subset.ssa)
-      subset.g[1:n,:,:] = full.p[1,start:start+n-1,:,:]
+      subset.g[1:n,:,:] .= full.p[1,start:start+n-1,:,:]
     elseif subset isa ty_optical_props_nstr
+      allocated(subset.ssa) && deallocate!(subset.ssa)
+      allocated(subset.p  ) && deallocate!(subset.p  )
       err_message = alloc!(subset, nmom, n, nlay)
       err_message ≠ "" && return
       extract_subset!(      ncol, nlay, ngpt, full.tau, start, start+n-1, subset.tau)
