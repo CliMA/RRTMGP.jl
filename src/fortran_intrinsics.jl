@@ -35,7 +35,7 @@ fmaxloc(a; dim, mask=nothing) = mask==nothing ? argmax(a, dims=dim) : argmax(a[m
 Based on: https://gcc.gnu.org/onlinedocs/gcc-4.4.0/gfortran/SPREAD.html
 TODO: FIX IMPLEMENTATION
 """
-spread(source, dim, ncopies) = ...
+#spread(source, dim, ncopies) = ...
 
 associated(a::Array) = length(a)>0
 is_initialized(a::Array) = length(a)>0

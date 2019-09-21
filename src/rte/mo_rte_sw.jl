@@ -48,7 +48,6 @@ module mo_rte_sw
 
   export rte_sw, expand_and_transpose
 
-contains
   # --------------------------------------------------
   function rte_sw(atmos, top_at_1,                 
                   mu0, inc_flux,                   
@@ -195,7 +194,7 @@ contains
 #        #gpt_flux_up = 0._wp
 #        #gpt_flux_dn = 0._wp
 #        #$acc exit data delete(atmos%tau, atmos)
-      else if ( atmos isa ty_optical_props_2str )
+      elseif ( atmos isa ty_optical_props_2str )
         #
         # two-stream calculation with scattering
         #
