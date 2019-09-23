@@ -75,7 +75,7 @@ module mo_rte_sw
 #    real(wp), dimension(:,:),   allocatable :: sfc_alb_dir_gpt, sfc_alb_dif_gpt
     # ------------------------------------------------------------------------------------
     wp = eltype(mu0)
-    wl = eltype(top_at_1)
+    wl = typeof(top_at_1)
 
     ncol  = get_ncol(atmos)
     nlay  = get_nlay(atmos)
