@@ -7,7 +7,7 @@ module mo_load_coefficients
 
   export load_and_init, stop_on_err
 
-%-------------------------
+#-------------------------
   function stop_on_err(msg)
 #    use iso_fortran_env, only : error_unit
 #    character(len=*), intent(in) :: msg
