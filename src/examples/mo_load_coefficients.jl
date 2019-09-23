@@ -18,7 +18,7 @@ module mo_load_coefficients
   end
 
 
-%--------------------------
+#--------------------------
   function load_and_init(kdist::ty_gas_optics_rrtmgp, filename::String, available_gases::ty_gas_concs )
 
   # Reading the properties from the NetCDF file
