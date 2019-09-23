@@ -1,5 +1,7 @@
 module JRRTMGP
 
-greet() = print("Hello World!")
+include("fortran_intrinsics.jl")
+include("RTE.jl")
+include("RRTMGP.jl")
 
 end # module
