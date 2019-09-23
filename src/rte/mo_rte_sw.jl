@@ -104,7 +104,7 @@ module mo_rte_sw
       error_msg = "rte_sw: one or more mu0 <= 0 or > 1"
     end
 
-    if(any([size(inc_flux)[1], size(inc_flux)[2]] != [ncol, ngpt])) 
+    if(any([size(inc_flux)[1], size(inc_flux)[2]] .!= [ncol, ngpt])) 
       error_msg = "rte_sw: inc_flux inconsistently sized"
     end
 
