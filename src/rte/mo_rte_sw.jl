@@ -113,7 +113,7 @@ module mo_rte_sw
     end
 
     if present(inc_flux_dif)
-      if(any([size(inc_flux_dif)[1], size(inc_flux_dif)[2]] != [ncol, ngpt]))
+      if any([size(inc_flux_dif)[1], size(inc_flux_dif)[2]] .!= [ncol, ngpt])
         error_msg = "rte_sw: inc_flux_dif inconsistently sized"
       end
       if(any_vals_less_than(inc_flux_dif, wp(0)))
