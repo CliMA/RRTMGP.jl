@@ -166,7 +166,7 @@ module mo_rte_sw
 #    #$acc enter data create(gpt_flux_up, gpt_flux_dn, gpt_flux_dir)
 
 #    #$acc enter data copyin(inc_flux)
-    apply_BC(ncol, nlay, ngpt, logical(top_at_1, wl),   inc_flux, mu0, gpt_flux_dir)
+    apply_BC!(ncol, nlay, ngpt, logical(top_at_1, wl),   inc_flux, mu0, gpt_flux_dir)
 #    #$acc exit data delete(inc_flux)
     if(present(inc_flux_dif)) #then
 #      #$acc enter data copyin(inc_flux_dif)
