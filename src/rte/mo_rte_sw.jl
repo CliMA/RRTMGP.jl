@@ -52,7 +52,7 @@ module mo_rte_sw
   function rte_sw(atmos, top_at_1,                 
                   mu0, inc_flux,                   
                   sfc_alb_dir, sfc_alb_dif,        
-                  fluxes, inc_flux_dif) result(error_msg)
+                  fluxes, inc_flux_dif) #result(error_msg)
 #    class(ty_optical_props_arry), intent(in   ) :: atmos           # Optical properties provided as arrays
 #    logical,                      intent(in   ) :: top_at_1        # Is the top of the domain at index 1?
 #                                                                   # (if not, ordering is bottom-to-top)
@@ -88,7 +88,7 @@ module mo_rte_sw
     # Error checking -- consistency of sizes and validity of values
     #
     # --------------------------------
-    if(!fluxes.are_desired()) 
+    if(!are_desired(fluxes)) 
       error_msg = "rte_sw: no space allocated for fluxes"
       return
     end
@@ -151,8 +151,8 @@ module mo_rte_sw
     # Lower boundary condition -- expand surface albedos by band to gpoints
     #   and switch dimension ordering
 #    #$acc enter data create(sfc_alb_dir_gpt, sfc_alb_dif_gpt)
-    expand_and_transpose(atmos, sfc_alb_dir, sfc_alb_dir_gpt)
-    expand_and_transpose(atmos, sfc_alb_dif, sfc_alb_dif_gpt)
+    expand_and_transpose!(atmos, sfc_alb_dir, sfc_alb_dir_gpt)
+    expand_and_transpose!(atmos, sfc_alb_dif, sfc_alb_dif_gpt)
     # ------------------------------------------------------------------------------------
     #
     # Compute the radiative transfer...
@@ -227,7 +227,7 @@ module mo_rte_sw
     #
     # ...and reduce spectral fluxes to desired output quantities
     #
-    error_msg = fluxes.reduce(gpt_flux_up, gpt_flux_dn, atmos, top_at_1, gpt_flux_dir)
+    error_msg = reduce(fluxes,gpt_flux_up, gpt_flux_dn, atmos, top_at_1, gpt_flux_dir)
 #    #$acc exit data delete(mu0)
 #    #$acc exit data delete(gpt_flux_up, gpt_flux_dn, gpt_flux_dir)
   end
@@ -244,10 +244,10 @@ module mo_rte_sw
 #    integer :: icol, iband, igpt
 #    integer, dimension(2,ops%get_nband()) :: limits
 
-    ncol  = size(arr_in)[2]
-    nband = ops.get_nband()
-    ngpt  = ops.get_ngpt()
-    limits = ops.get_band_lims_gpoint()
+    ncol  = size(arr_in,2)
+    nband = get_nband(ops)
+    ngpt  = get_ngpt(ops)
+    limits = get_band_lims_gpoint(ops)
 #    #$acc parallel loop collapse(2) copyin(arr_in, limits)
     for iband = 1:nband
       for icol = 1:ncol
