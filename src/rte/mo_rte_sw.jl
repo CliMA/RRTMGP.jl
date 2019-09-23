@@ -108,7 +108,7 @@ module mo_rte_sw
       error_msg = "rte_sw: inc_flux inconsistently sized"
     end
 
-    if(any_vals_less_than(inc_flux, wp(0))) 
+    if any_vals_less_than(inc_flux, wp(0))
       error_msg = "rte_sw: one or more inc_flux < 0"
     end
 
