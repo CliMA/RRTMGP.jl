@@ -183,7 +183,7 @@ module mo_rte_sw
 #        #$acc enter data copyin(atmos, atmos%tau)
         error_msg =  validate(atmos)
         if(length(strip(error_msg)) > 0) 
-	  return
+	  return error_msg
         end
         sw_solver_noscat(ncol, nlay, ngpt, logical(top_at_1, wl), 
                               atmos.tau, mu0,
