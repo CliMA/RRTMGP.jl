@@ -168,7 +168,7 @@ end
         return
       end
 
-      band_lims_gpt_lcl[:,:] = band_lims_gpt[:,:]
+      band_lims_gpt_lcl[:,:] .= band_lims_gpt[:,:]
     else
       #
       # Assume that values are defined by band, one g-point per band
@@ -180,6 +180,8 @@ end
     #
     # Assignment
     #
+    allocated(this.band2gpt     ) && deallocate!(this.band2gpt)
+    allocated(this.band_lims_wvn) && deallocate!(this.band_lims_wvn)
     this.band2gpt = Array(undef, 2,size(band_lims_wvn,2))
     this.band_lims_wvn = Array(undef, 2,size(band_lims_wvn,2))
     this.band2gpt      = band_lims_gpt_lcl
@@ -193,6 +195,7 @@ end
     #   Efficient only when g-point indexes start at 1 and are contiguous.
     #
 
+    allocated(this.gpt2band) && deallocate!(this.gpt2band)
     this.gpt2band = Array(undef, maxval(band_lims_gpt_lcl))
     for iband in 1:size(band_lims_gpt_lcl, dim=2)
       this.gpt2band[band_lims_gpt_lcl[1,iband]:band_lims_gpt_lcl[2,iband]] = iband
@@ -222,7 +225,7 @@ end
     class(ty_optical_props), intent(in) :: this
     logical                             :: is_initialized_base
 """
-  is_initialized(this::ty_optical_props) = length(this.band2gpt)>0
+  is_initialized(this::ty_optical_props) = allocated(this.band2gpt)
   #-------------------------------------------------------------------------------------------------
   #
   # Base class: finalize (deallocate memory)
@@ -234,9 +237,9 @@ end
     class(ty_optical_props),    intent(inout) :: this
 """
   function finalize!(this::ty_optical_props)
-    this.band2gpt .= 0
-    this.gpt2band .= 0
-    this.band_lims_wvn .= 0
+    allocated(this.band2gpt) && deallocate!(this.band2gpt)
+    allocated(this.gpt2band) && deallocate!(this.gpt2band)
+    allocated(this.band_lims_wvn) && deallocate!(this.band_lims_wvn)
     this.name = ""
   end
   # ------------------------------------------------------------------------------------------
@@ -261,6 +264,7 @@ end
     if any([ncol, nlay] .<= 0)
       err_message = "alloc_only_1scl!: must provide positive extents for ncol, nlay"
     else
+      allocated(this.tau) && deallocate!(this.tau)
       this.tau = Array(undef, ncol, nlay, get_ngpt(this))
     end
     return err_message
@@ -280,9 +284,12 @@ end
     if any([ncol, nlay] .<= 0)
       err_message = "alloc_only_2str!: must provide positive extents for ncol, nlay"
     else
+      allocated(this.tau) && deallocate!(this.tau)
       this.tau = Array(undef, ncol,nlay,get_ngpt(this))
     end
+    allocated(this.ssa) && deallocate!(this.ssa)
     this.ssa = Array(undef, ncol,nlay,get_ngpt(this))
+    allocated(this.g) && deallocate!(this.g)
     this.g = Array(undef, ncol,nlay,get_ngpt(this))
     return err_message
   end
@@ -302,14 +309,16 @@ end
     if any([ncol, nlay] .<= 0)
       err_message = "optical_props%alloc: must provide positive extents for ncol, nlay"
     else
+      allocated(this.tau) && deallocate!(this.tau)
       this.tau = Array(undef, ncol,nlay,get_ngpt(this))
     end
+    allocated(this.ssa) && deallocate!(this.ssa)
     this.ssa = Array(undef, ncol,nlay,get_ngpt(this))
+    allocated(this.p) && deallocate!(this.p)
     this.p = Array(undef, nmom,ncol,nlay,get_ngpt(this))
     return err_message
   end
 
-  allocated(this::ty_optical_props) = is_initialized(this)
   # ------------------------------------------------------------------------------------------
   #
   # Combined allocation/initialization routines
@@ -628,24 +637,29 @@ end
     # Seems like the deallocation statements should be needed under Fortran 2003
     #   but Intel compiler doesn't run without them
 
-    if typeof(subset) == ty_optical_props_1scl
+    allocated(subset.tau) && deallocate!(subset.tau)
+    if subset isa ty_optical_props_1scl
         err_message = alloc!(subset, n, nlay)
         err_message ≠ "" && return
-    elseif typeof(subset) == ty_optical_props_2str
-        err_message = alloc!(subset,n, nlay)
+    elseif subset isa ty_optical_props_2str
+        allocated(subset.ssa) && deallocate!(subset.ssa)
+        allocated(subset.g  ) && deallocate!(subset.g  )
+        err_message = alloc!(subset, n, nlay)
         err_message ≠ "" && return
-        subset.ssa[1:n,:,:] = DT(0)
-        subset.g[1:n,:,:] = DT(0)
-    elseif typeof(subset) == ty_optical_props_nstr
+        subset.ssa[1:n,:,:] .= DT(0)
+        subset.g[1:n,:,:] .= DT(0)
+    elseif subset isa ty_optical_props_nstr
+        allocated(subset.ssa) && deallocate!(subset.ssa)
         if allocated(subset.p)
-          nmom = subset.name
+          nmom = get_nmom(subset)
+          allocated(subset.p  ) && deallocate!(subset.p  )
         else
           nmom = 1
         end
         err_message = alloc!(subset, nmom, n, nlay)
         err_message ≠ "" && return
-        subset.ssa[1:n,:,:] = DT(0)
-        subset.p[:,1:n,:,:] = DT(0)
+        subset.ssa[1:n,:,:] .= DT(0)
+        subset.p[:,1:n,:,:] .= DT(0)
     else
       error("Uncaught case in subset_range!(full::ty_optical_props_1scl{DT}")
     end
@@ -682,24 +696,32 @@ end
     is_initialized(subset) && finalize!(subset)
     err_message = init(subset, full)
 
-    if typeof(subset) <: ty_optical_props_1scl # TODO: check logic
+    if subset isa ty_optical_props_1scl # TODO: check logic
       err_message = alloc!(subset, n, nlay)
       err_message ≠ "" && return err_message
       extract_subset!(ncol, nlay, ngpt, full.tau, full.ssa, start, start+n-1, subset.tau)
-    elseif typeof(subset) <: ty_optical_props_2str
+    elseif subset isa ty_optical_props_2str
+      allocated(subset.ssa) && deallocate!(subset.ssa)
+      allocated(subset.g  ) && deallocate!(subset.g  )
       err_message = alloc!(subset, n, nlay)
       err_message ≠ "" && return
       extract_subset!(ncol, nlay, ngpt, full.tau, start, start+n-1, subset.tau)
       extract_subset!(ncol, nlay, ngpt, full.ssa, start, start+n-1, subset.ssa)
       extract_subset!(ncol, nlay, ngpt, full.g  , start, start+n-1, subset.g  )
-    elseif typeof(subset) <: ty_optical_props_nstr
-      nmom = allocated(subset.p) ? get_nmom(subset) : 1
+    elseif subset isa ty_optical_props_nstr
+      allocated(subset.ssa) && deallocate!(subset.ssa)
+      if allocated(subset.p)
+        nmom = get_nmom(subset)
+        allocated(subset.p  ) && deallocate!(subset.p  )
+      else
+        nmom = 1
+      end
       err_message = alloc!(subset, nmom, n, nlay)
       err_message ≠ "" && return
       extract_subset!(ncol, nlay, ngpt, full.tau, start, start+n-1, subset.tau)
       extract_subset!(ncol, nlay, ngpt, full.ssa, start, start+n-1, subset.ssa)
-      subset.p[1,1:n,:,:] = full.g[start:start+n-1,:,:]
-      subset.p[2:end,:, :,:] = DT(0) # TODO Verify this line
+      subset.p[1,1:n,:,:] .= full.g[start:start+n-1,:,:]
+      subset.p[2:end,:, :,:] .= DT(0) # TODO Verify this line
     else
       error("Uncaught case in subset_range!(full::ty_optical_props_2str{DT}")
     end
@@ -734,17 +756,22 @@ end
     is_initialized(subset) && finalize!(subset)
     err_message = init!(subset, full)
 
-    if typeof(subset) <: ty_optical_props_1scl # TODO: check logic
+    allocated(subset.tau) && deallocate!(subset.tau)
+    if subset isa ty_optical_props_1scl # TODO: check logic
       err_message = alloc!(subset, n, nlay)
       err_message ≠ "" && return
       extract_subset!(ncol, nlay, ngpt, full.tau, full.ssa, start, start+n-1, subset.tau)
-    elseif typeof(subset) <: ty_optical_props_2str
+    elseif subset isa ty_optical_props_2str
+      allocated(subset.ssa) && deallocate!(subset.ssa)
+      allocated(subset.g  ) && deallocate!(subset.g  )
       err_message = alloc!(subset, n, nlay)
       err_message ≠ "" && return
       extract_subset!(ncol, nlay, ngpt, full.tau, start, start+n-1, subset.tau)
       extract_subset!(ncol, nlay, ngpt, full.ssa, start, start+n-1, subset.ssa)
-      subset.g[1:n,:,:] = full.p[1,start:start+n-1,:,:]
-    elseif typeof(subset) <: ty_optical_props_nstr
+      subset.g[1:n,:,:] .= full.p[1,start:start+n-1,:,:]
+    elseif subset isa ty_optical_props_nstr
+      allocated(subset.ssa) && deallocate!(subset.ssa)
+      allocated(subset.p  ) && deallocate!(subset.p  )
       err_message = alloc!(subset, nmom, n, nlay)
       err_message ≠ "" && return
       extract_subset!(      ncol, nlay, ngpt, full.tau, start, start+n-1, subset.tau)
@@ -785,37 +812,37 @@ end
       # Increment by gpoint
       #   (or by band if both op_in and op_io are defined that way)
       #
-      if typeof(op_io) <: ty_optical_props_1scl
+      if op_io isa ty_optical_props_1scl
 
-        if typeof(op_in) <: ty_optical_props_1scl
+        if op_in isa ty_optical_props_1scl
           increment_1scalar_by_1scalar!(ncol, nlay, ngpt, op_io.tau, op_in.tau)
-        elseif typeof(op_in) <: ty_optical_props_2str
+        elseif op_in isa ty_optical_props_2str
            increment_1scalar_by_2stream!(ncol, nlay, ngpt, op_io.tau, op_in.tau, op_in.ssa)
-        elseif typeof(op_in) <: ty_optical_props_nstr
+        elseif op_in isa ty_optical_props_nstr
            increment_1scalar_by_nstream!(ncol, nlay, ngpt, op_io.tau, op_in.tau, op_in.ssa)
         else
           error("Uncaught case 1 in increment!(op_in, op_io)")
         end
 
-      elseif typeof(op_io) <: ty_optical_props_2str
+      elseif op_io isa ty_optical_props_2str
 
-        if typeof(op_in) <: ty_optical_props_1scl
+        if op_in isa ty_optical_props_1scl
           increment_2stream_by_1scalar!(ncol, nlay, ngpt, op_io.tau, op_io.ssa, op_in.tau)
-        elseif typeof(op_in) <: ty_optical_props_2str
+        elseif op_in isa ty_optical_props_2str
           increment_2stream_by_2stream!(ncol, nlay, ngpt, op_io.tau, op_io.ssa, op_io.g, op_in.tau, op_in.ssa, op_in.g)
-        elseif typeof(op_in) <: ty_optical_props_nstr
+        elseif op_in isa ty_optical_props_nstr
           increment_2stream_by_nstream!(ncol, nlay, ngpt, get_nmom(op_in), op_io.tau, op_io.ssa, op_io.g, op_in.tau, op_in.ssa, op_in.p)
         else
           error("Uncaught case 1 in increment!(op_in, op_io)")
         end
 
-      elseif typeof(op_io) <: ty_optical_props_nstr
+      elseif op_io isa ty_optical_props_nstr
 
-        if typeof(op_in) <: ty_optical_props_1scl
+        if op_in isa ty_optical_props_1scl
           increment_nstream_by_1scalar!(ncol, nlay, ngpt, op_io.tau, op_io.ssa, op_in.tau)
-        elseif typeof(op_in) <: ty_optical_props_2str
+        elseif op_in isa ty_optical_props_2str
           increment_nstream_by_2stream!(ncol, nlay, ngpt, get_nmom(op_io), op_io.tau, op_io.ssa, op_io.p, op_in.tau, op_in.ssa, op_in.g)
-        elseif typeof(op_in) <: ty_optical_props_nstr
+        elseif op_in isa ty_optical_props_nstr
           increment_nstream_by_nstream!(ncol, nlay, ngpt, get_nmom(op_io), get_nmom(op_in), op_io.tau, op_io.ssa, op_io.p, op_in.tau, op_in.ssa, op_in.p)
         else
           error("Uncaught case 1 in increment!(op_in, op_io)")
@@ -838,36 +865,36 @@ end
       #
       # Increment by band
       #
-      if typeof(op_io) <: ty_optical_props_1scl
+      if op_io isa ty_optical_props_1scl
 
-        if typeof(op_in) <: ty_optical_props_1scl
+        if op_in isa ty_optical_props_1scl
           inc_1scalar_by_1scalar_bybnd!(ncol, nlay, ngpt, op_io.tau, op_in.tau, get_nband(op_io), get_band_lims_gpoint(op_io))
-        elseif typeof(op_in) <: ty_optical_props_2str
+        elseif op_in isa ty_optical_props_2str
           inc_1scalar_by_2stream_bybnd!(ncol, nlay, ngpt, op_io.tau, op_in.tau, op_in.ssa, get_nband(op_io), get_band_lims_gpoint(op_io))
-        elseif typeof(op_in) <: ty_optical_props_nstr
+        elseif op_in isa ty_optical_props_nstr
           inc_1scalar_by_nstream_bybnd!(ncol, nlay, ngpt, op_io.tau, op_in.tau, op_in.ssa, get_nband(op_io), get_band_lims_gpoint(op_io))
         else
           error("Uncaught case 1 in increment!(op_in, op_io)")
         end
 
-      elseif typeof(op_io) <: ty_optical_props_2str
+      elseif op_io isa ty_optical_props_2str
 
-        if typeof(op_in) <: ty_optical_props_1scl
+        if op_in isa ty_optical_props_1scl
           inc_2stream_by_1scalar_bybnd!(ncol, nlay, ngpt, op_io.tau, op_io.ssa, op_in.tau, get_nband(op_io), get_band_lims_gpoint(op_io))
-        elseif typeof(op_in) <: ty_optical_props_2str
+        elseif op_in isa ty_optical_props_2str
           inc_2stream_by_2stream_bybnd!(ncol, nlay, ngpt, op_io.tau, op_io.ssa, op_io.g, op_in.tau, op_in.ssa, op_in.g, get_nband(op_io), get_band_lims_gpoint(op_io))
-        elseif typeof(op_in) <: ty_optical_props_nstr
+        elseif op_in isa ty_optical_props_nstr
           inc_2stream_by_nstream_bybnd!(ncol, nlay, ngpt, get_nmom(op_in), op_io.tau, op_io.ssa, op_io.g, op_in.tau, op_in.ssa, op_in.p, get_nband(op_io), get_band_lims_gpoint(op_io))
         else
           error("Uncaught case 1 in increment!(op_in, op_io)")
         end
 
-      elseif typeof(op_io) <: ty_optical_props_nstr
-        if typeof(op_in) <: ty_optical_props_1scl
+      elseif op_io isa ty_optical_props_nstr
+        if op_in isa ty_optical_props_1scl
           inc_nstream_by_1scalar_bybnd!(ncol, nlay, ngpt, op_io.tau, op_io.ssa, op_in.tau, get_nband(op_io), get_band_lims_gpoint(op_io))
-        elseif typeof(op_in) <: ty_optical_props_2str
+        elseif op_in isa ty_optical_props_2str
           inc_nstream_by_2stream_bybnd!(ncol, nlay, ngpt, get_nmom(op_io), op_io.tau, op_io.ssa, op_io.p, op_in.tau, op_in.ssa, op_in.g, get_nband(op_io), get_band_lims_gpoint(op_io))
-        elseif typeof(op_in) <: ty_optical_props_nstr
+        elseif op_in isa ty_optical_props_nstr
           inc_nstream_by_nstream_bybnd!(ncol, nlay, ngpt, get_nmom(op_io), get_nmom(op_in), op_io.tau, op_io.ssa, op_io.p, op_in.tau, op_in.ssa, op_in.p, get_nband(op_io), get_band_lims_gpoint(op_io))
         else
           error("Uncaught case 1 in increment!(op_in, op_io)")

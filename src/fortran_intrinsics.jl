@@ -1,3 +1,13 @@
+module fortran_intrinsics
+
+export fmerge,
+       fminloc,
+       fmaxloc,
+       spread,
+       associated,
+       is_initialized,
+       allocated,
+       present
 
 """
     fmerge(t_source, f_source, mask)
@@ -27,3 +37,10 @@ TODO: FIX IMPLEMENTATION
 """
 spread(source, dim, ncopies) = ...
 
+associated(a::Array) = length(a)>0
+allocated(a::Array) = a ≠ nothing
+deallocate!(a) = (a = nothing)
+is_initialized(a::Array) = allocated(a) && length(a)>0
+present(arg) = arg ≠ nothing
+
+end
