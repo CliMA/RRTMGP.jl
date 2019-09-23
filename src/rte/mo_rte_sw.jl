@@ -121,7 +121,7 @@ module mo_rte_sw
       end
     end
 
-    if(any([size(sfc_alb_dir)[1], size(sfc_alb_dir)[2]] != [nband, ncol])) 
+    if any([size(sfc_alb_dir)[1], size(sfc_alb_dir)[2]] .!= [nband, ncol])
       error_msg = "rte_sw: sfc_alb_dir inconsistently sized"
     end
     if(any_vals_outside(sfc_alb_dir,  wp(0), wp(1)))
