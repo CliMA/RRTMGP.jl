@@ -114,11 +114,15 @@ module mo_source_functions
     end
     err_message ≠ "" && return err_message
 
+    allocated(this.sfc_source) && deallocate!(this.sfc_source)
+    allocated(this.lay_source) && deallocate!(this.lay_source)
+    allocated(this.lev_source_inc) && deallocate!(this.lev_source_inc)
+    allocated(this.lev_source_dec) && deallocate!(this.lev_source_dec)
     ngpt = get_ngpt(this)
-    this.sfc_source = zeros(DT, ncol,ngpt)
-    this.lay_source = zeros(DT, ncol,nlay,ngpt)
-    this.lev_source_inc = zeros(DT, ncol,nlay,ngpt)
-    this.lev_source_dec = zeros(DT, ncol,nlay,ngpt)
+    this.sfc_source = Array(undef, ncol,ngpt)
+    this.lay_source = Array(undef, ncol,nlay,ngpt)
+    this.lev_source_inc = Array(undef, ncol,nlay,ngpt)
+    this.lev_source_dec = Array(undef, ncol,nlay,ngpt)
   end
 
   # --------------------------------------------------------------
@@ -150,7 +154,7 @@ module mo_source_functions
     return is_initialized(this) && allocated(this.toa_source)
   end
   # --------------------------------------------------------------
-  function alloc_sw(this::ty_source_func_sw{DT}, ncol) where DT
+  function alloc_sw!(this::ty_source_func_sw{DT}, ncol) where DT
     # class(ty_source_func_sw),    intent(inout) :: this
     # integer,                     intent(in   ) :: ncol
     # character(len = 128)                       :: err_message
@@ -163,8 +167,9 @@ module mo_source_functions
       err_message = "source_func_sw%alloc: must provide positive extents for ncol"
     end
     err_message ≠ "" && return err_message
+    allocated(this.toa_source) && deallocate!(this.toa_source)
 
-    this.toa_source = zeros(DT, ncol, get_ngpt(this))
+    this.toa_source = Array(undef, ncol, get_ngpt(this))
   end
   # --------------------------------------------------------------
   function copy_and_alloc_sw!(this::ty_source_func_sw, ncol, spectral_desc)
@@ -192,13 +197,17 @@ module mo_source_functions
   function finalize_lw!(this::ty_source_func_lw)
     # class(ty_source_func_lw),    intent(inout) :: this
 
+    allocated(this.lay_source    ) && deallocate!(this.lay_source)
+    allocated(this.lev_source_inc) && deallocate!(this.lev_source_inc)
+    allocated(this.lev_source_dec) && deallocate!(this.lev_source_dec)
+    allocated(this.sfc_source    ) && deallocate!(this.sfc_source)
     finalize!(this)
   end
   # --------------------------------------------------------------
   function finalize_sw!(this::ty_source_func_lw)
     # class(ty_source_func_sw),    intent(inout) :: this
 
-    # if (allocated(this%toa_source    )) deallocate(this%toa_source)
+    allocated(this.toa_source    ) && deallocate!(this.toa_source)
     finalize!(this)
   end
   # ------------------------------------------------------------------------------------------

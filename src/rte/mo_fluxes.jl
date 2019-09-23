@@ -86,9 +86,9 @@ end
                             top_at_1::Bool,
                             gpt_flux_dn_dir=nothing) where A
 
-    ncol = size(gpt_flux_up, dim=1)
-    nlev = size(gpt_flux_up, dim=2)
-    ngpt = size(gpt_flux_up, dim=3)
+    ncol = size(gpt_flux_up, 1)
+    nlev = size(gpt_flux_up, 2)
+    ngpt = size(gpt_flux_up, 3)
     error_msg = ""
 
     #

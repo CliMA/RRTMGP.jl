@@ -20,7 +20,7 @@ Description: Numeric calculations for gas optics. Absorption and Rayleigh optica
 """
 module mo_gas_optics_kernels
 
-include("../../fortranfuncs.jl")
+using ..fortran_intrinsics
 
 """
     interpolation!(...)

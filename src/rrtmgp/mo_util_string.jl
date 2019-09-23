@@ -17,71 +17,74 @@
 #
 # -------------------------------------------------------------------------------------------------
 module mo_util_string
-  implicit none
-  private
-  public :: lower_case, string_in_array, string_loc_in_array
+  # implicit none
+  # private
+  # public :: lower_case, string_in_array, string_loc_in_array
+  export lower_case, string_in_array, string_loc_in_array
 
   # List of character for case conversion
-  character(len=26), parameter :: LOWER_CASE_CHARS = 'abcdefghijklmnopqrstuvwxyz'
-  character(len=26), parameter :: UPPER_CASE_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+  # character(len=26), parameter :: LOWER_CASE_CHARS = 'abcdefghijklmnopqrstuvwxyz'
+  # character(len=26), parameter :: UPPER_CASE_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 
-contains
+# contains
   # -------------------------------------------------------------------------------------------------
-  pure function lower_case( input_string ) result( output_string )
-    character(len=*), intent(in) :: input_string
-    character(len=len(input_string)) :: output_string
-    integer :: i, n
+  lower_case( input_string ) = lowercase(input_string)
+    # character(len=*), intent(in) :: input_string
+    # character(len=len(input_string)) :: output_string
+    # integer :: i, n
 
-    # Copy input string
-    output_string = input_string
+  #   # Copy input string
+  #   output_string = input_string
 
-    # Convert case character by character
-    do i = 1, len(output_string)
-      n = index(UPPER_CASE_CHARS, output_string(i:i))
-      if ( n /= 0 ) output_string(i:i) = LOWER_CASE_CHARS(n:n)
-    end do
-  end function
+  #   # Convert case character by character
+  #   do i = 1, len(output_string)
+  #     n = index(UPPER_CASE_CHARS, output_string(i:i))
+  #     if ( n /= 0 ) output_string(i:i) = LOWER_CASE_CHARS(n:n)
+  #   end do
+  # end function
   # --------------------------------------------------------------------------------------
   #
   # Is string somewhere in array?
   #
-  pure function string_in_array(string, array)
-    character(len=*),               intent(in) :: string
-    character(len=*), dimension(:), intent(in) :: array
-    logical                                    :: string_in_array
+  function string_in_array(s, array)
+    # character(len=*),               intent(in) :: string
+    # character(len=*), dimension(:), intent(in) :: array
+    # logical                                    :: string_in_array
 
-    integer :: i
-    character(len=len_trim(string)) :: lc_string
+    # integer :: i
+    # character(len=len_trim(s)) :: lc_string
 
-    string_in_array = .false.
-    lc_string = lower_case(trim(string))
-    do i = 1, size(array)
-      if(lc_string == lower_case(trim(array(i)))) then
-        string_in_array = .true.
-        exit
-      end if
-    end do
-  end function string_in_array
+    s_in_array = false
+    lc_string = lower_case(strip(s))
+    for i in eachindex(array)
+      if lc_string == lower_case(strip(array[i]))
+        s_in_array = true
+        break
+      end
+    end
+    return s_in_array
+  end
   # --------------------------------------------------------------------------------------
   #
   # Is string somewhere in array?
   #
-  pure function string_loc_in_array(string, array)
-    character(len=*),               intent(in) :: string
-    character(len=*), dimension(:), intent(in) :: array
-    integer                                    :: string_loc_in_array
+  function string_loc_in_array(s, array)
+    # character(len=*),               intent(in) :: string
+    # character(len=*), dimension(:), intent(in) :: array
+    # integer                                    :: string_loc_in_array
 
-    integer :: i
-    character(len=len_trim(string)) :: lc_string
+    # integer :: i
+    # character(len=len_trim(string)) :: lc_string
 
-    string_loc_in_array = -1
-    lc_string = lower_case(trim(string))
-    do i = 1, size(array)
-      if(lc_string == lower_case(trim(array(i)))) then
-        string_loc_in_array = i
-        exit
-      end if
-    end do
-  end function string_loc_in_array
+    s_loc_in_array = -1
+    lc_string = lower_case(strip(s))
+    for i in eachindex(array)
+      if lc_string == lower_case(strip(array[i]))
+        s_loc_in_array = i
+        break
+      end
+    end
+    return s_loc_in_array
+  end
   # --------------------------------------------------------------------------------------
-end module
+end # module
