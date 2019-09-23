@@ -3,7 +3,7 @@ module RRTMG
 # data_dir = joinpath("rrtmgp","data")
 
 include("fortran_intrinsics.jl")
-# include(joinpath("rrtmgp","mo_util_string.jl"))
+include(joinpath("rrtmgp","mo_util_string.jl"))
 # include(joinpath("rrtmgp","mo_util_reorder.jl"))
 # include(joinpath("rrtmgp","mo_gas_optics.jl"))
 # include(joinpath("rrtmgp","mo_rrtmgp_constants.jl"))
