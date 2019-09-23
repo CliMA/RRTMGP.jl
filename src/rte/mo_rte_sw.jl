@@ -77,10 +77,10 @@ module mo_rte_sw
     wp = eltype(mu0)
     wl = eltype(top_at_1)
 
-    ncol  = atmos.get_ncol()
-    nlay  = atmos.get_nlay()
-    ngpt  = atmos.get_ngpt()
-    nband = atmos.get_nband()
+    ncol  = get_ncol(atmos)
+    nlay  = get_nlay(atmos)
+    ngpt  = get_ngpt(atmos)
+    nband = get_nband(atmos)
     error_msg = ""
 
     # ------------------------------------------------------------------------------------
@@ -135,8 +135,8 @@ module mo_rte_sw
     end
 
     if(length( strip(error_msg) ) > 0)
-      if(length(strip(atmos.get_name())) > 0)
-        error_msg = strip(atmos.get_name()) * ": " * strip(error_msg)
+      if(length(strip(get_name(atmos))) > 0)
+        error_msg = strip(get_name(atmos)) * ": " * strip(error_msg)
       end
       return
     end
@@ -181,7 +181,7 @@ module mo_rte_sw
         # Direct beam only
         #
 #        #$acc enter data copyin(atmos, atmos%tau)
-        error_msg =  atmos.validate()
+        error_msg =  validate(atmos)
         if(length(strip(error_msg)) > 0) 
 	  return
         end
@@ -199,12 +199,12 @@ module mo_rte_sw
         # two-stream calculation with scattering
         #
 #        #$acc enter data copyin(atmos, atmos%tau, atmos%ssa, atmos%g)
-        error_msg =  atmos.validate()
+        error_msg =  validate(atmos)
         if(length(strip(error_msg)) > 0) 
           return
         end
         sw_solver_2stream(ncol, nlay, ngpt, logical(top_at_1, wl), 
-                               atmos.tau, atmos.ssa, atmos%g, mu0,
+                               atmos.tau, atmos.ssa, atmos.g, mu0,
                                sfc_alb_dir_gpt, sfc_alb_dif_gpt, 
                                gpt_flux_up, gpt_flux_dn, gpt_flux_dir)
 #        #$acc exit data delete(atmos%tau, atmos%ssa, atmos%g, atmos)
@@ -219,8 +219,8 @@ module mo_rte_sw
       end
 
     if(length(strip(error_msg)) > 0) 
-      if(length(strip(atmos.get_name())) > 0) 
-        error_msg = strip(atmos.get_name()) * ": " * strip(error_msg)
+      if(length(strip(get_name(atmos))) > 0) 
+        error_msg = strip(get_name(atmos)) * ": " * strip(error_msg)
         return
       end
     end
