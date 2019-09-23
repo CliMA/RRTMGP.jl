@@ -12,7 +12,7 @@ module mo_load_coefficients
 #    use iso_fortran_env, only : error_unit
 #    character(len=*), intent(in) :: msg
 
-    if(msg != "") then
+    if msg != ""
       error(msg)
     end
   end
