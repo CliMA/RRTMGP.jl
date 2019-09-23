@@ -170,7 +170,7 @@ module mo_rte_sw
 #    #$acc exit data delete(inc_flux)
     if(present(inc_flux_dif)) #then
 #      #$acc enter data copyin(inc_flux_dif)
-      apply_BC(ncol, nlay, ngpt, logical(top_at_1, wl), inc_flux_dif,  gpt_flux_dn )
+      apply_BC!(ncol, nlay, ngpt, logical(top_at_1, wl), inc_flux_dif,  gpt_flux_dn )
 #      #$acc exit data delete(inc_flux_dif)
     else
       apply_BC(ncol, nlay, ngpt, logical(top_at_1, wl),                gpt_flux_dn )
