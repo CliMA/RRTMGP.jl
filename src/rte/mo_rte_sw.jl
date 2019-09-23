@@ -201,7 +201,7 @@ module mo_rte_sw
 #        #$acc enter data copyin(atmos, atmos%tau, atmos%ssa, atmos%g)
         error_msg =  validate(atmos)
         if(length(strip(error_msg)) > 0) 
-          return
+          return error_msg
         end
         sw_solver_2stream(ncol, nlay, ngpt, logical(top_at_1, wl), 
                                atmos.tau, atmos.ssa, atmos.g, mu0,
