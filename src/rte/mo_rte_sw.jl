@@ -185,7 +185,7 @@ module mo_rte_sw
         if(length(strip(error_msg)) > 0) 
 	  return error_msg
         end
-        sw_solver_noscat(ncol, nlay, ngpt, logical(top_at_1, wl), 
+        sw_solver_noscat!(ncol, nlay, ngpt, logical(top_at_1, wl), 
                               atmos.tau, mu0,
                               gpt_flux_dir)
         #
