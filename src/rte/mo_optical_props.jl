@@ -80,7 +80,10 @@ maxval(v) = max(v)
   #
   # -------------------------------------------------------------------------------------------------
 
+export ty_optical_props
 abstract type ty_optical_props{T,I} end
+export ty_optical_props_arry
+abstract type ty_optical_props_arry{T,I} <: ty_optical_props{T,I} end
 
 struct ty_optical_props_1scl{T,I} <: ty_optical_props{T,I}
   band2gpt::Array{T,2}        # (begin g-point, end g-point) = band2gpt(2,band)
