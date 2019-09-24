@@ -35,6 +35,7 @@ fmaxloc(a; dim, mask=nothing) = mask==nothing ? argmax(a, dims=dim) : argmax(a[m
 Based on: https://gcc.gnu.org/onlinedocs/gcc-4.4.0/gfortran/SPREAD.html
 TODO: FIX IMPLEMENTATION
 """
+
 function spread(source::T, dim::Int, ncopies::Int) where T<:Number
   @assert dim <= N+1
   Vector{T}([source for x in 1:ncopies])
@@ -51,6 +52,7 @@ allocated(a::Array) = a ≠ nothing
 deallocate!(a) = (a = nothing)
 is_initialized(a::Array) = allocated(a) && length(a)>0
 present(arg) = arg ≠ nothing
+
 
 
 """

@@ -30,7 +30,7 @@ Numeric calculations for radiative transfer solvers.
 """
 module mo_rte_solver_kernels
 
-include("../fortranfuncs.jl")
+using ..fortran_intrinsics
 
 # -------------------------------------------------------------------------------------------------
 #
