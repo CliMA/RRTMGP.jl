@@ -53,7 +53,11 @@ deallocate!(a) = (a = nothing)
 is_initialized(a::Array) = allocated(a) && length(a)>0
 present(arg) = arg ≠ nothing
 
-
+"""
+Based on: https://gnu.huihoo.org/gcc/gcc-4.4.5/gfortran/SPACING.html
+TODO: Verify
+"""
+spacing(x) = nextfloat(x)-x
 
 """
     move_alloc!(from, to)
