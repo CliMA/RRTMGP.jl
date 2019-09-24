@@ -24,6 +24,7 @@ module mo_source_functions
   #   spectral mapping in each direction separately, and at the surface
 
 
+  export ty_source_func_lw
   struct ty_source_func_lw{T, I} <: ty_optical_props{T, I}
     band2gpt::Array{T,2}        # (begin g-point, end g-point) = band2gpt(2,band)
     gpt2band::Array{I,1}        # band = gpt2band(g-point)
@@ -36,6 +37,7 @@ module mo_source_functions
     lev_source_dec # Planck source at layer edge in decreasing ilay direction [W/m2] (ncol, nlay+1, ngpt)
     sfc_source
   end
+  export ty_source_func_sw
   struct ty_source_func_sw{T, I} <: ty_optical_props{T, I}
     band2gpt::Array{T,2}        # (begin g-point, end g-point) = band2gpt(2,band)
     gpt2band::Array{I,1}        # band = gpt2band(g-point)
