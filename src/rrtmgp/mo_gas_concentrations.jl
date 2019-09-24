@@ -42,6 +42,7 @@ module mo_gas_concentrations
   #   real(wp), dimension(:,:), allocatable :: conc
   # end type conc_field
 
+  export ty_gas_concs
   struct ty_gas_concs{T, I}
     gas_name::String
     concs::Vector{conc_field{T}}
