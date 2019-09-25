@@ -43,6 +43,7 @@ module mo_gas_optics_rrtmgp
   # use mo_gas_optics,         only: ty_gas_optics
   # using mo_gas_optics # only defines abstract interfaces
   using ..mo_util_reorder
+  export gas_optics!
 
   # -------------------------------------------------------------------------------------------------
   # type, extends(ty_gas_optics), public :: ty_gas_optics_rrtmgp
@@ -258,7 +259,7 @@ module mo_gas_optics_rrtmgp
   # Compute gas optical depth and Planck source functions,
   #  given temperature, pressure, and composition
   #
-  function gas_optics_int(this::ty_gas_optics_rrtmgp,
+  function gas_optics!(this::ty_gas_optics_rrtmgp,
                           play, plev, tlay, tsfc, gas_desc::ty_gas_concs,
                           optical_props::ty_optical_props_arry, sources::ty_source_func_lw,
                           col_dry=nothing, tlev=nothing) # result(error_msg)
@@ -352,7 +353,7 @@ module mo_gas_optics_rrtmgp
   #
   # Compute gas optical depth given temperature, pressure, and composition
   #
-  function gas_optics_ext(this::ty_gas_optics_rrtmgp,
+  function gas_optics!(this::ty_gas_optics_rrtmgp,
                           play, plev, tlay, gas_desc::ty_gas_concs,    # mandatory inputs
                           optical_props::ty_optical_props_arry, toa_src,        # mandatory outputs
                           col_dry=nothing) # result(error_msg)      # optional input
