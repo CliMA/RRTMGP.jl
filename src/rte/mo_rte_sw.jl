@@ -49,9 +49,9 @@ module mo_rte_sw
   export rte_sw, expand_and_transpose
 
   # --------------------------------------------------
-  function rte_sw(atmos, top_at_1,                 
-                  mu0, inc_flux,                   
-                  sfc_alb_dir, sfc_alb_dif,        
+  function rte_sw(atmos, top_at_1,
+                  mu0, inc_flux,
+                  sfc_alb_dir, sfc_alb_dif,
                   fluxes, inc_flux_dif) #result(error_msg)
 #    class(ty_optical_props_arry), intent(in   ) :: atmos           # Optical properties provided as arrays
 #    logical,                      intent(in   ) :: top_at_1        # Is the top of the domain at index 1?
@@ -88,7 +88,7 @@ module mo_rte_sw
     # Error checking -- consistency of sizes and validity of values
     #
     # --------------------------------
-    if(!are_desired(fluxes)) 
+    if(!are_desired(fluxes))
       error_msg = "rte_sw: no space allocated for fluxes"
       return
     end
@@ -100,11 +100,11 @@ module mo_rte_sw
       error_msg = "rte_sw: mu0 inconsistently sized"
     end
 
-    if(any_vals_outside(mu0, wp(0), wp(1))) 
+    if(any_vals_outside(mu0, wp(0), wp(1)))
       error_msg = "rte_sw: one or more mu0 <= 0 or > 1"
     end
 
-    if(any([size(inc_flux)[1], size(inc_flux)[2]] .!= [ncol, ngpt])) 
+    if(any([size(inc_flux)[1], size(inc_flux)[2]] .!= [ncol, ngpt]))
       error_msg = "rte_sw: inc_flux inconsistently sized"
     end
 
@@ -127,7 +127,7 @@ module mo_rte_sw
     if(any_vals_outside(sfc_alb_dir,  wp(0), wp(1)))
       error_msg = "rte_sw: sfc_alb_dir out of bounds [0,1]"
     end
-    if(any([size(sfc_alb_dif)[1], size(sfc_alb_dif)[2]] .!= [nband, ncol])) 
+    if(any([size(sfc_alb_dif)[1], size(sfc_alb_dif)[2]] .!= [nband, ncol]))
       error_msg = "rte_sw: sfc_alb_dif inconsistently sized"
     end
     if(any_vals_outside(sfc_alb_dif, wp(0), wp(1)))
@@ -182,10 +182,10 @@ module mo_rte_sw
         #
 #        #$acc enter data copyin(atmos, atmos%tau)
         error_msg =  validate(atmos)
-        if(length(strip(error_msg)) > 0) 
+        if(length(strip(error_msg)) > 0)
 	  return error_msg
         end
-        sw_solver_noscat!(ncol, nlay, ngpt, logical(top_at_1, wl), 
+        sw_solver_noscat!(ncol, nlay, ngpt, logical(top_at_1, wl),
                               atmos.tau, mu0,
                               gpt_flux_dir)
         #
@@ -200,12 +200,12 @@ module mo_rte_sw
         #
 #        #$acc enter data copyin(atmos, atmos%tau, atmos%ssa, atmos%g)
         error_msg =  validate(atmos)
-        if(length(strip(error_msg)) > 0) 
+        if(length(strip(error_msg)) > 0)
           return error_msg
         end
-        sw_solver_2stream(ncol, nlay, ngpt, logical(top_at_1, wl), 
+        sw_solver_2stream(ncol, nlay, ngpt, logical(top_at_1, wl),
                                atmos.tau, atmos.ssa, atmos.g, mu0,
-                               sfc_alb_dir_gpt, sfc_alb_dif_gpt, 
+                               sfc_alb_dir_gpt, sfc_alb_dif_gpt,
                                gpt_flux_up, gpt_flux_dn, gpt_flux_dir)
 #        #$acc exit data delete(atmos%tau, atmos%ssa, atmos%g, atmos)
 #        #$acc exit data delete(sfc_alb_dir_gpt, sfc_alb_dif_gpt)
@@ -218,8 +218,8 @@ module mo_rte_sw
         error_msg = "sw_solver(...ty_optical_props_nstr...) not yet implemented"
       end
 
-    if(length(strip(error_msg)) > 0) 
-      if(length(strip(get_name(atmos))) > 0) 
+    if(length(strip(error_msg)) > 0)
+      if(length(strip(get_name(atmos))) > 0)
         error_msg = strip(get_name(atmos)) * ": " * strip(error_msg)
         return
       end
