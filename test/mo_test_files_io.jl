@@ -15,35 +15,41 @@
 #   netCDF file layout
 
 module mo_test_files_io
-  use mo_rte_kind,           only: wp
-  use mo_optical_props,      only: ty_optical_props, ty_optical_props_arry, &
-                                   ty_optical_props_1scl, ty_optical_props_2str, ty_optical_props_nstr
-  use mo_source_functions,   only: ty_source_func_lw
-  use mo_gas_concentrations, only: ty_gas_concs
-  use mo_util_reorder
-  use mo_simple_netcdf,      only: read_field, read_string, var_exists, get_dim_size, &
-                                   write_field, create_dim, create_var
-  use netcdf
-  implicit none
-  private
 
-  public :: read_atmos, write_atmos, is_lw, is_sw, &
-            read_lw_bc, read_sw_bc, read_lw_rt, &
-            write_fluxes, write_dir_fluxes,     &
-            write_heating_rates, &
-            write_spectral_disc, read_spectral_disc, &
-            write_sw_surface_albedo, write_solar_zenith_angle, &
-            write_lw_surface_emissivity, read_sfc_test_file, &
-            write_optical_prop_values, read_optical_prop_values, &
-            write_direction,     read_direction,  &
-            write_lw_Planck_sources, read_lw_Planck_sources, &
-            write_sw_solar_sources,  read_sw_solar_sources, &
-            write_two_stream,    read_two_stream, &
-            read_sources,        write_sources,   &
-            write_gpt_fluxes,    read_gpt_fluxes
+  using ..mo_optical_props
+  using ..mo_source_functions
+  using ..mo_gas_concentrations
+  using ..mo_util_reorder
+
+#  use mo_rte_kind,           only: wp
+#  use mo_optical_props,      only: ty_optical_props, ty_optical_props_arry, &
+#                                   ty_optical_props_1scl, ty_optical_props_2str, ty_optical_props_nstr
+#  use mo_source_functions,   only: ty_source_func_lw
+#  use mo_gas_concentrations, only: ty_gas_concs
+#  use mo_util_reorder
+#  use mo_simple_netcdf,      only: read_field, read_string, var_exists, get_dim_size, &
+#                                   write_field, create_dim, create_var
+#  use netcdf
+#  implicit none
+#  private
+
+#  public :: read_atmos, write_atmos, is_lw, is_sw, &
+#            read_lw_bc, read_sw_bc, read_lw_rt, &
+#            write_fluxes, write_dir_fluxes,     &
+#            write_heating_rates, &
+#            write_spectral_disc, read_spectral_disc, &
+#            write_sw_surface_albedo, write_solar_zenith_angle, &
+#            write_lw_surface_emissivity, read_sfc_test_file, &
+#            write_optical_prop_values, read_optical_prop_values, &
+#            write_direction,     read_direction,  &
+#            write_lw_Planck_sources, read_lw_Planck_sources, &
+#            write_sw_solar_sources,  read_sw_solar_sources, &
+#            write_two_stream,    read_two_stream, &
+#            read_sources,        write_sources,   &
+#            write_gpt_fluxes,    read_gpt_fluxes
 
 
-contains
+#contains
   #--------------------------------------------------------------------------------------------------------------------
   #
   # Read profiles for all columns  -- T, p, and gas concentrations
