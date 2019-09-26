@@ -43,7 +43,7 @@ module mo_gas_optics_rrtmgp
   # use mo_gas_optics,         only: ty_gas_optics
   # using mo_gas_optics # only defines abstract interfaces
   using ..mo_util_reorder
-  export gas_optics!
+  export gas_optics!, ty_gas_optics_rrtmgp
 
   # -------------------------------------------------------------------------------------------------
   # type, extends(ty_gas_optics), public :: ty_gas_optics_rrtmgp
