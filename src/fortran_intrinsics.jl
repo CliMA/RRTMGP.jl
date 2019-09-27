@@ -42,7 +42,7 @@ function spread(source::T, dim::Int, ncopies::Int) where T<:Number
 end
 function spread(source::Array{T,N}, dim::Int, ncopies::Int) where {T,N}
   @assert dim <= N+1
-  counts = [1 for i in 1:N]
+  counts = [1 for i in 1:dim]
   counts[dim] = ncopies
   return repeat(source, counts...)
 end
@@ -72,5 +72,9 @@ end
 # https://gcc.gnu.org/onlinedocs/gfortran/PACK.html
 # pack()
 
+
+trim(s) = strip(s)
+len_trim(s) = length(strip(s))
+maxval(v) = max(v)
 
 end

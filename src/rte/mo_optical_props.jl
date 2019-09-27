@@ -40,6 +40,7 @@ Subsets of optical properties held as arrays may be extracted along the column d
 """
 module mo_optical_props
 
+using ..fortran_intrinsics
 using ..mo_util_array
 
 export init!,
@@ -58,6 +59,7 @@ export init!,
        get_gpoint_bands,
        expand,
        bands_are_equal,
+       convert_gpt2band,
        gpoints_are_equal
 
 export ty_optical_props,
@@ -67,9 +69,6 @@ export ty_optical_props,
 
 any_vals_less_than(a, t) = a .< t
 any_vals_outside(a,t1,t2) = !(t1<a<t2)
-trim(s) = strip(s)
-len_trim(s) = length(strip(s))
-maxval(v) = max(v)
 
   # -------------------------------------------------------------------------------------------------
   #
@@ -926,8 +925,8 @@ end
     integer, dimension(size(this%gpt2band,dim=1))
                                         :: get_gpoint_bands
 """
-  function get_gpoint_bands(this::ty_optical_props{DT}) where DT
-    is_initialized(this) ? this.gpt2band[:] : zeros(DT,length(this.gpt2band))
+  function get_gpoint_bands(this::ty_optical_props)
+    is_initialized(this) ? this.gpt2band[:] : zeros(Int,length(this.gpt2band))
   end
 
   #--------------------------------------------------------------------------------------------------------------------
@@ -940,7 +939,7 @@ end
     integer,                            intent(in) :: gpt
     integer                             :: convert_gpt2band
 """
-  convert_gpt2band(this::ty_optical_props{DT}, gpt) where DT = is_initialized(this) ? this.gpt2band[gpt] : DT(0)
+  convert_gpt2band(this::ty_optical_props, gpt) = is_initialized(this) ? this.gpt2band[gpt] : 0
 
   #--------------------------------------------------------------------------------------------------------------------
   #

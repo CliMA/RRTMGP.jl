@@ -1,9 +1,32 @@
+using JRRTMGP
+using NCDatasets
+using JRRTMGP.mo_optical_props
+using JRRTMGP.mo_rte_solver_kernels
+using JRRTMGP.fortran_intrinsics
 using Test
-
 
 get_array(ds, name, DT) = haskey(ds, name) ? convert(Array{DT}, ds[name][:]) : nothing
 get_array(ds, name, DT, s) = haskey(ds, name) ? convert(Array{DT}, ds[name][:]) : zeros(s)
 get_dim_size(ds, name) = ds.dim[name]
+
+function compare(ds, var_tuple)
+  D = Dict(name => true for (var,name) in var_tuple)
+  for (A, name) in var_tuple
+    A_ds = get_array(ds, name, eltype(A))
+    if !all(A_ds .≈ A)
+      @show name, sum(abs.(A_ds - A))
+      D[name] = false
+    end
+  end
+  return D
+end
+
+function read_sw_solar_sources(ds, DT)
+  ncol  = get_dim_size(ds, "col")
+  ngpt = get_dim_size(ds, "gpt")
+  toa_src = get_array(ds, "toa_src", DT, (ncol))
+  return toa_src
+end
 
 function read_sw_bc(ds, DT)
   ncol  = get_dim_size(ds, "col")
@@ -59,12 +82,6 @@ function read_spectral_disc(ds, DT)
 
     # ncid = nf90_close(ncid)
 end
-
-using JRRTMGP
-using NCDatasets
-using JRRTMGP.mo_optical_props
-using JRRTMGP.mo_rte_solver_kernels
-# using JRRTMGP.mo_test_files_io
 
 # function stop_on_err(msg)
 #   #
@@ -137,64 +154,72 @@ using JRRTMGP.mo_rte_solver_kernels
     mu0, tsi, tsi_scaling, sfc_alb_dir, sfc_alb_dif = read_sw_bc(ds, DT)
     mu0[:] .= cos.(mu0[:] * acos(-DT(1))/DT(180))
   else
-  #   Rdif, Tdif = read_two_stream(fileName)
+    # Rdif, Tdif = read_two_stream(fileName)
   #   t_sfc, sfc_alb_dif = read_lw_bc(fileName)
   #   DT = eltype(Rdif)
   #   # Read emissivity; convert to surface albedo
   #   sfc_alb_dif[:,:] .= DT(1) .- sfc_alb_dif[:,:]
   end
 
-  # ncol = size(source_up, 1)
-  # nlay = size(source_up, 2)
-  # ngpt = size(source_up, 3)
-  # flux_up = Array{DT}(undef, ncol,nlay+1,ngpt)
-  # flux_dn = Array{DT}(undef, ncol,nlay+1,ngpt)
-  # sfc_alb_gpt = Array{DT}(ncol, ngpt)
-  # if top_at_1
-  #   flux_dn[:,     1,:] .= DT(0)
-  # else
-  #   flux_dn[:,nlay+1,:] .= DT(0)
-  # end
-  #  # Expand surface albedos from bands to gpoints
-  # for igpt = 1:ngpt
-  #   ibnd = spectral_disc.convert_gpt2band[igpt]
-  #   sfc_alb_gpt[1:ncol,igpt] = sfc_alb_dif[ibnd,1:ncol]
-  # end
+  ncol = size(source_up, 1)
+  nlay = size(source_up, 2)
+  ngpt = size(source_up, 3)
+  flux_up = Array{DT}(undef, ncol,nlay+1,ngpt)
+  flux_dn = Array{DT}(undef, ncol,nlay+1,ngpt)
+  sfc_alb_gpt = Array{DT}(undef, ncol, ngpt)
+  if top_at_1
+    flux_dn[:,     1,:] .= DT(0)
+  else
+    flux_dn[:,nlay+1,:] .= DT(0)
+  end
+  # Expand surface albedos from bands to gpoints
+  for igpt = 1:ngpt
+    ibnd = convert_gpt2band(spectral_disc, igpt)
+    sfc_alb_gpt[1:ncol,igpt] = sfc_alb_dif[ibnd,1:ncol]
+  end
 
-  # for k = 1:ngpt
-  #   adding!(ncol, nlay, logical[top_at_1, wl],
-  #               sfc_alb_gpt[:,k],
-  #               Rdif[:,:,k], Tdif[:,:,k],
-  #               source_dn[:,:,k], source_up[:,:,k], source_sfc[:,k],
-  #               flux_up[:,:,k], flux_dn[:,:,k])
-  # end
+  for k = 1:ngpt
+    adding!(ncol, nlay, top_at_1,
+                sfc_alb_gpt[:,k],
+                Rdif[:,:,k], Tdif[:,:,k],
+                source_dn[:,:,k], source_up[:,:,k], source_sfc[:,k],
+                flux_up[:,:,k], flux_dn[:,:,k])
+  end
 
-  # if do_sw
-  #   #
-  #   # Compute direct beam for solar  - this is done in sources()
-  #   #
-  #   toa_src = read_sw_solar_sources(fileName)
-  #   flux_dn_dir = Array{DT}(undef, ncol, nlay+1, ngpt)
+  if do_sw
+    #
+    # Compute direct beam for solar  - this is done in sources()
+    #
+    toa_src = read_sw_solar_sources(ds, DT)
+    flux_dn_dir = Array{DT}(undef, ncol, nlay+1, ngpt)
 
-  #   if top_at_1
-  #     flux_dn_dir[:,    1,:]  .= toa_src[:,:] .* spread[mu0, 2, ngpt]
-  #     for j = 1:nlay
-  #       flux_dn_dir[:,j+1,:] .= Tnoscat[:,j,:] .* flux_dn_dir[:,j,:]
-  #     end
-  #   else
-  #     flux_dn_dir[:,nlay+1,:] .= toa_src[:,:] .* spread[mu0, 2, ngpt]
-  #     for j = nlay:-1:1
-  #       flux_dn_dir[:,j,:] .= Tnoscat[:,j,:] .* flux_dn_dir[:,j+1,:]
-  #     end
-  #   end
-  #   #
-  #   # Add direct beam so flux_dn is total
-  #   #
-  #   flux_dn[:,:,:] .= flux_dn[:,:,:] .+ flux_dn_dir[:,:,:]
-  #   # write_gpt_fluxes!(fileName, flux_up, flux_dn, flux_dn_dir)
-  # else
-  #   # write_gpt_fluxes!(fileName, flux_up, flux_dn)
-  # end
+    if top_at_1
+      flux_dn_dir[:,    1,:]  .= toa_src[:,:] .* spread(mu0, 2, ngpt)
+      for j = 1:nlay
+        flux_dn_dir[:,j+1,:] .= Tnoscat[:,j,:] .* flux_dn_dir[:,j,:]
+      end
+    else
+      flux_dn_dir[:,nlay+1,:] .= toa_src[:,:] .* spread(mu0, 2, ngpt)
+      for j = nlay:-1:1
+        flux_dn_dir[:,j,:] .= Tnoscat[:,j,:] .* flux_dn_dir[:,j+1,:]
+      end
+    end
+    #
+    # Add direct beam so flux_dn is total
+    #
+    flux_dn[:,:,:] .= flux_dn[:,:,:] .+ flux_dn_dir[:,:,:]
+    # write_gpt_fluxes!(fileName, flux_up, flux_dn, flux_dn_dir)
+  else
+    # write_gpt_fluxes!(fileName, flux_up, flux_dn)
+  end
+  # @show haskey(ds,"flux_dn")
+  # @show haskey(ds,"flux_up")
+  # @show haskey(ds,"gpt_flux_up")
+  # @show haskey(ds,"gpt_flux_dn")
+  # @show haskey(ds,"gpt_flux_dn_dir")
+  D = compare(ds, ((flux_dn,"gpt_flux_dn"),
+                   (flux_up,"gpt_flux_up")))
+  @show D
   close(ds)
 
 end

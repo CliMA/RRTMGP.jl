@@ -30,6 +30,23 @@ Numeric calculations for radiative transfer solvers.
 """
 module mo_rte_solver_kernels
 
+export lw_solver_noscat!,
+       lw_solver_noscat_GaussQuad!,
+       lw_solver_2stream!,
+       sw_solver_noscat!,
+       sw_solver_2stream!,
+       lw_source_noscat!,
+       lw_transport_noscat!,
+       lw_two_stream!,
+       lw_combine_sources!,
+       lw_source_2str!,
+       sw_two_stream!,
+       sw_source_2str!,
+       adding!,
+       apply_BC_gpt!,
+       apply_BC_factor!,
+       apply_BC_0!
+
 using ..fortran_intrinsics
 
 # -------------------------------------------------------------------------------------------------
@@ -75,7 +92,7 @@ real(wp), parameter :: π = acos(-1._wp)
 integer             :: ilev, igpt, top_level
 # ------------------------------------
 """
-  function lw_solver_noscat!(ncol, nlay, ngpt, top_at_1, D, weight,
+function lw_solver_noscat!(ncol, nlay, ngpt, top_at_1, D, weight,
                               tau, lay_source, lev_source_inc, lev_source_dec, sfc_emis, sfc_src,
                               radn_up, radn_dn)
     # Which way is up?
@@ -161,7 +178,7 @@ real(wp), dimension(ncol,       ngpt) :: Ds_ncol
 
 integer :: imu, top_level
 """
-  function lw_solver_noscat_GaussQuad!(ncol, nlay, ngpt, top_at_1, nmus, Ds, weights,
+function lw_solver_noscat_GaussQuad!(ncol, nlay, ngpt, top_at_1, nmus, Ds, weights,
                                    tau, lay_source, lev_source_inc, lev_source_dec, sfc_emis, sfc_src, flux_up, flux_dn)
 
     # ------------------------------------
@@ -224,7 +241,7 @@ real(wp), dimension(ncol,nlay  ) :: source_dn, source_up
 real(wp), dimension(ncol       ) :: source_sfc
 # ------------------------------------
 """
-   function lw_solver_2stream!(ncol, nlay, ngpt, top_at_1,
+ function lw_solver_2stream!(ncol, nlay, ngpt, top_at_1,
                                  tau, ssa, g,
                                  lay_source, lev_source_inc, lev_source_dec, sfc_emis, sfc_src,
                                  flux_up, flux_dn)
@@ -288,7 +305,7 @@ integer :: icol, ilev, igpt
 real(wp) :: mu0_inv(ncol)
 """
 
-  function sw_solver_noscat!(ncol, nlay, ngpt,
+function sw_solver_noscat!(ncol, nlay, ngpt,
                               top_at_1, tau, mu0, flux_dir)
 
     DT = eltype(tau)
@@ -348,7 +365,7 @@ real(wp), dimension(ncol,nlay) :: source_up, source_dn
 real(wp), dimension(ncol     ) :: source_srf
 # ------------------------------------
 """
-  function sw_solver_2stream!(ncol, nlay, ngpt, top_at_1,
+function sw_solver_2stream!(ncol, nlay, ngpt, top_at_1,
                                  tau, ssa, g, mu0,
                                  sfc_alb_dir, sfc_alb_dif,
                                  flux_up, flux_dn, flux_dir)
@@ -409,7 +426,7 @@ real(wp), parameter :: tau_thresh = sqrt(epsilon(tau))
 # ---------------------------------------------------------------
 """
 
-  function lw_source_noscat!(ncol, nlay, lay_source, lev_source_up, lev_source_dn, tau, trans,
+function lw_source_noscat!(ncol, nlay, lay_source, lev_source_up, lev_source_dn, tau, trans,
                               source_dn, source_up)
     DT = eltype(tau)
     for ilay in 1:nlay
@@ -457,7 +474,7 @@ integer :: ilev
 # ---------------------------------------------------
 """
 
-  function lw_transport_noscat!(ncol, nlay, top_at_1,
+function lw_transport_noscat!(ncol, nlay, top_at_1,
                                  tau, trans, sfc_albedo, source_dn, source_up, source_sfc,
                                  radn_up, radn_dn)
     if top_at_1
@@ -526,7 +543,7 @@ real(wp), parameter :: LW_diff_sec = 1.66  # 1./cos(diffusivity angle)
 # ---------------------------------
 """
 
-  function lw_two_stream!(ncol, nlay, tau, w0, g,
+function lw_two_stream!(ncol, nlay, tau, w0, g,
                                 gamma1, gamma2, Rdif, Tdif)
     DT = eltype(tau)
     for j in 1:nlay
@@ -589,7 +606,7 @@ real(wp), parameter :: LW_diff_sec = 1.66  # 1./cos(diffusivity angle)
     integer :: icol, ilay
     # ---------------------------------------------------------------
 """
-  function lw_combine_sources!(ncol, nlay, top_at_1,
+function lw_combine_sources!(ncol, nlay, top_at_1,
                                 lev_src_inc, lev_src_dec, lev_source)
     ilay = 1
     for icol in 1:ncol
@@ -635,7 +652,7 @@ real(wp), parameter :: LW_diff_sec = 1.66  # 1./cos(diffusivity angle)
     real(wp), dimension(:), pointer :: lev_source_bot, lev_source_top
     # ---------------------------------------------------------------
 """
-  function lw_source_2str!(ncol, nlay, top_at_1,
+function lw_source_2str!(ncol, nlay, top_at_1,
                             sfc_emis, sfc_src,
                             lay_source, lev_source,
                             gamma1, gamma2, rdif, tdif, tau, source_dn, source_up, source_sfc)
@@ -708,7 +725,7 @@ real(wp), parameter :: LW_diff_sec = 1.66  # 1./cos(diffusivity angle)
     real(wp) :: mu0_inv(ncol)
     # ---------------------------------
 """
-  function sw_two_stream!(ncol, nlay, mu0, tau, w0, g,
+function sw_two_stream!(ncol, nlay, mu0, tau, w0, g,
                                 Rdif, Tdif, Rdir, Tdir, Tnoscat)
     DT = eltype(tau)
     mu0_inv[1:ncol] = 1/mu0[1:ncol]
@@ -814,7 +831,7 @@ real(wp), parameter :: LW_diff_sec = 1.66  # 1./cos(diffusivity angle)
     integer :: ilev
 """
 
-  function sw_source_2str!(ncol, nlay, top_at_1, Rdir, Tdir, Tnoscat, sfc_albedo,
+function sw_source_2str!(ncol, nlay, top_at_1, Rdir, Tdir, Tnoscat, sfc_albedo,
                             source_up, source_dn, source_sfc, flux_dn_dir)
 
     if top_at_1
@@ -872,6 +889,9 @@ function adding!(ncol, nlay, top_at_1,
                   src_dn, src_up, src_sfc,
                   flux_up, flux_dn)
   DT = eltype(albedo_sfc)
+  albedo = Array{DT}(undef, ncol,nlay+1)
+  src = Array{DT}(undef, ncol,nlay+1)
+  denom = Array{DT}(undef, ncol,nlay)
   #
   # Indexing into arrays for upward and downward propagation depends on the vertical
   #   orientation of the arrays (whether the domain top is at the first or last index)
@@ -929,32 +949,31 @@ function adding!(ncol, nlay, top_at_1,
     #   compute albedo and source of upward radiation
     #
     for ilev in 1:nlay
-      denom[:, ilev  ] = DT(1)/(DT(1) - rdif[:,ilev]*albedo[:,ilev])                # Eq 10
-      albedo[:,ilev+1] = rdif[:,ilev] +
-                         tdif[:,ilev]*tdif[:,ilev] * albedo[:,ilev] * denom[:,ilev] # Equation 9
+      denom[:, ilev  ] .= DT(1)./(DT(1) .- rdif[:,ilev].*albedo[:,ilev])                # Eq 10
+      albedo[:,ilev+1] .= rdif[:,ilev] .+ tdif[:,ilev].*tdif[:,ilev] .* albedo[:,ilev] .* denom[:,ilev] # Equation 9
       #
       # Equation 11 -- source is emitted upward radiation at top of layer plus
       #   radiation emitted at bottom of layer,
       #   transmitted through the layer and reflected from layers below (tdiff*src*albedo)
       #
-      src[:,ilev+1] =  src_up[:, ilev] +
-                       tdif[:,ilev] * denom[:,ilev] *
-                       (src[:,ilev] + albedo[:,ilev]*src_dn[:,ilev])
+      src[:,ilev+1] .= src_up[:, ilev] .+
+                       tdif[:,ilev] .* denom[:,ilev] .*
+                       (src[:,ilev] .+ albedo[:,ilev].*src_dn[:,ilev])
     end
 
     # Eq 12, at the top of the domain upwelling diffuse is due to ...
     ilev = nlay+1
-    flux_up[:,ilev] = flux_dn[:,ilev] * albedo[:,ilev] +  # ... reflection of incident diffuse and
+    flux_up[:,ilev] .= flux_dn[:,ilev] .* albedo[:,ilev] .+  # ... reflection of incident diffuse and
                       src[:,ilev]                          # scattering by the direct beam below
 
     #
     # From the top of the atmosphere downward -- compute fluxes
     #
     for ilev in nlay:-1:1
-      flux_dn[:,ilev] = (tdif[:,ilev]*flux_dn[:,ilev+1] +   # Equation 13
-                         rdif[:,ilev]*src[:,ilev] +
-                         src_dn[:, ilev]) * denom[:,ilev]
-      flux_up[:,ilev] = flux_dn[:,ilev] * albedo[:,ilev] +  # Equation 12
+      flux_dn[:,ilev] = (tdif[:,ilev].*flux_dn[:,ilev+1] +   # Equation 13
+                         rdif[:,ilev].*src[:,ilev] +
+                         src_dn[:, ilev]) .* denom[:,ilev]
+      flux_up[:,ilev] .= flux_dn[:,ilev] .* albedo[:,ilev] +  # Equation 12
                         src[:,ilev]
 
     end
