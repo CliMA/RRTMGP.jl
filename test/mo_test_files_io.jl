@@ -20,6 +20,7 @@ module mo_test_files_io
   using ..mo_source_functions
   using ..mo_gas_concentrations
   using ..mo_util_reorder
+  using ..mo_simple_netcdf
 
 #  use mo_rte_kind,           only: wp
 #  use mo_optical_props,      only: ty_optical_props, ty_optical_props_arry, &
@@ -55,198 +56,237 @@ module mo_test_files_io
   # Read profiles for all columns  -- T, p, and gas concentrations
   #   Allocation occurs on assignments (says the F2003 standard)
   #
-  subroutine read_atmos(fileName,                          &
-                        p_lay, t_lay, p_lev, t_lev,        &
+  function read_atmos(ds,                          
+                        p_lay, t_lay, p_lev, t_lev,   
                         gas_concs, col_dry)
-    character(len=*),   intent(in   ) :: fileName
-    real(wp), dimension(:,:), allocatable,                 &
-                        intent(inout) :: p_lay, t_lay, p_lev, t_lev, col_dry
-    type(ty_gas_concs), intent(inout) :: gas_concs
-    # -------------------
-    integer :: ncid
-    integer :: ncol, nlay, nlev
+#    character(len=*),   intent(in   ) :: fileName
+#    real(wp), dimension(:,:), allocatable,                 &
+#                        intent(inout) :: p_lay, t_lay, p_lev, t_lev, col_dry
+#    type(ty_gas_concs), intent(inout) :: gas_concs
+#    # -------------------
+#    integer :: ncid
+#    integer :: ncol, nlay, nlev
 
-    if(nf90_open(trim(fileName), NF90_NOWRITE, ncid) /= NF90_NOERR) &
-      call stop_on_err("read_atmos: can't find file " // trim(fileName))
+#    if(nf90_open(trim(fileName), NF90_NOWRITE, ncid) /= NF90_NOERR) &
+#      call stop_on_err("read_atmos: can't find file " // trim(fileName))
 
-    ncol = get_dim_size(ncid, 'col')
-    nlay = get_dim_size(ncid, 'lay')
-    nlev = get_dim_size(ncid, 'lev')
-    if(nlev /= nlay+1) call stop_on_err("read_atmos: nlev should be nlay+1")
+    ncol = size(ds["col"],1)
+    nlay = size(ds["lay"],1)
+    nlev = size(ds["lev"],1)
+    if nlev ≠ nlay+1
+      stop_on_err("read_atmos: nlev should be nlay+1")
+    end
 
     #
     # These lines assume that compilers follow the Fortran 2003 standard for
     #   allocating on assignment. This may require explicit compiler support
     #   e.g. -assume realloc_lhs flag for Intel
     #
-    p_lay = read_field(ncid, 'p_lay', ncol, nlay)
-    t_lay = read_field(ncid, 't_lay', ncol, nlay)
-    p_lev = read_field(ncid, 'p_lev', ncol, nlev)
-    t_lev = read_field(ncid, 't_lev', ncol, nlev)
+    p_lay = read_field(ds, "p_lay")
+    t_lay = read_field(ds, "t_lay")
+    p_lev = read_field(ds, "p_lev")
+    t_lev = read_field(ds, "t_lev")
 
-    if(var_exists(ncid, 'vmr_h2o')) &
-         call stop_on_err(gas_concs%set_vmr('h2o', read_field(ncid, 'vmr_h2o', ncol, nlay)))
-    if(var_exists(ncid, 'vmr_co2')) &
-         call stop_on_err(gas_concs%set_vmr('co2', read_field(ncid, 'vmr_co2', ncol, nlay)))
-    if(var_exists(ncid, 'vmr_o3' )) &
-         call stop_on_err(gas_concs%set_vmr('o3' , read_field(ncid, 'vmr_o3' , ncol, nlay)))
-    if(var_exists(ncid, 'vmr_n2o')) &
-         call stop_on_err(gas_concs%set_vmr('n2o', read_field(ncid, 'vmr_n2o', ncol, nlay)))
-    if(var_exists(ncid, 'vmr_co' )) &
-         call stop_on_err(gas_concs%set_vmr('co' , read_field(ncid, 'vmr_co' , ncol, nlay)))
-    if(var_exists(ncid, 'vmr_ch4')) &
-         call stop_on_err(gas_concs%set_vmr('ch4', read_field(ncid, 'vmr_ch4', ncol, nlay)))
-    if(var_exists(ncid, 'vmr_o2' )) &
-         call stop_on_err(gas_concs%set_vmr('o2' , read_field(ncid, 'vmr_o2' , ncol, nlay)))
-    if(var_exists(ncid, 'vmr_n2' )) &
-         call stop_on_err(gas_concs%set_vmr('n2' , read_field(ncid, 'vmr_n2' , ncol, nlay)))
-    if(var_exists(ncid, 'vmr_ccl4' )) &
-         call stop_on_err(gas_concs%set_vmr('ccl4' , read_field(ncid, 'vmr_ccl4' , ncol, nlay)))
-    if(var_exists(ncid, 'vmr_cfc11' )) &
-         call stop_on_err(gas_concs%set_vmr('cfc11' , read_field(ncid, 'vmr_cfc11' , ncol, nlay)))
-    if(var_exists(ncid, 'vmr_cfc12' )) &
-         call stop_on_err(gas_concs%set_vmr('cfc12' , read_field(ncid, 'vmr_cfc12' , ncol, nlay)))
-    if(var_exists(ncid, 'vmr_cfc22' )) &
-         call stop_on_err(gas_concs%set_vmr('cfc22' , read_field(ncid, 'vmr_cfc22' , ncol, nlay)))
-    if(var_exists(ncid, 'vmr_hfc143a' )) &
-         call stop_on_err(gas_concs%set_vmr('hfc143a' , read_field(ncid, 'vmr_hfc143a' , ncol, nlay)))
-    if(var_exists(ncid, 'vmr_hfc125' )) &
-         call stop_on_err(gas_concs%set_vmr('hfc125' , read_field(ncid, 'vmr_hfc125' , ncol, nlay)))
-    if(var_exists(ncid, 'vmr_hfc23' )) &
-         call stop_on_err(gas_concs%set_vmr('hfc23' , read_field(ncid, 'vmr_hfc23' , ncol, nlay)))
-    if(var_exists(ncid, 'vmr_hfc32' )) &
-         call stop_on_err(gas_concs%set_vmr('hfc32' , read_field(ncid, 'vmr_hfc32' , ncol, nlay)))
-    if(var_exists(ncid, 'vmr_hfc134a' )) &
-         call stop_on_err(gas_concs%set_vmr('hfc134a' , read_field(ncid, 'vmr_hfc134a' , ncol, nlay)))
-    if(var_exists(ncid, 'vmr_cf4' )) &
-         call stop_on_err(gas_concs%set_vmr('cf4' , read_field(ncid, 'vmr_cf4' , ncol, nlay)))
-    if(var_exists(ncid, 'vmr_no2' )) &
-         call stop_on_err(gas_concs%set_vmr('no2' , read_field(ncid, 'vmr_no2' , ncol, nlay)))
+    if(var_exists(ds, "vmr_h2o")) 
+         stop_on_err(set_vmr(gas_concs,"h2o", read_field(ds, "vmr_h2o")))
+    end
+    if(var_exists(ds, "vmr_co2")) 
+         stop_on_err(set_vmr(gas_concs,"co2", read_field(ds, "vmr_co2")))
+    end
+    if(var_exists(ds, "vmr_o3" )) 
+         stop_on_err(set_vmr(gas_concs,"o3" , read_field(ds, "vmr_o3")))
+    end
+    if(var_exists(ds, "vmr_n2o")) 
+         stop_on_err(set_vmr(gas_concs,"n2o", read_field(ds, "vmr_n2o")))
+    end
+    if(var_exists(ds, "vmr_co" )) 
+         stop_on_err(set_vmr(gas_concs,"co" , read_field(ds, "vmr_co")))
+    end
+    if(var_exists(ds, "vmr_ch4")) 
+         stop_on_err(set_vmr(gas_concs,"ch4", read_field(ds, "vmr_ch4")))
+    end
+    if(var_exists(ds, "vmr_o2" )) 
+         stop_on_err(set_vmr(gas_concs,"o2" , read_field(ds, "vmr_o2")))
+    end
+    if(var_exists(ds, "vmr_n2" )) 
+         stop_on_err(set_vmr(gas_concs,"n2" , read_field(ds, "vmr_n2")))
+    end
+    if(var_exists(ds, "vmr_ccl4" )) 
+         stop_on_err(set_vmr(gas_concs,"ccl4" , read_field(ds, "vmr_ccl4")))
+    end
+    if(var_exists(ds, "vmr_cfc11" )) 
+         stop_on_err(set_vmr(gas_concs,"cfc11" , read_field(ds, "vmr_cfc11")))
+    end
+    if(var_exists(ds, "vmr_cfc12" )) 
+         stop_on_err(set_vmr(gas_concs,"cfc12" , read_field(ds, "vmr_cfc12")))
+    end
+    if(var_exists(ds, "vmr_cfc22" )) 
+         stop_on_err(set_vmr(gas_concs,"cfc22" , read_field(ds, "vmr_cfc22")))
+    end
+    if(var_exists(ds, "vmr_hfc143a" )) 
+         stop_on_err(set_vmr(gas_concs,"hfc143a" , read_field(ds, "vmr_hfc143a")))
+    end
+    if(var_exists(ds, "vmr_hfc125" )) 
+         stop_on_err(set_vmr(gas_concs,"hfc125" , read_field(ds, "vmr_hfc125")))
+    end
+    if(var_exists(ds, "vmr_hfc23" )) 
+         stop_on_err(set_vmr(gas_concs,"hfc23" , read_field(ds, "vmr_hfc23")))
+    end
+    if(var_exists(ds, "vmr_hfc32" )) 
+         stop_on_err(set_vmr(gas_concs,"hfc32" , read_field(ds, "vmr_hfc32")))
+    end
+    if(var_exists(ds, "vmr_hfc134a" )) 
+         stop_on_err(set_vmr(gas_concs,"hfc134a" , read_field(ds, "vmr_hfc134a")))
+    end
+    if(var_exists(ds, "vmr_cf4" )) 
+         stop_on_err(set_vmr(gas_concs,"cf4" , read_field(ds, "vmr_cf4")))
+    end
+    if(var_exists(ds, "vmr_no2" )) 
+         stop_on_err(set_vmr(gas_concs,"no2" , read_field(ds, "vmr_no2")))
+    end
 
     # col_dry has unchanged allocation status on return if the variable isn't present in the netCDF file
-    if(var_exists(ncid, 'col_dry')) col_dry = read_field(ncid, 'col_dry', ncol, nlay)
+    if(var_exists(ds, "col_dry")) col_dry = read_field(ds, "col_dry")
 
-    ncid = nf90_close(ncid)
+#    ncid = nf90_close(ncid)
 
-  end subroutine read_atmos
+  end #subroutine read_atmos
   #--------------------------------------------------------------------------------------------------------------------
   #
   # Write the atmospheric conditions that might be computed on the fly
   #
-  subroutine write_atmos(fileName, t_lev, col_dry)
-    character(len=*),         intent(in) :: fileName
-    real(wp), dimension(:,:), intent(in) :: t_lev, col_dry
+  function write_atmos(ds, t_lev, col_dry)
+#    character(len=*),         intent(in) :: fileName
+#    real(wp), dimension(:,:), intent(in) :: t_lev, col_dry
 
-    integer :: ncid, ncol, nlev, nlay
+#    integer :: ncid, ncol, nlev, nlay
 
-    if(nf90_open(trim(fileName), NF90_WRITE, ncid) /= NF90_NOERR) &
-      call stop_on_err("write_atmos: can't open file " // trim(fileName))
+#    if(nf90_open(trim(fileName), NF90_WRITE, ncid) /= NF90_NOERR) &
+#      call stop_on_err("write_atmos: can't open file " // trim(fileName))
     #
     # At present these dimension sizes aren't used
     #   We could certainly check the array sizes against these dimension sizes
     #
-    ncol  = get_dim_size(ncid, 'col')
-    nlay  = get_dim_size(ncid, 'lay')
-    nlev  = get_dim_size(ncid, 'lev')
-    call create_var(ncid, "col_dry", ["col",  "lay"], [ncol, nlay])
-    call create_var(ncid, "t_lev",   ["col",  "lev"], [ncol, nlev])
-    call stop_on_err(write_field(ncid, "col_dry",  col_dry ))
-    call stop_on_err(write_field(ncid, "t_lev",     t_lev ))
+    ds = Dataset(fileName,"a")
+  
+    ncol  = length( size( ds["col"] ) )
+    nlay  = length( size( ds["lay"] ) )
+    nlev  = length( size( ds["lev"] ) )
 
-    ncid = nf90_close(ncid)
-  end subroutine write_atmos
+
+    defVar(ds,"col_dry", col_dry, ("col","lay"))
+    defVar(ds,"t_lev",   t_lev,   ("col","lev"))
+
+#    call create_var(ncid, "col_dry", ["col",  "lay"], [ncol, nlay])
+#    call create_var(ncid, "t_lev",   ["col",  "lev"], [ncol, nlev])
+#    call stop_on_err(write_field(ncid, "col_dry",  col_dry ))
+#    call stop_on_err(write_field(ncid, "t_lev",     t_lev ))
+
+#    ncid = nf90_close(ncid)
+  end #subroutine write_atmos
   #--------------------------------------------------------------------------------------------------------------------
   #
   # Does this file contain variables needed to do SW calculations ?
   #
-  function is_sw(fileName)
-    character(len=*), intent(in   ) :: fileName
-    logical                         :: is_sw
+  function is_sw(ds)
+#    character(len=*), intent(in   ) :: fileName
+#    logical                         :: is_sw
 
-    integer :: ncid
+#    integer :: ncid
 
-    if(nf90_open(trim(fileName), NF90_NOWRITE, ncid) /= NF90_NOERR) &
-      call stop_on_err("is_sw: can't find file " // trim(fileName))
+#    if(nf90_open(trim(fileName), NF90_NOWRITE, ncid) /= NF90_NOERR) &
+#      call stop_on_err("is_sw: can't find file " // trim(fileName))
 
-    is_sw = var_exists(ncid, 'solar_zenith_angle')
-    ncid = nf90_close(ncid)
-  end function is_sw
+
+    is_this_sw = haskey(ds,"solar_zenith_angle")
+    return is_this_sw
+#    is_sw = var_exists(ncid, 'solar_zenith_angle')
+#    ncid = nf90_close(ncid)
+  end #function is_sw
   # ----------------------
-  function is_lw(fileName)
-    character(len=*), intent(in   ) :: fileName
-    logical                         :: is_lw
+  function is_lw(ds)
+#    character(len=*), intent(in   ) :: fileName
+#    logical                         :: is_lw
 
-    is_lw = .not. is_sw(fileName)
-  end function is_lw
+    return (!is_sw(ds))
+  end #function is_lw
   #--------------------------------------------------------------------------------------------------------------------
   #
   # Read LW boundary conditions for all columns
   #
-  subroutine read_lw_bc(fileName, t_sfc, emis_sfc)
-    character(len=*),                      intent(in   ) :: fileName
-    real(wp), dimension(:),   allocatable, intent(inout) :: t_sfc
-    real(wp), dimension(:,:), allocatable, intent(inout) :: emis_sfc
+  function read_lw_bc(ds, t_sfc, emis_sfc)
+#    character(len=*),                      intent(in   ) :: fileName
+#    real(wp), dimension(:),   allocatable, intent(inout) :: t_sfc
+#    real(wp), dimension(:,:), allocatable, intent(inout) :: emis_sfc
+#    # -------------------
+#    integer :: ncid
+#    integer :: ncol, nband
     # -------------------
-    integer :: ncid
-    integer :: ncol, nband
-    # -------------------
-    if(nf90_open(trim(fileName), NF90_NOWRITE, ncid) /= NF90_NOERR) &
-      call stop_on_err("read_lw_bc: can't find file " // trim(fileName))
+#    if(nf90_open(trim(fileName), NF90_NOWRITE, ncid) /= NF90_NOERR) &
+#      call stop_on_err("read_lw_bc: can't find file " // trim(fileName))
 
-    ncol  = get_dim_size(ncid, 'col')
-    nband = get_dim_size(ncid, 'band')
+    ncol  = length( size( ds["col"] ) )
+    nband = length( size( ds["band"]) )
 
-    t_sfc    =  read_field(ncid, 't_sfc',           ncol)
-    emis_sfc =  read_field(ncid, 'emis_sfc', nband, ncol)
+    t_sfc    =  ds["t_sfc"][:]
+    emis_sfc =  ds["emis_sfc"][:]
 
-    ncid = nf90_close(ncid)
-  end subroutine read_lw_bc
+#    ncid = nf90_close(ncid)
+  end #subroutine read_lw_bc
    #--------------------------------------------------------------------------------------------------------------------
   #
   # Read LW radiative transfer parameters
   #
-  subroutine read_lw_rt(fileName, n_quad_angles)
-    character(len=*),                      intent(in   ) :: fileName
-    integer,                               intent(  out) :: n_quad_angles
+  function read_lw_rt!(ds)#, n_quad_angles)
+#    character(len=*),                      intent(in   ) :: fileName
+#    integer,                               intent(  out) :: n_quad_angles
+#    # -------------------
+#    integer :: ncid
+#    integer :: ncol, nband
     # -------------------
-    integer :: ncid
-    integer :: ncol, nband
-    # -------------------
-    if(nf90_open(trim(fileName), NF90_NOWRITE, ncid) /= NF90_NOERR) &
-      call stop_on_err("read_lw_bc: can't find file " // trim(fileName))
-    n_quad_angles  = get_dim_size(ncid, 'angle')
-    ncid = nf90_close(ncid)
-  end subroutine read_lw_rt
+#    if(nf90_open(trim(fileName), NF90_NOWRITE, ncid) /= NF90_NOERR) &
+#      call stop_on_err("read_lw_bc: can't find file " // trim(fileName))
+    n_quad_angles  = length( size( ds["angle"] ) ) #get_dim_size(ncid, 'angle')
+#    ncid = nf90_close(ncid)
+    return n_quad_angles
+  end #subroutine read_lw_rt
  #--------------------------------------------------------------------------------------------------------------------
   #
   # Read SW boundary conditions for all columns
   #
-  subroutine read_sw_bc(fileName, sza, tsi, tsi_scaling, sfc_alb_dir, sfc_alb_dif)
-    character(len=*),                      intent(in   ) :: fileName
-    real(wp), dimension(:),   allocatable, intent(inout) :: sza, tsi
-    real(wp), dimension(:,:), allocatable, intent(inout) :: sfc_alb_dir, sfc_alb_dif
-    real(wp),                              intent(inout) :: tsi_scaling
-    # -------------------
-    integer :: ncid
-    integer :: ncol, nband
-    # -------------------
-    if(nf90_open(trim(fileName), NF90_NOWRITE, ncid) /= NF90_NOERR) &
-      call stop_on_err("read_sw_bc: can't find file " // trim(fileName))
+  function read_sw_bc(ds, sza, tsi, tsi_scaling, sfc_alb_dir, sfc_alb_dif)
+#    character(len=*),                      intent(in   ) :: fileName
+#    real(wp), dimension(:),   allocatable, intent(inout) :: sza, tsi
+#    real(wp), dimension(:,:), allocatable, intent(inout) :: sfc_alb_dir, sfc_alb_dif
+#    real(wp),                              intent(inout) :: tsi_scaling
+#    # -------------------
+#    integer :: ncid
+#    integer :: ncol, nband
+#    # -------------------
+#    if(nf90_open(trim(fileName), NF90_NOWRITE, ncid) /= NF90_NOERR) &
+#      call stop_on_err("read_sw_bc: can't find file " // trim(fileName))
+    tsi_scaling = []
 
-    ncol  = get_dim_size(ncid, 'col')
-    nband = get_dim_size(ncid, 'band')
 
-    sza         =  read_field(ncid, 'solar_zenith_angle',        ncol)
-    tsi         =  read_field(ncid, 'total_solar_irradiance',    ncol)
-    sfc_alb_dir =  read_field(ncid, 'sfc_alb_direct',  nband, ncol)
-    sfc_alb_dif =  read_field(ncid, 'sfc_alb_diffuse', nband, ncol)
+    ncol  = length( size( ds["col"] ) ) #get_dim_size(ncid, 'col')
+    nband = length( size( ds["band"]) ) #get_dim_size(ncid, 'band')
+
+    sza         =  ds["solar_zenith_angle"][:]
+    tsi         =  ds["total_solar_irradiance"][:]
+    sfc_alb_dir =  ds["sfc_alb_direct"]
+    sfc_alb_dif =  ds["sfc_alb_diffuse"]
 
     # read tsi_scaling only if variable is present in the netCDF file
-    if(var_exists(ncid, 'tsi_scaling')) tsi_scaling = read_field(ncid, 'tsi_scaling' )
-
-    ncid = nf90_close(ncid)
-  end subroutine read_sw_bc
+    if haskey(ds,"tsi_scaling") 
+      tsi_scaling = ds["tsi_scaling"][:]
+    end 
+#    ncid = nf90_close(ncid)
+ 
+    return sza,tsi,sfc_alb_dir,sfc_alb_dif,tsi_scaling 
+   
+  end #subroutine read_sw_bc
   #--------------------------------------------------------------------------------------------------------------------
+#---current
   #
   # Write broadband and by-band fluxes
   #
@@ -658,12 +698,12 @@ module mo_test_files_io
     ncid = nf90_close(ncid)
   end subroutine write_direction
   #--------------------------------------------------------------------------------------------------------------------
-  subroutine read_direction(fileName, top_at_1)
-    character(len=*),           intent(in ) :: fileName
-    logical,                    intent(out) :: top_at_1
+  function read_direction(fileName, top_at_1)
+#    character(len=*),           intent(in ) :: fileName
+#    logical,                    intent(out) :: top_at_1
      # -------------------
-    integer :: ncid, status
-    integer :: top
+#    integer :: ncid, status
+#    integer :: top
 
     if(nf90_open(trim(fileName), NF90_NOWRITE, ncid) /= NF90_NOERR) &
       call stop_on_err("read_direction: can't open file " // trim(fileName))
@@ -958,41 +998,41 @@ module mo_test_files_io
     ncid = nf90_close(ncid)
   end subroutine write_gpt_fluxes
   #--------------------------------------------------------------------------------------------------------------------
-  subroutine read_gpt_fluxes(fileName, gpt_flux_up, gpt_flux_dn, gpt_flux_dn_dir)
-    character(len=*),           intent(in ) :: fileName
-    real(wp), dimension(:,:,:), allocatable, &
-                                intent(out) :: gpt_flux_up, gpt_flux_dn
-    real(wp), dimension(:,:,:), allocatable, optional, &
-                                intent(out) :: gpt_flux_dn_dir
-    # -------------------
-    integer :: ncid
-    integer :: ncol, nlev, ngpt
-    # -------------------
-    if(nf90_open(trim(fileName), NF90_NOWRITE, ncid) /= NF90_NOERR) &
-      call stop_on_err("read_gpt_fluxes: can't open file " // trim(fileName))
+  function read_gpt_fluxes(ds, gpt_flux_up, gpt_flux_dn, gpt_flux_dn_dir)
+#    character(len=*),           intent(in ) :: fileName
+#    real(wp), dimension(:,:,:), allocatable, &
+#                                intent(out) :: gpt_flux_up, gpt_flux_dn
+#    real(wp), dimension(:,:,:), allocatable, optional, &
+#                                intent(out) :: gpt_flux_dn_dir
+#    # -------------------
+#    integer :: ncid
+#    integer :: ncol, nlev, ngpt
+#    # -------------------
+#    if(nf90_open(trim(fileName), NF90_NOWRITE, ncid) /= NF90_NOERR) &
+#      call stop_on_err("read_gpt_fluxes: can't open file " // trim(fileName))
 
-    ncol = get_dim_size(ncid, 'col')
-    nlev = get_dim_size(ncid, 'lev')
-    ngpt = get_dim_size(ncid, 'gpt')
+    ncol = ds.dim["col"]
+    nlev = ds.dim["lev"]
+    ngpt = ds.dim["gpt"]
 
-    gpt_flux_up    = read_field(ncid, 'gpt_flux_up', ncol, nlev, ngpt)
-    gpt_flux_dn    = read_field(ncid, 'gpt_flux_dn', ncol, nlev, ngpt)
-    if(present(gpt_flux_dn_dir)) &
-      gpt_flux_dn_dir = read_field(ncid, 'gpt_flux_dn_dir', ncol, nlev, ngpt)
+    gpt_flux_up    = ds["gpt_flux_up"][:]
+    gpt_flux_dn    = ds["gpt_flux_dn"][:]
+    if haskey(ds,"gpt_flux_dn_dir")
+      gpt_flux_dn_dir = ds["gpt_flux_dn_dir"][:]
+    end
 
-    ncid = nf90_close(ncid)
-  end subroutine read_gpt_fluxes
+#    ncid = nf90_close(ncid)
+  end #subroutine read_gpt_fluxes
   #--------------------------------------------------------------------------------------------------------------------
-  subroutine stop_on_err(msg)
-    #
-    # Print error message and stop
-    #
-    use iso_fortran_env, only : error_unit
-    character(len=*), intent(in) :: msg
-    if(len_trim(msg) > 0) then
-      write(error_unit,*) trim(msg)
-      stop
-    end if
-  end subroutine
+  function stop_on_err(msg)
+#    #
+#    # Print error message and stop
+#    #
+#    use iso_fortran_env, only : error_unit
+#    character(len=*), intent(in) :: msg
+    if length(strip(msg)) > 0
+      error(strip(msg))
+    end
+  end
   #--------------------------------------------------------------------------------------------------------------------
-end module mo_test_files_io
+end #module mo_test_files_io
