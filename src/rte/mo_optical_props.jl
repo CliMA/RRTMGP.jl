@@ -41,7 +41,6 @@ Subsets of optical properties held as arrays may be extracted along the column d
 module mo_optical_props
 
 using ..mo_util_array
-using ..mo_optical_props_kernels
 
 export init!,
        init_base_from_copy!,
@@ -86,33 +85,39 @@ export ty_optical_props_arry
 abstract type ty_optical_props_arry{T,I} <: ty_optical_props{T,I} end
 
 struct ty_optical_props_1scl{T,I} <: ty_optical_props{T,I}
-  band2gpt::Array{T,2}        # (begin g-point, end g-point) = band2gpt(2,band)
-  gpt2band::Array{I,1}        # band = gpt2band(g-point)
-  band_lims_wvn::Array{T,2}   # (upper and lower wavenumber by band) = band_lims_wvn(2,band)
-  name::String
-  tau::Array{T,3}
+  band2gpt#::Array{T,2}        # (begin g-point, end g-point) = band2gpt(2,band)
+  gpt2band#::Array{I,1}        # band = gpt2band(g-point)
+  band_lims_wvn#::Array{T,2}   # (upper and lower wavenumber by band) = band_lims_wvn(2,band)
+  name#::String
+  tau#::Array{T,3}
 end
 
 struct ty_optical_props_2str{T,I} <: ty_optical_props{T,I}
-  band2gpt::Array{T,2}        # (begin g-point, end g-point) = band2gpt(2,band)
-  gpt2band::Array{I,1}        # band = gpt2band(g-point)
-  band_lims_wvn::Array{T,2}   # (upper and lower wavenumber by band) = band_lims_wvn(2,band)
-  name::String
-  tau::Array{T,3}
-  ssa::Array{T,3}
-  g::Array{T,3}
+  band2gpt#::Array{T,2}        # (begin g-point, end g-point) = band2gpt(2,band)
+  gpt2band#::Array{I,1}        # band = gpt2band(g-point)
+  band_lims_wvn#::Array{T,2}   # (upper and lower wavenumber by band) = band_lims_wvn(2,band)
+  name#::String
+  tau#::Array{T,3}
+  ssa#::Array{T,3}
+  g#::Array{T,3}
 end
 
 struct ty_optical_props_nstr{T,I} <: ty_optical_props{T,I}
-  band2gpt::Array{T,2}        # (begin g-point, end g-point) = band2gpt(2,band)
-  gpt2band::Array{I,1}        # band = gpt2band(g-point)
-  band_lims_wvn::Array{T,2}   # (upper and lower wavenumber by band) = band_lims_wvn(2,band)
-  name::String
-  tau::Array{T,3}
-  ssa::Array{T,3}
-  p::Array{T,4}
+  band2gpt#::Array{T,2}        # (begin g-point, end g-point) = band2gpt(2,band)
+  gpt2band#::Array{I,1}        # band = gpt2band(g-point)
+  band_lims_wvn#::Array{T,2}   # (upper and lower wavenumber by band) = band_lims_wvn(2,band)
+  name#::String
+  tau#::Array{T,3}
+  ssa#::Array{T,3}
+  p#::Array{T,4}
 end
 
+
+# ty_optical_props_1scl() = ty_optical_props_1scl(nothing,nothing,nothing,nothing,nothing)
+# ty_optical_props_2str() = ty_optical_props_2str(nothing,nothing,nothing,nothing,nothing,nothing,nothing)
+# ty_optical_props_nstr() = ty_optical_props_nstr(nothing,nothing,nothing,nothing,nothing,nothing,nothing)
+
+# band_lims_wvn, band_lims_gpt
   # -------------------------------------------------------------------------------------------------
   #
   #  Routines for the base class: initialization, validity checking, finalization
@@ -138,72 +143,36 @@ end
     integer :: iband
     integer, dimension(2, size(band_lims_wvn, 2)) :: band_lims_gpt_lcl
 """
-  function init!(this::ty_optical_props{DT}, band_lims_wvn, band_lims_gpt=nothing, name=nothing) where DT
-    # -------------------------
-    #
-    # Error checking -- are the arrays the size we expect, contain positive values?
-    #
-    err_message = ""
-    if size(band_lims_wvn,1) ≠ 2
-      err_message = "init(optical_props): band_lims_wvn 1st dim should be 2"
-    end
-    if any_vals_less_than(band_lims_wvn, DT(0))
-      err_message = "init(optical_props): band_lims_wvn has values <  0., respectively"
-    end
-    if len_trim(err_message) > 0
-      return
-    end
+  function ty_optical_props_1scl(name, band_lims_wvn, band_lims_gpt=nothing)
+    DT = eltype(band_lims_wvn)
+
+    @assert size(band_lims_wvn,1) == 2
+    @show typeof(band_lims_wvn)
+    @assert !any(band_lims_wvn.<DT(0))
+    @show band_lims_gpt
+    band_lims_gpt_lcl = Array{Int}(undef, 2, size(band_lims_wvn, 2))
     if band_lims_gpt ≠ nothing
-
-      if size(band_lims_gpt, 1) ≠ 2
-        err_message = "init(optical_props): band_lims_gpt 1st dim should be 2"
-      end
-
-      if size(band_lims_gpt,2) ≠ size(band_lims_wvn,2)
-        err_message = "init(optical_props): band_lims_gpt and band_lims_wvn sized inconsistently"
-      end
-
-      if any(band_lims_gpt < 1)
-        err_message = "init(optical_props): band_lims_gpt has values < 1"
-      end
-
-      if len_trim(err_message) > 0
-        return
-      end
-
+      @assert size(band_lims_gpt,1) == 2
+      @assert size(band_lims_gpt,2) == size(band_lims_wvn,2)
+      @assert !any(band_lims_gpt .< 1)
       band_lims_gpt_lcl[:,:] .= band_lims_gpt[:,:]
     else
-      #
-      # Assume that values are defined by band, one g-point per band
-      #
       for iband in 1:size(band_lims_wvn, 2)
         band_lims_gpt_lcl[1:2,iband] = iband
       end
     end
-    #
-    # Assignment
-    #
-    allocated(this.band2gpt     ) && deallocate!(this.band2gpt)
-    allocated(this.band_lims_wvn) && deallocate!(this.band_lims_wvn)
-    this.band2gpt = Array(undef, 2,size(band_lims_wvn,2))
-    this.band_lims_wvn = Array(undef, 2,size(band_lims_wvn,2))
-    this.band2gpt      = band_lims_gpt_lcl
-    this.band_lims_wvn = band_lims_wvn
-    if name ≠ nothing
-      this.name = strip(name)
-    end
 
-    #
+    band2gpt = band_lims_gpt_lcl
+
     # Make a map between g-points and bands
     #   Efficient only when g-point indexes start at 1 and are contiguous.
-    #
 
-    allocated(this.gpt2band) && deallocate!(this.gpt2band)
-    this.gpt2band = Array(undef, maxval(band_lims_gpt_lcl))
-    for iband in 1:size(band_lims_gpt_lcl, dim=2)
-      this.gpt2band[band_lims_gpt_lcl[1,iband]:band_lims_gpt_lcl[2,iband]] = iband
+    gpt2band = Array{Int}(undef, max(band_lims_gpt_lcl...))
+    for iband in 1:size(band_lims_gpt_lcl, 2)
+      gpt2band[band_lims_gpt_lcl[1,iband]:band_lims_gpt_lcl[2,iband]] .= iband
     end
-    return err_message
+    tau = nothing
+    return ty_optical_props_1scl{DT, Int}(band2gpt,gpt2band,band_lims_wvn,name,tau)
   end
 
 """
@@ -815,45 +784,7 @@ end
       # Increment by gpoint
       #   (or by band if both op_in and op_io are defined that way)
       #
-      if op_io isa ty_optical_props_1scl
-
-        if op_in isa ty_optical_props_1scl
-          increment_1scalar_by_1scalar!(ncol, nlay, ngpt, op_io.tau, op_in.tau)
-        elseif op_in isa ty_optical_props_2str
-           increment_1scalar_by_2stream!(ncol, nlay, ngpt, op_io.tau, op_in.tau, op_in.ssa)
-        elseif op_in isa ty_optical_props_nstr
-           increment_1scalar_by_nstream!(ncol, nlay, ngpt, op_io.tau, op_in.tau, op_in.ssa)
-        else
-          error("Uncaught case 1 in increment!(op_in, op_io)")
-        end
-
-      elseif op_io isa ty_optical_props_2str
-
-        if op_in isa ty_optical_props_1scl
-          increment_2stream_by_1scalar!(ncol, nlay, ngpt, op_io.tau, op_io.ssa, op_in.tau)
-        elseif op_in isa ty_optical_props_2str
-          increment_2stream_by_2stream!(ncol, nlay, ngpt, op_io.tau, op_io.ssa, op_io.g, op_in.tau, op_in.ssa, op_in.g)
-        elseif op_in isa ty_optical_props_nstr
-          increment_2stream_by_nstream!(ncol, nlay, ngpt, get_nmom(op_in), op_io.tau, op_io.ssa, op_io.g, op_in.tau, op_in.ssa, op_in.p)
-        else
-          error("Uncaught case 1 in increment!(op_in, op_io)")
-        end
-
-      elseif op_io isa ty_optical_props_nstr
-
-        if op_in isa ty_optical_props_1scl
-          increment_nstream_by_1scalar!(ncol, nlay, ngpt, op_io.tau, op_io.ssa, op_in.tau)
-        elseif op_in isa ty_optical_props_2str
-          increment_nstream_by_2stream!(ncol, nlay, ngpt, get_nmom(op_io), op_io.tau, op_io.ssa, op_io.p, op_in.tau, op_in.ssa, op_in.g)
-        elseif op_in isa ty_optical_props_nstr
-          increment_nstream_by_nstream!(ncol, nlay, ngpt, get_nmom(op_io), get_nmom(op_in), op_io.tau, op_io.ssa, op_io.p, op_in.tau, op_in.ssa, op_in.p)
-        else
-          error("Uncaught case 1 in increment!(op_in, op_io)")
-        end
-
-      else
-        error("Uncaught case 1 in increment!(op_in, op_io)")
-      end
+      increment_by_gpoint!(op_io, op_in)
 
     else
 
@@ -868,44 +799,7 @@ end
       #
       # Increment by band
       #
-      if op_io isa ty_optical_props_1scl
-
-        if op_in isa ty_optical_props_1scl
-          inc_1scalar_by_1scalar_bybnd!(ncol, nlay, ngpt, op_io.tau, op_in.tau, get_nband(op_io), get_band_lims_gpoint(op_io))
-        elseif op_in isa ty_optical_props_2str
-          inc_1scalar_by_2stream_bybnd!(ncol, nlay, ngpt, op_io.tau, op_in.tau, op_in.ssa, get_nband(op_io), get_band_lims_gpoint(op_io))
-        elseif op_in isa ty_optical_props_nstr
-          inc_1scalar_by_nstream_bybnd!(ncol, nlay, ngpt, op_io.tau, op_in.tau, op_in.ssa, get_nband(op_io), get_band_lims_gpoint(op_io))
-        else
-          error("Uncaught case 1 in increment!(op_in, op_io)")
-        end
-
-      elseif op_io isa ty_optical_props_2str
-
-        if op_in isa ty_optical_props_1scl
-          inc_2stream_by_1scalar_bybnd!(ncol, nlay, ngpt, op_io.tau, op_io.ssa, op_in.tau, get_nband(op_io), get_band_lims_gpoint(op_io))
-        elseif op_in isa ty_optical_props_2str
-          inc_2stream_by_2stream_bybnd!(ncol, nlay, ngpt, op_io.tau, op_io.ssa, op_io.g, op_in.tau, op_in.ssa, op_in.g, get_nband(op_io), get_band_lims_gpoint(op_io))
-        elseif op_in isa ty_optical_props_nstr
-          inc_2stream_by_nstream_bybnd!(ncol, nlay, ngpt, get_nmom(op_in), op_io.tau, op_io.ssa, op_io.g, op_in.tau, op_in.ssa, op_in.p, get_nband(op_io), get_band_lims_gpoint(op_io))
-        else
-          error("Uncaught case 1 in increment!(op_in, op_io)")
-        end
-
-      elseif op_io isa ty_optical_props_nstr
-        if op_in isa ty_optical_props_1scl
-          inc_nstream_by_1scalar_bybnd!(ncol, nlay, ngpt, op_io.tau, op_io.ssa, op_in.tau, get_nband(op_io), get_band_lims_gpoint(op_io))
-        elseif op_in isa ty_optical_props_2str
-          inc_nstream_by_2stream_bybnd!(ncol, nlay, ngpt, get_nmom(op_io), op_io.tau, op_io.ssa, op_io.p, op_in.tau, op_in.ssa, op_in.g, get_nband(op_io), get_band_lims_gpoint(op_io))
-        elseif op_in isa ty_optical_props_nstr
-          inc_nstream_by_nstream_bybnd!(ncol, nlay, ngpt, get_nmom(op_io), get_nmom(op_in), op_io.tau, op_io.ssa, op_io.p, op_in.tau, op_in.ssa, op_in.p, get_nband(op_io), get_band_lims_gpoint(op_io))
-        else
-          error("Uncaught case 1 in increment!(op_in, op_io)")
-        end
-      else
-        error("Uncaught case 1 in increment!(op_in, op_io)")
-      end
-
+      increment_bybnd!(op_io, op_in)
     end
   end
 
@@ -1117,5 +1011,7 @@ end
 """
   get_name(this) = trim(this.name)
   # ------------------------------------------------------------------------------------------
+
+include(joinpath("kernels","mo_optical_props_kernels.jl"))
 
 end # module

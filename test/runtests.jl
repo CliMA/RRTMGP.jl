@@ -1,6 +1,7 @@
 using Test
 
 for submodule in [
+                  "adding",
                   "RTE",
                   "RRTMG",
                   ]
