@@ -14,7 +14,8 @@ function compare(ds, var_tuple)
   for (A, name) in var_tuple
     A_ds = get_array(ds, name, eltype(A))
     if !all(A_ds .≈ A)
-      @show name, sum(abs.(A_ds - A))
+      d = abs.(A_ds - A)
+      @show name, sum(d)
       D[name] = false
     end
   end
@@ -144,7 +145,7 @@ end
   # @show haskey(ds, "top_at_1")
   # top_at_1 = read_direction(fileName)
   top_at_1 = ds.attrib["top_at_1"]==1
-  # @show top_at_1
+  @show top_at_1
   DT = Float64
   spectral_disc = read_spectral_disc(ds, DT)
   @show spectral_disc

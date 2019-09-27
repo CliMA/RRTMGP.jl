@@ -900,49 +900,49 @@ function adding!(ncol, nlay, top_at_1,
   if top_at_1
     ilev = nlay + 1
     # Albedo of lowest level is the surface albedo...
-    albedo[:,ilev]  = albedo_sfc[:]
+    albedo[:,ilev]  = albedo_sfc
     # ... and source of diffuse radiation is surface emission
-    src[:,ilev] = src_sfc[:]
+    src[:,ilev] .= src_sfc
 
     #
     # From bottom to top of atmosphere --
     #   compute albedo and source of upward radiation
     #
     for ilev in nlay:-1:1
-      denom[:, ilev] = DT(1)/(DT(1) - rdif[:,ilev]*albedo[:,ilev+1])                 # Eq 10
-      albedo[:,ilev] = rdif[:,ilev] +
-                       tdif[:,ilev]*tdif[:,ilev] * albedo[:,ilev+1] * denom[:,ilev] # Equation 9
+      denom[:, ilev] .= DT(1)/(DT(1) - rdif[:,ilev].*albedo[:,ilev+1])                 # Eq 10
+      albedo[:,ilev] .= rdif[:,ilev] +
+                       tdif[:,ilev].*tdif[:,ilev] .* albedo[:,ilev+1] .* denom[:,ilev] # Equation 9
       #
       # Equation 11 -- source is emitted upward radiation at top of layer plus
       #   radiation emitted at bottom of layer,
       #   transmitted through the layer and reflected from layers below (tdiff*src*albedo)
       #
-      src[:,ilev] =  src_up[:, ilev] +
-                     tdif[:,ilev] * denom[:,ilev] *
-                       (src[:,ilev+1] + albedo[:,ilev+1]*src_dn[:,ilev])
+      src[:,ilev] .=  src_up[:, ilev] .+
+                     tdif[:,ilev] .* denom[:,ilev] .*
+                       (src[:,ilev+1] .+ albedo[:,ilev+1].*src_dn[:,ilev])
     end
 
     # Eq 12, at the top of the domain upwelling diffuse is due to ...
     ilev = 1
-    flux_up[:,ilev] = flux_dn[:,ilev] * albedo[:,ilev] +  # ... reflection of incident diffuse and
+    flux_up[:,ilev] .= flux_dn[:,ilev] .* albedo[:,ilev] .+  # ... reflection of incident diffuse and
                       src[:,ilev]                          # emission from below
 
     #
     # From the top of the atmosphere downward -- compute fluxes
     #
     for ilev in 2:nlay+1
-      flux_dn[:,ilev] = (tdif[:,ilev-1]*flux_dn[:,ilev-1] +   # Equation 13
-                         rdif[:,ilev-1]*src[:,ilev] +
-                         src_dn[:,ilev-1]) * denom[:,ilev-1]
-      flux_up[:,ilev] = flux_dn[:,ilev] * albedo[:,ilev] +  # Equation 12
+      flux_dn[:,ilev] .= (tdif[:,ilev-1].*flux_dn[:,ilev-1] +   # Equation 13
+                         rdif[:,ilev-1].*src[:,ilev] +
+                         src_dn[:,ilev-1]) .* denom[:,ilev-1]
+      flux_up[:,ilev] = flux_dn[:,ilev] .* albedo[:,ilev] +  # Equation 12
                         src[:,ilev]
     end
   else
     ilev = 1
     # Albedo of lowest level is the surface albedo...
-    albedo[:,ilev]  = albedo_sfc[:]
+    albedo[:,ilev] .= albedo_sfc[:]
     # ... and source of diffuse radiation is surface emission
-    src[:,ilev] = src_sfc[:]
+    src[:,ilev] .= src_sfc[:]
 
     #
     # From bottom to top of atmosphere --
