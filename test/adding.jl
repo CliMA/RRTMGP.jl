@@ -10,14 +10,15 @@ get_array(ds, name, DT, s) = haskey(ds, name) ? convert(Array{DT}, ds[name][:]) 
 get_dim_size(ds, name) = ds.dim[name]
 
 function compare(ds, var_tuple)
-  D = Dict(name => true for (var,name) in var_tuple)
+  D = Dict()
   for (A, name) in var_tuple
     A_ds = get_array(ds, name, eltype(A))
-    if !all(A_ds .≈ A)
-      d = abs.(A_ds - A)
-      @show name, sum(d)
-      D[name] = false
-    end
+    d = abs.(A_ds - A)
+    # @show size(A_ds), length(size(d))
+    # @show name, sum(d)
+    # D[name] = [sum(d, dims=i) for i in 1:length(size(d))]
+    # D[name] = [sum(d, dims=[j for j in 1:length(size(d)) if i ≠ j]) for i in 1:length(size(d))]
+    D[name] = false
   end
   return D
 end
@@ -84,17 +85,6 @@ function read_spectral_disc(ds, DT)
     # ncid = nf90_close(ncid)
 end
 
-# function stop_on_err(msg)
-#   #
-#   # Print error message and stop
-#   #
-#   # character(len=*), intent(in) :: msg
-#   if len_trim(msg) > 0
-#     println(trim(msg))
-#     println("test_adding stopping")
-#     error("Done in stop_on_err in adding.jl")
-#   end
-# end
 # ----------------------------------------------------------------------------------
 # program test_adding
 @testset "test_adding" begin
@@ -141,14 +131,11 @@ end
   ds = Dataset(fileName, "r")
   do_sw = haskey(ds, "solar_zenith_angle")
   # do_sw = var_exists(ncid, '')
-  @show do_sw
   # @show haskey(ds, "top_at_1")
   # top_at_1 = read_direction(fileName)
   top_at_1 = ds.attrib["top_at_1"]==1
-  @show top_at_1
   DT = Float64
   spectral_disc = read_spectral_disc(ds, DT)
-  @show spectral_disc
   source_up, source_dn, source_sfc = read_sources(ds, DT)
   if do_sw
     Rdif, Tdif, Rdir, Tdir, Tnoscat = read_two_stream(ds, DT)
@@ -220,7 +207,7 @@ end
   # @show haskey(ds,"gpt_flux_dn_dir")
   D = compare(ds, ((flux_dn,"gpt_flux_dn"),
                    (flux_up,"gpt_flux_up")))
-  @show D
+  # @show D
   close(ds)
 
 end

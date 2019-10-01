@@ -81,7 +81,6 @@ module mo_rte_sw
     nlay  = get_nlay(atmos)
     ngpt  = get_ngpt(atmos)
     nband = get_nband(atmos)
-    error_msg = ""
 
     # ------------------------------------------------------------------------------------
     #
@@ -89,57 +88,50 @@ module mo_rte_sw
     #
     # --------------------------------
     if(!are_desired(fluxes))
-      error_msg = "rte_sw: no space allocated for fluxes"
-      return
+      error("rte_sw: no space allocated for fluxes")
     end
 
     #
     # Sizes and values of input arrays
     #
     if( size(mu0)[1] !=  ncol )
-      error_msg = "rte_sw: mu0 inconsistently sized"
+      error("rte_sw: mu0 inconsistently sized")
     end
 
     if(any_vals_outside(mu0, wp(0), wp(1)))
-      error_msg = "rte_sw: one or more mu0 <= 0 or > 1"
+      error("rte_sw: one or more mu0 <= 0 or > 1")
     end
 
     if(any([size(inc_flux)[1], size(inc_flux)[2]] .!= [ncol, ngpt]))
-      error_msg = "rte_sw: inc_flux inconsistently sized"
+      error("rte_sw: inc_flux inconsistently sized")
     end
 
     if any_vals_less_than(inc_flux, wp(0))
-      error_msg = "rte_sw: one or more inc_flux < 0"
+      error("rte_sw: one or more inc_flux < 0")
     end
 
     if present(inc_flux_dif)
       if any([size(inc_flux_dif)[1], size(inc_flux_dif)[2]] .!= [ncol, ngpt])
-        error_msg = "rte_sw: inc_flux_dif inconsistently sized"
+        error("rte_sw: inc_flux_dif inconsistently sized")
       end
       if any_vals_less_than(inc_flux_dif, wp(0))
-        error_msg = "rte_sw: one or more inc_flux_dif < 0"
+        error("rte_sw: one or more inc_flux_dif < 0")
       end
     end
 
     if any([size(sfc_alb_dir)[1], size(sfc_alb_dir)[2]] .!= [nband, ncol])
-      error_msg = "rte_sw: sfc_alb_dir inconsistently sized"
+      error("rte_sw: sfc_alb_dir inconsistently sized")
     end
     if(any_vals_outside(sfc_alb_dir,  wp(0), wp(1)))
-      error_msg = "rte_sw: sfc_alb_dir out of bounds [0,1]"
+      error("rte_sw: sfc_alb_dir out of bounds [0,1]")
     end
     if(any([size(sfc_alb_dif)[1], size(sfc_alb_dif)[2]] .!= [nband, ncol]))
-      error_msg = "rte_sw: sfc_alb_dif inconsistently sized"
+      error("rte_sw: sfc_alb_dif inconsistently sized")
     end
     if(any_vals_outside(sfc_alb_dif, wp(0), wp(1)))
-      error_msg = "rte_sw: sfc_alb_dif out of bounds [0,1]"
+      error("rte_sw: sfc_alb_dif out of bounds [0,1]")
     end
 
-    if(length( strip(error_msg) ) > 0)
-      if(length(strip(get_name(atmos))) > 0)
-        error_msg = strip(get_name(atmos)) * ": " * strip(error_msg)
-      end
-      return
-    end
     # ------------------------------------------------------------------------------------
     gpt_flux_up  = Array{wp}(undef,ncol, nlay+1, ngpt)
     gpt_flux_dn  = Array{wp}(undef,ncol, nlay+1, ngpt)
@@ -199,10 +191,7 @@ module mo_rte_sw
         # two-stream calculation with scattering
         #
 #        #$acc enter data copyin(atmos, atmos%tau, atmos%ssa, atmos%g)
-        error_msg =  validate(atmos)
-        if(length(strip(error_msg)) > 0)
-          return error_msg
-        end
+        validate(atmos)
         sw_solver_2stream(ncol, nlay, ngpt, logical(top_at_1, wl),
                                atmos.tau, atmos.ssa, atmos.g, mu0,
                                sfc_alb_dir_gpt, sfc_alb_dif_gpt,
@@ -215,19 +204,13 @@ module mo_rte_sw
         #
         # not yet implemented so fail
         #
-        error_msg = "sw_solver(...ty_optical_props_nstr...) not yet implemented"
+        error("sw_solver(...ty_optical_props_nstr...) not yet implemented")
       end
 
-    if(length(strip(error_msg)) > 0)
-      if(length(strip(get_name(atmos))) > 0)
-        error_msg = strip(get_name(atmos)) * ": " * strip(error_msg)
-        return
-      end
-    end
     #
     # ...and reduce spectral fluxes to desired output quantities
     #
-    error_msg = reduce(fluxes,gpt_flux_up, gpt_flux_dn, atmos, top_at_1, gpt_flux_dir)
+    reduce(fluxes,gpt_flux_up, gpt_flux_dn, atmos, top_at_1, gpt_flux_dir)
 #    #$acc exit data delete(mu0)
 #    #$acc exit data delete(gpt_flux_up, gpt_flux_dn, gpt_flux_dir)
   end

@@ -1,3 +1,17 @@
+using Test
+using JRRTMGP
+using NCDatasets
+using JRRTMGP.mo_optical_props
+using JRRTMGP.mo_rte_solver_kernels
+using JRRTMGP.fortran_intrinsics
+using JRRTMGP.mo_util_array
+using JRRTMGP.mo_gas_optics_rrtmgp
+using JRRTMGP.mo_gas_concentrations
+using JRRTMGP.mo_rte_sw
+using JRRTMGP.mo_fluxes
+using JRRTMGP.mo_load_coefficients
+using JRRTMGP.mo_rfmip_io
+
 # This code is part of RRTM for GCM Applications - Parallel (RRTMGP)
 #
 # Contacts: Robert Pincus and Eli Mlawer
@@ -22,22 +36,13 @@
 # Error checking: Procedures in rte+rrtmgp return strings which are empty if no errors occured
 #   Check the incoming string, print it out and stop execution if non-empty
 #
-function stop_on_err(error_msg)
-  # use iso_fortran_env, only : error_unit
-  # character(len=*), intent(in) :: error_msg
 
-  if error_msg ≠ ""
-    println(error_unit,trim(error_msg))
-    println(error_unit,"rrtmgp_rfmip_sw stopping")
-    error("Error")
-  end
-end
 # -------------------------------------------------------------------------------------------------
 #
 # Main program
 #
 # -------------------------------------------------------------------------------------------------
-module rrtmgp_rfmip_sw
+@testset "Shortwave driver" begin
   # --------------------------------------------------
   #
   # Modules for working with rte and rrtmgp
@@ -49,35 +54,29 @@ module rrtmgp_rfmip_sw
   # Array utilities
   #
   # use mo_util_array,         only: zero_array
-  using ..mo_util_array
   #
   # Optical properties of the atmosphere as array of values
   #   In the longwave we include only absorption optical depth (_1scl)
   #   Shortwave calculations use optical depth, single-scattering albedo, asymmetry parameter (_2str)
   #
   # use mo_optical_props,      only: ty_optical_props_2str
-  using ..mo_optical_props
   #
   # Gas optics: maps physical state of the atmosphere to optical properties
   #
   # use mo_gas_optics_rrtmgp,  only: ty_gas_optics_rrtmgp
-  using ..mo_gas_optics_rrtmgp
   #
   # Gas optics uses a derived type to represent gas concentrations compactly
   #
   # use mo_gas_concentrations, only: ty_gas_concs
-  using ..mo_gas_concentrations
   #
   # RTE shortwave driver
   #
   # use mo_rte_sw,             only: rte_sw
-  using ..mo_rte_sw
   #
   # RTE driver uses a derived type to reduce spectral fluxes to whatever the user wants
   #   Here we're just reporting broadband fluxes
   #
   # use mo_fluxes,             only: ty_fluxes_broadband
-  using ..mo_fluxes
   # --------------------------------------------------
   #
   # modules for reading and writing files
@@ -85,11 +84,7 @@ module rrtmgp_rfmip_sw
   # RRTMGP's gas optics class needs to be initialized with data read from a netCDF files
   #
   # use mo_load_coefficients,  only: load_and_init
-  using ..mo_load_coefficients
   # use mo_rfmip_io,           only: read_size, read_and_block_pt, read_and_block_gases_ty, unblock_and_write, read_and_block_sw_bc, determine_gas_names
-  using ..mo_rfmip_io
-
-  function main()
 
 #ifdef USE_TIMING
   #
@@ -103,8 +98,11 @@ module rrtmgp_rfmip_sw
   #
   # Local variables
   #
-  rfmip_file = "multiple_input4MIPs_radiation_RFMIP_UColorado-RFMIP-1-2_none.nc"
-  kdist_file = "coefficients_sw.nc"
+
+  clear_sky_dir = joinpath("..", "src", "examples","rfmip-clear-sky")
+  data_dir = joinpath("..", "src", "rrtmgp","data")
+
+
   # character(len=132) :: flxdn_file, flxup_file
   # integer            :: nargs, ncol, nlay, nbnd, ngpt, nexp, nblocks, block_size, forcing_index
   # logical            :: top_at_1
@@ -134,40 +132,29 @@ module rrtmgp_rfmip_sw
   # type(ty_gas_concs), dimension(:), allocatable  :: gas_conc_array
   DT = Float64
   deg_to_rad = acos(-DT(1))/DT(180)
-#ifdef USE_TIMING
-  # integer :: ret, i
-#endif
+
   # -------------------------------------------------------------------------------------------------
   #
   # Code starts
   #   all arguments are optional
   #
-  print("Usage: rrtmgp_rfmip_sw [block_size] [rfmip_file] [k-distribution_file] [forcing_index (1,2,3)]")
-  nargs = command_argument_count()
-  block_size_char = 8
-  read_size!(rfmip_file, ncol, nlay, nexp)
-  if nargs >= 1
-    get_command_argument!(1, block_size_char)
-    # TODO: Uncomment read line:
-    # read(block_size_char, "(i4)") block_size
-  else
-    block_size = ncol
-  end
-  if nargs >= 2
-    get_command_argument!(2, rfmip_file)
-  end
-  if nargs >= 3
-    get_command_argument!(3, kdist_file)
-  end
-  if nargs >= 4
-    get_command_argument!(4, forcing_index_char)
-  end
+
+  rfmip_file = joinpath(clear_sky_dir, "multiple_input4MIPs_radiation_RFMIP_UColorado-RFMIP-1-2_none.nc")
+  kdist_file = joinpath(data_dir, "rrtmgp-data-sw-g224-2018-12-04.nc")
+  ds = Dataset(rfmip_file, "r") # reading the NetCDF file in read only mode
+  ds_k_dist = Dataset(kdist_file, "r") # reading the NetCDF file in read only mode
+
+  ncol, nlay, nexp = read_size(ds)
+
+  forcing_index = 1
+  block_size = 8
+  # error("Done")
 
   #
   # How big is the problem? Does it fit into blocks of the size we've specified?
   #
   if mod(ncol*nexp, block_size) ≠ 0
-    stop_on_err("rrtmgp_rfmip_sw: number of columns does not fit evenly into blocks.")
+    error("rrtmgp_rfmip_sw: number of columns does not fit evenly into blocks.")
   end
   nblocks = (ncol*nexp)/block_size
   println("Doing $(nblocks) blocks of size $(block_size)")
@@ -177,17 +164,18 @@ module rrtmgp_rfmip_sw
   if (forcing_index < 1 || forcing_index > 3)
     error("Forcing index is invalid (must be 1,2 or 3)")
   end
-  flxdn_file = "rsd_Efx_RTE-RRTMGP-181204_rad-irf_r1i1p1f" * trim(forcing_index_char) * "_gn.nc"
-  flxup_file = "rsu_Efx_RTE-RRTMGP-181204_rad-irf_r1i1p1f" * trim(forcing_index_char) * "_gn.nc"
+  flxdn_file = "rsd_Efx_RTE-RRTMGP-181204_rad-irf_r1i1p1f" * string(forcing_index) * "_gn.nc"
+  flxup_file = "rsu_Efx_RTE-RRTMGP-181204_rad-irf_r1i1p1f" * string(forcing_index) * "_gn.nc"
 
   #
   # Identify the set of gases used in the calculation based on the forcing index
   #   A gas might have a different name in the k-distribution than in the files
   #   provided by RFMIP (e.g. 'co2' and 'carbon_dioxide')
   #
-  determine_gas_names!(rfmip_file, kdist_file, forcing_index, kdist_gas_names, rfmip_gas_games)
+  # names_in_kdist, names_in_file = determine_gas_names(ds_k_dist, forcing_index)
+  kdist_gas_names, rfmip_gas_games = determine_gas_names(ds_k_dist, forcing_index)
   print("Calculation uses RFMIP gases: ")
-  @show b, rfmip_gas_games[b], size(rfmip_gas_games)
+  @show rfmip_gas_games
 
   # --------------------------------------------------
   #
@@ -196,7 +184,7 @@ module rrtmgp_rfmip_sw
   #
   # Allocation on assignment within reading routines
   #
-  read_and_block_pt!(rfmip_file, block_size, p_lay, p_lev, t_lay, t_lev)
+  p_lay, p_lev, t_lay, t_lev = read_and_block_pt(ds, block_size)
   #
   # Are the arrays ordered in the vertical with 1 at the top or the bottom of the domain?
   #
@@ -205,13 +193,13 @@ module rrtmgp_rfmip_sw
   #
   # Read the gas concentrations and surface properties
   #
-  read_and_block_gases_ty!(rfmip_file, block_size, kdist_gas_names, rfmip_gas_games, gas_conc_array)
-  read_and_block_sw_bc!(rfmip_file, block_size, surface_albedo, total_solar_irradiance, solar_zenith_angle)
+  gas_conc_array = read_and_block_gases_ty(ds, block_size, kdist_gas_names, rfmip_gas_games)
+  surface_albedo, total_solar_irradiance, solar_zenith_angle = read_and_block_sw_bc(ds, block_size)
   #
   # Read k-distribution information. load_and_init() reads data from netCDF and calls
   #   k_dist%init(); users might want to use their own reading methods
   #
-  load_and_init!(k_dist, trim(kdist_file), gas_conc_array[1])
+  load_and_init!(k_dist, strip(kdist_file), gas_conc_array[1])
   if(!source_is_external(k_dist))
     error("rrtmgp_rfmip_sw: k-distribution file is not SW")
   end
@@ -250,7 +238,7 @@ module rrtmgp_rfmip_sw
   flux_dn = Array{DT}(undef, block_size, nlay+1, nblocks)
   mu0 = Array{DT}(undef, block_size)
   sfc_alb_spec = Array{DT}(undef, nbnd,block_size)
-  stop_on_err(alloc!(optical_props, block_size, nlay, k_dist))
+  alloc!(optical_props, block_size, nlay, k_dist)
   #$acc enter data create(optical_props, optical_props%tau, optical_props%ssa, optical_props%g)
   #$acc enter data create (toa_flux, def_tsi)
   #$acc enter data create (sfc_alb_spec, mu0)
@@ -279,12 +267,12 @@ module rrtmgp_rfmip_sw
 #ifdef USE_TIMING
     # ret =  gptlstart('gas_optics (SW)')
 #endif
-    stop_on_err(gas_optics!(k_dist,p_lay[:,:,b],
-                                  p_lev[:,:,b],
-                                  t_lay[:,:,b],
-                                  gas_conc_array[b],
-                                  optical_props,
-                                  toa_flux))
+    gas_optics!(k_dist,p_lay[:,:,b],
+                p_lev[:,:,b],
+                t_lay[:,:,b],
+                gas_conc_array[b],
+                optical_props,
+                toa_flux)
 #ifdef USE_TIMING
     # ret =  gptlstop('gas_optics (SW)')
 #endif
@@ -340,13 +328,13 @@ module rrtmgp_rfmip_sw
 #ifdef USE_TIMING
     # ret =  gptlstart('rte_sw')
 #endif
-    stop_on_err(rte_sw(optical_props,
-                            top_at_1,
-                            mu0,
-                            toa_flux,
-                            sfc_alb_spec,
-                            sfc_alb_spec,
-                            fluxes))
+    rte_sw(optical_props,
+           top_at_1,
+           mu0,
+           toa_flux,
+           sfc_alb_spec,
+           sfc_alb_spec,
+           fluxes)
 #ifdef USE_TIMING
     # ret =  gptlstop('rte_sw')
 #endif
@@ -372,8 +360,7 @@ module rrtmgp_rfmip_sw
   #$acc exit data delete(sfc_alb_spec, mu0)
   #$acc exit data delete(toa_flux, def_tsi)
   # --------------------------------------------------
-  unblock_and_write!(trim(flxup_file), "rsu", flux_up)
-  unblock_and_write!(trim(flxdn_file), "rsd", flux_dn)
-end
+  unblock_and_write!(strip(flxup_file), "rsu", flux_up)
+  unblock_and_write!(strip(flxdn_file), "rsd", flux_dn)
 
 end

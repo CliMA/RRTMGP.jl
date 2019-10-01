@@ -909,8 +909,8 @@ function adding!(ncol, nlay, top_at_1,
     #   compute albedo and source of upward radiation
     #
     for ilev in nlay:-1:1
-      denom[:, ilev] .= DT(1)/(DT(1) - rdif[:,ilev].*albedo[:,ilev+1])                 # Eq 10
-      albedo[:,ilev] .= rdif[:,ilev] +
+      denom[:, ilev] .= DT(1) ./ (DT(1) .- rdif[:,ilev].*albedo[:,ilev+1])                 # Eq 10
+      albedo[:,ilev] .= rdif[:,ilev] .+
                        tdif[:,ilev].*tdif[:,ilev] .* albedo[:,ilev+1] .* denom[:,ilev] # Equation 9
       #
       # Equation 11 -- source is emitted upward radiation at top of layer plus

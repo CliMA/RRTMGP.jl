@@ -5,25 +5,12 @@ module mo_load_coefficients
   using ..fortran_intrinsics
   using NCDatasets
 
-  export load_and_init, stop_on_err
-
-#-------------------------
-  function stop_on_err(msg)
-#    use iso_fortran_env, only : error_unit
-#    character(len=*), intent(in) :: msg
-
-    if msg != ""
-      error(msg)
-    end
-  end
-
+  export load_and_init
 
 #--------------------------
-  function load_and_init(kdist::ty_gas_optics_rrtmgp, filename::String, available_gases::ty_gas_concs)
+  function load_and_init(kdist::ty_gas_optics_rrtmgp, ds, available_gases::ty_gas_concs)
 
   # Reading the properties from the NetCDF file
-
-  ds = Dataset(filename,"r")
 
   gas_names                       = ds["gas_names"][:]
   key_species                     = ds["key_species"][:]
@@ -66,76 +53,75 @@ module mo_load_coefficients
     totplnk     =      ds["totplnk"][:]
     planck_frac =      ds["plank_fraction"][:]
 
-    stop_on_err(load!(kdist,
-                      available_gases,
-                      gas_names,
-                      key_species,
-                      band2gpt,
-                      band_lims,
-                      press_ref,
-                      press_ref_trop,
-                      temp_ref,
-                      temp_ref_p,
-                      temp_ref_t,
-                      vmr_ref,
-                      kmajor,
-                      kminor_lower,
-                      kminor_upper,
-                      gas_minor,
-                      identifier_minor,
-                      minor_gases_lower,
-                      minor_gases_upper,
-                      minor_limits_gpt_lower,
-                      minor_limits_gpt_upper,
-                      minor_scales_with_density_lower,
-                      minor_scales_with_density_upper,
-                      scaling_gas_lower,
-                      scaling_gas_upper,
-                      scale_by_complement_lower,
-                      scale_by_complement_upper,
-                      kminor_start_lower,
-                      kminor_start_upper,
-                      totplnk, planck_frac,
-                      rayl_lower,
-                      rayl_upper))
+    load!(kdist,
+          available_gases,
+          gas_names,
+          key_species,
+          band2gpt,
+          band_lims,
+          press_ref,
+          press_ref_trop,
+          temp_ref,
+          temp_ref_p,
+          temp_ref_t,
+          vmr_ref,
+          kmajor,
+          kminor_lower,
+          kminor_upper,
+          gas_minor,
+          identifier_minor,
+          minor_gases_lower,
+          minor_gases_upper,
+          minor_limits_gpt_lower,
+          minor_limits_gpt_upper,
+          minor_scales_with_density_lower,
+          minor_scales_with_density_upper,
+          scaling_gas_lower,
+          scaling_gas_upper,
+          scale_by_complement_lower,
+          scale_by_complement_upper,
+          kminor_start_lower,
+          kminor_start_upper,
+          totplnk, planck_frac,
+          rayl_lower,
+          rayl_upper)
 
   else
 
     solar_src = ds["solar_source"][:]
 
-    stop_on_err(load!(kdist,
-                      available_gases,
-                      gas_names,
-                      key_species,
-                      band2gpt,
-                      band_lims,
-                      press_ref,
-                      press_ref_trop,
-                      temp_ref,
-                      temp_ref_p,
-                      temp_ref_t,
-                      vmr_ref,
-                      kmajor,
-                      kminor_lower,
-                      kminor_upper,
-                      gas_minor,
-                      identifier_minor,
-                      minor_gases_lower,
-                      minor_gases_upper,
-                      minor_limits_gpt_lower,
-                      minor_limits_gpt_upper,
-                      minor_scales_with_density_lower,
-                      minor_scales_with_density_upper,
-                      scaling_gas_lower,
-                      scaling_gas_upper,
-                      scale_by_complement_lower,
-                      scale_by_complement_upper,
-                      kminor_start_lower,
-                      kminor_start_upper,
-                      solar_src,
-                      rayl_lower,
-                      rayl_upper))
-
+    load!(kdist,
+          available_gases,
+          gas_names,
+          key_species,
+          band2gpt,
+          band_lims,
+          press_ref,
+          press_ref_trop,
+          temp_ref,
+          temp_ref_p,
+          temp_ref_t,
+          vmr_ref,
+          kmajor,
+          kminor_lower,
+          kminor_upper,
+          gas_minor,
+          identifier_minor,
+          minor_gases_lower,
+          minor_gases_upper,
+          minor_limits_gpt_lower,
+          minor_limits_gpt_upper,
+          minor_scales_with_density_lower,
+          minor_scales_with_density_upper,
+          scaling_gas_lower,
+          scaling_gas_upper,
+          scale_by_complement_lower,
+          scale_by_complement_upper,
+          kminor_start_lower,
+          kminor_start_upper,
+          solar_src,
+          rayl_lower,
+          rayl_upper)
 
   end
 

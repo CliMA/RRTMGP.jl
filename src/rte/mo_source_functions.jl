@@ -107,14 +107,8 @@ module mo_source_functions
 
     # integer :: ngpt
 
-    err_message = ""
-    if !is_initialized(this)
-      err_message = "source_func_lw%alloc: not initialized so can't allocate"
-    end
-    if any([ncol, nlay] <= 0)
-      err_message = "source_func_lw%alloc: must provide positive extents for ncol, nlay"
-    end
-    err_message ≠ "" && return err_message
+    !is_initialized(this) && error("source_func_lw%alloc: not initialized so can't allocate")
+    any([ncol, nlay] <= 0) && error("source_func_lw%alloc: must provide positive extents for ncol, nlay")
 
     allocated(this.sfc_source) && deallocate!(this.sfc_source)
     allocated(this.lay_source) && deallocate!(this.lay_source)
@@ -134,15 +128,10 @@ module mo_source_functions
     # class(ty_optical_props ),    intent(in   ) :: spectral_desc
     # character(len = 128)                       :: err_message
 
-    err_message = ""
-    if !is_initialized(spectral_desc)
-      err_message = "source_func_lw%alloc: spectral_desc not initialized"
-      return
-    end
+    !is_initialized(spectral_desc) && error("source_func_lw%alloc: spectral_desc not initialized")
     finalize!(this)
-    err_message = init!(this, spectral_desc)
-    err_message ≠ "" && return err_message
-    err_message = alloc!(this, ncol,nlay)
+    init!(this, spectral_desc)
+    alloc!(this, ncol,nlay)
   end
   # ------------------------------------------------------------------------------------------
   #
@@ -161,14 +150,8 @@ module mo_source_functions
     # integer,                     intent(in   ) :: ncol
     # character(len = 128)                       :: err_message
 
-    err_message = ""
-    if (!is_initialized(this))
-      err_message = "source_func_sw%alloc: not initialized so can't allocate"
-    end
-    if (ncol <= 0)
-      err_message = "source_func_sw%alloc: must provide positive extents for ncol"
-    end
-    err_message ≠ "" && return err_message
+    !is_initialized(this) && error("source_func_sw%alloc: not initialized so can't allocate")
+    ncol <= 0 && error("source_func_sw%alloc: must provide positive extents for ncol")
     allocated(this.toa_source) && deallocate!(this.toa_source)
 
     this.toa_source = Array(undef, ncol, get_ngpt(this))
@@ -180,16 +163,9 @@ module mo_source_functions
     # class(ty_optical_props ),    intent(in   ) :: spectral_desc
     # character(len = 128)                       :: err_message
 
-    err_message = ""
-    if !is_initialized(spectral_desc)
-      err_message = "source_func_sw%alloc: spectral_desc not initialized"
-      return
-    end
-    err_message = init(this, spectral_desc)
-    if (err_message ≠ "")
-      return
-    end
-    err_message = alloc!(this, ncol)
+    !is_initialized(spectral_desc) &&  error("source_func_sw%alloc: spectral_desc not initialized")
+    init!(this, spectral_desc)
+    alloc!(this, ncol)
   end
   # ------------------------------------------------------------------------------------------
   #
@@ -260,28 +236,17 @@ module mo_source_functions
     # class(ty_source_func_lw), intent(inout) :: subset
     # character(128)                          :: err_message
 
-    err_message = ""
-    if (!is_allocated(full))
-      err_message = "source_func_lw%subset: Asking for a subset of unallocated data"
-      return
-    end
-    if (start < 1 || start + n-1 > get_ncol(full))
-       err_message = "optical_props%subset: Asking for columns outside range"
+    !is_allocated(full) && error("source_func_lw%subset: Asking for a subset of unallocated data")
+    if start < 1 || start + n-1 > get_ncol(full)
+       error("optical_props%subset: Asking for columns outside range")
      end
-    if (err_message ≠ "")
-      return
-    end
 
     #
     # Could check to see if subset is correctly sized, has consistent spectral discretization
     #
-    if (is_allocated(subset))
-      finalize!(subset)
-    end
-    err_message = alloc!(subset, n, get_nlay(full), full)
-    if (err_message ≠ "")
-      return
-    end
+    is_allocated(subset) && finalize!(subset)
+    alloc!(subset, n, get_nlay(full), full)
+
     subset.sfc_source[1:n,  :] = full.sfc_source[start:start+n-1,  :]
     subset.lay_source[1:n,:,:] = full.lay_source[start:start+n-1,:,:]
     subset.lev_source_inc[1:n,:,:] = full.lev_source_inc[start:start+n-1,:,:]
@@ -294,26 +259,17 @@ module mo_source_functions
     # class(ty_source_func_sw), intent(inout) :: subset
     # character(128)                          :: err_message
 
-    err_message = ""
-    if (!is_allocated(full))
-      err_message = "source_func_sw%subset: Asking for a subset of unallocated data"
-      return
-    end
+    !is_allocated(full) && error("source_func_sw%subset: Asking for a subset of unallocated data")
     if (start < 1 || start + n-1 > get_ncol(full))
-       err_message = "optical_props%subset: Asking for columns outside range"
-    end
-    if (err_message ≠ "")
-      return
+       error("optical_props%subset: Asking for columns outside range")
     end
 
     #
     # Could check to see if subset is correctly sized, has consistent spectral discretization
     #
-    if (is_allocated(subset))
-      finalize!(subset)
-    end
+    is_allocated(subset) && finalize!(subset)
     # Seems like I should be able to call "alloc" generically but the compilers are complaining
-    err_message = copy_and_alloc_sw!(subset, n, full)
+    copy_and_alloc_sw!(subset, n, full)
 
     subset.toa_source[1:n,  :] = full.toa_source[start:start+n-1,  :]
   end

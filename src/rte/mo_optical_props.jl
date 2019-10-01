@@ -146,9 +146,7 @@ end
     DT = eltype(band_lims_wvn)
 
     @assert size(band_lims_wvn,1) == 2
-    @show typeof(band_lims_wvn)
     @assert !any(band_lims_wvn.<DT(0))
-    @show band_lims_gpt
     band_lims_gpt_lcl = Array{Int}(undef, 2, size(band_lims_wvn, 2))
     if band_lims_gpt ≠ nothing
       @assert size(band_lims_gpt,1) == 2
@@ -182,8 +180,7 @@ end
     character(len = 128)                        :: err_message
 """
   function init_base_from_copy!(this::ty_optical_props, spectral_desc::ty_optical_props)
-    err_message = init!(this,get_band_lims_wavenumber(spectral_desc), get_band_lims_gpoint(spectral_desc))
-    return err_message
+    init!(this,get_band_lims_wavenumber(spectral_desc), get_band_lims_gpoint(spectral_desc))
   end
   #-------------------------------------------------------------------------------------------------
   #
@@ -231,14 +228,12 @@ end
     character(len=128)           :: err_message
 """
   function alloc!(this::ty_optical_props_1scl, ncol, nlay)
-    err_message = ""
     if any([ncol, nlay] .<= 0)
-      err_message = "alloc_only_1scl!: must provide positive extents for ncol, nlay"
+      error("alloc_only_1scl!: must provide positive extents for ncol, nlay")
     else
       allocated(this.tau) && deallocate!(this.tau)
       this.tau = Array(undef, ncol, nlay, get_ngpt(this))
     end
-    return err_message
   end
 
   # --- 2 stream ------------------------------------------------------------------------
@@ -251,9 +246,8 @@ end
 """
 
   function alloc!(this::ty_optical_props_2str, ncol, nlay)
-    err_message = ""
     if any([ncol, nlay] .<= 0)
-      err_message = "alloc_only_2str!: must provide positive extents for ncol, nlay"
+      error("alloc_only_2str!: must provide positive extents for ncol, nlay")
     else
       allocated(this.tau) && deallocate!(this.tau)
       this.tau = Array(undef, ncol,nlay,get_ngpt(this))
@@ -262,7 +256,6 @@ end
     this.ssa = Array(undef, ncol,nlay,get_ngpt(this))
     allocated(this.g) && deallocate!(this.g)
     this.g = Array(undef, ncol,nlay,get_ngpt(this))
-    return err_message
   end
 
   # --- n stream ------------------------------------------------------------------------
@@ -276,9 +269,8 @@ end
     character(len=128)              :: err_message
 """
   function alloc!(this::ty_optical_props_nstr, nmom, ncol, nlay)
-    err_message = ""
     if any([ncol, nlay] .<= 0)
-      err_message = "optical_props%alloc: must provide positive extents for ncol, nlay"
+      error("optical_props%alloc: must provide positive extents for ncol, nlay")
     else
       allocated(this.tau) && deallocate!(this.tau)
       this.tau = Array(undef, ncol,nlay,get_ngpt(this))
@@ -287,7 +279,6 @@ end
     this.ssa = Array(undef, ncol,nlay,get_ngpt(this))
     allocated(this.p) && deallocate!(this.p)
     this.p = Array(undef, nmom,ncol,nlay,get_ngpt(this))
-    return err_message
   end
 
   # ------------------------------------------------------------------------------------------
@@ -312,9 +303,8 @@ end
     character(len=128)                       :: err_message
 """
   function init_and_alloc!(this::ty_optical_props_1scl, ncol, nlay, band_lims_wvn, band_lims_gpt, name)
-    err_message = init!(this, band_lims_wvn, band_lims_gpt, name)
-    err_message ≠ "" && return err_message
-    err_message = alloc!(this, ncol, nlay)
+    init!(this, band_lims_wvn, band_lims_gpt, name)
+    alloc!(this, ncol, nlay)
   end
   # ---------------------------------------------------------------------------
 """
@@ -329,9 +319,8 @@ end
     character(len=128)                       :: err_message
 """
   function init_and_alloc!(this::ty_optical_props_2str, ncol, nlay, band_lims_wvn, band_lims_gpt, name)
-    err_message = init!(this, band_lims_wvn, band_lims_gpt, name)
-    err_message ≠ "" && return err_message
-    err_message = alloc!(this, ncol, nlay)
+    init!(this, band_lims_wvn, band_lims_gpt, name)
+    alloc!(this, ncol, nlay)
   end
   # ---------------------------------------------------------------------------
 
@@ -348,9 +337,8 @@ end
 """
 
   function init_and_alloc!(this::ty_optical_props_nstr, nmom, ncol, nlay, band_lims_wvn, band_lims_gpt, name)
-    err_message = init!(this, band_lims_wvn, band_lims_gpt, name)
-    err_message ≠ "" && return err_message
-    err_message = alloc!(this, nmom, ncol, nlay)
+    init!(this, band_lims_wvn, band_lims_gpt, name)
+    alloc!(this, nmom, ncol, nlay)
   end
 
   #-------------------------------------------------------------------------------------------------
@@ -368,12 +356,10 @@ end
     character(len=128)                       :: err_message
 """
   function copy_and_alloc!(this::ty_optical_props_1scl, ncol, nlay, spectral_desc, name)
-    err_message = ""
     is_initialized(this) && finalize!(this)
-    err_message = init!(this, get_band_lims_wavenumber(spectral_desc),
-                              get_band_lims_gpoint(spectral_desc), name)
-    err_message ≠ "" && return err_message
-    err_message = alloc!(this, ncol, nlay)
+    init!(this, get_band_lims_wavenumber(spectral_desc),
+                get_band_lims_gpoint(spectral_desc), name)
+    alloc!(this, ncol, nlay)
   end
 
 """
@@ -386,12 +372,10 @@ end
     character(len=128)                       :: err_message
 """
   function copy_and_alloc!(this::ty_optical_props_2str, ncol, nlay, spectral_desc, name)
-    err_message = ""
     is_initialized(this) && finalize!(this)
-    err_message = init!(this, get_band_lims_wavenumber(spectral_desc),
-                              get_band_lims_gpoint(spectral_desc), name)
-    err_message ≠ "" && return err_message
-    err_message = alloc!(this, ncol, nlay)
+    init!(this, get_band_lims_wavenumber(spectral_desc),
+                get_band_lims_gpoint(spectral_desc), name)
+    alloc!(this, ncol, nlay)
   end
 
 """
@@ -404,12 +388,10 @@ end
     character(len=128)                       :: err_message
 """
   function copy_and_alloc!(this::ty_optical_props_nstr, nmom, ncol, nlay, spectral_desc, name)
-    err_message = ""
     is_initialized(this) && finalize!(this)
-    err_message = init!(this, get_band_lims_wavenumber(spectral_desc),
-                              get_band_lims_gpoint(spectral_desc), name)
-    err_message ≠ "" && return err_message
-    err_message = alloc!(this, nmom, ncol, nlay)
+    init!(this, get_band_lims_wavenumber(spectral_desc),
+                get_band_lims_gpoint(spectral_desc), name)
+    alloc!(this, nmom, ncol, nlay)
   end
 
   # ------------------------------------------------------------------------------------------
@@ -446,22 +428,18 @@ end
     ncol = get_ncol(this)
     nlay = get_nlay(this)
     ngpt = get_ngpt(this)
-    err_message = ""
 
     if for_ ≠ nothing
       if any([size(for_, 1), size(for_, 2), size(for_, 3)] ≠ [ncol, nlay, ngpt])
-        err_message = "delta_scale: dimension of 'for_' don't match optical properties arrays"
-        return err_message
+        error("delta_scale: dimension of 'for_' don't match optical properties arrays")
       end
       if any(for_ < DT(0) || for_ > DT(1))
-        err_message = "delta_scale: values of 'for_' out of bounds [0,1]"
-        return err_message
+        error("delta_scale: values of 'for_' out of bounds [0,1]")
       end
       delta_scale_2str_kernel!(ncol, nlay, ngpt, this.tau, this.ssa, this.g, for_)
     else
       delta_scale_2str_kernel!(ncol, nlay, ngpt, this.tau, this.ssa, this.g)
     end
-    return err_message
   end
   # ------------------------------------------------------------------------------------------
 
@@ -488,16 +466,8 @@ end
 """
 
   function validate!(this::ty_optical_props_1scl{DT}) where DT
-    err_message = ""
-    if !allocated(this)
-      err_message = "validate: tau not allocated/initialized"
-      return err_message
-    end
-    any_vals_less_than(this.tau, DT(0)) && (err_message = "validate: tau values out of range")
-    if len_trim(err_message) > 0 && len_trim(this.name) > 0
-      err_message = strip(this.name) * ": " * strip(err_message)
-    end
-    return err_message
+    !allocated(this) && error("validate: tau not allocated/initialized")
+    any_vals_less_than(this.tau, DT(0)) && error("validate: tau values out of range")
   end
 
 """
@@ -509,30 +479,23 @@ end
 """
   function validate!(this::ty_optical_props_2str{DT}) where DT
 
-    err_message = ""
     #
     # Array allocation status, sizing
     #
     if !all([allocated(this.tau), allocated(this.ssa), allocated(this.g)])
-      err_message = "validate: arrays not allocated/initialized"
-      return err_message
+      error("validate: arrays not allocated/initialized")
     end
     varSizes =   [size(this.tau, 1), size(this.tau, 2), size(this.tau, 3)]
     if !all([size(this.ssa, 1), size(this.ssa, 2), size(this.ssa, 3)] == varSizes) ||
        !all([size(this.g,   1), size(this.g,   2), size(this.g,   3)] == varSizes)
-    err_message = "validate: arrays not sized consistently"
+      error("validate: arrays not sized consistently")
     end
     #
     # Valid values
     #
-    any_vals_less_than(this.tau,  DT(0)) && (err_message = "validate: tau values out of range")
-    any_vals_outside(this.ssa,  DT(0), DT(1)) && (err_message = "validate: ssa values out of range")
-    any_vals_outside(this.g  , DT(-1), DT(1)) && (err_message = "validate: g values out of range")
-
-    if(len_trim(err_message) > 0 && len_trim(this.name) > 0)
-      err_message = trim(this.name) * ": " * trim(err_message)
-    end
-
+    any_vals_less_than(this.tau,  DT(0)) && error("validate: tau values out of range")
+    any_vals_outside(this.ssa,  DT(0), DT(1)) && error("validate: ssa values out of range")
+    any_vals_outside(this.g  , DT(-1), DT(1)) && error("validate: g values out of range")
   end
 
   # ------------------------------------------------------------------------------------------
@@ -545,29 +508,23 @@ end
 """
   function validate!(this::ty_optical_props_nstr{DT}) where DT
 
-    err_message = ""
     #
     # Array allocation status, sizing
     #
     if !all([allocated(this.tau), allocated(this.ssa), allocated(this.p)])
-      err_message = "validate: arrays not allocated/initialized"
-      return err_message
+      error("validate: arrays not allocated/initialized")
     end
     varSizes =   [size(this.tau, 1), size(this.tau, 2), size(this.tau, 3)]
     if      !all([size(this.ssa, 1), size(this.ssa, 2), size(this.ssa, 3)] == varSizes) ||
             !all([size(this.p,   2), size(this.p,   3), size(this.p,   4)] == varSizes)
-      err_message = "validate: arrays not sized consistently"
+      error("validate: arrays not sized consistently")
     end
     #
     # Valid values
     #
-    any_vals_less_than(this.tau,  DT(0)) && (err_message = "validate: tau values out of range")
-    any_vals_outside(this.ssa,  DT(0), DT(1)) && (err_message = "validate: ssa values out of range")
-    any_vals_outside(this.p[1,:,:,:], DT(-1), DT(1)) && (err_message = "validate: p(1,:,:,:)  = g values out of range")
-
-    if len_trim(err_message) > 0 && len_trim(this.name) > 0
-      err_message = trim(this.name) * ": " * trim(err_message)
-    end
+    any_vals_less_than(this.tau,  DT(0)) && error("validate: tau values out of range")
+    any_vals_outside(this.ssa,  DT(0), DT(1)) && error("validate: ssa values out of range")
+    any_vals_outside(this.p[1,:,:,:], DT(-1), DT(1)) && error("validate: p(1,:,:,:)  = g values out of range")
   end
 
   # ------------------------------------------------------------------------------------------
@@ -590,33 +547,28 @@ end
     integer :: ncol, nlay, ngpt, nmom
 """
   function subset_range!(full::ty_optical_props_1scl{DT}, start, n, subset) where DT
-    err_message = ""
     if !is_initialized(full)
-      err_message = "optical_props%subset: Asking for a subset of uninitialized data"
-      return err_message
+      error("optical_props%subset: Asking for a subset of uninitialized data")
     end
     ncol = get_ncol(full)
     nlay = get_nlay(full)
     ngpt = get_ngpt(full)
     if start < 1 || start + n-1 > get_ncol(full)
-       err_message = "optical_props%subset: Asking for columns outside range"
+       error("optical_props%subset: Asking for columns outside range")
     end
-    err_message ≠ "" && return
 
     is_initialized(subset) && finalize!(subset)
-    err_message = init!(subset, full)
+    init!(subset, full)
     # Seems like the deallocation statements should be needed under Fortran 2003
     #   but Intel compiler doesn't run without them
 
     allocated(subset.tau) && deallocate!(subset.tau)
     if subset isa ty_optical_props_1scl
-        err_message = alloc!(subset, n, nlay)
-        err_message ≠ "" && return
+        alloc!(subset, n, nlay)
     elseif subset isa ty_optical_props_2str
         allocated(subset.ssa) && deallocate!(subset.ssa)
         allocated(subset.g  ) && deallocate!(subset.g  )
-        err_message = alloc!(subset, n, nlay)
-        err_message ≠ "" && return
+        alloc!(subset, n, nlay)
         subset.ssa[1:n,:,:] .= DT(0)
         subset.g[1:n,:,:] .= DT(0)
     elseif subset isa ty_optical_props_nstr
@@ -627,8 +579,7 @@ end
         else
           nmom = 1
         end
-        err_message = alloc!(subset, nmom, n, nlay)
-        err_message ≠ "" && return
+        alloc!(subset, nmom, n, nlay)
         subset.ssa[1:n,:,:] .= DT(0)
         subset.p[:,1:n,:,:] .= DT(0)
     else
@@ -651,31 +602,26 @@ end
 """
   function subset_range!(full::ty_optical_props_2str{DT}, start, n, subset) where DT
 
-    err_message = ""
     if !is_initialized(full)
-      err_message = "optical_props%subset: Asking for a subset of uninitialized data"
-      return err_message
+      error("optical_props%subset: Asking for a subset of uninitialized data")
     end
     ncol = get_ncol(full)
     nlay = get_nlay(full)
     ngpt = get_ngpt(full)
     if start < 1 || start + n-1 > get_ncol(full)
-       err_message = "optical_props%subset: Asking for columns outside range"
+       error("optical_props%subset: Asking for columns outside range")
     end
-    err_message ≠ "" && return
 
     is_initialized(subset) && finalize!(subset)
-    err_message = init(subset, full)
+    init!(subset, full)
 
     if subset isa ty_optical_props_1scl # TODO: check logic
-      err_message = alloc!(subset, n, nlay)
-      err_message ≠ "" && return err_message
+      alloc!(subset, n, nlay)
       extract_subset!(ncol, nlay, ngpt, full.tau, full.ssa, start, start+n-1, subset.tau)
     elseif subset isa ty_optical_props_2str
       allocated(subset.ssa) && deallocate!(subset.ssa)
       allocated(subset.g  ) && deallocate!(subset.g  )
-      err_message = alloc!(subset, n, nlay)
-      err_message ≠ "" && return
+      alloc!(subset, n, nlay)
       extract_subset!(ncol, nlay, ngpt, full.tau, start, start+n-1, subset.tau)
       extract_subset!(ncol, nlay, ngpt, full.ssa, start, start+n-1, subset.ssa)
       extract_subset!(ncol, nlay, ngpt, full.g  , start, start+n-1, subset.g  )
@@ -687,8 +633,7 @@ end
       else
         nmom = 1
       end
-      err_message = alloc!(subset, nmom, n, nlay)
-      err_message ≠ "" && return
+      alloc!(subset, nmom, n, nlay)
       extract_subset!(ncol, nlay, ngpt, full.tau, start, start+n-1, subset.tau)
       extract_subset!(ncol, nlay, ngpt, full.ssa, start, start+n-1, subset.ssa)
       subset.p[1,1:n,:,:] .= full.g[start:start+n-1,:,:]
@@ -711,40 +656,34 @@ end
 """
   function subset_range!(full::ty_optical_props_nstr, start, n, subset)
 
-    err_message = ""
     if !is_initialized(full)
-      err_message = "optical_props%subset: Asking for a subset of uninitialized data"
-      return err_message
+      error("optical_props%subset: Asking for a subset of uninitialized data")
     end
     ncol = get_ncol(full)
     nlay = get_nlay(full)
     ngpt = get_ngpt(full)
     if(start < 1 || start + n-1 > get_ncol(full))
-       err_message = "optical_props%subset: Asking for columns outside range"
+       error("optical_props%subset: Asking for columns outside range")
     end
-    err_message ≠ "" && return
 
     is_initialized(subset) && finalize!(subset)
-    err_message = init!(subset, full)
+    init!(subset, full)
 
     allocated(subset.tau) && deallocate!(subset.tau)
     if subset isa ty_optical_props_1scl # TODO: check logic
-      err_message = alloc!(subset, n, nlay)
-      err_message ≠ "" && return
+      alloc!(subset, n, nlay)
       extract_subset!(ncol, nlay, ngpt, full.tau, full.ssa, start, start+n-1, subset.tau)
     elseif subset isa ty_optical_props_2str
       allocated(subset.ssa) && deallocate!(subset.ssa)
       allocated(subset.g  ) && deallocate!(subset.g  )
-      err_message = alloc!(subset, n, nlay)
-      err_message ≠ "" && return
+      alloc!(subset, n, nlay)
       extract_subset!(ncol, nlay, ngpt, full.tau, start, start+n-1, subset.tau)
       extract_subset!(ncol, nlay, ngpt, full.ssa, start, start+n-1, subset.ssa)
       subset.g[1:n,:,:] .= full.p[1,start:start+n-1,:,:]
     elseif subset isa ty_optical_props_nstr
       allocated(subset.ssa) && deallocate!(subset.ssa)
       allocated(subset.p  ) && deallocate!(subset.p  )
-      err_message = alloc!(subset, nmom, n, nlay)
-      err_message ≠ "" && return
+      alloc!(subset, nmom, n, nlay)
       extract_subset!(      ncol, nlay, ngpt, full.tau, start, start+n-1, subset.tau)
       extract_subset!(      ncol, nlay, ngpt, full.ssa, start, start+n-1, subset.ssa)
       extract_subset!(nmom, ncol, nlay, ngpt, full.p  , start, start+n-1, subset.p  )
@@ -770,10 +709,8 @@ end
     # -----
 """
   function increment!(op_in, op_io)
-    err_message = ""
     if !bands_are_equal(op_in, op_io)
-      err_message = "ty_optical_props%increment: optical properties objects have different band structures"
-      return
+      error("ty_optical_props%increment: optical properties objects have different band structures")
     end
     ncol = get_ncol(op_io)
     nlay = get_nlay(op_io)
@@ -792,8 +729,7 @@ end
       #   Anything else is an error
 
       if get_ngpt(op_in) ≠ get_nband(op_io)
-        err_message = "ty_optical_props%increment: optical properties objects have incompatible g-point structures"
-        return err_message
+        error("ty_optical_props%increment: optical properties objects have incompatible g-point structures")
       end
       #
       # Increment by band

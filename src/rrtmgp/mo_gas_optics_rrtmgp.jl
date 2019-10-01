@@ -807,26 +807,26 @@ module mo_gas_optics_rrtmgp
     #                                                          kminor_start_upper
     # character(len = 128) :: err_message
     # # ----
-    err_message = init_abs_coeffs!(this,
-                                  available_gases,
-                                  gas_names, key_species,
-                                  band2gpt, band_lims_wavenum,
-                                  press_ref, temp_ref,
-                                  press_ref_trop, temp_ref_p, temp_ref_t,
-                                  vmr_ref,
-                                  kmajor, kminor_lower, kminor_upper,
-                                  gas_minor,identifier_minor,
-                                  minor_gases_lower, minor_gases_upper,
-                                  minor_limits_gpt_lower,
-                                  minor_limits_gpt_upper,
-                                  minor_scales_with_density_lower,
-                                  minor_scales_with_density_upper,
-                                  scaling_gas_lower, scaling_gas_upper,
-                                  scale_by_complement_lower,
-                                  scale_by_complement_upper,
-                                  kminor_start_lower,
-                                  kminor_start_upper,
-                                  rayl_lower, rayl_upper)
+    init_abs_coeffs!(this,
+                     available_gases,
+                     gas_names, key_species,
+                     band2gpt, band_lims_wavenum,
+                     press_ref, temp_ref,
+                     press_ref_trop, temp_ref_p, temp_ref_t,
+                     vmr_ref,
+                     kmajor, kminor_lower, kminor_upper,
+                     gas_minor,identifier_minor,
+                     minor_gases_lower, minor_gases_upper,
+                     minor_limits_gpt_lower,
+                     minor_limits_gpt_upper,
+                     minor_scales_with_density_lower,
+                     minor_scales_with_density_upper,
+                     scaling_gas_lower, scaling_gas_upper,
+                     scale_by_complement_lower,
+                     scale_by_complement_upper,
+                     kminor_start_lower,
+                     kminor_start_upper,
+                     rayl_lower, rayl_upper)
     # Planck function tables
     #
     this.totplnk = totplnk
@@ -858,7 +858,7 @@ module mo_gas_optics_rrtmgp
                     scale_by_complement_upper,
                     kminor_start_lower,
                     kminor_start_upper,
-                    solar_src, rayl_lower, rayl_upper)  result(err_message)
+                    solar_src, rayl_lower, rayl_upper)
     # class(ty_gas_optics_rrtmgp), intent(inout) :: this
     # class(ty_gas_concs),                intent(in   ) :: available_gases # Which gases does the host model have available?
     # character(len=*),
@@ -897,26 +897,26 @@ module mo_gas_optics_rrtmgp
     # real(wp), dimension(:,:,:), intent(in), allocatable :: rayl_lower, rayl_upper
     # character(len = 128) err_message
     # ----
-    err_message = init_abs_coeffs!(this,
-                                  available_gases,
-                                  gas_names, key_species,
-                                  band2gpt, band_lims_wavenum,
-                                  press_ref, temp_ref,
-                                  press_ref_trop, temp_ref_p, temp_ref_t,
-                                  vmr_ref,
-                                  kmajor, kminor_lower, kminor_upper,
-                                  gas_minor,identifier_minor,
-                                  minor_gases_lower, minor_gases_upper,
-                                  minor_limits_gpt_lower,
-                                  minor_limits_gpt_upper,
-                                  minor_scales_with_density_lower,
-                                  minor_scales_with_density_upper,
-                                  scaling_gas_lower, scaling_gas_upper,
-                                  scale_by_complement_lower,
-                                  scale_by_complement_upper,
-                                  kminor_start_lower,
-                                  kminor_start_upper,
-                                  rayl_lower, rayl_upper)
+    init_abs_coeffs!(this,
+                     available_gases,
+                     gas_names, key_species,
+                     band2gpt, band_lims_wavenum,
+                     press_ref, temp_ref,
+                     press_ref_trop, temp_ref_p, temp_ref_t,
+                     vmr_ref,
+                     kmajor, kminor_lower, kminor_upper,
+                     gas_minor,identifier_minor,
+                     minor_gases_lower, minor_gases_upper,
+                     minor_limits_gpt_lower,
+                     minor_limits_gpt_upper,
+                     minor_scales_with_density_lower,
+                     minor_scales_with_density_upper,
+                     scaling_gas_lower, scaling_gas_upper,
+                     scale_by_complement_lower,
+                     scale_by_complement_upper,
+                     kminor_start_lower,
+                     kminor_start_upper,
+                     rayl_lower, rayl_upper)
     #
     # Solar source table init
     #
@@ -947,7 +947,7 @@ module mo_gas_optics_rrtmgp
                            scale_by_complement_upper,
                            kminor_start_lower,
                            kminor_start_upper,
-                           rayl_lower, rayl_upper) result(err_message)
+                           rayl_lower, rayl_upper)
     # class(ty_gas_optics_rrtmgp), intent(inout) :: this
     # class(ty_gas_concs),                intent(in   ) :: available_gases
     # character(len=*),
@@ -996,8 +996,7 @@ module mo_gas_optics_rrtmgp
     # # --------------------------------------
     DT = eltype(kmajor)
 
-    err_message = init!(this, band_lims_wavenum, band2gpt)
-    len_trim(err_message) ≠ 0 && return err_message
+    init!(this, band_lims_wavenum, band2gpt)
     #
     # Which gases known to the gas optics are present in the host model (available_gases)?
     #
@@ -1074,8 +1073,7 @@ module mo_gas_optics_rrtmgp
 
     # TODO: Check if .neqv. is the same as ≠
     if allocated(rayl_lower) ≠ allocated(rayl_upper)
-      err_message = "rayl_lower and rayl_upper must have the same allocation status"
-      return err_message
+      error("rayl_lower and rayl_upper must have the same allocation status")
     end
     if allocated(rayl_lower)
       this.krayl = Array{DT}(undef, size(rayl_lower,1),size(rayl_lower,2),size(rayl_lower,3),2)
@@ -1104,8 +1102,8 @@ module mo_gas_optics_rrtmgp
     # create flavor list
     # Reduce (remap) key_species list; checks that all key gases are present in incoming
     create_key_species_reduce!(gas_names,this.gas_names, key_species,key_species_red,key_species_present_init)
-    err_message = check_key_species_present_init(gas_names,key_species_present_init)
-    len_trim(err_message) ≠ 0 && return err_message
+    check_key_species_present_init(gas_names,key_species_present_init)
+
     # create flavor list
     create_flavor!(key_species_red, this.flavor)
     # create gpoint_flavor list
@@ -1145,16 +1143,11 @@ module mo_gas_optics_rrtmgp
 
     # integer :: i
 
-    err_message = ""
     for i in 1:length(key_species_present_init)
       if !key_species_present_init[i]
-        err_message = " " * trim(gas_names[i]) * trim(err_message)
+        error("gas_optics: required gases" * trim(gas_names[i]) * " are not provided")
       end
     end
-    if len_trim(err_message) > 0
-      err_message = "gas_optics: required gases" * trim(err_message) * " are not provided"
-    end
-    return err_message
   end
   #------------------------------------------------------------------------------------------
   #

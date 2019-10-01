@@ -44,7 +44,7 @@ module mo_gas_concentrations
 
   export ty_gas_concs
   struct ty_gas_concs{T, I}
-    gas_name::String
+    gas_name::Vector{String}
     concs::Vector{conc_field{T}}
     ncol::I
     nlay::I
@@ -87,7 +87,7 @@ module mo_gas_concentrations
   # Set concentrations --- scalar, 1D, 2D
   #
   # -------------------------------------------------------------------------------------
-  function set_vmr_scalar!(this::ty_gas_concs{DT}, gas, w) where DT # result(error_msg)
+  function set_vmr!(this::ty_gas_concs{DT}, gas, w::DT) where DT # result(error_msg)
     # class(ty_gas_concs), intent(inout) :: this
     # character(len=*),    intent(in   ) :: gas
     # real(wp),            intent(in   ) :: w
@@ -95,10 +95,8 @@ module mo_gas_concentrations
     # # ---------
     # integer :: igas
     # # ---------
-    error_msg = ""
     if w < DT(0) || w > DT(1)
-      error_msg = "ty_gas_concs%set_vmr: concentrations should be >= 0, <= 1"
-      return error_msg
+      error("ty_gas_concs%set_vmr: concentrations should be >= 0, <= 1")
     end
 
     igas = find_gas(this, gas)
@@ -115,7 +113,7 @@ module mo_gas_concentrations
     this.gas_name[igas] = trim(gas)
   end
   # -------------------------------------------------------------------------------------
-  function set_vmr_1d!(this::ty_gas_concs{DT}, gas, w) where DT
+  function set_vmr!(this::ty_gas_concs{DT}, gas, w::Vector{DT}) where DT
     # class(ty_gas_concs), intent(inout) :: this
     # character(len=*),    intent(in   ) :: gas
     # real(wp), dimension(:),
@@ -124,20 +122,16 @@ module mo_gas_concentrations
     # # ---------
     # integer :: igas
     # # ---------
-    error_msg = ""
 
     if any(w < DT(0) || w > DT(1))
-      error_msg = "ty_gas_concs%set_vmr: concentrations should be >= 0, <= 1"
+      error("ty_gas_concs%set_vmr: concentrations should be >= 0, <= 1")
     end
     if this.nlay > 0
       if (size(w) ≠ this.nlay)
-        error_msg = "ty_gas_concs%set_vmr: different dimension (nlay)"
+        error("ty_gas_concs%set_vmr: different dimension (nlay)")
       end
     else
       this.nlay = size(w)
-    end
-    if (error_msg ≠ "")
-      return
     end
 
     igas = this.find_gas(gas)
@@ -154,7 +148,7 @@ module mo_gas_concentrations
     this.gas_name[igas] = trim(gas)
   end
   # --------------------
-  function set_vmr_2d(this::ty_gas_concs, gas, w::Array)
+  function set_vmr!(this::ty_gas_concs, gas, w::Array{DT}) where DT
     # class(ty_gas_concs), intent(inout) :: this
     # character(len=*),    intent(in   ) :: gas
     # real(wp), dimension(:,:),
@@ -163,23 +157,19 @@ module mo_gas_concentrations
     # # ---------
     # integer :: igas
     # # ---------
-    error_msg = ""
 
     if any(w < DT(0) || w > DT(1))
-      error_msg = "ty_gas_concs%set_vmr: concentrations should be >= 0, <= 1"
+      error("ty_gas_concs%set_vmr: concentrations should be >= 0, <= 1")
     end
     if this.ncol > 0 && size(w, 1) ≠ this.ncol
-      error_msg = "ty_gas_concs%set_vmr: different dimension (ncol)"
+      error("ty_gas_concs%set_vmr: different dimension (ncol)")
     else
       this.ncol = size(w, 1)
     end
     if this.nlay > 0 && size(w, 2) ≠ this.nlay
-      error_msg = "ty_gas_concs%set_vmr: different dimension (nlay)"
+      error("ty_gas_concs%set_vmr: different dimension (nlay)")
     else
       this.nlay = size(w, 2)
-    end
-    if (error_msg ≠ "")
-      return
     end
 
     igas = find_gas(this, gas)
@@ -210,22 +200,18 @@ module mo_gas_concentrations
     # # ---------------------
     # integer :: igas
     # # ---------------------
-    error_msg = ""
 
     igas = find_gas(this, gas)
     if igas == GAS_NOT_IN_LIST
-      error_msg = "ty_gas_concs%get_vmr; gas " * trim(gas) * " not found"
+      error("ty_gas_concs%get_vmr; gas " * trim(gas) * " not found")
       array[:] .= DT(0)
     elseif size(this.concs(igas).conc, 1) > 1 # Are we requesting a single profile when many are present?
-      error_msg = "ty_gas_concs%get_vmr; gas " * trim(gas) * " requesting single profile but many are available"
+      error("ty_gas_concs%get_vmr; gas " * trim(gas) * " requesting single profile but many are available")
       array[:] .= DT(0)
     end
     if this.nlay > 0 && this.nlay ≠ size(array)
-      error_msg = "ty_gas_concs%get_vmr; gas " * trim(gas) * " array is wrong size (nlay)"
+      error("ty_gas_concs%get_vmr; gas " * trim(gas) * " array is wrong size (nlay)")
       array[:] .= DT(0)
-    end
-    if (error_msg ≠ "")
-      return
     end
 
     if size(this.concs[igas].conc, 2) > 1
@@ -239,7 +225,7 @@ module mo_gas_concentrations
   #
   # 2D array (col, lay)
   #
-  function get_vmr_2d(this, gas, array) result(error_msg)
+  function get_vmr_2d(this, gas, array)
     # class(ty_gas_concs) :: this
     # character(len=*),         intent(in ) :: gas
     # real(wp), dimension(:,:), intent(out) :: array
@@ -247,26 +233,22 @@ module mo_gas_concentrations
     # # ---------------------
     # integer :: igas
     # # ---------------------
-    error_msg = ""
 
     igas = find_gas(this, gas)
     if igas == GAS_NOT_IN_LIST
-      error_msg = "ty_gas_concs%get_vmr; gas " * trim(gas) * " not found"
+      error("ty_gas_concs%get_vmr; gas " * trim(gas) * " not found")
       array[:,:] .= DT(0)
     end
     #
     # Is the requested array the correct size?
     #
     if this.ncol > 0 && this.ncol ≠ size(array,1)
-      error_msg = "ty_gas_concs%get_vmr; gas " * trim(gas) * " array is wrong size (ncol)"
+      error("ty_gas_concs%get_vmr; gas " * trim(gas) * " array is wrong size (ncol)")
       array[:,:] .= DT(0)
     end
     if this.nlay > 0 && this.nlay ≠ size(array,2)
-      error_msg = "ty_gas_concs%get_vmr; gas " * trim(gas) * " array is wrong size (nlay)"
+      error("ty_gas_concs%get_vmr; gas " * trim(gas) * " array is wrong size (nlay)")
       array[:,:] .= DT(0)
-    end
-    if (error_msg ≠ "")
-      return
     end
 
     if size(this.concs[igas].conc, 1) > 1      # Concentration stored as 2D
@@ -283,7 +265,7 @@ module mo_gas_concentrations
   # Extract a subset of n columns starting with column 'start'
   #
   # -------------------------------------------------------------------------------------
-  function get_subset_range(this, start, n, subset) result(error_msg)
+  function get_subset_range(this, start, n, subset)
     # class(ty_gas_concs),      intent(in   ) :: this
     # integer,                  intent(in   ) :: start, n
     # class(ty_gas_concs),      intent(inout) :: subset
@@ -291,18 +273,14 @@ module mo_gas_concentrations
     # # ---------------------
     # integer :: i
     # # ---------------------
-    error_msg = ""
     if (n <= 0)
-      error_msg = "gas_concs%get_vmr: Asking for 0 or fewer columns "
+      error("gas_concs%get_vmr: Asking for 0 or fewer columns ")
     end
     if (start < 1 )
-      error_msg = "gas_concs%get_vmr: Asking for columns outside range"
+      error("gas_concs%get_vmr: Asking for columns outside range")
     end
     if (this.ncol > 0 && start > this.ncol || start+n-1 > this.ncol )
-      error_msg = "gas_concs%get_vmr: Asking for columns outside range"
-    end
-    if (error_msg ≠ "")
-      return
+      error("gas_concs%get_vmr: Asking for columns outside range")
     end
 
     reset!(subset)
