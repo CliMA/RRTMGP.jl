@@ -3,7 +3,7 @@ module mo_simple_netcdf
 #  use netcdf
   using NCDatasets
 
-  export read_field, write_field
+  export read_field, write_field, var_exists
 #  implicit none
 #  private
 
@@ -15,7 +15,7 @@ module mo_simple_netcdf
 
 #  interface write_field
 #    module procedure write_1d_int_field, write_2d_int_field, &
-                     write_1d_field, write_2d_field, write_3d_field, write_4d_field
+#                     write_1d_field, write_2d_field, write_3d_field, write_4d_field
 #  end interface
 
 #  public :: dim_exists, get_dim_size, create_dim, &
@@ -353,6 +353,7 @@ end
 #    dim_exists = nf90_inq_dimid(ncid, trim(dimName), dimid) == NF90_NOERR
 #  end function dim_exists
 #  !--------------------------------------------------------------------------------------------------------------------
+  function var_exists(ds, varName)
 #  function var_exists(ncid, varName)
 #    !
 #    ! Does this variable exist (have a valid var_id) in the open netCDF file?
@@ -363,7 +364,13 @@ end
 
 #    integer :: varId
 #    var_exists = nf90_inq_varid(ncid, trim(varName), varid) == NF90_NOERR
-#  end function var_exists
+    if haskey(ds,varName)
+      return true
+    else
+      return false
+    end
+
+  end #function var_exists
 #  !--------------------------------------------------------------------------------------------------------------------
 #  subroutine create_dim(ncid, dimName, dimLength)
 #    !
