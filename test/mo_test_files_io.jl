@@ -16,13 +16,14 @@
 
 module mo_test_files_io
 
+  using ..fortran_intrinsics
   using ..mo_optical_props
   using ..mo_source_functions
   using ..mo_gas_concentrations
   using ..mo_util_reorder
   using ..mo_simple_netcdf
 
-#  use mo_rte_kind,           only: wp
+#  use mo_rte_kind,           only: FT
 #  use mo_optical_props,      only: ty_optical_props, ty_optical_props_arry, &
 #                                   ty_optical_props_1scl, ty_optical_props_2str, ty_optical_props_nstr
 #  use mo_source_functions,   only: ty_source_func_lw
@@ -33,15 +34,15 @@ module mo_test_files_io
 #  use netcdf
 #  implicit none
 #  private
-  export read_atmos, is_lw, is_sw, 
-         read_lw_bc, read_sw_bc, read_lw_rt, 
-         read_spectral_disc, 
-         read_sfc_test_file, 
-         read_optical_prop_values, 
-         read_direction,  
-         read_lw_Planck_sources, 
+  export read_atmos, is_lw, is_sw,
+         read_lw_bc, read_sw_bc, read_lw_rt,
+         read_spectral_disc,
+         read_sfc_test_file,
+         read_optical_prop_values,
+         read_direction,
+         read_lw_Planck_sources,
          read_sw_solar_sources,
-         read_two_stream, 
+         read_two_stream,
          read_sources,
          read_gpt_fluxes
 
@@ -67,11 +68,11 @@ module mo_test_files_io
   # Read profiles for all columns  -- T, p, and gas concentrations
   #   Allocation occurs on assignments (says the F2003 standard)
   #
-  function read_atmos(ds),                          
-#                        p_lay, t_lay, p_lev, t_lev,   
+  function read_atmos(ds),
+#                        p_lay, t_lay, p_lev, t_lev,
 #                        gas_concs, col_dry)
 #    character(len=*),   intent(in   ) :: fileName
-#    real(wp), dimension(:,:), allocatable,                 &
+#    real(FT), dimension(:,:), allocatable,                 &
 #                        intent(inout) :: p_lay, t_lay, p_lev, t_lev, col_dry
 #    type(ty_gas_concs), intent(inout) :: gas_concs
 #    # -------------------
@@ -98,61 +99,61 @@ module mo_test_files_io
     p_lev = ds["p_lev"][:]
     t_lev = ds["t_lev"][:]
 
-    if(var_exists(ds, "vmr_h2o")) 
+    if(var_exists(ds, "vmr_h2o"))
          stop_on_err(set_vmr(gas_concs,"h2o", read_field(ds, "vmr_h2o")))
     end
-    if(var_exists(ds, "vmr_co2")) 
+    if(var_exists(ds, "vmr_co2"))
          stop_on_err(set_vmr(gas_concs,"co2", read_field(ds, "vmr_co2")))
     end
-    if(var_exists(ds, "vmr_o3" )) 
+    if(var_exists(ds, "vmr_o3" ))
          stop_on_err(set_vmr(gas_concs,"o3" , read_field(ds, "vmr_o3")))
     end
-    if(var_exists(ds, "vmr_n2o")) 
+    if(var_exists(ds, "vmr_n2o"))
          stop_on_err(set_vmr(gas_concs,"n2o", read_field(ds, "vmr_n2o")))
     end
-    if(var_exists(ds, "vmr_co" )) 
+    if(var_exists(ds, "vmr_co" ))
          stop_on_err(set_vmr(gas_concs,"co" , read_field(ds, "vmr_co")))
     end
-    if(var_exists(ds, "vmr_ch4")) 
+    if(var_exists(ds, "vmr_ch4"))
          stop_on_err(set_vmr(gas_concs,"ch4", read_field(ds, "vmr_ch4")))
     end
-    if(var_exists(ds, "vmr_o2" )) 
+    if(var_exists(ds, "vmr_o2" ))
          stop_on_err(set_vmr(gas_concs,"o2" , read_field(ds, "vmr_o2")))
     end
-    if(var_exists(ds, "vmr_n2" )) 
+    if(var_exists(ds, "vmr_n2" ))
          stop_on_err(set_vmr(gas_concs,"n2" , read_field(ds, "vmr_n2")))
     end
-    if(var_exists(ds, "vmr_ccl4" )) 
+    if(var_exists(ds, "vmr_ccl4" ))
          stop_on_err(set_vmr(gas_concs,"ccl4" , read_field(ds, "vmr_ccl4")))
     end
-    if(var_exists(ds, "vmr_cfc11" )) 
+    if(var_exists(ds, "vmr_cfc11" ))
          stop_on_err(set_vmr(gas_concs,"cfc11" , read_field(ds, "vmr_cfc11")))
     end
-    if(var_exists(ds, "vmr_cfc12" )) 
+    if(var_exists(ds, "vmr_cfc12" ))
          stop_on_err(set_vmr(gas_concs,"cfc12" , read_field(ds, "vmr_cfc12")))
     end
-    if(var_exists(ds, "vmr_cfc22" )) 
+    if(var_exists(ds, "vmr_cfc22" ))
          stop_on_err(set_vmr(gas_concs,"cfc22" , read_field(ds, "vmr_cfc22")))
     end
-    if(var_exists(ds, "vmr_hfc143a" )) 
+    if(var_exists(ds, "vmr_hfc143a" ))
          stop_on_err(set_vmr(gas_concs,"hfc143a" , read_field(ds, "vmr_hfc143a")))
     end
-    if(var_exists(ds, "vmr_hfc125" )) 
+    if(var_exists(ds, "vmr_hfc125" ))
          stop_on_err(set_vmr(gas_concs,"hfc125" , read_field(ds, "vmr_hfc125")))
     end
-    if(var_exists(ds, "vmr_hfc23" )) 
+    if(var_exists(ds, "vmr_hfc23" ))
          stop_on_err(set_vmr(gas_concs,"hfc23" , read_field(ds, "vmr_hfc23")))
     end
-    if(var_exists(ds, "vmr_hfc32" )) 
+    if(var_exists(ds, "vmr_hfc32" ))
          stop_on_err(set_vmr(gas_concs,"hfc32" , read_field(ds, "vmr_hfc32")))
     end
-    if(var_exists(ds, "vmr_hfc134a" )) 
+    if(var_exists(ds, "vmr_hfc134a" ))
          stop_on_err(set_vmr(gas_concs,"hfc134a" , read_field(ds, "vmr_hfc134a")))
     end
-    if(var_exists(ds, "vmr_cf4" )) 
+    if(var_exists(ds, "vmr_cf4" ))
          stop_on_err(set_vmr(gas_concs,"cf4" , read_field(ds, "vmr_cf4")))
     end
-    if(var_exists(ds, "vmr_no2" )) 
+    if(var_exists(ds, "vmr_no2" ))
          stop_on_err(set_vmr(gas_concs,"no2" , read_field(ds, "vmr_no2")))
     end
 
@@ -168,7 +169,7 @@ module mo_test_files_io
   #
   function write_atmos(ds, t_lev, col_dry)
 #    character(len=*),         intent(in) :: fileName
-#    real(wp), dimension(:,:), intent(in) :: t_lev, col_dry
+#    real(FT), dimension(:,:), intent(in) :: t_lev, col_dry
 
 #    integer :: ncid, ncol, nlev, nlay
 
@@ -179,7 +180,7 @@ module mo_test_files_io
     #   We could certainly check the array sizes against these dimension sizes
     #
     ds = Dataset(fileName,"a")
-  
+
     ncol  = length( size( ds["col"] ) )
     nlay  = length( size( ds["lay"] ) )
     nlev  = length( size( ds["lev"] ) )
@@ -227,8 +228,8 @@ module mo_test_files_io
   #
   function read_lw_bc(ds, t_sfc, emis_sfc)
 #    character(len=*),                      intent(in   ) :: fileName
-#    real(wp), dimension(:),   allocatable, intent(inout) :: t_sfc
-#    real(wp), dimension(:,:), allocatable, intent(inout) :: emis_sfc
+#    real(FT), dimension(:),   allocatable, intent(inout) :: t_sfc
+#    real(FT), dimension(:,:), allocatable, intent(inout) :: emis_sfc
 #    # -------------------
 #    integer :: ncid
 #    integer :: ncol, nband
@@ -267,9 +268,9 @@ module mo_test_files_io
   #
   function read_sw_bc(ds)#, sza, tsi, tsi_scaling, sfc_alb_dir, sfc_alb_dif)
 #    character(len=*),                      intent(in   ) :: fileName
-#    real(wp), dimension(:),   allocatable, intent(inout) :: sza, tsi
-#    real(wp), dimension(:,:), allocatable, intent(inout) :: sfc_alb_dir, sfc_alb_dif
-#    real(wp),                              intent(inout) :: tsi_scaling
+#    real(FT), dimension(:),   allocatable, intent(inout) :: sza, tsi
+#    real(FT), dimension(:,:), allocatable, intent(inout) :: sfc_alb_dir, sfc_alb_dif
+#    real(FT),                              intent(inout) :: tsi_scaling
 #    # -------------------
 #    integer :: ncid
 #    integer :: ncol, nband
@@ -288,13 +289,13 @@ module mo_test_files_io
     sfc_alb_dif =  ds["sfc_alb_diffuse"]
 
     # read tsi_scaling only if variable is present in the netCDF file
-    if haskey(ds,"tsi_scaling") 
+    if haskey(ds,"tsi_scaling")
       tsi_scaling = ds["tsi_scaling"][:]
-    end 
+    end
 #    ncid = nf90_close(ncid)
- 
-    return sza,tsi,sfc_alb_dir,sfc_alb_dif,tsi_scaling 
-   
+
+    return sza,tsi,sfc_alb_dir,sfc_alb_dif,tsi_scaling
+
   end #subroutine read_sw_bc
   #--------------------------------------------------------------------------------------------------------------------
   #
@@ -302,13 +303,13 @@ module mo_test_files_io
   #
 #  subroutine write_fluxes(fileName, flux_up, flux_dn, flux_net, bnd_flux_up, bnd_flux_dn, bnd_flux_net)
 #    character(len=*),           intent(in) :: fileName
-#    real(wp), dimension(:,:  ), intent(in) ::     flux_up,     flux_dn,     flux_net
-#    real(wp), dimension(:,:,:), optional, &
+#    real(FT), dimension(:,:  ), intent(in) ::     flux_up,     flux_dn,     flux_net
+#    real(FT), dimension(:,:,:), optional, &
                                 intent(in) :: bnd_flux_up, bnd_flux_dn, bnd_flux_net
 #    # -------------------
 #    integer :: ncid
 #    integer :: ncol, nlev, nband
-#    real(wp), dimension(:,:,:), allocatable :: band_out
+#    real(FT), dimension(:,:,:), allocatable :: band_out
 #    # -------------------
 #    if(nf90_open(trim(fileName), NF90_WRITE, ncid) /= NF90_NOERR) &
 #      call stop_on_err("write_fluxes: can't open file " // trim(fileName))
@@ -347,13 +348,13 @@ module mo_test_files_io
   #
 #  subroutine write_dir_fluxes(fileName, flux_dir, bnd_flux_dir)
 #    character(len=*),           intent(in) :: fileName
-#    real(wp), dimension(:,:  ), intent(in) ::     flux_dir
-#    real(wp), dimension(:,:,:), optional, &
+#    real(FT), dimension(:,:  ), intent(in) ::     flux_dir
+#    real(FT), dimension(:,:,:), optional, &
 #                                intent(in) :: bnd_flux_dir
 #    # -------------------
 #    integer :: ncid
 #    integer :: ncol, nlay, nband
-#    real(wp), dimension(:,:,:), allocatable :: band_out
+#    real(FT), dimension(:,:,:), allocatable :: band_out
 #    # -------------------
 #    if(nf90_open(trim(fileName), NF90_WRITE, ncid) /= NF90_NOERR) &
 #      call stop_on_err("write_dir_fluxes: can't open file " // trim(fileName))
@@ -382,12 +383,12 @@ module mo_test_files_io
 #  #
 #  subroutine write_heating_rates(fileName, heating_rate, bnd_heating_rate)
 #    character(len=*),           intent(in) :: fileName
-#    real(wp), dimension(:,:  ), intent(in) ::     heating_rate
-#    real(wp), dimension(:,:,:), intent(in) :: bnd_heating_rate
+#    real(FT), dimension(:,:  ), intent(in) ::     heating_rate
+#    real(FT), dimension(:,:,:), intent(in) :: bnd_heating_rate
 #    # -------------------
 #    integer :: ncid
 #    integer :: ncol, nlay, nband
-#    real(wp), dimension(:,:,:), allocatable :: band_out
+#    real(FT), dimension(:,:,:), allocatable :: band_out
 #    # -------------------
 #    if(nf90_open(trim(fileName), NF90_WRITE, ncid) /= NF90_NOERR) &
 #      call stop_on_err("write_heating_rates: can't open file " // trim(fileName))
@@ -447,7 +448,7 @@ module mo_test_files_io
 #    integer :: ncid
 #    integer :: nband
 #    integer,  dimension(:,:), allocatable :: band_lims_gpt
-#    real(wp), dimension(:,:), allocatable :: band_lims_wvn
+#    real(FT), dimension(:,:), allocatable :: band_lims_wvn
 
     # -------------------
 #    if(nf90_open(trim(fileName), NF90_WRITE, ncid) /= NF90_NOERR) &
@@ -471,7 +472,7 @@ module mo_test_files_io
 #  #
 #  subroutine write_sw_surface_albedo(fileName, sfc_alb_direct, sfc_alb_diffuse)
 #    character(len=*),           intent(in) :: fileName
-#    real(wp), dimension(:,:), intent(in) :: sfc_alb_direct, sfc_alb_diffuse # Dimensions (nband,ncol)
+#    real(FT), dimension(:,:), intent(in) :: sfc_alb_direct, sfc_alb_diffuse # Dimensions (nband,ncol)
 
 #    integer :: ncid
 #    integer :: ncol, nband
@@ -497,7 +498,7 @@ module mo_test_files_io
 #  #
 #  subroutine write_solar_zenith_angle(fileName, solar_zenith_angle)
 #    character(len=*),           intent(in) :: fileName
-#    real(wp), dimension(:), intent(in) :: solar_zenith_angle # Dimensions (ncol)
+#    real(FT), dimension(:), intent(in) :: solar_zenith_angle # Dimensions (ncol)
 
 #    integer :: ncid
 #    integer :: ncol
@@ -519,7 +520,7 @@ module mo_test_files_io
 #  #
 #  subroutine write_lw_surface_emissivity(fileName, emis_sfc)
 #    character(len=*),           intent(in) :: fileName
-#    real(wp), dimension(:,:), intent(in) :: emis_sfc # Dimensions (ncol,nband)
+#    real(FT), dimension(:,:), intent(in) :: emis_sfc # Dimensions (ncol,nband)
 
 #    integer :: ncid
 #    integer :: ncol, nband
@@ -542,8 +543,8 @@ module mo_test_files_io
  #
   function read_sfc_test_file(ds)#, sfc_alb, sfc_emis)
 #    character(len=*),           intent(in) :: fileName
-#    real(wp), dimension(:,:), allocatable, intent(inout) :: sfc_alb  # Dimensions (nband,nspectra)
-#    real(wp), dimension(:,:), allocatable, intent(inout) :: sfc_emis # Dimensions (nband,nspectra)
+#    real(FT), dimension(:,:), allocatable, intent(inout) :: sfc_alb  # Dimensions (nband,nspectra)
+#    real(FT), dimension(:,:), allocatable, intent(inout) :: sfc_emis # Dimensions (nband,nspectra)
 
 #    integer :: ncid
 #    integer :: nswband, nlwband, nspectra
@@ -641,7 +642,7 @@ module mo_test_files_io
 #    # -------------------
 #    integer :: ncid
 #    integer :: ncol, nlay, ngpt, nmom, nband
-#    real(wp), dimension(:,:), allocatable :: band_lims_wvn
+#    real(FT), dimension(:,:), allocatable :: band_lims_wvn
 #    integer,  dimension(:,:), allocatable :: band_lims_gpt
 #    # -------------------
 #    if(nf90_open(trim(fileName), NF90_NOWRITE, ncid) /= NF90_NOERR) &
@@ -663,7 +664,7 @@ module mo_test_files_io
     band_lims_gpt = ds["band_lims_gpt"][:]
 
     stop_on_err(init(opt_props,band_lims_wvn, band_lims_gpt, " ")) #check for the initializing string
-    
+
     if(var_exists(ncid, 'p')) then
       # n-stream calculation
       nmom = ds.dim["mom"]
@@ -757,8 +758,8 @@ module mo_test_files_io
 #  #
 #  subroutine write_sources(fileName, source_up, source_dn, source_sfc)
 #    character(len=*),           intent(in) :: fileName
-#    real(wp), dimension(:,:,:), intent(in) :: source_up, source_dn
-#    real(wp), dimension(:,:  ), intent(in) :: source_sfc
+#    real(FT), dimension(:,:,:), intent(in) :: source_up, source_dn
+#    real(FT), dimension(:,:  ), intent(in) :: source_sfc
 #    # -------------------
 #    integer :: ncid
 #    integer :: ncol, nlay, ngpt
@@ -784,9 +785,9 @@ module mo_test_files_io
   #--------------------------------------------------------------------------------------------------------------------
   function read_sources(ds)#, source_up, source_dn, source_sfc)
 #    character(len=*),           intent(in ) :: fileName
-#    real(wp), dimension(:,:,:), allocatable, &
+#    real(FT), dimension(:,:,:), allocatable, &
 #                                intent(out) :: source_up, source_dn
-#    real(wp), dimension(:,:  ), allocatable, &
+#    real(FT), dimension(:,:  ), allocatable, &
 #                                intent(out) :: source_sfc
 #    # -------------------
 #    integer :: ncid
@@ -860,7 +861,7 @@ module mo_test_files_io
 #    integer :: ncid
 #    integer :: ncol, nlay, ngpt, nmom, nband
 #    integer,  dimension(:,:), allocatable :: band_lims_gpt
-#    real(wp), dimension(:,:), allocatable :: band_lims_wvn
+#    real(FT), dimension(:,:), allocatable :: band_lims_wvn
     # -------------------
 #    if(nf90_open(trim(fileName), NF90_NOWRITE, ncid) /= NF90_NOERR) &
 #      call stop_on_err("read_lw_Planck_sources: can't open file " // trim(fileName))
@@ -884,7 +885,7 @@ module mo_test_files_io
     #
     band_lims_wvn = ds["band_lims_wvn"][:]
     band_lims_gpt = ds["band_lims_gpt"][:]
-    
+
     stop_on_err(init(sources,band_lims_wvn, band_lims_gpt, " "))
     stop_on_err(alloc(sources,ncol,nlay))
 
@@ -913,7 +914,7 @@ module mo_test_files_io
 #  #
 #  subroutine write_sw_solar_sources(fileName, toa_src)
 #    character(len=*),           intent(in) :: fileName
-#    real(wp), dimension(:,:  ), intent(in) :: toa_src
+#    real(FT), dimension(:,:  ), intent(in) :: toa_src
 #    # -------------------
 #    integer :: ncid
 #    integer :: ncol, ngpt
@@ -933,7 +934,7 @@ module mo_test_files_io
   #--------------------------------------------------------------------------------------------------------------------
   function read_sw_solar_sources(ds)#, toa_src)
 #    character(len=*),           intent(in ) :: fileName
-#    real(wp), dimension(:,:), allocatable, &
+#    real(FT), dimension(:,:), allocatable, &
 #                                intent(out) :: toa_src
 #    # -------------------
 #    integer :: ncid, status
@@ -943,7 +944,7 @@ module mo_test_files_io
 #    if(nf90_open(trim(fileName), NF90_NOWRITE, ncid) /= NF90_NOERR) &
 #      call stop_on_err("read_sw_solar_sources: can't open file " // trim(fileName))
 
-    if !haskey(ds,"toa_src") 
+    if !haskey(ds,"toa_src")
       stop_on_err("read_sw_solar_sources: file " *  " doesn't contain toa_src field.")
     end
 
@@ -960,8 +961,8 @@ module mo_test_files_io
 #  #
 #  subroutine write_two_stream(fileName, Rdif, Tdif, Rdir, Tdir, Tnoscat)
 #    character(len=*),           intent(in) :: fileName
-#    real(wp), dimension(:,:,:), intent(in) :: Rdif, Tdif
-#    real(wp), dimension(:,:,:), optional, &
+#    real(FT), dimension(:,:,:), intent(in) :: Rdif, Tdif
+#    real(FT), dimension(:,:,:), optional, &
 #                                intent(in) :: Rdir, Tdir, Tnoscat
 #    # -------------------
 #    integer :: ncid
@@ -997,9 +998,9 @@ module mo_test_files_io
   #--------------------------------------------------------------------------------------------------------------------
   function read_two_stream(ds)#, Rdif, Tdif, Rdir, Tdir, Tnoscat)
 #    character(len=*),           intent(in ) :: fileName
-#    real(wp), dimension(:,:,:), allocatable, &
+#    real(FT), dimension(:,:,:), allocatable, &
 #                                intent(out) :: Rdif, Tdif
-#    real(wp), dimension(:,:,:), allocatable, optional, &
+#    real(FT), dimension(:,:,:), allocatable, optional, &
 #                                intent(out) :: Rdir, Tdir, Tnoscat
 
 #    # -------------------
@@ -1022,13 +1023,13 @@ module mo_test_files_io
     Tnoscat = []
 
 
-    if haskey(ds,"Rdir") 
+    if haskey(ds,"Rdir")
       Rdir = ds["Rdir"][:]
     end
-    if haskey(ds,"Tdir") 
+    if haskey(ds,"Tdir")
       Tdir = ds["Tdir"][:]
     end
-    if haskey(ds,"Tnoscat") 
+    if haskey(ds,"Tnoscat")
       Tnoscat = ds["Tnoscat"][:]
     end
 
@@ -1041,8 +1042,8 @@ module mo_test_files_io
 #  #
 #  subroutine write_gpt_fluxes(fileName, gpt_flux_up, gpt_flux_dn, gpt_flux_dn_dir)
 #    character(len=*),           intent(in) :: fileName
-#    real(wp), dimension(:,:,:), intent(in) :: gpt_flux_up, gpt_flux_dn
-#    real(wp), dimension(:,:,:), optional, &
+#    real(FT), dimension(:,:,:), intent(in) :: gpt_flux_up, gpt_flux_dn
+#    real(FT), dimension(:,:,:), optional, &
 #                                intent(in) :: gpt_flux_dn_dir
 #    # -------------------
 #    integer :: ncid
@@ -1070,9 +1071,9 @@ module mo_test_files_io
   #--------------------------------------------------------------------------------------------------------------------
   function read_gpt_fluxes(ds)# gpt_flux_up, gpt_flux_dn, gpt_flux_dn_dir)
 #    character(len=*),           intent(in ) :: fileName
-#    real(wp), dimension(:,:,:), allocatable, &
+#    real(FT), dimension(:,:,:), allocatable, &
 #                                intent(out) :: gpt_flux_up, gpt_flux_dn
-#    real(wp), dimension(:,:,:), allocatable, optional, &
+#    real(FT), dimension(:,:,:), allocatable, optional, &
 #                                intent(out) :: gpt_flux_dn_dir
 #    # -------------------
 #    integer :: ncid
@@ -1093,7 +1094,7 @@ module mo_test_files_io
       gpt_flux_dn_dir = ds["gpt_flux_dn_dir"][:]
     end
 
-    return gpt_flux_up, gpt_flux_dn, gpt_flux_dn_dir 
+    return gpt_flux_up, gpt_flux_dn, gpt_flux_dn_dir
 #    ncid = nf90_close(ncid)
   end #subroutine read_gpt_fluxes
   #--------------------------------------------------------------------------------------------------------------------
@@ -1103,8 +1104,8 @@ module mo_test_files_io
 #    #
 #    use iso_fortran_env, only : error_unit
 #    character(len=*), intent(in) :: msg
-    if length(strip(msg)) > 0
-      error(strip(msg))
+    if length(trim(msg)) > 0
+      error(trim(msg))
     end
   end
   #--------------------------------------------------------------------------------------------------------------------

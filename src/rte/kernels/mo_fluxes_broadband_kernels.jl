@@ -21,7 +21,7 @@ module mo_fluxes_broadband_kernels
 export sum_broadband, net_broadband_full, net_broadband_precalc
 
 #  use, intrinsic :: iso_c_binding
-#  use mo_rte_kind, only: wp
+#  use mo_rte_kind, only: FT
 #  implicit none
 #  private
 #  public :: sum_broadband, net_broadband
@@ -39,8 +39,8 @@ export sum_broadband, net_broadband_full, net_broadband_precalc
     #
   function sum_broadband(ncol, nlev, ngpt, spectral_flux, broadband_flux) #bind(C, name="sum_broadband")
 #    integer,                               intent(in ) :: ncol, nlev, ngpt
-#    real(wp), dimension(ncol, nlev, ngpt), intent(in ) :: spectral_flux
-#    real(wp), dimension(ncol, nlev),       intent(out) :: broadband_flux
+#    real(FT), dimension(ncol, nlev, ngpt), intent(in ) :: spectral_flux
+#    real(FT), dimension(ncol, nlev),       intent(out) :: broadband_flux
 
 #    integer :: icol, ilev, igpt
 
@@ -77,11 +77,11 @@ export sum_broadband, net_broadband_full, net_broadband_precalc
   function net_broadband_full(ncol, nlev, ngpt, spectral_flux_dn, spectral_flux_up, broadband_flux_net) # &
 #    bind(C, name="net_broadband_full")
 #    integer,                               intent(in ) :: ncol, nlev, ngpt
-#    real(wp), dimension(ncol, nlev, ngpt), intent(in ) :: spectral_flux_dn, spectral_flux_up
-#    real(wp), dimension(ncol, nlev),       intent(out) :: broadband_flux_net
+#    real(FT), dimension(ncol, nlev, ngpt), intent(in ) :: spectral_flux_dn, spectral_flux_up
+#    real(FT), dimension(ncol, nlev),       intent(out) :: broadband_flux_net
 
 #    integer  :: icol, ilev, igpt
-#    real(wp) :: diff
+#    real(FT) :: diff
 
 #    #$acc enter data copyin(spectral_flux_dn, spectral_flux_up) create(broadband_flux_net)
 #    #$acc parallel loop collapse(2)
@@ -110,8 +110,8 @@ export sum_broadband, net_broadband_full, net_broadband_precalc
   function net_broadband_precalc(ncol, nlev, flux_dn, flux_up, broadband_flux_net) # &
 #    bind(C, name="net_broadband_precalc")
 #    integer,                         intent(in ) :: ncol, nlev
-#    real(wp), dimension(ncol, nlev), intent(in ) :: flux_dn, flux_up
-#    real(wp), dimension(ncol, nlev), intent(out) :: broadband_flux_net
+#    real(FT), dimension(ncol, nlev), intent(in ) :: flux_dn, flux_up
+#    real(FT), dimension(ncol, nlev), intent(out) :: broadband_flux_net
 
 #    integer  :: icol, ilev
 #    #$acc enter data copyin(flux_dn, flux_up) create(broadband_flux_net)

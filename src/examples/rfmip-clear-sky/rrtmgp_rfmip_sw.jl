@@ -22,16 +22,7 @@
 # Error checking: Procedures in rte+rrtmgp return strings which are empty if no errors occured
 #   Check the incoming string, print it out and stop execution if non-empty
 #
-function stop_on_err(error_msg)
-  # use iso_fortran_env, only : error_unit
-  # character(len=*), intent(in) :: error_msg
 
-  if error_msg ≠ ""
-    println(error_unit,trim(error_msg))
-    println(error_unit,"rrtmgp_rfmip_sw stopping")
-    error("Error")
-  end
-end
 # -------------------------------------------------------------------------------------------------
 #
 # Main program
@@ -44,7 +35,7 @@ module rrtmgp_rfmip_sw
   #
   # Working precision for real variables
   #
-  # use mo_rte_kind,           only: wp
+  # use mo_rte_kind,           only: FT
   #
   # Array utilities
   #
@@ -112,11 +103,11 @@ module rrtmgp_rfmip_sw
   # character(len=4)   :: block_size_char, forcing_index_char = '1'
 
   # character(len=32 ), dimension(:),   allocatable :: kdist_gas_names, rfmip_gas_games
-  # real(wp), dimension(:,:,:),         allocatable :: p_lay, p_lev, t_lay, t_lev # block_size, nlay, nblocks
-  # real(wp), dimension(:,:,:), target, allocatable :: flux_up, flux_dn
-  # real(wp), dimension(:,:  ),         allocatable :: surface_albedo, total_solar_irradiance, solar_zenith_angle
+  # real(FT), dimension(:,:,:),         allocatable :: p_lay, p_lev, t_lay, t_lev # block_size, nlay, nblocks
+  # real(FT), dimension(:,:,:), target, allocatable :: flux_up, flux_dn
+  # real(FT), dimension(:,:  ),         allocatable :: surface_albedo, total_solar_irradiance, solar_zenith_angle
   #                                                    # block_size, nblocks
-  # real(wp), dimension(:,:  ),         allocatable :: sfc_alb_spec # nbnd, block_size; spectrally-resolved surface albedo
+  # real(FT), dimension(:,:  ),         allocatable :: sfc_alb_spec # nbnd, block_size; spectrally-resolved surface albedo
   #
   # Classes used by rte+rrtmgp
   #
@@ -124,16 +115,16 @@ module rrtmgp_rfmip_sw
   # type(ty_optical_props_2str)                    :: optical_props
   # type(ty_fluxes_broadband)                      :: fluxes
 
-  # real(wp), dimension(:,:), allocatable          :: toa_flux # block_size, ngpt
-  # real(wp), dimension(:  ), allocatable          :: def_tsi, mu0    # block_size
+  # real(FT), dimension(:,:), allocatable          :: toa_flux # block_size, ngpt
+  # real(FT), dimension(:  ), allocatable          :: def_tsi, mu0    # block_size
   # logical , dimension(:,:), allocatable          :: usecol # block_size, nblocks
   #
   # ty_gas_concentration holds multiple columns; we make an array of these objects to
   #   leverage what we know about the input file
   #
   # type(ty_gas_concs), dimension(:), allocatable  :: gas_conc_array
-  DT = Float64
-  deg_to_rad = acos(-DT(1))/DT(180)
+  FT = Float64
+  deg_to_rad = acos(-FT(1))/FT(180)
 #ifdef USE_TIMING
   # integer :: ret, i
 #endif
@@ -167,7 +158,7 @@ module rrtmgp_rfmip_sw
   # How big is the problem? Does it fit into blocks of the size we've specified?
   #
   if mod(ncol*nexp, block_size) ≠ 0
-    stop_on_err("rrtmgp_rfmip_sw: number of columns does not fit evenly into blocks.")
+    error("rrtmgp_rfmip_sw: number of columns does not fit evenly into blocks.")
   end
   nblocks = (ncol*nexp)/block_size
   println("Doing $(nblocks) blocks of size $(block_size)")
@@ -218,8 +209,8 @@ module rrtmgp_rfmip_sw
   nbnd = get_nband(k_dist)
   ngpt = get_ngpt(k_dist)
 
-  toa_flux = Array{DT}(undef, block_size, get_ngpt(k_dist))
-  def_tsi = Array{DT}(undef, block_size)
+  toa_flux = Array{FT}(undef, block_size, get_ngpt(k_dist))
+  def_tsi = Array{FT}(undef, block_size)
   usecol = Array{Bool}(undef, block_size,nblocks)
   #
   # RRTMGP won't run with pressure less than its minimum. The top level in the RFMIP file
@@ -227,9 +218,9 @@ module rrtmgp_rfmip_sw
   #   This introduces an error but shows input sanitizing.
   #
   if top_at_1
-    p_lev[:,1,:] .= get_press_min(k_dist) + eps(DT)
+    p_lev[:,1,:] .= get_press_min(k_dist) + eps(FT)
   else
-    p_lev[:,nlay+1,:] .= get_press_min(k_dist) + eps(DT)
+    p_lev[:,nlay+1,:] .= get_press_min(k_dist) + eps(FT)
   end
 
   #
@@ -238,7 +229,7 @@ module rrtmgp_rfmip_sw
   #   course, but this gives us more work and so a better measure of timing.
   #
   for b = 1:nblocks
-    usecol[1:block_size,b]  = solar_zenith_angle[1:block_size,b] < DT(90) - DT(2) * spacing(DT(90))
+    usecol[1:block_size,b]  = solar_zenith_angle[1:block_size,b] < FT(90) - FT(2) * spacing(FT(90))
   end
 
   #
@@ -246,10 +237,10 @@ module rrtmgp_rfmip_sw
   #   gas optical properties, and source functions. The %alloc() routines carry along
   #   the spectral discretization from the k-distribution.
   #
-  flux_up = Array{DT}(undef, block_size, nlay+1, nblocks)
-  flux_dn = Array{DT}(undef, block_size, nlay+1, nblocks)
-  mu0 = Array{DT}(undef, block_size)
-  sfc_alb_spec = Array{DT}(undef, nbnd,block_size)
+  flux_up = Array{FT}(undef, block_size, nlay+1, nblocks)
+  flux_dn = Array{FT}(undef, block_size, nlay+1, nblocks)
+  mu0 = Array{FT}(undef, block_size)
+  sfc_alb_spec = Array{FT}(undef, nbnd,block_size)
   stop_on_err(alloc!(optical_props, block_size, nlay, k_dist))
   #$acc enter data create(optical_props, optical_props%tau, optical_props%ssa, optical_props%g)
   #$acc enter data create (toa_flux, def_tsi)
@@ -293,7 +284,7 @@ module rrtmgp_rfmip_sw
     # What's the total solar irradiance assumed by RRTMGP?
     #
 #ifdef _OPENACC
-    zero_array!(block_size, def_tsi)
+    zero_array!(def_tsi)
     #$acc parallel loop collapse(2) copy(def_tsi) copyin(toa_flux)
     for igpt = 1:ngpt
       for icol = 1:block_size
@@ -330,7 +321,7 @@ module rrtmgp_rfmip_sw
     #
     #$acc parallel loop copyin(solar_zenith_angle, usecol)
     for icol = 1:block_size
-      mu0[icol] = fmerge(cos(solar_zenith_angle[icol,b]*deg_to_rad), DT(1), usecol[icol,b])
+      mu0[icol] = fmerge(cos(solar_zenith_angle[icol,b]*deg_to_rad), FT(1), usecol[icol,b])
     end
 
     #
@@ -355,8 +346,8 @@ module rrtmgp_rfmip_sw
     #
     for icol = 1:block_size
       if !usecol[icol,b]
-        flux_up[icol,:,b]  = DT(0)
-        flux_dn[icol,:,b]  = DT(0)
+        flux_up[icol,:,b]  = FT(0)
+        flux_dn[icol,:,b]  = FT(0)
       end
     end
   end

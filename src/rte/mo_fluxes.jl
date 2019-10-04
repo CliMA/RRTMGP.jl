@@ -21,6 +21,7 @@ module mo_fluxes
 using ..mo_optical_props
 using ..mo_fluxes_broadband_kernels
 
+export ty_fluxes_broadband
 
   # -----------------------------------------------------------------------------------------------
   #
@@ -30,7 +31,7 @@ using ..mo_fluxes_broadband_kernels
   #
   # -----------------------------------------------------------------------------------------------
 
-abstract type ty_fluxes{T} end
+abstract type ty_fluxes{FT} end
 
   # type, abstract, public :: ty_fluxes
   # contains
@@ -44,17 +45,20 @@ abstract type ty_fluxes{T} end
   #
   # -----------------------------------------------------------------------------------------------
 
-struct ty_fluxes_broadband{T} <: ty_fluxes{T}
-  flux_up::Array{T,2}
-  flux_dn::Array{T,2}
-  flux_net::Array{T,2}
-  flux_dn_dir::Array{T,2}
+mutable struct ty_fluxes_broadband{FT} <: ty_fluxes{FT}
+  flux_up#::Array{FT,2}
+  flux_dn#::Array{FT,2}
+  flux_net#::Array{FT,2}
+  flux_dn_dir#::Array{FT,2}
 end
 
+ty_fluxes_broadband(FT) = ty_fluxes_broadband{FT}(ntuple(i->nothing, 4)...)
+
+
   # type, extends(ty_fluxes), public :: ty_fluxes_broadband
-  #   real(wp), dimension(:,:), pointer :: flux_up => NULL(), flux_dn => NULL()
-  #   real(wp), dimension(:,:), pointer :: flux_net => NULL()    # Net (down - up)
-  #   real(wp), dimension(:,:), pointer :: flux_dn_dir => NULL() # Direct flux down
+  #   real(FT), dimension(:,:), pointer :: flux_up => NULL(), flux_dn => NULL()
+  #   real(FT), dimension(:,:), pointer :: flux_net => NULL()    # Net (down - up)
+  #   real(FT), dimension(:,:), pointer :: flux_dn_dir => NULL() # Direct flux down
   # contains
   #   procedure, public :: reduce      => reduce_broadband
   #   procedure, public :: are_desired => are_desired_broadband
@@ -68,11 +72,11 @@ end
   # --------------------------------------------------------------------------------------
 """
     class(ty_fluxes_broadband),        intent(inout) :: this
-    real(kind=wp), dimension(:,:,:),   intent(in   ) :: gpt_flux_up # Fluxes by gpoint [W/m2](ncol, nlay+1, ngpt)
-    real(kind=wp), dimension(:,:,:),   intent(in   ) :: gpt_flux_dn # Fluxes by gpoint [W/m2](ncol, nlay+1, ngpt)
+    real(kind=FT), dimension(:,:,:),   intent(in   ) :: gpt_flux_up # Fluxes by gpoint [W/m2](ncol, nlay+1, ngpt)
+    real(kind=FT), dimension(:,:,:),   intent(in   ) :: gpt_flux_dn # Fluxes by gpoint [W/m2](ncol, nlay+1, ngpt)
     class(ty_optical_props),           intent(in   ) :: spectral_disc  #< derived type with spectral information
     logical,                           intent(in   ) :: top_at_1
-    real(kind=wp), dimension(:,:,:), optional,
+    real(kind=FT), dimension(:,:,:), optional,
                                        intent(in   ) :: gpt_flux_dn_dir# Direct flux down
     character(len=128)                               :: error_msg
     # ------

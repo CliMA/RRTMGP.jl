@@ -28,7 +28,7 @@
 #
 # -------------------------------------------------------------------------------------------------
 module mo_rte_sw
-#  use mo_rte_kind,      only: wp, wl
+#  use mo_rte_kind,      only: FT, wl
 #  use mo_util_array,    only: any_vals_less_than, any_vals_outside
 #  use mo_optical_props, only: ty_optical_props, &
 #                              ty_optical_props_arry, ty_optical_props_1scl, ty_optical_props_2str, ty_optical_props_nstr
@@ -56,12 +56,12 @@ module mo_rte_sw
 #    class(ty_optical_props_arry), intent(in   ) :: atmos           # Optical properties provided as arrays
 #    logical,                      intent(in   ) :: top_at_1        # Is the top of the domain at index 1?
 #                                                                   # (if not, ordering is bottom-to-top)
-#    real(wp), dimension(:),       intent(in   ) :: mu0             # cosine of solar zenith angle (ncol)
-#    real(wp), dimension(:,:),     intent(in   ) :: inc_flux,    &  # incident flux at top of domain [W/m2] (ncol, ngpt)
+#    real(FT), dimension(:),       intent(in   ) :: mu0             # cosine of solar zenith angle (ncol)
+#    real(FT), dimension(:,:),     intent(in   ) :: inc_flux,    &  # incident flux at top of domain [W/m2] (ncol, ngpt)
 #                                                   sfc_alb_dir, &  # surface albedo for direct and
 #                                                   sfc_alb_dif     # diffuse radiation (nband, ncol)
 #    class(ty_fluxes),             intent(inout) :: fluxes          # Class describing output calculations
-#    real(wp), dimension(:,:), optional, &
+#    real(FT), dimension(:,:), optional, &
 #                                  intent(in   ) :: inc_flux_dif    # incident diffuse flux at top of domain [W/m2] (ncol, ngpt)
 #    character(len=128)                          :: error_msg       # If empty, calculation was successful
 #    # --------------------------------
@@ -71,10 +71,10 @@ module mo_rte_sw
 #    integer :: ncol, nlay, ngpt, nband
 #    integer :: icol
 
-#    real(wp), dimension(:,:,:), allocatable :: gpt_flux_up, gpt_flux_dn, gpt_flux_dir
-#    real(wp), dimension(:,:),   allocatable :: sfc_alb_dir_gpt, sfc_alb_dif_gpt
+#    real(FT), dimension(:,:,:), allocatable :: gpt_flux_up, gpt_flux_dn, gpt_flux_dir
+#    real(FT), dimension(:,:),   allocatable :: sfc_alb_dir_gpt, sfc_alb_dif_gpt
     # ------------------------------------------------------------------------------------
-    wp = eltype(mu0)
+    FT = eltype(mu0)
     wl = typeof(top_at_1)
 
     ncol  = get_ncol(atmos)
@@ -98,7 +98,7 @@ module mo_rte_sw
       error("rte_sw: mu0 inconsistently sized")
     end
 
-    if(any_vals_outside(mu0, wp(0), wp(1)))
+    if(any_vals_outside(mu0, FT(0), FT(1)))
       error("rte_sw: one or more mu0 <= 0 or > 1")
     end
 
@@ -106,7 +106,7 @@ module mo_rte_sw
       error("rte_sw: inc_flux inconsistently sized")
     end
 
-    if any_vals_less_than(inc_flux, wp(0))
+    if any_vals_less_than(inc_flux, FT(0))
       error("rte_sw: one or more inc_flux < 0")
     end
 
@@ -114,7 +114,7 @@ module mo_rte_sw
       if any([size(inc_flux_dif)[1], size(inc_flux_dif)[2]] .!= [ncol, ngpt])
         error("rte_sw: inc_flux_dif inconsistently sized")
       end
-      if any_vals_less_than(inc_flux_dif, wp(0))
+      if any_vals_less_than(inc_flux_dif, FT(0))
         error("rte_sw: one or more inc_flux_dif < 0")
       end
     end
@@ -122,23 +122,23 @@ module mo_rte_sw
     if any([size(sfc_alb_dir)[1], size(sfc_alb_dir)[2]] .!= [nband, ncol])
       error("rte_sw: sfc_alb_dir inconsistently sized")
     end
-    if(any_vals_outside(sfc_alb_dir,  wp(0), wp(1)))
+    if(any_vals_outside(sfc_alb_dir,  FT(0), FT(1)))
       error("rte_sw: sfc_alb_dir out of bounds [0,1]")
     end
     if(any([size(sfc_alb_dif)[1], size(sfc_alb_dif)[2]] .!= [nband, ncol]))
       error("rte_sw: sfc_alb_dif inconsistently sized")
     end
-    if(any_vals_outside(sfc_alb_dif, wp(0), wp(1)))
+    if(any_vals_outside(sfc_alb_dif, FT(0), FT(1)))
       error("rte_sw: sfc_alb_dif out of bounds [0,1]")
     end
 
     # ------------------------------------------------------------------------------------
-    gpt_flux_up  = Array{wp}(undef,ncol, nlay+1, ngpt)
-    gpt_flux_dn  = Array{wp}(undef,ncol, nlay+1, ngpt)
-    gpt_flux_dir = Array{wp}(undef,ncol, nlay+1, ngpt)
+    gpt_flux_up  = Array{FT}(undef,ncol, nlay+1, ngpt)
+    gpt_flux_dn  = Array{FT}(undef,ncol, nlay+1, ngpt)
+    gpt_flux_dir = Array{FT}(undef,ncol, nlay+1, ngpt)
 
-    sfc_alb_dir_gpt = Array{wp}(undef,ncol, ngpt)
-    sfc_alb_dif_gpt = Array{wp}(undef,ncol, ngpt)
+    sfc_alb_dir_gpt = Array{FT}(undef,ncol, ngpt)
+    sfc_alb_dif_gpt = Array{FT}(undef,ncol, ngpt)
     # ------------------------------------------------------------------------------------
     # Lower boundary condition -- expand surface albedos by band to gpoints
     #   and switch dimension ordering
@@ -173,10 +173,7 @@ module mo_rte_sw
         # Direct beam only
         #
 #        #$acc enter data copyin(atmos, atmos%tau)
-        error_msg =  validate(atmos)
-        if(length(strip(error_msg)) > 0)
-	  return error_msg
-        end
+        validate!(atmos)
         sw_solver_noscat!(ncol, nlay, ngpt, logical(top_at_1, wl),
                               atmos.tau, mu0,
                               gpt_flux_dir)
@@ -220,8 +217,8 @@ module mo_rte_sw
   #
   function expand_and_transpose(ops,arr_in,arr_out)
 #    class(ty_optical_props),  intent(in ) :: ops
-#    real(wp), dimension(:,:), intent(in ) :: arr_in  # (nband, ncol)
-#    real(wp), dimension(:,:), intent(out) :: arr_out # (ncol, igpt)
+#    real(FT), dimension(:,:), intent(in ) :: arr_in  # (nband, ncol)
+#    real(FT), dimension(:,:), intent(out) :: arr_out # (ncol, igpt)
 #    # -------------
 #    integer :: ncol, nband, ngpt
 #    integer :: icol, iband, igpt

@@ -49,7 +49,7 @@ using JRRTMGP.mo_rfmip_io
   #
   # Working precision for real variables
   #
-  # use mo_rte_kind,           only: wp
+  # use mo_rte_kind,           only: FT
   #
   # Array utilities
   #
@@ -99,9 +99,6 @@ using JRRTMGP.mo_rfmip_io
   # Local variables
   #
 
-  clear_sky_dir = joinpath("..", "src", "examples","rfmip-clear-sky")
-  data_dir = joinpath("..", "src", "rrtmgp","data")
-
 
   # character(len=132) :: flxdn_file, flxup_file
   # integer            :: nargs, ncol, nlay, nbnd, ngpt, nexp, nblocks, block_size, forcing_index
@@ -110,11 +107,11 @@ using JRRTMGP.mo_rfmip_io
   # character(len=4)   :: block_size_char, forcing_index_char = '1'
 
   # character(len=32 ), dimension(:),   allocatable :: kdist_gas_names, rfmip_gas_games
-  # real(wp), dimension(:,:,:),         allocatable :: p_lay, p_lev, t_lay, t_lev # block_size, nlay, nblocks
-  # real(wp), dimension(:,:,:), target, allocatable :: flux_up, flux_dn
-  # real(wp), dimension(:,:  ),         allocatable :: surface_albedo, total_solar_irradiance, solar_zenith_angle
+  # real(FT), dimension(:,:,:),         allocatable :: p_lay, p_lev, t_lay, t_lev # block_size, nlay, nblocks
+  # real(FT), dimension(:,:,:), target, allocatable :: flux_up, flux_dn
+  # real(FT), dimension(:,:  ),         allocatable :: surface_albedo, total_solar_irradiance, solar_zenith_angle
   #                                                    # block_size, nblocks
-  # real(wp), dimension(:,:  ),         allocatable :: sfc_alb_spec # nbnd, block_size; spectrally-resolved surface albedo
+  # real(FT), dimension(:,:  ),         allocatable :: sfc_alb_spec # nbnd, block_size; spectrally-resolved surface albedo
   #
   # Classes used by rte+rrtmgp
   #
@@ -122,23 +119,24 @@ using JRRTMGP.mo_rfmip_io
   # type(ty_optical_props_2str)                    :: optical_props
   # type(ty_fluxes_broadband)                      :: fluxes
 
-  # real(wp), dimension(:,:), allocatable          :: toa_flux # block_size, ngpt
-  # real(wp), dimension(:  ), allocatable          :: def_tsi, mu0    # block_size
+  # real(FT), dimension(:,:), allocatable          :: toa_flux # block_size, ngpt
+  # real(FT), dimension(:  ), allocatable          :: def_tsi, mu0    # block_size
   # logical , dimension(:,:), allocatable          :: usecol # block_size, nblocks
   #
   # ty_gas_concentration holds multiple columns; we make an array of these objects to
   #   leverage what we know about the input file
   #
   # type(ty_gas_concs), dimension(:), allocatable  :: gas_conc_array
-  DT = Float64
-  deg_to_rad = acos(-DT(1))/DT(180)
+  FT = Float64
+  deg_to_rad = acos(-FT(1))/FT(180)
 
   # -------------------------------------------------------------------------------------------------
   #
   # Code starts
   #   all arguments are optional
   #
-
+  clear_sky_dir = joinpath("..", "src", "examples","rfmip-clear-sky")
+  data_dir = joinpath("..", "src", "rrtmgp","data")
   rfmip_file = joinpath(clear_sky_dir, "multiple_input4MIPs_radiation_RFMIP_UColorado-RFMIP-1-2_none.nc")
   kdist_file = joinpath(data_dir, "rrtmgp-data-sw-g224-2018-12-04.nc")
   ds = Dataset(rfmip_file, "r") # reading the NetCDF file in read only mode
@@ -156,7 +154,7 @@ using JRRTMGP.mo_rfmip_io
   if mod(ncol*nexp, block_size) ≠ 0
     error("rrtmgp_rfmip_sw: number of columns does not fit evenly into blocks.")
   end
-  nblocks = (ncol*nexp)/block_size
+  nblocks = Int((ncol*nexp)/block_size)
   println("Doing $(nblocks) blocks of size $(block_size)")
 
   # TODO: Fix readme
@@ -188,6 +186,12 @@ using JRRTMGP.mo_rfmip_io
   #
   # Are the arrays ordered in the vertical with 1 at the top or the bottom of the domain?
   #
+
+  test_data(p_lay, "p_lay")
+  test_data(p_lev, "p_lev")
+  test_data(t_lay, "t_lay")
+  test_data(t_lev, "t_lev")
+
   top_at_1 = p_lay[1, 1, 1] < p_lay[1, nlay, 1]
 
   #
@@ -195,172 +199,175 @@ using JRRTMGP.mo_rfmip_io
   #
   gas_conc_array = read_and_block_gases_ty(ds, block_size, kdist_gas_names, rfmip_gas_games)
   surface_albedo, total_solar_irradiance, solar_zenith_angle = read_and_block_sw_bc(ds, block_size)
-  #
-  # Read k-distribution information. load_and_init() reads data from netCDF and calls
-  #   k_dist%init(); users might want to use their own reading methods
-  #
-  load_and_init!(k_dist, strip(kdist_file), gas_conc_array[1])
-  if(!source_is_external(k_dist))
-    error("rrtmgp_rfmip_sw: k-distribution file is not SW")
-  end
-  nbnd = get_nband(k_dist)
-  ngpt = get_ngpt(k_dist)
+#   error("Done")
+#   #
+#   # Read k-distribution information. load_and_init() reads data from netCDF and calls
+#   #   k_dist%init(); users might want to use their own reading methods
+#   #
+#   k_dist = load_and_init(ds_k_dist, gas_conc_array[1])
+#   !source_is_external(k_dist) && error("rrtmgp_rfmip_sw: k-distribution file is not SW")
 
-  toa_flux = Array{DT}(undef, block_size, get_ngpt(k_dist))
-  def_tsi = Array{DT}(undef, block_size)
-  usecol = Array{Bool}(undef, block_size,nblocks)
-  #
-  # RRTMGP won't run with pressure less than its minimum. The top level in the RFMIP file
-  #   is set to 10^-3 Pa. Here we pretend the layer is just a bit less deep.
-  #   This introduces an error but shows input sanitizing.
-  #
-  if top_at_1
-    p_lev[:,1,:] .= get_press_min(k_dist) + eps(DT)
-  else
-    p_lev[:,nlay+1,:] .= get_press_min(k_dist) + eps(DT)
-  end
+#   nbnd = get_nband(k_dist.optical_props)
+#   ngpt = get_ngpt(k_dist.optical_props)
 
-  #
-  # RTE will fail if passed solar zenith angles greater than 90 degree. We replace any with
-  #   nighttime columns with a default solar zenith angle. We'll mask these out later, of
-  #   course, but this gives us more work and so a better measure of timing.
-  #
-  for b = 1:nblocks
-    usecol[1:block_size,b]  = solar_zenith_angle[1:block_size,b] < DT(90) - DT(2) * spacing(DT(90))
-  end
+#   toa_flux = Array{FT}(undef, block_size, get_ngpt(k_dist.optical_props))
+#   def_tsi = Array{FT}(undef, block_size)
+#   usecol = Array{Bool}(undef, block_size, nblocks)
+#   #
+#   # RRTMGP won't run with pressure less than its minimum. The top level in the RFMIP file
+#   #   is set to 10^-3 Pa. Here we pretend the layer is just a bit less deep.
+#   #   This introduces an error but shows input sanitizing.
+#   #
+#   if top_at_1
+#     p_lev[:,1,:] .= get_press_min(k_dist) + eps(FT)
+#   else
+#     p_lev[:,nlay+1,:] .= get_press_min(k_dist) + eps(FT)
+#   end
 
-  #
-  # Allocate space for output fluxes (accessed via pointers in ty_fluxes_broadband),
-  #   gas optical properties, and source functions. The %alloc() routines carry along
-  #   the spectral discretization from the k-distribution.
-  #
-  flux_up = Array{DT}(undef, block_size, nlay+1, nblocks)
-  flux_dn = Array{DT}(undef, block_size, nlay+1, nblocks)
-  mu0 = Array{DT}(undef, block_size)
-  sfc_alb_spec = Array{DT}(undef, nbnd,block_size)
-  alloc!(optical_props, block_size, nlay, k_dist)
-  #$acc enter data create(optical_props, optical_props%tau, optical_props%ssa, optical_props%g)
-  #$acc enter data create (toa_flux, def_tsi)
-  #$acc enter data create (sfc_alb_spec, mu0)
-  # --------------------------------------------------
-#ifdef USE_TIMING
-  #
-  # Initialize timers
-  #
-  # ret = gptlsetoption (gptlpercent, 1)        # Turn on "% of" print
-  # ret = gptlsetoption (gptloverhead, 0)       # Turn off overhead estimate
-  # ret =  gptlinitialize()
-#endif
-  #
-  # Loop over blocks
-  #
-#ifdef USE_TIMING
-  for i = 1:32
-#endif
-  for b = 1:nblocks
-    fluxes.flux_up = flux_up[:,:,b]
-    fluxes.flux_dn = flux_dn[:,:,b]
-    #
-    # Compute the optical properties of the atmosphere and the Planck source functions
-    #    from pressures, temperatures, and gas concentrations...
-    #
-#ifdef USE_TIMING
-    # ret =  gptlstart('gas_optics (SW)')
-#endif
-    gas_optics!(k_dist,p_lay[:,:,b],
-                p_lev[:,:,b],
-                t_lay[:,:,b],
-                gas_conc_array[b],
-                optical_props,
-                toa_flux)
-#ifdef USE_TIMING
-    # ret =  gptlstop('gas_optics (SW)')
-#endif
-    # Boundary conditions
-    #   (This is partly to show how to keep work on GPUs using OpenACC in a host application)
-    # What's the total solar irradiance assumed by RRTMGP?
-    #
-#ifdef _OPENACC
-    zero_array!(block_size, def_tsi)
-    #$acc parallel loop collapse(2) copy(def_tsi) copyin(toa_flux)
-    for igpt = 1:ngpt
-      for icol = 1:block_size
-        #$acc atomic update
-        def_tsi[icol] = def_tsi[icol] + toa_flux[icol, igpt]
-      end
-    end
-#else
-    #
-    # More compactly...
-    #
-    def_tsi[1:block_size] = sum(toa_flux, dims=2)
-#endif
-    #
-    # Normalize incoming solar flux to match RFMIP specification
-    #
-    #$acc parallel loop collapse(2) copyin(total_solar_irradiance, def_tsi) copy(toa_flux)
-    for igpt = 1:ngpt
-      for icol = 1:block_size
-        toa_flux[icol,igpt] = toa_flux[icol,igpt] * total_solar_irradiance[icol,b]/def_tsi[icol]
-      end
-    end
-    #
-    # Expand the spectrally-constant surface albedo to a per-band albedo for each column
-    #
-    #$acc parallel loop collapse(2) copyin(surface_albedo)
-    for icol = 1:block_size
-      for ibnd = 1:nbnd
-        sfc_alb_spec[ibnd,icol] = surface_albedo[icol,b]
-      end
-    end
-    #
-    # Cosine of the solar zenith angle
-    #
-    #$acc parallel loop copyin(solar_zenith_angle, usecol)
-    for icol = 1:block_size
-      mu0[icol] = fmerge(cos(solar_zenith_angle[icol,b]*deg_to_rad), DT(1), usecol[icol,b])
-    end
+#   #
+#   # RTE will fail if passed solar zenith angles greater than 90 degree. We replace any with
+#   #   nighttime columns with a default solar zenith angle. We'll mask these out later, of
+#   #   course, but this gives us more work and so a better measure of timing.
+#   #
+#   for b = 1:nblocks
+#     usecol[1:block_size,b] .= solar_zenith_angle[1:block_size,b] .< FT(90) - FT(2) * spacing(FT(90))
+#   end
 
-    #
-    # ... and compute the spectrally-resolved fluxes, providing reduced values
-    #    via ty_fluxes_broadband
-    #
-#ifdef USE_TIMING
-    # ret =  gptlstart('rte_sw')
-#endif
-    rte_sw(optical_props,
-           top_at_1,
-           mu0,
-           toa_flux,
-           sfc_alb_spec,
-           sfc_alb_spec,
-           fluxes)
-#ifdef USE_TIMING
-    # ret =  gptlstop('rte_sw')
-#endif
-    #
-    # Zero out fluxes for which the original solar zenith angle is > 90 degrees.
-    #
-    for icol = 1:block_size
-      if !usecol[icol,b]
-        flux_up[icol,:,b]  = DT(0)
-        flux_dn[icol,:,b]  = DT(0)
-      end
-    end
-  end
-  #
-  # End timers
-  #
-#ifdef USE_TIMING
-  end
-  # ret = gptlpr(block_size)
-  # ret = gptlfinalize()
-#endif
-  #$acc exit data delete(optical_props%tau, optical_props%ssa, optical_props%g, optical_props)
-  #$acc exit data delete(sfc_alb_spec, mu0)
-  #$acc exit data delete(toa_flux, def_tsi)
-  # --------------------------------------------------
-  unblock_and_write!(strip(flxup_file), "rsu", flux_up)
-  unblock_and_write!(strip(flxdn_file), "rsd", flux_dn)
+#   #
+#   # Allocate space for output fluxes (accessed via pointers in ty_fluxes_broadband),
+#   #   gas optical properties, and source functions. The %alloc() routines carry along
+#   #   the spectral discretization from the k-distribution.
+#   #
+#   flux_up = Array{FT}(undef, block_size, nlay+1, nblocks)
+#   flux_dn = Array{FT}(undef, block_size, nlay+1, nblocks)
+#   mu0 = Array{FT}(undef, block_size)
+#   sfc_alb_spec = Array{FT}(undef, nbnd,block_size)
+#   optical_props = ty_optical_props_2str(FT, Int)
+#   copy_and_alloc!(optical_props, block_size, nlay, k_dist.optical_props)
+#   #$acc enter data create(optical_props, optical_props%tau, optical_props%ssa, optical_props%g)
+#   #$acc enter data create (toa_flux, def_tsi)
+#   #$acc enter data create (sfc_alb_spec, mu0)
+#   # --------------------------------------------------
+# #ifdef USE_TIMING
+#   #
+#   # Initialize timers
+#   #
+#   # ret = gptlsetoption (gptlpercent, 1)        # Turn on "% of" print
+#   # ret = gptlsetoption (gptloverhead, 0)       # Turn off overhead estimate
+#   # ret =  gptlinitialize()
+# #endif
+#   #
+#   # Loop over blocks
+#   #
+# #ifdef USE_TIMING
+#   fluxes = ty_fluxes_broadband(FT)
+#   for i = 1:32
+# #endif
+#   for b = 1:nblocks
+#     fluxes.flux_up = flux_up[:,:,b]
+#     fluxes.flux_dn = flux_dn[:,:,b]
+#     #
+#     # Compute the optical properties of the atmosphere and the Planck source functions
+#     #    from pressures, temperatures, and gas concentrations...
+#     #
+# #ifdef USE_TIMING
+#     # ret =  gptlstart('gas_optics (SW)')
+# #endif
+#     gas_optics!(k_dist,
+#                 p_lay[:,:,b],
+#                 p_lev[:,:,b],
+#                 t_lay[:,:,b],
+#                 gas_conc_array[b],
+#                 optical_props,
+#                 toa_flux)
+# #ifdef USE_TIMING
+#     # ret =  gptlstop('gas_optics (SW)')
+# #endif
+#     # Boundary conditions
+#     #   (This is partly to show how to keep work on GPUs using OpenACC in a host application)
+#     # What's the total solar irradiance assumed by RRTMGP?
+#     #
+# #ifdef _OPENACC
+#     zero_array!(def_tsi)
+#     #$acc parallel loop collapse(2) copy(def_tsi) copyin(toa_flux)
+#     for igpt = 1:ngpt
+#       for icol = 1:block_size
+#         #$acc atomic update
+#         def_tsi[icol] = def_tsi[icol] + toa_flux[icol, igpt]
+#       end
+#     end
+# #else
+#     #
+#     # More compactly...
+#     #
+#     def_tsi[1:block_size] = sum(toa_flux, dims=2)
+# #endif
+#     #
+#     # Normalize incoming solar flux to match RFMIP specification
+#     #
+#     #$acc parallel loop collapse(2) copyin(total_solar_irradiance, def_tsi) copy(toa_flux)
+#     for igpt = 1:ngpt
+#       for icol = 1:block_size
+#         toa_flux[icol,igpt] = toa_flux[icol,igpt] * total_solar_irradiance[icol,b]/def_tsi[icol]
+#       end
+#     end
+#     #
+#     # Expand the spectrally-constant surface albedo to a per-band albedo for each column
+#     #
+#     #$acc parallel loop collapse(2) copyin(surface_albedo)
+#     for icol = 1:block_size
+#       for ibnd = 1:nbnd
+#         sfc_alb_spec[ibnd,icol] = surface_albedo[icol,b]
+#       end
+#     end
+#     #
+#     # Cosine of the solar zenith angle
+#     #
+#     #$acc parallel loop copyin(solar_zenith_angle, usecol)
+#     for icol = 1:block_size
+#       mu0[icol] = fmerge(cos(solar_zenith_angle[icol,b]*deg_to_rad), FT(1), usecol[icol,b])
+#     end
+
+#     #
+#     # ... and compute the spectrally-resolved fluxes, providing reduced values
+#     #    via ty_fluxes_broadband
+#     #
+# #ifdef USE_TIMING
+#     # ret =  gptlstart('rte_sw')
+# #endif
+#     rte_sw(optical_props,
+#            top_at_1,
+#            mu0,
+#            toa_flux,
+#            sfc_alb_spec,
+#            sfc_alb_spec,
+#            fluxes)
+# #ifdef USE_TIMING
+#     # ret =  gptlstop('rte_sw')
+# #endif
+#     #
+#     # Zero out fluxes for which the original solar zenith angle is > 90 degrees.
+#     #
+#     for icol = 1:block_size
+#       if !usecol[icol,b]
+#         flux_up[icol,:,b]  = FT(0)
+#         flux_dn[icol,:,b]  = FT(0)
+#       end
+#     end
+#   end
+#   #
+#   # End timers
+#   #
+# #ifdef USE_TIMING
+#   end
+#   # ret = gptlpr(block_size)
+#   # ret = gptlfinalize()
+# #endif
+#   #$acc exit data delete(optical_props%tau, optical_props%ssa, optical_props%g, optical_props)
+#   #$acc exit data delete(sfc_alb_spec, mu0)
+#   #$acc exit data delete(toa_flux, def_tsi)
+#   # --------------------------------------------------
+#   unblock_and_write!(trim(flxup_file), "rsu", flux_up)
+#   unblock_and_write!(trim(flxdn_file), "rsd", flux_dn)
 
 end

@@ -22,8 +22,9 @@
 # The protocol does not specify the treatmet of gases like CO
 #
 # -------------------------------------------------------------------------------------------------
+
 module mo_rfmip_io
-#  use mo_rte_kind,   only: wp
+#  use mo_rte_kind,   only: FT
 #  use mo_gas_concentrations, &
 #                        only: ty_gas_concs
 #  use mo_util_string,   only: lower_case, string_in_array, string_loc_in_array
@@ -34,6 +35,7 @@ module mo_rfmip_io
 
   using ..mo_gas_concentrations
   using ..mo_util_string
+  using ..fortran_intrinsics
   using NCDatasets
 
   export read_kdist_gas_names, determine_gas_names, read_size, read_and_block_pt,
@@ -59,7 +61,6 @@ module mo_rfmip_io
     ncol = Int(ds.dim["site"])
     nlay = Int(ds.dim["layer"])
     nexp = Int(ds.dim["expt"])
-    @show ncol, nlay, nexp
 
     if ds.dim["level"] ≠ nlay+1
       error("read_size: number of levels should be nlay+1")
@@ -76,16 +77,16 @@ module mo_rfmip_io
   function read_and_block_pt(ds, blocksize)
 #    character(len=*),           intent(in   ) :: fileName
 #    integer,                    intent(in   ) :: blocksize
-#    real(wp), dimension(:,:,:), allocatable, & ! [blocksize, nlay/+1, nblocks]
+#    real(FT), dimension(:,:,:), allocatable, & ! [blocksize, nlay/+1, nblocks]
 #                                intent(  out) :: p_lay, p_lev, t_lay, t_lev
     # ---------------------------
 #    integer :: ncid
 #    integer :: b, nblocks
-#    real(wp), dimension(:,:  ), allocatable :: temp2d
-#    real(wp), dimension(:,:,:), allocatable :: temp3d
+#    real(FT), dimension(:,:  ), allocatable :: temp2d
+#    real(FT), dimension(:,:,:), allocatable :: temp3d
     # ---------------------------
 
-    wp = Float64
+    FT = Float64
     ncol_l, nlay_l, nexp_l = read_size(ds)
 
     if any([ncol_l, nlay_l, nexp_l]  .== 0)
@@ -98,10 +99,10 @@ module mo_rfmip_io
 
     nblocks = Int((ncol_l*nexp_l)/blocksize)
 
-    p_lay = Array{wp}(undef,blocksize,nlay_l  ,nblocks)
-    t_lay = Array{wp}(undef,blocksize,nlay_l  ,nblocks)
-    p_lev = Array{wp}(undef,blocksize,nlay_l+1,nblocks)
-    t_lev = Array{wp}(undef,blocksize,nlay_l+1,nblocks)
+    p_lay = Array{FT}(undef,blocksize,nlay_l  ,nblocks)
+    t_lay = Array{FT}(undef,blocksize,nlay_l  ,nblocks)
+    p_lev = Array{FT}(undef,blocksize,nlay_l+1,nblocks)
+    t_lev = Array{FT}(undef,blocksize,nlay_l+1,nblocks)
 
 #    if(nf90_open(trim(fileName), NF90_NOWRITE, ncid) /= NF90_NOERR) &
 #      call stop_on_err("read_and_block_pt: can't find file " // trim(fileName))
@@ -145,14 +146,14 @@ module mo_rfmip_io
   function read_and_block_sw_bc(ds, blocksize)
 #    character(len=*),           intent(in   ) :: fileName
 #    integer,                    intent(in   ) :: blocksize
-#    real(wp), dimension(:,:), allocatable, &
+#    real(FT), dimension(:,:), allocatable, &
 #                                intent(  out) :: surface_albedo, total_solar_irradiance, solar_zenith_angle
 #    ! ---------------------------
 #    integer :: ncid
 #    integer :: nblocks
-#    real(wp), dimension(ncol_l, nexp_l) :: temp2D
+#    real(FT), dimension(ncol_l, nexp_l) :: temp2D
     # ---------------------------
-    wp = Float64
+    FT = Float64
     ncol_l, nlay_l, nexp_l = read_size(ds)
 
     if any([ncol_l, nlay_l, nexp_l] .== 0)
@@ -161,7 +162,7 @@ module mo_rfmip_io
     if (ncol_l*nexp_l)%blocksize ≠ 0
       error("read_and_block_sw_bc: number of columns doesn't fit evenly into blocks.")
     end
-    nblocks = (ncol_l*nexp_l)/blocksize
+    nblocks = Int((ncol_l*nexp_l)/blocksize)
     #
     # Check that output arrays are sized correctly : blocksize, nlay, (ncol * nexp)/blocksize
     #
@@ -171,10 +172,10 @@ module mo_rfmip_io
     surface_albedo = reshape(temp2D,blocksize,nblocks)
 
     temp2D = repeat(ds["total_solar_irradiance"][:],1,nexp_l)
-    total_solar_irradiance = reshape(temp2D,blocksize,nblocks)
+    total_solar_irradiance = reshape(temp2D, blocksize, nblocks)
 
     temp2D = repeat(ds["solar_zenith_angle"][:],1,nexp_l)
-    solar_zenith_angle = reshape(temp2d,blocksize, nblocks)
+    solar_zenith_angle = reshape(temp2D, blocksize, nblocks)
     return surface_albedo, total_solar_irradiance, solar_zenith_angle
   end
   #--------------------------------------------------------------------------------------------------------------------
@@ -184,13 +185,13 @@ module mo_rfmip_io
   function read_and_block_lw_bc(ds, blocksize)
 #    character(len=*),           intent(in   ) :: fileName
 #    integer,                    intent(in   ) :: blocksize
-#    real(wp), dimension(:,:), allocatable, &
+#    real(FT), dimension(:,:), allocatable, &
 #                                intent(  out) :: surface_emissivity, surface_temperature
 #    ! ---------------------------
 #    integer :: ncid
 #    integer :: nblocks
-#    real(wp), dimension(ncol_l, nexp_l) :: temp2D ! Required to make gfortran 8 work, not sure why
-    wp = Float64
+#    real(FT), dimension(ncol_l, nexp_l) :: temp2D ! Required to make gfortran 8 work, not sure why
+    FT = Float64
     # ---------------------------
     ncol_l, nlay_l, nexp_l = read_size(ds)
     if any([ncol_l, nlay_l, nexp_l]  .== 0)
@@ -230,8 +231,8 @@ module mo_rfmip_io
 #    ! ----------------
 #    integer :: num_gases, i
 #    character(len=32), dimension(11) :: &
-      chem_name = ["co", "ch4", "o2", "n2o", "n2", "co2",
-        	   "CCl4", "ch4", "CH3Br", "CH3Cl", "cfc22"]
+      # chem_name = ["co", "ch4", "o2", "n2o", "n2", "co2", "CCl4", "ch4", "CH3Br", "CH3Cl", "cfc22"]
+      chem_name = ["co", "ch4", "o2", "n2o", "n2", "co2", "ccl4", "ch4", "ch3br", "ch3cl", "cfc22"]
 
       conc_name = ["carbon_monoxide", "methane", "oxygen",
           	   "nitrous_oxide", "nitrogen",
@@ -244,7 +245,7 @@ module mo_rfmip_io
       names_in_file = Array{String}(undef,length(names_in_kdist))
 #      allocate(names_in_file(size(names_in_kdist)))
       for i = 1:length(names_in_kdist)
-        names_in_file[i] = strip(lowercase(names_in_kdist[i]))
+        names_in_file[i] = trim(lowercase(names_in_kdist[i]))
         #
         # Use a mapping between chemical formula and name if it exists
         #
@@ -273,6 +274,8 @@ module mo_rfmip_io
     else
       error("determine_gas_names: unknown value of forcing_index")
     end
+    @show forcing_index
+    @show names_in_kdist, names_in_file
     return names_in_kdist, names_in_file
 
   end
@@ -297,18 +300,18 @@ module mo_rfmip_io
 
 #    allocate(kdist_gas_names(get_dim_size(ncid, 'absorber')))
 
-    ngases = size(ds.dim["absorber"],1)
+    ngases = ds.dim["absorber"]
 
     kdist_gas_names = Array{String}(undef, ngases)
 
     if !haskey(ds,varName)
-      error("read_kdist_gas_names: can't find variable " * strip(varName))
+      error("read_kdist_gas_names: can't find variable " * trim(varName))
     end
 
     temp_str = ds[varName][:]
 
     for i = 1:ngases
-      kdist_gas_names[i] = join(temp_str[:,i])
+      kdist_gas_names[i] = trim(join(temp_str[:,i]))
     end
     return kdist_gas_names
 
@@ -349,10 +352,11 @@ module mo_rfmip_io
 #    integer :: nblocks
 #    integer :: b, g
 #    integer,  dimension(:,:),   allocatable :: exp_num
-#    real(wp), dimension(:),     allocatable :: gas_conc_temp_1d
-#    real(wp), dimension(:,:,:), allocatable :: gas_conc_temp_3d
+#    real(FT), dimension(:),     allocatable :: gas_conc_temp_1d
+#    real(FT), dimension(:,:,:), allocatable :: gas_conc_temp_3d
 #    ! ---------------------------
     ncol_l, nlay_l, nexp_l = read_size(ds)
+
     if any([ncol_l, nlay_l, nexp_l] .== 0)
       error("read_and_block_lw_bc: Haven't read problem size yet.")
     end
@@ -360,13 +364,16 @@ module mo_rfmip_io
       error("read_and_block_lw_bc: number of columns doesn't fit evenly into blocks.")
     end
     nblocks = Int((ncol_l*nexp_l)/blocksize)
-    gas_conc_array = Array{ty_gas_concs}(undef,nblocks)
+    gas_concs = ty_gas_concs(Float64, ncol_l, nlay_l)
+    gas_conc_array = Vector([gas_concs for i in 1:nblocks])
+    # gas_conc_array = Vector()
 #    allocate(gas_conc_array(nblocks))
     # Experiment index for each colum
 
-    exp_num = permutedims( reshape( repeat( 1:nexp_l, ncol_l ), blocksize, nblocks ), [1,2] )
+    # ORIGINAL: exp_num = reshape(spread([(b, b = 1, nexp_l)], 1, ncopies = ncol_l), shape = [blocksize, nblocks], order=[1,2])
 
-    #exp_num = reshape(spread([(b, b = 1, nexp_l)], 1, ncopies = ncol_l), shape = [blocksize, nblocks], order=[1,2])
+    exp_num = freshape(spread(convert(Array,collect(1:nexp_l)'), 1, ncol_l), [blocksize, nblocks], order=[1,2])
+    test_data(exp_num, "exp_num")
 
 
 #    if(nf90_open(trim(fileName), NF90_NOWRITE, ncid) /= NF90_NOERR) &
@@ -375,13 +382,17 @@ module mo_rfmip_io
     #
     # Water vapor and ozone depend on col, lay, exp: look just like other fields
     #
-#    gas_conc_temp_3d = reshape(read_field(ncid, "water_vapor", nlay_l, ncol_l, nexp_l), &
-#                               shape = [nlay_l, blocksize, nblocks]) * read_scaling(ncid, "water_vapor")
+    # gas_conc_temp_3d = reshape(read_field(ncid, "water_vapor", nlay_l, ncol_l, nexp_l), &
+    #                           shape = [nlay_l, blocksize, nblocks]) * read_scaling(ncid, "water_vapor")
 
     gas_conc_temp_3d = reshape( ds["water_vapor"][:], nlay_l, blocksize, nblocks ) .* read_scaling(ds,"water_vapor")
+    test_data(gas_conc_temp_3d, "gas_conc_temp_3d")
 
     for b = 1:nblocks
-      set_vmr!(gas_conc_array[b],"h2o", transpose(gas_conc_temp_3d[:,:,b]))
+      gas_conc_temp_3d_t = transpose(gas_conc_temp_3d[:,:,b])
+      gas_conc_temp_3d_a = convert(Array, gas_conc_temp_3d_t)
+
+      set_vmr!(gas_conc_array[b], "h2o", gas_conc_temp_3d_a, size(gas_conc_temp_3d_a))
     end
 
 #    gas_conc_temp_3d = reshape(read_field(ncid, "ozone", nlay_l, ncol_l, nexp_l), &
@@ -390,7 +401,7 @@ module mo_rfmip_io
     gas_conc_temp_3d = reshape( ds["ozone"][:], nlay_l, blocksize, nblocks ) * read_scaling(ds,"ozone")
 
     for b = 1:nblocks
-      set_vmr!(gas_conc_array[b],"o3", transpose(gas_conc_temp_3d[:,:,b]))
+      set_vmr!(gas_conc_array[b],"o3", convert(Array, transpose(gas_conc_temp_3d[:,:,b])))
     end
 
     #
@@ -405,9 +416,8 @@ module mo_rfmip_io
       end
 
       # Read the values as a function of experiment
-#      gas_conc_temp_1d = read_field(ncid, trim(names_in_file(g)) // "_GM", nexp_l) *&
-#        read_scaling(ncid, trim(names_in_file(g)) // "_GM")
-      gas_conc_temp1d = ds[strip(names_in_file[g]) * "_GM"][:] * read_scaling(ds,strip(names_in_file[g]) * "_GM")
+     # gas_conc_temp_1d = read_field(ncid, trim(names_in_file(g)) // "_GM", nexp_l) * read_scaling(ncid, trim(names_in_file(g)) // "_GM")
+      gas_conc_temp_1d = ds[trim(names_in_file[g]) * "_GM"][:] * read_scaling(ds,trim(names_in_file[g]) * "_GM")
 
       for b = 1:nblocks
         # Does every value in this block belong to the same experiment?
@@ -418,10 +428,18 @@ module mo_rfmip_io
           # Create 2D field, blocksize x nlay, with scalar values from each experiment
 #          call stop_on_err(gas_conc_array(b)%set_vmr(gas_names(g), &
 #          spread(gas_conc_temp_1d(exp_num(:,b)), 2, ncopies = nlay_l)))
-          set_vmr!(gas_conc_array[b],gas_names[g], repeat(gas_conc_temp_1d, 1, nlay_l) )
+          # gas_conc_temp_1d_rep = repeat(gas_conc_temp_1d, 1, nlay_l)
+          # set_vmr!(gas_conc_array[b],gas_names[g], gas_conc_temp_1d_rep )
+
+          set_vmr!(gas_conc_array[b], gas_names[g], spread(gas_conc_temp_1d[exp_num[:,b]], 2, nlay_l))
         end
       end
 
+    end
+    for b = 1:length(gas_names)
+      for igas = 1:length(gas_conc_array[b].concs)
+        test_data(gas_conc_array[b], "gas_conc_b"*string(b)*"_i"*string(igas))
+      end
     end
     return gas_conc_array
   end
@@ -430,17 +448,17 @@ module mo_rfmip_io
   function read_scaling(ds, varName) # modified to pass DS (dataset instead of ncid)
 #    integer,          intent(in) :: ncid
 #    character(len=*), intent(in) :: varName
-#    real(wp)                     :: read_scaling
+#    real(FT)                     :: read_scaling
 
 #    integer           :: varid
 #    character(len=16) :: charUnits
 
-    wp = Float64
+    FT = Float64
 
     if haskey(ds,varName)
       scaling_str = ds[varName].attrib["units"]
     else
-      error("read_scaling: can't find variable " * strip(varName))
+      error("read_scaling: can't find variable " * trim(varName))
     end
 
 #    if(nf90_inq_varid(ncid, trim(varName), varid) /= NF90_NOERR) &
@@ -448,7 +466,7 @@ module mo_rfmip_io
 #    if(nf90_get_att(ncid, varid, "units", charUnits)  /= NF90_NOERR) &
 #      call stop_on_err("read_scaling: can't read attribute 'units' from variable " // trim(varName))
 #    read(charUnits, *) read_scaling
-    return parse(wp, scaling_str)
+    return parse(FT, scaling_str)
 
   end
 #--------------------------------------------------------------------------------------------------------------------
@@ -459,14 +477,14 @@ module mo_rfmip_io
   #
   function unblock_and_write(ds, varName, values)
 #    character(len=*),           intent(in   ) :: fileName, varName
-#    real(wp), dimension(:,:,:),  & ! [blocksize, nlay/+1, nblocks]
+#    real(FT), dimension(:,:,:),  & ! [blocksize, nlay/+1, nblocks]
 #                                intent(in   ) :: values
 #    ! ---------------------------
 #    integer :: ncid
 #    integer :: b, blocksize, nlev, nblocks
-#    real(wp), dimension(:,:), allocatable :: temp2d
+#    real(FT), dimension(:,:), allocatable :: temp2d
 #    ! ---------------------------
-    wp = Float64
+    FT = Float64
     ncol_l, nlay_l, nexp_l = read_size(ds)
 
     if any([ncol_l, nlay_l, nexp_l] .== 0)
@@ -482,7 +500,7 @@ module mo_rfmip_io
       error("unblock_and_write: array values has the wrong number of blocks/size")
     end
 
-    temp2D = Array{wp}(undef,nlev,ncol_l*nexp_l)
+    temp2D = Array{FT}(undef,nlev,ncol_l*nexp_l)
 
     for b = 1:nblocks
       temp2D[1:nlev, ((b-1)*blocksize+1):(b*blocksize)] = transpose(values[1:blocksize,1:nlev,b])

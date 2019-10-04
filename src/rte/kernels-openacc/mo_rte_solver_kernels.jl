@@ -27,7 +27,7 @@
 # -------------------------------------------------------------------------------------------------
 module mo_rte_solver_kernels
   use,  intrinsic :: iso_c_binding
-  use mo_rte_kind, only: wp, wl
+  use mo_rte_kind, only: FT, wl
   implicit none
   private
 
@@ -45,7 +45,7 @@ module mo_rte_solver_kernels
             lw_two_stream, sw_two_stream, &
             adding
 
-  real(wp), parameter :: pi = acos(-1._wp)
+  real(FT), parameter :: pi = acos(-1._wp)
 contains
   # -------------------------------------------------------------------------------------------------
   #
@@ -63,30 +63,30 @@ contains
                               radn_up, radn_dn) bind(C, name="lw_solver_noscat")
     integer,                    intent( in) :: ncol, nlay, ngpt # Number of columns, layers, g-points
     logical(wl),                intent( in) :: top_at_1
-    real(wp), dimension(ncol,       ngpt), intent( in) :: D            # secant of propagation angle  []
-    real(wp),                              intent( in) :: weight       # quadrature weight
-    real(wp), dimension(ncol,nlay,  ngpt), intent( in) :: tau          # Absorption optical thickness []
-    real(wp), dimension(ncol,nlay,  ngpt), intent( in) :: lay_source   # Planck source at layer average temperature [W/m2]
+    real(FT), dimension(ncol,       ngpt), intent( in) :: D            # secant of propagation angle  []
+    real(FT),                              intent( in) :: weight       # quadrature weight
+    real(FT), dimension(ncol,nlay,  ngpt), intent( in) :: tau          # Absorption optical thickness []
+    real(FT), dimension(ncol,nlay,  ngpt), intent( in) :: lay_source   # Planck source at layer average temperature [W/m2]
     # Planck source at layer edge for radiation in increasing/decreasing ilay direction
     # lev_source_dec applies the mapping in layer i to the Planck function at layer i
     # lev_source_inc applies the mapping in layer i to the Planck function at layer i+1
-    real(wp), dimension(ncol,nlay,  ngpt), target, &
+    real(FT), dimension(ncol,nlay,  ngpt), target, &
                                            intent( in) :: lev_source_inc, lev_source_dec
-    real(wp), dimension(ncol,       ngpt), intent( in) :: sfc_emis         # Surface emissivity      []
-    real(wp), dimension(ncol,       ngpt), intent( in) :: sfc_src          # Surface source function [W/m2]
-    real(wp), dimension(ncol,nlay+1,ngpt), intent(inout) :: radn_dn # Radiances [W/m2-str]
-    real(wp), dimension(ncol,nlay+1,ngpt), intent(  out) :: radn_up # Radiances [W/m2-str]
+    real(FT), dimension(ncol,       ngpt), intent( in) :: sfc_emis         # Surface emissivity      []
+    real(FT), dimension(ncol,       ngpt), intent( in) :: sfc_src          # Surface source function [W/m2]
+    real(FT), dimension(ncol,nlay+1,ngpt), intent(inout) :: radn_dn # Radiances [W/m2-str]
+    real(FT), dimension(ncol,nlay+1,ngpt), intent(  out) :: radn_up # Radiances [W/m2-str]
                                                                            # Top level must contain incident flux boundary condition
 
     # Local variables, no g-point dependency
-    real(wp), dimension(ncol,nlay,ngpt) :: tau_loc, &  # path length (tau/mu)
+    real(FT), dimension(ncol,nlay,ngpt) :: tau_loc, &  # path length (tau/mu)
                                            trans       # transmissivity  = exp(-tau)
-    real(wp), dimension(ncol,nlay,ngpt) :: source_dn, source_up
-    real(wp), dimension(ncol,     ngpt) :: source_sfc, sfc_albedo
+    real(FT), dimension(ncol,nlay,ngpt) :: source_dn, source_up
+    real(FT), dimension(ncol,     ngpt) :: source_sfc, sfc_albedo
 
-    real(wp), dimension(:,:,:), pointer :: lev_source_up, lev_source_dn # Mapping increasing/decreasing indicies to up/down
+    real(FT), dimension(:,:,:), pointer :: lev_source_up, lev_source_dn # Mapping increasing/decreasing indicies to up/down
 
-    real(wp), parameter :: pi = acos(-1._wp)
+    real(FT), parameter :: pi = acos(-1._wp)
     integer             :: icol, ilev, igpt, top_level
     # ------------------------------------
 
@@ -188,23 +188,23 @@ contains
     integer,                               intent(in   ) :: ncol, nlay, ngpt # Number of columns, layers, g-points
     logical(wl),                           intent(in   ) :: top_at_1
     integer,                               intent(in   ) :: nmus          # number of quadrature angles
-    real(wp), dimension(nmus),             intent(in   ) :: Ds, weights  # quadrature secants, weights
-    real(wp), dimension(ncol,nlay,  ngpt), intent(in   ) :: tau          # Absorption optical thickness []
-    real(wp), dimension(ncol,nlay,  ngpt), intent(in   ) :: lay_source   # Planck source at layer average temperature [W/m2]
-    real(wp), dimension(ncol,nlay,  ngpt), intent(in   ) :: lev_source_inc
+    real(FT), dimension(nmus),             intent(in   ) :: Ds, weights  # quadrature secants, weights
+    real(FT), dimension(ncol,nlay,  ngpt), intent(in   ) :: tau          # Absorption optical thickness []
+    real(FT), dimension(ncol,nlay,  ngpt), intent(in   ) :: lay_source   # Planck source at layer average temperature [W/m2]
+    real(FT), dimension(ncol,nlay,  ngpt), intent(in   ) :: lev_source_inc
                                         # Planck source at layer edge for radiation in increasing ilay direction [W/m2]
                                         # Includes spectral weighting that accounts for state-dependent frequency to g-space mapping
-    real(wp), dimension(ncol,nlay,  ngpt), intent(in   ) :: lev_source_dec
+    real(FT), dimension(ncol,nlay,  ngpt), intent(in   ) :: lev_source_dec
                                                # Planck source at layer edge for radiation in decreasing ilay direction [W/m2]
-    real(wp), dimension(ncol,       ngpt), intent(in   ) :: sfc_emis         # Surface emissivity      []
-    real(wp), dimension(ncol,       ngpt), intent(in   ) :: sfc_src          # Surface source function [W/m2]
-    real(wp), dimension(ncol,nlay+1,ngpt), intent(inout) :: flux_dn # Radiances [W/m2-str]
-    real(wp), dimension(ncol,nlay+1,ngpt), intent(  out) :: flux_up # Radiances [W/m2-str]
+    real(FT), dimension(ncol,       ngpt), intent(in   ) :: sfc_emis         # Surface emissivity      []
+    real(FT), dimension(ncol,       ngpt), intent(in   ) :: sfc_src          # Surface source function [W/m2]
+    real(FT), dimension(ncol,nlay+1,ngpt), intent(inout) :: flux_dn # Radiances [W/m2-str]
+    real(FT), dimension(ncol,nlay+1,ngpt), intent(  out) :: flux_up # Radiances [W/m2-str]
                                                                            # Top level must contain incident flux boundary condition
     # Local variables
-    real(wp), dimension(ncol,nlay+1,ngpt) :: radn_dn, radn_up # Fluxes per quad angle
-    real(wp), dimension(ncol,       ngpt) :: Ds_ncol
-    real(wp), dimension(ncol,       ngpt) :: flux_top
+    real(FT), dimension(ncol,nlay+1,ngpt) :: radn_dn, radn_up # Fluxes per quad angle
+    real(FT), dimension(ncol,       ngpt) :: Ds_ncol
+    real(FT), dimension(ncol,       ngpt) :: flux_top
 
     integer :: imu, top_level
     integer :: icol, ilev, igpt
@@ -278,29 +278,29 @@ contains
                                  flux_up, flux_dn) bind(C, name="lw_solver_2stream")
     integer,                               intent(in   ) :: ncol, nlay, ngpt # Number of columns, layers, g-points
     logical(wl),                           intent(in   ) :: top_at_1
-    real(wp), dimension(ncol,nlay,  ngpt), intent(in   ) :: tau, &  # Optical thickness,
+    real(FT), dimension(ncol,nlay,  ngpt), intent(in   ) :: tau, &  # Optical thickness,
                                                             ssa, &  # single-scattering albedo,
                                                             g       # asymmetry parameter []
-    real(wp), dimension(ncol,nlay,ngpt), intent(in   ) :: lay_source   # Planck source at layer average temperature [W/m2]
-    real(wp), dimension(ncol,nlay,ngpt), target, &
+    real(FT), dimension(ncol,nlay,ngpt), intent(in   ) :: lay_source   # Planck source at layer average temperature [W/m2]
+    real(FT), dimension(ncol,nlay,ngpt), target, &
                                            intent(in   ) :: lev_source_inc, lev_source_dec
                                         # Planck source at layer edge for radiation in increasing/decreasing ilay direction [W/m2]
                                         # Includes spectral weighting that accounts for state-dependent frequency to g-space mapping
-    real(wp), dimension(ncol,       ngpt), intent(in   ) :: sfc_emis         # Surface emissivity      []
-    real(wp), dimension(ncol,       ngpt), intent(in   ) :: sfc_src          # Surface source function [W/m2]
-    real(wp), dimension(ncol,nlay+1,ngpt), &
+    real(FT), dimension(ncol,       ngpt), intent(in   ) :: sfc_emis         # Surface emissivity      []
+    real(FT), dimension(ncol,       ngpt), intent(in   ) :: sfc_src          # Surface source function [W/m2]
+    real(FT), dimension(ncol,nlay+1,ngpt), &
                                            intent(  out) :: flux_up   # Fluxes [W/m2]
-    real(wp), dimension(ncol,nlay+1,ngpt), &
+    real(FT), dimension(ncol,nlay+1,ngpt), &
                                            intent(inout) :: flux_dn  # Fluxes [W/m2]
                                                                               # Top level (= merge(1, nlay+1, top_at_1)
                                                                               # must contain incident flux boundary condition
     # ----------------------------------------------------------------------
     integer :: icol, igpt
-    real(wp), dimension(ncol,nlay  ,ngpt) :: Rdif, Tdif, gamma1, gamma2
-    real(wp), dimension(ncol       ,ngpt) :: sfc_albedo
-    real(wp), dimension(ncol,nlay+1,ngpt) :: lev_source
-    real(wp), dimension(ncol,nlay  ,ngpt) :: source_dn, source_up
-    real(wp), dimension(ncol       ,ngpt) :: source_sfc
+    real(FT), dimension(ncol,nlay  ,ngpt) :: Rdif, Tdif, gamma1, gamma2
+    real(FT), dimension(ncol       ,ngpt) :: sfc_albedo
+    real(FT), dimension(ncol,nlay+1,ngpt) :: lev_source
+    real(FT), dimension(ncol,nlay  ,ngpt) :: source_dn, source_up
+    real(FT), dimension(ncol       ,ngpt) :: source_sfc
     # ------------------------------------
     # ------------------------------------
     #$acc enter data copyin(tau, ssa, g, lay_source, lev_source_inc, lev_source_dec, sfc_emis, sfc_src, flux_dn)
@@ -360,12 +360,12 @@ contains
                                 top_at_1, tau, mu0, flux_dir) bind (C, name="sw_solver_noscat")
       integer,                    intent(in   ) :: ncol, nlay, ngpt # Number of columns, layers, g-points
       logical(wl),                intent(in   ) :: top_at_1
-      real(wp), dimension(ncol,nlay,  ngpt), intent(in   ) :: tau          # Absorption optical thickness []
-      real(wp), dimension(ncol            ), intent(in   ) :: mu0          # cosine of solar zenith angle
-      real(wp), dimension(ncol,nlay+1,ngpt), intent(inout) :: flux_dir     # Direct-beam flux, spectral [W/m2]
+      real(FT), dimension(ncol,nlay,  ngpt), intent(in   ) :: tau          # Absorption optical thickness []
+      real(FT), dimension(ncol            ), intent(in   ) :: mu0          # cosine of solar zenith angle
+      real(FT), dimension(ncol,nlay+1,ngpt), intent(inout) :: flux_dir     # Direct-beam flux, spectral [W/m2]
                                                                            # Top level must contain incident flux boundary condition
       integer :: icol, ilev, igpt
-      real(wp) :: mu0_inv(ncol)
+      real(FT) :: mu0_inv(ncol)
       # ------------------------------------
       # ------------------------------------
       #$acc enter data copyin(tau, mu0) create(mu0_inv, flux_dir)
@@ -419,21 +419,21 @@ contains
                                   flux_up, flux_dn, flux_dir) bind (C, name="sw_solver_2stream")
       integer,                               intent(in   ) :: ncol, nlay, ngpt # Number of columns, layers, g-points
       logical(wl),                           intent(in   ) :: top_at_1
-      real(wp), dimension(ncol,nlay,  ngpt), intent(in   ) :: tau, &  # Optical thickness,
+      real(FT), dimension(ncol,nlay,  ngpt), intent(in   ) :: tau, &  # Optical thickness,
                                                               ssa, &  # single-scattering albedo,
                                                               g       # asymmetry parameter []
-      real(wp), dimension(ncol            ), intent(in   ) :: mu0     # cosine of solar zenith angle
-      real(wp), dimension(ncol,       ngpt), intent(in   ) :: sfc_alb_dir, sfc_alb_dif
+      real(FT), dimension(ncol            ), intent(in   ) :: mu0     # cosine of solar zenith angle
+      real(FT), dimension(ncol,       ngpt), intent(in   ) :: sfc_alb_dir, sfc_alb_dif
                                                                     # Spectral albedo of surface to direct and diffuse radiation
-      real(wp), dimension(ncol,nlay+1,ngpt), &
+      real(FT), dimension(ncol,nlay+1,ngpt), &
                                              intent(  out) :: flux_up # Fluxes [W/m2]
-      real(wp), dimension(ncol,nlay+1,ngpt), &                        # Downward fluxes contain boundary conditions
+      real(FT), dimension(ncol,nlay+1,ngpt), &                        # Downward fluxes contain boundary conditions
                                              intent(inout) :: flux_dn, flux_dir
       # -------------------------------------------
       integer :: icol, ilay, igpt
-      real(wp), dimension(ncol,nlay,ngpt) :: Rdif, Tdif, Rdir, Tdir, Tnoscat
-      real(wp), dimension(ncol,nlay,ngpt) :: source_up, source_dn
-      real(wp), dimension(ncol     ,ngpt) :: source_srf
+      real(FT), dimension(ncol,nlay,ngpt) :: Rdif, Tdif, Rdir, Tdir, Tnoscat
+      real(FT), dimension(ncol,nlay,ngpt) :: source_up, source_dn
+      real(FT), dimension(ncol     ,ngpt) :: source_srf
       # ------------------------------------
       #
       # Cell properties: transmittance and reflectance for direct and diffuse radiation
@@ -478,18 +478,18 @@ contains
     subroutine lw_source_noscat(ncol, nlay, ngpt, lay_source, lev_source_up, lev_source_dn, tau, trans, &
                                 source_dn, source_up) bind(C, name="lw_source_noscat")
       integer,                               intent(in) :: ncol, nlay, ngpt
-      real(wp), dimension(ncol, nlay, ngpt), intent(in) :: lay_source, & # Planck source at layer center
+      real(FT), dimension(ncol, nlay, ngpt), intent(in) :: lay_source, & # Planck source at layer center
                                                            lev_source_up, & # Planck source at levels (layer edges),
                                                            lev_source_dn, & #   increasing/decreasing layer index
                                                            tau,        & # Optical path (tau/mu)
                                                            trans         # Transmissivity (exp(-tau))
-      real(wp), dimension(ncol, nlay, ngpt), intent(out):: source_dn, source_up
+      real(FT), dimension(ncol, nlay, ngpt), intent(out):: source_dn, source_up
                                                                      # Source function at layer edges
                                                                      # Down at the bottom of the layer, up at the top
       # --------------------------------
       integer             :: icol, ilay, igpt
-      real(wp)            :: fact
-      real(wp), parameter :: tau_thresh = sqrt(epsilon(tau))
+      real(FT)            :: fact
+      real(FT), parameter :: tau_thresh = sqrt(epsilon(tau))
       # ---------------------------------------------------------------
       # ---------------------------------------------------------------
       #$acc  parallel loop collapse(3)
@@ -526,14 +526,14 @@ contains
                                  radn_up, radn_dn) bind(C, name="lw_transport_noscat")
     integer,                               intent(in   ) :: ncol, nlay, ngpt # Number of columns, layers, g-points
     logical(wl),                           intent(in   ) :: top_at_1   #
-    real(wp), dimension(ncol,nlay  ,ngpt), intent(in   ) :: tau, &     # Absorption optical thickness, pre-divided by mu []
+    real(FT), dimension(ncol,nlay  ,ngpt), intent(in   ) :: tau, &     # Absorption optical thickness, pre-divided by mu []
                                                             trans      # transmissivity = exp(-tau)
-    real(wp), dimension(ncol       ,ngpt), intent(in   ) :: sfc_albedo # Surface albedo
-    real(wp), dimension(ncol,nlay  ,ngpt), intent(in   ) :: source_dn, &
+    real(FT), dimension(ncol       ,ngpt), intent(in   ) :: sfc_albedo # Surface albedo
+    real(FT), dimension(ncol,nlay  ,ngpt), intent(in   ) :: source_dn, &
                                                             source_up  # Diffuse radiation emitted by the layer
-    real(wp), dimension(ncol       ,ngpt), intent(in   ) :: source_sfc # Surface source function [W/m2]
-    real(wp), dimension(ncol,nlay+1,ngpt), intent(inout) :: radn_dn # Radiances [W/m2-str]
-    real(wp), dimension(ncol,nlay+1,ngpt), intent(  out) :: radn_up # Radiances [W/m2-str]
+    real(FT), dimension(ncol       ,ngpt), intent(in   ) :: source_sfc # Surface source function [W/m2]
+    real(FT), dimension(ncol,nlay+1,ngpt), intent(inout) :: radn_dn # Radiances [W/m2-str]
+    real(FT), dimension(ncol,nlay+1,ngpt), intent(  out) :: radn_up # Radiances [W/m2-str]
                                                                              # Top level must contain incident flux boundary condition
     # Local variables
     integer :: igpt, ilev, icol
@@ -595,20 +595,20 @@ contains
   subroutine lw_two_stream(ncol, nlay, ngpt, tau, w0, g, &
                                 gamma1, gamma2, Rdif, Tdif) bind(C, name="lw_two_stream")
     integer,                             intent(in)  :: ncol, nlay, ngpt
-    real(wp), dimension(ncol,nlay,ngpt), intent(in)  :: tau, w0, g
-    real(wp), dimension(ncol,nlay,ngpt), intent(out) :: gamma1, gamma2, Rdif, Tdif
+    real(FT), dimension(ncol,nlay,ngpt), intent(in)  :: tau, w0, g
+    real(FT), dimension(ncol,nlay,ngpt), intent(out) :: gamma1, gamma2, Rdif, Tdif
 
     # -----------------------
     integer  :: icol, ilay, igpt
 
     # Variables used in Meador and Weaver
-    real(wp) :: k
+    real(FT) :: k
 
     # Ancillary variables
-    real(wp) :: RT_term
-    real(wp) :: exp_minusktau, exp_minus2ktau
+    real(FT) :: RT_term
+    real(FT) :: exp_minusktau, exp_minus2ktau
 
-    real(wp), parameter :: LW_diff_sec = 1.66  # 1./cos(diffusivity angle)
+    real(FT), parameter :: LW_diff_sec = 1.66  # 1./cos(diffusivity angle)
     # ---------------------------------
     # ---------------------------------
     #$acc enter data copyin(tau, w0, g)
@@ -668,8 +668,8 @@ contains
                                 lev_src_inc, lev_src_dec, lev_source) bind(C, name="lw_combine_sources")
     integer,                                 intent(in ) :: ncol, nlay, ngpt
     logical(wl),                             intent(in ) :: top_at_1
-    real(wp), dimension(ncol, nlay  , ngpt), intent(in ) :: lev_src_inc, lev_src_dec
-    real(wp), dimension(ncol, nlay+1, ngpt), intent(out) :: lev_source
+    real(FT), dimension(ncol, nlay  , ngpt), intent(in ) :: lev_src_inc, lev_src_dec
+    real(FT), dimension(ncol, nlay+1, ngpt), intent(out) :: lev_source
 
     integer :: icol, ilay, igpt
     # ---------------------------------------------------------------
@@ -709,19 +709,19 @@ contains
                             bind (C, name="lw_source_2str")
     integer,                         intent(in) :: ncol, nlay, ngpt
     logical(wl),                     intent(in) :: top_at_1
-    real(wp), dimension(ncol      , ngpt), intent(in) :: sfc_emis, sfc_src
-    real(wp), dimension(ncol, nlay, ngpt), intent(in) :: lay_source,    & # Planck source at layer center
+    real(FT), dimension(ncol      , ngpt), intent(in) :: sfc_emis, sfc_src
+    real(FT), dimension(ncol, nlay, ngpt), intent(in) :: lay_source,    & # Planck source at layer center
                                                    tau,           & # Optical depth (tau)
                                                    gamma1, gamma2,& # Coupling coefficients
                                                    rdif, tdif       # Layer reflectance and transmittance
-    real(wp), dimension(ncol, nlay+1, ngpt), target, &
+    real(FT), dimension(ncol, nlay+1, ngpt), target, &
                                      intent(in)  :: lev_source       # Planck source at layer edges
-    real(wp), dimension(ncol, nlay, ngpt), intent(out) :: source_dn, source_up
-    real(wp), dimension(ncol      , ngpt), intent(out) :: source_sfc      # Source function for upward radation at surface
+    real(FT), dimension(ncol, nlay, ngpt), intent(out) :: source_dn, source_up
+    real(FT), dimension(ncol      , ngpt), intent(out) :: source_sfc      # Source function for upward radation at surface
 
     integer             :: icol, ilay, igpt
-    real(wp)            :: Z, Zup_top, Zup_bottom, Zdn_top, Zdn_bottom
-    real(wp)            :: lev_source_bot, lev_source_top
+    real(FT)            :: Z, Zup_top, Zup_bottom, Zdn_top, Zdn_bottom
+    real(FT)            :: lev_source_bot, lev_source_top
     # ---------------------------------------------------------------
     # ---------------------------------
     #$acc enter data copyin(sfc_emis, sfc_src, lay_source, tau, gamma1, gamma2, rdif, tdif, lev_source)
@@ -776,22 +776,22 @@ contains
     subroutine sw_two_stream(ncol, nlay, ngpt, mu0, tau, w0, g, &
                                   Rdif, Tdif, Rdir, Tdir, Tnoscat) bind (C, name="sw_two_stream")
       integer,                             intent(in)  :: ncol, nlay, ngpt
-      real(wp), dimension(ncol),           intent(in)  :: mu0
-      real(wp), dimension(ncol,nlay,ngpt), intent(in)  :: tau, w0, g
-      real(wp), dimension(ncol,nlay,ngpt), intent(out) :: Rdif, Tdif, Rdir, Tdir, Tnoscat
+      real(FT), dimension(ncol),           intent(in)  :: mu0
+      real(FT), dimension(ncol,nlay,ngpt), intent(in)  :: tau, w0, g
+      real(FT), dimension(ncol,nlay,ngpt), intent(out) :: Rdif, Tdif, Rdir, Tdir, Tnoscat
 
       # -----------------------
       integer  :: icol,ilay,igpt
 
       # Variables used in Meador and Weaver
-      real(wp) :: gamma1, gamma2, gamma3, gamma4
-      real(wp) :: alpha1, alpha2, k
+      real(FT) :: gamma1, gamma2, gamma3, gamma4
+      real(FT) :: alpha1, alpha2, k
 
       # Ancillary variables
-      real(wp) :: RT_term
-      real(wp) :: exp_minusktau, exp_minus2ktau
-      real(wp) :: k_mu, k_gamma3, k_gamma4
-      real(wp) :: mu0_inv(ncol)
+      real(FT) :: RT_term
+      real(FT) :: exp_minusktau, exp_minus2ktau
+      real(FT) :: k_mu, k_gamma3, k_gamma4
+      real(FT) :: mu0_inv(ncol)
       # ---------------------------------
       # ---------------------------------
       #$acc enter data copyin (mu0, tau, w0, g)
@@ -895,11 +895,11 @@ contains
                             source_up, source_dn, source_sfc, flux_dn_dir) bind(C, name="sw_source_2str")
     integer,                                 intent(in   ) :: ncol, nlay, ngpt
     logical(wl),                             intent(in   ) :: top_at_1
-    real(wp), dimension(ncol, nlay  , ngpt), intent(in   ) :: Rdir, Tdir, Tnoscat # Layer reflectance, transmittance for diffuse radiation
-    real(wp), dimension(ncol        , ngpt), intent(in   ) :: sfc_albedo          # surface albedo for direct radiation
-    real(wp), dimension(ncol, nlay  , ngpt), intent(  out) :: source_dn, source_up
-    real(wp), dimension(ncol        , ngpt), intent(  out) :: source_sfc          # Source function for upward radation at surface
-    real(wp), dimension(ncol, nlay+1, ngpt), intent(inout) :: flux_dn_dir # Direct beam flux
+    real(FT), dimension(ncol, nlay  , ngpt), intent(in   ) :: Rdir, Tdir, Tnoscat # Layer reflectance, transmittance for diffuse radiation
+    real(FT), dimension(ncol        , ngpt), intent(in   ) :: sfc_albedo          # surface albedo for direct radiation
+    real(FT), dimension(ncol, nlay  , ngpt), intent(  out) :: source_dn, source_up
+    real(FT), dimension(ncol        , ngpt), intent(  out) :: source_sfc          # Source function for upward radation at surface
+    real(FT), dimension(ncol, nlay+1, ngpt), intent(inout) :: flux_dn_dir # Direct beam flux
                                                                     # intent(inout) because top layer includes incident flux
 
     integer :: icol, ilev, igpt
@@ -953,21 +953,21 @@ contains
                     flux_up, flux_dn) bind(C, name="adding")
     integer,                               intent(in   ) :: ncol, nlay, ngpt
     logical(wl),                           intent(in   ) :: top_at_1
-    real(wp), dimension(ncol       ,ngpt), intent(in   ) :: albedo_sfc
-    real(wp), dimension(ncol,nlay  ,ngpt), intent(in   ) :: rdif, tdif
-    real(wp), dimension(ncol,nlay  ,ngpt), intent(in   ) :: src_dn, src_up
-    real(wp), dimension(ncol       ,ngpt), intent(in   ) :: src_sfc
-    real(wp), dimension(ncol,nlay+1,ngpt), intent(  out) :: flux_up
+    real(FT), dimension(ncol       ,ngpt), intent(in   ) :: albedo_sfc
+    real(FT), dimension(ncol,nlay  ,ngpt), intent(in   ) :: rdif, tdif
+    real(FT), dimension(ncol,nlay  ,ngpt), intent(in   ) :: src_dn, src_up
+    real(FT), dimension(ncol       ,ngpt), intent(in   ) :: src_sfc
+    real(FT), dimension(ncol,nlay+1,ngpt), intent(  out) :: flux_up
     # intent(inout) because top layer includes incident flux
-    real(wp), dimension(ncol,nlay+1,ngpt), intent(inout) :: flux_dn
+    real(FT), dimension(ncol,nlay+1,ngpt), intent(inout) :: flux_dn
     # ------------------
     integer :: icol, ilev, igpt
-    real(wp), dimension(nlay+1) :: albedo, &  # reflectivity to diffuse radiation below this level
+    real(FT), dimension(nlay+1) :: albedo, &  # reflectivity to diffuse radiation below this level
                                               # alpha in SH08
                                    src        # source of diffuse upwelling radiation from emission or
                                               # scattering of direct beam
                                               # G in SH08
-    real(wp), dimension(nlay  ) :: denom      # beta in SH08
+    real(FT), dimension(nlay  ) :: denom      # beta in SH08
     # ------------------
     # ---------------------------------
     #
@@ -1094,8 +1094,8 @@ contains
   subroutine apply_BC_gpt(ncol, nlay, ngpt, top_at_1, inc_flux, flux_dn) bind (C, name="apply_BC_gpt")
     integer,                               intent(in   ) :: ncol, nlay, ngpt # Number of columns, layers, g-points
     logical(wl),                           intent(in   ) :: top_at_1
-    real(wp), dimension(ncol,       ngpt), intent(in   ) :: inc_flux         # Flux at top of domain
-    real(wp), dimension(ncol,nlay+1,ngpt), intent(  out) :: flux_dn          # Flux to be used as input to solvers below
+    real(FT), dimension(ncol,       ngpt), intent(in   ) :: inc_flux         # Flux at top of domain
+    real(FT), dimension(ncol,nlay+1,ngpt), intent(  out) :: flux_dn          # Flux to be used as input to solvers below
 
     integer :: icol, igpt
     # --------------
@@ -1121,9 +1121,9 @@ contains
   subroutine apply_BC_factor(ncol, nlay, ngpt, top_at_1, inc_flux, factor, flux_dn) bind (C, name="apply_BC_factor")
     integer,                               intent(in   ) :: ncol, nlay, ngpt # Number of columns, layers, g-points
     logical(wl),                           intent(in   ) :: top_at_1
-    real(wp), dimension(ncol,       ngpt), intent(in   ) :: inc_flux         # Flux at top of domain
-    real(wp), dimension(ncol            ), intent(in   ) :: factor           # Factor to multiply incoming flux
-    real(wp), dimension(ncol,nlay+1,ngpt), intent(out  ) :: flux_dn          # Flux to be used as input to solvers below
+    real(FT), dimension(ncol,       ngpt), intent(in   ) :: inc_flux         # Flux at top of domain
+    real(FT), dimension(ncol            ), intent(in   ) :: factor           # Factor to multiply incoming flux
+    real(FT), dimension(ncol,nlay+1,ngpt), intent(out  ) :: flux_dn          # Flux to be used as input to solvers below
 
     integer :: icol, igpt
     # --------------
@@ -1150,7 +1150,7 @@ contains
   subroutine apply_BC_0(ncol, nlay, ngpt, top_at_1, flux_dn) bind (C, name="apply_BC_0")
     integer,                               intent(in   ) :: ncol, nlay, ngpt # Number of columns, layers, g-points
     logical(wl),                           intent(in   ) :: top_at_1
-    real(wp), dimension(ncol,nlay+1,ngpt), intent(  out) :: flux_dn          # Flux to be used as input to solvers below
+    real(FT), dimension(ncol,nlay+1,ngpt), intent(  out) :: flux_dn          # Flux to be used as input to solvers below
 
     integer :: icol, igpt
     # --------------

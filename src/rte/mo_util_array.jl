@@ -26,6 +26,6 @@ any_vals_outside(array, minVal, maxVal) = any(array .< minVal || array .> maxVal
 #-------------------------------------------------------------------------------------------------
 # Initializing arrays to 0
 #-------------------------------------------------------------------------------------------------
-zero_array!(ni, array::Array{T}) where T = (array .= T(0))
+zero_array!(array::Array{FT}) where FT = (array .= FT(0))
 
 end

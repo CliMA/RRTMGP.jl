@@ -12,7 +12,7 @@
 #
 # -------------------------------------------------------------------------------------------------
 module mo_gas_optics
-  # use mo_rte_kind,           only: wp
+  # use mo_rte_kind,           only: FT
   # use mo_source_functions,   only: ty_source_func_lw
   # use mo_gas_concentrations, only: ty_gas_concs
   # use mo_optical_props,      only: ty_optical_props, ty_optical_props_arry
@@ -54,18 +54,18 @@ module mo_gas_optics
   #                                    play, plev, tlay, gas_desc,   & # mandatory inputs
   #                                    optical_props, toa_src,       & # mandatory outputs
   #                                    col_dry) result(error_msg)      # optional input
-  #     import ty_gas_optics, wp, ty_gas_concs, ty_optical_props_arry
+  #     import ty_gas_optics, FT, ty_gas_concs, ty_optical_props_arry
   #     class(ty_gas_optics), intent(in) :: this
-  #     real(wp), dimension(:,:), intent(in   ) :: play, &   # layer pressures [Pa, mb]; (ncol,nlay)
+  #     real(FT), dimension(:,:), intent(in   ) :: play, &   # layer pressures [Pa, mb]; (ncol,nlay)
   #                                                plev, &   # level pressures [Pa, mb]; (ncol,nlay+1)
   #                                                tlay      # layer temperatures [K]; (ncol,nlay)
   #     type(ty_gas_concs),       intent(in   ) :: gas_desc  # Gas volume mixing ratios
   #     class(ty_optical_props_arry),  &
   #                               intent(inout) :: optical_props
-  #     real(wp), dimension(:,:), intent(  out) :: toa_src     # Incoming solar irradiance(ncol,ngpt)
+  #     real(FT), dimension(:,:), intent(  out) :: toa_src     # Incoming solar irradiance(ncol,ngpt)
   #     character(len=128)                      :: error_msg
   #     # Optional inputs
-  #     real(wp), dimension(:,:), intent(in   ), &
+  #     real(FT), dimension(:,:), intent(in   ), &
   #                            optional, target :: col_dry # Column dry amount; dim(ncol,nlay)
   #   end function gas_optics_ext_abstract
   #   #--------------------------------------------------------------------------------------------------------------------
@@ -77,19 +77,19 @@ module mo_gas_optics
   #                                    play, plev, tlay, tsfc, gas_desc, &
   #                                    optical_props, sources,           &
   #                                    col_dry, tlev) result(error_msg)
-  #     import ty_gas_optics, wp, ty_gas_concs, ty_optical_props_arry, ty_source_func_lw
+  #     import ty_gas_optics, FT, ty_gas_concs, ty_optical_props_arry, ty_source_func_lw
   #     class(ty_gas_optics),     intent(in   ) :: this
-  #     real(wp), dimension(:,:), intent(in   ) :: play, &   # layer pressures [Pa, mb]; (ncol,nlay)
+  #     real(FT), dimension(:,:), intent(in   ) :: play, &   # layer pressures [Pa, mb]; (ncol,nlay)
   #                                                plev, &   # level pressures [Pa, mb]; (ncol,nlay+1)
   #                                                tlay      # layer temperatures [K]; (ncol,nlay)
-  #     real(wp), dimension(:),   intent(in   ) :: tsfc      # surface skin temperatures [K]; (ncol)
+  #     real(FT), dimension(:),   intent(in   ) :: tsfc      # surface skin temperatures [K]; (ncol)
   #     type(ty_gas_concs),       intent(in   ) :: gas_desc  # Gas volume mixing ratios
   #     class(ty_optical_props_arry),  &
   #                               intent(inout) :: optical_props # Optical properties
   #     class(ty_source_func_lw    ),  &
   #                               intent(inout) :: sources       # Planck sources
   #     character(len=128)                      :: error_msg
-  #     real(wp), dimension(:,:), intent(in   ), &
+  #     real(FT), dimension(:,:), intent(in   ), &
   #                           optional, target :: col_dry, &  # Column dry amount; dim(ncol,nlay)
   #                                                  tlev        # level temperatures [K]l (ncol,nlay+1)
   #   end function gas_optics_int_abstract
@@ -101,9 +101,9 @@ module mo_gas_optics
   #   end function logical_abstract
   #   #--------------------------------------------------------------------------------------------------------------------
   #   function real_abstract(this)
-  #     import ty_gas_optics, wp
+  #     import ty_gas_optics, FT
   #     class(ty_gas_optics),     intent(in   ) :: this
-  #     real(wp)                                :: real_abstract
+  #     real(FT)                                :: real_abstract
   #   end function real_abstract
   #   #--------------------------------------------------------------------------------------------------------------------
   # end interface

@@ -14,7 +14,7 @@
 #
 module mo_fluxes_byband_kernels
   use, intrinsic :: iso_c_binding
-  use mo_rte_kind, only: wp
+  use mo_rte_kind, only: FT
   implicit none
   private
   public :: sum_byband, net_byband
@@ -31,8 +31,8 @@ contains
   pure subroutine sum_byband(ncol, nlev, ngpt, nbnd, band_lims, spectral_flux, byband_flux) bind (C)
     integer,                               intent(in ) :: ncol, nlev, ngpt, nbnd
     integer,  dimension(2,          nbnd), intent(in ) :: band_lims
-    real(wp), dimension(ncol, nlev, ngpt), intent(in ) :: spectral_flux
-    real(wp), dimension(ncol, nlev, nbnd), intent(out) :: byband_flux
+    real(FT), dimension(ncol, nlev, ngpt), intent(in ) :: spectral_flux
+    real(FT), dimension(ncol, nlev, nbnd), intent(out) :: byband_flux
 
     integer :: icol, ilev, igpt, ibnd
     #$acc parallel loop collapse(3) copyin(spectral_flux, band_lims) copyout(byband_flux)
@@ -55,8 +55,8 @@ contains
   pure subroutine net_byband_full(ncol, nlev, ngpt, nbnd, band_lims, spectral_flux_dn, spectral_flux_up, byband_flux_net) bind (C)
     integer,                               intent(in ) :: ncol, nlev, ngpt, nbnd
     integer,  dimension(2,          nbnd), intent(in ) :: band_lims
-    real(wp), dimension(ncol, nlev, ngpt), intent(in ) :: spectral_flux_dn, spectral_flux_up
-    real(wp), dimension(ncol, nlev, nbnd), intent(out) :: byband_flux_net
+    real(FT), dimension(ncol, nlev, ngpt), intent(in ) :: spectral_flux_dn, spectral_flux_up
+    real(FT), dimension(ncol, nlev, nbnd), intent(out) :: byband_flux_net
 
     integer :: icol, ilev, igpt, ibnd
 
@@ -79,8 +79,8 @@ contains
   # ----------------------------------------------------------------------------
   pure subroutine net_byband_precalc(ncol, nlev, nbnd, byband_flux_dn, byband_flux_up, byband_flux_net) bind (C)
     integer,                               intent(in ) :: ncol, nlev, nbnd
-    real(wp), dimension(ncol, nlev, nbnd), intent(in ) :: byband_flux_dn, byband_flux_up
-    real(wp), dimension(ncol, nlev, nbnd), intent(out) :: byband_flux_net
+    real(FT), dimension(ncol, nlev, nbnd), intent(in ) :: byband_flux_dn, byband_flux_up
+    real(FT), dimension(ncol, nlev, nbnd), intent(out) :: byband_flux_net
 
     byband_flux_net(1:ncol,1:nlev,1:nbnd) = byband_flux_dn(1:ncol,1:nlev,1:nbnd) - byband_flux_up(1:ncol,1:nlev,1:nbnd)
   end subroutine net_byband_precalc

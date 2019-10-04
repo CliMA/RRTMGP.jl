@@ -5,8 +5,8 @@ using JRRTMGP.mo_rte_solver_kernels
 using JRRTMGP.fortran_intrinsics
 using Test
 
-get_array(ds, name, DT) = haskey(ds, name) ? convert(Array{DT}, ds[name][:]) : nothing
-get_array(ds, name, DT, s) = haskey(ds, name) ? convert(Array{DT}, ds[name][:]) : zeros(s)
+get_array(ds, name, FT) = haskey(ds, name) ? convert(Array{FT}, ds[name][:]) : nothing
+get_array(ds, name, FT, s) = haskey(ds, name) ? convert(Array{FT}, ds[name][:]) : zeros(s)
 get_dim_size(ds, name) = ds.dim[name]
 
 function compare(ds, var_tuple)
@@ -23,49 +23,49 @@ function compare(ds, var_tuple)
   return D
 end
 
-function read_sw_solar_sources(ds, DT)
+function read_sw_solar_sources(ds, FT)
   ncol  = get_dim_size(ds, "col")
   ngpt = get_dim_size(ds, "gpt")
-  toa_src = get_array(ds, "toa_src", DT, (ncol))
+  toa_src = get_array(ds, "toa_src", FT, (ncol))
   return toa_src
 end
 
-function read_sw_bc(ds, DT)
+function read_sw_bc(ds, FT)
   ncol  = get_dim_size(ds, "col")
   nband = get_dim_size(ds, "band")
-  mu0         =  get_array(ds, "mu0", DT, (ncol))
-  tsi         =  get_array(ds, "tsi", DT, (ncol))
-  sfc_alb_dir =  get_array(ds, "sfc_alb_dir", DT, (nband,ncol))
-  sfc_alb_dif =  get_array(ds, "sfc_alb_dif", DT, (nband,ncol))
+  mu0         =  get_array(ds, "mu0", FT, (ncol))
+  tsi         =  get_array(ds, "tsi", FT, (ncol))
+  sfc_alb_dir =  get_array(ds, "sfc_alb_dir", FT, (nband,ncol))
+  sfc_alb_dif =  get_array(ds, "sfc_alb_dif", FT, (nband,ncol))
 
-  tsi_scaling =  get_array(ds, "tsi_scaling", DT)
+  tsi_scaling =  get_array(ds, "tsi_scaling", FT)
   return mu0, tsi, tsi_scaling, sfc_alb_dir, sfc_alb_dif
 end
 
-function read_sources(ds, DT)
-  source_up =  get_array(ds, "source_up", DT)
-  source_dn =  get_array(ds, "source_dn", DT)
-  source_sfc = get_array(ds, "source_sfc", DT)
+function read_sources(ds, FT)
+  source_up =  get_array(ds, "source_up", FT)
+  source_dn =  get_array(ds, "source_dn", FT)
+  source_sfc = get_array(ds, "source_sfc", FT)
   return source_up, source_dn, source_sfc
 end
 
-function read_two_stream(ds, DT)
-  Rdif = get_array(ds, "Rdif", DT)
-  Tdif = get_array(ds, "Tdif", DT)
-  Rdir = get_array(ds, "Rdir", DT)
-  Tdir = get_array(ds, "Tdir", DT)
-  Tnoscat = get_array(ds, "Tnoscat", DT)
+function read_two_stream(ds, FT)
+  Rdif = get_array(ds, "Rdif", FT)
+  Tdif = get_array(ds, "Tdif", FT)
+  Rdir = get_array(ds, "Rdir", FT)
+  Tdir = get_array(ds, "Tdir", FT)
+  Tnoscat = get_array(ds, "Tnoscat", FT)
   return Rdif, Tdif, Rdir, Tdir, Tnoscat
 end
 
-function read_spectral_disc(ds, DT)
+function read_spectral_disc(ds, FT)
     # character(len=*),       intent(in   ) :: fileName
     # class(ty_optical_props), intent(inout) :: spectral_disc
 
     # integer :: ncid
     # integer :: nband
     # integer,  dimension(:,:), allocatable :: band_lims_gpt
-    # real(wp), dimension(:,:), allocatable :: band_lims_wvn
+    # real(FT), dimension(:,:), allocatable :: band_lims_wvn
 
     # ! -------------------
     # if(nf90_open(trim(fileName), NF90_WRITE, ncid) /= NF90_NOERR) &
@@ -78,9 +78,11 @@ function read_spectral_disc(ds, DT)
     # @show ds["pair"][:]
     # @show ds["name"][:]
 
-    band_lims_wvn = convert(Array{DT}, ds["band_lims_wvn"][:])
-    band_lims_gpt = convert(Array{DT}, ds["band_lims_gpt"][:])
-    return ty_optical_props_1scl("spectral_disc", band_lims_wvn, band_lims_gpt)
+    band_lims_wvn = convert(Array{FT}, ds["band_lims_wvn"][:])
+    band_lims_gpt = convert(Array{FT}, ds["band_lims_gpt"][:])
+    op = ty_optical_props_1scl(FT,Int)
+    init!(op, "spectral_disc", band_lims_wvn, band_lims_gpt)
+    return op
 
     # ncid = nf90_close(ncid)
 end
@@ -88,7 +90,7 @@ end
 # ----------------------------------------------------------------------------------
 # program test_adding
 @testset "test_adding" begin
-  # use mo_rte_kind,      only: wp, wl
+  # use mo_rte_kind,      only: FT, wl
   # use mo_optical_props, only: ty_optical_props, ty_optical_props_arry
   # use mo_rte_solver_kernels,
   #                       only: adding
@@ -113,16 +115,16 @@ end
 
   # class(ty_optical_props_arry), allocatable :: atmos
 
-  # real(wp), dimension(:,:,:), allocatable :: Rdif, Tdif, source_up, source_dn
-  # real(wp), dimension(:,  :), allocatable :: source_sfc
-  # real(wp), dimension(:,:,:), allocatable :: Rdir, Tdir, Tnoscat
-  # real(wp), dimension(:    ), allocatable :: mu0, tsi, t_sfc
-  # real(wp), dimension(:,  :), allocatable :: toa_src
-  # real(wp), dimension(:,  :), allocatable :: sfc_alb_dir, sfc_alb_dif,
+  # real(FT), dimension(:,:,:), allocatable :: Rdif, Tdif, source_up, source_dn
+  # real(FT), dimension(:,  :), allocatable :: source_sfc
+  # real(FT), dimension(:,:,:), allocatable :: Rdir, Tdir, Tnoscat
+  # real(FT), dimension(:    ), allocatable :: mu0, tsi, t_sfc
+  # real(FT), dimension(:,  :), allocatable :: toa_src
+  # real(FT), dimension(:,  :), allocatable :: sfc_alb_dir, sfc_alb_dif,
   #                                            sfc_alb_gpt
-  # real(wp)                                :: tsi_scaling
+  # real(FT)                                :: tsi_scaling
 
-  # real(wp), dimension(:,:,:), allocatable :: flux_up, flux_dn, flux_dn_dir
+  # real(FT), dimension(:,:,:), allocatable :: flux_up, flux_dn, flux_dn_dir
 
   # logical :: top_at_1, do_sw
   # integer :: i, j, k, ibnd, igpt
@@ -134,31 +136,31 @@ end
   # @show haskey(ds, "top_at_1")
   # top_at_1 = read_direction(fileName)
   top_at_1 = ds.attrib["top_at_1"]==1
-  DT = Float64
-  spectral_disc = read_spectral_disc(ds, DT)
-  source_up, source_dn, source_sfc = read_sources(ds, DT)
+  FT = Float64
+  spectral_disc = read_spectral_disc(ds, FT)
+  source_up, source_dn, source_sfc = read_sources(ds, FT)
   if do_sw
-    Rdif, Tdif, Rdir, Tdir, Tnoscat = read_two_stream(ds, DT)
-    mu0, tsi, tsi_scaling, sfc_alb_dir, sfc_alb_dif = read_sw_bc(ds, DT)
-    mu0[:] .= cos.(mu0[:] * acos(-DT(1))/DT(180))
+    Rdif, Tdif, Rdir, Tdir, Tnoscat = read_two_stream(ds, FT)
+    mu0, tsi, tsi_scaling, sfc_alb_dir, sfc_alb_dif = read_sw_bc(ds, FT)
+    mu0[:] .= cos.(mu0[:] * acos(-FT(1))/FT(180))
   else
     # Rdif, Tdif = read_two_stream(fileName)
   #   t_sfc, sfc_alb_dif = read_lw_bc(fileName)
-  #   DT = eltype(Rdif)
+  #   FT = eltype(Rdif)
   #   # Read emissivity; convert to surface albedo
-  #   sfc_alb_dif[:,:] .= DT(1) .- sfc_alb_dif[:,:]
+  #   sfc_alb_dif[:,:] .= FT(1) .- sfc_alb_dif[:,:]
   end
 
   ncol = size(source_up, 1)
   nlay = size(source_up, 2)
   ngpt = size(source_up, 3)
-  flux_up = Array{DT}(undef, ncol,nlay+1,ngpt)
-  flux_dn = Array{DT}(undef, ncol,nlay+1,ngpt)
-  sfc_alb_gpt = Array{DT}(undef, ncol, ngpt)
+  flux_up = Array{FT}(undef, ncol,nlay+1,ngpt)
+  flux_dn = Array{FT}(undef, ncol,nlay+1,ngpt)
+  sfc_alb_gpt = Array{FT}(undef, ncol, ngpt)
   if top_at_1
-    flux_dn[:,     1,:] .= DT(0)
+    flux_dn[:,     1,:] .= FT(0)
   else
-    flux_dn[:,nlay+1,:] .= DT(0)
+    flux_dn[:,nlay+1,:] .= FT(0)
   end
   # Expand surface albedos from bands to gpoints
   for igpt = 1:ngpt
@@ -178,8 +180,8 @@ end
     #
     # Compute direct beam for solar  - this is done in sources()
     #
-    toa_src = read_sw_solar_sources(ds, DT)
-    flux_dn_dir = Array{DT}(undef, ncol, nlay+1, ngpt)
+    toa_src = read_sw_solar_sources(ds, FT)
+    flux_dn_dir = Array{FT}(undef, ncol, nlay+1, ngpt)
 
     if top_at_1
       flux_dn_dir[:,    1,:]  .= toa_src[:,:] .* spread(mu0, 2, ngpt)
