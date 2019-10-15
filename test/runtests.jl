@@ -1,8 +1,8 @@
 using Test
 
 for submodule in [
-                  "adding",
-                  # "DriverSW",
+                  # "adding",
+                  "DriverSW",
                   "RTE",
                   "RRTMG",
                   ]
