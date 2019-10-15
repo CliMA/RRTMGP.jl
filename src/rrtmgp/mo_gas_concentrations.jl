@@ -30,24 +30,36 @@
 # -------------------------------------------------------------------------------------------------
 
 module mo_gas_concentrations
-  # use mo_rte_kind,    only: wp
+  using ..fortran_intrinsics
+  # use mo_rte_kind,    only: FT
   # use mo_util_string, only: lower_case
   # implicit none
   const GAS_NOT_IN_LIST = -1
 
-  struct conc_field{T}
-    conc::Array{T,2}
+  mutable struct conc_field{FT}
+    conc::Array{FT,2}
   end
   # type, private :: conc_field
-  #   real(wp), dimension(:,:), allocatable :: conc
+  #   real(FT), dimension(:,:), allocatable :: conc
   # end type conc_field
+  export set_vmr!, get_vmr
 
   export ty_gas_concs
-  struct ty_gas_concs{T, I}
-    gas_name::String
-    concs::Vector{conc_field{T}}
-    ncol::I
-    nlay::I
+  mutable struct ty_gas_concs{FT}
+    gas_name::Vector{String}
+    # concs::Vector{conc_field{FT}}
+    concs
+    ncol#::Int
+    nlay#::Int
+  end
+  function ty_gas_concs(::Type{FT}, ncol, nlay) where FT
+    gas_name = Vector([])
+    # conc = Array{FT,2}(undef, ncol, nlay)
+    # concs = Vector([conc_field(conc)])
+    concs = Vector([])
+    # concs = nothing
+    ncol, nlay = nothing, nothing
+    return ty_gas_concs{FT}(gas_name, concs, ncol, nlay)
   end
 #   type, public :: ty_gas_concs
 #     #
@@ -60,7 +72,6 @@ module mo_gas_concentrations
 #       #
 #       # Procedures
 #       #
-#       procedure, private :: increase_list_size
 #       procedure, private :: find_gas
 #       procedure, private :: set_vmr_scalar
 #       procedure, private :: set_vmr_1d
@@ -87,112 +98,125 @@ module mo_gas_concentrations
   # Set concentrations --- scalar, 1D, 2D
   #
   # -------------------------------------------------------------------------------------
-  function set_vmr_scalar!(this::ty_gas_concs{DT}, gas, w) where DT # result(error_msg)
+  function set_vmr!(this::ty_gas_concs{FT}, gas, w, sw) where FT
+    if length(sw)==1 && length(w)==1
+      set_vmr!(this, gas, w[1])
+    elseif length(sw)==1 && length(w)>1
+      set_vmr!(this, gas, w)
+    else
+      set_vmr!(this, gas, w)
+    end
+  end
+
+  function set_vmr!(this::ty_gas_concs{FT}, gas, w::FT) where FT # result(error_msg)
     # class(ty_gas_concs), intent(inout) :: this
     # character(len=*),    intent(in   ) :: gas
-    # real(wp),            intent(in   ) :: w
+    # real(FT),            intent(in   ) :: w
     # character(len=128)                 :: error_msg
     # # ---------
     # integer :: igas
     # # ---------
-    error_msg = ""
-    if w < DT(0) || w > DT(1)
-      error_msg = "ty_gas_concs%set_vmr: concentrations should be >= 0, <= 1"
-      return error_msg
+    if w < FT(0) || w > FT(1)
+      error("ty_gas_concs%set_vmr: concentrations should be >= 0, <= 1")
     end
 
     igas = find_gas(this, gas)
+
+    conc = Array{FT}(undef, 1,1)
+    fill!(conc, w)
+    gas_name = trim(gas)
+
+    # if igas == GAS_NOT_IN_LIST || igas>length(this.concs)
     if igas == GAS_NOT_IN_LIST
-      increase_list_size!(this)
-      igas = size(this.gas_name)
+      push!(this.concs, conc_field(conc))
+      push!(this.gas_name, gas_name)
+      igas = length(this.concs)
+      # L = lowercase.(strip.(this.gas_name)) .== lowercase(trim(gas))
+      # @show L
+      # @show gas
+      # @show igas
     end
+    this.concs[igas].conc = conc
+    this.gas_name[igas] = gas_name
     #
     # Deallocate anything existing -- could be more efficient to test if it's already the correct size
     #
 
-    this.concs[igas].conc = Array(undef, 1,1)
-    this.concs[igas].conc[:,:] .= w
-    this.gas_name[igas] = trim(gas)
   end
   # -------------------------------------------------------------------------------------
-  function set_vmr_1d!(this::ty_gas_concs{DT}, gas, w) where DT
+  function set_vmr!(this::ty_gas_concs{FT}, gas, w::Vector{FT}) where FT
     # class(ty_gas_concs), intent(inout) :: this
     # character(len=*),    intent(in   ) :: gas
-    # real(wp), dimension(:),
+    # real(FT), dimension(:),
         #                      intent(in   ) :: w
     # character(len=128)                 :: error_msg
     # # ---------
     # integer :: igas
     # # ---------
-    error_msg = ""
 
-    if any(w < DT(0) || w > DT(1))
-      error_msg = "ty_gas_concs%set_vmr: concentrations should be >= 0, <= 1"
+    if any(w < FT(0) || w > FT(1))
+      error("ty_gas_concs%set_vmr: concentrations should be >= 0, <= 1")
     end
-    if this.nlay > 0
-      if (size(w) ≠ this.nlay)
-        error_msg = "ty_gas_concs%set_vmr: different dimension (nlay)"
-      end
+    if this.nlay ≠ nothing && size(w,2) ≠ this.nlay
+      error("ty_gas_concs%set_vmr: different dimension (nlay)")
     else
       this.nlay = size(w)
     end
-    if (error_msg ≠ "")
-      return
-    end
 
-    igas = this.find_gas(gas)
+    igas = find_gas(this, gas)
+    conc = Array{FT}(w, 1, this.nlay)
+    gas_name = trim(gas)
+    # @show "Vector", igas, size(this.concs)
+    # if igas == GAS_NOT_IN_LIST || igas>length(this.concs)
     if igas == GAS_NOT_IN_LIST
-      increase_list_size!(this)
-      igas = size(this.gas_name)
+      push!(this.concs, conc_field(conc))
+      push!(this.gas_name, gas_name)
+      igas = length(this.concs)
     end
-    #
-    # Deallocate anything existing -- could be more efficient to test if it's already the correct size
-    #
-
-    this.concs[igas].conc = Array(undef,1,this.nlay)
-    this.concs[igas].conc[1,:] .= w
-    this.gas_name[igas] = trim(gas)
+    this.concs[igas].conc = conc
+    this.gas_name[igas] = gas_name
   end
   # --------------------
-  function set_vmr_2d(this::ty_gas_concs, gas, w::Array)
+  function set_vmr!(this::ty_gas_concs, gas, w::Array{FT}) where FT
     # class(ty_gas_concs), intent(inout) :: this
     # character(len=*),    intent(in   ) :: gas
-    # real(wp), dimension(:,:),
+    # real(FT), dimension(:,:),
         #                      intent(in   ) :: w
     # character(len=128)                 :: error_msg
     # # ---------
     # integer :: igas
     # # ---------
-    error_msg = ""
 
-    if any(w < DT(0) || w > DT(1))
-      error_msg = "ty_gas_concs%set_vmr: concentrations should be >= 0, <= 1"
+    if any(w .< FT(0)) || any(w .> FT(1))
+      error("set_vmr: concentrations should be >= 0, <= 1")
     end
-    if this.ncol > 0 && size(w, 1) ≠ this.ncol
-      error_msg = "ty_gas_concs%set_vmr: different dimension (ncol)"
+    if this.ncol ≠ nothing && size(w, 1) ≠ this.ncol
+      @show size(w)
+      @show size(w, 1)
+      @show this.ncol
+      error("set_vmr: different dimension (ncol)")
     else
       this.ncol = size(w, 1)
     end
-    if this.nlay > 0 && size(w, 2) ≠ this.nlay
-      error_msg = "ty_gas_concs%set_vmr: different dimension (nlay)"
+    if this.nlay ≠ nothing && size(w, 2) ≠ this.nlay
+      error("set_vmr: different dimension (nlay)")
     else
       this.nlay = size(w, 2)
     end
-    if (error_msg ≠ "")
-      return
-    end
 
+    conc = w
+    gas_name = trim(gas)
     igas = find_gas(this, gas)
+    # @show "Array", gas, igas, igas == GAS_NOT_IN_LIST
+
+    # if igas == GAS_NOT_IN_LIST || igas>length(this.concs)
     if igas == GAS_NOT_IN_LIST
-      increase_list_size!(this)
-      igas = size(this.gas_name)
+      push!(this.concs, conc_field(conc))
+      push!(this.gas_name, gas_name)
+      igas = length(this.concs)
     end
-    #
-    # Deallocate anything existing -- could be more efficient to test if it's already the correct size
-    #
-    this.concs[igas].conc = Array(undef, this.ncol,this.nlay)
-    this.concs[igas].conc[:,:] .= w
-    this.gas_name[igas] = trim(gas)
+    this.concs[igas].conc = conc
+    this.gas_name[igas] = gas_name
   end
   # -------------------------------------------------------------------------------------
   #
@@ -202,80 +226,100 @@ module mo_gas_concentrations
   #
   # 1D array ( lay depdendence only)
   #
-  function get_vmr_1d(this::ty_gas_concs{DT}, gas, array) where DT #result(error_msg)
+  function get_vmr(this::ty_gas_concs{FT}, gas) where FT #result(error_msg)
     # class(ty_gas_concs) :: this
     # character(len=*),         intent(in ) :: gas
-    # real(wp), dimension(:),   intent(out) :: array
+    # real(FT), dimension(:),   intent(out) :: array
     # character(len=128) :: error_msg
     # # ---------------------
     # integer :: igas
     # # ---------------------
-    error_msg = ""
 
     igas = find_gas(this, gas)
     if igas == GAS_NOT_IN_LIST
-      error_msg = "ty_gas_concs%get_vmr; gas " * trim(gas) * " not found"
-      array[:] .= DT(0)
-    elseif size(this.concs(igas).conc, 1) > 1 # Are we requesting a single profile when many are present?
-      error_msg = "ty_gas_concs%get_vmr; gas " * trim(gas) * " requesting single profile but many are available"
-      array[:] .= DT(0)
+      error("get_vmr: gas " * trim(gas) * " not found")
+    # elseif size(this.concs[igas].conc, 1) > 1 # Are we requesting a single profile when many are present?
+    #   error("get_vmr: gas " * trim(gas) * " requesting single profile but many are available")
     end
-    if this.nlay > 0 && this.nlay ≠ size(array)
-      error_msg = "ty_gas_concs%get_vmr; gas " * trim(gas) * " array is wrong size (nlay)"
-      array[:] .= DT(0)
-    end
-    if (error_msg ≠ "")
-      return
+    conc = this.concs[igas].conc
+
+    # if size(this.concs[igas].conc, 2) > 1
+    #   array = this.concs[igas].conc[1,:]
+    # else
+    #   array = this.concs[igas].conc[1,1]
+    # end
+
+    array = Array{FT}(undef, this.ncol, this.nlay)
+
+
+    if size(conc, 1) > 1     # Concentration stored as 2D
+      array .= conc[:,:]
+    elseif size(conc, 2) > 1 # Concentration stored as 1D
+      array .= spread(conc[1,:], dim=1, ncopies=max(this.ncol, size(array,1)))
+      # array .= conc[1,:]
+    else                     # Concentration stored as scalar
+      fill!(array, conc[1,1])
     end
 
-    if size(this.concs[igas].conc, 2) > 1
-      array[:] .= this.concs[igas].conc[1,:]
-    else
-      array[:] .= this.concs[igas].conc[1,1]
+    if this.ncol ≠ nothing && this.ncol ≠ size(array,1)
+      @show size(conc, 1) > 1
+      @show size(conc, 2) > 1
+      @show gas, igas
+      @show size(conc)
+      @show size(array)
+      @show this.ncol
+      @show this.nlay
+      error("get_vmr: gas " * trim(gas) * " array is wrong size (ncol)")
     end
+    if this.nlay ≠ nothing && this.nlay ≠ size(array,2)
+      @show size(conc, 1) > 1
+      @show size(conc, 2) > 1
+      @show gas, igas
+      @show size(conc)
+      @show size(array)
+      @show this.ncol
+      @show this.nlay
+      error("get_vmr: gas " * trim(gas) * " array is wrong size (nlay)")
+    end
+
+    return array
 
   end
   # -------------------------------------------------------------------------------------
   #
   # 2D array (col, lay)
   #
-  function get_vmr_2d(this, gas, array) result(error_msg)
+  function get_vmr(this::ty_gas_concs, gas, array::Array{FT,2}) where FT
     # class(ty_gas_concs) :: this
     # character(len=*),         intent(in ) :: gas
-    # real(wp), dimension(:,:), intent(out) :: array
+    # real(FT), dimension(:,:), intent(out) :: array
     # character(len=128)                    :: error_msg
     # # ---------------------
     # integer :: igas
     # # ---------------------
-    error_msg = ""
 
     igas = find_gas(this, gas)
     if igas == GAS_NOT_IN_LIST
-      error_msg = "ty_gas_concs%get_vmr; gas " * trim(gas) * " not found"
-      array[:,:] .= DT(0)
+      error("get_vmr: gas " * trim(gas) * " not found")
     end
     #
     # Is the requested array the correct size?
     #
-    if this.ncol > 0 && this.ncol ≠ size(array,1)
-      error_msg = "ty_gas_concs%get_vmr; gas " * trim(gas) * " array is wrong size (ncol)"
-      array[:,:] .= DT(0)
+    if this.ncol ≠ nothing && this.ncol ≠ size(array,1)
+      error("get_vmr: gas " * trim(gas) * " array is wrong size (ncol)")
     end
-    if this.nlay > 0 && this.nlay ≠ size(array,2)
-      error_msg = "ty_gas_concs%get_vmr; gas " * trim(gas) * " array is wrong size (nlay)"
-      array[:,:] .= DT(0)
-    end
-    if (error_msg ≠ "")
-      return
+    if this.nlay ≠ nothing && this.nlay ≠ size(array,2)
+      error("get_vmr: gas " * trim(gas) * " array is wrong size (nlay)")
     end
 
     if size(this.concs[igas].conc, 1) > 1      # Concentration stored as 2D
-      array[:,:] .= this.concs[igas].conc[:,:]
+      array = this.concs[igas].conc[:,:]
     elseif size(this.concs(igas).conc, 2) > 1 # Concentration stored as 1D
-      array[:,:] .= spread(this.concs(igas).conc(1,:), dim=1, ncopies=max(this.ncol, size(array,1)))
+      array = spread(this.concs(igas).conc(1,:), dim=1, ncopies=max(this.ncol, size(array,1)))
     else                                                   # Concentration stored as scalar
-      array[:,:] .= this.concs[igas].conc[1,1]
+      array = this.concs[igas].conc[1,1]
     end
+    return array
 
   end
   # -------------------------------------------------------------------------------------
@@ -283,7 +327,7 @@ module mo_gas_concentrations
   # Extract a subset of n columns starting with column 'start'
   #
   # -------------------------------------------------------------------------------------
-  function get_subset_range(this, start, n, subset) result(error_msg)
+  function get_subset_range(this::ty_gas_concs, start, n, subset)
     # class(ty_gas_concs),      intent(in   ) :: this
     # integer,                  intent(in   ) :: start, n
     # class(ty_gas_concs),      intent(inout) :: subset
@@ -291,18 +335,14 @@ module mo_gas_concentrations
     # # ---------------------
     # integer :: i
     # # ---------------------
-    error_msg = ""
     if (n <= 0)
-      error_msg = "gas_concs%get_vmr: Asking for 0 or fewer columns "
+      error("gas_concs%get_vmr: Asking for 0 or fewer columns ")
     end
     if (start < 1 )
-      error_msg = "gas_concs%get_vmr: Asking for columns outside range"
+      error("gas_concs%get_vmr: Asking for columns outside range")
     end
-    if (this.ncol > 0 && start > this.ncol || start+n-1 > this.ncol )
-      error_msg = "gas_concs%get_vmr: Asking for columns outside range"
-    end
-    if (error_msg ≠ "")
-      return
+    if (this.ncol ≠ nothing && start > this.ncol || start+n-1 > this.ncol )
+      error("gas_concs%get_vmr: Asking for columns outside range")
     end
 
     reset!(subset)
@@ -310,7 +350,7 @@ module mo_gas_concentrations
     subset.gas_name = Array(undef, size(this.gas_name))
     subset.concs = Array(undef, size(this.concs))
     subset.nlay = this.nlay
-    subset.ncol = fmerge(n, 0, this.ncol > 0)
+    subset.ncol = fmerge(n, 0, this.ncol ≠ nothing)
     subset.gas_name[:] .= this.gas_name[:]
 
     for i = 1:size(this.gas_name)
@@ -365,52 +405,36 @@ module mo_gas_concentrations
   end
   # -------------------------------------------------------------------------------------
   #
-  # Private procedures
-  #
-  # -------------------------------------------------------------------------------------
-  #
-  # This routine is called when adding a new concentration if the
-  #   the gas isn't in the list already
-  #
-  function increase_list_size(this::ty_gas_concs{DT}) where DT
-    # class(ty_gas_concs), intent(inout) :: this
-    # # -----------------
-    # character(len=32), dimension(:), allocatable :: new_names
-    # type(conc_field),  dimension(:), allocatable :: new_concs
-    # # -----------------
-
-    if allocated(this.gas_name)
-      new_names = Array{DT}(undef, size(this.gas_name)+1)
-      new_concs = Array{DT}(undef, size(this.gas_name)+1)
-      new_names[1:size(this.gas_name)] = this.gas_name[:]
-      new_concs[1:size(this.gas_name)] = this.concs[:]
-      move_alloc!(new_names, this.gas_name)
-      move_alloc!(new_concs, this.concs)
-    else
-      this.gas_name = Array{DT}(undef, 1)
-      this.concs = Array{DT}(undef, 1)
-    end
-  end
-  # -------------------------------------------------------------------------------------
-  #
   # find gas in list; GAS_NOT_IN_LIST if not found
   #
   function find_gas(this::ty_gas_concs, gas)
-    # character(len=*),   intent(in) :: gas
-    # class(ty_gas_concs), intent(in) :: this
-    # integer                        :: find_gas
-    # # -----------------
-    # integer :: igas
-    # # -----------------
-    find_gas = GAS_NOT_IN_LIST
-    if !allocated(this.gas_name)
-      return
-    end
-    for igas = 1:size(this.gas_name)
-      if lowercase(trim(this.gas_name[igas])) == lowercase(trim(gas))
-        find_gas = igas
-      end
-    end
+    L = lowercase.(strip.(this.gas_name)) .== lowercase(trim(gas))
+    !any(L) && return GAS_NOT_IN_LIST
+    return argmax(L)
   end
+
+  # function find_gas(this::ty_gas_concs, gas)
+  #   # character(len=*),   intent(in) :: gas
+  #   # class(ty_gas_concs), intent(in) :: this
+  #   # integer                        :: find_gas
+  #   # # -----------------
+  #   # integer :: igas
+  #   # # -----------------
+  #   gas_names = this.gas_name
+  #   return
+  #   if !allocated(this.gas_name)
+  #     return GAS_NOT_IN_LIST
+  #   end
+  #   println("********************************")
+  #   @show gas
+  #   @show this.gas_name
+  #   for igas = 1:length(this.gas_name)
+  #     @show igas, this.gas_name[igas], gas
+  #     if lowercase(trim(this.gas_name[igas])) == lowercase(trim(gas))
+  #       return igas
+  #     end
+  #   end
+  #   println("********************************")
+  # end
 
 end # module

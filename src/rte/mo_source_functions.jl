@@ -25,12 +25,12 @@ module mo_source_functions
 
 
   export ty_source_func_lw
-  struct ty_source_func_lw{T, I} <: ty_optical_props{T, I}
-    band2gpt::Array{T,2}        # (begin g-point, end g-point) = band2gpt(2,band)
+  struct ty_source_func_lw{FT, I} <: ty_optical_props{FT, I}
+    band2gpt::Array{FT,2}        # (begin g-point, end g-point) = band2gpt(2,band)
     gpt2band::Array{I,1}        # band = gpt2band(g-point)
-    band_lims_wvn::Array{T,2}   # (upper and lower wavenumber by band) = band_lims_wvn(2,band)
+    band_lims_wvn::Array{FT,2}   # (upper and lower wavenumber by band) = band_lims_wvn(2,band)
     name::String
-    tau::Array{T,3}
+    tau::Array{FT,3}
     #
     lay_source     # Planck source at layer average temperature [W/m2] (ncol, nlay, ngpt)
     lev_source_inc # Planck source at layer edge in increasing ilay direction [W/m2] (ncol, nlay+1, ngpt)
@@ -38,25 +38,25 @@ module mo_source_functions
     sfc_source
   end
   export ty_source_func_sw
-  struct ty_source_func_sw{T, I} <: ty_optical_props{T, I}
-    band2gpt::Array{T,2}        # (begin g-point, end g-point) = band2gpt(2,band)
+  struct ty_source_func_sw{FT, I} <: ty_optical_props{FT, I}
+    band2gpt::Array{FT,2}        # (begin g-point, end g-point) = band2gpt(2,band)
     gpt2band::Array{I,1}        # band = gpt2band(g-point)
-    band_lims_wvn::Array{T,2}   # (upper and lower wavenumber by band) = band_lims_wvn(2,band)
+    band_lims_wvn::Array{FT,2}   # (upper and lower wavenumber by band) = band_lims_wvn(2,band)
     name::String
-    tau::Array{T,3}
+    tau::Array{FT,3}
     #
     toa_source
     lev_source_inc
     lev_source_dec
   end
   # type, extends(ty_optical_props), public :: ty_source_func_lw
-  #   real(wp), allocatable, dimension(:,:,:) :: lay_source,       # Planck source at layer average temperature [W/m2] (ncol, nlay, ngpt)
+  #   real(FT), allocatable, dimension(:,:,:) :: lay_source,       # Planck source at layer average temperature [W/m2] (ncol, nlay, ngpt)
   #                                              lev_source_inc,   # Planck source at layer edge in increasing ilay direction [W/m2] (ncol, nlay+1, ngpt)
   #                                              lev_source_dec     # Planck source at layer edge in decreasing ilay direction [W/m2] (ncol, nlay+1, ngpt)
   #                                                                 # in increasing/decreasing ilay direction
   #                                                                 # Includes spectral weighting that accounts for state-dependent
   #                                                                 # frequency to g-space mapping
-  #   real(wp), allocatable, dimension(:,:  ) :: sfc_source
+  #   real(FT), allocatable, dimension(:,:  ) :: sfc_source
   # contains
   #   generic,   public :: alloc => alloc_lw, copy_and_alloc_lw
   #   procedure, private:: alloc_lw
@@ -73,7 +73,7 @@ module mo_source_functions
   # Type for shortave sources: top-of-domain spectrally-resolved flux
   #
   # type, extends(ty_optical_props), public :: ty_source_func_sw
-  #   real(wp), allocatable, dimension(:,:  ) :: toa_source
+  #   real(FT), allocatable, dimension(:,:  ) :: toa_source
   # contains
   #   generic,   public :: alloc => alloc_sw, copy_and_alloc_sw
   #   procedure, private:: alloc_sw
@@ -100,21 +100,15 @@ module mo_source_functions
     # logical                              :: is_allocated_lw
 
   # --------------------------------------------------------------
-  function alloc_lw!(this::ty_source_func_lw{DT}, ncol, nlay) where DT
+  function alloc_lw!(this::ty_source_func_lw{FT}, ncol, nlay) where FT
     # class(ty_source_func_lw),    intent(inout) :: this
     # integer,                     intent(in   ) :: ncol, nlay
     # character(len = 128)                       :: err_message
 
     # integer :: ngpt
 
-    err_message = ""
-    if !is_initialized(this)
-      err_message = "source_func_lw%alloc: not initialized so can't allocate"
-    end
-    if any([ncol, nlay] <= 0)
-      err_message = "source_func_lw%alloc: must provide positive extents for ncol, nlay"
-    end
-    err_message ≠ "" && return err_message
+    !is_initialized(this) && error("source_func_lw%alloc: not initialized so can't allocate")
+    any([ncol, nlay] <= 0) && error("source_func_lw%alloc: must provide positive extents for ncol, nlay")
 
     allocated(this.sfc_source) && deallocate!(this.sfc_source)
     allocated(this.lay_source) && deallocate!(this.lay_source)
@@ -128,21 +122,16 @@ module mo_source_functions
   end
 
   # --------------------------------------------------------------
-  function copy_and_alloc_lw(this::ty_source_func_lw{DT}, ncol, nlay, spectral_desc) where DT
+  function copy_and_alloc_lw(this::ty_source_func_lw{FT}, ncol, nlay, spectral_desc) where FT
     # class(ty_source_func_lw),    intent(inout) :: this
     # integer,                     intent(in   ) :: ncol, nlay
     # class(ty_optical_props ),    intent(in   ) :: spectral_desc
     # character(len = 128)                       :: err_message
 
-    err_message = ""
-    if !is_initialized(spectral_desc)
-      err_message = "source_func_lw%alloc: spectral_desc not initialized"
-      return
-    end
+    !is_initialized(spectral_desc) && error("source_func_lw%alloc: spectral_desc not initialized")
     finalize!(this)
-    err_message = init!(this, spectral_desc)
-    err_message ≠ "" && return err_message
-    err_message = alloc!(this, ncol,nlay)
+    init!(this, spectral_desc)
+    alloc!(this, ncol,nlay)
   end
   # ------------------------------------------------------------------------------------------
   #
@@ -156,19 +145,13 @@ module mo_source_functions
     return is_initialized(this) && allocated(this.toa_source)
   end
   # --------------------------------------------------------------
-  function alloc_sw!(this::ty_source_func_sw{DT}, ncol) where DT
+  function alloc_sw!(this::ty_source_func_sw{FT}, ncol) where FT
     # class(ty_source_func_sw),    intent(inout) :: this
     # integer,                     intent(in   ) :: ncol
     # character(len = 128)                       :: err_message
 
-    err_message = ""
-    if (!is_initialized(this))
-      err_message = "source_func_sw%alloc: not initialized so can't allocate"
-    end
-    if (ncol <= 0)
-      err_message = "source_func_sw%alloc: must provide positive extents for ncol"
-    end
-    err_message ≠ "" && return err_message
+    !is_initialized(this) && error("source_func_sw%alloc: not initialized so can't allocate")
+    ncol <= 0 && error("source_func_sw%alloc: must provide positive extents for ncol")
     allocated(this.toa_source) && deallocate!(this.toa_source)
 
     this.toa_source = Array(undef, ncol, get_ngpt(this))
@@ -180,16 +163,9 @@ module mo_source_functions
     # class(ty_optical_props ),    intent(in   ) :: spectral_desc
     # character(len = 128)                       :: err_message
 
-    err_message = ""
-    if !is_initialized(spectral_desc)
-      err_message = "source_func_sw%alloc: spectral_desc not initialized"
-      return
-    end
-    err_message = init(this, spectral_desc)
-    if (err_message ≠ "")
-      return
-    end
-    err_message = alloc!(this, ncol)
+    !is_initialized(spectral_desc) &&  error("source_func_sw%alloc: spectral_desc not initialized")
+    init!(this, spectral_desc)
+    alloc!(this, ncol)
   end
   # ------------------------------------------------------------------------------------------
   #
@@ -260,28 +236,17 @@ module mo_source_functions
     # class(ty_source_func_lw), intent(inout) :: subset
     # character(128)                          :: err_message
 
-    err_message = ""
-    if (!is_allocated(full))
-      err_message = "source_func_lw%subset: Asking for a subset of unallocated data"
-      return
-    end
-    if (start < 1 || start + n-1 > get_ncol(full))
-       err_message = "optical_props%subset: Asking for columns outside range"
+    !is_allocated(full) && error("source_func_lw%subset: Asking for a subset of unallocated data")
+    if start < 1 || start + n-1 > get_ncol(full)
+       error("optical_props%subset: Asking for columns outside range")
      end
-    if (err_message ≠ "")
-      return
-    end
 
     #
     # Could check to see if subset is correctly sized, has consistent spectral discretization
     #
-    if (is_allocated(subset))
-      finalize!(subset)
-    end
-    err_message = alloc!(subset, n, get_nlay(full), full)
-    if (err_message ≠ "")
-      return
-    end
+    is_allocated(subset) && finalize!(subset)
+    alloc!(subset, n, get_nlay(full), full)
+
     subset.sfc_source[1:n,  :] = full.sfc_source[start:start+n-1,  :]
     subset.lay_source[1:n,:,:] = full.lay_source[start:start+n-1,:,:]
     subset.lev_source_inc[1:n,:,:] = full.lev_source_inc[start:start+n-1,:,:]
@@ -294,26 +259,17 @@ module mo_source_functions
     # class(ty_source_func_sw), intent(inout) :: subset
     # character(128)                          :: err_message
 
-    err_message = ""
-    if (!is_allocated(full))
-      err_message = "source_func_sw%subset: Asking for a subset of unallocated data"
-      return
-    end
+    !is_allocated(full) && error("source_func_sw%subset: Asking for a subset of unallocated data")
     if (start < 1 || start + n-1 > get_ncol(full))
-       err_message = "optical_props%subset: Asking for columns outside range"
-    end
-    if (err_message ≠ "")
-      return
+       error("optical_props%subset: Asking for columns outside range")
     end
 
     #
     # Could check to see if subset is correctly sized, has consistent spectral discretization
     #
-    if (is_allocated(subset))
-      finalize!(subset)
-    end
+    is_allocated(subset) && finalize!(subset)
     # Seems like I should be able to call "alloc" generically but the compilers are complaining
-    err_message = copy_and_alloc_sw!(subset, n, full)
+    copy_and_alloc_sw!(subset, n, full)
 
     subset.toa_source[1:n,  :] = full.toa_source[start:start+n-1,  :]
   end

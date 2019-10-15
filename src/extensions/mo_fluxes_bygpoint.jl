@@ -15,7 +15,7 @@
 #    This implementation reports the g-point fluxes
 #
 module mo_fluxes_bygpoint
-  use mo_rte_kind,      only: wp
+  use mo_rte_kind,      only: FT
   use mo_fluxes,        only: ty_fluxes
   use mo_optical_props, only: ty_optical_props
   implicit none
@@ -24,10 +24,10 @@ module mo_fluxes_bygpoint
   #   Data components are pointers so results can be written directly into memory
   #   reduce() function accepts spectral flux profiles
   type, extends(ty_fluxes) :: ty_fluxes_bygpoint
-    real(wp), dimension(:,:,:), pointer :: gpt_flux_up => NULL(), & # Band-by-band fluxes
+    real(FT), dimension(:,:,:), pointer :: gpt_flux_up => NULL(), & # Band-by-band fluxes
                                            gpt_flux_dn => NULL()    # (ncol, nlev, nband)
-    real(wp), dimension(:,:,:), pointer :: gpt_flux_net => NULL()   # Net (down - up)
-    real(wp), dimension(:,:,:), pointer :: gpt_flux_dn_dir => NULL() # Direct flux down
+    real(FT), dimension(:,:,:), pointer :: gpt_flux_net => NULL()   # Net (down - up)
+    real(FT), dimension(:,:,:), pointer :: gpt_flux_dn_dir => NULL() # Direct flux down
   contains
     procedure :: reduce => reduce_bygpoint
     procedure :: are_desired => are_desired_bygpoint
@@ -36,11 +36,11 @@ contains
   # --------------------------------------------------------------------------------------
   function reduce_bygpoint(this, gpt_flux_up, gpt_flux_dn, spectral_disc, top_at_1, gpt_flux_dn_dir) result(error_msg)
     class(ty_fluxes_bygpoint),           intent(inout) :: this
-    real(kind=wp), dimension(:,:,:),   intent(in   ) :: gpt_flux_up # Fluxes by gpoint [W/m2](ncol, nlay+1, ngpt)
-    real(kind=wp), dimension(:,:,:),   intent(in   ) :: gpt_flux_dn # Fluxes by gpoint [W/m2](ncol, nlay+1, ngpt)
+    real(kind=FT), dimension(:,:,:),   intent(in   ) :: gpt_flux_up # Fluxes by gpoint [W/m2](ncol, nlay+1, ngpt)
+    real(kind=FT), dimension(:,:,:),   intent(in   ) :: gpt_flux_dn # Fluxes by gpoint [W/m2](ncol, nlay+1, ngpt)
     class(ty_optical_props),           intent(in   ) :: spectral_disc  #< derived type with spectral information
     logical,                           intent(in   ) :: top_at_1
-    real(kind=wp), dimension(:,:,:), optional, &
+    real(kind=FT), dimension(:,:,:), optional, &
                                        intent(in   ) :: gpt_flux_dn_dir# Direct flux down
     character(len=128)                               :: error_msg
     # ------

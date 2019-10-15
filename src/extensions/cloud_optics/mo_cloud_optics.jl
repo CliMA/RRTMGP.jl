@@ -19,7 +19,7 @@
 # -------------------------------------------------------------------------------------------------
 
 module mo_cloud_optics
-  use mo_rte_kind,      only: wp
+  use mo_rte_kind,      only: FT
   use mo_optical_props, only: ty_optical_props,      &
                               ty_optical_props_arry, &
                               ty_optical_props_1scl, &
@@ -38,28 +38,28 @@ module mo_cloud_optics
     # Lookup table information
     #
     # Upper and lower limits of the tables
-    real(wp) :: radliq_lwr = 0._wp, radliq_upr = 0._wp
-    real(wp) :: radice_lwr = 0._wp, radice_upr = 0._wp
+    real(FT) :: radliq_lwr = 0._wp, radliq_upr = 0._wp
+    real(FT) :: radice_lwr = 0._wp, radice_upr = 0._wp
     # How many steps in the table? (for convenience)
     integer  :: liq_nsteps = 0,        ice_nsteps = 0
     # How big is each step in the table?
-    real(wp) :: liq_step_size = 0._wp, ice_step_size = 0._wp
+    real(FT) :: liq_step_size = 0._wp, ice_step_size = 0._wp
     #
     # The tables themselves.
     #
-    real(wp), dimension(:,:    ), allocatable :: lut_extliq, lut_ssaliq, lut_asyliq # (nsize_liq, nbnd)
-    real(wp), dimension(:,:,:  ), allocatable :: lut_extice, lut_ssaice, lut_asyice # (nsize_ice, nbnd, nrghice)
+    real(FT), dimension(:,:    ), allocatable :: lut_extliq, lut_ssaliq, lut_asyliq # (nsize_liq, nbnd)
+    real(FT), dimension(:,:,:  ), allocatable :: lut_extice, lut_ssaice, lut_asyice # (nsize_ice, nbnd, nrghice)
 
     #
     # Pade approximant coefficients
     #
-    real(wp), dimension(:,:,:  ), allocatable :: pade_extliq                 # (nbnd, nsizereg, ncoeff_ext)
-    real(wp), dimension(:,:,:  ), allocatable :: pade_ssaliq,  pade_asyliq   # (nbnd, nsizereg, ncoeff_ssa_g)
-    real(wp), dimension(:,:,:,:), allocatable :: pade_extice                 # (nbnd, nsizereg, ncoeff_ext, nrghice)
-    real(wp), dimension(:,:,:,:), allocatable :: pade_ssaice, pade_asyice    # (nbnd, nsizereg, ncoeff_ssa_g, nrghice)
+    real(FT), dimension(:,:,:  ), allocatable :: pade_extliq                 # (nbnd, nsizereg, ncoeff_ext)
+    real(FT), dimension(:,:,:  ), allocatable :: pade_ssaliq,  pade_asyliq   # (nbnd, nsizereg, ncoeff_ssa_g)
+    real(FT), dimension(:,:,:,:), allocatable :: pade_extice                 # (nbnd, nsizereg, ncoeff_ext, nrghice)
+    real(FT), dimension(:,:,:,:), allocatable :: pade_ssaice, pade_asyice    # (nbnd, nsizereg, ncoeff_ssa_g, nrghice)
     # Particle size regimes for Pade formulations
-    real(wp), dimension(:), allocatable :: pade_sizreg_extliq, pade_sizreg_ssaliq, pade_sizreg_asyliq  # (nbound)
-    real(wp), dimension(:), allocatable :: pade_sizreg_extice, pade_sizreg_ssaice, pade_sizreg_asyice  # (nbound)
+    real(FT), dimension(:), allocatable :: pade_sizreg_extliq, pade_sizreg_ssaliq, pade_sizreg_asyliq  # (nbound)
+    real(FT), dimension(:), allocatable :: pade_sizreg_extice, pade_sizreg_ssaice, pade_sizreg_asyice  # (nbound)
     # -----
   contains
     generic,   public :: load  => load_lut, load_pade
@@ -89,15 +89,15 @@ contains
                     lut_extliq, lut_ssaliq, lut_asyliq, &
                     lut_extice, lut_ssaice, lut_asyice) result(error_msg)
     class(ty_cloud_optics),     intent(inout) :: this
-    real(wp), dimension(:,:),   intent(in   ) :: band_lims_wvn # Spectral discretization
+    real(FT), dimension(:,:),   intent(in   ) :: band_lims_wvn # Spectral discretization
     # Lookup table interpolation constants
     # Lower and upper bounds of the tables; also the constant for calculating interpolation indices for liquid
-    real(wp),                   intent(in   ) :: radliq_lwr, radliq_upr, radliq_fac
-    real(wp),                   intent(in   ) :: radice_lwr, radice_upr, radice_fac
+    real(FT),                   intent(in   ) :: radliq_lwr, radliq_upr, radliq_fac
+    real(FT),                   intent(in   ) :: radice_lwr, radice_upr, radice_fac
     # LUT coefficients
     # Extinction, single-scattering albedo, and asymmetry parameter for liquid and ice respectively
-    real(wp), dimension(:,:),   intent(in)    :: lut_extliq, lut_ssaliq, lut_asyliq
-    real(wp), dimension(:,:,:), intent(in)    :: lut_extice, lut_ssaice, lut_asyice
+    real(FT), dimension(:,:),   intent(in)    :: lut_extliq, lut_ssaliq, lut_asyliq
+    real(FT), dimension(:,:,:), intent(in)    :: lut_extice, lut_ssaice, lut_asyice
     character(len=128)    :: error_msg
     # -------
     #
@@ -133,8 +133,8 @@ contains
 
     this%liq_nsteps = nsize_liq
     this%ice_nsteps = nsize_ice
-    this%liq_step_size = (radliq_upr - radliq_lwr)/real(nsize_liq-1,wp)
-    this%ice_step_size = (radice_upr - radice_lwr)/real(nsize_ice-1,wp)
+    this%liq_step_size = (radliq_upr - radliq_lwr)/real(nsize_liq-1,FT)
+    this%ice_step_size = (radice_upr - radice_lwr)/real(nsize_ice-1,FT)
     # Allocate LUT coefficients
     allocate(this%lut_extliq(nsize_liq, nbnd), &
              this%lut_ssaliq(nsize_liq, nbnd), &
@@ -169,18 +169,18 @@ contains
                      pade_sizreg_extice, pade_sizreg_ssaice, pade_sizreg_asyice) &
                      result(error_msg)
     class(ty_cloud_optics),       intent(inout) :: this          # cloud specification data
-    real(wp), dimension(:,:),     intent(in   ) :: band_lims_wvn # Spectral discretization
+    real(FT), dimension(:,:),     intent(in   ) :: band_lims_wvn # Spectral discretization
     #
     # Pade coefficients: extinction, single-scattering albedo, and asymmetry factor for liquid and ice
     #
-    real(wp), dimension(:,:,:),   intent(in)    :: pade_extliq, pade_ssaliq, pade_asyliq
-    real(wp), dimension(:,:,:,:), intent(in)    :: pade_extice, pade_ssaice, pade_asyice
+    real(FT), dimension(:,:,:),   intent(in)    :: pade_extliq, pade_ssaliq, pade_asyliq
+    real(FT), dimension(:,:,:,:), intent(in)    :: pade_extice, pade_ssaice, pade_asyice
     #
     # Boundaries of size regimes. Liquid and ice are separate;
     #   extinction is fit to different numbers of size bins than single-scattering albedo and asymmetry factor
     #
-    real(wp),  dimension(:),       intent(in)    :: pade_sizreg_extliq, pade_sizreg_ssaliq, pade_sizreg_asyliq
-    real(wp),  dimension(:),       intent(in)    :: pade_sizreg_extice, pade_sizreg_ssaice, pade_sizreg_asyice
+    real(FT),  dimension(:),       intent(in)    :: pade_sizreg_extliq, pade_sizreg_ssaliq, pade_sizreg_asyliq
+    real(FT),  dimension(:),       intent(in)    :: pade_sizreg_extice, pade_sizreg_ssaice, pade_sizreg_asyice
     character(len=128)    :: error_msg
 
 # ------- Local -------
@@ -322,7 +322,7 @@ contains
     integer,  intent(in   ) :: nrghice              # number of ice roughness categories
     logical,  intent(in   ) :: liqmsk(ncol,nlay), & # Cloud mask for liquid and ice clouds respectively
                                icemsk(ncol,nlay)
-    real(wp), intent(in   ) :: ciwp  (ncol,nlay), &     # cloud ice water path
+    real(FT), intent(in   ) :: ciwp  (ncol,nlay), &     # cloud ice water path
                                clwp  (ncol,nlay), &     # cloud liquid water path
                                reice (ncol,nlay), &      # cloud ice particle effective size (microns)
                                reliq (ncol,nlay)      # cloud liquid particle effective radius (microns)
@@ -484,28 +484,28 @@ contains
   #-----------------------------------------------
   function get_min_radius_liq(this) result(r)
     class(ty_cloud_optics), intent(in   ) :: this
-    real(wp)                              :: r
+    real(FT)                              :: r
 
     r = this%radliq_lwr
   end function get_min_radius_liq
   #-----------------------------------------------
   function get_max_radius_liq(this) result(r)
     class(ty_cloud_optics), intent(in   ) :: this
-    real(wp)                              :: r
+    real(FT)                              :: r
 
     r = this%radliq_upr
   end function get_max_radius_liq
   #-----------------------------------------------
   function get_min_radius_ice(this) result(r)
     class(ty_cloud_optics), intent(in   ) :: this
-    real(wp)                              :: r
+    real(FT)                              :: r
 
     r = this%radice_lwr
   end function get_min_radius_ice
   #-----------------------------------------------
   function get_max_radius_ice(this) result(r)
     class(ty_cloud_optics), intent(in   ) :: this
-    real(wp)                              :: r
+    real(FT)                              :: r
 
     r = this%radice_upr
   end function get_max_radius_ice
@@ -523,14 +523,14 @@ contains
   function compute_from_table(ncol, nlay, nbnd, mask, size, nsteps, step_size, offset, table)
     integer,                          intent(in) :: ncol, nlay, nbnd, nsteps
     logical,  dimension(ncol,  nlay), intent(in) :: mask
-    real(wp), dimension(ncol,  nlay), intent(in) :: size
-    real(wp),                         intent(in) :: step_size, offset
-    real(wp), dimension(nsteps,nbnd), intent(in) :: table
-    real(wp), dimension(ncol,nlay,nbnd)          :: compute_from_table
+    real(FT), dimension(ncol,  nlay), intent(in) :: size
+    real(FT),                         intent(in) :: step_size, offset
+    real(FT), dimension(nsteps,nbnd), intent(in) :: table
+    real(FT), dimension(ncol,nlay,nbnd)          :: compute_from_table
     # ---------------------------
     integer  :: icol, ilay, ibnd
     integer  :: index
-    real(wp) :: fint
+    real(FT) :: fint
     # ---------------------------
     do ilay = 1,nlay
       do icol = 1, ncol
@@ -557,12 +557,12 @@ contains
   function compute_from_pade(ncol, nlay, nbnd, mask, size, nsizes, size_bounds, m, n, pade_coeffs)
     integer,                        intent(in) :: ncol, nlay, nbnd, nsizes
     logical,  dimension(ncol,nlay), intent(in) :: mask
-    real(wp), dimension(ncol,nlay), intent(in) :: size
-    real(wp), dimension(nsizes+1),  intent(in) :: size_bounds
+    real(FT), dimension(ncol,nlay), intent(in) :: size
+    real(FT), dimension(nsizes+1),  intent(in) :: size_bounds
     integer,                        intent(in) :: m, n
-    real(wp), dimension(nbnd,nsizes,0:m+n), &
+    real(FT), dimension(nbnd,nsizes,0:m+n), &
                                     intent(in) :: pade_coeffs
-    real(wp), dimension(ncol,nlay,nbnd)        :: compute_from_pade
+    real(FT), dimension(ncol,nlay,nbnd)        :: compute_from_pade
     # ---------------------------
     integer  :: icol, ilay, ibnd, irad
 
@@ -592,13 +592,13 @@ contains
   #
   function pade_eval(nbnd, nrads, m, n, irad, re, pade_coeffs)
     integer,                intent(in) :: nbnd, nrads, m, n, irad
-    real(wp), dimension(nbnd, nrads, 0:m+n), &
+    real(FT), dimension(nbnd, nrads, 0:m+n), &
                             intent(in) :: pade_coeffs
-    real(wp),               intent(in) :: re
-    real(wp), dimension(nbnd)         :: pade_eval
+    real(FT),               intent(in) :: re
+    real(FT), dimension(nbnd)         :: pade_eval
 
     integer :: iband
-    real(wp) :: numer, denom
+    real(FT) :: numer, denom
     integer  :: i
 
     do iband = 1, nbnd

@@ -44,7 +44,7 @@ program rrtmgp_rfmip_lw
   #
   # Working precision for real variables
   #
-  use mo_rte_kind,           only: wp
+  use mo_rte_kind,           only: FT
   #
   # Optical properties of the atmosphere as array of values
   #   In the longwave we include only absorption optical depth (_1scl)
@@ -103,10 +103,10 @@ program rrtmgp_rfmip_lw
 
   character(len=32 ), &
             dimension(:),             allocatable :: kdist_gas_names, rfmip_gas_games
-  real(wp), dimension(:,:,:),         allocatable :: p_lay, p_lev, t_lay, t_lev # block_size, nlay, nblocks
-  real(wp), dimension(:,:,:), target, allocatable :: flux_up, flux_dn
-  real(wp), dimension(:,:  ),         allocatable :: sfc_emis, sfc_t  # block_size, nblocks (emissivity is spectrally constant)
-  real(wp), dimension(:,:  ),         allocatable :: sfc_emis_spec    # nbands, block_size (spectrally-resolved emissivity)
+  real(FT), dimension(:,:,:),         allocatable :: p_lay, p_lev, t_lay, t_lev # block_size, nlay, nblocks
+  real(FT), dimension(:,:,:), target, allocatable :: flux_up, flux_dn
+  real(FT), dimension(:,:  ),         allocatable :: sfc_emis, sfc_t  # block_size, nblocks (emissivity is spectrally constant)
+  real(FT), dimension(:,:  ),         allocatable :: sfc_emis_spec    # nbands, block_size (spectrally-resolved emissivity)
 
   #
   # Classes used by rte+rrtmgp

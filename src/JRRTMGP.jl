@@ -7,6 +7,8 @@ include(joinpath("rte","kernels","mo_rte_solver_kernels.jl"))
 include(joinpath("rte","mo_optical_props.jl"))
 include(joinpath("rte","mo_fluxes.jl"))
 include(joinpath("rte","mo_source_functions.jl"))
+include(joinpath("extensions","mo_fluxes_byband_kernels.jl"))
+# include(joinpath("extensions","mo_fluxes_byband.jl"))
 include(joinpath("rte","mo_rte_sw.jl"))
 
 include(joinpath("rrtmgp","mo_util_string.jl"))

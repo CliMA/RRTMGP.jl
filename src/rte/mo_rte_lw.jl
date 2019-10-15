@@ -34,7 +34,7 @@
 #
 # -------------------------------------------------------------------------------------------------
 module mo_rte_lw
-  use mo_rte_kind,      only: wp, wl
+  use mo_rte_kind,      only: FT, wl
   use mo_util_array,    only: any_vals_less_than, any_vals_outside
   use mo_optical_props, only: ty_optical_props, &
                               ty_optical_props_arry, ty_optical_props_1scl, ty_optical_props_2str, ty_optical_props_nstr
@@ -63,10 +63,10 @@ contains
     logical,                      intent(in   ) :: top_at_1          # Is the top of the domain at index 1?
                                                                      # (if not, ordering is bottom-to-top)
     type(ty_source_func_lw),      intent(in   ) :: sources
-    real(wp), dimension(:,:),     intent(in   ) :: sfc_emis    # emissivity at surface [] (nband, ncol)
+    real(FT), dimension(:,:),     intent(in   ) :: sfc_emis    # emissivity at surface [] (nband, ncol)
     class(ty_fluxes),             intent(inout) :: fluxes      # Array of ty_fluxes. Default computes broadband fluxes at all levels
                                                                #   if output arrays are defined. Can be extended per user desires.
-    real(wp), dimension(:,:),   &
+    real(FT), dimension(:,:),   &
               target, optional, intent(in   ) :: inc_flux    # incident flux at domain top [W/m2] (ncol, ngpts)
     integer,          optional, intent(in   ) :: n_gauss_angles # Number of angles used in Gaussian quadrature
                                                                 # (no-scattering solution)
@@ -78,8 +78,8 @@ contains
     integer :: ncol, nlay, ngpt, nband
     integer :: n_quad_angs
     integer :: icol, iband, igpt
-    real(wp), dimension(:,:,:), allocatable :: gpt_flux_up, gpt_flux_dn
-    real(wp), dimension(:,:),   allocatable :: sfc_emis_gpt
+    real(FT), dimension(:,:,:), allocatable :: gpt_flux_up, gpt_flux_dn
+    real(FT), dimension(:,:),   allocatable :: sfc_emis_gpt
     # --------------------------------------------------
     #
     # Weights and angle secants for first order (k=1) Gaussian quadrature.
@@ -87,7 +87,7 @@ contains
     #   after Abramowitz & Stegun 1972, page 921
     #
     integer,  parameter :: max_gauss_pts = 4
-    real(wp), parameter,                         &
+    real(FT), parameter,                         &
       dimension(max_gauss_pts, max_gauss_pts) :: &
         gauss_Ds  = RESHAPE([1.66_wp,               0._wp,         0._wp,         0._wp, &  # Diffusivity angle, not Gaussian angle
                              1.18350343_wp, 2.81649655_wp,         0._wp,         0._wp, &
@@ -248,8 +248,8 @@ contains
   #
   subroutine expand_and_transpose(ops,arr_in,arr_out)
     class(ty_optical_props),  intent(in ) :: ops
-    real(wp), dimension(:,:), intent(in ) :: arr_in  # (nband, ncol)
-    real(wp), dimension(:,:), intent(out) :: arr_out # (ncol, igpt)
+    real(FT), dimension(:,:), intent(in ) :: arr_in  # (nband, ncol)
+    real(FT), dimension(:,:), intent(out) :: arr_out # (ncol, igpt)
     # -------------
     integer :: ncol, nband, ngpt
     integer :: icol, iband, igpt

@@ -43,10 +43,10 @@
 #        extract_subset_dim2_4d,
 #        extract_subset_absorption_tau
 
-ε_machine(DT) = 3*eps(DT)
+ε_machine(FT) = 3*eps(FT)
 
 #  use, intrinsic :: iso_c_binding
-#  use mo_rte_kind, only: DT, wl
+#  use mo_rte_kind, only: FT, wl
 #  implicit none
 
 #  public
@@ -59,7 +59,7 @@
 #    module procedure extract_subset_absorption_tau
 #  end interface extract_subset
 
-#  real(DT), parameter, private :: eps = 3.0_DT*tiny(1.0_DT)
+#  real(FT), parameter, private :: eps = 3.0_DT*tiny(1.0_DT)
 #contains
   # -------------------------------------------------------------------------------------------------
   #
@@ -69,23 +69,23 @@
   # Delta-scale two-stream optical properties
   #   user-provided value of f (forward scattering)
   #
-  function delta_scale_2str_kernel!(op::ty_optical_props{DT}, f) where DT
+  function delta_scale_2str_kernel!(op::ty_optical_props{FT}, f) where FT
 #      bind(C, name="delta_scale_2str_f_k")
 #    integer,                               intent(in   ) :: ncol, nlay, ngpt
-#    real(DT), dimension(ncol, nlay, ngpt), intent(inout) ::  tau, ssa, g
-#    real(DT), dimension(ncol, nlay, ngpt), intent(in   ) ::  f
+#    real(FT), dimension(ncol, nlay, ngpt), intent(inout) ::  tau, ssa, g
+#    real(FT), dimension(ncol, nlay, ngpt), intent(in   ) ::  f
 
-#    real(DT) :: wf
+#    real(FT) :: wf
 #    integer  :: icol, ilay, igpt
 
     for igpt = 1:get_ngpt(op)
       for ilay = 1:get_nlay(op)
         for icol = 1:get_ncol(op)
           wf = op.ssa[icol,ilay,igpt] * f[icol,ilay,igpt]
-          op.tau[icol,ilay,igpt] = (DT(1) - wf) * op.tau[icol,ilay,igpt]
-          op.ssa[icol,ilay,igpt] = (op.ssa[icol,ilay,igpt] - wf) /  max(ε_machine(DT),(DT(1) - wf))
+          op.tau[icol,ilay,igpt] = (FT(1) - wf) * op.tau[icol,ilay,igpt]
+          op.ssa[icol,ilay,igpt] = (op.ssa[icol,ilay,igpt] - wf) /  max(ε_machine(FT),(FT(1) - wf))
           op.g[icol,ilay,igpt] = (g[icol,ilay,igpt] - f[icol,ilay,igpt]) /
-                                        max(ε_machine(DT),(DT(1) - f[icol,ilay,igpt]))
+                                        max(ε_machine(FT),(FT(1) - f[icol,ilay,igpt]))
         end
       end
     end
@@ -95,12 +95,12 @@
   # Delta-scale
   #   f = g*g
   #
-  function delta_scale_2str_kernel!(op::ty_optical_props{DT}) where DT
+  function delta_scale_2str_kernel!(op::ty_optical_props{FT}) where FT
 #      bind(C, name="delta_scale_2str_k")
 #    integer,                               intent(in   ) :: ncol, nlay, ngpt
-#    real(DT), dimension(ncol, nlay, ngpt), intent(inout) ::  tau, ssa, g
+#    real(FT), dimension(ncol, nlay, ngpt), intent(inout) ::  tau, ssa, g
 
-#    real(DT) :: f, wf
+#    real(FT) :: f, wf
 #    integer  :: icol, ilay, igpt
 
     for igpt = 1:get_ngpt(op)
@@ -108,9 +108,9 @@
         for icol = 1:get_ncol(op)
           f  = op.g[icol,ilay,igpt] * op.g[icol,ilay,igpt]
           wf = op.ssa[icol,ilay,igpt] * f
-          op.tau[icol,ilay,igpt] = (DT(1) - wf) * op.tau[icol,ilay,igpt]
-          op.ssa[icol,ilay,igpt] = (op.ssa[icol,ilay,igpt] - wf) /  max(ε_machine(DT),(DT(1) - wf))
-          op.g[icol,ilay,igpt] = (op.g[icol,ilay,igpt] -  f) /  max(ε_machine(DT),(DT(1) -  f))
+          op.tau[icol,ilay,igpt] = (FT(1) - wf) * op.tau[icol,ilay,igpt]
+          op.ssa[icol,ilay,igpt] = (op.ssa[icol,ilay,igpt] - wf) /  max(ε_machine(FT),(FT(1) - wf))
+          op.g[icol,ilay,igpt] = (op.g[icol,ilay,igpt] -  f) /  max(ε_machine(FT),(FT(1) -  f))
         end
       end
     end
@@ -132,11 +132,11 @@
   #   resolution (adding properties defined by band to those defined by g-point)
   #
   # -------------------------------------------------------------------------------------------------
-  function increment_by_gpoint!(op_1::ty_optical_props_1scl{DT}, op_2::ty_optical_props_1scl{DT}) where DT
+  function increment_by_gpoint!(op_1::ty_optical_props_1scl{FT}, op_2::ty_optical_props_1scl{FT}) where FT
   # bind(C, name="increment_1scalar_by_1scalar")
 #    integer,                              intent(in  ) :: ncol, nlay, ngpt
-#    real(DT), dimension(ncol,nlay,ngpt), intent(inout) :: op_1.tau
-#    real(DT), dimension(ncol,nlay,ngpt), intent(in   ) :: op_2.tau
+#    real(FT), dimension(ncol,nlay,ngpt), intent(inout) :: op_1.tau
+#    real(FT), dimension(ncol,nlay,ngpt), intent(in   ) :: op_2.tau
 
 #    integer  :: icol, ilay, igpt
 
@@ -144,30 +144,30 @@
   end
   # ---------------------------------
   # increment 1scalar by 2stream
-  function increment_by_gpoint!(op_1::ty_optical_props_1scl{DT}, op_2::ty_optical_props_2str{DT}) where DT
-    op_1.tau .= op_1.tau .+ op_2.tau .* ( DT(1) .- op_2.ssa[icol,ilay,igpt])
+  function increment_by_gpoint!(op_1::ty_optical_props_1scl{FT}, op_2::ty_optical_props_2str{FT}) where FT
+    op_1.tau .= op_1.tau .+ op_2.tau .* ( FT(1) .- op_2.ssa[icol,ilay,igpt])
   end
   # ---------------------------------
   # increment 1scalar by nstream
-  function increment_by_gpoint!(op_1::ty_optical_props_1scl{DT}, op_2::ty_optical_props_nstr{DT}) where DT
+  function increment_by_gpoint!(op_1::ty_optical_props_1scl{FT}, op_2::ty_optical_props_nstr{FT}) where FT
 #    integer,                             intent(in   ) :: ncol, nlay, ngpt
-#    real(DT), dimension(ncol,nlay,ngpt), intent(inout) :: op_1.tau
-#    real(DT), dimension(ncol,nlay,ngpt), intent(in   ) :: op_2.tau, op_2.ssa
+#    real(FT), dimension(ncol,nlay,ngpt), intent(inout) :: op_1.tau
+#    real(FT), dimension(ncol,nlay,ngpt), intent(in   ) :: op_2.tau, op_2.ssa
 
 #    integer  :: icol, ilay, igpt
 
-    op_1.tau = op_1.tau .+ op_2.tau * ( DT(1) - op_2.ssa)
+    op_1.tau = op_1.tau .+ op_2.tau * ( FT(1) - op_2.ssa)
   end
   # ---------------------------------
   # ---------------------------------
   # increment 2stream by 1scalar
-  function increment_by_gpoint!(op_1::ty_optical_props_2str{DT}, op_2::ty_optical_props_1scl{DT}) where DT
+  function increment_by_gpoint!(op_1::ty_optical_props_2str{FT}, op_2::ty_optical_props_1scl{FT}) where FT
 #    integer,                             intent(in   ) :: ncol, nlay, ngpt
-#    real(DT), dimension(ncol,nlay,ngpt), intent(inout) :: op_1.tau, op_1.ssa
-#    real(DT), dimension(ncol,nlay,ngpt), intent(in   ) :: op_2.tau
+#    real(FT), dimension(ncol,nlay,ngpt), intent(inout) :: op_1.tau, op_1.ssa
+#    real(FT), dimension(ncol,nlay,ngpt), intent(in   ) :: op_2.tau
 
 #    integer  :: icol, ilay, igpt
-#    real(DT) :: tau12
+#    real(FT) :: tau12
 
     ngpt = get_ngpt(op_io)
     nlay = get_nlay(op_io)
@@ -177,7 +177,7 @@
       for ilay = 1:nlay
         for icol = 1:ncol
           tau12 = op_1.tau[icol,ilay,igpt] + op_2.tau[icol,ilay,igpt]
-          op_1.ssa[icol,ilay,igpt] = op_1.tau[icol,ilay,igpt] * op_1.ssa[icol,ilay,igpt] / max(ε_machine(DT),tau12)
+          op_1.ssa[icol,ilay,igpt] = op_1.tau[icol,ilay,igpt] * op_1.ssa[icol,ilay,igpt] / max(ε_machine(FT),tau12)
           op_1.tau[icol,ilay,igpt] = tau12
           # g is unchanged
         end
@@ -186,13 +186,13 @@
   end
   # ---------------------------------
   # increment 2stream by 2stream
-  function increment_by_gpoint!(op_1::ty_optical_props_2str{DT}, op_2::ty_optical_props_2str{DT}) where DT
+  function increment_by_gpoint!(op_1::ty_optical_props_2str{FT}, op_2::ty_optical_props_2str{FT}) where FT
 #    integer,                              intent(in   ) :: ncol, nlay, ngpt
-#    real(DT), dimension(ncol,nlay,ngpt), intent(inout) :: op_1.tau, op_1.ssa, op_1.g
-#    real(DT), dimension(ncol,nlay,ngpt), intent(in   ) :: op_2.tau, op_2.ssa, op_2.g
+#    real(FT), dimension(ncol,nlay,ngpt), intent(inout) :: op_1.tau, op_1.ssa, op_1.g
+#    real(FT), dimension(ncol,nlay,ngpt), intent(in   ) :: op_2.tau, op_2.ssa, op_2.g
 
 #    integer :: icol, ilay, igpt
-#    real(DT) :: tau12, tauscat12
+#    real(FT) :: tau12, tauscat12
 
     ngpt = get_ngpt(op_io)
     nlay = get_nlay(op_io)
@@ -208,8 +208,8 @@
                       op_2.tau[icol,ilay,igpt] * op_2.ssa[icol,ilay,igpt]
           op_1.g[icol,ilay,igpt] =
             (op_1.tau[icol,ilay,igpt] * op_1.ssa[icol,ilay,igpt] * op_1.g[icol,ilay,igpt] +
-             op_2.tau[icol,ilay,igpt] * op_2.ssa[icol,ilay,igpt] * op_2.g[icol,ilay,igpt]) / max(ε_machine(DT),tauscat12)
-          op_1.ssa[icol,ilay,igpt] = tauscat12 / max(ε_machine(DT),tau12)
+             op_2.tau[icol,ilay,igpt] * op_2.ssa[icol,ilay,igpt] * op_2.g[icol,ilay,igpt]) / max(ε_machine(FT),tauscat12)
+          op_1.ssa[icol,ilay,igpt] = tauscat12 / max(ε_machine(FT),tau12)
           op_1.tau[icol,ilay,igpt] = tau12
         end
       end
@@ -217,15 +217,15 @@
   end
   # ---------------------------------
   # increment 2stream by nstream
-  function increment_by_gpoint!(op_1::ty_optical_props_2str{DT}, op_2::ty_optical_props_nstr{DT}) where DT
+  function increment_by_gpoint!(op_1::ty_optical_props_2str{FT}, op_2::ty_optical_props_nstr{FT}) where FT
 #    integer,                              intent(in   ) :: ncol, nlay, ngpt, nmom2
-#    real(DT), dimension(ncol,nlay,ngpt), intent(inout) :: op_1.tau, op_1.ssa, op_1.g
-#    real(DT), dimension(ncol,nlay,ngpt), intent(in   ) :: op_2.tau, op_2.ssa
-#    real(DT), dimension(nmom2,
+#    real(FT), dimension(ncol,nlay,ngpt), intent(inout) :: op_1.tau, op_1.ssa, op_1.g
+#    real(FT), dimension(ncol,nlay,ngpt), intent(in   ) :: op_2.tau, op_2.ssa
+#    real(FT), dimension(nmom2,
 #                        ncol,nlay,ngpt), intent(in   ) :: op_2.p
 
 #    integer  :: icol, ilay, igpt
-#    real(DT) :: tau12, tauscat12
+#    real(FT) :: tau12, tauscat12
 
     ngpt = get_ngpt(op_io)
     nlay = get_nlay(op_io)
@@ -242,8 +242,8 @@
              op_2.tau[icol,ilay,igpt] * op_2.ssa[icol,ilay,igpt]
           op_1.g[icol,ilay,igpt] =
             (op_1.tau[icol,ilay,igpt] * op_1.ssa[icol,ilay,igpt] * op_1.g[   icol,ilay,igpt]+
-             op_2.tau[icol,ilay,igpt] * op_2.ssa[icol,ilay,igpt] * op_2.p[1, icol,ilay,igpt]) / max(ε_machine(DT),tauscat12)
-          op_1.ssa[icol,ilay,igpt] = tauscat12 / max(ε_machine(DT),tau12)
+             op_2.tau[icol,ilay,igpt] * op_2.ssa[icol,ilay,igpt] * op_2.p[1, icol,ilay,igpt]) / max(ε_machine(FT),tauscat12)
+          op_1.ssa[icol,ilay,igpt] = tauscat12 / max(ε_machine(FT),tau12)
           op_1.tau[icol,ilay,igpt] = tau12
         end
       end
@@ -252,13 +252,13 @@
   # ---------------------------------
   # ---------------------------------
   # increment nstream by 1scalar
-  function increment_by_gpoint!(op_1::ty_optical_props_nstr{DT}, op_2::ty_optical_props_1scl{DT}) where DT
+  function increment_by_gpoint!(op_1::ty_optical_props_nstr{FT}, op_2::ty_optical_props_1scl{FT}) where FT
 #    integer,                              intent(in   ) :: ncol, nlay, ngpt
-#    real(DT), dimension(ncol,nlay,ngpt), intent(inout) :: op_1.tau, op_1.ssa
-#    real(DT), dimension(ncol,nlay,ngpt), intent(in   ) :: op_2.tau
+#    real(FT), dimension(ncol,nlay,ngpt), intent(inout) :: op_1.tau, op_1.ssa
+#    real(FT), dimension(ncol,nlay,ngpt), intent(in   ) :: op_2.tau
 
 #    integer  :: icol, ilay, igpt
-#    real(DT) :: tau12
+#    real(FT) :: tau12
 
     ngpt = get_ngpt(op_io)
     nlay = get_nlay(op_io)
@@ -268,7 +268,7 @@
       for ilay = 1:nlay
         for icol = 1:ncol
           tau12 = op_1.tau[icol,ilay,igpt] + op_2.tau[icol,ilay,igpt]
-          op_1.ssa[icol,ilay,igpt] = op_1.tau[icol,ilay,igpt] * op_1.ssa[icol,ilay,igpt] / max(ε_machine(DT),tau12)
+          op_1.ssa[icol,ilay,igpt] = op_1.tau[icol,ilay,igpt] * op_1.ssa[icol,ilay,igpt] / max(ε_machine(FT),tau12)
           op_1.tau[icol,ilay,igpt] = tau12
           # p is unchanged
         end
@@ -277,16 +277,16 @@
   end
   # ---------------------------------
   # increment nstream by 2stream
-  function increment_by_gpoint!(op_1::ty_optical_props_nstr{DT}, op_2::ty_optical_props_2str{DT}) where DT
+  function increment_by_gpoint!(op_1::ty_optical_props_nstr{FT}, op_2::ty_optical_props_2str{FT}) where FT
 #    integer,                              intent(in   ) :: ncol, nlay, ngpt, nmom1
-#    real(DT), dimension(ncol,nlay,ngpt), intent(inout) :: op_1.tau, op_1.ssa
-#    real(DT), dimension(nmom1,
+#    real(FT), dimension(ncol,nlay,ngpt), intent(inout) :: op_1.tau, op_1.ssa
+#    real(FT), dimension(nmom1,
 #                        ncol,nlay,ngpt), intent(inout) :: op_1.p
-#    real(DT), dimension(ncol,nlay,ngpt), intent(in   ) :: op_2.tau, op_2.ssa, op_2.g
+#    real(FT), dimension(ncol,nlay,ngpt), intent(in   ) :: op_2.tau, op_2.ssa, op_2.g
 
 #    integer  :: icol, ilay, igpt
-#    real(DT) :: tau12, tauscat12
-#    real(DT), dimension(nmom1) :: temp_moms # TK
+#    real(FT) :: tau12, tauscat12
+#    real(FT), dimension(nmom1) :: temp_moms # TK
 #    integer  :: imom  #TK
 
     ngpt = get_ngpt(op_io)
@@ -309,8 +309,8 @@
           end
           op_1.p[1:nmom1, icol,ilay,igpt] =
               (op_1.tau[icol,ilay,igpt] * op_1.ssa[icol,ilay,igpt] * op_1.p[1:nmom1, icol,ilay,igpt] +
-               op_2.tau[icol,ilay,igpt] * op_2.ssa[icol,ilay,igpt] * temp_moms[1:nmom1]  ) / max(ε_machine(DT),tauscat12)
-          op_1.ssa[icol,ilay,igpt] = tauscat12 / max(ε_machine(DT),tau12)
+               op_2.tau[icol,ilay,igpt] * op_2.ssa[icol,ilay,igpt] * temp_moms[1:nmom1]  ) / max(ε_machine(FT),tauscat12)
+          op_1.ssa[icol,ilay,igpt] = tauscat12 / max(ε_machine(FT),tau12)
           op_1.tau[icol,ilay,igpt] = tau12
         end
       end
@@ -318,17 +318,17 @@
   end
   # ---------------------------------
   # increment nstream by nstream
-  function increment_by_gpoint!(op_1::ty_optical_props_nstr{DT}, op_2::ty_optical_props_nstr{DT}) where DT
+  function increment_by_gpoint!(op_1::ty_optical_props_nstr{FT}, op_2::ty_optical_props_nstr{FT}) where FT
 #    integer,                              intent(in   ) :: ncol, nlay, ngpt, nmom1, nmom2
-#    real(DT), dimension(ncol,nlay,ngpt), intent(inout) :: op_1.tau, op_1.ssa
-#    real(DT), dimension(nmom1,
+#    real(FT), dimension(ncol,nlay,ngpt), intent(inout) :: op_1.tau, op_1.ssa
+#    real(FT), dimension(nmom1,
 #                        ncol,nlay,ngpt), intent(inout) :: op_1.p
-#    real(DT), dimension(ncol,nlay,ngpt), intent(in   ) :: op_2.tau, op_2.ssa
-#    real(DT), dimension(nmom2,
+#    real(FT), dimension(ncol,nlay,ngpt), intent(in   ) :: op_2.tau, op_2.ssa
+#    real(FT), dimension(nmom2,
 #                        ncol,nlay,ngpt), intent(in   ) :: op_2.p
 
 #    integer  :: icol, ilay, igpt, mom_lim
-#    real(DT) :: tau12, tauscat12
+#    real(FT) :: tau12, tauscat12
 
     ngpt = get_ngpt(op_io)
     nlay = get_nlay(op_io)
@@ -348,7 +348,7 @@
           #
           op_1.p[1:mom_lim, icol,ilay,igpt] =
               (op_1.tau[icol,ilay,igpt] * op_1.ssa[icol,ilay,igpt] * op_1.p[1:mom_lim, icol,ilay,igpt] +
-               op_2.tau[icol,ilay,igpt] * op_2.ssa[icol,ilay,igpt] * op_2.p[1:mom_lim, icol,ilay,igpt]) / max( ε_machine(DT),tauscat12)
+               op_2.tau[icol,ilay,igpt] * op_2.ssa[icol,ilay,igpt] * op_2.p[1:mom_lim, icol,ilay,igpt]) / max( ε_machine(FT),tauscat12)
           op_1.ssa[icol,ilay,igpt] = tauscat12 / max(eps,tau12)
           op_1.tau[icol,ilay,igpt] = tau12
         end
@@ -361,10 +361,10 @@
   #   (e.g. by band instead of by gpoint)
   #
   # -------------------------------------------------------------------------------------------------
-  function increment_bybnd!(op_1::ty_optical_props_1scl{DT}, op_2::ty_optical_props_1scl{DT}) where DT
+  function increment_bybnd!(op_1::ty_optical_props_1scl{FT}, op_2::ty_optical_props_1scl{FT}) where FT
 #    integer,                             intent(in   ) :: ncol, nlay, ngpt, nbnd
-#    real(DT), dimension(ncol,nlay,ngpt), intent(inout) :: tau1
-#    real(DT), dimension(ncol,nlay,nbnd), intent(in   ) :: tau2
+#    real(FT), dimension(ncol,nlay,ngpt), intent(inout) :: tau1
+#    real(FT), dimension(ncol,nlay,nbnd), intent(in   ) :: tau2
 #    integer,  dimension(2,nbnd),         intent(in   ) :: gpt_lims # Starting and ending gpoint for each band
 
 #    integer :: ibnd, igpt
@@ -380,10 +380,10 @@
   end
   # ---------------------------------
   # increment 1scalar by 2stream
-  function increment_bybnd!(op_1::ty_optical_props_1scl{DT}, op_2::ty_optical_props_2str{DT}) where DT
+  function increment_bybnd!(op_1::ty_optical_props_1scl{FT}, op_2::ty_optical_props_2str{FT}) where FT
 #    integer,                             intent(in   ) :: ncol, nlay, ngpt, nbnd
-#    real(DT), dimension(ncol,nlay,ngpt), intent(inout) :: tau1
-#    real(DT), dimension(ncol,nlay,nbnd), intent(in   ) :: tau2, ssa2
+#    real(FT), dimension(ncol,nlay,ngpt), intent(inout) :: tau1
+#    real(FT), dimension(ncol,nlay,nbnd), intent(in   ) :: tau2, ssa2
 #    integer,  dimension(2,nbnd),         intent(in   ) :: gpt_lims # Starting and ending gpoint for each band
 
 #    integer :: ibnd, igpt
@@ -396,16 +396,16 @@
 
     for ibnd = 1:nbnd
       for igpt = gpt_lims[1, ibnd]:gpt_lims[2, ibnd]
-        op_1.tau[:,:,igpt] .= op_1.tau[:,:,igpt] .+ op_2.tau[:,:,ibnd] .* ( DT(1) .- op_2.ssa[:,:,ibnd])
+        op_1.tau[:,:,igpt] .= op_1.tau[:,:,igpt] .+ op_2.tau[:,:,ibnd] .* ( FT(1) .- op_2.ssa[:,:,ibnd])
       end
     end
   end
   # ---------------------------------
   # increment 1scalar by nstream
-  function increment_bybnd!(op_1::ty_optical_props_1scl{DT}, op_2::ty_optical_props_nstr{DT}) where DT
+  function increment_bybnd!(op_1::ty_optical_props_1scl{FT}, op_2::ty_optical_props_nstr{FT}) where FT
 #    integer,                             intent(in   ) :: ncol, nlay, ngpt, nbnd
-#    real(DT), dimension(ncol,nlay,ngpt), intent(inout) :: tau1
-#    real(DT), dimension(ncol,nlay,nbnd), intent(in   ) :: tau2, ssa2
+#    real(FT), dimension(ncol,nlay,ngpt), intent(inout) :: tau1
+#    real(FT), dimension(ncol,nlay,nbnd), intent(in   ) :: tau2, ssa2
 #    integer,  dimension(2,nbnd),         intent(in   ) :: gpt_lims # Starting and ending gpoint for each band
 
 #    integer :: ibnd, igpt
@@ -418,21 +418,21 @@
 
     for ibnd = 1:nbnd
       for igpt = gpt_lims[1, ibnd]:gpt_lims[2, ibnd]
-        op_1.tau[:,:,igpt] .= op_1.tau[:,:,igpt] .+ op_2.tau[:,:,ibnd] .* ( DT(1) .- op_2.ssa[:,:,ibnd])
+        op_1.tau[:,:,igpt] .= op_1.tau[:,:,igpt] .+ op_2.tau[:,:,ibnd] .* ( FT(1) .- op_2.ssa[:,:,ibnd])
       end
     end
   end
 
     # ---------------------------------
   # increment 2stream by 1scalar
-  function increment_bybnd!(op_1::ty_optical_props_2str{DT}, op_2::ty_optical_props_1scl{DT}) where DT
+  function increment_bybnd!(op_1::ty_optical_props_2str{FT}, op_2::ty_optical_props_1scl{FT}) where FT
 #    integer,                             intent(in   ) :: ncol, nlay, ngpt, nbnd
-#    real(DT), dimension(ncol,nlay,ngpt), intent(inout) :: tau1, ssa1
-#    real(DT), dimension(ncol,nlay,nbnd), intent(in   ) :: tau2
+#    real(FT), dimension(ncol,nlay,ngpt), intent(inout) :: tau1, ssa1
+#    real(FT), dimension(ncol,nlay,nbnd), intent(in   ) :: tau2
 #    integer,  dimension(2,nbnd),         intent(in   ) :: gpt_lims # Starting and ending gpoint for each band
 
 #    integer  :: icol, ilay, igpt, ibnd
-#    real(DT) :: tau12
+#    real(FT) :: tau12
     ngpt = get_ngpt(op_io)
     nlay = get_nlay(op_io)
     ncol = get_ncol(op_io)
@@ -454,14 +454,14 @@
   end
   # ---------------------------------
   # increment 2stream by 2stream
-  function increment_bybnd!(op_1::ty_optical_props_2str{DT}, op_2::ty_optical_props_2str{DT}) where DT
+  function increment_bybnd!(op_1::ty_optical_props_2str{FT}, op_2::ty_optical_props_2str{FT}) where FT
 #    integer,                             intent(in   ) :: ncol, nlay, ngpt, nbnd
-#    real(DT), dimension(ncol,nlay,ngpt), intent(inout) :: tau1, ssa1, op_1.g
-#    real(DT), dimension(ncol,nlay,nbnd), intent(in   ) :: tau2, ssa2, op_2.g
+#    real(FT), dimension(ncol,nlay,ngpt), intent(inout) :: tau1, ssa1, op_1.g
+#    real(FT), dimension(ncol,nlay,nbnd), intent(in   ) :: tau2, ssa2, op_2.g
 #    integer,  dimension(2,nbnd),         intent(in   ) :: gpt_lims # Starting and ending gpoint for each band
 
 #    integer  :: icol, ilay, igpt, ibnd
-#    real(DT) :: tau12, tauscat12
+#    real(FT) :: tau12, tauscat12
 
     ngpt = get_ngpt(op_io)
     nlay = get_nlay(op_io)
@@ -481,8 +481,8 @@
                tau2[icol,ilay,ibnd] * ssa2[icol,ilay,ibnd]
             op_1.g[icol,ilay,igpt] =
               (tau1[icol,ilay,igpt] * ssa1[icol,ilay,igpt] * op_1.g[icol,ilay,igpt] +
-               tau2[icol,ilay,ibnd] * ssa2[icol,ilay,ibnd] * op_2.g[icol,ilay,ibnd]) / max(ε_machine(DT),tauscat12)
-            ssa1[icol,ilay,igpt] = tauscat12 / max(ε_machine(DT),tau12)
+               tau2[icol,ilay,ibnd] * ssa2[icol,ilay,ibnd] * op_2.g[icol,ilay,ibnd]) / max(ε_machine(FT),tauscat12)
+            ssa1[icol,ilay,igpt] = tauscat12 / max(ε_machine(FT),tau12)
             tau1[icol,ilay,igpt] = tau12
           end
         end
@@ -491,16 +491,16 @@
   end
   # ---------------------------------
   # increment 2stream by nstream
-  function increment_bybnd!(op_1::ty_optical_props_2str{DT}, op_2::ty_optical_props_nstr{DT}) where DT
+  function increment_bybnd!(op_1::ty_optical_props_2str{FT}, op_2::ty_optical_props_nstr{FT}) where FT
 #    integer,                             intent(in   ) :: ncol, nlay, ngpt, nmom2, nbnd
-#    real(DT), dimension(ncol,nlay,ngpt), intent(inout) :: op_1.tau, op_1.ssa, op_1.g
-#    real(DT), dimension(ncol,nlay,nbnd), intent(in   ) :: op_2.tau, op_2.ssa
-#    real(DT), dimension(nmom2,
+#    real(FT), dimension(ncol,nlay,ngpt), intent(inout) :: op_1.tau, op_1.ssa, op_1.g
+#    real(FT), dimension(ncol,nlay,nbnd), intent(in   ) :: op_2.tau, op_2.ssa
+#    real(FT), dimension(nmom2,
 #                        ncol,nlay,nbnd), intent(in   ) :: op_2.p
 #    integer,  dimension(2,nbnd),         intent(in   ) :: gpt_lims # Starting and ending gpoint for each band
 
 #    integer  :: icol, ilay, igpt, ibnd
-#    real(DT) :: tau12, tauscat12
+#    real(FT) :: tau12, tauscat12
 
     ngpt = get_ngpt(op_io)
     nlay = get_nlay(op_io)
@@ -520,8 +520,8 @@
                op_2.tau[icol,ilay,ibnd] * op_2.ssa[icol,ilay,ibnd]
             op_1.g[icol,ilay,igpt] =
               (op_1.tau[icol,ilay,igpt] * op_1.ssa[icol,ilay,igpt] * op_1.g[   icol,ilay,igpt]+
-               op_2.tau[icol,ilay,ibnd] * op_2.ssa[icol,ilay,ibnd] * op_2.p[1, icol,ilay,ibnd]) / max(ε_machine(DT),tauscat12)
-            op_1.ssa[icol,ilay,igpt] = tauscat12 / max(ε_machine(DT),tau12)
+               op_2.tau[icol,ilay,ibnd] * op_2.ssa[icol,ilay,ibnd] * op_2.p[1, icol,ilay,ibnd]) / max(ε_machine(FT),tauscat12)
+            op_1.ssa[icol,ilay,igpt] = tauscat12 / max(ε_machine(FT),tau12)
             op_1.tau[icol,ilay,igpt] = tau12
           end
         end
@@ -531,14 +531,14 @@
   # ---------------------------------
   # ---------------------------------
   # increment nstream by 1scalar
-  function increment_bybnd!(op_1::ty_optical_props_nstr{DT}, op_2::ty_optical_props_1scl{DT}) where DT
+  function increment_bybnd!(op_1::ty_optical_props_nstr{FT}, op_2::ty_optical_props_1scl{FT}) where FT
 #    integer,                             intent(in   ) :: ncol, nlay, ngpt, nbnd
-#    real(DT), dimension(ncol,nlay,ngpt), intent(inout) :: op_1.tau, op_1.ssa
-#    real(DT), dimension(ncol,nlay,nbnd), intent(in   ) :: op_2.tau
+#    real(FT), dimension(ncol,nlay,ngpt), intent(inout) :: op_1.tau, op_1.ssa
+#    real(FT), dimension(ncol,nlay,nbnd), intent(in   ) :: op_2.tau
 #    integer,  dimension(2,nbnd),         intent(in   ) :: gpt_lims # Starting and ending gpoint for each band
 
 #    integer  :: icol, ilay, igpt, ibnd
-#    real(DT) :: tau12
+#    real(FT) :: tau12
 
     ngpt = get_ngpt(op_io)
     nlay = get_nlay(op_io)
@@ -551,7 +551,7 @@
         for ilay = 1:nlay
           for icol = 1:ncol
             tau12 = op_1.tau[icol,ilay,igpt] + op_2.tau[icol,ilay,ibnd]
-            op_1.ssa[icol,ilay,igpt] = op_1.tau[icol,ilay,igpt] * op_1.ssa[icol,ilay,igpt] / max(ε_machine(DT),tau12)
+            op_1.ssa[icol,ilay,igpt] = op_1.tau[icol,ilay,igpt] * op_1.ssa[icol,ilay,igpt] / max(ε_machine(FT),tau12)
             op_1.tau[icol,ilay,igpt] = tau12
             # p is unchanged
           end
@@ -561,17 +561,17 @@
   end
   # ---------------------------------
   # increment nstream by 2stream
-  function increment_bybnd!(op_1::ty_optical_props_nstr{DT}, op_2::ty_optical_props_2str{DT}) where DT
+  function increment_bybnd!(op_1::ty_optical_props_nstr{FT}, op_2::ty_optical_props_2str{FT}) where FT
 #    integer,                             intent(in   ) :: ncol, nlay, ngpt, nmom1, nbnd
-#    real(DT), dimension(ncol,nlay,ngpt), intent(inout) :: op_1.tau, op_1.ssa
-#    real(DT), dimension(nmom1,
+#    real(FT), dimension(ncol,nlay,ngpt), intent(inout) :: op_1.tau, op_1.ssa
+#    real(FT), dimension(nmom1,
 #                        ncol,nlay,ngpt), intent(inout) :: op_1.p
-#    real(DT), dimension(ncol,nlay,nbnd), intent(in   ) :: op_2.tau, op_2.ssa, op_2.g
+#    real(FT), dimension(ncol,nlay,nbnd), intent(in   ) :: op_2.tau, op_2.ssa, op_2.g
 #    integer,  dimension(2,nbnd),         intent(in   ) :: gpt_lims # Starting and ending gpoint for each band
 
 #    integer  :: icol, ilay, igpt, ibnd
-#    real(DT) :: tau12, tauscat12
-#    real(DT), dimension(nmom1) :: temp_moms # TK
+#    real(FT) :: tau12, tauscat12
+#    real(FT), dimension(nmom1) :: temp_moms # TK
 #    integer  :: imom  #TK
 
     ngpt = get_ngpt(op_io)
@@ -597,8 +597,8 @@
             end
             op_1.p[1:nmom1, icol,ilay,igpt] =
                 (op_1.tau[icol,ilay,igpt] * op_1.ssa[icol,ilay,igpt] * op_1.p[1:nmom1, icol,ilay,igpt] +
-                 op_2.tau[icol,ilay,ibnd] * op_2.ssa[icol,ilay,ibnd] * temp_moms[1:nmom1]  ) / max(ε_machine(DT),tauscat12)
-            op_1.ssa[icol,ilay,igpt] = tauscat12 / max(ε_machine(DT),tau12)
+                 op_2.tau[icol,ilay,ibnd] * op_2.ssa[icol,ilay,ibnd] * temp_moms[1:nmom1]  ) / max(ε_machine(FT),tauscat12)
+            op_1.ssa[icol,ilay,igpt] = tauscat12 / max(ε_machine(FT),tau12)
             op_1.tau[icol,ilay,igpt] = tau12
           end
         end
@@ -607,18 +607,18 @@
   end
   # ---------------------------------
   # increment nstream by nstream
-  function increment_bybnd!(op_1::ty_optical_props_nstr{DT}, op_2::ty_optical_props_nstr{DT}) where DT
+  function increment_bybnd!(op_1::ty_optical_props_nstr{FT}, op_2::ty_optical_props_nstr{FT}) where FT
 #    integer,                             intent(in   ) :: ncol, nlay, ngpt, nmom1, nmom2, nbnd
-#    real(DT), dimension(ncol,nlay,ngpt), intent(inout) :: op_1.tau, op_1.ssa
-#    real(DT), dimension(nmom1,
+#    real(FT), dimension(ncol,nlay,ngpt), intent(inout) :: op_1.tau, op_1.ssa
+#    real(FT), dimension(nmom1,
 #                        ncol,nlay,ngpt), intent(inout) :: op_1.p
-#    real(DT), dimension(ncol,nlay,nbnd), intent(in   ) :: op_2.tau, op_2.ssa
-#    real(DT), dimension(nmom2,
+#    real(FT), dimension(ncol,nlay,nbnd), intent(in   ) :: op_2.tau, op_2.ssa
+#    real(FT), dimension(nmom2,
 #                        ncol,nlay,nbnd), intent(in   ) :: op_2.p
 #    integer,  dimension(2,nbnd),         intent(in   ) :: gpt_lims # Starting and ending gpoint for each band
 
 #    integer  :: icol, ilay, igpt, ibnd, mom_lim
-#    real(DT) :: tau12, tauscat12
+#    real(FT) :: tau12, tauscat12
 
     ngpt = get_ngpt(op_io)
     nlay = get_nlay(op_io)
@@ -641,7 +641,7 @@
             #
             op_1.p[1:mom_lim, icol,ilay,igpt] =
                 (op_1.tau[icol,ilay,igpt] * op_1.ssa[icol,ilay,igpt] * op_1.p[1:mom_lim, icol,ilay,igpt] +
-                 op_2.tau[icol,ilay,ibnd] * op_2.ssa[icol,ilay,ibnd] * op_2.p[1:mom_lim, icol,ilay,ibnd]) / max( ε_machine(DT),tauscat12)
+                 op_2.tau[icol,ilay,ibnd] * op_2.ssa[icol,ilay,ibnd] * op_2.p[1:mom_lim, icol,ilay,ibnd]) / max( ε_machine(FT),tauscat12)
             op_1.ssa[icol,ilay,igpt] = tauscat12 / max(eps,tau12)
             op_1.tau[icol,ilay,igpt] = tau12
           end
@@ -657,9 +657,9 @@
   function extract_subset_dim1_3d(ncol, nlay, ngpt, array_in, colS, colE, array_out)#
 #    bind (C, name="extract_subset_dim1_3d")
 #    integer,                             intent(in ) :: ncol, nlay, ngpt
-#    real(DT), dimension(ncol,nlay,ngpt), intent(in ) :: array_in
+#    real(FT), dimension(ncol,nlay,ngpt), intent(in ) :: array_in
 #    integer,                             intent(in ) :: colS, colE
-#    real(DT), dimension(colE-colS+1,
+#    real(FT), dimension(colE-colS+1,
 #                             nlay,ngpt), intent(out) :: array_out
 
 #    integer :: icol, ilay, igpt
@@ -676,9 +676,9 @@
   function extract_subset_dim2_4d(nmom, ncol, nlay, ngpt, array_in, colS, colE, array_out)#
 #    bind (C, name="extract_subset_dim2_4d")
 #    integer,                                  intent(in ) :: nmom, ncol, nlay, ngpt
-#    real(DT), dimension(nmom,ncol,nlay,ngpt), intent(in ) :: array_in
+#    real(FT), dimension(nmom,ncol,nlay,ngpt), intent(in ) :: array_in
 #    integer,                                  intent(in ) :: colS, colE
-#    real(DT), dimension(nmom,colE-colS+1,
+#    real(FT), dimension(nmom,colE-colS+1,
 #                                  nlay,ngpt), intent(out) :: array_out
 
 #    integer :: icol, ilay, igpt, imom
@@ -700,19 +700,19 @@
   #
   function extract_subset_absorption_tau(ncol, nlay, ngpt, tau_in, ssa_in, colS, colE, tau_out) # bind (C, name="extract_subset_absorption_tau")
 #    integer,                             intent(in ) :: ncol, nlay, ngpt
-#    real(DT), dimension(ncol,nlay,ngpt), intent(in ) :: tau_in, ssa_in
+#    real(FT), dimension(ncol,nlay,ngpt), intent(in ) :: tau_in, ssa_in
 #    integer,                             intent(in ) :: colS, colE
-#    real(DT), dimension(colE-colS+1,
+#    real(FT), dimension(colE-colS+1,
 #                             nlay,ngpt), intent(out) :: tau_out
 
 #    integer :: icol, ilay, igpt
 
-    DT = eltype(tau_in)
+    FT = eltype(tau_in)
 
     for igpt = 1:ngpt
       for ilay = 1:nlay
         for icol = colS:colE
-          tau_out[icol-colS+1, ilay, igpt] = tau_in[icol, ilay, igpt] * ( DT(1) - ssa_in[icol, ilay, igpt] )
+          tau_out[icol-colS+1, ilay, igpt] = tau_in[icol, ilay, igpt] * ( FT(1) - ssa_in[icol, ilay, igpt] )
         end
       end
     end
