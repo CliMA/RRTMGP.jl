@@ -84,7 +84,6 @@ module mo_load_coefficients
  #   !   on whether the radiation sources are internal to the atmosphere (longwave) or external (shortwave)
  #   ! gas_optics%load() returns a string; a non-empty string indicates an error.
 
- @show haskey(ds,"totplnk")
   if haskey(ds,"totplnk")
     totplnk     =      ds["totplnk"][:]
     planck_frac =      ds["plank_fraction"][:]

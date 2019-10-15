@@ -18,7 +18,7 @@
 
 module mo_fluxes_broadband_kernels
 
-export sum_broadband, net_broadband_full, net_broadband_precalc
+export sum_broadband, net_broadband
 
 #  use, intrinsic :: iso_c_binding
 #  use mo_rte_kind, only: FT
@@ -37,7 +37,7 @@ export sum_broadband, net_broadband_full, net_broadband_precalc
     #
     # Spectral reduction over all points
     #
-  function sum_broadband(ncol, nlev, ngpt, spectral_flux, broadband_flux) #bind(C, name="sum_broadband")
+  function sum_broadband(ncol, nlev, ngpt, spectral_flux::Array{FT}) where FT #bind(C, name="sum_broadband")
 #    integer,                               intent(in ) :: ncol, nlev, ngpt
 #    real(FT), dimension(ncol, nlev, ngpt), intent(in ) :: spectral_flux
 #    real(FT), dimension(ncol, nlev),       intent(out) :: broadband_flux
@@ -46,6 +46,8 @@ export sum_broadband, net_broadband_full, net_broadband_precalc
 
 #    #$acc enter data copyin(spectral_flux) create(broadband_flux)
 #    #$acc parallel loop collapse(2)
+
+    broadband_flux = Array{FT}(undef, ncol, nlev)
 
     for ilev = 1:nlev
       for icol = 1:ncol
@@ -62,6 +64,7 @@ export sum_broadband, net_broadband_full, net_broadband_precalc
         end
       end
     end
+    return broadband_flux
 
 #    #$acc exit data delete(spectral_flux) copyout(broadband_flux)
 
@@ -74,40 +77,42 @@ export sum_broadband, net_broadband_full, net_broadband_precalc
   #
   # Net flux: Spectral reduction over all points
   #
-  function net_broadband_full(ncol, nlev, ngpt, spectral_flux_dn, spectral_flux_up, broadband_flux_net) # &
+  function net_broadband(ncol, nlev, ngpt, spectral_flux_dn::Array{FT}, spectral_flux_up) where FT # &
 #    bind(C, name="net_broadband_full")
 #    integer,                               intent(in ) :: ncol, nlev, ngpt
 #    real(FT), dimension(ncol, nlev, ngpt), intent(in ) :: spectral_flux_dn, spectral_flux_up
 #    real(FT), dimension(ncol, nlev),       intent(out) :: broadband_flux_net
 
 #    integer  :: icol, ilev, igpt
-#    real(FT) :: diff
+#    real(FT) :: diff_
 
 #    #$acc enter data copyin(spectral_flux_dn, spectral_flux_up) create(broadband_flux_net)
 #    #$acc parallel loop collapse(2)
+    broadband_flux_net = Array{FT}(undef, ncol, nlev)
     for ilev = 1:nlev
       for icol = 1:ncol
-        diff = spectral_flux_dn[icol, ilev, 1   ] - spectral_flux_up[icol, ilev,     1]
-        broadband_flux_net[icol, ilev] = diff
+        diff_ = spectral_flux_dn[icol, ilev, 1   ] - spectral_flux_up[icol, ilev,     1]
+        broadband_flux_net[icol, ilev] = diff_
       end
     end
 #    #$acc parallel loop collapse(3)
     for igpt = 2:ngpt
       for ilev = 1:nlev
         for icol = 1:ncol
-          diff = spectral_flux_dn(icol, ilev, igpt) - spectral_flux_up(icol, ilev, igpt)
+          diff_ = spectral_flux_dn[icol, ilev, igpt] - spectral_flux_up[icol, ilev, igpt]
 #          #$acc atomic update
-          broadband_flux_net[icol, ilev] = broadband_flux_net[icol, ilev] + diff
+          broadband_flux_net[icol, ilev] = broadband_flux_net[icol, ilev] + diff_
         end
       end
     end
+    return broadband_flux_net
 #    #$acc exit data delete(spectral_flux_dn, spectral_flux_up) copyout(broadband_flux_net)
   end
   # ----------------------------------------------------------------------------
   #
   # Net flux when bradband flux up and down are already available
   #
-  function net_broadband_precalc(ncol, nlev, flux_dn, flux_up, broadband_flux_net) # &
+  function net_broadband(ncol, nlev, flux_dn, flux_up) # &
 #    bind(C, name="net_broadband_precalc")
 #    integer,                         intent(in ) :: ncol, nlev
 #    real(FT), dimension(ncol, nlev), intent(in ) :: flux_dn, flux_up
@@ -116,11 +121,12 @@ export sum_broadband, net_broadband_full, net_broadband_precalc
 #    integer  :: icol, ilev
 #    #$acc enter data copyin(flux_dn, flux_up) create(broadband_flux_net)
 #    #$acc parallel loop collapse(2)
-    for ilev = 1:nlev
-      for icol = 1:ncol
-         broadband_flux_net[icol,ilev] = flux_dn[icol,ilev] - flux_up[icol,ilev]
-       end
-    end
+    return flux_dn .- flux_up
+    # for ilev = 1:nlev
+    #   for icol = 1:ncol
+    #      broadband_flux_net[icol,ilev] = flux_dn[icol,ilev] - flux_up[icol,ilev]
+    #    end
+    # end
 #    #$acc exit data delete(flux_dn, flux_up) copyout(broadband_flux_net)
   end
   # ----------------------------------------------------------------------------

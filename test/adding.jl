@@ -15,7 +15,7 @@ function compare(ds, var_tuple)
     A_ds = get_array(ds, name, eltype(A))
     d = abs.(A_ds - A)
     # @show size(A_ds), length(size(d))
-    # @show name, sum(d)
+    @show name, max(d...)
     # D[name] = [sum(d, dims=i) for i in 1:length(size(d))]
     # D[name] = [sum(d, dims=[j for j in 1:length(size(d)) if i ≠ j]) for i in 1:length(size(d))]
     D[name] = false
@@ -133,7 +133,6 @@ end
   ds = Dataset(fileName, "r")
   do_sw = haskey(ds, "solar_zenith_angle")
   # do_sw = var_exists(ncid, '')
-  # @show haskey(ds, "top_at_1")
   # top_at_1 = read_direction(fileName)
   top_at_1 = ds.attrib["top_at_1"]==1
   FT = Float64
@@ -155,7 +154,9 @@ end
   nlay = size(source_up, 2)
   ngpt = size(source_up, 3)
   flux_up = Array{FT}(undef, ncol,nlay+1,ngpt)
+  fill!(flux_up, 0)
   flux_dn = Array{FT}(undef, ncol,nlay+1,ngpt)
+  fill!(flux_dn, 0)
   sfc_alb_gpt = Array{FT}(undef, ncol, ngpt)
   if top_at_1
     flux_dn[:,     1,:] .= FT(0)
@@ -172,7 +173,7 @@ end
     adding!(ncol, nlay, top_at_1,
                 sfc_alb_gpt[:,k],
                 Rdif[:,:,k], Tdif[:,:,k],
-                source_dn[:,:,k], source_up[:,:,k], source_sfc[:,k],
+                @view(source_dn[:,:,k]), @view(source_up[:,:,k]), @view(source_sfc[:,k]),
                 flux_up[:,:,k], flux_dn[:,:,k])
   end
 
@@ -202,14 +203,10 @@ end
   else
     # write_gpt_fluxes!(fileName, flux_up, flux_dn)
   end
-  # @show haskey(ds,"flux_dn")
-  # @show haskey(ds,"flux_up")
-  # @show haskey(ds,"gpt_flux_up")
-  # @show haskey(ds,"gpt_flux_dn")
-  # @show haskey(ds,"gpt_flux_dn_dir")
+
   D = compare(ds, ((flux_dn,"gpt_flux_dn"),
                    (flux_up,"gpt_flux_up")))
-  # @show D
+  @show D
   close(ds)
 
 end

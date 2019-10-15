@@ -46,13 +46,17 @@ module mo_rte_sw
   using ..mo_rte_solver_kernels
   using ..fortran_intrinsics
 
-  export rte_sw, expand_and_transpose
+  export rte_sw!, expand_and_transpose
 
   # --------------------------------------------------
-  function rte_sw(atmos, top_at_1,
-                  mu0, inc_flux,
-                  sfc_alb_dir, sfc_alb_dif,
-                  fluxes, inc_flux_dif) #result(error_msg)
+  function rte_sw!(atmos::ty_optical_props_arry,
+                   top_at_1,
+                   mu0::Array{FT},
+                   inc_flux,
+                   sfc_alb_dir,
+                   sfc_alb_dif,
+                   fluxes,
+                   inc_flux_dif=nothing) where {FT<:AbstractFloat} #result(error_msg)
 #    class(ty_optical_props_arry), intent(in   ) :: atmos           # Optical properties provided as arrays
 #    logical,                      intent(in   ) :: top_at_1        # Is the top of the domain at index 1?
 #                                                                   # (if not, ordering is bottom-to-top)
@@ -74,8 +78,6 @@ module mo_rte_sw
 #    real(FT), dimension(:,:,:), allocatable :: gpt_flux_up, gpt_flux_dn, gpt_flux_dir
 #    real(FT), dimension(:,:),   allocatable :: sfc_alb_dir_gpt, sfc_alb_dif_gpt
     # ------------------------------------------------------------------------------------
-    FT = eltype(mu0)
-    wl = typeof(top_at_1)
 
     ncol  = get_ncol(atmos)
     nlay  = get_nlay(atmos)
@@ -102,7 +104,7 @@ module mo_rte_sw
       error("rte_sw: one or more mu0 <= 0 or > 1")
     end
 
-    if(any([size(inc_flux)[1], size(inc_flux)[2]] .!= [ncol, ngpt]))
+    if(any([size(inc_flux,1), size(inc_flux,2)] .!= [ncol, ngpt]))
       error("rte_sw: inc_flux inconsistently sized")
     end
 
@@ -137,14 +139,16 @@ module mo_rte_sw
     gpt_flux_dn  = Array{FT}(undef,ncol, nlay+1, ngpt)
     gpt_flux_dir = Array{FT}(undef,ncol, nlay+1, ngpt)
 
-    sfc_alb_dir_gpt = Array{FT}(undef,ncol, ngpt)
-    sfc_alb_dif_gpt = Array{FT}(undef,ncol, ngpt)
     # ------------------------------------------------------------------------------------
     # Lower boundary condition -- expand surface albedos by band to gpoints
     #   and switch dimension ordering
 #    #$acc enter data create(sfc_alb_dir_gpt, sfc_alb_dif_gpt)
-    expand_and_transpose!(atmos, sfc_alb_dir, sfc_alb_dir_gpt)
-    expand_and_transpose!(atmos, sfc_alb_dif, sfc_alb_dif_gpt)
+    sfc_alb_dir_gpt = expand_and_transpose(atmos, sfc_alb_dir)
+    sfc_alb_dif_gpt = expand_and_transpose(atmos, sfc_alb_dif)
+
+    # test_data(sfc_alb_dir_gpt, "sfc_alb_dir_gpt")
+    # test_data(sfc_alb_dif_gpt, "sfc_alb_dif_gpt")
+
     # ------------------------------------------------------------------------------------
     #
     # Compute the radiative transfer...
@@ -158,15 +162,17 @@ module mo_rte_sw
 #    #$acc enter data create(gpt_flux_up, gpt_flux_dn, gpt_flux_dir)
 
 #    #$acc enter data copyin(inc_flux)
-    apply_BC!(ncol, nlay, ngpt, logical(top_at_1, wl),   inc_flux, mu0, gpt_flux_dir)
+    gpt_flux_dir = apply_BC(ncol, nlay, ngpt, top_at_1,   inc_flux, mu0)
+    # test_data(gpt_flux_dir, "BC_gpt_flux_dir")
 #    #$acc exit data delete(inc_flux)
-    if(present(inc_flux_dif)) #then
+    if present(inc_flux_dif)
 #      #$acc enter data copyin(inc_flux_dif)
-      apply_BC!(ncol, nlay, ngpt, logical(top_at_1, wl), inc_flux_dif,  gpt_flux_dn )
+      gpt_flux_dn  = apply_BC(ncol, nlay, ngpt, top_at_1, inc_flux_dif)
 #      #$acc exit data delete(inc_flux_dif)
     else
-      apply_BC(ncol, nlay, ngpt, logical(top_at_1, wl),                gpt_flux_dn )
+      gpt_flux_dn  = apply_BC(ncol, nlay, ngpt, top_at_1, FT)
     end
+    # test_data(gpt_flux_dn, "BC_gpt_flux_dn")
 #    select type (atmos)
       if ( atmos isa ty_optical_props_1scl )
         #
@@ -174,7 +180,7 @@ module mo_rte_sw
         #
 #        #$acc enter data copyin(atmos, atmos%tau)
         validate!(atmos)
-        sw_solver_noscat!(ncol, nlay, ngpt, logical(top_at_1, wl),
+        sw_solver_noscat!(ncol, nlay, ngpt, top_at_1,
                               atmos.tau, mu0,
                               gpt_flux_dir)
         #
@@ -188,11 +194,23 @@ module mo_rte_sw
         # two-stream calculation with scattering
         #
 #        #$acc enter data copyin(atmos, atmos%tau, atmos%ssa, atmos%g)
-        validate(atmos)
-        sw_solver_2stream(ncol, nlay, ngpt, logical(top_at_1, wl),
+        validate!(atmos)
+
+        # test_data(atmos.tau, "atmos_tau")
+        # test_data(atmos.ssa, "atmos_ssa")
+        # test_data(atmos.g, "atmos_g")
+        # test_data(gpt_flux_dn, "gpt_flux_dn_in")
+        # test_data(gpt_flux_dir, "gpt_flux_dir_in")
+
+        sw_solver_2stream!(ncol, nlay, ngpt, top_at_1,
                                atmos.tau, atmos.ssa, atmos.g, mu0,
                                sfc_alb_dir_gpt, sfc_alb_dif_gpt,
                                gpt_flux_up, gpt_flux_dn, gpt_flux_dir)
+
+        # test_data(gpt_flux_up, "gpt_flux_up")
+        # test_data(gpt_flux_dn, "gpt_flux_dn_out")
+        # test_data(gpt_flux_dir, "gpt_flux_dir_out")
+
 #        #$acc exit data delete(atmos%tau, atmos%ssa, atmos%g, atmos)
 #        #$acc exit data delete(sfc_alb_dir_gpt, sfc_alb_dif_gpt)
       else                #class is (ty_optical_props_nstr)
@@ -207,7 +225,7 @@ module mo_rte_sw
     #
     # ...and reduce spectral fluxes to desired output quantities
     #
-    reduce(fluxes,gpt_flux_up, gpt_flux_dn, atmos, top_at_1, gpt_flux_dir)
+    reduce!(fluxes,gpt_flux_up, gpt_flux_dn, atmos, top_at_1, gpt_flux_dir)
 #    #$acc exit data delete(mu0)
 #    #$acc exit data delete(gpt_flux_up, gpt_flux_dn, gpt_flux_dir)
   end
@@ -215,7 +233,7 @@ module mo_rte_sw
   #
   # Expand from band to g-point dimension, transpose dimensions (nband, ncol) -> (ncol,ngpt)
   #
-  function expand_and_transpose(ops,arr_in,arr_out)
+  function expand_and_transpose(ops::ty_optical_props,arr_in::Array{FT}) where FT
 #    class(ty_optical_props),  intent(in ) :: ops
 #    real(FT), dimension(:,:), intent(in ) :: arr_in  # (nband, ncol)
 #    real(FT), dimension(:,:), intent(out) :: arr_out # (ncol, igpt)
@@ -227,16 +245,17 @@ module mo_rte_sw
     ncol  = size(arr_in,2)
     nband = get_nband(ops)
     ngpt  = get_ngpt(ops)
+    arr_out = Array{FT}(undef,ncol, ngpt)
     limits = get_band_lims_gpoint(ops)
 #    #$acc parallel loop collapse(2) copyin(arr_in, limits)
     for iband = 1:nband
       for icol = 1:ncol
-        for igpt = limits(1, iband):limits(2, iband)
+        for igpt = limits[1, iband]:limits[2, iband]
           arr_out[icol, igpt] = arr_in[iband,icol]
         end
       end
     end
-
+    return arr_out
   end
 #-------------------------------------------------------------
 end

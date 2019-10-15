@@ -1,5 +1,6 @@
 module fortran_intrinsics
 using DelimitedFiles
+using OffsetArrays
 using Test
 
 export fmerge,
@@ -34,21 +35,41 @@ squeeze(A) = dropdims(A, dims=tuple([i for i in 1:length(size(A)) if size(A)[i]=
 fint(x::Integer) = x
 fint(x::Real) = abs(x) < 1 ? 0 : floor(x)
 
+test_data(x::OffsetArray, name) = test_data(reshape([x[:]...], size(x)...), name)
+
 function test_data(x, name)
-  x_correct, s = readdlm(joinpath("..",name)*".dat", '\t', Float64, header=true, '\n')
+  x_correct, s = readdlm(joinpath("..","TestData",name)*".dat", '\t', Float64, header=true, '\n')
   s = parse.(Int, filter(i-> i≠"", split(strip(s[1]), " ")))
-  println("*********************************** comparing data "*name)
   x_correct = reshape(x_correct, s...)
+  @assert all(size(x_correct) .== size(x))
+  FT = Float32
+  x_max = max(x_correct...)
   d = x .- x_correct
-  L = sum(abs.(d)) < eps(Float32)
+  if x_max>1
+    d = d ./x_max
+  end
+  ad = abs.(d) .< eps(Float32)
+  # L = sum(abs.(d)) < eps(Float32)
+  L = all(ad)
   if !L
-    println(" ---- Error for variable "*name)
-    @show x_correct
-    @show x
-    @show d
-    @show size(x_correct)
-    @show size(x)
+    println("\n\n\n\n\n")
+    println(" ***************************** Failed comparison: "*name)
+    @show max(x_correct...)
     @show sum(abs.(d))
+    @show max(abs.(d)...)
+    @show x_correct[1:10]
+    @show x[1:10]
+    @show d[1:10]
+    # @show count(ad)
+    # @show count(ad)/length(ad)
+    @show sum(abs.(x))
+    @show sum(abs.(x_correct))
+    @show max(abs.(x .- x_correct)...)
+    @show sum(abs.(x .- x_correct))
+  else
+    if !occursin("gas_conc",name)
+      println(" ----------------------------- Successful comparison: "*name)
+    end
   end
   @test L
 end
@@ -74,21 +95,20 @@ fmerge(t_source, f_source, mask) = mask ? t_source : f_source
 Based on: https://gcc.gnu.org/onlinedocs/gfortran/MINLOC.html
 TODO: FIX IMPLEMENTATION
 """
-# fminloc(a; dim, mask=nothing) = mask==nothing ? argmin(a, dims=dim) : argmin(a[mask], dims=dim)
-
 function fminloc(a; dim, mask=nothing)
   if mask==nothing
     return argmin(a, dims=dim)
   else
     tmp = deepcopy(a)
-    tmp[mask] .= Inf
+    tmp[.!mask] .= Inf
     return squeeze(argmin(tmp, dims=dim))
   end
 end
 
 function fminloc_wrapper(a; dim, mask=nothing)
   r = fminloc(a; dim=dim, mask=mask)
-  return [r[i][2] for i in 1:length(r)]
+  res = [r[i][2] for i in 1:length(r)] # get index from CartesianIndex
+  return res
 end
 
 """
@@ -96,21 +116,20 @@ end
 Based on: https://gcc.gnu.org/onlinedocs/gfortran/MAXLOC.html
 TODO: FIX IMPLEMENTATION
 """
-# fmaxloc(a; dim, mask=nothing) = mask==nothing ? argmax(a, dims=dim) : argmax(a[mask], dims=dim)
-
 function fmaxloc(a; dim, mask=nothing)
   if mask==nothing
     return argmax(a, dims=dim)
   else
     tmp = deepcopy(a)
-    tmp[mask] .= Inf
+    tmp[.!mask] .= -Inf
     return squeeze(argmax(tmp, dims=dim))
   end
 end
 
 function fmaxloc_wrapper(a; dim, mask=nothing)
   r = fmaxloc(a; dim=dim, mask=mask)
-  return [r[i][2] for i in 1:length(r)]
+  res = [r[i][2] for i in 1:length(r)]  # get index from CartesianIndex
+  return res
 end
 
 """
@@ -128,9 +147,9 @@ function spread(source::Array{FT,N}, dim::Int, ncopies::Int) where {FT,N}
   @assert 1 <= dim <= N+1
   counts = [1 for i in 1:dim+1]
   counts[dim] = ncopies
-  # return squeeze(repeat(convert(Array,source'), counts...))
   return squeeze(repeat(source, counts...))
 end
+
 # function spread(source::Array{FT,N}, dim::Int, ncopies::Int) where {FT,N}
 #   @assert 1 <= dim <= N+1
 #   # if dim==2
@@ -168,11 +187,13 @@ function freshape(source, shape; pad=nothing, order = nothing)
 
 end
 
+associated(a::Nothing) = false
 associated(a::Array) = length(a)>0
 allocated(a::Array) = a ≠ nothing
 allocated(a::Nothing) = false
 deallocate!(a) = (a = nothing)
 is_initialized(a::Array) = allocated(a) && length(a)>0
+is_initialized(a::Nothing) = false
 present(arg) = arg ≠ nothing
 
 """

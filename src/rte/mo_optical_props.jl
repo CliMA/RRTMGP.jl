@@ -62,6 +62,8 @@ export init!,
        bands_are_equal,
        convert_gpt2band,
        get_band_lims_gpoint,
+       get_ncol,
+       get_nlay,
        gpoints_are_equal
 
 export ty_optical_props,
@@ -73,8 +75,6 @@ export ty_optical_props,
 
 export get_nband, get_ngpt
 
-any_vals_less_than(a, t) = a .< t
-any_vals_outside(a,t1,t2) = !(t1<a<t2)
 
   # -------------------------------------------------------------------------------------------------
   #
@@ -184,9 +184,9 @@ ty_optical_props_nstr(T,I) = ty_optical_props_nstr{T,I}(ntuple(i->nothing, 7)...
     end
     this.band2gpt = band2gpt
     this.gpt2band = gpt2band
-    this.band_lims_wvn = band_lims_wvn
+    this.band_lims_wvn = deepcopy(band_lims_wvn)
     this.name = name
-    return
+    nothing
   end
 
 """
@@ -197,7 +197,7 @@ ty_optical_props_nstr(T,I) = ty_optical_props_nstr{T,I}(ntuple(i->nothing, 7)...
     character(len = 128)                        :: err_message
 """
   function init_base_from_copy!(this::ty_optical_props, spectral_desc::ty_optical_props)
-    init!(this,get_band_lims_wavenumber(spectral_desc), get_band_lims_gpoint(spectral_desc))
+    init!(this, "called_from_init_base_from_copy" ,get_band_lims_wavenumber(spectral_desc), get_band_lims_gpoint(spectral_desc))
   end
   #-------------------------------------------------------------------------------------------------
   #
@@ -321,9 +321,9 @@ ty_optical_props_nstr(T,I) = ty_optical_props_nstr{T,I}(ntuple(i->nothing, 7)...
 """
   function init_and_alloc!(this::ty_optical_props, ncol, nlay, band_lims_wvn, band_lims_gpt=nothing, name=nothing)
     if band_lims_gpt==nothing
-      init!(this, band_lims_wvn, name)
+      init!(this, name, band_lims_wvn)
     else
-      init!(this, band_lims_wvn, band_lims_gpt, name)
+      init!(this, name, band_lims_wvn, band_lims_gpt)
     end
     alloc!(this, ncol, nlay)
   end
@@ -344,8 +344,8 @@ ty_optical_props_nstr(T,I) = ty_optical_props_nstr{T,I}(ntuple(i->nothing, 7)...
 """
   function copy_and_alloc!(this::ty_optical_props_1scl, ncol, nlay, spectral_desc::ty_optical_props, name=nothing)
     is_initialized(this) && finalize!(this)
-    init!(this, get_band_lims_wavenumber(spectral_desc),
-                get_band_lims_gpoint(spectral_desc), name)
+    init!(this, name, get_band_lims_wavenumber(spectral_desc),
+                get_band_lims_gpoint(spectral_desc))
     alloc!(this, ncol, nlay)
   end
 
@@ -360,8 +360,8 @@ ty_optical_props_nstr(T,I) = ty_optical_props_nstr{T,I}(ntuple(i->nothing, 7)...
 """
   function copy_and_alloc!(this::ty_optical_props_2str, ncol, nlay, spectral_desc::ty_optical_props, name=nothing)
     is_initialized(this) && finalize!(this)
-    init!(this, get_band_lims_wavenumber(spectral_desc),
-                get_band_lims_gpoint(spectral_desc), name)
+    init!(this, name, get_band_lims_wavenumber(spectral_desc),
+                      get_band_lims_gpoint(spectral_desc))
     alloc!(this, ncol, nlay)
   end
 
@@ -376,8 +376,8 @@ ty_optical_props_nstr(T,I) = ty_optical_props_nstr{T,I}(ntuple(i->nothing, 7)...
 """
   function copy_and_alloc!(this::ty_optical_props_nstr, nmom, ncol, nlay, spectral_desc::ty_optical_props, name=nothing)
     is_initialized(this) && finalize!(this)
-    init!(this, get_band_lims_wavenumber(spectral_desc),
-                get_band_lims_gpoint(spectral_desc), name)
+    init!(this, name, get_band_lims_wavenumber(spectral_desc),
+                      get_band_lims_gpoint(spectral_desc))
     alloc!(this, nmom, ncol, nlay)
   end
 

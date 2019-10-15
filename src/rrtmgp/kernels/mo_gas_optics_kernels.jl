@@ -20,6 +20,8 @@ Description: Numeric calculations for gas optics. Absorption and Rayleigh optica
 """
 module mo_gas_optics_kernels
 
+PaTohPa(::Type{FT}) where FT = FT(0.01)
+
 using ..fortran_intrinsics
 
 export interpolation,
@@ -33,7 +35,7 @@ export interpolation,
        interpolate2D_byflav,
        interpolate3D,
        interpolate3D_byflav,
-       combine_and_reorder_2str!,
+       combine_and_reorder_2str,
        combine_and_reorder_nstr!
 
 """
@@ -117,6 +119,13 @@ integer :: icol, ilay, iflav, igases(2), itropo, itemp
       end
     end
 
+    # test_data(vmr_ref, "vmr_ref_interp")
+    # test_data(ftemp, "ftemp")
+    # test_data(jtemp, "jtemp")
+    # test_data(jpress, "jpress")
+    # test_data(tropo, "tropo")
+    # test_data(col_gas, "col_gas")
+
     for ilay in 1:nlay
       for icol in 1:ncol
         # itropo = 1 lower atmosphere; itropo = 2 upper atmosphere
@@ -150,6 +159,10 @@ integer :: icol, ilay, iflav, igases(2), itropo, itemp
         end # iflav
       end # icol,ilay
     end
+    # test_data(col_mix, "col_mix")
+    # test_data(jeta, "jeta")
+    # test_data(fminor, "fminor")
+    # test_data(fmajor, "fmajor")
     return jtemp,fmajor,fminor,col_mix,tropo,jeta,jpress
 
   end
@@ -240,6 +253,8 @@ integer, dimension(ncol,2) :: itropo_lower, itropo_upper
     top_at_1 = play[1,1] < play[1, nlay]
     itropo_lower = Array{Int}(undef, ncol, 2)
     itropo_upper = similar(itropo_lower)
+    # test_data(tropo, "tropo_compute_tau_absorption")
+    # test_data(play, "play_compute_tau_absorption")
     if top_at_1
       itropo_lower[:, 1] .= fminloc_wrapper(play, dim=2, mask=tropo)
       itropo_lower[:, 2] .= nlay
@@ -251,9 +266,22 @@ integer, dimension(ncol,2) :: itropo_lower, itropo_upper
       itropo_upper[:, 1] .= fmaxloc_wrapper(play, dim=2, mask=(.!tropo))
       itropo_upper[:, 2] .= nlay
     end
+
+    # if(top_at_1) then
+    #   itropo_lower(:, 1) = minloc(play, dim=2, mask=tropo)
+    #   itropo_lower(:, 2) = nlay
+    #   itropo_upper(:, 1) = 1
+    #   itropo_upper(:, 2) = maxloc(play, dim=2, mask=(.not. tropo))
+    # else
+    #   itropo_lower(:, 1) = 1
+    #   itropo_lower(:, 2) = minloc(play, dim=2, mask= tropo)
+    #   itropo_upper(:, 1) = maxloc(play, dim=2, mask=(.not. tropo))
+    #   itropo_upper(:, 2) = nlay
+    # end if
+
+    # test_data(itropo_lower, "itropo_lower")
+    # test_data(itropo_upper, "itropo_upper")
     tau = zeros(FT, ngpt,nlay,ncol)
-    @show itropo_lower
-    @show itropo_upper
     # ---------------------
     # Major Species
     # ---------------------
@@ -266,6 +294,9 @@ integer, dimension(ncol,2) :: itropo_lower, itropo_upper
           col_mix,fmajor,
           jeta,tropo,jtemp,jpress,
           tau)
+    # test_data(tau, "tau_after_gas_optical_depths_major")
+    # test_data(col_gas, "col_gas_after_gas_optical_depths_major")
+    # test_data(idx_minor_lower, "idx_minor_after_gas_optical_depths_major")
     # ---------------------
     # Minor Species - lower
     # ---------------------
@@ -286,6 +317,7 @@ integer, dimension(ncol,2) :: itropo_lower, itropo_upper
            col_gas,fminor,jeta,
            itropo_lower,jtemp,
            tau)
+    # test_data(tau, "tau_after_gas_optical_depths_minor_lower")
     # ---------------------
     # Minor Species - upper
     # ---------------------
@@ -306,6 +338,8 @@ integer, dimension(ncol,2) :: itropo_lower, itropo_upper
            col_gas,fminor,jeta,
            itropo_upper,jtemp,
            tau)
+    # test_data(tau, "tau_after_gas_optical_depths_minor_upper")
+    return tau
   end
   # --------------------------------------------------------------------------------------
 
@@ -431,8 +465,9 @@ real(FT), dimension(ngpt) :: tau_minor
     # First check skips the routine entirely if all columns are out of bounds...
     #
     FT = eltype(tau)
+    tau_minor = Array{FT}(undef, ngpt)
     if any(layer_limits[:,1] .> 0)
-      for imnr in 1:size(scale_by_complement,dim=1) # loop over minor absorbers in each band
+      for imnr in 1:size(scale_by_complement,1) # loop over minor absorbers in each band
         for icol in 1:ncol
           #
           # This check skips individual columns with no pressures in range
@@ -450,7 +485,7 @@ real(FT), dimension(ngpt) :: tau_minor
                 #
                 # NOTE: P needed in hPa to properly handle density scaling.
                 #
-                scaling = scaling * (PaTohPa*play[icol,ilay]/tlay[icol,ilay])
+                scaling = scaling * (PaTohPa(FT)*play[icol,ilay]/tlay[icol,ilay])
                 if idx_minor_scaling[imnr] > 0  # there is a second gas that affects this gas's absorption
                   vmr_fact = FT(1) / col_gas[icol,ilay,0]
                   dry_fact = FT(1) / (FT(1) + col_gas[icol,ilay,idx_h2o] * vmr_fact)
@@ -515,6 +550,8 @@ integer  :: itropo
                                   idx_h2o, col_dry,col_gas,
                                   fminor,jeta,tropo,jtemp,
                                   tau_rayleigh)
+    FT = eltype(fminor)
+    k = Array{FT}(undef, ngpt)
     for ilay in 1:nlay
       for icol in 1:ncol
         itropo = fmerge(1,2,tropo[icol,ilay]) # itropo = 1 lower atmosphere; itropo = 2 upper atmosphere
@@ -787,11 +824,6 @@ integer :: igpt
     FT = eltype(k)
     res = Vector{FT}(undef, gptE-gptS+1)
     for igpt = 1:gptE-gptS+1
-      @show typeof(igpt)
-      @show typeof(gptS)
-      @show typeof(jeta[1])
-      @show typeof(jpress)
-      @show typeof(jtemp)
       res[igpt] =
         scaling[1] *
         ( fmajor[1,1,1] * k[gptS+igpt-1, jeta[1]  , jpress-1, jtemp  ] +
@@ -820,15 +852,18 @@ integer  :: icol, ilay, igpt
 real(FT) :: t
 # -----------------------
 """
-  function combine_and_reorder_2str!(ncol, nlay, ngpt, tau_abs, tau_rayleigh, tau, ssa, g)
+  function combine_and_reorder_2str(ncol, nlay, ngpt, tau_abs, tau_rayleigh)
     FT = eltype(tau_abs)
+    tau = Array{FT}(undef,ncol, nlay, ngpt)
+    ssa = Array{FT}(undef,ncol, nlay, ngpt)
+    g = Array{FT}(undef,ncol, nlay, ngpt)
     for icol in 1:ncol
       for ilay in 1:nlay
         for igpt in 1:ngpt
            t = tau_abs[igpt,ilay,icol] + tau_rayleigh[igpt,ilay,icol]
            tau[icol,ilay,igpt] = t
            g[icol,ilay,igpt] = FT(0)
-           if (t > FT(2) * realmin(FT))
+           if (t > FT(2) * floatmin(FT))
              ssa[icol,ilay,igpt] = tau_rayleigh[igpt,ilay,icol] / t
            else
              ssa[icol,ilay,igpt] = FT(0)
@@ -836,6 +871,7 @@ real(FT) :: t
         end
       end
     end
+    return tau, ssa, g
   end
 
 """

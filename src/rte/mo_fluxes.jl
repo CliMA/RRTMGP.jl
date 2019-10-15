@@ -18,10 +18,11 @@
 # -------------------------------------------------------------------------------------------------
 module mo_fluxes
 
+using ..fortran_intrinsics
 using ..mo_optical_props
 using ..mo_fluxes_broadband_kernels
 
-export ty_fluxes_broadband
+export ty_fluxes_broadband, are_desired, reduce!
 
   # -----------------------------------------------------------------------------------------------
   #
@@ -55,6 +56,7 @@ end
 ty_fluxes_broadband(FT) = ty_fluxes_broadband{FT}(ntuple(i->nothing, 4)...)
 
 
+
   # type, extends(ty_fluxes), public :: ty_fluxes_broadband
   #   real(FT), dimension(:,:), pointer :: flux_up => NULL(), flux_dn => NULL()
   #   real(FT), dimension(:,:), pointer :: flux_net => NULL()    # Net (down - up)
@@ -83,7 +85,7 @@ ty_fluxes_broadband(FT) = ty_fluxes_broadband{FT}(ntuple(i->nothing, 4)...)
     integer :: ncol, nlev, ngpt
     # ------
 """
-  function reduce_broadband(this::ty_fluxes_broadband,
+  function reduce!(this::ty_fluxes_broadband,
                             gpt_flux_up::A,
                             gpt_flux_dn::A,
                             spectral_disc::ty_optical_props,
@@ -93,20 +95,17 @@ ty_fluxes_broadband(FT) = ty_fluxes_broadband{FT}(ntuple(i->nothing, 4)...)
     ncol = size(gpt_flux_up, 1)
     nlev = size(gpt_flux_up, 2)
     ngpt = size(gpt_flux_up, 3)
-    error_msg = ""
 
     #
     # Check array sizes
     #  Input arrays
     #
     if any([size(gpt_flux_dn, 1) ≠ ncol, size(gpt_flux_dn, 2) ≠ nlev, size(gpt_flux_dn, 3) ≠ ngpt])
-      error_msg = "reduce: gpt_flux_dn array incorrectly sized"
-      return error_msg
+      error("reduce: gpt_flux_dn array incorrectly sized")
     end
     if gpt_flux_dn_dir ≠ nothing
       if any([size(gpt_flux_dn_dir, 1) ≠ ncol, size(gpt_flux_dn_dir, 2) ≠ nlev, size(gpt_flux_dn_dir, 3) ≠ ngpt])
-        error_msg = "reduce: gpt_flux_dn_dir array incorrectly sized"
-        return error_msg
+        error("reduce: gpt_flux_dn_dir array incorrectly sized")
       end
     end
     #
@@ -114,46 +113,41 @@ ty_fluxes_broadband(FT) = ty_fluxes_broadband{FT}(ntuple(i->nothing, 4)...)
     #
     if associated(this.flux_up)
       if any([size(this.flux_up, 1), size(this.flux_up, 2)] ≠ [ncol,nlev])
-        error_msg = "reduce: flux_up array incorrectly sized"
-        return error_msg
+        error("reduce: flux_up array incorrectly sized")
       end
     end
     if associated(this.flux_dn)
       if any([size(this.flux_dn, 1), size(this.flux_dn, 2)] ≠ [ncol,nlev])
-        error_msg = "reduce: flux_dn array incorrectly sized"
-        return error_msg
+        error("reduce: flux_dn array incorrectly sized")
       end
     end
     if associated(this.flux_net)
       if any([size(this.flux_net, 1), size(this.flux_net, 2)] ≠ [ncol,nlev])
-        error_msg = "reduce: flux_net array incorrectly sized"
-        return error_msg
+        error("reduce: flux_net array incorrectly sized")
       end
     end
     if associated(this.flux_dn_dir)
       if any([size(this.flux_dn_dir, 1), size(this.flux_dn_dir, 2)] ≠ [ncol,nlev])
-        error_msg = "reduce: flux_dn_dir array incorrectly sized"
-        return error_msg
+        error("reduce: flux_dn_dir array incorrectly sized")
       end
     end
     #
     # Self-consistency -- shouldn't be asking for direct beam flux if it isn't supplied
     if associated(this.flux_dn_dir) && !present(gpt_flux_dn_dir)
-      error_msg = "reduce: requesting direct downward flux but this hasn't been supplied"
-      return
+      error("reduce: requesting direct downward flux but this hasn't been supplied")
     end
 
     #
     # Broadband fluxes - call the kernels
     #
     if associated(this.flux_up    )
-      sum_broadband!(ncol, nlev, ngpt, gpt_flux_up,     this.flux_up)
+      this.flux_up = sum_broadband(ncol, nlev, ngpt, gpt_flux_up)
     end
     if associated(this.flux_dn    )
-      sum_broadband!(ncol, nlev, ngpt, gpt_flux_dn,     this.flux_dn)
+      this.flux_dn = sum_broadband(ncol, nlev, ngpt, gpt_flux_dn)
     end
     if associated(this.flux_dn_dir)
-      sum_broadband!(ncol, nlev, ngpt, gpt_flux_dn_dir, this.flux_dn_dir)
+      this.flux_dn_dir = sum_broadband(ncol, nlev, ngpt, gpt_flux_dn_dir)
     end
 
     if associated(this.flux_net)
@@ -161,9 +155,9 @@ ty_fluxes_broadband(FT) = ty_fluxes_broadband{FT}(ntuple(i->nothing, 4)...)
       #  Reuse down and up results if possible
       #
       if associated(this.flux_dn) && associated(this.flux_up)
-        net_broadband!(ncol, nlev,      this.flux_dn, this.flux_up, this.flux_net)
+        this.flux_net = net_broadband(ncol, nlev,      this.flux_dn, this.flux_up)
       else
-        net_broadband!(ncol, nlev, ngpt, gpt_flux_dn,  gpt_flux_up, this.flux_net)
+        this.flux_net = net_broadband(ncol, nlev, ngpt, gpt_flux_dn,  gpt_flux_up)
       end
     end
   end # function
@@ -177,8 +171,11 @@ ty_fluxes_broadband(FT) = ty_fluxes_broadband{FT}(ntuple(i->nothing, 4)...)
     class(ty_fluxes_broadband), intent(in   ) :: this
     logical                                   :: are_desired_broadband
 """
-  function are_desired_broadband(this::ty_fluxes_broadband)
-    return any( [associated(this.flux_up), associated(this.flux_dn), associated(this.flux_dn_dir), associated(this.flux_net)] )
+  function are_desired(this::ty_fluxes_broadband)
+    return any( [associated(this.flux_up),
+                 associated(this.flux_dn),
+                 associated(this.flux_dn_dir),
+                 associated(this.flux_net)] )
   end
   # --------------------------------------------------------------------------------------
 end # module

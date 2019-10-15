@@ -289,6 +289,9 @@ module mo_gas_optics_rrtmgp
                      play, plev, tlay, gas_desc,
                      optical_props,
                      col_dry)
+
+    # test_data(jeta, "jeta")
+    # test_data(fmajor, "fmajor")
     #$acc exit data delete(jtemp, jpress, tropo, fmajor, jeta)
 
     # ----------------------------------------------------------
@@ -408,14 +411,17 @@ module mo_gas_optics_rrtmgp
     #
     # Fill out the array of volume mixing ratios
     #
+    # error("Done")
     for igas in 1:ngas
       #
       # Get vmr if  gas is provided in ty_gas_concs
       #
-      if any(lower_case(this.gas_names[igas]) == gas_desc.gas_name[:])
-         gas_desc.get_vmr(this.gas_names[igas], vmr[:,:,igas])
+      # if any(lower_case(this.gas_names[igas]) == gas_desc.gas_name[:])
+      if lowercase(this.gas_names[igas]) in gas_desc.gas_name
+         vmr[:,:,igas] = get_vmr(gas_desc, this.gas_names[igas])
       end
     end
+    # test_data(vmr, "vmr_after_get")
 
     #
     # Compute dry air column amounts (number of molecule per cm^2) if user hasn't provided them
@@ -434,6 +440,15 @@ module mo_gas_optics_rrtmgp
     for igas = 1:ngas
       col_gas[1:ncol,1:nlay,igas] .= vmr[1:ncol,1:nlay,igas] .* col_dry_wk[1:ncol,1:nlay]
     end
+
+    if present(col_dry)
+      # test_data(col_dry, "col_dry")
+    end
+    # test_data(col_dry_arr, "col_dry_arr")
+    # test_data(col_dry_wk, "col_dry_wk")
+    # test_data(vmr, "vmr_local")
+    # test_data(col_gas, "col_gas")
+
 
     #
     # ---- calculate gas optical depths ----
@@ -501,6 +516,8 @@ module mo_gas_optics_rrtmgp
     end
 
     # Combine optical depths and reorder for radiative transfer solver.
+    # test_data(tau_rayleigh, "tau_rayleigh")
+    # test_data(tau, "tau_before_CAR")
     combine_and_reorder!(tau, tau_rayleigh, allocated(this.krayl), optical_props)
     #$acc exit data delete(tau, tau_rayleigh)
     #$acc exit data delete(play, tlay, col_gas)
@@ -830,6 +847,7 @@ kminor_start_upper)
       vmr_ref_red[:,i,:] = vmr_ref[:,idx+1,:]
     end
     this.vmr_ref = vmr_ref_red
+    # test_data(this.vmr_ref, "vmr_ref")
     #
     # Reduce minor arrays so variables only contain minor gases that are available
     # Reduce size of minor Arrays
@@ -860,6 +878,11 @@ kminor_start_lower                   # kminor_start_atm,
 # this.scale_by_complement_lower,       # scale_by_complement_atm_red,
 # this.kminor_start_lower               # kminor_start_atm_red
 )
+
+    # test_data(this.kminor_lower, "kminor_lower")
+    # test_data(this.minor_limits_gpt_lower, "minor_limits_gpt_lower")
+    # test_data(this.kminor_start_lower, "kminor_start_lower")
+
     this.kminor_upper,
     minor_gases_upper_red,
     this.minor_limits_gpt_upper,
@@ -885,6 +908,10 @@ kminor_start_lower                   # kminor_start_atm,
                              # this.scale_by_complement_upper,
                              # this.kminor_start_upper
                              )
+
+    # test_data(this.kminor_upper,                    "kminor_upper")
+    # test_data(this.minor_limits_gpt_upper,          "minor_limits_gpt_upper")
+    # test_data(this.kminor_start_upper,              "kminor_start_upper")
 
     # Arrays not reduced by the presence, or lack thereof, of a gas
     this.press_ref = press_ref
@@ -913,8 +940,10 @@ kminor_start_lower                   # kminor_start_atm,
     this.press_ref_trop_log = log(press_ref_trop)
 
     # Get index of gas (if present) for determining col_gas
-    create_idx_minor!(this.gas_names, gas_minor, identifier_minor, minor_gases_lower_red, this.idx_minor_lower)
-    create_idx_minor!(this.gas_names, gas_minor, identifier_minor, minor_gases_upper_red, this.idx_minor_upper)
+    this.idx_minor_lower = create_idx_minor(this.gas_names, gas_minor, identifier_minor, minor_gases_lower_red)
+    this.idx_minor_upper = create_idx_minor(this.gas_names, gas_minor, identifier_minor, minor_gases_upper_red)
+    # test_data(this.idx_minor_lower, "idx_minor_lower")
+    # test_data(this.idx_minor_lower, "idx_minor_lower")
     # Get index of gas (if present) that has special treatment in density scaling
     this.idx_minor_scaling_lower = create_idx_minor_scaling(this.gas_names, scaling_gas_lower_red)
     this.idx_minor_scaling_upper = create_idx_minor_scaling(this.gas_names, scaling_gas_upper_red)
@@ -923,11 +952,14 @@ kminor_start_lower                   # kminor_start_atm,
     # Reduce (remap) key_species list; checks that all key gases are present in incoming
     key_species_red,key_species_present_init = create_key_species_reduce(gas_names,this.gas_names, key_species)
     check_key_species_present_init(gas_names,key_species_present_init)
+    # test_data(key_species_red, "key_species_red")
 
     # create flavor list
     this.flavor = create_flavor(key_species_red)
+    # test_data(this.flavor, "flavor")
     # create gpoint_flavor list
     this.gpoint_flavor = create_gpoint_flavor(key_species_red, get_gpoint_bands(this.optical_props), this.flavor)
+    # test_data(this.gpoint_flavor, "gpoint_flavor")
 
     # minimum, maximum reference temperature, pressure -- assumes low-to-high ordering
     #   for T, high-to-low ordering for p
@@ -951,6 +983,7 @@ kminor_start_lower                   # kminor_start_atm,
         end
       end
     end
+    # test_data(this.is_key, "is_key")
     return this
 
   end
@@ -1224,7 +1257,7 @@ kminor_start_lower                   # kminor_start_atm,
   #
   # create index list for extracting col_gas needed for minor gas optical depth calculations
   #
-  function create_idx_minor!(gas_names, gas_minor, identifier_minor, minor_gases_atm, idx_minor_atm)
+  function create_idx_minor(gas_names, gas_minor, identifier_minor, minor_gases_atm)
     # character(len=*), dimension(:), intent(in) :: gas_names
     # character(len=*), dimension(:), intent(in) ::
     #                                               gas_minor,
@@ -1243,6 +1276,7 @@ kminor_start_lower                   # kminor_start_atm,
           # Find name of gas associated with minor species identifier (e.g. h2o)
           idx_minor_atm[imnr] = string_loc_in_array(gas_minor[idx_mnr],    gas_names)
     end
+    return idx_minor_atm
 
   end
 
@@ -1337,20 +1371,13 @@ kminor_start_atm
     # character(len=*), dimension(:),     intent(in) :: scaling_gas_atm
     # logical(wl),      dimension(:),     intent(in) :: scale_by_complement_atm
     # integer,          dimension(:),     intent(in) :: kminor_start_atm
-    # real(FT),         dimension(:,:,:), allocatable,
-    #                                     intent(out) :: kminor_atm_red
-    # character(len=*), dimension(:), allocatable,
-    #                                     intent(out) :: minor_gases_atm_red
-    # integer,          dimension(:,:), allocatable,
-    #                                     intent(out) :: minor_limits_gpt_atm_red
-    # logical(wl),      dimension(:),    allocatable,
-    #                                     intent(out) ::minor_scales_with_density_atm_red
-    # character(len=*), dimension(:), allocatable,
-    #                                     intent(out) ::scaling_gas_atm_red
-    # logical(wl),      dimension(:), allocatable, intent(out) ::
-    #                                             scale_by_complement_atm_red
-    # integer,          dimension(:), allocatable, intent(out) ::
-    #                                             kminor_start_atm_red
+    # real(FT),         dimension(:,:,:), allocatable, intent(out) :: kminor_atm_red
+    # character(len=*), dimension(:),     allocatable, intent(out) :: minor_gases_atm_red
+    # integer,          dimension(:,:),   allocatable, intent(out) :: minor_limits_gpt_atm_red
+    # logical(wl),      dimension(:),     allocatable, intent(out) :: minor_scales_with_density_atm_red
+    # character(len=*), dimension(:),     allocatable, intent(out) :: scaling_gas_atm_red
+    # logical(wl),      dimension(:),     allocatable, intent(out) :: scale_by_complement_atm_red
+    # integer,          dimension(:),     allocatable, intent(out) :: kminor_start_atm_red
 
     # # Local variables
     # integer :: i, j
@@ -1463,7 +1490,7 @@ kminor_start_atm
  # Utility function to combine optical depths from gas absorption and Rayleigh scattering
  #   (and reorder them for convenience, while we're at it)
  #
- function combine_and_reorder(tau, tau_rayleigh, has_rayleigh, optical_props::ty_optical_props_arry)
+ function combine_and_reorder!(tau, tau_rayleigh, has_rayleigh, optical_props::ty_optical_props_arry)
     # real(FT), dimension(:,:,:),   intent(in) :: tau
     # real(FT), dimension(:,:,:),   intent(in) :: tau_rayleigh
     # logical,                      intent(in) :: has_rayleigh
@@ -1504,8 +1531,8 @@ kminor_start_atm
           #$acc exit data copyout(optical_props%tau)
         elseif optical_props isa ty_optical_props_2str
           #$acc enter data create(optical_props%tau, optical_props%ssa, optical_props%g)
-          combine_and_reorder_2str!(ncol, nlay, ngpt,       tau, tau_rayleigh,
-                                        optical_props.tau, optical_props.ssa, optical_props.g)
+          optical_props.tau, optical_props.ssa, optical_props.g =
+            combine_and_reorder_2str(ncol, nlay, ngpt,       tau, tau_rayleigh)
           #$acc exit data copyout(optical_props%tau, optical_props%ssa, optical_props%g)
         elseif optical_props isa ty_optical_props_nstr # We ought to be able to combine this with above
           nmom = size(optical_props.p, 1)

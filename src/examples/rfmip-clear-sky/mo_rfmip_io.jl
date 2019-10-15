@@ -274,8 +274,6 @@ module mo_rfmip_io
     else
       error("determine_gas_names: unknown value of forcing_index")
     end
-    @show forcing_index
-    @show names_in_kdist, names_in_file
     return names_in_kdist, names_in_file
 
   end
@@ -365,7 +363,7 @@ module mo_rfmip_io
     end
     nblocks = Int((ncol_l*nexp_l)/blocksize)
     gas_concs = ty_gas_concs(Float64, ncol_l, nlay_l)
-    gas_conc_array = Vector([gas_concs for i in 1:nblocks])
+    gas_conc_array = Vector([deepcopy(gas_concs) for i in 1:nblocks])
     # gas_conc_array = Vector()
 #    allocate(gas_conc_array(nblocks))
     # Experiment index for each colum
@@ -373,7 +371,7 @@ module mo_rfmip_io
     # ORIGINAL: exp_num = reshape(spread([(b, b = 1, nexp_l)], 1, ncopies = ncol_l), shape = [blocksize, nblocks], order=[1,2])
 
     exp_num = freshape(spread(convert(Array,collect(1:nexp_l)'), 1, ncol_l), [blocksize, nblocks], order=[1,2])
-    test_data(exp_num, "exp_num")
+    # test_data(exp_num, "exp_num")
 
 
 #    if(nf90_open(trim(fileName), NF90_NOWRITE, ncid) /= NF90_NOERR) &
@@ -386,7 +384,7 @@ module mo_rfmip_io
     #                           shape = [nlay_l, blocksize, nblocks]) * read_scaling(ncid, "water_vapor")
 
     gas_conc_temp_3d = reshape( ds["water_vapor"][:], nlay_l, blocksize, nblocks ) .* read_scaling(ds,"water_vapor")
-    test_data(gas_conc_temp_3d, "gas_conc_temp_3d")
+    # test_data(gas_conc_temp_3d, "water_vapor_gas_conc_temp_3d")
 
     for b = 1:nblocks
       gas_conc_temp_3d_t = transpose(gas_conc_temp_3d[:,:,b])
@@ -395,10 +393,9 @@ module mo_rfmip_io
       set_vmr!(gas_conc_array[b], "h2o", gas_conc_temp_3d_a, size(gas_conc_temp_3d_a))
     end
 
-#    gas_conc_temp_3d = reshape(read_field(ncid, "ozone", nlay_l, ncol_l, nexp_l), &
-#                               shape = [nlay_l, blocksize, nblocks]) * read_scaling(ncid, "ozone")
 
     gas_conc_temp_3d = reshape( ds["ozone"][:], nlay_l, blocksize, nblocks ) * read_scaling(ds,"ozone")
+    # test_data(gas_conc_temp_3d, "ozone_gas_conc_temp_3d")
 
     for b = 1:nblocks
       set_vmr!(gas_conc_array[b],"o3", convert(Array, transpose(gas_conc_temp_3d[:,:,b])))
@@ -436,11 +433,12 @@ module mo_rfmip_io
       end
 
     end
-    for b = 1:length(gas_names)
-      for igas = 1:length(gas_conc_array[b].concs)
-        test_data(gas_conc_array[b], "gas_conc_b"*string(b)*"_i"*string(igas))
-      end
-    end
+
+    # for b = 1:nblocks
+    #   for igas = 1:length(gas_conc_array[b].concs)
+    #     test_data(gas_conc_array[b].concs[igas].conc, "gas_conc_b"*string(b)*"_i"*string(igas))
+    #   end
+    # end
     return gas_conc_array
   end
   #--------------------------------------------------------------------------------------------------------------------

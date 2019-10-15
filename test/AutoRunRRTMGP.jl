@@ -1,8 +1,13 @@
 
 
+# PS = Sys.iswindows() ? "\\" : "/"
+# PS = "/"
 if Sys.iswindows()
-  ENV["NCHOME"] = "/usr/local/"
-  ENV["NFHOME"] = "/usr/local/"
+  # ENV["NCHOME"] = joinpath("C:","Program Files","netCDF 4.7.1","bin")
+  # ENV["NCHOME"] = joinpath("C:","Program Files","netCDF 4.7.1","lib")
+  ENV["NCHOME"] = joinpath("C:","Program Files","netCDF 4.7.1")
+  # ENV["NFHOME"] = joinpath("C:","MinGW","bin")
+  ENV["NFHOME"] = joinpath("C:","MinGW")
 else
 # ENV["NCHOME"] = "/usr/local/Cellar/netcdf/4.6.1_4"
   ENV["NCHOME"] = "/usr/local/"
