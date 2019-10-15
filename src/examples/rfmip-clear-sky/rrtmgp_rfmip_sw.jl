@@ -241,7 +241,7 @@ module rrtmgp_rfmip_sw
   flux_dn = Array{FT}(undef, block_size, nlay+1, nblocks)
   mu0 = Array{FT}(undef, block_size)
   sfc_alb_spec = Array{FT}(undef, nbnd,block_size)
-  stop_on_err(alloc!(optical_props, block_size, nlay, k_dist))
+  alloc!(optical_props, block_size, nlay, k_dist)
   #$acc enter data create(optical_props, optical_props%tau, optical_props%ssa, optical_props%g)
   #$acc enter data create (toa_flux, def_tsi)
   #$acc enter data create (sfc_alb_spec, mu0)
@@ -270,12 +270,12 @@ module rrtmgp_rfmip_sw
 #ifdef USE_TIMING
     # ret =  gptlstart('gas_optics (SW)')
 #endif
-    stop_on_err(gas_optics!(k_dist,p_lay[:,:,b],
+    gas_optics!(k_dist,p_lay[:,:,b],
                                   p_lev[:,:,b],
                                   t_lay[:,:,b],
                                   gas_conc_array[b],
                                   optical_props,
-                                  toa_flux))
+                                  toa_flux)
 #ifdef USE_TIMING
     # ret =  gptlstop('gas_optics (SW)')
 #endif
@@ -331,13 +331,13 @@ module rrtmgp_rfmip_sw
 #ifdef USE_TIMING
     # ret =  gptlstart('rte_sw')
 #endif
-    stop_on_err(rte_sw(optical_props,
+    rte_sw(optical_props,
                             top_at_1,
                             mu0,
                             toa_flux,
                             sfc_alb_spec,
                             sfc_alb_spec,
-                            fluxes))
+                            fluxes)
 #ifdef USE_TIMING
     # ret =  gptlstop('rte_sw')
 #endif
