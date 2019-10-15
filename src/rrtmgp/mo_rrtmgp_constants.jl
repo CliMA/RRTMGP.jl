@@ -20,7 +20,7 @@
 #   host model but may be changed in a call to init_constants(), normally at initialization
 # -------------------------------------------------------------------------------------------------
 module mo_rrtmgp_constants
-  # use mo_rte_kind, only: wp
+  # use mo_rte_kind, only: FT
 
   export k_boltz,
          m_h2o,
@@ -34,16 +34,16 @@ module mo_rrtmgp_constants
   # Physical constants, 2018 SI defintion of metric system
   #   doi:10.1088/1681-7575/aa950a (see also https://www.nist.gov/si-redefinition/meet-constants)
   # Boltzmann constant [J/K] = [(kg m^2)/(K s^2)]
-  k_boltz(::Type{DT}) where DT = DT(1.380649e-23)
+  k_boltz(::Type{FT}) where FT = FT(1.380649e-23)
 
   #  molecular weight of water [kg/mol]
-  m_h2o(::Type{DT}) where DT = DT( 0.018016)
+  m_h2o(::Type{FT}) where FT = FT( 0.018016)
 
   # Avogadro's number [molec/mol]
-  avogad(::Type{DT}) where DT = DT(6.02214076e23)
+  avogad(::Type{FT}) where FT = FT(6.02214076e23)
 
   # Universal gas constant [J/(mol K)]
-  R_univ_gconst(::Type{DT}) where DT = DT(avogad * k_boltz)
+  R_univ_gconst(::Type{FT}) where FT = avogad(FT) * k_boltz(FT)
 
   # -----------------------------------------
   #
@@ -51,12 +51,12 @@ module mo_rrtmgp_constants
   #   might be different on e.g. other planets
 
   # molecular weight of dry air [kg/mol]
-  m_dry(::Type{DT}) where DT = DT(0.028964)
+  m_dry(::Type{FT}) where FT = FT(0.028964)
 
   # Gravity at Earth's surface [m/s2]
-  grav(::Type{DT}) where DT = DT(9.80665)
+  grav(::Type{FT}) where FT = FT(9.80665)
 
   # Specific heat at constant pressure for dry air [J/(K kg)]
-  cp_dry(::Type{DT}) where DT = DT(1004.64)
+  cp_dry(::Type{FT}) where FT = FT(1004.64)
 
 end

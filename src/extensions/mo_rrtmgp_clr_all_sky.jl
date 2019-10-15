@@ -20,7 +20,7 @@
 #   will use either this module or the underling modules, but not both
 #
 module mo_rrtmgp_clr_all_sky
-  use mo_rte_kind,   only: wp
+  use mo_rte_kind,   only: FT
   use mo_gas_optics, &
                         only: ty_gas_optics
   use mo_gas_concentrations, &
@@ -49,21 +49,21 @@ contains
                      aer_props, col_dry, t_lev, inc_flux, n_gauss_angles) result(error_msg)
     class(ty_gas_optics),              intent(in   ) :: k_dist       #< derived type with spectral information
     type(ty_gas_concs),                intent(in   ) :: gas_concs    #< derived type encapsulating gas concentrations
-    real(wp), dimension(:,:),          intent(in   ) :: p_lay, t_lay #< pressure [Pa], temperature [K] at layer centers (ncol,nlay)
-    real(wp), dimension(:,:),          intent(in   ) :: p_lev        #< pressure at levels/interfaces [Pa] (ncol,nlay+1)
-    real(wp), dimension(:),            intent(in   ) :: t_sfc     #< surface temperature           [K]  (ncol)
-    real(wp), dimension(:,:),          intent(in   ) :: sfc_emis  #< emissivity at surface         []   (nband, ncol)
+    real(FT), dimension(:,:),          intent(in   ) :: p_lay, t_lay #< pressure [Pa], temperature [K] at layer centers (ncol,nlay)
+    real(FT), dimension(:,:),          intent(in   ) :: p_lev        #< pressure at levels/interfaces [Pa] (ncol,nlay+1)
+    real(FT), dimension(:),            intent(in   ) :: t_sfc     #< surface temperature           [K]  (ncol)
+    real(FT), dimension(:,:),          intent(in   ) :: sfc_emis  #< emissivity at surface         []   (nband, ncol)
     class(ty_optical_props_arry),      intent(in   ) :: cloud_props #< cloud optical properties (ncol,nlay,ngpt)
     class(ty_fluxes),                  intent(inout) :: allsky_fluxes, clrsky_fluxes
 
     # Optional inputs
     class(ty_optical_props_arry),  &
               optional,       intent(in ) :: aer_props   #< aerosol optical properties
-    real(wp), dimension(:,:), &
+    real(FT), dimension(:,:), &
               optional,       intent(in ) :: col_dry #< Molecular number density (ncol, nlay)
-    real(wp), dimension(:,:), target, &
+    real(FT), dimension(:,:), target, &
               optional,       intent(in ) :: t_lev     #< temperature at levels [K] (ncol, nlay+1)
-    real(wp), dimension(:,:), target, &
+    real(FT), dimension(:,:), target, &
               optional,       intent(in ) :: inc_flux   #< incident flux at domain top [W/m2] (ncol, ngpts)
     integer,  optional,       intent(in ) :: n_gauss_angles # Number of angles used in Gaussian quadrature (no-scattering solution)
     character(len=128)                    :: error_msg
@@ -180,10 +180,10 @@ contains
                                  aer_props, col_dry, inc_flux, tsi_scaling) result(error_msg)
     class(ty_gas_optics),              intent(in   ) :: k_dist       #< derived type with spectral information
     type(ty_gas_concs),                intent(in   ) :: gas_concs    #< derived type encapsulating gas concentrations
-    real(wp), dimension(:,:),          intent(in   ) :: p_lay, t_lay #< pressure [Pa], temperature [K] at layer centers (ncol,nlay)
-    real(wp), dimension(:,:),          intent(in   ) :: p_lev        #< pressure at levels/interfaces [Pa] (ncol,nlay+1)
-    real(wp), dimension(:  ),          intent(in   ) :: mu0          #< cosine of solar zenith angle
-    real(wp), dimension(:,:),          intent(in   ) :: sfc_alb_dir, sfc_alb_dif
+    real(FT), dimension(:,:),          intent(in   ) :: p_lay, t_lay #< pressure [Pa], temperature [K] at layer centers (ncol,nlay)
+    real(FT), dimension(:,:),          intent(in   ) :: p_lev        #< pressure at levels/interfaces [Pa] (ncol,nlay+1)
+    real(FT), dimension(:  ),          intent(in   ) :: mu0          #< cosine of solar zenith angle
+    real(FT), dimension(:,:),          intent(in   ) :: sfc_alb_dir, sfc_alb_dif
                                                         #  surface albedo for direct and diffuse radiation (band, col)
     class(ty_optical_props_arry),      intent(in   ) :: cloud_props #< cloud optical properties (ncol,nlay,ngpt)
     class(ty_fluxes),                  intent(inout) :: allsky_fluxes, clrsky_fluxes
@@ -191,17 +191,17 @@ contains
     # Optional inputs
     class(ty_optical_props_arry),   target, &
               optional,       intent(in ) :: aer_props   #< aerosol optical properties
-    real(wp), dimension(:,:), &
+    real(FT), dimension(:,:), &
               optional,       intent(in ) :: col_dry, &  #< Molecular number density (ncol, nlay)
                                              inc_flux    #< incident flux at domain top [W/m2] (ncol, ngpts)
-    real(wp), optional,       intent(in ) :: tsi_scaling #< Optional scaling for total solar irradiance
+    real(FT), optional,       intent(in ) :: tsi_scaling #< Optional scaling for total solar irradiance
 
     character(len=128)                    :: error_msg
     # --------------------------------
     # Local variables
     #
     class(ty_optical_props_arry), allocatable :: optical_props
-    real(wp), dimension(:,:),     allocatable :: toa_flux
+    real(FT), dimension(:,:),     allocatable :: toa_flux
     integer :: ncol, nlay, ngpt, nband, nstr
     logical :: top_at_1
     # --------------------------------

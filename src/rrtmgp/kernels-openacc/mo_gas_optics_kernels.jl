@@ -15,7 +15,7 @@
 #   source functions.
 
 module mo_gas_optics_kernels
-  use mo_rte_kind,      only: wp, wl
+  use mo_rte_kind,      only: FT, wl
   implicit none
 contains
   # --------------------------------------------------------------------------------------
@@ -34,33 +34,33 @@ contains
     integer,                            intent(in) :: ncol,nlay
     integer,                            intent(in) :: ngas,nflav,neta,npres,ntemp
     integer,     dimension(2,nflav),    intent(in) :: flavor
-    real(wp),    dimension(npres),      intent(in) :: press_ref_log
-    real(wp),    dimension(ntemp),      intent(in) :: temp_ref
-    real(wp),                           intent(in) :: press_ref_log_delta, &
+    real(FT),    dimension(npres),      intent(in) :: press_ref_log
+    real(FT),    dimension(ntemp),      intent(in) :: temp_ref
+    real(FT),                           intent(in) :: press_ref_log_delta, &
                                                       temp_ref_min, temp_ref_delta, &
                                                       press_ref_trop_log
-    real(wp),    dimension(2,0:ngas,ntemp), intent(in) :: vmr_ref
+    real(FT),    dimension(2,0:ngas,ntemp), intent(in) :: vmr_ref
 
     # inputs from profile or parent function
-    real(wp),    dimension(ncol,nlay),        intent(in) :: play, tlay
-    real(wp),    dimension(ncol,nlay,0:ngas), intent(in) :: col_gas
+    real(FT),    dimension(ncol,nlay),        intent(in) :: play, tlay
+    real(FT),    dimension(ncol,nlay,0:ngas), intent(in) :: col_gas
 
     # outputs
     integer,     dimension(ncol,nlay), intent(out) :: jtemp, jpress
     logical(wl), dimension(ncol,nlay), intent(out) :: tropo
     integer,     dimension(2,    nflav,ncol,nlay), intent(out) :: jeta
-    real(wp),    dimension(2,    nflav,ncol,nlay), intent(out) :: col_mix
-    real(wp),    dimension(2,2,2,nflav,ncol,nlay), intent(out) :: fmajor
-    real(wp),    dimension(2,2,  nflav,ncol,nlay), intent(out) :: fminor
+    real(FT),    dimension(2,    nflav,ncol,nlay), intent(out) :: col_mix
+    real(FT),    dimension(2,2,2,nflav,ncol,nlay), intent(out) :: fmajor
+    real(FT),    dimension(2,2,  nflav,ncol,nlay), intent(out) :: fminor
     # -----------------
     # local
-    real(wp), dimension(ncol,nlay) :: ftemp, fpress # interpolation fraction for temperature, pressure
-    real(wp) :: locpress # needed to find location in pressure grid
-    real(wp) :: ratio_eta_half # ratio of vmrs of major species that defines eta=0.5
+    real(FT), dimension(ncol,nlay) :: ftemp, fpress # interpolation fraction for temperature, pressure
+    real(FT) :: locpress # needed to find location in pressure grid
+    real(FT) :: ratio_eta_half # ratio of vmrs of major species that defines eta=0.5
                                # for given flavor and reference temperature level
-    real(wp) :: eta, feta      # binary_species_parameter, interpolation variable for eta
-    real(wp) :: loceta         # needed to find location in eta grid
-    real(wp) :: ftemp_term
+    real(FT) :: eta, feta      # binary_species_parameter, interpolation variable for eta
+    real(FT) :: loceta         # needed to find location in eta grid
+    real(FT) :: ftemp_term
     # -----------------
     # local indexes
     integer :: icol, ilay, iflav, igases(2), itropo, itemp
@@ -112,7 +112,7 @@ contains
             feta = mod(loceta, 1.0_wp)
             # compute interpolation fractions needed for minor species
             # ftemp_term = (1._wp-ftemp(icol,ilay)) for itemp = 1, ftemp(icol,ilay) for itemp=2
-            ftemp_term = (real(2-itemp, wp) + real(2*itemp-3, wp) * ftemp(icol,ilay))
+            ftemp_term = (real(2-itemp, FT) + real(2*itemp-3, FT) * ftemp(icol,ilay))
             fminor(1,itemp,iflav,icol,ilay) = (1._wp-feta) * ftemp_term
             fminor(2,itemp,iflav,icol,ilay) =        feta  * ftemp_term
             # compute interpolation fractions needed for major species
@@ -173,9 +173,9 @@ contains
     # inputs from object
     integer,     dimension(2,ngpt),                  intent(in) :: gpoint_flavor
     integer,     dimension(2,nbnd),                  intent(in) :: band_lims_gpt
-    real(wp),    dimension(ngpt,neta,npres+1,ntemp), intent(in) :: kmajor
-    real(wp),    dimension(nminorklower,neta,ntemp), intent(in) :: kminor_lower
-    real(wp),    dimension(nminorkupper,neta,ntemp), intent(in) :: kminor_upper
+    real(FT),    dimension(ngpt,neta,npres+1,ntemp), intent(in) :: kmajor
+    real(FT),    dimension(nminorklower,neta,ntemp), intent(in) :: kminor_lower
+    real(FT),    dimension(nminorkupper,neta,ntemp), intent(in) :: kminor_upper
     integer,     dimension(2,nminorlower),           intent(in) :: minor_limits_gpt_lower
     integer,     dimension(2,nminorupper),           intent(in) :: minor_limits_gpt_upper
     logical(wl), dimension(  nminorlower),           intent(in) :: minor_scales_with_density_lower
@@ -191,17 +191,17 @@ contains
     logical(wl), dimension(ncol,nlay),               intent(in) :: tropo
     # ---------------------
     # inputs from profile or parent function
-    real(wp), dimension(2,    nflav,ncol,nlay       ), intent(in) :: col_mix
-    real(wp), dimension(2,2,2,nflav,ncol,nlay       ), intent(in) :: fmajor
-    real(wp), dimension(2,2,  nflav,ncol,nlay       ), intent(in) :: fminor
-    real(wp), dimension(            ncol,nlay       ), intent(in) :: play, tlay      # pressure and temperature
-    real(wp), dimension(            ncol,nlay,0:ngas), intent(in) :: col_gas
+    real(FT), dimension(2,    nflav,ncol,nlay       ), intent(in) :: col_mix
+    real(FT), dimension(2,2,2,nflav,ncol,nlay       ), intent(in) :: fmajor
+    real(FT), dimension(2,2,  nflav,ncol,nlay       ), intent(in) :: fminor
+    real(FT), dimension(            ncol,nlay       ), intent(in) :: play, tlay      # pressure and temperature
+    real(FT), dimension(            ncol,nlay,0:ngas), intent(in) :: col_gas
     integer,  dimension(2,    nflav,ncol,nlay       ), intent(in) :: jeta
     integer,  dimension(            ncol,nlay       ), intent(in) :: jtemp
     integer,  dimension(            ncol,nlay       ), intent(in) :: jpress
     # ---------------------
     # output - optical depth
-    real(wp), dimension(ngpt,nlay,ncol), intent(inout) :: tau
+    real(FT), dimension(ngpt,nlay,ncol), intent(inout) :: tau
     # ---------------------
     # Local variables
     #
@@ -314,20 +314,20 @@ contains
     # inputs from object
     integer,  dimension(2,ngpt),  intent(in) :: gpoint_flavor
     integer,  dimension(2,nbnd),  intent(in) :: band_lims_gpt # start and end g-point for each band
-    real(wp), dimension(ngpt,neta,npres+1,ntemp), intent(in) :: kmajor
+    real(FT), dimension(ngpt,neta,npres+1,ntemp), intent(in) :: kmajor
 
     # inputs from profile or parent function
-    real(wp),    dimension(2,    nflav,ncol,nlay), intent(in) :: col_mix
-    real(wp),    dimension(2,2,2,nflav,ncol,nlay), intent(in) :: fmajor
+    real(FT),    dimension(2,    nflav,ncol,nlay), intent(in) :: col_mix
+    real(FT),    dimension(2,2,2,nflav,ncol,nlay), intent(in) :: fmajor
     integer,     dimension(2,    nflav,ncol,nlay), intent(in) :: jeta
     logical(wl), dimension(ncol,nlay), intent(in) :: tropo
     integer,     dimension(ncol,nlay), intent(in) :: jtemp, jpress
 
     # outputs
-    real(wp), dimension(ngpt,nlay,ncol), intent(inout) :: tau
+    real(FT), dimension(ngpt,nlay,ncol), intent(inout) :: tau
     # -----------------
     # local variables
-    real(wp) :: tau_major # major species optical depth
+    real(FT) :: tau_major # major species optical depth
     # local index
     integer :: icol, ilay, iflav, igpt, itropo
 
@@ -381,24 +381,24 @@ contains
     integer,                                     intent(in   ) :: ntemp,neta,nminor,nminork
     integer,                                     intent(in   ) :: idx_h2o, idx_tropo
     integer,     dimension(2, ngpt),             intent(in   ) :: gpt_flv
-    real(wp),    dimension(nminork,neta,ntemp),  intent(in   ) :: kminor
+    real(FT),    dimension(nminork,neta,ntemp),  intent(in   ) :: kminor
     integer,     dimension(2,nminor),            intent(in   ) :: minor_limits_gpt
     logical(wl), dimension(  nminor),            intent(in   ) :: minor_scales_with_density
     logical(wl), dimension(  nminor),            intent(in   ) :: scale_by_complement
     integer,     dimension(  nminor),            intent(in   ) :: kminor_start
     integer,     dimension(  nminor),            intent(in   ) :: idx_minor, idx_minor_scaling
-    real(wp),    dimension(ncol,nlay),           intent(in   ) :: play, tlay
-    real(wp),    dimension(ncol,nlay,0:ngas),    intent(in   ) :: col_gas
-    real(wp),    dimension(2,2,nflav,ncol,nlay), intent(in   ) :: fminor
+    real(FT),    dimension(ncol,nlay),           intent(in   ) :: play, tlay
+    real(FT),    dimension(ncol,nlay,0:ngas),    intent(in   ) :: col_gas
+    real(FT),    dimension(2,2,nflav,ncol,nlay), intent(in   ) :: fminor
     integer,     dimension(2,  nflav,ncol,nlay), intent(in   ) :: jeta
     integer,     dimension(ncol, 2),             intent(in   ) :: layer_limits
     integer,     dimension(ncol,nlay),           intent(in   ) :: jtemp
-    real(wp),    dimension(ngpt,nlay,ncol),      intent(inout) :: tau
+    real(FT),    dimension(ngpt,nlay,ncol),      intent(inout) :: tau
     # -----------------
     # local variables
-    real(wp), parameter :: PaTohPa = 0.01
-    real(wp) :: vmr_fact, dry_fact             # conversion from column abundance to dry vol. mixing ratio;
-    real(wp) :: scaling, kminor_loc, tau_minor # minor species absorption coefficient, optical depth
+    real(FT), parameter :: PaTohPa = 0.01
+    real(FT) :: vmr_fact, dry_fact             # conversion from column abundance to dry vol. mixing ratio;
+    real(FT) :: scaling, kminor_loc, tau_minor # minor species absorption coefficient, optical depth
     integer  :: icol, ilay, iflav, igpt, imnr
     integer  :: gptS, gptE
     integer  :: minor_start, minor_loc, extent
@@ -478,19 +478,19 @@ contains
     integer,                                     intent(in ) :: ngas,nflav,neta,npres,ntemp
     integer,     dimension(2,ngpt),              intent(in ) :: gpoint_flavor
     integer,     dimension(2,nbnd),              intent(in ) :: band_lims_gpt # start and end g-point for each band
-    real(wp),    dimension(ngpt,neta,ntemp,2),   intent(in ) :: krayl
+    real(FT),    dimension(ngpt,neta,ntemp,2),   intent(in ) :: krayl
     integer,                                     intent(in ) :: idx_h2o
-    real(wp),    dimension(ncol,nlay),           intent(in ) :: col_dry
-    real(wp),    dimension(ncol,nlay,0:ngas),    intent(in ) :: col_gas
-    real(wp),    dimension(2,2,nflav,ncol,nlay), intent(in ) :: fminor
+    real(FT),    dimension(ncol,nlay),           intent(in ) :: col_dry
+    real(FT),    dimension(ncol,nlay,0:ngas),    intent(in ) :: col_gas
+    real(FT),    dimension(2,2,nflav,ncol,nlay), intent(in ) :: fminor
     integer,     dimension(2,  nflav,ncol,nlay), intent(in ) :: jeta
     logical(wl), dimension(ncol,nlay),           intent(in ) :: tropo
     integer,     dimension(ncol,nlay),           intent(in ) :: jtemp
     # outputs
-    real(wp),    dimension(ngpt,nlay,ncol),      intent(out) :: tau_rayleigh
+    real(FT),    dimension(ngpt,nlay,ncol),      intent(out) :: tau_rayleigh
     # -----------------
     # local variables
-    real(wp) :: k # rayleigh scattering coefficient
+    real(FT) :: k # rayleigh scattering coefficient
     integer  :: icol, ilay, iflav, igpt
     integer  :: itropo
     # -----------------
@@ -521,33 +521,33 @@ contains
                     sfc_src, lay_src, lev_src_inc, lev_src_dec) bind(C, name="compute_Planck_source")
     integer,                                    intent(in) :: ncol, nlay, nbnd, ngpt
     integer,                                    intent(in) :: nflav, neta, npres, ntemp, nPlanckTemp
-    real(wp),    dimension(ncol,nlay  ),        intent(in) :: tlay
-    real(wp),    dimension(ncol,nlay+1),        intent(in) :: tlev
-    real(wp),    dimension(ncol       ),        intent(in) :: tsfc
+    real(FT),    dimension(ncol,nlay  ),        intent(in) :: tlay
+    real(FT),    dimension(ncol,nlay+1),        intent(in) :: tlev
+    real(FT),    dimension(ncol       ),        intent(in) :: tsfc
     integer,                                    intent(in) :: sfc_lay
     # Interpolation variables
-    real(wp),    dimension(2,2,2,nflav,ncol,nlay), intent(in) :: fmajor
+    real(FT),    dimension(2,2,2,nflav,ncol,nlay), intent(in) :: fmajor
     integer,     dimension(2,    nflav,ncol,nlay), intent(in) :: jeta
     logical(wl), dimension(            ncol,nlay), intent(in) :: tropo
     integer,     dimension(            ncol,nlay), intent(in) :: jtemp, jpress
     # Table-specific
     integer, dimension(ngpt),                     intent(in) :: gpoint_bands # start and end g-point for each band
     integer, dimension(2, nbnd),                  intent(in) :: band_lims_gpt # start and end g-point for each band
-    real(wp),                                     intent(in) :: temp_ref_min, totplnk_delta
-    real(wp), dimension(ngpt,neta,npres+1,ntemp), intent(in) :: pfracin
-    real(wp), dimension(nPlanckTemp,nbnd),        intent(in) :: totplnk
+    real(FT),                                     intent(in) :: temp_ref_min, totplnk_delta
+    real(FT), dimension(ngpt,neta,npres+1,ntemp), intent(in) :: pfracin
+    real(FT), dimension(nPlanckTemp,nbnd),        intent(in) :: totplnk
     integer,  dimension(2,ngpt),                  intent(in) :: gpoint_flavor
 
-    real(wp), dimension(ngpt,     ncol), intent(out) :: sfc_src
-    real(wp), dimension(ngpt,nlay,ncol), intent(out) :: lay_src
-    real(wp), dimension(ngpt,nlay,ncol), intent(out) :: lev_src_inc, lev_src_dec
+    real(FT), dimension(ngpt,     ncol), intent(out) :: sfc_src
+    real(FT), dimension(ngpt,nlay,ncol), intent(out) :: lay_src
+    real(FT), dimension(ngpt,nlay,ncol), intent(out) :: lev_src_inc, lev_src_dec
     # -----------------
     # local
     integer  :: ilay, icol, igpt, ibnd, itropo, iflav
     integer  :: gptS, gptE
-    real(wp), dimension(2), parameter :: one = [1._wp, 1._wp]
-    real(wp) :: pfrac          (ngpt,nlay,  ncol)
-    real(wp) :: planck_function(nbnd,nlay+1,ncol)
+    real(FT), dimension(2), parameter :: one = [1._wp, 1._wp]
+    real(FT) :: pfrac          (ngpt,nlay,  ncol)
+    real(FT) :: planck_function(nbnd,nlay+1,ncol)
     # -----------------
 
     #$acc enter data copyin(tlay,tlev,tsfc,fmajor,jeta,tropo,jtemp,jpress,gpoint_bands,pfracin,totplnk,gpoint_flavor,one)
@@ -645,18 +645,18 @@ contains
   subroutine interpolate1D(val, offset, delta, table, res)
   #$acc routine seq
     # input
-    real(wp), intent(in) :: val,    & # axis value at which to evaluate table
+    real(FT), intent(in) :: val,    & # axis value at which to evaluate table
                             offset, & # minimum of table axis
                             delta     # step size of table axis
-    real(wp), dimension(:,:), &
+    real(FT), dimension(:,:), &
               intent(in) :: table # dimensions (axis, values)
     # output
-    real(wp), intent(out) ,dimension(size(table,dim=2)) :: res
+    real(FT), intent(out) ,dimension(size(table,dim=2)) :: res
 
     # local
-    real(wp) :: val0 # fraction index adjusted by offset and delta
+    real(FT) :: val0 # fraction index adjusted by offset and delta
     integer :: index # index term
-    real(wp) :: frac # fractional term
+    real(FT) :: frac # fractional term
     # -------------------------------------
     val0 = (val - offset) / delta
     frac = val0 - int(val0) # get fractional part
@@ -668,13 +668,13 @@ contains
   #
   function interpolate2D(fminor, k, igpt, jeta, jtemp) result(res)
   #$acc routine seq
-    real(wp), dimension(2,2), intent(in) :: fminor # interpolation fractions for minor species
+    real(FT), dimension(2,2), intent(in) :: fminor # interpolation fractions for minor species
                                        # index(1) : reference eta level (temperature dependent)
                                        # index(2) : reference temperature level
-    real(wp), dimension(:,:,:), intent(in) :: k # (g-point, eta, temp)
+    real(FT), dimension(:,:,:), intent(in) :: k # (g-point, eta, temp)
     integer,                    intent(in) :: igpt, jtemp # interpolation index for temperature
     integer, dimension(2),      intent(in) :: jeta # interpolation index for binary species parameter (eta)
-    real(wp)                             :: res # the result
+    real(FT)                             :: res # the result
 
     res =  &
       fminor(1,1) * k(igpt, jeta(1)  , jtemp  ) + &
@@ -687,17 +687,17 @@ contains
   # interpolation in temperature, pressure, and eta
   function interpolate3D(scaling, fmajor, k, igpt, jeta, jtemp, jpress) result(res)
   #$acc routine seq
-    real(wp), dimension(2),     intent(in) :: scaling
-    real(wp), dimension(2,2,2), intent(in) :: fmajor # interpolation fractions for major species
+    real(FT), dimension(2),     intent(in) :: scaling
+    real(FT), dimension(2,2,2), intent(in) :: fmajor # interpolation fractions for major species
                                                      # index(1) : reference eta level (temperature dependent)
                                                      # index(2) : reference pressure level
                                                      # index(3) : reference temperature level
-    real(wp), dimension(:,:,:,:),intent(in) :: k # (gpt, eta,temp,press)
+    real(FT), dimension(:,:,:,:),intent(in) :: k # (gpt, eta,temp,press)
     integer,                     intent(in) :: igpt
     integer, dimension(2),       intent(in) :: jeta # interpolation index for binary species parameter (eta)
     integer,                     intent(in) :: jtemp # interpolation index for temperature
     integer,                     intent(in) :: jpress # interpolation index for pressure
-    real(wp)                                :: res # the result
+    real(FT)                                :: res # the result
     # each code block is for a different reference temperature
     res =  &
       scaling(1) * &
@@ -719,11 +719,11 @@ contains
   subroutine combine_and_reorder_2str(ncol, nlay, ngpt, tau_abs, tau_rayleigh, tau, ssa, g) &
       bind(C, name="combine_and_reorder_2str")
     integer,                             intent(in) :: ncol, nlay, ngpt
-    real(wp), dimension(ngpt,nlay,ncol), intent(in   ) :: tau_abs, tau_rayleigh
-    real(wp), dimension(ncol,nlay,ngpt), intent(inout) :: tau, ssa, g # inout because components are allocated
+    real(FT), dimension(ngpt,nlay,ncol), intent(in   ) :: tau_abs, tau_rayleigh
+    real(FT), dimension(ncol,nlay,ngpt), intent(inout) :: tau, ssa, g # inout because components are allocated
     # -----------------------
     integer  :: icol, ilay, igpt
-    real(wp) :: t
+    real(FT) :: t
     # -----------------------
     #$acc parallel loop collapse(3) &
     #$acc&     copy(tau, ssa, g) &
@@ -751,13 +751,13 @@ contains
   subroutine combine_and_reorder_nstr(ncol, nlay, ngpt, nmom, tau_abs, tau_rayleigh, tau, ssa, p) &
       bind(C, name="combine_and_reorder_nstr")
     integer, intent(in) :: ncol, nlay, ngpt, nmom
-    real(wp), dimension(ngpt,nlay,ncol), intent(in ) :: tau_abs, tau_rayleigh
-    real(wp), dimension(ncol,nlay,ngpt), intent(inout) :: tau, ssa
-    real(wp), dimension(ncol,nlay,ngpt,nmom), &
+    real(FT), dimension(ngpt,nlay,ncol), intent(in ) :: tau_abs, tau_rayleigh
+    real(FT), dimension(ncol,nlay,ngpt), intent(inout) :: tau, ssa
+    real(FT), dimension(ncol,nlay,ngpt,nmom), &
                                          intent(inout) :: p
     # -----------------------
     integer :: icol, ilay, igpt, imom
-    real(wp) :: t
+    real(FT) :: t
     # -----------------------
     #$acc parallel loop collapse(3) &
     #$acc&     copy(tau, ssa, p) &

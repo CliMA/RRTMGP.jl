@@ -19,7 +19,7 @@ module mo_compute_bc
   #   especially in the longwave
   # The boundary condition is on diffuse flux in the LW and direct flux in the SW
   # -------------------------------------------------------------------------------------------------
-  use mo_rte_kind,           only: wp, wl
+  use mo_rte_kind,           only: FT, wl
   use mo_source_functions,   only: ty_source_func_lw
   use mo_gas_concentrations, only: ty_gas_concs
   use mo_optical_props,      only: ty_optical_props, ty_optical_props_arry, &
@@ -36,7 +36,7 @@ module mo_compute_bc
   # Extend ty_fluxes to report spectrally-resolved downwelling flux at a single layer
   #
   type, extends(ty_fluxes) :: ty_fluxes_1lev
-    real(wp), dimension(:,:), pointer :: gpt_flux_dn => NULL()    # (ncol, nlev, nband)
+    real(FT), dimension(:,:), pointer :: gpt_flux_dn => NULL()    # (ncol, nlev, nband)
   contains
     procedure :: reduce => reduce_1lev
     procedure :: are_desired => are_desired_1lev
@@ -50,13 +50,13 @@ contains
                       play, plev, tlay, gas_concs, &
                       flux_bc, mu0) result(error_msg)
     class(ty_gas_optics),     intent(in   ) :: k_dist
-    real(wp), dimension(:,:), intent(in   ) :: play, &    # layer pressures [Pa, mb]; (ncol,nlay)
+    real(FT), dimension(:,:), intent(in   ) :: play, &    # layer pressures [Pa, mb]; (ncol,nlay)
                                                plev, &    # level pressures [Pa, mb]; (ncol,nlay+1)
                                                tlay       # layer temperatures [K]; (ncol,nlay)
     type(ty_gas_concs),       intent(in   ) :: gas_concs  # Gas volume mixing ratios
-    real(wp), dimension(:,:), target, &
+    real(FT), dimension(:,:), target, &
                               intent(  out) :: flux_bc    # Boundary condition to be applied (ncol,ngpt)
-    real(wp), dimension(:), optional, &
+    real(FT), dimension(:), optional, &
                               intent(in   ) :: mu0        # Must be provided for solar problems
     character(len=128)                      :: error_msg
     # ----------------------------------------------------------
@@ -68,19 +68,19 @@ contains
 
     integer :: igas, ngases
     character(len=32), dimension(:), allocatable :: gas_names
-    real(wp), dimension(size(play,1), size(play,2)) :: vmr
+    real(FT), dimension(size(play,1), size(play,2)) :: vmr
 
     integer :: top_lay
-    real(wp), dimension(size(play,1), 1) :: play_1lay, tlay_1lay
-    real(wp), dimension(size(play,1), 2) :: plev_1lay, tlev_1lay
-    real(wp), dimension(k_dist%get_nband(),size(play,1)) &
+    real(FT), dimension(size(play,1), 1) :: play_1lay, tlay_1lay
+    real(FT), dimension(size(play,1), 2) :: plev_1lay, tlev_1lay
+    real(FT), dimension(k_dist%get_nband(),size(play,1)) &
                                           :: lower_bc # emissivity or surface albedo
     type(ty_gas_concs)                    :: gas_concs_1lay  # Gas volume mixing ratios
     class(ty_optical_props_arry), &
                               allocatable :: optical_props_1lay
     type(ty_fluxes_1lev)                  :: fluxes_1lev
     type(ty_source_func_lw)               :: lw_sources_1lay
-    real(wp), dimension(size(play,1),k_dist%get_ngpt()) :: solar_src
+    real(FT), dimension(size(play,1),k_dist%get_ngpt()) :: solar_src
     # ----------------------------------------------------------
     #
     # Problem extent
@@ -199,11 +199,11 @@ contains
   # --------------------------------------------------------------------------------------
   function reduce_1lev(this, gpt_flux_up, gpt_flux_dn, spectral_disc, top_at_1, gpt_flux_dn_dir) result(error_msg)
     class(ty_fluxes_1lev),             intent(inout) :: this
-    real(kind=wp), dimension(:,:,:),   intent(in   ) :: gpt_flux_up # Fluxes by gpoint [W/m2](ncol, nlay+1, ngpt)
-    real(kind=wp), dimension(:,:,:),   intent(in   ) :: gpt_flux_dn # Fluxes by gpoint [W/m2](ncol, nlay+1, ngpt)
+    real(kind=FT), dimension(:,:,:),   intent(in   ) :: gpt_flux_up # Fluxes by gpoint [W/m2](ncol, nlay+1, ngpt)
+    real(kind=FT), dimension(:,:,:),   intent(in   ) :: gpt_flux_dn # Fluxes by gpoint [W/m2](ncol, nlay+1, ngpt)
     class(ty_optical_props),           intent(in   ) :: spectral_disc  #< derived type with spectral information
     logical,                           intent(in   ) :: top_at_1
-    real(kind=wp), dimension(:,:,:), optional, &
+    real(kind=FT), dimension(:,:,:), optional, &
                                        intent(in   ) :: gpt_flux_dn_dir# Direct flux down
     character(len=128)                               :: error_msg
     # ------

@@ -20,6 +20,7 @@ module mo_util_string
   # implicit none
   # private
   # public :: lower_case, string_in_array, string_loc_in_array
+  using ..fortran_intrinsics
   export lower_case, string_in_array, string_loc_in_array
 
   # List of character for case conversion
@@ -55,9 +56,9 @@ module mo_util_string
     # character(len=len_trim(s)) :: lc_string
 
     s_in_array = false
-    lc_string = lower_case(strip(s))
+    lc_string = lower_case(trim(s))
     for i in eachindex(array)
-      if lc_string == lower_case(strip(array[i]))
+      if lc_string == lower_case(trim(array[i]))
         s_in_array = true
         break
       end
@@ -77,9 +78,9 @@ module mo_util_string
     # character(len=len_trim(string)) :: lc_string
 
     s_loc_in_array = -1
-    lc_string = lower_case(strip(s))
+    lc_string = lower_case(trim(s))
     for i in eachindex(array)
-      if lc_string == lower_case(strip(array[i]))
+      if lc_string == lower_case(trim(array[i]))
         s_loc_in_array = i
         break
       end

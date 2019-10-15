@@ -9,6 +9,7 @@
 !docs/src/assets/*.png
 *.DS_Store
 docs/build/
+data/
 docs/site/
 *.jl.*.cov
 *.jl.mem

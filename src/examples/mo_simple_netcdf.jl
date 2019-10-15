@@ -1,6 +1,7 @@
 module mo_simple_netcdf
-#  use mo_rte_kind, only: wp, wl
+#  use mo_rte_kind, only: FT, wl
 #  use netcdf
+  using ..fortran_intrinsics
   using NCDatasets
 
   export read_field, write_field, var_exists
@@ -25,7 +26,7 @@ module mo_simple_netcdf
   function read_field(ds, varName)
 
     if !haskey(ds,varName)
-      stop_on_err("read_field: can't find variable " * strip(varName))
+      stop_on_err("read_field: can't find variable " * trim(varName))
     end
 
     field = ds[varName][:]
@@ -44,28 +45,14 @@ module mo_simple_netcdf
     elseif ndim == 4
       defVar(ds,varName, var, ("dim1","dim2","dim3","dim4"))
     else
-      stop_on_err("write_field: variables with more than 4 dimensions not supported at this point" * strip(varName))
+      error("write_field: variables with more than 4 dimensions not supported at this point" * trim(varName))
     end
-      
   end
-#-------------------------------------------
-  function stop_on_err(msg)
-#    !
-#    ! Print error message and stop
-#    !
-#    use iso_fortran_env, only : error_unit
-#    character(len=*), intent(in) :: msg
-    if(length(strip(msg)) > 0)
-      error(strip(msg))
-    end
-  end 
-#  !--------------------------------------------------------------------------------------------------------------------
-end
 #  !--------------------------------------------------------------------------------------------------------------------
 #  function write_3d_field(ncid, varName, var) #result(err_msg)
 #    integer,                    intent(in) :: ncid
 #    character(len=*),           intent(in) :: varName
-#    real(wp), dimension(:,:,:), intent(in) :: var
+#    real(FT), dimension(:,:,:), intent(in) :: var
 #    character(len=128)                     :: err_msg
 
 #    integer :: varid
@@ -87,7 +74,7 @@ end
 #  function read_scalar(ncid, varName)
 #    integer,          intent(in) :: ncid
 #    character(len=*), intent(in) :: varName
-#    real(wp)                     :: read_scalar
+#    real(FT)                     :: read_scalar
 
 #    integer :: varid
 
@@ -102,7 +89,7 @@ end
 #    integer,          intent(in) :: ncid
 #    character(len=*), intent(in) :: varName
 #    integer,          intent(in) :: nx
-#    real(wp), dimension(nx)      :: read_1d_field
+#    real(FT), dimension(nx)      :: read_1d_field
 
 #    integer :: varid
 
@@ -117,7 +104,7 @@ end
 #    integer,          intent(in) :: ncid
 #    character(len=*), intent(in) :: varName
 #    integer,          intent(in) :: nx, ny
-#    real(wp), dimension(nx, ny)  :: read_2d_field
+#    real(FT), dimension(nx, ny)  :: read_2d_field
 
 #    integer :: varid
 
@@ -132,7 +119,7 @@ end
 #    integer,          intent(in) :: ncid
 #    character(len=*), intent(in) :: varName
 #    integer,          intent(in) :: nx, ny, nz
-#    real(wp), dimension(nx, ny, nz)  :: read_3d_field
+#    real(FT), dimension(nx, ny, nz)  :: read_3d_field
 
 #    integer :: varid
 
@@ -147,7 +134,7 @@ end
 #    integer,          intent(in) :: ncid
 #    character(len=*), intent(in) :: varName
 #    integer,          intent(in) :: nw, nx, ny, nz
-#    real(wp), dimension(nw, nx, ny, nz)  :: read_4d_field
+#    real(FT), dimension(nw, nx, ny, nz)  :: read_4d_field
 
 #    integer :: varid
 
@@ -215,7 +202,7 @@ end
 #  function write_1d_field(ncid, varName, var) result(err_msg)
 #    integer,                intent(in) :: ncid
 #    character(len=*),       intent(in) :: varName
-#    real(wp), dimension(:), intent(in) :: var
+#    real(FT), dimension(:), intent(in) :: var
 #    character(len=128)                 :: err_msg
 
 #    integer :: varid
@@ -233,7 +220,7 @@ end
 #  function write_2d_field(ncid, varName, var) result(err_msg)
 #    integer,                  intent(in) :: ncid
 #    character(len=*),         intent(in) :: varName
-#    real(wp), dimension(:,:), intent(in) :: var
+#    real(FT), dimension(:,:), intent(in) :: var
 #    character(len=128)                   :: err_msg
 
 #    integer :: varid
@@ -251,7 +238,7 @@ end
 #  function write_3d_field(ncid, varName, var) result(err_msg)
 #    integer,                    intent(in) :: ncid
 #    character(len=*),           intent(in) :: varName
-#    real(wp), dimension(:,:,:), intent(in) :: var
+#    real(FT), dimension(:,:,:), intent(in) :: var
 #    character(len=128)                     :: err_msg
 
 #    integer :: varid
@@ -269,7 +256,7 @@ end
 #  function write_4d_field(ncid, varName, var) result(err_msg)
 #    integer,                    intent(in) :: ncid
 #    character(len=*),           intent(in) :: varName
-#    real(wp), dimension(:,:,:,:), intent(in) :: var
+#    real(FT), dimension(:,:,:,:), intent(in) :: var
 #    character(len=128)                     :: err_msg
 
 #    integer :: varid

@@ -19,7 +19,7 @@
 #
 # -------------------------------------------------------------------------------------------------
 module mo_cloud_sampling
-  use mo_rte_kind,      only: wp, wl
+  use mo_rte_kind,      only: FT, wl
   use mo_optical_props, only: ty_optical_props_arry, &
                               ty_optical_props_1scl, &
                               ty_optical_props_2str, &
@@ -123,14 +123,14 @@ contains
   # Generate a McICA-sampled cloud mask for maximum-random overlap
   #
   function sampled_mask_max_ran(randoms,cloud_frac,cloud_mask) result(error_msg)
-    real(wp), dimension(:,:,:),    intent(in ) :: randoms    #ngpt,nlay,ncol
-    real(wp), dimension(:,:),      intent(in ) :: cloud_frac # ncol,nlay
+    real(FT), dimension(:,:,:),    intent(in ) :: randoms    #ngpt,nlay,ncol
+    real(FT), dimension(:,:),      intent(in ) :: cloud_frac # ncol,nlay
     logical,  dimension(:,:,:),    intent(out) :: cloud_mask # ncol,nlay,ngpt
     character(len=128)                         :: error_msg
   # ------------------------
     integer                              :: ncol, nlay, ngpt, icol, ilay, igpt
     integer                              :: cloud_lay_fst, cloud_lay_lst
-    real(wp), dimension(size(randoms,1)) :: local_rands
+    real(FT), dimension(size(randoms,1)) :: local_rands
     logical,  dimension(size(randoms,2)) :: cloud_mask_layer
     # ------------------------
     #
@@ -198,16 +198,16 @@ contains
   #   By skipping layers with 0 cloud fraction the code forces alpha(i) = 0 for cloud_frac(i) = 0.
   #
   function sampled_mask_exp_ran(randoms,cloud_frac,overlap_param,cloud_mask) result(error_msg)
-    real(wp), dimension(:,:,:), intent(in ) :: randoms       # ngpt,nlay,ncol
-    real(wp), dimension(:,:),   intent(in ) :: cloud_frac    # ncol,nlay
-    real(wp), dimension(:,:),   intent(in ) :: overlap_param # ncol,nlay-1
+    real(FT), dimension(:,:,:), intent(in ) :: randoms       # ngpt,nlay,ncol
+    real(FT), dimension(:,:),   intent(in ) :: cloud_frac    # ncol,nlay
+    real(FT), dimension(:,:),   intent(in ) :: overlap_param # ncol,nlay-1
     logical,  dimension(:,:,:), intent(out) :: cloud_mask    # ncol,nlay,ngpt
     character(len=128)                      :: error_msg
     # ------------------------
     integer                              :: ncol, nlay, ngpt, icol, ilay, igpt
     integer                              :: cloud_lay_fst, cloud_lay_lst
-    real(wp)                             :: rho # correlation coefficient
-    real(wp), dimension(size(randoms,1)) :: local_rands
+    real(FT)                             :: rho # correlation coefficient
+    real(FT), dimension(size(randoms,1)) :: local_rands
     logical,  dimension(size(randoms,2)) :: cloud_mask_layer
     # ------------------------
     #
@@ -292,8 +292,8 @@ contains
     integer,                                intent(in ) :: ncol,nlay,nbnd,ngpt
     integer,     dimension(2,nbnd),         intent(in ) :: band_lims_gpt
     logical,     dimension(ncol,nlay,ngpt), intent(in ) :: cloud_mask
-    real(wp),    dimension(ncol,nlay,nbnd), intent(in ) :: input_field
-    real(wp),    dimension(ncol,nlay,ngpt), intent(out) :: sampled_field
+    real(FT),    dimension(ncol,nlay,nbnd), intent(in ) :: input_field
+    real(FT),    dimension(ncol,nlay,ngpt), intent(out) :: sampled_field
 
     integer :: icol,ilay,ibnd,igpt
 

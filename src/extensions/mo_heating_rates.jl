@@ -12,7 +12,7 @@
 # Description:  Heating rate calculation
 
 module mo_heating_rates
-  use mo_rte_kind,      only: wp, wl
+  use mo_rte_kind,      only: FT, wl
   use mo_rrtmgp_constants, only: cp_dry, grav # Only needed for heating rate calculation
   implicit none
   private
@@ -22,9 +22,9 @@ contains
   # heating rate H [K/sec] = 1/(rho cp) d f_net/d z
   # Here use hydrostatic equation for density and heat capacity of dry air
   function compute_heating_rate(flux_up, flux_dn, plev, heating_rate) result(error_msg)
-    real(wp), dimension(:,:), intent(in ) :: flux_up, flux_dn, & #< fluxes at interfaces [W/m2]
+    real(FT), dimension(:,:), intent(in ) :: flux_up, flux_dn, & #< fluxes at interfaces [W/m2]
                                              plev                #< pressure at interfaces [Pa]
-    real(wp), dimension(:,:), intent(out) :: heating_rate        #< heating rate within layer [K/sec]
+    real(FT), dimension(:,:), intent(out) :: heating_rate        #< heating rate within layer [K/sec]
     character(len=128)                    :: error_msg
     # ---------
     integer :: ncol, nlay, ilay

@@ -15,7 +15,7 @@
 #
 # -------------------------------------------------------------------------------------------------
 module mo_util_reorder
-  # use mo_rte_kind, only: wp
+  # use mo_rte_kind, only: FT
   using ..mo_reorder_kernels
   # implicit none
   # private
@@ -27,8 +27,8 @@ module mo_util_reorder
   # (x,y,z) -> (z,x,y)
   #
   function reorder123x312!(array, array_out)
-    # real(wp), dimension(:,:,:), intent(in ) :: array
-    # real(wp), dimension(:,:,:), intent(out) :: array_out
+    # real(FT), dimension(:,:,:), intent(in ) :: array
+    # real(FT), dimension(:,:,:), intent(out) :: array_out
 
     reorder_123x312_kernel!(size(array,1), size(array,2), size(array,3), array, array_out)
   end
@@ -37,8 +37,8 @@ module mo_util_reorder
   # (x,y,z) -> (z,y,x)
   #
   function reorder123x321!(array, array_out)
-    # real(wp), dimension(:,:,:), intent(in ) :: array
-    # real(wp), dimension(:,:,:), intent(out) :: array_out
+    # real(FT), dimension(:,:,:), intent(in ) :: array
+    # real(FT), dimension(:,:,:), intent(out) :: array_out
 
     reorder_123x321_kernel!(size(array,1), size(array,2), size(array,3), array, array_out)
   end
