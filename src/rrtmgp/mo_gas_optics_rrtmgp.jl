@@ -300,8 +300,8 @@ module mo_gas_optics_rrtmgp
     #
     check_extent(toa_src,     (ncol,         ngpt), "toa_src")
     #$acc parallel loop collapse(2)
-    for igpt in 1:ngpt
-       for icol in 1:ncol
+    @inbounds for igpt in 1:ngpt
+       @inbounds for icol in 1:ncol
           toa_src[icol,igpt] = this.solar_src[igpt]
        end
     end
@@ -412,7 +412,7 @@ module mo_gas_optics_rrtmgp
     # Fill out the array of volume mixing ratios
     #
     # error("Done")
-    for igas in 1:ngas
+    @inbounds for igas in 1:ngas
       #
       # Get vmr if  gas is provided in ty_gas_concs
       #
@@ -436,8 +436,8 @@ module mo_gas_optics_rrtmgp
     #
     # compute column gas amounts [molec/cm^2]
     #
-    col_gas[1:ncol,1:nlay,0] .= col_dry_wk[1:ncol,1:nlay]
-    for igas = 1:ngas
+    @inbounds col_gas[1:ncol,1:nlay,0] .= col_dry_wk[1:ncol,1:nlay]
+    @inbounds for igas = 1:ngas
       col_gas[1:ncol,1:nlay,igas] .= vmr[1:ncol,1:nlay,igas] .* col_dry_wk[1:ncol,1:nlay]
     end
 
@@ -474,12 +474,7 @@ module mo_gas_optics_rrtmgp
             play,
             tlay,
             col_gas)
-    tau = compute_tau_absorption!(
-            ncol,nlay,nband,ngpt,                      # dimensions
-            ngas,nflav,neta,npres,ntemp,
-            nminorlower, nminorklower,                # number of minor contributors, total num absorption coeffs
-            nminorupper, nminorkupper,
-            idx_h2o,
+    tau = compute_tau_absorption!(idx_h2o,
             this.gpoint_flavor,
             get_band_lims_gpoint(this.optical_props),
             this.kmajor,
@@ -503,15 +498,13 @@ module mo_gas_optics_rrtmgp
             jeta,jtemp,jpress)
     if allocated(this.krayl)
       #$acc enter data attach(col_dry_wk) copyin(this%krayl)
-      compute_tau_rayleigh!(          #Rayleigh scattering optical depths
-            ncol,nlay,nband,ngpt,
-            ngas,nflav,neta,npres,ntemp,  # dimensions
-            this.gpoint_flavor,
-            get_band_lims_gpoint(this.optical_props),
-            this.krayl,                   # inputs from object
-            idx_h2o, col_dry_wk,col_gas,
-            fminor,jeta,tropo,jtemp,      # local input
-            tau_rayleigh)
+      #Rayleigh scattering optical depths
+      compute_tau_rayleigh!(this.gpoint_flavor,
+                            get_band_lims_gpoint(this.optical_props),
+                            this.krayl,                   # inputs from object
+                            idx_h2o, col_dry_wk,col_gas,
+                            fminor,jeta,tropo,jtemp,      # local input
+                            tau_rayleigh)
       #$acc exit data detach(col_dry_wk) delete(this%krayl)
     end
 
@@ -823,7 +816,7 @@ kminor_start_upper)
     ngas = length(gas_names)
     gas_is_present = Vector{Bool}(undef, ngas...)
 
-    for i in 1:ngas
+    @inbounds for i in 1:ngas
       gas_is_present[i] = string_in_array(gas_names[i], available_gases.gas_name)
     end
     #
@@ -842,7 +835,7 @@ kminor_start_upper)
 
     # Gas 0 is used in single-key species method, set to 1.0 (col_dry)
     vmr_ref_red[:,0,:] = vmr_ref[:,1,:]
-    for i = 1:ngas
+    @inbounds for i = 1:ngas
       idx = string_loc_in_array(this.gas_names[i], gas_names)
       vmr_ref_red[:,i,:] = vmr_ref[:,idx+1,:]
     end
@@ -976,8 +969,8 @@ kminor_start_lower                   # kminor_start_atm,
     #   this%flavor is an index into this%gas_names
     #
     this.is_key = [false for i in 1:get_ngas(this)]
-    for j in 1:size(this.flavor, 2)
-      for i in 1:size(this.flavor, 1) # should be 2
+    @inbounds for j in 1:size(this.flavor, 2)
+      @inbounds for i in 1:size(this.flavor, 1) # should be 2
         if this.flavor[i,j] ≠ 0
           this.is_key[this.flavor[i,j]] = true
         end
@@ -995,7 +988,7 @@ kminor_start_lower                   # kminor_start_atm,
 
     # integer :: i
 
-    for i in 1:length(key_species_present_init)
+    @inbounds for i in 1:length(key_species_present_init)
       if !key_species_present_init[i]
         error("gas_optics: required gases" * trim(gas_names[i]) * " are not provided")
       end
@@ -1016,7 +1009,7 @@ kminor_start_lower                   # kminor_start_atm,
     # integer                                               :: igas
     # # --------------------------------------
     key_gas_names = pack(this.gas_names, this.is_key)
-    for igas = 1:length(key_gas_names)
+    @inbounds for igas = 1:length(key_gas_names)
       if !string_in_array(key_gas_names[igas], gas_desc.gas_name)
         error("gas_optics: required gases" * trim(key_gas_names[igas]) * " are not provided")
       end
@@ -1321,9 +1314,9 @@ kminor_start_lower                   # kminor_start_atm,
     key_species_present_init = Vector{Bool}(undef, size(gas_names))
     key_species_present_init = true
 
-    for ip = 1:np
-      for ia = 1:na
-        for it = 1:nt
+    @inbounds for ip = 1:np
+      @inbounds for ia = 1:na
+        @inbounds for it = 1:nt
           if key_species[ip,ia,it] ≠ 0
             key_species_red[ip,ia,it] = string_loc_in_array(gas_names[key_species[ip,ia,it]],gas_names_red)
             if key_species_red[ip,ia,it] == -1
@@ -1389,7 +1382,7 @@ kminor_start_atm
     nm = length(minor_gases_atm)
     tot_g=0
     gas_is_present = Vector{Bool}(undef, nm)
-    for i = 1:length(minor_gases_atm)
+    @inbounds for i = 1:length(minor_gases_atm)
       idx_mnr = string_loc_in_array(minor_gases_atm[i], identifier_minor)
       gas_is_present[i] = string_in_array(gas_minor[idx_mnr],available_gases.gas_name)
       if gas_is_present[i]
@@ -1422,13 +1415,13 @@ kminor_start_atm
 
       icnt = 0
       n_elim = 0
-      for i = 1:nm
+      @inbounds for i = 1:nm
         ng = minor_limits_gpt_atm[2,i]-minor_limits_gpt_atm[1,i]+1
         if gas_is_present[i]
           icnt = icnt + 1
           minor_limits_gpt_atm_red[1:2,icnt] = minor_limits_gpt_atm[1:2,i]
           kminor_start_atm_red[icnt] = kminor_start_atm[i]-n_elim
-          for j = 1:ng
+          @inbounds for j = 1:ng
             kminor_atm_red[kminor_start_atm_red[icnt]+j-1,:,:] = kminor_atm[kminor_start_atm[i]+j-1,:,:]
           end
         else
@@ -1474,8 +1467,8 @@ kminor_start_atm
     # integer :: ngpt, igpt, iatm
     ngpt = length(gpt2band)
     gpoint_flavor = Array{Int}(undef, 2,ngpt)
-    for igpt=1:ngpt
-      for iatm=1:2
+    @inbounds for igpt=1:ngpt
+      @inbounds for iatm=1:2
         gpoint_flavor[iatm,igpt] = key_species_pair2flavor(
           flavor,
           rewrite_key_species_pair(key_species[:,iatm,gpt2band[igpt]])

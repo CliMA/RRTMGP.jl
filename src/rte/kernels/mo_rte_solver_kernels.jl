@@ -370,7 +370,7 @@ function sw_solver_2stream!(ncol, nlay, ngpt, top_at_1,
     Rdif, Tdif, Rdir, Tdir, Tnoscat, source_up, source_dn = ntuple(i->Array{FT}(undef, ncol,nlay), 7)
     source_srf = Array{FT}(undef, ncol)
 
-    for igpt in 1:ngpt
+    @inbounds for igpt in 1:ngpt
       #
       # Cell properties: transmittance and reflectance for direct and diffuse radiation
       #
@@ -731,105 +731,108 @@ function lw_source_2str!(ncol, nlay, top_at_1,
     real(FT) :: mu0_inv(ncol)
     # ---------------------------------
 """
-function sw_two_stream(ncol, nlay, mu0, tau, w0, g)
-    FT = eltype(tau)
-    mu0_inv = 1 ./ mu0
-    exp_minusktau = Array{FT}(undef, ncol)
-    exp_minus2ktau = Array{FT}(undef, ncol)
-    RT_term = Array{FT}(undef, ncol)
+function sw_two_stream(ncol, nlay, mu0, tau::Array{FT}, w0, g) where FT
+  Rdif, Tdif, Rdir, Tdir, Tnoscat = ntuple(i-> Array{FT}(undef, ncol,nlay), 5)
+  sw_two_stream!(Rdif, Tdif, Rdir, Tdir, Tnoscat, ncol, nlay, mu0, tau, w0, g)
+  return Rdif, Tdif, Rdir, Tdir, Tnoscat
+end
+function sw_two_stream!(Rdif, Tdif, Rdir, Tdir, Tnoscat, ncol, nlay, mu0, tau, w0, g)
+  FT = eltype(tau)
+  mu0_inv = 1 ./ mu0
+  exp_minusktau = Array{FT}(undef, ncol)
+  exp_minus2ktau = Array{FT}(undef, ncol)
+  RT_term = Array{FT}(undef, ncol)
 
-    Rdif, Tdif, Rdir, Tdir, Tnoscat = ntuple(i-> Array{FT}(undef, ncol,nlay), 5)
+  gamma1, gamma2, gamma3, gamma4, alpha1, alpha2, k = ntuple(i->Array{FT}(undef, ncol), 7)
 
-    gamma1, gamma2, gamma3, gamma4, alpha1, alpha2, k = ntuple(i->Array{FT}(undef, ncol), 7)
-
-    for j in 1:nlay
-      for i in 1:ncol
-        # Zdunkowski Practical Improved Flux Method "PIFM"
-        #  (Zdunkowski et al., 1980;  Contributions to Atmospheric Physics 53, 147-66)
-        #
-        gamma1[i]= (FT(8) - w0[i,j] * (FT(5) + FT(3) * g[i,j])) * FT(.25)
-        gamma2[i]=  FT(3) *(w0[i,j] * (FT(1) -         g[i,j])) * FT(.25)
-        gamma3[i]= (FT(2) - FT(3) * mu0[i] *           g[i,j] ) * FT(.25)
-        gamma4[i]=  FT(1) - gamma3[i]
-
-        alpha1[i] = gamma1[i] * gamma4[i] + gamma2[i] * gamma3[i]           # Eq. 16
-        alpha2[i] = gamma1[i] * gamma3[i] + gamma2[i] * gamma4[i]           # Eq. 17
-      end
-
-      # Written to encourage vectorization of exponential, square root
-      # Eq 18;  k = SQRT(gamma1**2 - gamma2**2), limited below to avoid div by 0.
-      #   k = 0 for isotropic, conservative scattering; this lower limit on k
-      #   gives relative error with respect to conservative solution
-      #   of < 0.1% in Rdif down to tau = 10^-9
-      temp = (gamma1[1:ncol] .- gamma2[1:ncol]) .*
-             (gamma1[1:ncol] .+ gamma2[1:ncol])
-      k[1:ncol] .= sqrt.(max( temp..., FT(1.e-12)))
-      exp_minusktau[1:ncol] .= exp.(-tau[1:ncol,j] .* k[1:ncol])
-
+  @inbounds for j in 1:nlay
+    @inbounds for i in 1:ncol
+      # Zdunkowski Practical Improved Flux Method "PIFM"
+      #  (Zdunkowski et al., 1980;  Contributions to Atmospheric Physics 53, 147-66)
       #
-      # Diffuse reflection and transmission
-      #
-      for i in 1:ncol
-        exp_minus2ktau[i] = exp_minusktau[i] * exp_minusktau[i]
+      gamma1[i]= (FT(8) - w0[i,j] * (FT(5) + FT(3) * g[i,j])) * FT(.25)
+      gamma2[i]=  FT(3) *(w0[i,j] * (FT(1) -         g[i,j])) * FT(.25)
+      gamma3[i]= (FT(2) - FT(3) * mu0[i] *           g[i,j] ) * FT(.25)
+      gamma4[i]=  FT(1) - gamma3[i]
 
-        # Refactored to avoid rounding errors when k, gamma1 are of very different magnitudes
-        RT_term[i] = FT(1) / (     k[i] * (FT(1) + exp_minus2ktau[i])  +
-                              gamma1[i] * (FT(1) - exp_minus2ktau[i]) )
-
-        # Equation 25
-        Rdif[i,j] = RT_term[i] * gamma2[i] * (FT(1) - exp_minus2ktau[i])
-
-        # Equation 26
-        Tdif[i,j] = RT_term[i] * FT(2) * k[i] * exp_minusktau[i]
-      end
-
-      #
-      # Transmittance of direct, unscattered beam. Also used below
-      #
-      Tnoscat[1:ncol,j] .= exp.(-tau[1:ncol,j] .* mu0_inv[1:ncol])
-
-      #
-      # Direct reflect and transmission
-      #
-      for i in 1:ncol
-        k_mu     = k[i] * mu0[i]
-        k_gamma3 = k[i] * gamma3[i]
-        k_gamma4 = k[i] * gamma4[i]
-
-        #
-        # Equation 14, multiplying top and bottom by exp(-k*tau)
-        #   and rearranging to avoid div by 0.
-        #
-        RT_term[i] =  w0[i,j] * RT_term[i]/fmerge(FT(1) - k_mu*k_mu,
-                                                  eps(FT),
-                                                  abs(FT(1) - k_mu*k_mu) >= eps(FT))
-
-        Rdir[i,j] = RT_term[i]  *
-            ((FT(1) - k_mu) * (alpha2[i] + k_gamma3)                     -
-             (FT(1) + k_mu) * (alpha2[i] - k_gamma3) * exp_minus2ktau[i] -
-              FT(2) * (k_gamma3 - alpha2[i] * k_mu)  * exp_minusktau[i] * Tnoscat[i,j])
-
-        #
-        # Equation 15, multiplying top and bottom by exp(-k*tau),
-        #   multiplying through by exp(-tau/mu0) to
-        #   prefer underflow to overflow
-        # Omitting direct transmittance
-        #
-        Tdir[i,j] = -RT_term[i] *
-                    ((FT(1) + k_mu) * (alpha1[i] + k_gamma4)                     * Tnoscat[i,j] -
-                     (FT(1) - k_mu) * (alpha1[i] - k_gamma4) * exp_minus2ktau[i] * Tnoscat[i,j] -
-                      FT(2) * (k_gamma4 + alpha1[i] * k_mu)  * exp_minusktau[i])
-
-      end
+      alpha1[i] = gamma1[i] * gamma4[i] + gamma2[i] * gamma3[i]           # Eq. 16
+      alpha2[i] = gamma1[i] * gamma3[i] + gamma2[i] * gamma4[i]           # Eq. 17
     end
-    return Rdif, Tdif, Rdir, Tdir, Tnoscat
+
+    # Written to encourage vectorization of exponential, square root
+    # Eq 18;  k = SQRT(gamma1**2 - gamma2**2), limited below to avoid div by 0.
+    #   k = 0 for isotropic, conservative scattering; this lower limit on k
+    #   gives relative error with respect to conservative solution
+    #   of < 0.1% in Rdif down to tau = 10^-9
+    temp = (gamma1 .- gamma2) .*
+           (gamma1 .+ gamma2)
+    k .= sqrt.(max( temp..., FT(1.e-12)))
+    exp_minusktau .= exp.(-tau[1:ncol,j] .* k[1:ncol])
+
+    #
+    # Diffuse reflection and transmission
+    #
+    @inbounds for i in 1:ncol
+      exp_minus2ktau[i] = exp_minusktau[i] * exp_minusktau[i]
+
+      # Refactored to avoid rounding errors when k, gamma1 are of very different magnitudes
+      RT_term[i] = FT(1) / (     k[i] * (FT(1) + exp_minus2ktau[i])  +
+                            gamma1[i] * (FT(1) - exp_minus2ktau[i]) )
+
+      # Equation 25
+      Rdif[i,j] = RT_term[i] * gamma2[i] * (FT(1) - exp_minus2ktau[i])
+
+      # Equation 26
+      Tdif[i,j] = RT_term[i] * FT(2) * k[i] * exp_minusktau[i]
+    end
+
+    #
+    # Transmittance of direct, unscattered beam. Also used below
+    #
+    Tnoscat[1:ncol,j] .= exp.(-tau[1:ncol,j] .* mu0_inv)
+
+    #
+    # Direct reflect and transmission
+    #
+    @inbounds for i in 1:ncol
+      k_mu     = k[i] * mu0[i]
+      k_gamma3 = k[i] * gamma3[i]
+      k_gamma4 = k[i] * gamma4[i]
+
+      #
+      # Equation 14, multiplying top and bottom by exp(-k*tau)
+      #   and rearranging to avoid div by 0.
+      #
+      RT_term[i] =  w0[i,j] * RT_term[i]/fmerge(FT(1) - k_mu*k_mu,
+                                                eps(FT),
+                                                abs(FT(1) - k_mu*k_mu) >= eps(FT))
+
+      Rdir[i,j] = RT_term[i]  *
+          ((FT(1) - k_mu) * (alpha2[i] + k_gamma3)                     -
+           (FT(1) + k_mu) * (alpha2[i] - k_gamma3) * exp_minus2ktau[i] -
+            FT(2) * (k_gamma3 - alpha2[i] * k_mu)  * exp_minusktau[i] * Tnoscat[i,j])
+
+      #
+      # Equation 15, multiplying top and bottom by exp(-k*tau),
+      #   multiplying through by exp(-tau/mu0) to
+      #   prefer underflow to overflow
+      # Omitting direct transmittance
+      #
+      Tdir[i,j] = -RT_term[i] *
+                  ((FT(1) + k_mu) * (alpha1[i] + k_gamma4)                     * Tnoscat[i,j] -
+                   (FT(1) - k_mu) * (alpha1[i] - k_gamma4) * exp_minus2ktau[i] * Tnoscat[i,j] -
+                    FT(2) * (k_gamma4 + alpha1[i] * k_mu)  * exp_minusktau[i])
+
+    end
   end
-  # ---------------------------------------------------------------
-  #
-  # Direct beam source for diffuse radiation in layers and at surface;
-  #   report direct beam as a byproduct
-  #
-  # -------------------------------------------------------------------------------------------------
+  return Rdif, Tdif, Rdir, Tdir, Tnoscat
+end
+# ---------------------------------------------------------------
+#
+# Direct beam source for diffuse radiation in layers and at surface;
+#   report direct beam as a byproduct
+#
+# -------------------------------------------------------------------------------------------------
 """
     sw_source_2str!(...)
 
@@ -844,12 +847,11 @@ function sw_two_stream(ncol, nlay, mu0, tau, w0, g)
 
     integer :: ilev
 """
-
 function sw_source_2str!(ncol, nlay, top_at_1, Rdir, Tdir, Tnoscat, sfc_albedo,
                             source_up, source_dn, source_sfc, flux_dn_dir)
 
     if top_at_1
-      for ilev in 1:nlay
+      @inbounds for ilev in 1:nlay
         source_up[:,ilev]     .=    Rdir[:,ilev] .* flux_dn_dir[:,ilev]
         source_dn[:,ilev]     .=    Tdir[:,ilev] .* flux_dn_dir[:,ilev]
         flux_dn_dir[:,ilev+1] .= Tnoscat[:,ilev] .* flux_dn_dir[:,ilev]
@@ -922,7 +924,7 @@ function adding!(ncol, nlay, top_at_1,
     # From bottom to top of atmosphere --
     #   compute albedo and source of upward radiation
     #
-    for ilev in nlay:-1:1
+    @inbounds for ilev in nlay:-1:1
       denom[:, ilev] .= FT(1) ./ (FT(1) .- rdif[:,ilev].*albedo[:,ilev+1])                 # Eq 10
       albedo[:,ilev] .= rdif[:,ilev] .+
                        tdif[:,ilev].*tdif[:,ilev] .* albedo[:,ilev+1] .* denom[:,ilev] # Equation 9
@@ -944,7 +946,7 @@ function adding!(ncol, nlay, top_at_1,
     #
     # From the top of the atmosphere downward -- compute fluxes
     #
-    for ilev in 2:nlay+1
+    @inbounds for ilev in 2:nlay+1
       flux_dn[:,ilev] .= (tdif[:,ilev-1].*flux_dn[:,ilev-1] +   # Equation 13
                          rdif[:,ilev-1].*src[:,ilev] +
                          src_dn[:,ilev-1]) .* denom[:,ilev-1]
@@ -1039,7 +1041,7 @@ function apply_BC(ncol::I, nlay::I, ngpt::I,
   # flux_dn = zeros(FT, ncol,nlay+1,ngpt)
   fill!(flux_dn, 0)
   if top_at_1
-    flux_dn[1:ncol,      1, 1:ngpt]  .= inc_flux[1:ncol,1:ngpt] .* spread(factor, 2, ngpt)
+    @inbounds flux_dn[1:ncol,      1, 1:ngpt]  .= inc_flux[1:ncol,1:ngpt] .* spread(factor, 2, ngpt)
     # flux_dn[1:ncol,      :, 1:ngpt]  .= inc_flux[1:ncol,1:ngpt] .* spread(factor, 2, ngpt)
   else
     # flux_dn[1:ncol, :, 1:ngpt]  .= inc_flux[1:ncol,1:ngpt] .* spread(factor, 2, ngpt)

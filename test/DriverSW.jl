@@ -1,6 +1,7 @@
 using Test
 using JRRTMGP
 using NCDatasets
+using Profile
 using BenchmarkTools
 using JRRTMGP.mo_optical_props
 using JRRTMGP.mo_rte_solver_kernels
@@ -277,7 +278,7 @@ function run_driver(nblocks_iterations=nothing)
   fluxes = ty_fluxes_broadband(FT)
 
   nblocks_iterations==nothing && (nblocks_iterations = nblocks)
-  for b = 1:nblocks_iterations
+  @inbounds for b = 1:nblocks_iterations
     @show b/nblocks
     fluxes.flux_up = flux_up[:,:,b]
     fluxes.flux_dn = flux_dn[:,:,b]
@@ -316,15 +317,15 @@ function run_driver(nblocks_iterations=nothing)
     #
     # More compactly...
     #
-    def_tsi[1:block_size] = sum(toa_flux, dims=2)
+    def_tsi = sum(toa_flux, dims=2)
     # test_data(def_tsi, "def_tsi")
 #endif
     #
     # Normalize incoming solar flux to match RFMIP specification
     #
     #$acc parallel loop collapse(2) copyin(total_solar_irradiance, def_tsi) copy(toa_flux)
-    for igpt = 1:ngpt
-      for icol = 1:block_size
+    @inbounds for igpt = 1:ngpt
+      @inbounds for icol = 1:block_size
         toa_flux[icol,igpt] = toa_flux[icol,igpt] * total_solar_irradiance[icol,b]/def_tsi[icol]
       end
     end
@@ -333,8 +334,8 @@ function run_driver(nblocks_iterations=nothing)
     # Expand the spectrally-constant surface albedo to a per-band albedo for each column
     #
     #$acc parallel loop collapse(2) copyin(surface_albedo)
-    for icol = 1:block_size
-      for ibnd = 1:nbnd
+    @inbounds for icol = 1:block_size
+      @inbounds for ibnd = 1:nbnd
         sfc_alb_spec[ibnd,icol] = surface_albedo[icol,b]
       end
     end
@@ -343,7 +344,7 @@ function run_driver(nblocks_iterations=nothing)
     # Cosine of the solar zenith angle
     #
     #$acc parallel loop copyin(solar_zenith_angle, usecol)
-    for icol = 1:block_size
+    @inbounds for icol = 1:block_size
       mu0[icol] = fmerge(cos(solar_zenith_angle[icol,b]*deg_to_rad), FT(1), usecol[icol,b])
     end
     # test_data(mu0, "mu0")
@@ -371,7 +372,7 @@ function run_driver(nblocks_iterations=nothing)
     #
     # Zero out fluxes for which the original solar zenith angle is > 90 degrees.
     #
-    for icol = 1:block_size
+    @inbounds for icol = 1:block_size
       if !usecol[icol,b]
         flux_up[icol,:,b] .= FT(0)
         flux_dn[icol,:,b] .= FT(0)
@@ -403,6 +404,9 @@ function run_driver(nblocks_iterations=nothing)
 end
 
 @testset "Shortwave driver" begin
-  run_driver(1)
-  run_driver()
+  @time run_driver(1)
+  @time run_driver()
+  # Profile.clear()
+  # Profile.@profile run_driver(1)
+  # Profile.print()
 end

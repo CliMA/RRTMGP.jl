@@ -80,92 +80,107 @@ real(FT) :: ftemp_term
 # local indexes
 integer :: icol, ilay, iflav, igases(2), itropo, itemp
 """
-  function interpolation(
-                ncol,nlay,ngas,nflav,neta, npres, ntemp,
-                flavor,
-                press_ref_log, temp_ref,press_ref_log_delta,
-                temp_ref_min,temp_ref_delta,press_ref_trop_log,
-                vmr_ref,
-                play,
-                tlay,
-                col_gas)
-    # input dimensions
-    FT = eltype(temp_ref)
-    ftemp = Array{FT}(undef, ncol, nlay)
-    fpress = Array{FT}(undef, ncol, nlay)
-    igases = Vector{Int}(undef, 2)
-    jtemp = Array{Int}(undef, ncol, nlay)
-    fmajor = Array{FT}(undef, 2,2,2,nflav,ncol,nlay)
-    fminor = Array{FT}(undef, 2,2,nflav,ncol,nlay)
-    col_mix = Array{FT}(undef, 2, nflav, ncol, nlay)
-    tropo = Array{Bool}(undef, ncol, nlay)
-    jeta = Array{Int}(undef, 2, nflav, ncol, nlay)
-    jpress = Array{Int}(undef, ncol, nlay)
+function interpolation(
+              ncol,nlay,ngas,nflav,neta, npres, ntemp,
+              flavor,
+              press_ref_log, temp_ref,press_ref_log_delta,
+              temp_ref_min,temp_ref_delta,press_ref_trop_log,
+              vmr_ref,
+              play,
+              tlay,
+              col_gas)
+  # input dimensions
+  FT = eltype(temp_ref)
+  ftemp = Array{FT}(undef, ncol, nlay)
+  fpress = Array{FT}(undef, ncol, nlay)
+  igases = Vector{Int}(undef, 2)
+  jtemp = Array{Int}(undef, ncol, nlay)
+  fmajor = Array{FT}(undef, 2,2,2,nflav,ncol,nlay)
+  fminor = Array{FT}(undef, 2,2,nflav,ncol,nlay)
+  col_mix = Array{FT}(undef, 2, nflav, ncol, nlay)
+  tropo = Array{Bool}(undef, ncol, nlay)
+  jeta = Array{Int}(undef, 2, nflav, ncol, nlay)
+  jpress = Array{Int}(undef, ncol, nlay)
+  interpolation!(jtemp,fmajor,fminor,col_mix,tropo,jeta,jpress,
+              ncol,nlay,ngas,nflav,neta, npres, ntemp,
+              flavor,
+              press_ref_log, temp_ref,press_ref_log_delta,
+              temp_ref_min,temp_ref_delta,press_ref_trop_log,
+              vmr_ref,
+              play,
+              tlay,
+              col_gas,
+              ftemp,
+              fpress,
+              igases)
+  return jtemp,fmajor,fminor,col_mix,tropo,jeta,jpress
+end
 
-    for ilay in 1:nlay
-      for icol in 1:ncol
-        # index and factor for temperature interpolation
-        jtemp[icol,ilay] = fint((tlay[icol,ilay] - (temp_ref_min - temp_ref_delta)) / temp_ref_delta)
-        jtemp[icol,ilay] = min(ntemp - 1, max(1, jtemp[icol,ilay])) # limit the index range
-        ftemp[icol,ilay] = (tlay[icol,ilay] - temp_ref[jtemp[icol,ilay]]) / temp_ref_delta
+function interpolation!(jtemp,fmajor,fminor,col_mix,tropo,jeta,jpress,
+                        ncol,nlay,ngas,nflav,neta, npres, ntemp,
+                        flavor,
+                        press_ref_log, temp_ref::Array{FT},press_ref_log_delta,
+                        temp_ref_min,temp_ref_delta,press_ref_trop_log,
+                        vmr_ref,
+                        play,
+                        tlay,
+                        col_gas,
+                        ftemp,
+                        fpress,
+                        igases) where FT
 
-        # index and factor for pressure interpolation
-        locpress = FT(1) + (log(play[icol,ilay]) - press_ref_log[1]) / press_ref_log_delta
-        jpress[icol,ilay] = min(npres-1, max(1, fint(locpress)))
-        fpress[icol,ilay] = locpress - FT(jpress[icol,ilay])
+  @inbounds for ilay in 1:nlay
+    @inbounds for icol in 1:ncol
+      # index and factor for temperature interpolation
+      jtemp[icol,ilay] = fint((tlay[icol,ilay] - (temp_ref_min - temp_ref_delta)) / temp_ref_delta)
+      jtemp[icol,ilay] = min(ntemp - 1, max(1, jtemp[icol,ilay])) # limit the index range
+      ftemp[icol,ilay] = (tlay[icol,ilay] - temp_ref[jtemp[icol,ilay]]) / temp_ref_delta
 
-        # determine if in lower or upper part of atmosphere
-        tropo[icol,ilay] = log(play[icol,ilay]) > press_ref_trop_log
-      end
+      # index and factor for pressure interpolation
+      locpress = FT(1) + (log(play[icol,ilay]) - press_ref_log[1]) / press_ref_log_delta
+      jpress[icol,ilay] = min(npres-1, max(1, fint(locpress)))
+      fpress[icol,ilay] = locpress - FT(jpress[icol,ilay])
+
+      # determine if in lower or upper part of atmosphere
+      tropo[icol,ilay] = log(play[icol,ilay]) > press_ref_trop_log
     end
-
-    # test_data(vmr_ref, "vmr_ref_interp")
-    # test_data(ftemp, "ftemp")
-    # test_data(jtemp, "jtemp")
-    # test_data(jpress, "jpress")
-    # test_data(tropo, "tropo")
-    # test_data(col_gas, "col_gas")
-
-    for ilay in 1:nlay
-      for icol in 1:ncol
-        # itropo = 1 lower atmosphere; itropo = 2 upper atmosphere
-        itropo = fmerge(1,2,tropo[icol,ilay])
-        # loop over implemented combinations of major species
-        for iflav in 1:nflav
-          igases[:] .= flavor[:,iflav]
-          for itemp in 1:2
-            # compute interpolation fractions needed for lower, then upper reference temperature level
-            # compute binary species parameter (eta) for flavor and temperature and
-            #  associated interpolation index and factors
-            ratio_eta_half = vmr_ref[itropo,igases[1],(jtemp[icol,ilay]+itemp-1)] /
-                             vmr_ref[itropo,igases[2],(jtemp[icol,ilay]+itemp-1)]
-            col_mix[itemp,iflav,icol,ilay] = col_gas[icol,ilay,igases[1]] + ratio_eta_half * col_gas[icol,ilay,igases[2]]
-            eta = fmerge(col_gas[icol,ilay,igases[1]] / col_mix[itemp,iflav,icol,ilay], FT(0.5),
-                        col_mix[itemp,iflav,icol,ilay] > FT(2) * floatmin(FT))
-            loceta = eta * FT(neta-1)
-            jeta[itemp,iflav,icol,ilay] = min(fint(loceta)+1, neta-1)
-            feta = mod(loceta, 1)
-            # compute interpolation fractions needed for minor species
-            # ftemp_term = (FT(1)-ftemp(icol,ilay)) for itemp = 1, ftemp(icol,ilay) for itemp=2
-            ftemp_term = (FT(2-itemp) + FT(2*itemp-3) * ftemp[icol,ilay])
-            fminor[1,itemp,iflav,icol,ilay] = (1-feta) * ftemp_term
-            fminor[2,itemp,iflav,icol,ilay] =        feta  * ftemp_term
-            # compute interpolation fractions needed for major species
-            fmajor[1,1,itemp,iflav,icol,ilay] = (FT(1)-fpress[icol,ilay]) * fminor[1,itemp,iflav,icol,ilay]
-            fmajor[2,1,itemp,iflav,icol,ilay] = (FT(1)-fpress[icol,ilay]) * fminor[2,itemp,iflav,icol,ilay]
-            fmajor[1,2,itemp,iflav,icol,ilay] =        fpress[icol,ilay]  * fminor[1,itemp,iflav,icol,ilay]
-            fmajor[2,2,itemp,iflav,icol,ilay] =        fpress[icol,ilay]  * fminor[2,itemp,iflav,icol,ilay]
-          end # reference temperatures
-        end # iflav
-      end # icol,ilay
-    end
-    # test_data(col_mix, "col_mix")
-    # test_data(jeta, "jeta")
-    # test_data(fminor, "fminor")
-    # test_data(fmajor, "fmajor")
-    return jtemp,fmajor,fminor,col_mix,tropo,jeta,jpress
-
   end
+
+  @inbounds for ilay in 1:nlay
+    @inbounds for icol in 1:ncol
+      # itropo = 1 lower atmosphere; itropo = 2 upper atmosphere
+      itropo = fmerge(1,2,tropo[icol,ilay])
+      # loop over implemented combinations of major species
+      @inbounds for iflav in 1:nflav
+        igases .= flavor[:,iflav]
+        @inbounds for itemp in 1:2
+          # compute interpolation fractions needed for lower, then upper reference temperature level
+          # compute binary species parameter (eta) for flavor and temperature and
+          #  associated interpolation index and factors
+          @inbounds ratio_eta_half = vmr_ref[itropo,igases[1],(jtemp[icol,ilay]+itemp-1)] /
+                           vmr_ref[itropo,igases[2],(jtemp[icol,ilay]+itemp-1)]
+          @inbounds col_mix[itemp,iflav,icol,ilay] = col_gas[icol,ilay,igases[1]] + ratio_eta_half * col_gas[icol,ilay,igases[2]]
+          @inbounds eta = fmerge(col_gas[icol,ilay,igases[1]] / col_mix[itemp,iflav,icol,ilay], FT(0.5),
+                      col_mix[itemp,iflav,icol,ilay] > FT(2) * floatmin(FT))
+          loceta = eta * FT(neta-1)
+          @inbounds jeta[itemp,iflav,icol,ilay] = min(fint(loceta)+1, neta-1)
+          feta = mod(loceta, 1)
+          # compute interpolation fractions needed for minor species
+          # ftemp_term = (FT(1)-ftemp(icol,ilay)) for itemp = 1, ftemp(icol,ilay) for itemp=2
+          ftemp_term = (FT(2-itemp) + FT(2*itemp-3) * ftemp[icol,ilay])
+          fminor[1,itemp,iflav,icol,ilay] = (1-feta) * ftemp_term
+          fminor[2,itemp,iflav,icol,ilay] =        feta  * ftemp_term
+          # compute interpolation fractions needed for major species
+          fmajor[1,1,itemp,iflav,icol,ilay] = (FT(1)-fpress[icol,ilay]) * fminor[1,itemp,iflav,icol,ilay]
+          fmajor[2,1,itemp,iflav,icol,ilay] = (FT(1)-fpress[icol,ilay]) * fminor[2,itemp,iflav,icol,ilay]
+          fmajor[1,2,itemp,iflav,icol,ilay] =        fpress[icol,ilay]  * fminor[1,itemp,iflav,icol,ilay]
+          fmajor[2,2,itemp,iflav,icol,ilay] =        fpress[icol,ilay]  * fminor[2,itemp,iflav,icol,ilay]
+        end # reference temperatures
+      end # iflav
+    end # icol,ilay
+  end
+  nothing
+end
 
 """
     compute_tau_absorption!(...)
@@ -218,130 +233,118 @@ real(FT), dimension(ngpt,nlay,ncol), intent(inout) :: tau
 logical                    :: top_at_1
 integer, dimension(ncol,2) :: itropo_lower, itropo_upper
 """
-  function compute_tau_absorption!(
-                ncol,nlay,nbnd,ngpt,                  # dimensions
-                ngas,nflav,neta,npres,ntemp,
-                nminorlower, nminorklower,           # number of minor contributors, total num absorption coeffs
-                nminorupper, nminorkupper,
-                idx_h2o,
-                gpoint_flavor,
-                band_lims_gpt,
-                kmajor,
-                kminor_lower,
-                kminor_upper,
-                minor_limits_gpt_lower,
-                minor_limits_gpt_upper,
-                minor_scales_with_density_lower,
-                minor_scales_with_density_upper,
-                scale_by_complement_lower,
-                scale_by_complement_upper,
-                idx_minor_lower,
-                idx_minor_upper,
-                idx_minor_scaling_lower,
-                idx_minor_scaling_upper,
-                kminor_start_lower,
-                kminor_start_upper,
-                tropo,
-                col_mix,fmajor,fminor,
-                play,tlay,col_gas,
-                jeta,jtemp,jpress)
+function compute_tau_absorption!(idx_h2o::I,
+                                 gpoint_flavor::Array{I},
+                                 band_lims_gpt::Array{I},
+                                 kmajor::Array{FT},
+                                 kminor_lower::Array{FT},
+                                 kminor_upper::Array{FT},
+                                 minor_limits_gpt_lower::Array{I},
+                                 minor_limits_gpt_upper::Array{I},
+                                 minor_scales_with_density_lower::Array{B},
+                                 minor_scales_with_density_upper::Array{B},
+                                 scale_by_complement_lower::Array{B},
+                                 scale_by_complement_upper::Array{B},
+                                 idx_minor_lower::Array{I},
+                                 idx_minor_upper::Array{I},
+                                 idx_minor_scaling_lower::Array{I},
+                                 idx_minor_scaling_upper::Array{I},
+                                 kminor_start_lower::Array{I},
+                                 kminor_start_upper::Array{I},
+                                 tropo::Array{B},
+                                 col_mix::Array{FT},
+                                 fmajor::Array{FT},
+                                 fminor::Array{FT},
+                                 play::Array{FT},
+                                 tlay::Array{FT},
+                                 col_gas::AbstractArray{FT}, # OffsetArray
+                                 jeta::Array{I},
+                                 jtemp::Array{I},
+                                 jpress::Array{I}) where {FT<:AbstractFloat, I<:Integer, B<:Bool}
 
-    FT = eltype(fmajor)
-    # ---------------------
-    # Layer limits of upper, lower atmospheres
-    # ---------------------
-    top_at_1 = play[1,1] < play[1, nlay]
-    itropo_lower = Array{Int}(undef, ncol, 2)
-    itropo_upper = similar(itropo_lower)
-    # test_data(tropo, "tropo_compute_tau_absorption")
-    # test_data(play, "play_compute_tau_absorption")
-    if top_at_1
-      itropo_lower[:, 1] .= fminloc_wrapper(play, dim=2, mask=tropo)
-      itropo_lower[:, 2] .= nlay
-      itropo_upper[:, 1] .= 1
-      itropo_upper[:, 2] .= fmaxloc_wrapper(play, dim=2, mask=(.!tropo)) # TODO:
-    else
-      itropo_lower[:, 1] .= 1
-      itropo_lower[:, 2] .= fminloc_wrapper(play, dim=2, mask= tropo)
-      itropo_upper[:, 1] .= fmaxloc_wrapper(play, dim=2, mask=(.!tropo))
-      itropo_upper[:, 2] .= nlay
-    end
+  ncol,nlay = size(play)
+  s_kmajor = size(kmajor)
+  ngpt,neta,npres,ntemp = s_kmajor[1], s_kmajor[2], s_kmajor[3]-1,s_kmajor[4]
+  nminorklower = size(kminor_lower,1)
+  nminorkupper = size(kminor_upper,1)
+  nminorlower = length(scale_by_complement_lower)
+  nminorupper = length(scale_by_complement_upper)
+  nbnd = size(band_lims_gpt,2)
+  ngas = size(col_gas,3)-1
+  nflav = size(fminor,3)
 
-    # if(top_at_1) then
-    #   itropo_lower(:, 1) = minloc(play, dim=2, mask=tropo)
-    #   itropo_lower(:, 2) = nlay
-    #   itropo_upper(:, 1) = 1
-    #   itropo_upper(:, 2) = maxloc(play, dim=2, mask=(.not. tropo))
-    # else
-    #   itropo_lower(:, 1) = 1
-    #   itropo_lower(:, 2) = minloc(play, dim=2, mask= tropo)
-    #   itropo_upper(:, 1) = maxloc(play, dim=2, mask=(.not. tropo))
-    #   itropo_upper(:, 2) = nlay
-    # end if
-
-    # test_data(itropo_lower, "itropo_lower")
-    # test_data(itropo_upper, "itropo_upper")
-    tau = zeros(FT, ngpt,nlay,ncol)
-    # ---------------------
-    # Major Species
-    # ---------------------
-    gas_optical_depths_major!(
-          ncol,nlay,nbnd,ngpt,        # dimensions
-          nflav,neta,npres,ntemp,
-          gpoint_flavor,
-          band_lims_gpt,
-          kmajor,
-          col_mix,fmajor,
-          jeta,tropo,jtemp,jpress,
-          tau)
-    # test_data(tau, "tau_after_gas_optical_depths_major")
-    # test_data(col_gas, "col_gas_after_gas_optical_depths_major")
-    # test_data(idx_minor_lower, "idx_minor_after_gas_optical_depths_major")
-    # ---------------------
-    # Minor Species - lower
-    # ---------------------
-    gas_optical_depths_minor!(
-           ncol,nlay,ngpt,              # dimensions
-           ngas,nflav,ntemp,neta,
-           nminorlower,nminorklower,
-           idx_h2o,
-           gpoint_flavor[1,:],
-           kminor_lower,
-           minor_limits_gpt_lower,
-           minor_scales_with_density_lower,
-           scale_by_complement_lower,
-           idx_minor_lower,
-           idx_minor_scaling_lower,
-           kminor_start_lower,
-           play, tlay,
-           col_gas,fminor,jeta,
-           itropo_lower,jtemp,
-           tau)
-    # test_data(tau, "tau_after_gas_optical_depths_minor_lower")
-    # ---------------------
-    # Minor Species - upper
-    # ---------------------
-    gas_optical_depths_minor!(
-           ncol,nlay,ngpt,              # dimensions
-           ngas,nflav,ntemp,neta,
-           nminorupper,nminorkupper,
-           idx_h2o,
-           gpoint_flavor[2,:],
-           kminor_upper,
-           minor_limits_gpt_upper,
-           minor_scales_with_density_upper,
-           scale_by_complement_upper,
-           idx_minor_upper,
-           idx_minor_scaling_upper,
-           kminor_start_upper,
-           play, tlay,
-           col_gas,fminor,jeta,
-           itropo_upper,jtemp,
-           tau)
-    # test_data(tau, "tau_after_gas_optical_depths_minor_upper")
-    return tau
+  # ---------------------
+  # Layer limits of upper, lower atmospheres
+  # ---------------------
+  top_at_1 = play[1,1] < play[1, nlay]
+  itropo_lower = Array{Int}(undef, ncol, 2)
+  itropo_upper = similar(itropo_lower)
+  # test_data(tropo, "tropo_compute_tau_absorption")
+  # test_data(play, "play_compute_tau_absorption")
+  if top_at_1
+    @inbounds itropo_lower[:, 1] .= fminloc_wrapper(play, dim=2, mask=tropo)
+    @inbounds itropo_lower[:, 2] .= nlay
+    @inbounds itropo_upper[:, 1] .= 1
+    @inbounds itropo_upper[:, 2] .= fmaxloc_wrapper(play, dim=2, mask=(.!tropo)) # TODO:
+  else
+    itropo_lower[:, 1] .= 1
+    itropo_lower[:, 2] .= fminloc_wrapper(play, dim=2, mask= tropo)
+    itropo_upper[:, 1] .= fmaxloc_wrapper(play, dim=2, mask=(.!tropo))
+    itropo_upper[:, 2] .= nlay
   end
-  # --------------------------------------------------------------------------------------
+
+  # test_data(itropo_lower, "itropo_lower")
+  # test_data(itropo_upper, "itropo_upper")
+  tau = zeros(FT, ngpt,nlay,ncol)
+  # ---------------------
+  # Major Species
+  # ---------------------
+  gas_optical_depths_major!(gpoint_flavor,
+        band_lims_gpt,
+        kmajor,
+        col_mix,fmajor,
+        jeta,tropo,jtemp,jpress,
+        tau)
+  # test_data(tau, "tau_after_gas_optical_depths_major")
+  # test_data(col_gas, "col_gas_after_gas_optical_depths_major")
+  # test_data(idx_minor_lower, "idx_minor_after_gas_optical_depths_major")
+  # ---------------------
+  # Minor Species - lower
+  # ---------------------
+  gas_optical_depths_minor!(idx_h2o,
+         gpoint_flavor[1,:],
+         kminor_lower,
+         minor_limits_gpt_lower,
+         minor_scales_with_density_lower,
+         scale_by_complement_lower,
+         idx_minor_lower,
+         idx_minor_scaling_lower,
+         kminor_start_lower,
+         play, tlay,
+         col_gas,fminor,jeta,
+         itropo_lower,jtemp,
+         tau)
+  # test_data(tau, "tau_after_gas_optical_depths_minor_lower")
+  # ---------------------
+  # Minor Species - upper
+  # ---------------------
+  gas_optical_depths_minor!(idx_h2o,
+         gpoint_flavor[2,:],
+         kminor_upper,
+         minor_limits_gpt_upper,
+         minor_scales_with_density_upper,
+         scale_by_complement_upper,
+         idx_minor_upper,
+         idx_minor_scaling_upper,
+         kminor_start_upper,
+         play, tlay,
+         col_gas,fminor,jeta,
+         itropo_upper,jtemp,
+         tau)
+  # test_data(tau, "tau_after_gas_optical_depths_minor_upper")
+  return tau
+end
+# --------------------------------------------------------------------------------------
 
 """
     gas_optical_depths_major!(...)
@@ -373,41 +376,47 @@ real(FT) :: tau_major(ngpt) # major species optical depth
 integer :: icol, ilay, iflav, ibnd, igpt, itropo
 integer :: gptS, gptE
 """
-  function gas_optical_depths_major!(ncol,nlay,nbnd,ngpt,
-                                      nflav,neta,npres,ntemp,       # dimensions
-                                      gpoint_flavor, band_lims_gpt,    # inputs from object
-                                      kmajor,
-                                      col_mix,fmajor,
-                                      jeta,tropo,jtemp,jpress,         # local input
-                                      tau)
-
-    FT = eltype(tau)
-    tau_major = Array{FT}(undef, ngpt)
-    for icol in 1:ncol
-      for ilay in 1:nlay
-        # itropo = 1 lower atmosphere; itropo = 2 upper atmosphere
-        itropo = fmerge(1,2,tropo[icol,ilay])
-        # optical depth calculation for major species
-        for ibnd in 1:nbnd
-          gptS = band_lims_gpt[1, ibnd]
-          gptE = band_lims_gpt[2, ibnd]
-          iflav = gpoint_flavor[itropo, gptS] #eta interpolation depends on band's flavor
-          tau_major[gptS:gptE] .=
-            # interpolation in temperature, pressure, and eta
-            interpolate3D_byflav(col_mix[:,iflav,icol,ilay],
-                                 fmajor[:,:,:,iflav,icol,ilay],
-                                 kmajor,
-                                 band_lims_gpt[1, ibnd],
-                                 band_lims_gpt[2, ibnd],
-                                 jeta[:,iflav,icol,ilay],
-                                 jtemp[icol,ilay],
-                                 jpress[icol,ilay]+itropo
-                                 )
-          tau[gptS:gptE,ilay,icol] = tau[gptS:gptE,ilay,icol] .+ tau_major[gptS:gptE]
-        end # igpt
-      end
-    end # ilay
-  end
+function gas_optical_depths_major!(gpoint_flavor::Array{I},
+                                   band_lims_gpt::Array{I},    # inputs from object
+                                   kmajor::Array{FT},
+                                   col_mix,
+                                   fmajor::Array{FT},
+                                   jeta::Array{I},
+                                   tropo::Array{B},
+                                   jtemp::Array{I},
+                                   jpress::Array{I},
+                                   tau::Array{FT}) where {FT<:AbstractFloat, I<:Integer, B<:Bool}
+  ncol,nlay = size(tropo)
+  nbnd = size(band_lims_gpt,2)
+  nflav = size(col_mix,2)
+  s_kmajor = size(kmajor)
+  ngpt,neta,npres,ntemp = s_kmajor[1], s_kmajor[2], s_kmajor[3]-1,s_kmajor[4]
+  tau_major = Array{FT}(undef, ngpt)
+  @inbounds for icol in 1:ncol
+    @inbounds for ilay in 1:nlay
+      # itropo = 1 lower atmosphere; itropo = 2 upper atmosphere
+      itropo = fmerge(1,2,tropo[icol,ilay])
+      # optical depth calculation for major species
+      @inbounds for ibnd in 1:nbnd
+        @inbounds gptS = band_lims_gpt[1, ibnd]
+        @inbounds gptE = band_lims_gpt[2, ibnd]
+        @inbounds iflav = gpoint_flavor[itropo, gptS] #eta interpolation depends on band's flavor
+        @inbounds tau_major[gptS:gptE] .=
+          # interpolation in temperature, pressure, and eta
+          interpolate3D_byflav(col_mix[:,iflav,icol,ilay],
+                               fmajor[:,:,:,iflav,icol,ilay],
+                               kmajor,
+                               band_lims_gpt[1, ibnd],
+                               band_lims_gpt[2, ibnd],
+                               jeta[:,iflav,icol,ilay],
+                               jtemp[icol,ilay],
+                               jpress[icol,ilay]+itropo
+                               )
+        @inbounds tau[gptS:gptE,ilay,icol] = tau[gptS:gptE,ilay,icol] .+ tau_major[gptS:gptE]
+      end # igpt
+    end
+  end # ilay
+end
 
 
 """
@@ -444,78 +453,85 @@ integer  :: gptS, gptE
 real(FT), dimension(ngpt) :: tau_minor
 
 """
-  function gas_optical_depths_minor!(ncol,nlay,ngpt,
-                                      ngas,nflav,ntemp,neta,
-                                      nminor,nminork,
-                                      idx_h2o,
-                                      gpt_flv,
-                                      kminor,
-                                      minor_limits_gpt,
-                                      minor_scales_with_density,
-                                      scale_by_complement,
-                                      idx_minor, idx_minor_scaling,
-                                      kminor_start,
-                                      play, tlay,
-                                      col_gas,fminor,jeta,
-                                      layer_limits,jtemp,
-                                      tau)
-    #
-    # Guard against layer limits being 0 -- that means don't do anything i.e. there are no
-    #   layers with pressures in the upper or lower atmosphere respectively
-    # First check skips the routine entirely if all columns are out of bounds...
-    #
-    FT = eltype(tau)
-    tau_minor = Array{FT}(undef, ngpt)
-    if any(layer_limits[:,1] .> 0)
-      for imnr in 1:size(scale_by_complement,1) # loop over minor absorbers in each band
-        for icol in 1:ncol
-          #
-          # This check skips individual columns with no pressures in range
-          #
-          if layer_limits[icol,1] > 0
-            for ilay in layer_limits[icol,1]:layer_limits[icol,2]
+function gas_optical_depths_minor!(idx_h2o::I,
+                                   gpt_flv::Array{I},
+                                   kminor::Array{FT},
+                                   minor_limits_gpt::Array{I},
+                                   minor_scales_with_density::Array{B},
+                                   scale_by_complement::Array{B},
+                                   idx_minor::Array{I},
+                                   idx_minor_scaling::Array{I},
+                                   kminor_start::Array{I},
+                                   play::Array{FT},
+                                   tlay::Array{FT},
+                                   col_gas::AbstractArray{FT}, # OffsetArray
+                                   fminor::Array{FT},
+                                   jeta::Array{I},
+                                   layer_limits::Array{I},
+                                   jtemp::Array{I},
+                                   tau::Array{FT}) where {FT<:AbstractFloat,I<:Integer,B<:Bool}
+  nminork,neta,ntemp = size(kminor)
+  nminor = length(kminor_start)
+  ngpt = length(gpt_flv)
+  ncol,nlay = size(play)
+  nflav = size(fminor,2)
+  ngas = size(col_gas,3)-1
+  #
+  # Guard against layer limits being 0 -- that means don't do anything i.e. there are no
+  #   layers with pressures in the upper or lower atmosphere respectively
+  # First check skips the routine entirely if all columns are out of bounds...
+  #
+  tau_minor = Array{FT}(undef, ngpt)
+  if any(layer_limits[:,1] .> 0)
+    @inbounds for imnr in 1:size(scale_by_complement,1) # loop over minor absorbers in each band
+      @inbounds for icol in 1:ncol
+        #
+        # This check skips individual columns with no pressures in range
+        #
+        if layer_limits[icol,1] > 0
+          @inbounds for ilay in layer_limits[icol,1]:layer_limits[icol,2]
+            #
+            # Scaling of minor gas absortion coefficient begins with column amount of minor gas
+            #
+            @inbounds scaling = col_gas[icol,ilay,idx_minor[imnr]]
+            #
+            # Density scaling (e.g. for h2o continuum, collision-induced absorption)
+            #
+            if minor_scales_with_density[imnr]
               #
-              # Scaling of minor gas absortion coefficient begins with column amount of minor gas
+              # NOTE: P needed in hPa to properly handle density scaling.
               #
-              scaling = col_gas[icol,ilay,idx_minor[imnr]]
-              #
-              # Density scaling (e.g. for h2o continuum, collision-induced absorption)
-              #
-              if minor_scales_with_density[imnr]
-                #
-                # NOTE: P needed in hPa to properly handle density scaling.
-                #
-                scaling = scaling * (PaTohPa(FT)*play[icol,ilay]/tlay[icol,ilay])
-                if idx_minor_scaling[imnr] > 0  # there is a second gas that affects this gas's absorption
-                  vmr_fact = FT(1) / col_gas[icol,ilay,0]
-                  dry_fact = FT(1) / (FT(1) + col_gas[icol,ilay,idx_h2o] * vmr_fact)
-                  # scale by density of special gas
-                  if scale_by_complement[imnr] # scale by densities of all gases but the special one
-                    scaling = scaling * (FT(1) - col_gas[icol,ilay,idx_minor_scaling[imnr]] * vmr_fact * dry_fact)
-                  else
-                    scaling = scaling *          col_gas[icol,ilay,idx_minor_scaling[imnr]] * vmr_fact * dry_fact
-                  end
+              @inbounds scaling = scaling * (PaTohPa(FT)*play[icol,ilay]/tlay[icol,ilay])
+              if idx_minor_scaling[imnr] > 0  # there is a second gas that affects this gas's absorption
+                vmr_fact = FT(1) / col_gas[icol,ilay,0]
+                dry_fact = FT(1) / (FT(1) + col_gas[icol,ilay,idx_h2o] * vmr_fact)
+                # scale by density of special gas
+                if scale_by_complement[imnr] # scale by densities of all gases but the special one
+                  @inbounds scaling = scaling * (FT(1) - col_gas[icol,ilay,idx_minor_scaling[imnr]] * vmr_fact * dry_fact)
+                else
+                  @inbounds scaling = scaling *          col_gas[icol,ilay,idx_minor_scaling[imnr]] * vmr_fact * dry_fact
                 end
               end
-              #
-              # Interpolation of absorption coefficient and calculation of optical depth
-              #
-              # Which gpoint range does this minor gas affect?
-              gptS = minor_limits_gpt[1,imnr]
-              gptE = minor_limits_gpt[2,imnr]
-              iflav = gpt_flv[gptS]
-              tau_minor[gptS:gptE] = scaling *
-                                      interpolate2D_byflav(fminor[:,:,iflav,icol,ilay],
-                                                           kminor,
-                                                           kminor_start[imnr], kminor_start[imnr]+(gptE-gptS),
-                                                           jeta[:,iflav,icol,ilay], jtemp[icol,ilay])
-              tau[gptS:gptE,ilay,icol] = tau[gptS:gptE,ilay,icol] + tau_minor[gptS:gptE]
             end
+            #
+            # Interpolation of absorption coefficient and calculation of optical depth
+            #
+            # Which gpoint range does this minor gas affect?
+            @inbounds gptS = minor_limits_gpt[1,imnr]
+            @inbounds gptE = minor_limits_gpt[2,imnr]
+            @inbounds iflav = gpt_flv[gptS]
+            @inbounds tau_minor[gptS:gptE] = scaling *
+                                    interpolate2D_byflav(fminor[:,:,iflav,icol,ilay],
+                                                         kminor,
+                                                         kminor_start[imnr], kminor_start[imnr]+(gptE-gptS),
+                                                         jeta[:,iflav,icol,ilay], jtemp[icol,ilay])
+            @inbounds tau[gptS:gptE,ilay,icol] = tau[gptS:gptE,ilay,icol] + tau_minor[gptS:gptE]
           end
         end
       end
     end
   end
+end
 
 """
     compute_tau_rayleigh!()
@@ -543,31 +559,42 @@ integer  :: icol, ilay, iflav, ibnd, igpt, gptS, gptE
 integer  :: itropo
 # -----------------
 """
-  function compute_tau_rayleigh!(ncol,nlay,nbnd,ngpt,
-                                  ngas,nflav,neta,npres,ntemp,
-                                  gpoint_flavor,band_lims_gpt,
-                                  krayl,
-                                  idx_h2o, col_dry,col_gas,
-                                  fminor,jeta,tropo,jtemp,
-                                  tau_rayleigh)
-    FT = eltype(fminor)
-    k = Array{FT}(undef, ngpt)
-    for ilay in 1:nlay
-      for icol in 1:ncol
-        itropo = fmerge(1,2,tropo[icol,ilay]) # itropo = 1 lower atmosphere; itropo = 2 upper atmosphere
-        for ibnd in 1:nbnd
-          gptS = band_lims_gpt[1, ibnd]
-          gptE = band_lims_gpt[2, ibnd]
-          iflav = gpoint_flavor[itropo, gptS] #eta interpolation depends on band's flavor
-          k[gptS:gptE] = interpolate2D_byflav(fminor[:,:,iflav,icol,ilay],
-                                              krayl[:,:,:,itropo],
-                                              gptS, gptE, jeta[:,iflav,icol,ilay], jtemp[icol,ilay])
-          tau_rayleigh[gptS:gptE,ilay,icol] = k[gptS:gptE] *
-                                              (col_gas[icol,ilay,idx_h2o]+col_dry[icol,ilay])
-        end
+function compute_tau_rayleigh!(gpoint_flavor::Array{I},
+                               band_lims_gpt::Array{I},
+                               krayl::Array{FT},
+                               idx_h2o::I,
+                               col_dry::Array{FT},
+                               col_gas::AbstractArray{FT}, # OffsetArray
+                               fminor::Array{FT},
+                               jeta::Array{I},
+                               tropo::Array{B},
+                               jtemp::Array{I},
+                               tau_rayleigh::Array{FT}) where {FT<:AbstractFloat, I<:Integer, B<:Bool}
+  ncol,nlay = size(col_dry)
+  nbnd = size(band_lims_gpt,2)
+  ngpt = size(tau_rayleigh,1)
+  ngas = size(col_gas,3)-1
+  nflav = size(fminor,3)
+  neta = size(krayl,2)
+  ntemp = size(krayl,3)
+
+  k = Array{FT}(undef, ngpt)
+  @inbounds for ilay in 1:nlay
+    @inbounds for icol in 1:ncol
+      @inbounds itropo = fmerge(1,2,tropo[icol,ilay]) # itropo = 1 lower atmosphere; itropo = 2 upper atmosphere
+      @inbounds for ibnd in 1:nbnd
+        @inbounds gptS = band_lims_gpt[1, ibnd]
+        @inbounds gptE = band_lims_gpt[2, ibnd]
+        @inbounds iflav = gpoint_flavor[itropo, gptS] #eta interpolation depends on band's flavor
+        @inbounds interpolate2D_byflav!(@view(k[gptS:gptE]), fminor[:,:,iflav,icol,ilay],
+                                            krayl[:,:,:,itropo],
+                                            gptS, gptE, jeta[:,iflav,icol,ilay], jtemp[icol,ilay])
+        @inbounds tau_rayleigh[gptS:gptE,ilay,icol] = k[gptS:gptE] *
+                                            (col_gas[icol,ilay,idx_h2o]+col_dry[icol,ilay])
       end
     end
   end
+end
 
 """
     compute_Planck_source!(...)
@@ -603,39 +630,55 @@ real(FT) :: pfrac          (ngpt,nlay,  ncol)
 real(FT) :: planck_function(nbnd,nlay+1,ncol)
 # -----------------
 """
-  function compute_Planck_source!(
-                    ncol, nlay, nbnd, ngpt,
-                    nflav, neta, npres, ntemp, nPlanckTemp,
-                    tlay, tlev, tsfc, sfc_lay,
-                    fmajor, jeta, tropo, jtemp, jpress,
-                    gpoint_bands, band_lims_gpt,
-                    pfracin, temp_ref_min, totplnk_delta, totplnk, gpoint_flavor,
-                    sfc_src, lay_src, lev_src_inc, lev_src_dec)
+function compute_Planck_source!(
+                  ncol, nlay, nbnd, ngpt,
+                  nflav, neta, npres, ntemp, nPlanckTemp,
+                  tlay, tlev, tsfc, sfc_lay,
+                  fmajor, jeta, tropo, jtemp, jpress,
+                  gpoint_bands, band_lims_gpt,
+                  pfracin, temp_ref_min, totplnk_delta, totplnk, gpoint_flavor,
+                  sfc_src, lay_src, lev_src_inc, lev_src_dec)
 
-    # Calculation of fraction of band's Planck irradiance associated with each g-point
-    for icol in 1:ncol
-      for ilay in 1:nlay
-        # itropo = 1 lower atmosphere; itropo = 2 upper atmosphere
-        itropo = fmerge(1,2,tropo[icol,ilay])
-        for ibnd = 1:nbnd
-          gptS = band_lims_gpt[1, ibnd]
-          gptE = band_lims_gpt[2, ibnd]
-          iflav = gpoint_flavor[itropo, gptS] #eta interpolation depends on band's flavor
-          pfrac[gptS:gptE,ilay,icol] =
-            # interpolation in temperature, pressure, and eta
-            interpolate3D_byflav(FT[1,1], fmajor[:,:,:,iflav,icol,ilay], pfracin,
-                          band_lims_gpt[1, ibnd], band_lims_gpt[2, ibnd],
-                          jeta[:,iflav,icol,ilay], jtemp[icol,ilay],jpress[icol,ilay]+itropo)
-        end # band
-      end   # layer
-    end     # column
+  # Calculation of fraction of band's Planck irradiance associated with each g-point
+  for icol in 1:ncol
+    for ilay in 1:nlay
+      # itropo = 1 lower atmosphere; itropo = 2 upper atmosphere
+      itropo = fmerge(1,2,tropo[icol,ilay])
+      for ibnd = 1:nbnd
+        gptS = band_lims_gpt[1, ibnd]
+        gptE = band_lims_gpt[2, ibnd]
+        iflav = gpoint_flavor[itropo, gptS] #eta interpolation depends on band's flavor
+        pfrac[gptS:gptE,ilay,icol] =
+          # interpolation in temperature, pressure, and eta
+          interpolate3D_byflav(FT[1,1], fmajor[:,:,:,iflav,icol,ilay], pfracin,
+                        band_lims_gpt[1, ibnd], band_lims_gpt[2, ibnd],
+                        jeta[:,iflav,icol,ilay], jtemp[icol,ilay],jpress[icol,ilay]+itropo)
+      end # band
+    end   # layer
+  end     # column
 
+  #
+  # Planck function by band for the surface
+  # Compute surface source irradiance for g-point, equals band irradiance x fraction for g-point
+  #
+  for icol in 1:ncol
+    planck_function[1:nbnd,1,icol] = interpolate1D(tsfc[icol], temp_ref_min, totplnk_delta, totplnk)
     #
-    # Planck function by band for the surface
-    # Compute surface source irradiance for g-point, equals band irradiance x fraction for g-point
+    # Map to g-points
     #
-    for icol in 1:ncol
-      planck_function[1:nbnd,1,icol] = interpolate1D(tsfc[icol], temp_ref_min, totplnk_delta, totplnk)
+    for ibnd in 1:nbnd
+      gptS = band_lims_gpt[1, ibnd]
+      gptE = band_lims_gpt[2, ibnd]
+      for igpt in gptS:gptE
+        sfc_src[igpt, icol] = pfrac[igpt,sfc_lay,icol] * planck_function[ibnd, 1, icol]
+      end
+    end
+  end # icol
+
+  for icol in 1:ncol
+    for ilay in 1:nlay
+      # Compute layer source irradiance for g-point, equals band irradiance x fraction for g-point
+      planck_function[1:nbnd,ilay,icol] = interpolate1D(tlay[icol,ilay], temp_ref_min, totplnk_delta, totplnk)
       #
       # Map to g-points
       #
@@ -643,48 +686,32 @@ real(FT) :: planck_function(nbnd,nlay+1,ncol)
         gptS = band_lims_gpt[1, ibnd]
         gptE = band_lims_gpt[2, ibnd]
         for igpt in gptS:gptE
-          sfc_src[igpt, icol] = pfrac[igpt,sfc_lay,icol] * planck_function[ibnd, 1, icol]
+          lay_src[igpt,ilay,icol] = pfrac[igpt,ilay,icol] * planck_function[ibnd,ilay,icol]
         end
       end
-    end # icol
+    end # ilay
+  end # icol
 
-    for icol in 1:ncol
-      for ilay in 1:nlay
-        # Compute layer source irradiance for g-point, equals band irradiance x fraction for g-point
-        planck_function[1:nbnd,ilay,icol] = interpolate1D(tlay[icol,ilay], temp_ref_min, totplnk_delta, totplnk)
-        #
-        # Map to g-points
-        #
-        for ibnd in 1:nbnd
-          gptS = band_lims_gpt[1, ibnd]
-          gptE = band_lims_gpt[2, ibnd]
-          for igpt in gptS:gptE
-            lay_src[igpt,ilay,icol] = pfrac[igpt,ilay,icol] * planck_function[ibnd,ilay,icol]
-          end
+  # compute level source irradiances for each g-point, one each for upward and downward paths
+  for icol in 1:ncol
+    planck_function[1:nbnd,       1,icol] = interpolate1D(tlev[icol,     1], temp_ref_min, totplnk_delta, totplnk)
+    for ilay in 1:nlay
+      planck_function[1:nbnd,ilay+1,icol] = interpolate1D(tlev[icol,ilay+1], temp_ref_min, totplnk_delta, totplnk)
+      #
+      # Map to g-points
+      #
+      for ibnd in 1:nbnd
+        gptS = band_lims_gpt[1, ibnd]
+        gptE = band_lims_gpt[2, ibnd]
+        for igpt in gptS:gptE
+          lev_src_inc[igpt,ilay,icol] = pfrac[igpt,ilay,icol] * planck_function[ibnd,ilay+1,icol]
+          lev_src_dec[igpt,ilay,icol] = pfrac[igpt,ilay,icol] * planck_function[ibnd,ilay,  icol]
         end
-      end # ilay
-    end # icol
+      end
+    end # ilay
+  end # icol
 
-    # compute level source irradiances for each g-point, one each for upward and downward paths
-    for icol in 1:ncol
-      planck_function[1:nbnd,       1,icol] = interpolate1D(tlev[icol,     1], temp_ref_min, totplnk_delta, totplnk)
-      for ilay in 1:nlay
-        planck_function[1:nbnd,ilay+1,icol] = interpolate1D(tlev[icol,ilay+1], temp_ref_min, totplnk_delta, totplnk)
-        #
-        # Map to g-points
-        #
-        for ibnd in 1:nbnd
-          gptS = band_lims_gpt[1, ibnd]
-          gptE = band_lims_gpt[2, ibnd]
-          for igpt in gptS:gptE
-            lev_src_inc[igpt,ilay,icol] = pfrac[igpt,ilay,icol] * planck_function[ibnd,ilay+1,icol]
-            lev_src_dec[igpt,ilay,icol] = pfrac[igpt,ilay,icol] * planck_function[ibnd,ilay,  icol]
-          end
-        end
-      end # ilay
-    end # icol
-
-  end
+end
 
 """
     interpolate1D(...)
@@ -707,15 +734,15 @@ integer :: index # index term
 real(FT) :: frac # fractional term
 # -------------------------------------
 """
-  function interpolate1D(val, offset, delta, table)
-    FT = eltype(delta)
-    res = Vector{FT}(undef, size(table, dim=2))
-    val0 = (val - offset) / delta
-    frac = val0 - fint(val0) # get fractional part
-    index = min(size(table,dim=1)-1, max(1, fint(val0)+1)) # limit the index range
-    res[:] = table[index,:] + frac * (table[index+1,:] - table[index,:])
-    return res
-  end
+function interpolate1D(val, offset, delta, table)
+  FT = eltype(delta)
+  res = Vector{FT}(undef, size(table, dim=2))
+  val0 = (val - offset) / delta
+  frac = val0 - fint(val0) # get fractional part
+  index = min(size(table,dim=1)-1, max(1, fint(val0)+1)) # limit the index range
+  res[:] = table[index,:] + frac * (table[index+1,:] - table[index,:])
+  return res
+end
 
 """
     interpolate2D(...)
@@ -730,14 +757,15 @@ integer,                    intent(in) :: igpt, jtemp # interpolation index for 
 integer, dimension(2),      intent(in) :: jeta # interpolation index for binary species parameter (eta)
 real(FT)                             :: res # the result
 """
-  function interpolate2D(fminor, k, igpt, jeta, jtemp)
-    res =
-      fminor[1,1] * k[igpt, jeta[1]  , jtemp  ] +
-      fminor[2,1] * k[igpt, jeta[1]+1, jtemp  ] +
-      fminor[1,2] * k[igpt, jeta[2]  , jtemp+1] +
-      fminor[2,2] * k[igpt, jeta[2]+1, jtemp+1]
-    return res
-  end
+function interpolate2D(fminor, k, igpt, jeta, jtemp)
+  @inbounds res =
+    fminor[1,1] * k[igpt, jeta[1]  , jtemp  ] +
+    fminor[2,1] * k[igpt, jeta[1]+1, jtemp  ] +
+    fminor[1,2] * k[igpt, jeta[2]  , jtemp+1] +
+    fminor[2,2] * k[igpt, jeta[2]+1, jtemp+1]
+  return res
+end
+
 """
     interpolate2D_byflav(...)
 
@@ -754,18 +782,28 @@ real(FT), dimension(gptE-gptS+1)       :: res # the result
 # Local variable
 integer :: igpt
 """
-  function interpolate2D_byflav(fminor, k, gptS, gptE, jeta, jtemp)
-    FT = eltype(fminor)
-    res = Vector{FT}(undef, gptE-gptS+1)
-    # each code block is for a different reference temperature
-    for igpt in 1:gptE-gptS+1
-      res[igpt] = fminor[1,1] * k[gptS+igpt-1, jeta[1]  , jtemp  ] +
-                  fminor[2,1] * k[gptS+igpt-1, jeta[1]+1, jtemp  ] +
-                  fminor[1,2] * k[gptS+igpt-1, jeta[2]  , jtemp+1] +
-                  fminor[2,2] * k[gptS+igpt-1, jeta[2]+1, jtemp+1]
-    end
-    return res
+function interpolate2D_byflav(fminor::Array{FT},
+                              k::Array{FT},
+                              gptS::I, gptE::I,
+                              jeta::Array{I}, jtemp::I) where {FT<:AbstractFloat, I<:Integer}
+  res = Vector{FT}(undef, gptE-gptS+1)
+  interpolate2D_byflav!(res, fminor, k, gptS, gptE, jeta, jtemp)
+  return res
+end
+function interpolate2D_byflav!(res::AbstractArray{FT},
+                               fminor::Array{FT},
+                               k::Array{FT},
+                               gptS::I, gptE::I,
+                               jeta::Array{I}, jtemp::I) where {FT<:AbstractFloat, I<:Integer}
+  # each code block is for a different reference temperature
+  @inbounds for igpt in eachindex(res)
+    @inbounds res[igpt] = fminor[1,1] * k[gptS+igpt-1, jeta[1]  , jtemp  ] +
+                          fminor[2,1] * k[gptS+igpt-1, jeta[1]+1, jtemp  ] +
+                          fminor[1,2] * k[gptS+igpt-1, jeta[2]  , jtemp+1] +
+                          fminor[2,2] * k[gptS+igpt-1, jeta[2]+1, jtemp+1]
   end
+  nothing
+end
 
 """
     interpolate3D(...)
@@ -784,21 +822,21 @@ integer,                     intent(in) :: jtemp # interpolation index for tempe
 integer,                     intent(in) :: jpress # interpolation index for pressure
 real(FT)                                :: res # the result
 """
-  function interpolate3D(scaling, fmajor, k, igpt, jeta, jtemp, jpress)
-    # each code block is for a different reference temperature
-    res =
-      scaling[1] *
-      ( fmajor[1,1,1] * k[igpt, jeta[1]  , jpress-1, jtemp  ] +
-        fmajor[2,1,1] * k[igpt, jeta[1]+1, jpress-1, jtemp  ] +
-        fmajor[1,2,1] * k[igpt, jeta[1]  , jpress  , jtemp  ] +
-        fmajor[2,2,1] * k[igpt, jeta[1]+1, jpress  , jtemp  ] ) +
-      scaling[2] *
-      ( fmajor[1,1,2] * k[igpt, jeta[2]  , jpress-1, jtemp+1] +
-        fmajor[2,1,2] * k[igpt, jeta[2]+1, jpress-1, jtemp+1] +
-        fmajor[1,2,2] * k[igpt, jeta[2]  , jpress  , jtemp+1] +
-        fmajor[2,2,2] * k[igpt, jeta[2]+1, jpress  , jtemp+1] )
-    return res
-  end
+function interpolate3D(scaling, fmajor, k, igpt, jeta, jtemp, jpress)
+  # each code block is for a different reference temperature
+  res =
+    scaling[1] *
+    ( fmajor[1,1,1] * k[igpt, jeta[1]  , jpress-1, jtemp  ] +
+      fmajor[2,1,1] * k[igpt, jeta[1]+1, jpress-1, jtemp  ] +
+      fmajor[1,2,1] * k[igpt, jeta[1]  , jpress  , jtemp  ] +
+      fmajor[2,2,1] * k[igpt, jeta[1]+1, jpress  , jtemp  ] ) +
+    scaling[2] *
+    ( fmajor[1,1,2] * k[igpt, jeta[2]  , jpress-1, jtemp+1] +
+      fmajor[2,1,2] * k[igpt, jeta[2]+1, jpress-1, jtemp+1] +
+      fmajor[1,2,2] * k[igpt, jeta[2]  , jpress  , jtemp+1] +
+      fmajor[2,2,2] * k[igpt, jeta[2]+1, jpress  , jtemp+1] )
+  return res
+end
 
 """
     interpolate3D_byflav(...)
@@ -818,26 +856,30 @@ real(FT), dimension(gptE-gptS+1)        :: res # the result
 # Local variable
 integer :: igpt
 """
-
-  function interpolate3D_byflav(scaling, fmajor, k, gptS, gptE, jeta, jtemp, jpress)
-    # each code block is for a different reference temperature
-    FT = eltype(k)
-    res = Vector{FT}(undef, gptE-gptS+1)
-    for igpt = 1:gptE-gptS+1
-      res[igpt] =
-        scaling[1] *
-        ( fmajor[1,1,1] * k[gptS+igpt-1, jeta[1]  , jpress-1, jtemp  ] +
-          fmajor[2,1,1] * k[gptS+igpt-1, jeta[1]+1, jpress-1, jtemp  ] +
-          fmajor[1,2,1] * k[gptS+igpt-1, jeta[1]  , jpress  , jtemp  ] +
-          fmajor[2,2,1] * k[gptS+igpt-1, jeta[1]+1, jpress  , jtemp  ] ) +
-        scaling[2] *
-        ( fmajor[1,1,2] * k[gptS+igpt-1, jeta[2]  , jpress-1, jtemp+1] +
-          fmajor[2,1,2] * k[gptS+igpt-1, jeta[2]+1, jpress-1, jtemp+1] +
-          fmajor[1,2,2] * k[gptS+igpt-1, jeta[2]  , jpress  , jtemp+1] +
-          fmajor[2,2,2] * k[gptS+igpt-1, jeta[2]+1, jpress  , jtemp+1] )
-    end
-    return res
+function interpolate3D_byflav(scaling, fmajor, k, gptS, gptE, jeta, jtemp, jpress)
+  # each code block is for a different reference temperature
+  FT = eltype(k)
+  res = Vector{FT}(undef, gptE-gptS+1)
+  interpolate3D_byflav!(res, scaling, fmajor, k, gptS, gptE, jeta, jtemp, jpress)
+  return res
+end
+function interpolate3D_byflav!(res::Array{FT}, scaling, fmajor, k, gptS, gptE, jeta, jtemp, jpress) where FT
+  # each code block is for a different reference temperature
+  @inbounds for igpt = 1:gptE-gptS+1
+    res[igpt] =
+      scaling[1] *
+      ( fmajor[1,1,1] * k[gptS+igpt-1, jeta[1]  , jpress-1, jtemp  ] +
+        fmajor[2,1,1] * k[gptS+igpt-1, jeta[1]+1, jpress-1, jtemp  ] +
+        fmajor[1,2,1] * k[gptS+igpt-1, jeta[1]  , jpress  , jtemp  ] +
+        fmajor[2,2,1] * k[gptS+igpt-1, jeta[1]+1, jpress  , jtemp  ] ) +
+      scaling[2] *
+      ( fmajor[1,1,2] * k[gptS+igpt-1, jeta[2]  , jpress-1, jtemp+1] +
+        fmajor[2,1,2] * k[gptS+igpt-1, jeta[2]+1, jpress-1, jtemp+1] +
+        fmajor[1,2,2] * k[gptS+igpt-1, jeta[2]  , jpress  , jtemp+1] +
+        fmajor[2,2,2] * k[gptS+igpt-1, jeta[2]+1, jpress  , jtemp+1] )
   end
+  return res
+end
 
 """
     combine_and_reorder_2str!(...)
@@ -852,27 +894,27 @@ integer  :: icol, ilay, igpt
 real(FT) :: t
 # -----------------------
 """
-  function combine_and_reorder_2str(ncol, nlay, ngpt, tau_abs, tau_rayleigh)
-    FT = eltype(tau_abs)
-    tau = Array{FT}(undef,ncol, nlay, ngpt)
-    ssa = Array{FT}(undef,ncol, nlay, ngpt)
-    g = Array{FT}(undef,ncol, nlay, ngpt)
-    for icol in 1:ncol
-      for ilay in 1:nlay
-        for igpt in 1:ngpt
-           t = tau_abs[igpt,ilay,icol] + tau_rayleigh[igpt,ilay,icol]
-           tau[icol,ilay,igpt] = t
-           g[icol,ilay,igpt] = FT(0)
-           if (t > FT(2) * floatmin(FT))
-             ssa[icol,ilay,igpt] = tau_rayleigh[igpt,ilay,icol] / t
-           else
-             ssa[icol,ilay,igpt] = FT(0)
-           end
-        end
+function combine_and_reorder_2str(ncol, nlay, ngpt, tau_abs, tau_rayleigh)
+  FT = eltype(tau_abs)
+  tau = Array{FT}(undef,ncol, nlay, ngpt)
+  ssa = Array{FT}(undef,ncol, nlay, ngpt)
+  g = Array{FT}(undef,ncol, nlay, ngpt)
+  for icol in 1:ncol
+    for ilay in 1:nlay
+      for igpt in 1:ngpt
+         t = tau_abs[igpt,ilay,icol] + tau_rayleigh[igpt,ilay,icol]
+         tau[icol,ilay,igpt] = t
+         g[icol,ilay,igpt] = FT(0)
+         if (t > FT(2) * floatmin(FT))
+           ssa[icol,ilay,igpt] = tau_rayleigh[igpt,ilay,icol] / t
+         else
+           ssa[icol,ilay,igpt] = FT(0)
+         end
       end
     end
-    return tau, ssa, g
   end
+  return tau, ssa, g
+end
 
 """
     combine_and_reorder_nstr!(...)
@@ -890,27 +932,28 @@ integer :: icol, ilay, igpt, imom
 real(FT) :: t
 # -----------------------
 """
-  function combine_and_reorder_nstr!(ncol, nlay, ngpt, nmom, tau_abs, tau_rayleigh, tau, ssa, p)
-    FT = eltype(tau_abs)
+function combine_and_reorder_nstr!(ncol, nlay, ngpt, nmom, tau_abs, tau_rayleigh, tau, ssa, p)
+  FT = eltype(tau_abs)
 
-    for icol in 1:ncol
-      for ilay in 1:nlay
-        for igpt in 1:ngpt
-          t = tau_abs[igpt,ilay,icol] + tau_rayleigh[igpt,ilay,icol]
-          tau[icol,ilay,igpt] = t
-          if (t > FT(2) * realmin(FT))
-            ssa[icol,ilay,igpt] = tau_rayleigh[igpt,ilay,icol] / t
-          else
-            ssa[icol,ilay,igpt] = FT(0)
-          end
-          for imom = 1:nmom
-            p[imom,icol,ilay,igpt] = FT(0)
-          end
-          if (nmom >= 2)
-            p[2,icol,ilay,igpt] = FT(0.1)
-          end
+  for icol in 1:ncol
+    for ilay in 1:nlay
+      for igpt in 1:ngpt
+        t = tau_abs[igpt,ilay,icol] + tau_rayleigh[igpt,ilay,icol]
+        tau[icol,ilay,igpt] = t
+        if (t > FT(2) * realmin(FT))
+          ssa[icol,ilay,igpt] = tau_rayleigh[igpt,ilay,icol] / t
+        else
+          ssa[icol,ilay,igpt] = FT(0)
+        end
+        for imom = 1:nmom
+          p[imom,icol,ilay,igpt] = FT(0)
+        end
+        if (nmom >= 2)
+          p[2,icol,ilay,igpt] = FT(0.1)
         end
       end
     end
   end
+end
+
 end
