@@ -79,6 +79,7 @@ jobs:
   - bash: |
       set -o xtrace
       ./julia-$(JULIA_VERSION)/bin/julia -e 'using InteractiveUtils; versioninfo()'
+      ./julia-$(JULIA_VERSION)/bin/julia --project=@. -e 'using Pkg; Pkg.add("Conda"); using Conda; Conda.add("libnetcdf")'
       ./julia-$(JULIA_VERSION)/bin/julia --project=@. -e 'using Pkg; Pkg.instantiate()'
       ./julia-$(JULIA_VERSION)/bin/julia --project=@. -e 'using Pkg; Pkg.test()'
     displayName: 'Run the tests'
