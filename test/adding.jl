@@ -69,12 +69,12 @@ function read_spectral_disc(ds, FT)
 
     # ! -------------------
     # if(nf90_open(trim(fileName), NF90_WRITE, ncid) /= NF90_NOERR) &
-    #   call stop_on_err("read_spectral_disc: can't open file " // trim(fileName))
+    #   error("read_spectral_disc: can't open file " // trim(fileName))
 
     # nband = length(size(ds["band"]))
     # nband = ds.dim["band"]
     # if (get_dim_size(ncid, 'pair') /= 2) &
-    #   call stop_on_err("read_spectral_disc: pair dimension not 2 in file "//trim(fileName) )
+    #   error("read_spectral_disc: pair dimension not 2 in file "//trim(fileName) )
     # @show ds["pair"][:]
     # @show ds["name"][:]
 
