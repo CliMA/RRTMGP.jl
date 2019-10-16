@@ -22,16 +22,6 @@
 # Error checking: Procedures in rte+rrtmgp return strings which are empty if no errors occured
 #   Check the incoming string, print it out and stop execution if non-empty
 #
-subroutine stop_on_err(error_msg)
-  use iso_fortran_env, only : error_unit
-  character(len=*), intent(in) :: error_msg
-
-  if(error_msg /= "") then
-    write (error_unit,*) trim(error_msg)
-    write (error_unit,*) "rrtmgp_rfmip_lw stopping"
-    stop
-  end if
-end subroutine stop_on_err
 # -------------------------------------------------------------------------------------------------
 #
 # Main program

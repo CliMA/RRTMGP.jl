@@ -56,7 +56,7 @@ module mo_rfmip_io
 #    integer :: ncid
     # ---------------------------
 #    if(nf90_open(trim(fileName), NF90_NOWRITE, ncid) /= NF90_NOERR) &
-#      call stop_on_err("read_size: can't find file " // trim(fileName))
+#      error("read_size: can't find file " // trim(fileName))
 
     ncol = Int(ds.dim["site"])
     nlay = Int(ds.dim["layer"])
@@ -105,7 +105,7 @@ module mo_rfmip_io
     t_lev = Array{FT}(undef,blocksize,nlay_l+1,nblocks)
 
 #    if(nf90_open(trim(fileName), NF90_NOWRITE, ncid) /= NF90_NOERR) &
-#      call stop_on_err("read_and_block_pt: can't find file " // trim(fileName))
+#      error("read_and_block_pt: can't find file " // trim(fileName))
     #
     # Read p, T data; reshape to suit RRTMGP dimensions
     #
@@ -294,7 +294,7 @@ module mo_rfmip_io
 
 
 #    if(nf90_open(trim(fileName), NF90_NOWRITE, ncid) /= NF90_NOERR) &
-#      call stop_on_err("read_kdist_gas_names: can't open file " // trim(fileName))
+#      error("read_kdist_gas_names: can't open file " // trim(fileName))
 
 #    allocate(kdist_gas_names(get_dim_size(ncid, 'absorber')))
 
@@ -315,9 +315,9 @@ module mo_rfmip_io
 
 
 #    if(nf90_inq_varid(ncid, trim(varName), varid) /= NF90_NOERR) &
-#      call stop_on_err("read_kdist_gas_names: can't find variable " // trim(varName))
+#      error("read_kdist_gas_names: can't find variable " // trim(varName))
 #    if(nf90_get_var(ncid, varid, kdist_gas_names)  /= NF90_NOERR) &
-#      call stop_on_err("read_kdist_gas_names: can't read variable " // trim(varName))
+#      error("read_kdist_gas_names: can't read variable " // trim(varName))
 
 #    ncid = nf90_close(ncid)
   end
@@ -375,7 +375,7 @@ module mo_rfmip_io
 
 
 #    if(nf90_open(trim(fileName), NF90_NOWRITE, ncid) /= NF90_NOERR) &
-#      call stop_on_err("read_and_block_gases_ty: can't find file " // trim(fileName))
+#      error("read_and_block_gases_ty: can't find file " // trim(fileName))
 
     #
     # Water vapor and ozone depend on col, lay, exp: look just like other fields
@@ -423,7 +423,7 @@ module mo_rfmip_io
           set_vmr!(gas_conc_array[b],gas_names[g], gas_conc_temp_1d[exp_num[1,b]])
         else
           # Create 2D field, blocksize x nlay, with scalar values from each experiment
-#          call stop_on_err(gas_conc_array(b)%set_vmr(gas_names(g), &
+#          error(gas_conc_array(b)%set_vmr(gas_names(g), &
 #          spread(gas_conc_temp_1d(exp_num(:,b)), 2, ncopies = nlay_l)))
           # gas_conc_temp_1d_rep = repeat(gas_conc_temp_1d, 1, nlay_l)
           # set_vmr!(gas_conc_array[b],gas_names[g], gas_conc_temp_1d_rep )
@@ -460,9 +460,9 @@ module mo_rfmip_io
     end
 
 #    if(nf90_inq_varid(ncid, trim(varName), varid) /= NF90_NOERR) &
-#      call stop_on_err("read_scaling: can't find variable " // trim(varName))
+#      error("read_scaling: can't find variable " // trim(varName))
 #    if(nf90_get_att(ncid, varid, "units", charUnits)  /= NF90_NOERR) &
-#      call stop_on_err("read_scaling: can't read attribute 'units' from variable " // trim(varName))
+#      error("read_scaling: can't read attribute 'units' from variable " // trim(varName))
 #    read(charUnits, *) read_scaling
     return parse(FT, scaling_str)
 
@@ -508,8 +508,8 @@ module mo_rfmip_io
     #
 # SK - commenting - assuming it is appending an existing file
 #    if(nf90_open(trim(fileName), NF90_WRITE, ncid) /= NF90_NOERR) &
-#      call stop_on_err("unblock_and_write: can't find file " // trim(fileName))
-#    call stop_on_err(write_field(ncid, varName,  &
+#      error("unblock_and_write: can't find file " // trim(fileName))
+#    error(write_field(ncid, varName,  &
 #                                 reshape(temp2d, shape = [nlev, ncol_l, nexp_l])))
 #
 #    ncid = nf90_close(ncid)
