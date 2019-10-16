@@ -1,10 +1,10 @@
-jobs:
-- job: Linux
+
+- job: macOS
 
   timeoutInMinutes: 0
 
   pool:
-    vmImage: 'ubuntu-16.04'
+    vmImage: 'macOS-10.14'
 
   strategy:
     matrix:
@@ -14,32 +14,21 @@ jobs:
   steps:
   - bash: |
       set -o xtrace
-      wget -nv https://julialang-s3.julialang.org/bin/linux/x64/$(JULIA_VERSION)/julia-$(JULIA_VERSION)-latest-linux-x86_64.tar.gz
-      mkdir julia-$(JULIA_VERSION)
-      tar zxf julia-$(JULIA_VERSION)-latest-linux-x86_64.tar.gz -C julia-$(JULIA_VERSION) --strip-components 1
+      wget -nv https://julialang-s3.julialang.org/bin/mac/x64/$(JULIA_VERSION)/julia-$(JULIA_VERSION)-latest-mac64.dmg
+      mkdir juliamnt
+      hdiutil mount -readonly -mountpoint juliamnt julia-$(JULIA_VERSION)-latest-mac64.dmg
+      cp -a juliamnt/*.app/Contents/Resources/julia julia-$(JULIA_VERSION)
     displayName: 'Download and extract Julia'
   - bash: |
       set -o xtrace
-      sudo apt-get update
+      brew update
+      brew upgrade
     displayName: 'Install dependencies'
   - bash: |
       set -o xtrace
       ./julia-$(JULIA_VERSION)/bin/julia -e 'using InteractiveUtils; versioninfo()'
+      ./julia-$(JULIA_VERSION)/bin/julia --project=@. -e 'using Pkg; Pkg.add("Conda"); using Conda; Conda.add("libnetcdf")'
       ./julia-$(JULIA_VERSION)/bin/julia --project=@. -e 'using Pkg; Pkg.instantiate()'
-      ./julia-$(JULIA_VERSION)/bin/julia --project=@. -e 'using Pkg; Pkg.test(coverage=true)'
+      ./julia-$(JULIA_VERSION)/bin/julia --project=@. -e 'using Pkg; Pkg.test()'
     displayName: 'Run the tests'
-  - bash: |
-      ./julia-$(JULIA_VERSION)/bin/julia --project=.coverage -e 'using Pkg; Pkg.instantiate();
-                                                                 Pkg.add("Coverage");
-                                                                 using Coverage;
-                                                                 Codecov.submit_local(Codecov.process_folder();
-                                                                   service = "azure_pipelines",
-                                                                   commit       = @show(ENV["BUILD_SOURCEVERSION"]),
-                                                                   pull_request = @show(get(ENV, "SYSTEM_PULLREQUEST_PULLREQUESTNUMBER", "false")),
-                                                                   job          = @show(ENV["BUILD_DEFINITIONNAME"]),
-                                                                   slug         = @show(ENV["BUILD_REPOSITORY_NAME"]),
-                                                                   build        = @show(ENV["BUILD_BUILDID"]))'
-    env:
-      CODECOV_TOKEN: "e62dc66d-04f1-424f-9c4d-1278fa8b2e8d"
-    displayName: 'Submit code coverage'
 
