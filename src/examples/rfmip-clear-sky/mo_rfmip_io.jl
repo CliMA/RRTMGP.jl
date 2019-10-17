@@ -109,14 +109,15 @@ module mo_rfmip_io
     #
     # Read p, T data; reshape to suit RRTMGP dimensions
     #
-
-    temp3d = reshape( repeat(ds["pres_layer"][:],1,1,nexp_l), nlay_l, blocksize, nblocks )
+    pres_layer = Array{FT}(ds["pres_layer"][:])
+    temp3d = reshape( repeat(pres_layer,1,1,nexp_l), nlay_l, blocksize, nblocks )
 
     for b = 1:nblocks
       p_lay[:,:,b] = transpose(temp3d[:,:,b])
     end
 
-    temp3d = reshape( ds["temp_layer"][:], nlay_l, blocksize, nblocks )
+    temp_layer = Array{FT}(ds["temp_layer"][:])
+    temp3d = reshape(temp_layer, nlay_l, blocksize, nblocks )
 
     for b = 1:nblocks
       t_lay[:,:,b] = transpose(temp3d[:,:,b])
@@ -124,13 +125,15 @@ module mo_rfmip_io
 
     temp3d = []
 
-    temp3d = reshape( repeat(ds["pres_level"][:],1,1,nexp_l), nlay_l+1, blocksize, nblocks )
+    pres_level = Array{FT}(ds["pres_level"][:])
+    temp3d = reshape( repeat(pres_level,1,1,nexp_l), nlay_l+1, blocksize, nblocks )
 
     for b = 1:nblocks
       p_lev[:,:,b] = transpose(temp3d[:,:,b])
     end
 
-    temp3d = reshape( ds["temp_level"][:],nlay_l+1, blocksize, nblocks )
+    temp_level = Array{FT}(ds["temp_level"][:])
+    temp3d = reshape(temp_level,nlay_l+1, blocksize, nblocks )
 
     for b = 1:nblocks
       t_lev[:,:,b] = transpose(temp3d[:,:,b])
@@ -166,15 +169,17 @@ module mo_rfmip_io
     #
     # Check that output arrays are sized correctly : blocksize, nlay, (ncol * nexp)/blocksize
     #
-
-    temp2D = repeat(ds["surface_albedo"][:],1,nexp_l)
+    surface_albedo = Array{FT}(ds["surface_albedo"][:])
+    temp2D = repeat(surface_albedo,1,nexp_l)
 
     surface_albedo = reshape(temp2D,blocksize,nblocks)
 
-    temp2D = repeat(ds["total_solar_irradiance"][:],1,nexp_l)
+    total_solar_irradiance = Array{FT}(ds["total_solar_irradiance"][:])
+    temp2D = repeat(total_solar_irradiance,1,nexp_l)
     total_solar_irradiance = reshape(temp2D, blocksize, nblocks)
 
-    temp2D = repeat(ds["solar_zenith_angle"][:],1,nexp_l)
+    solar_zenith_angle = Array{FT}(ds["solar_zenith_angle"][:])
+    temp2D = repeat(solar_zenith_angle,1,nexp_l)
     solar_zenith_angle = reshape(temp2D, blocksize, nblocks)
     return surface_albedo, total_solar_irradiance, solar_zenith_angle
   end
@@ -207,10 +212,12 @@ module mo_rfmip_io
     #
     # Allocate on assignment
     #
-    temp2D = repeat(ds["surface_emissivity"][:],1,nexp_l)
+    surface_emissivity = Array{FT}(ds["surface_emissivity"][:])
+    temp2D = repeat(surface_emissivity,1,nexp_l)
     surface_emissivity  = reshape(temp2D,blocksize,nblocks)
 
-    temp2D = repeat(ds["surface_temperature"][:],1,nexp_l)
+    surface_temperature = Array{FT}(ds["surface_temperature"][:])
+    temp2D = repeat(surface_temperature,1,nexp_l)
     surface_temperature = reshape(temp2D,blocksize,nblocks)
 
     return surface_emissivity, surface_temperature
@@ -362,7 +369,8 @@ module mo_rfmip_io
       error("read_and_block_lw_bc: number of columns doesn't fit evenly into blocks.")
     end
     nblocks = Int((ncol_l*nexp_l)/blocksize)
-    gas_concs = ty_gas_concs(Float64, ncol_l, nlay_l)
+    FT = Float64
+    gas_concs = ty_gas_concs(FT, ncol_l, nlay_l)
     gas_conc_array = Vector([deepcopy(gas_concs) for i in 1:nblocks])
     # gas_conc_array = Vector()
 #    allocate(gas_conc_array(nblocks))
@@ -383,7 +391,8 @@ module mo_rfmip_io
     # gas_conc_temp_3d = reshape(read_field(ncid, "water_vapor", nlay_l, ncol_l, nexp_l), &
     #                           shape = [nlay_l, blocksize, nblocks]) * read_scaling(ncid, "water_vapor")
 
-    gas_conc_temp_3d = reshape( ds["water_vapor"][:], nlay_l, blocksize, nblocks ) .* read_scaling(ds,"water_vapor")
+    water_vapor = Array{FT}(ds["water_vapor"][:])
+    gas_conc_temp_3d = reshape(water_vapor, nlay_l, blocksize, nblocks ) .* read_scaling(ds,"water_vapor")
     # test_data(gas_conc_temp_3d, "water_vapor_gas_conc_temp_3d")
 
     for b = 1:nblocks
@@ -393,8 +402,8 @@ module mo_rfmip_io
       set_vmr!(gas_conc_array[b], "h2o", gas_conc_temp_3d_a, size(gas_conc_temp_3d_a))
     end
 
-
-    gas_conc_temp_3d = reshape( ds["ozone"][:], nlay_l, blocksize, nblocks ) * read_scaling(ds,"ozone")
+    ozone = Array{FT}(ds["ozone"][:])
+    gas_conc_temp_3d = reshape(ozone, nlay_l, blocksize, nblocks ) * read_scaling(ds,"ozone")
     # test_data(gas_conc_temp_3d, "ozone_gas_conc_temp_3d")
 
     for b = 1:nblocks

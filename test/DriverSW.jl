@@ -1,8 +1,6 @@
 using Test
 using JRRTMGP
 using NCDatasets
-using Profile
-using BenchmarkTools
 using JRRTMGP.mo_optical_props
 using JRRTMGP.mo_rte_solver_kernels
 using JRRTMGP.fortran_intrinsics
