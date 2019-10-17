@@ -249,11 +249,8 @@ ty_optical_props_nstr(T,I) = ty_optical_props_nstr{T,I}(ntuple(i->nothing, 7)...
     if any([ncol, nlay] .<= 0)
       error("alloc_only_1scl!: must provide positive extents for ncol, nlay")
     else
-println("here 1.1")
       allocated(this.tau) && deallocate!(this.tau)
-println("here 1.2, get_ngpt(this) = ", get_ngpt(this))
       this.tau = Array{FT}(undef, ncol, nlay, get_ngpt(this))
-println("here 1.3")
     end
   end
 
@@ -348,12 +345,9 @@ println("here 1.3")
 """
   function copy_and_alloc!(this::ty_optical_props_1scl, ncol, nlay, spectral_desc::ty_optical_props, name=nothing)
     is_initialized(this) && finalize!(this)
-println("here 1")
     init!(this, name, get_band_lims_wavenumber(spectral_desc),
                 get_band_lims_gpoint(spectral_desc))
-println("here 2, ncol = ", ncol, "; nlay = ", nlay)
     alloc!(this, ncol, nlay)
-println("here 3")
   end
 
 """

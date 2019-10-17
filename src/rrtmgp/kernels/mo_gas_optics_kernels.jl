@@ -740,7 +740,7 @@ integer, dimension(2),      intent(in) :: jeta # interpolation index for binary 
 real(FT)                             :: res # the result
 """
   function interpolate2D(fminor, k, igpt, jeta, jtemp)
-    res =
+    res = 
       fminor[1,1] * k[igpt, jeta[1]  , jtemp  ] +
       fminor[2,1] * k[igpt, jeta[1]+1, jtemp  ] +
       fminor[1,2] * k[igpt, jeta[2]  , jtemp+1] +

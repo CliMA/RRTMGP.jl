@@ -207,22 +207,8 @@ module mo_rfmip_io
     #
     # Allocate on assignment
     #
-println("surface emmissivity")
-println( size( ds["surface_emissivity"][:] ) )
-
-println("surface temperature")
-println( size( ds["surface_temperature"][:] ) )
-
-println("ncol_l = ",ncol_l,"; nlay_l = ", nlay_l, "; nexp_l = ", nexp_l )
-
-println("blocksize = ",blocksize,"; nblocks = ", nblocks )
     temp2D = repeat( FT.(ds["surface_emissivity"][:]) ,1,nexp_l)
     surface_emissivity  = reshape(temp2D,blocksize,nblocks)
-@show "surface_emissivity"
-@show size(surface_emissivity)
-@show eltype(surface_emissivity)
-println("surface emmissivity, after reading")
-println( size( surface_emissivity ) )
 
 #comment - SK - Actual array size in rfmip file fo surf_temp is ( nsite/ncol x n_exp ) -> (100 x 18)
 # for some reason, fortran code is only reading the first ncol entries.
@@ -235,9 +221,6 @@ println( size( surface_emissivity ) )
     temp2D = repeat(  FT.(ds["surface_temperature"][:][:,1]),1,nexp_l)
     surface_temperature = reshape( temp2D, blocksize, nblocks )
 
-@show "surface_temperature"
-@show size(surface_temperature)
-@show eltype(surface_temperature)
     return surface_emissivity, surface_temperature
   end
 #--------------------------------------------------------------------------------------------------------------------

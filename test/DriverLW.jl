@@ -204,9 +204,7 @@ function run_driver(nblocks_iterations=nothing)
   # Read the gas concentrations and surface properties
   #
   gas_conc_array = read_and_block_gases_ty(ds, block_size, kdist_gas_names, rfmip_gas_games)
-println("before read_and_block_lw_bc")
   sfc_emis, sfc_t = read_and_block_lw_bc(ds, block_size)
-println("after read_and_block_lw_bc")
 
   # test_data(surface_albedo, "surface_albedo")
   # test_data(total_solar_irradiance, "total_solar_irradiance")
@@ -217,22 +215,16 @@ println("after read_and_block_lw_bc")
   #   k_dist%init(); users might want to use their own reading methods
   #
   k_dist = load_and_init(ds_k_dist, gas_conc_array[1])
-println("After load_and_init" )
-println("source_is_internal = ", source_is_internal(k_dist) )
-println("size(kdist.totplnk) = ", size(k_dist.totplnk) )
   if !source_is_internal(k_dist) 
     error("rrtmgp_rfmip_lw: k-distribution file is not LW")
   end
-println("After source_is_internal" )
 
   # test_data(k_dist.optical_props.band_lims_wvn, "k_dist_op_band_lims_wvn")
   # test_data(k_dist.optical_props.gpt2band, "k_dist_op_gpt2band")
   # test_data(k_dist.optical_props.band2gpt, "k_dist_op_band2gpt")
 
   nbnd = get_nband(k_dist.optical_props)
-println("After get_nband" )
   ngpt = get_ngpt(k_dist.optical_props)
-println("After get_ngpt" )
 
 #  toa_flux = Array{FT}(undef, block_size, get_ngpt(k_dist.optical_props))
 #  def_tsi = Array{FT}(undef, block_size)
@@ -247,7 +239,6 @@ println("After get_ngpt" )
   else
     p_lev[:,nlay+1,:] .= get_press_min(k_dist) + eps(FT)
   end
-println("After p_lev adjustment" )
   # test_data(p_lev, "p_lev_2")
 
   #
@@ -267,14 +258,9 @@ println("After p_lev adjustment" )
 #  mu0 = Array{FT}(undef, block_size)
   sfc_emis_spec = Array{FT}(undef, nbnd,block_size)
 
-println("After initializing flux_up, flux_dn, and sfc_emis_spec" )
   optical_props = ty_optical_props_1scl(FT, Int)
-println("initialized optical_props")
   copy_and_alloc!(optical_props, block_size, nlay, k_dist.optical_props)
-println("copied optical_props")
   source = ty_source_func_lw(block_size,nlay,k_dist.optical_props)
-println("initialized source function")
-#----curr - SK
 
   # test_data(optical_props.band_lims_wvn, "DriverSW_op_band_lims_wvn")
   # test_data(optical_props.gpt2band, "DriverSW_op_gpt2band")
@@ -300,11 +286,6 @@ println("initialized source function")
   for b = 1:1#nblocks_iterations
     fluxes.flux_up = flux_up[:,:,b]
     fluxes.flux_dn = flux_dn[:,:,b] 
-println("before gas_optics")
-println(" size(p_lay[:,:,b] = ", size(p_lay[:,:,b]), eltype(p_lay[:,:,b]))
-println(" size(p_lev[:,:,b] = ", size(p_lev[:,:,b]), eltype(p_lev[:,:,b]))
-println(" size(t_lay[:,:,b] = ", size(t_lay[:,:,b]), eltype(t_lay[:,:,b]))
-println(" size(sfc_t[:,b]   = ", size(sfc_t[:,b]), eltype(sfc_t[:,b]))
 
 #@show sfc_t[:,b]
     gas_optics!(k_dist,
@@ -317,12 +298,8 @@ println(" size(sfc_t[:,b]   = ", size(sfc_t[:,b]), eltype(sfc_t[:,b]))
                 source,
                 nothing,
                 t_lev[:,:,b]) 
-println("after gas_optics")
 
     rte_lw!(optical_props,top_at_1,source,sfc_emis_spec,fluxes,nothing,n_quad_angles)
-
-#rte_sw!(optical_props, top_at_1, mu0, toa_flux, sfc_alb_spec, sfc_alb_spec, fluxes)
-
   end
 
 #  nblocks_iterations==nothing && (nblocks_iterations = nblocks)

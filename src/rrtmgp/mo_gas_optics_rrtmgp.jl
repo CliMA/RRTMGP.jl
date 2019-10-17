@@ -174,9 +174,7 @@ module mo_gas_optics_rrtmgp
 
     # integer :: ncol, nlay, ngpt, nband, ngas, nflav
     # # ----------------------------------------------------------
-println("entered gas_optics")
     FT = eltype(play)
-println("FT = ", FT)
 
     jpress = Array{Int}(undef, size(play))
     jtemp = Array{Int}(undef, size(play))
@@ -192,33 +190,23 @@ println("FT = ", FT)
     # Gas optics
     #
     #$acc enter data create(jtemp, jpress, tropo, fmajor, jeta)
-println("before compute_gas_taus")
     jtemp, jpress, jeta, tropo, fmajor = compute_gas_taus!(this,
                      ncol, nlay, ngpt, nband,
                      play, plev, tlay, gas_desc,
                      optical_props,
                      col_dry)
 
-println("after compute_gas_taus")
     # ----------------------------------------------------------
     #
     # External source -- check arrays sizes and values
     # input data sizes and values
     #
-println("before check_extent")
     check_extent(tsfc, ncol, "tsfc")
-println("after check_extent")
     check_range(tsfc, this.temp_ref_min,  this.temp_ref_max,  "tsfc")
-println("after check_range")
     if present(tlev)
       check_extent(tlev, (ncol, nlay+1), "tlev")
       check_range(tlev, this.temp_ref_min, this.temp_ref_max, "tlev")
     end
-println("before output_extents")
-@show ("get_ncol(sources) = ")
-@show (get_ncol(sources))
-@show ("get_nlay(sources) = ", get_nlay(sources))
-@show ("get_ngpt(sources) = ", get_ngpt(sources))
 
     #
     #   output extents
@@ -230,14 +218,12 @@ println("before output_extents")
     #
     # Interpolate source function
     #
-println("before source")
     source(this,
            ncol, nlay, nband, ngpt,
            play, plev, tlay, tsfc,
            jtemp, jpress, jeta, tropo, fmajor,
            sources,
            tlev)
-println("after source")
     #$acc exit data delete(jtemp, jpress, tropo, fmajor, jeta)
   end
   #------------------------------------------------------------------------------------------
@@ -372,9 +358,7 @@ println("after source")
     # integer :: nminorlower, nminorklower,nminorupper, nminorkupper
     # logical :: use_rayl
     # ----------------------------------------------------------
-@show "entered compute_gas_tau"
     FT = eltype(play)
-@show ("FT = ", FT)
     tau = Array{FT}(undef, ngpt,nlay,ncol)          # absorption, Rayleigh scattering optical depths
     tau_rayleigh = Array{FT}(undef, ngpt,nlay,ncol) # absorption, Rayleigh scattering optical depths
     col_dry_arr = Array{FT}(undef, ncol, nlay)
@@ -385,7 +369,6 @@ println("after source")
     col_mix = Array{FT}(undef, 2,    get_nflav(this),ncol,nlay) # combination of major species's column amounts
     fminor  = Array{FT}(undef, 2,2,  get_nflav(this),ncol,nlay) # interpolation fractions for minor species
 
-@show "after assignments / compute_gas_tau"
     #
     # Error checking
     #
@@ -398,7 +381,6 @@ println("after source")
     # Check for presence of key species in ty_gas_concs; return error if any key species are not present
     #
     check_key_species_present(this, gas_desc)
-@show "after check_key_species / compute_gas_tau"
 
     #
     # Check input data sizes and values
@@ -413,7 +395,6 @@ println("after source")
       check_extent(col_dry, (ncol, nlay), "col_dry")
       check_range(col_dry, FT(0), floatmax(FT), "col_dry")
     end
-@show "after checking extents, range / compute_gas_tau"
 
     # ----------------------------------------------------------
     ngas  = get_ngas(this)
@@ -426,7 +407,6 @@ println("after source")
     nminorklower = size(this.kminor_lower, 1)
     nminorupper  = size(this.minor_scales_with_density_upper)
     nminorkupper = size(this.kminor_upper, 1)
-@show ("ngas, nflav, neta, npres, ntemp, etc. range / compute_gas_tau",ngas,nflav,npres,ntemp)
     #
     # Fill out the array of volume mixing ratios
     #
@@ -441,7 +421,6 @@ println("after source")
       end
     end
     # test_data(vmr, "vmr_after_get")
-@show ("after vmr, compute_gas_tau")
 
     #
     # Compute dry air column amounts (number of molecule per cm^2) if user hasn't provided them
@@ -454,14 +433,12 @@ println("after source")
       col_dry_wk = col_dry_arr
     end
     #
-@show ("after col_dry_wk, compute_gas_tau")
     # compute column gas amounts [molec/cm^2]
     #
     col_gas[1:ncol,1:nlay,0] .= col_dry_wk[1:ncol,1:nlay]
     for igas = 1:ngas
       col_gas[1:ncol,1:nlay,igas] .= vmr[1:ncol,1:nlay,igas] .* col_dry_wk[1:ncol,1:nlay]
     end
-@show ("after col_gas, compute_gas_tau")
 
     if present(col_dry)
       # test_data(col_dry, "col_dry")
@@ -482,7 +459,6 @@ println("after source")
     #$acc enter data copyin(this)
     #$acc enter data copyin(this%gpoint_flavor)
     zero_array!(tau)
-@show ("before interpolation, compute_gas_tau")
     jtemp,fmajor,fminor,col_mix,tropo,jeta,jpress = interpolation(
             ncol,nlay,                        # problem dimensions
             ngas, nflav, neta, npres, ntemp,  # interpolation dimensions
@@ -497,7 +473,6 @@ println("after source")
             play,
             tlay,
             col_gas)
-@show ("after interpolation, compute_gas_tau")
     tau = compute_tau_absorption!(
             ncol,nlay,nband,ngpt,                      # dimensions
             ngas,nflav,neta,npres,ntemp,
@@ -525,9 +500,6 @@ println("after source")
             col_mix,fmajor,fminor,
             play,tlay,col_gas,
             jeta,jtemp,jpress)
-@show ("after compute_tau_absorption, compute_gas_tau")
-@show this.krayl
-@show allocated(this.krayl)
     if allocated(this.krayl)
       #$acc enter data attach(col_dry_wk) copyin(this%krayl)
       compute_tau_rayleigh!(          #Rayleigh scattering optical depths
@@ -539,16 +511,13 @@ println("after source")
             idx_h2o, col_dry_wk,col_gas,
             fminor,jeta,tropo,jtemp,      # local input
             tau_rayleigh)
-      @show ("after compute_tau_rayleigh, compute_gas_tau")
       #$acc exit data detach(col_dry_wk) delete(this%krayl)
     end
-@show ("before combine_and_reorder, compute_gas_tau")
 
     # Combine optical depths and reorder for radiative transfer solver.
     # test_data(tau_rayleigh, "tau_rayleigh")
     # test_data(tau, "tau_before_CAR")
     combine_and_reorder!(tau, tau_rayleigh, allocated(this.krayl), optical_props)
-@show ("after combine_and_reorder, compute_gas_tau")
     #$acc exit data delete(tau, tau_rayleigh)
     #$acc exit data delete(play, tlay, col_gas)
     #$acc exit data delete(col_mix, fminor)
