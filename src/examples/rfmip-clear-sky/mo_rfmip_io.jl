@@ -110,15 +110,7 @@ module mo_rfmip_io
     # Read p, T data; reshape to suit RRTMGP dimensions
     #
     pres_layer = Array{FT}(ds["pres_layer"][:])
-    @show nlay_l, blocksize, nblocks, nexp_l
-    @show typeof(pres_layer)
-    @show size(pres_layer)
-    pres_layer_temp = repeat(pres_layer,1,1,nexp_l)
-    @show typeof(pres_layer_temp)
-    @show size(pres_layer_temp)
-    temp3d = reshape(pres_layer_temp , nlay_l, blocksize, nblocks )
-    @show typeof(temp3d)
-    @show size(temp3d)
+    temp3d = reshape( repeat(pres_layer,1,1,nexp_l), nlay_l, blocksize, nblocks )
 
     for b = 1:nblocks
       p_lay[:,:,b] = transpose(temp3d[:,:,b])
