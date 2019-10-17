@@ -10,6 +10,7 @@ include(joinpath("rte","mo_source_functions.jl"))
 include(joinpath("extensions","mo_fluxes_byband_kernels.jl"))
 # include(joinpath("extensions","mo_fluxes_byband.jl"))
 include(joinpath("rte","mo_rte_sw.jl"))
+include(joinpath("rte","mo_rte_lw.jl"))
 
 include(joinpath("rrtmgp","mo_util_string.jl"))
 include(joinpath("rrtmgp","mo_rrtmgp_constants.jl"))

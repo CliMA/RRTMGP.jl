@@ -17,6 +17,8 @@
 module mo_source_functions
 
   using ..mo_optical_props
+  using ..fortran_intrinsics
+  import ..mo_optical_props:get_ncol,get_nlay,get_ngpt
 
   # -------------------------------------------------------------------------------------------------
   #
@@ -25,18 +27,46 @@ module mo_source_functions
 
 
   export ty_source_func_lw
+  export get_ncol, get_nlay, get_ngpt
   struct ty_source_func_lw{FT, I} <: ty_optical_props{FT, I}
-    band2gpt::Array{FT,2}        # (begin g-point, end g-point) = band2gpt(2,band)
-    gpt2band::Array{I,1}        # band = gpt2band(g-point)
-    band_lims_wvn::Array{FT,2}   # (upper and lower wavenumber by band) = band_lims_wvn(2,band)
-    name::String
-    tau::Array{FT,3}
+    optical_props::ty_optical_props{FT,I}
+#    band2gpt::Array{FT,2}        # (begin g-point, end g-point) = band2gpt(2,band)
+#    gpt2band::Array{I,1}        # band = gpt2band(g-point)
+#    band_lims_wvn::Array{FT,2}   # (upper and lower wavenumber by band) = band_lims_wvn(2,band)
+#    name::String
+#    tau::Array{FT,3}
     #
     lay_source     # Planck source at layer average temperature [W/m2] (ncol, nlay, ngpt)
     lev_source_inc # Planck source at layer edge in increasing ilay direction [W/m2] (ncol, nlay+1, ngpt)
     lev_source_dec # Planck source at layer edge in decreasing ilay direction [W/m2] (ncol, nlay+1, ngpt)
     sfc_source
+    # --------------------------------------------------------------
+    function ty_source_func_lw(ncol, nlay, optical_props) 
+      FT = eltype(optical_props.band_lims_wvn)
+      I  = eltype(optical_props.gpt2band)
+      ngpt = get_ngpt(optical_props)
+
+      sfc_source = Array{FT}(undef, ncol,ngpt)
+      lay_source = Array{FT}(undef, ncol,nlay,ngpt)
+      lev_source_inc = Array{FT}(undef, ncol,nlay,ngpt)
+      lev_source_dec = Array{FT}(undef, ncol,nlay,ngpt)
+      opt_props = deepcopy(optical_props)
+       
+      # check, size( lev_source_inc ) is (ncol,nlay,ngpt)
+      # should this be (ncol,nlay+1,ngpt)
+      # same comment applies to lev_source_dec
+    
+
+      new{FT,I}(opt_props,
+                lay_source,
+                lev_source_inc,
+                lev_source_dec,
+                sfc_source)
+
+    end
+    # --------------------------------------------------------------
   end
+
   export ty_source_func_sw
   struct ty_source_func_sw{FT, I} <: ty_optical_props{FT, I}
     band2gpt::Array{FT,2}        # (begin g-point, end g-point) = band2gpt(2,band)
@@ -49,6 +79,47 @@ module mo_source_functions
     lev_source_inc
     lev_source_dec
   end
+  # ------------------------------------------------------------------------------------------
+  is_allocated(this::ty_source_func_lw) = is_initialized(this.optical_props) && allocated(this.sfc_source)
+  # ------------------------------------------------------------------------------------------
+  function get_ncol(this::ty_source_func_lw)
+    # class(ty_source_func_lw), intent(in) :: this
+    # integer :: get_ncol_lw
+
+    if is_allocated(this)
+      get_ncol_lw = size(this.lay_source,1)
+    else
+      get_ncol_lw = 0
+    end
+    return get_ncol_lw
+  end
+   # ------------------------------------------------------------------------------------------
+  function get_nlay(this::ty_source_func_lw)
+    # class(ty_source_func_lw), intent(in) :: this
+    # integer :: get_ncol_lw
+
+    if is_allocated(this)
+      get_nlay_lw = size(this.lay_source,2)
+    else
+      get_nlay_lw = 0
+    end
+    return get_nlay_lw
+  end
+   # ------------------------------------------------------------------------------------------
+  function get_ngpt(this::ty_source_func_lw)
+    # class(ty_source_func_lw), intent(in) :: this
+    # integer :: get_ncol_lw
+
+    if is_allocated(this)
+      get_ngpt_lw = size(this.lay_source,3)
+    else
+      get_ngpt_lw = 0
+    end
+    return get_ngpt_lw
+  end
+  # -------------------------------------------------------------- # --------------------------------------------------------------
+
+
   # type, extends(ty_optical_props), public :: ty_source_func_lw
   #   real(FT), allocatable, dimension(:,:,:) :: lay_source,       # Planck source at layer average temperature [W/m2] (ncol, nlay, ngpt)
   #                                              lev_source_inc,   # Planck source at layer edge in increasing ilay direction [W/m2] (ncol, nlay+1, ngpt)
@@ -95,10 +166,12 @@ module mo_source_functions
   # Longwave
   #
   # ------------------------------------------------------------------------------------------
-  is_allocated_lw(this::ty_source_func_lw) = is_initialized(this) && allocated(this.sfc_source)
+#  is_allocated_lw(this::ty_source_func_lw) = is_initialized(this) && allocated(this.sfc_source)
     # class(ty_source_func_lw), intent(in) :: this
     # logical                              :: is_allocated_lw
 
+  # --------------------------------------------------------------
+#=
   # --------------------------------------------------------------
   function alloc_lw!(this::ty_source_func_lw{FT}, ncol, nlay) where FT
     # class(ty_source_func_lw),    intent(inout) :: this
@@ -273,4 +346,7 @@ module mo_source_functions
 
     subset.toa_source[1:n,  :] = full.toa_source[start:start+n-1,  :]
   end
+
+=#
+
 end # module

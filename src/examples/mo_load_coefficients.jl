@@ -49,6 +49,9 @@ module mo_load_coefficients
   if haskey(ds,"rayl_lower")
     rayl_lower         	          = Array{FT}(ds["rayl_lower"][:])
     rayl_upper         	          = Array{FT}(ds["rayl_upper"][:])
+  else
+    rayl_lower = nothing # []
+    rayl_upper = nothing # []
   end
 
   args = (available_gases,
@@ -85,10 +88,12 @@ module mo_load_coefficients
  #   ! gas_optics%load() returns a string; a non-empty string indicates an error.
 
   if haskey(ds,"totplnk")
+println("totplnk is present")
     totplnk     =      ds["totplnk"][:]
     planck_frac =      ds["plank_fraction"][:]
     kdist = load_totplnk(totplnk, planck_frac, rayl_lower, rayl_upper, args...)
   else
+println("totplnk is not present")
     solar_src = ds["solar_source"][:]
     kdist = load_solar_source(solar_src, rayl_lower, rayl_upper, args...)
   end
