@@ -26,7 +26,7 @@ module mo_simple_netcdf
   function read_field(ds, varName)
 
     if !haskey(ds,varName)
-      stop_on_err("read_field: can't find variable " * trim(varName))
+      error("read_field: can't find variable " * trim(varName))
     end
 
     field = ds[varName][:]
@@ -79,9 +79,9 @@ module mo_simple_netcdf
 #    integer :: varid
 
 #    if(nf90_inq_varid(ncid, trim(varName), varid) /= NF90_NOERR) &
-#      call stop_on_err("read_field: can't find variable " // trim(varName))
+#      error("read_field: can't find variable " // trim(varName))
 #    if(nf90_get_var(ncid, varid, read_scalar)  /= NF90_NOERR) &
-#      call stop_on_err("read_field: can't read variable " // trim(varName))
+#      error("read_field: can't read variable " // trim(varName))
 
 #  end function read_scalar
 #  !--------------------------------------------------------------------------------------------------------------------
@@ -94,9 +94,9 @@ module mo_simple_netcdf
 #    integer :: varid
 
 #    if(nf90_inq_varid(ncid, trim(varName), varid) /= NF90_NOERR) &
-#      call stop_on_err("read_field: can't find variable " // trim(varName))
+#      error("read_field: can't find variable " // trim(varName))
 #    if(nf90_get_var(ncid, varid, read_1d_field)  /= NF90_NOERR) &
-#      call stop_on_err("read_field: can't read variable " // trim(varName))
+#      error("read_field: can't read variable " // trim(varName))
 
 #  end function read_1d_field
 #  !--------------------------------------------------------------------------------------------------------------------
@@ -109,9 +109,9 @@ module mo_simple_netcdf
 #    integer :: varid
 
 #    if(nf90_inq_varid(ncid, trim(varName), varid) /= NF90_NOERR) &
-#      call stop_on_err("read_field: can't find variable " // trim(varName))
+#      error("read_field: can't find variable " // trim(varName))
 #    if(nf90_get_var(ncid, varid, read_2d_field)  /= NF90_NOERR) &
-#      call stop_on_err("read_field: can't read variable " // trim(varName))
+#      error("read_field: can't read variable " // trim(varName))
 
 #  end function read_2d_field
 #  !--------------------------------------------------------------------------------------------------------------------
@@ -124,9 +124,9 @@ module mo_simple_netcdf
 #    integer :: varid
 
 #    if(nf90_inq_varid(ncid, trim(varName), varid) /= NF90_NOERR) &
-#      call stop_on_err("read_field: can't find variable " // trim(varName))
+#      error("read_field: can't find variable " // trim(varName))
 #    if(nf90_get_var(ncid, varid, read_3d_field)  /= NF90_NOERR) &
-#      call stop_on_err("read_field: can't read variable " // trim(varName))
+#      error("read_field: can't read variable " // trim(varName))
 
 #  end function read_3d_field
 #  !--------------------------------------------------------------------------------------------------------------------
@@ -139,9 +139,9 @@ module mo_simple_netcdf
 #    integer :: varid
 
 #    if(nf90_inq_varid(ncid, trim(varName), varid) /= NF90_NOERR) &
-#      call stop_on_err("read_field: can't find variable " // trim(varName))
+#      error("read_field: can't find variable " // trim(varName))
 #    if(nf90_get_var(ncid, varid, read_4d_field)  /= NF90_NOERR) &
-#      call stop_on_err("read_field: can't read variable " // trim(varName))
+#      error("read_field: can't read variable " // trim(varName))
 #
 #  end function read_4d_field
 #  !--------------------------------------------------------------------------------------------------------------------
@@ -158,7 +158,7 @@ module mo_simple_netcdf
 #      return
 #    end if
 #    if(nf90_get_var(ncid, varid, read_string)  /= NF90_NOERR) &
-#      call stop_on_err("read_field: can't read variable " // trim(varName))
+#      error("read_field: can't read variable " // trim(varName))
 #  end function read_string
 #  !--------------------------------------------------------------------------------------------------------------------
 #  ! Writing functions
@@ -300,9 +300,9 @@ module mo_simple_netcdf
 #    integer :: ix
 
 #    if(nf90_inq_varid(ncid, trim(varName), varid) /= NF90_NOERR) &
-#      call stop_on_err("read_logical_vec: can't find variable " // trim(varName))
+#      error("read_logical_vec: can't find variable " // trim(varName))
 #    if(nf90_get_var(ncid, varid, read_logical_tmp)  /= NF90_NOERR) &
-#      call stop_on_err("read_logical_vec: can't read variable " // trim(varName))
+#      error("read_logical_vec: can't read variable " // trim(varName))
 #    do ix = 1, nx
 #      if (read_logical_tmp(ix) .eq. 0) then
 #        read_logical_vec(ix) = .false.
@@ -322,9 +322,9 @@ module mo_simple_netcdf
 #    integer :: varid
 
 #    if(nf90_inq_varid(ncid, trim(varName), varid) /= NF90_NOERR) &
-#      call stop_on_err("read_char_vec: can't find variable " // trim(varName))
+#      error("read_char_vec: can't find variable " // trim(varName))
 #    if(nf90_get_var(ncid, varid, read_char_vec)  /= NF90_NOERR) &
-#      call stop_on_err("read_char_vec: can't read variable " // trim(varName))
+#      error("read_char_vec: can't read variable " // trim(varName))
 
 #  end function read_char_vec
 #  !--------------------------------------------------------------------------------------------------------------------
@@ -373,14 +373,14 @@ module mo_simple_netcdf
 
 #    if(dim_exists(ncid, dimName)) then
 #      if (dimLength /= get_dim_size(ncid, trim(dimName))) &
-#          call stop_on_err("dim " // trim(dimName) // " is present but incorrectly sized.")
+#          error("dim " // trim(dimName) // " is present but incorrectly sized.")
 #    else
 #      if(nf90_redef(ncid) /= NF90_NOERR) &
-#        call stop_on_err("create_dim: can't put file into redefine mode")
+#        error("create_dim: can't put file into redefine mode")
 #      if(nf90_def_dim(ncid, dimName, dimLength, dimid) /= NF90_NOERR) &
-#        call stop_on_err("create_dim: can't define dimension " // trim(dimName))
+#        error("create_dim: can't define dimension " // trim(dimName))
 #      if(nf90_enddef(ncid) /= NF90_NOERR) &
-#        call stop_on_err("create_dim: can't end redefinition??")
+#        error("create_dim: can't end redefinition??")
 #    end if
 #  end subroutine create_dim
 #  !--------------------------------------------------------------------------------------------------------------------
@@ -403,21 +403,21 @@ module mo_simple_netcdf
 #    if(var_exists(ncid, varName)) then
 #      do i = 1, size(dimNames)
 #        if (dimLengths(i) /= get_dim_size(ncid, trim(dimNames(i)))) &
-#          call stop_on_err("Variable " // trim(varName) // " is present but incorrectly sized.")
+#          error("Variable " // trim(varName) // " is present but incorrectly sized.")
 #      end do
 #    else
 #      do i = 1, size(dimNames)
 #        if(nf90_inq_dimid(ncid, trim(dimNames(i)), dimIds(i)) /= NF90_NOERR) &
-#          call stop_on_err("create_var: Can't get id for dimension " // trim(dimnames(i)))
+#          error("create_var: Can't get id for dimension " // trim(dimnames(i)))
 #      end do
 #      if(nf90_redef(ncid) /= NF90_NOERR) &
-#        call stop_on_err("create_var: can't put file into redefine mode")
+#        error("create_var: can't put file into redefine mode")
 #      xtype = NF90_DOUBLE
 #      if(present(dataType)) xtype = dataType
 #      if(nf90_def_var(ncid, varName, xtype, dimIds, varid) /= NF90_NOERR) &
-#        call stop_on_err("create_var: can't define variable " // trim(varName))
+#        error("create_var: can't define variable " // trim(varName))
 #      if(nf90_enddef(ncid) /= NF90_NOERR) &
-#        call stop_on_err("create_dim: can't end redefinition??")
+#        error("create_dim: can't end redefinition??")
 #    end if
 #  end subroutine create_var
 #  !--------------------------------------------------------------------------------------------------------------------
@@ -454,16 +454,16 @@ module mo_simple_netcdf
 
 #    get_var_size(n) = -1
 #    if(nf90_inq_varid(ncid, trim(varName), varid) /= NF90_NOERR) &
-#      call stop_on_err("get_var_size: can't find variable " // trim(varName))
+#      error("get_var_size: can't find variable " // trim(varName))
 #    if(nf90_inquire_variable(ncid, varid, ndims = ndims) /= NF90_NOERR) &
-#      call stop_on_err("get_var_size: can't get information for variable " // trim(varName))
+#      error("get_var_size: can't get information for variable " // trim(varName))
 #    if(ndims /= n) &
-#      call stop_on_err("get_var_size:  variable " // trim(varName) // " has the wrong number of dimensions" )
+#      error("get_var_size:  variable " // trim(varName) // " has the wrong number of dimensions" )
 #    if(nf90_inquire_variable(ncid, varid, dimids = dimids) /= NF90_NOERR) &
-#      call stop_on_err("get_var_size: can't read dimension ids for variable " // trim(varName))
+#      error("get_var_size: can't read dimension ids for variable " // trim(varName))
 #    do i = 1, n
 #      if(nf90_inquire_dimension(ncid, dimids(i), len = get_var_size(i)) /= NF90_NOERR) &
-#        call stop_on_err("get_var_size: can't get dimension lengths for variable " // trim(varName))
+#        error("get_var_size: can't get dimension lengths for variable " // trim(varName))
 #    end do
 
 #  end function get_var_size

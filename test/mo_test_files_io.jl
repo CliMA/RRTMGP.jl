@@ -80,13 +80,13 @@ module mo_test_files_io
 #    integer :: ncol, nlay, nlev
 
 #    if(nf90_open(trim(fileName), NF90_NOWRITE, ncid) /= NF90_NOERR) &
-#      call stop_on_err("read_atmos: can't find file " // trim(fileName))
+#      error("read_atmos: can't find file " // trim(fileName))
 
     ncol = ds.dim["col"]
     nlay = ds.dim["lay"]
     nlev = ds.dim["lev"]
     if nlev ≠ nlay+1
-      stop_on_err("read_atmos: nlev should be nlay+1")
+      error("read_atmos: nlev should be nlay+1")
     end
 
     #
@@ -100,61 +100,61 @@ module mo_test_files_io
     t_lev = ds["t_lev"][:]
 
     if(var_exists(ds, "vmr_h2o"))
-         stop_on_err(set_vmr(gas_concs,"h2o", read_field(ds, "vmr_h2o")))
+         set_vmr!(gas_concs,"h2o", read_field(ds, "vmr_h2o"))
     end
     if(var_exists(ds, "vmr_co2"))
-         stop_on_err(set_vmr(gas_concs,"co2", read_field(ds, "vmr_co2")))
+         set_vmr!(gas_concs,"co2", read_field(ds, "vmr_co2"))
     end
     if(var_exists(ds, "vmr_o3" ))
-         stop_on_err(set_vmr(gas_concs,"o3" , read_field(ds, "vmr_o3")))
+         set_vmr!(gas_concs,"o3" , read_field(ds, "vmr_o3"))
     end
     if(var_exists(ds, "vmr_n2o"))
-         stop_on_err(set_vmr(gas_concs,"n2o", read_field(ds, "vmr_n2o")))
+         set_vmr!(gas_concs,"n2o", read_field(ds, "vmr_n2o"))
     end
     if(var_exists(ds, "vmr_co" ))
-         stop_on_err(set_vmr(gas_concs,"co" , read_field(ds, "vmr_co")))
+         set_vmr!(gas_concs,"co" , read_field(ds, "vmr_co"))
     end
     if(var_exists(ds, "vmr_ch4"))
-         stop_on_err(set_vmr(gas_concs,"ch4", read_field(ds, "vmr_ch4")))
+         set_vmr!(gas_concs,"ch4", read_field(ds, "vmr_ch4"))
     end
     if(var_exists(ds, "vmr_o2" ))
-         stop_on_err(set_vmr(gas_concs,"o2" , read_field(ds, "vmr_o2")))
+         set_vmr!(gas_concs,"o2" , read_field(ds, "vmr_o2"))
     end
     if(var_exists(ds, "vmr_n2" ))
-         stop_on_err(set_vmr(gas_concs,"n2" , read_field(ds, "vmr_n2")))
+         set_vmr!(gas_concs,"n2" , read_field(ds, "vmr_n2"))
     end
     if(var_exists(ds, "vmr_ccl4" ))
-         stop_on_err(set_vmr(gas_concs,"ccl4" , read_field(ds, "vmr_ccl4")))
+         set_vmr!(gas_concs,"ccl4" , read_field(ds, "vmr_ccl4"))
     end
     if(var_exists(ds, "vmr_cfc11" ))
-         stop_on_err(set_vmr(gas_concs,"cfc11" , read_field(ds, "vmr_cfc11")))
+         set_vmr!(gas_concs,"cfc11" , read_field(ds, "vmr_cfc11"))
     end
     if(var_exists(ds, "vmr_cfc12" ))
-         stop_on_err(set_vmr(gas_concs,"cfc12" , read_field(ds, "vmr_cfc12")))
+         set_vmr!(gas_concs,"cfc12" , read_field(ds, "vmr_cfc12"))
     end
     if(var_exists(ds, "vmr_cfc22" ))
-         stop_on_err(set_vmr(gas_concs,"cfc22" , read_field(ds, "vmr_cfc22")))
+         set_vmr!(gas_concs,"cfc22" , read_field(ds, "vmr_cfc22"))
     end
     if(var_exists(ds, "vmr_hfc143a" ))
-         stop_on_err(set_vmr(gas_concs,"hfc143a" , read_field(ds, "vmr_hfc143a")))
+         set_vmr!(gas_concs,"hfc143a" , read_field(ds, "vmr_hfc143a"))
     end
     if(var_exists(ds, "vmr_hfc125" ))
-         stop_on_err(set_vmr(gas_concs,"hfc125" , read_field(ds, "vmr_hfc125")))
+         set_vmr!(gas_concs,"hfc125" , read_field(ds, "vmr_hfc125"))
     end
     if(var_exists(ds, "vmr_hfc23" ))
-         stop_on_err(set_vmr(gas_concs,"hfc23" , read_field(ds, "vmr_hfc23")))
+         set_vmr!(gas_concs,"hfc23" , read_field(ds, "vmr_hfc23"))
     end
     if(var_exists(ds, "vmr_hfc32" ))
-         stop_on_err(set_vmr(gas_concs,"hfc32" , read_field(ds, "vmr_hfc32")))
+         set_vmr!(gas_concs,"hfc32" , read_field(ds, "vmr_hfc32"))
     end
     if(var_exists(ds, "vmr_hfc134a" ))
-         stop_on_err(set_vmr(gas_concs,"hfc134a" , read_field(ds, "vmr_hfc134a")))
+         set_vmr!(gas_concs,"hfc134a" , read_field(ds, "vmr_hfc134a"))
     end
     if(var_exists(ds, "vmr_cf4" ))
-         stop_on_err(set_vmr(gas_concs,"cf4" , read_field(ds, "vmr_cf4")))
+         set_vmr!(gas_concs,"cf4" , read_field(ds, "vmr_cf4"))
     end
     if(var_exists(ds, "vmr_no2" ))
-         stop_on_err(set_vmr(gas_concs,"no2" , read_field(ds, "vmr_no2")))
+         set_vmr!(gas_concs,"no2" , read_field(ds, "vmr_no2"))
     end
 
     # col_dry has unchanged allocation status on return if the variable isn't present in the netCDF file
@@ -174,7 +174,7 @@ module mo_test_files_io
 #    integer :: ncid, ncol, nlev, nlay
 
 #    if(nf90_open(trim(fileName), NF90_WRITE, ncid) /= NF90_NOERR) &
-#      call stop_on_err("write_atmos: can't open file " // trim(fileName))
+#      error("write_atmos: can't open file " // trim(fileName))
     #
     # At present these dimension sizes aren't used
     #   We could certainly check the array sizes against these dimension sizes
@@ -191,8 +191,8 @@ module mo_test_files_io
 
 #    call create_var(ncid, "col_dry", ["col",  "lay"], [ncol, nlay])
 #    call create_var(ncid, "t_lev",   ["col",  "lev"], [ncol, nlev])
-#    call stop_on_err(write_field(ncid, "col_dry",  col_dry ))
-#    call stop_on_err(write_field(ncid, "t_lev",     t_lev ))
+#    error(write_field(ncid, "col_dry",  col_dry ))
+#    error(write_field(ncid, "t_lev",     t_lev ))
 
 #    ncid = nf90_close(ncid)
   end #subroutine write_atmos
@@ -207,7 +207,7 @@ module mo_test_files_io
 #    integer :: ncid
 
 #    if(nf90_open(trim(fileName), NF90_NOWRITE, ncid) /= NF90_NOERR) &
-#      call stop_on_err("is_sw: can't find file " // trim(fileName))
+#      error("is_sw: can't find file " // trim(fileName))
 
 
     is_this_sw = haskey(ds,"solar_zenith_angle")
@@ -235,7 +235,7 @@ module mo_test_files_io
 #    integer :: ncol, nband
     # -------------------
 #    if(nf90_open(trim(fileName), NF90_NOWRITE, ncid) /= NF90_NOERR) &
-#      call stop_on_err("read_lw_bc: can't find file " // trim(fileName))
+#      error("read_lw_bc: can't find file " // trim(fileName))
 
     ncol  = length( size( ds["col"] ) )
     nband = length( size( ds["band"]) )
@@ -257,7 +257,7 @@ module mo_test_files_io
 #    integer :: ncol, nband
     # -------------------
 #    if(nf90_open(trim(fileName), NF90_NOWRITE, ncid) /= NF90_NOERR) &
-#      call stop_on_err("read_lw_bc: can't find file " // trim(fileName))
+#      error("read_lw_bc: can't find file " // trim(fileName))
     n_quad_angles  = length( size( ds["angle"] ) ) #get_dim_size(ncid, 'angle')
 #    ncid = nf90_close(ncid)
     return n_quad_angles
@@ -276,7 +276,7 @@ module mo_test_files_io
 #    integer :: ncol, nband
 #    # -------------------
 #    if(nf90_open(trim(fileName), NF90_NOWRITE, ncid) /= NF90_NOERR) &
-#      call stop_on_err("read_sw_bc: can't find file " // trim(fileName))
+#      error("read_sw_bc: can't find file " // trim(fileName))
     tsi_scaling = []
 
 
@@ -312,7 +312,7 @@ module mo_test_files_io
 #    real(FT), dimension(:,:,:), allocatable :: band_out
 #    # -------------------
 #    if(nf90_open(trim(fileName), NF90_WRITE, ncid) /= NF90_NOERR) &
-#      call stop_on_err("write_fluxes: can't open file " // trim(fileName))
+#      error("write_fluxes: can't open file " // trim(fileName))
 #    #
 #    # At present these dimension sizes aren't used
 #    #   We could certainly check the array sizes against these dimension sizes
@@ -329,16 +329,16 @@ module mo_test_files_io
 #    if(present(bnd_flux_dn )) call create_var(ncid, "band_flux_dn",  ["band", "col ", "lev "], [nband, ncol, nlev])
 #    if(present(bnd_flux_net)) call create_var(ncid, "band_flux_net", ["band", "col ", "lev "], [nband, ncol, nlev])
 
-#    call stop_on_err(write_field(ncid, "flux_up",  flux_up ))
-#    call stop_on_err(write_field(ncid, "flux_dn",  flux_dn ))
-#    call stop_on_err(write_field(ncid, "flux_net", flux_net))
+#    error(write_field(ncid, "flux_up",  flux_up ))
+#    error(write_field(ncid, "flux_dn",  flux_dn ))
+#    error(write_field(ncid, "flux_net", flux_net))
 #    # col,lay,bnd -> bnd,col,lay
 #    if(present(bnd_flux_up )) call reorder123x312(bnd_flux_up, band_out)
-#    if(present(bnd_flux_up )) call stop_on_err(write_field(ncid, "band_flux_up",  band_out))
+#    if(present(bnd_flux_up )) error(write_field(ncid, "band_flux_up",  band_out))
 #    if(present(bnd_flux_dn )) call reorder123x312(bnd_flux_dn, band_out)
-#    if(present(bnd_flux_dn )) call stop_on_err(write_field(ncid, "band_flux_dn",  band_out))
+#    if(present(bnd_flux_dn )) error(write_field(ncid, "band_flux_dn",  band_out))
 #    if(present(bnd_flux_net)) call reorder123x312(bnd_flux_net, band_out)
-#    if(present(bnd_flux_net)) call stop_on_err(write_field(ncid, "band_flux_net", band_out))
+#    if(present(bnd_flux_net)) error(write_field(ncid, "band_flux_net", band_out))
 
 #    ncid = nf90_close(ncid)
 #  end subroutine write_fluxes
@@ -357,7 +357,7 @@ module mo_test_files_io
 #    real(FT), dimension(:,:,:), allocatable :: band_out
 #    # -------------------
 #    if(nf90_open(trim(fileName), NF90_WRITE, ncid) /= NF90_NOERR) &
-#      call stop_on_err("write_dir_fluxes: can't open file " // trim(fileName))
+#      error("write_dir_fluxes: can't open file " // trim(fileName))
 
 #    #
 #    # At present these dimension sizes aren't used
@@ -371,9 +371,9 @@ module mo_test_files_io
 #    call create_var(ncid,      "flux_dir_dn",         ["col",  "lev"],         [ncol, nlay+1])
 #    if(present(bnd_flux_dir)) call create_var(ncid, "band_flux_dir_dn", ["band", "col ", "lev "], [nband, ncol, nlay+1])
 
-#    call stop_on_err(write_field(ncid, "flux_dir_dn",  flux_dir))
+#    error(write_field(ncid, "flux_dir_dn",  flux_dir))
 #    if(present(bnd_flux_dir)) call reorder123x312(bnd_flux_dir, band_out)
-#    if(present(bnd_flux_dir)) call stop_on_err(write_field(ncid, "band_flux_dir_dn",  band_out))
+#    if(present(bnd_flux_dir)) error(write_field(ncid, "band_flux_dir_dn",  band_out))
 
 #    ncid = nf90_close(ncid)
 #  end subroutine write_dir_fluxes
@@ -391,7 +391,7 @@ module mo_test_files_io
 #    real(FT), dimension(:,:,:), allocatable :: band_out
 #    # -------------------
 #    if(nf90_open(trim(fileName), NF90_WRITE, ncid) /= NF90_NOERR) &
-#      call stop_on_err("write_heating_rates: can't open file " // trim(fileName))
+#      error("write_heating_rates: can't open file " // trim(fileName))
 
 #    #
 #    # At present these dimension sizes aren't used
@@ -405,9 +405,9 @@ module mo_test_files_io
 #    call create_var(ncid,      "heating_rate",          ["col", "lay"],         [ncol, nlay])
 #    call create_var(ncid, "band_heating_rate", ["band", "col ", "lay "], [nband, ncol, nlay])
 
-#    call stop_on_err(write_field(ncid,     "heating_rate",                     heating_rate))
+#    error(write_field(ncid,     "heating_rate",                     heating_rate))
 #    call reorder123x312(bnd_heating_rate, band_out)
-#    call stop_on_err(write_field(ncid, "band_heating_rate", band_out))
+#    error(write_field(ncid, "band_heating_rate", band_out))
 
 #    ncid = nf90_close(ncid)
 #  end subroutine write_heating_rates
@@ -424,16 +424,16 @@ module mo_test_files_io
 
 #    # -------------------
 #    if(nf90_open(trim(fileName), NF90_WRITE, ncid) /= NF90_NOERR) &
-#      call stop_on_err("write_spectral_disc: can't open file " // trim(fileName))
+#      error("write_spectral_disc: can't open file " // trim(fileName))
 
 #    nband = spectral_disc%get_nband()
 #    call create_dim(ncid, 'band', nband)
 #    call create_dim(ncid, "pair", 2)
 
 #    call create_var(ncid, "band_lims_wvn", ["pair", "band"], [2, nband])
-#    call stop_on_err(write_field(ncid, "band_lims_wvn", spectral_disc%get_band_lims_wavenumber()))
+#    error(write_field(ncid, "band_lims_wvn", spectral_disc%get_band_lims_wavenumber()))
 #    call create_var(ncid, "band_lims_gpt", ["pair", "band"], [2, nband], NF90_INT)
-#    call stop_on_err(write_field(ncid, "band_lims_gpt", spectral_disc%get_band_lims_gpoint()))
+#    error(write_field(ncid, "band_lims_gpt", spectral_disc%get_band_lims_gpoint()))
 
 #    ncid = nf90_close(ncid)
 #  end subroutine write_spectral_disc
@@ -452,16 +452,16 @@ module mo_test_files_io
 
     # -------------------
 #    if(nf90_open(trim(fileName), NF90_WRITE, ncid) /= NF90_NOERR) &
-#      call stop_on_err("read_spectral_disc: can't open file " // trim(fileName))
+#      error("read_spectral_disc: can't open file " // trim(fileName))
 
     nband = ds.dim["band"]
     if ds.dim["pair"] ≠ 2
-      stop_on_err("read_spectral_disc: pair dimension not 2 in file ")
+      error("read_spectral_disc: pair dimension not 2 in file ")
     end
 
     band_lims_wvn = ds["band_lims_wvn"][:]
     band_lims_gpt = ds["band_lims_gpt"][:]
-    stop_on_err(init(spectral_disc,band_lims_wvn, band_lims_gpt, " ")) # blank string used for now
+    init!(spectral_disc, " ", band_lims_wvn, band_lims_gpt) # blank string used for now
 
 #    ncid = nf90_close(ncid)
   end #subroutine read_spectral_disc
@@ -479,16 +479,16 @@ module mo_test_files_io
 
 #    # -------------------
 #    if(nf90_open(trim(fileName), NF90_WRITE, ncid) /= NF90_NOERR) &
-#      call stop_on_err("write_sw_surface_albedo: can't open file " // trim(fileName))
+#      error("write_sw_surface_albedo: can't open file " // trim(fileName))
 
 #    ncol = get_dim_size(ncid, 'col')
 #    nband = get_dim_size(ncid, 'band')
 
 #    call create_var(ncid, "sfc_alb_direct", ["band", "col "], [nband, ncol])
-#    call stop_on_err(write_field(ncid, "sfc_alb_direct", sfc_alb_direct))
+#    error(write_field(ncid, "sfc_alb_direct", sfc_alb_direct))
 
 #    call create_var(ncid, "sfc_alb_diffuse", ["band", "col "], [nband, ncol])
-#    call stop_on_err(write_field(ncid, "sfc_alb_diffuse", sfc_alb_diffuse))
+#    error(write_field(ncid, "sfc_alb_diffuse", sfc_alb_diffuse))
 
 #    ncid = nf90_close(ncid)
 #  end subroutine write_sw_surface_albedo
@@ -505,12 +505,12 @@ module mo_test_files_io
 
 #    # -------------------
 #    if(nf90_open(trim(fileName), NF90_WRITE, ncid) /= NF90_NOERR) &
-#      call stop_on_err("write_solar_zenith_angle: can't open file " // trim(fileName))
+#      error("write_solar_zenith_angle: can't open file " // trim(fileName))
 
 #    ncol = get_dim_size(ncid, 'col')
 
 #    call create_var(ncid, "solar_zenith_angle", ["col"], [ncol])
-#    call stop_on_err(write_field(ncid, "solar_zenith_angle", solar_zenith_angle))
+#    error(write_field(ncid, "solar_zenith_angle", solar_zenith_angle))
 
 #    ncid = nf90_close(ncid)
 #  end subroutine write_solar_zenith_angle
@@ -527,13 +527,13 @@ module mo_test_files_io
 
 #    # -------------------
 #    if(nf90_open(trim(fileName), NF90_WRITE, ncid) /= NF90_NOERR) &
-#      call stop_on_err("write_lw_surface_emissivity: can't open file " // trim(fileName))
+#      error("write_lw_surface_emissivity: can't open file " // trim(fileName))
 
 #    ncol = get_dim_size(ncid, 'col')
 #    nband = get_dim_size(ncid, 'band')
 
 #    call create_var(ncid, "emis_sfc", ["band", "col "], [nband, ncol])
-#    call stop_on_err(write_field(ncid, "emis_sfc", emis_sfc))
+#    error(write_field(ncid, "emis_sfc", emis_sfc))
 
 #    ncid = nf90_close(ncid)
 #  end subroutine write_lw_surface_emissivity
@@ -551,11 +551,11 @@ module mo_test_files_io
 
     # -------------------
 #    if(nf90_open(trim(fileName), NF90_NOWRITE, ncid) /= NF90_NOERR) &
-#      call stop_on_err("read_sfc_test_file: can't open file " // trim(fileName))
+#      error("read_sfc_test_file: can't open file " // trim(fileName))
 
 #    if (.not. var_exists(ncid, 'SW_albedo')) &
     if !haskey(ds,"SW_albedo")
-      stop_on_err("read_sfc_test_file: file " * " doesn't contain SW_albedo field.")
+      error("read_sfc_test_file: file " * " doesn't contain SW_albedo field.")
     end
     nswband = ds.dim["swband"]
     nspectra = ds.dim["spectra"]
@@ -563,7 +563,7 @@ module mo_test_files_io
     sfc_alb = ds["SW_albedo"][:]
 
     if !haskey(ds,"LW_emissivity") #(.not. var_exists(ncid, 'LW_emissivity')) &
-      stop_on_err("read_sfc_test_file: file " * " doesn't contain LW_emissivity field.")
+      error("read_sfc_test_file: file " * " doesn't contain LW_emissivity field.")
     end
     nlwband = ds.dim["lwband"]
     sfc_emis = ds["LW_emissivity"][:]
@@ -589,7 +589,7 @@ module mo_test_files_io
 #    integer :: dimLengths(3)
 #    # -------------------
 #    if(nf90_open(trim(fileName), NF90_WRITE, ncid) /= NF90_NOERR) &
-#      call stop_on_err("write_optical_prop_values: can't open file " // trim(fileName))
+#      error("write_optical_prop_values: can't open file " // trim(fileName))
 
 #    ncol = get_dim_size(ncid, 'col')
 #    nlay = get_dim_size(ncid, 'lay')
@@ -604,32 +604,32 @@ module mo_test_files_io
 #    call create_dim(ncid, "pair", 2)
 
 #    call create_var(ncid, "band_lims_wvn", ["pair", "band"], [2, nband])
-#    call stop_on_err(write_field(ncid, "band_lims_wvn", opt_props%get_band_lims_wavenumber()))
+#    error(write_field(ncid, "band_lims_wvn", opt_props%get_band_lims_wavenumber()))
 #    call create_var(ncid, "band_lims_gpt", ["pair", "band"], [2, nband], NF90_INT)
-#    call stop_on_err(write_field(ncid, "band_lims_gpt", opt_props%get_band_lims_gpoint()))
+#    error(write_field(ncid, "band_lims_gpt", opt_props%get_band_lims_gpoint()))
 
 #    #
 #    # Values
 #    #
 #    call create_var(ncid, "tau", ["col", "lay", "gpt"], [ncol, nlay, ngpt])
-#    call stop_on_err(write_field(ncid, "tau", opt_props%tau))
+#    error(write_field(ncid, "tau", opt_props%tau))
 
 #    select type (opt_props)
 #      class is (ty_optical_props_2str) # two-stream calculation
 #        call create_var(ncid, "ssa", ["col", "lay", "gpt"], [ncol, nlay, ngpt])
-#        call stop_on_err(write_field(ncid, "ssa", opt_props%ssa))
+#        error(write_field(ncid, "ssa", opt_props%ssa))
 
 #        call create_var(ncid, "g", ["col", "lay", "gpt"], [ncol, nlay, ngpt])
-#        call stop_on_err(write_field(ncid, "g", opt_props%g))
+#        error(write_field(ncid, "g", opt_props%g))
 
 #      class is (ty_optical_props_nstr) # n-stream calculation
 #        call create_var(ncid, "ssa", ["col", "lay", "gpt"], [ncol, nlay, ngpt])
-#        call stop_on_err(write_field(ncid, "ssa", opt_props%ssa))
+#        error(write_field(ncid, "ssa", opt_props%ssa))
 
 #        nmom = size(opt_props%p, 1)
 #        call create_dim(ncid, "mom", nmom)
 #        call create_var(ncid, "p", ["mom", "col", "lay", "gpt"], [nmom, ncol, nlay, ngpt])
-#        call stop_on_err(write_field(ncid, "p", opt_props%p))
+#        error(write_field(ncid, "p", opt_props%p))
 #    end select
 
 #    ncid = nf90_close(ncid)
@@ -646,10 +646,10 @@ module mo_test_files_io
 #    integer,  dimension(:,:), allocatable :: band_lims_gpt
 #    # -------------------
 #    if(nf90_open(trim(fileName), NF90_NOWRITE, ncid) /= NF90_NOERR) &
-#      call stop_on_err("read_optical_prop_values: can't open file " // trim(fileName))
+#      error("read_optical_prop_values: can't open file " // trim(fileName))
 
     if !haskey(ds,"tau")
-      stop_on_err("read_optical_prop_values: file " * " doesn't contain tau field.")
+      error("read_optical_prop_values: file " * " doesn't contain tau field.")
     end
 
     ncol  = ds.dim["col"]
@@ -658,32 +658,32 @@ module mo_test_files_io
     nband = ds.dim["band"]
 
     if ds.dim["pair"] ≠ 2
-      stop_on_err("read_optical_prop_values: pair dimension not 2 in file ")
+      error("read_optical_prop_values: pair dimension not 2 in file ")
     end
     band_lims_wvn = ds["band_lims_wvn"][:]
     band_lims_gpt = ds["band_lims_gpt"][:]
 
-    stop_on_err(init(opt_props,band_lims_wvn, band_lims_gpt, " ")) #check for the initializing string
+    init!(opt_props, " ",band_lims_wvn, band_lims_gpt) #check for the initializing string
 
     if(var_exists(ncid, 'p')) then
       # n-stream calculation
       nmom = ds.dim["mom"]
       allocate(ty_optical_props_nstr::opt_props)
 
-      stop_on_err(alloc_nstr(opt_props,nmom, ncol, nlay))
+      alloc_nstr!(opt_props,nmom, ncol, nlay)
       opt_props.ssa[:,:,:] = ds["ssa"][:] #,       ncol, nlay, ngpt)
       opt_props.p[:,:,:]   = ds["p"][:]   #,   nmom, ncol, nlay, ngpt)
 
     else if (var_exists(ncid, 'g')) then
       # two-stream calculation
       allocate(ty_optical_props_2str::opt_props)
-      call stop_on_err(opt_props%alloc_2str(ncol, nlay))
+      error(opt_props%alloc_2str(ncol, nlay))
       opt_props.ssa[:,:,:] = ds["ssa"][:]
       opt_props.g[:,:,:]   = ds["g"][:]
     else
       # No scattering
       allocate(ty_optical_props_1scl::opt_props)
-      stop_on_err(alloc_1scl(opt_props,ncol, nlay))
+      alloc_1scl!(opt_props,ncol, nlay)
     end if
     opt_props.tau[:,:,:] = ds["tau"][:] #, ncol, nlay, ngpt)
 
@@ -691,20 +691,20 @@ module mo_test_files_io
     # Spectral discretization
     #
 #    if (get_dim_size(ncid, 'pair') /= 2) &
-#      call stop_on_err("read_optical_prop_values: pair dimension not 2 in file " // trim(fileName) )
+#      error("read_optical_prop_values: pair dimension not 2 in file " // trim(fileName) )
 #    band_lims_wvn = read_field(ncid, 'band_lims_wvn', 2, nband)
 #    band_lims_gpt = read_field(ncid, 'band_lims_gpt', 2, nband)
 
-#    call stop_on_err(opt_props%init(band_lims_wvn, band_lims_gpt, read_string(ncid, 'name', 32)))
+#    error(opt_props%init(band_lims_wvn, band_lims_gpt, read_string(ncid, 'name', 32)))
 #    select type (opt_props)
 #      class is (ty_optical_props_1scl)      # No scattering
-#        call stop_on_err(opt_props%alloc_1scl(ncol, nlay))
+#        error(opt_props%alloc_1scl(ncol, nlay))
 #      class is (ty_optical_props_2str) # two-stream calculation
-#        call stop_on_err(opt_props%alloc_2str(ncol, nlay))
+#        error(opt_props%alloc_2str(ncol, nlay))
 #        opt_props%ssa = read_field(ncid, "ssa", ncol, nlay, ngpt)
 #        opt_props%g   = read_field(ncid, "g",   ncol, nlay, ngpt)
 #      class is (ty_optical_props_nstr) # n-stream calculation
-#        call stop_on_err(opt_props%alloc_nstr(nmom, ncol, nlay))
+#        error(opt_props%alloc_nstr(nmom, ncol, nlay))
 #        opt_props%ssa = read_field(ncid, "ssa",       ncol, nlay, ngpt)
 #        opt_props%p   = read_field(ncid, "p",   nmom, ncol, nlay, ngpt)
 #    end select
@@ -725,14 +725,14 @@ module mo_test_files_io
 #    # Vertical ordering, stored as a global attribute
 #    #
 #    if(nf90_open(trim(fileName), NF90_WRITE, ncid) /= NF90_NOERR) &
-#      call stop_on_err("write_direction: can't open file " // trim(fileName))
+#      error("write_direction: can't open file " // trim(fileName))
 
 #    if(nf90_redef(ncid) /= NF90_NOERR) &
-#      call stop_on_err("write_direction: can't put file into redefine mode")
+#      error("write_direction: can't put file into redefine mode")
 #    if(nf90_put_att(ncid, NF90_GLOBAL, "top_at_1", merge(1, 0, top_at_1)) /= NF90_NOERR) &
-#      call stop_on_err("write_direction: can't write attribute top_at_1" )
+#      error("write_direction: can't write attribute top_at_1" )
 #    if(nf90_enddef(ncid) /= NF90_NOERR) &
-#      call stop_on_err("write_direction: can't end redefinition??")
+#      error("write_direction: can't end redefinition??")
 
 #    ncid = nf90_close(ncid)
 #  end subroutine write_direction
@@ -745,7 +745,7 @@ module mo_test_files_io
 #    integer :: top
 
 #    if(nf90_open(trim(fileName), NF90_NOWRITE, ncid) /= NF90_NOERR) &
-#      call stop_on_err("read_direction: can't open file " // trim(fileName))
+#      error("read_direction: can't open file " // trim(fileName))
 
 #    status = nf90_get_att(ncid, NF90_GLOBAL, "top_at_1", top)
     return (ds.attrib["top_at_1"] == 1)
@@ -765,7 +765,7 @@ module mo_test_files_io
 #    integer :: ncol, nlay, ngpt
 #    # -------------------
 #    if(nf90_open(trim(fileName), NF90_WRITE, ncid) /= NF90_NOERR) &
-#      call stop_on_err("write_sources: can't open file " // trim(fileName))
+#      error("write_sources: can't open file " // trim(fileName))
 
 #    ncol = get_dim_size(ncid, 'col')
 #    nlay = get_dim_size(ncid, 'lay')
@@ -773,12 +773,12 @@ module mo_test_files_io
 #    call create_dim(ncid, "gpt", ngpt)
 
 #    call create_var(ncid, "source_up", ["col", "lay", "gpt"], [ncol, nlay, ngpt])
-#    call stop_on_err(write_field(ncid, "source_up", source_up))
+#    error(write_field(ncid, "source_up", source_up))
 #    call create_var(ncid, "source_dn", ["col", "lay", "gpt"], [ncol, nlay, ngpt])
-#    call stop_on_err(write_field(ncid, "source_dn", source_dn))
+#    error(write_field(ncid, "source_dn", source_dn))
 
 #    call create_var(ncid, "source_sfc", ["col",       "gpt"], [ncol,       ngpt])
-#    call stop_on_err(write_field(ncid, "source_sfc", source_sfc))
+#    error(write_field(ncid, "source_sfc", source_sfc))
 
 #    ncid = nf90_close(ncid)
 #  end subroutine write_sources
@@ -794,13 +794,13 @@ module mo_test_files_io
 #    integer :: ncol, nlay, ngpt, nmom
 #    # -------------------
 #    if(nf90_open(trim(fileName), NF90_NOWRITE, ncid) /= NF90_NOERR) &
-#      call stop_on_err("read_sources: can't open file " // trim(fileName))
+#      error("read_sources: can't open file " // trim(fileName))
 
 #    if(.not. var_exists(ncid, 'source_up')) &
-#      call stop_on_err("read_sources: file " //trim(fileName) // " doesn't contain source_up field.")
+#      error("read_sources: file " //trim(fileName) // " doesn't contain source_up field.")
 
     if !haskey(ds,"source_up")
-      stop_on_err("read_sources: file " * " doesn't contain source_up field.")
+      error("read_sources: file " * " doesn't contain source_up field.")
     end
 
     ncol = ds.dim["col"]
@@ -830,26 +830,26 @@ module mo_test_files_io
 #    integer :: ncol, nlay, ngpt
 #    # -------------------
 #    if(nf90_open(trim(fileName), NF90_WRITE, ncid) /= NF90_NOERR) &
-#      call stop_on_err("write_lw_Planck_sources: can't open file " // trim(fileName))
+#      error("write_lw_Planck_sources: can't open file " // trim(fileName))
 
 #    ncol = get_dim_size(ncid, 'col')
 #    nlay = get_dim_size(ncid, 'lay')
 #    if(any([sources%get_ncol(), sources%get_nlay()] /= [ncol, nlay])) &
-#      call stop_on_err("write_lw_Planck_sources: inconsistent sizes in file, sources")
+#      error("write_lw_Planck_sources: inconsistent sizes in file, sources")
 
 #    ngpt = sources%get_ngpt()
 #    call create_dim(ncid, "gpt", ngpt)
 
 #    call create_var(ncid, "lay_src", ["col", "lay", "gpt"], [ncol, nlay, ngpt])
-#    call stop_on_err(write_field(ncid, "lay_src", sources%lay_source))
+#    error(write_field(ncid, "lay_src", sources%lay_source))
 
 #    call create_var(ncid, "lev_src_inc", ["col", "lay", "gpt"], [ncol, nlay, ngpt])
-#    call stop_on_err(write_field(ncid, "lev_src_inc", sources%lev_source_inc))
+#    error(write_field(ncid, "lev_src_inc", sources%lev_source_inc))
 #    call create_var(ncid, "lev_src_dec", ["col", "lay", "gpt"], [ncol, nlay, ngpt])
-#    call stop_on_err(write_field(ncid, "lev_src_dec", sources%lev_source_dec))
+#    error(write_field(ncid, "lev_src_dec", sources%lev_source_dec))
 
 #    call create_var(ncid, "sfc_src", ["col", "gpt"], [ncol, ngpt])
-#    call stop_on_err(write_field(ncid, "sfc_src", sources%sfc_source))
+#    error(write_field(ncid, "sfc_src", sources%sfc_source))
 
 #    ncid = nf90_close(ncid)
 #  end subroutine write_lw_Planck_sources
@@ -864,7 +864,7 @@ module mo_test_files_io
 #    real(FT), dimension(:,:), allocatable :: band_lims_wvn
     # -------------------
 #    if(nf90_open(trim(fileName), NF90_NOWRITE, ncid) /= NF90_NOERR) &
-#      call stop_on_err("read_lw_Planck_sources: can't open file " // trim(fileName))
+#      error("read_lw_Planck_sources: can't open file " // trim(fileName))
 
     ncol  = ds.dim["col"]
     nlay  = ds.dim["lay"]
@@ -874,10 +874,10 @@ module mo_test_files_io
     # Error checking
     #
     if ds.dim["pair"] ≠ 2
-      stop_on_err("read_spectral_disc: pair dimension not 2 in file ")
+      error("read_spectral_disc: pair dimension not 2 in file ")
     end
     if !haskey(ds,"lay_src")
-      stop_on_err("read_lw_Planck_sources: file " * " doesn't contain lay_src field.")
+      error("read_lw_Planck_sources: file " * " doesn't contain lay_src field.")
     end
 
     #
@@ -886,8 +886,8 @@ module mo_test_files_io
     band_lims_wvn = ds["band_lims_wvn"][:]
     band_lims_gpt = ds["band_lims_gpt"][:]
 
-    stop_on_err(init(sources,band_lims_wvn, band_lims_gpt, " "))
-    stop_on_err(alloc(sources,ncol,nlay))
+    init(sources, " " ,band_lims_wvn, band_lims_gpt)
+    alloc!(sources,ncol,nlay)
 
     sources.lay_source[:,:,:]     = ds["lay_src"][:]
     sources.lev_source_inc[:,:,:] = ds["lev_src_inc"][:]
@@ -896,8 +896,8 @@ module mo_test_files_io
 
 #    return sources
 
-#    call stop_on_err(sources%init(band_lims_wvn, band_lims_gpt, read_string(ncid, 'name', 32)))
-#    call stop_on_err(sources%alloc(ncol, nlay))
+#    error(sources%init(band_lims_wvn, band_lims_gpt, read_string(ncid, 'name', 32)))
+#    error(sources%alloc(ncol, nlay))
 #    sources%lay_source     = read_field(ncid, 'lay_src',     ncol, nlay, ngpt)
 #    sources%lev_source_inc = read_field(ncid, 'lev_src_inc', ncol, nlay, ngpt)
 #    sources%lev_source_dec = read_field(ncid, 'lev_src_dec', ncol, nlay, ngpt)
@@ -920,14 +920,14 @@ module mo_test_files_io
 #    integer :: ncol, ngpt
 #    # -------------------
 #    if(nf90_open(trim(fileName), NF90_WRITE, ncid) /= NF90_NOERR) &
-#      call stop_on_err("write_sw_solar_sources: can't open file " // trim(fileName))
+#      error("write_sw_solar_sources: can't open file " // trim(fileName))
 
 #    ncol = get_dim_size(ncid, 'col')
 #    ngpt = size(toa_src, 2)
 #    call create_dim(ncid, "gpt", ngpt)
 
 #    call create_var(ncid, "toa_src", ["col", "gpt"], [ncol, ngpt])
-#    call stop_on_err(write_field(ncid, "toa_src", toa_src))
+#    error(write_field(ncid, "toa_src", toa_src))
 
 #    ncid = nf90_close(ncid)
 #  end subroutine write_sw_solar_sources
@@ -942,10 +942,10 @@ module mo_test_files_io
 #    integer :: top
 #    # -------------------
 #    if(nf90_open(trim(fileName), NF90_NOWRITE, ncid) /= NF90_NOERR) &
-#      call stop_on_err("read_sw_solar_sources: can't open file " // trim(fileName))
+#      error("read_sw_solar_sources: can't open file " // trim(fileName))
 
     if !haskey(ds,"toa_src")
-      stop_on_err("read_sw_solar_sources: file " *  " doesn't contain toa_src field.")
+      error("read_sw_solar_sources: file " *  " doesn't contain toa_src field.")
     end
 
     ncol = ds.dim["col"]
@@ -969,27 +969,27 @@ module mo_test_files_io
 #    integer :: ncol, nlay, ngpt
 
 #    if(nf90_open(trim(fileName), NF90_WRITE, ncid) /= NF90_NOERR) &
-#      call stop_on_err("write_two_stream: can't open file " // trim(fileName))
+#      error("write_two_stream: can't open file " // trim(fileName))
 
 #    ncol = get_dim_size(ncid, 'col')
 #    nlay = get_dim_size(ncid, 'lay')
 #    ngpt = get_dim_size(ncid, 'gpt')
 
 #    call create_var(ncid, "Rdif", ["col", "lay", "gpt"], [ncol, nlay, ngpt])
-#    call stop_on_err(write_field(ncid, "Rdif", Rdif))
+#    error(write_field(ncid, "Rdif", Rdif))
 #    call create_var(ncid, "Tdif", ["col", "lay", "gpt"], [ncol, nlay, ngpt])
-#    call stop_on_err(write_field(ncid, "Tdif", Tdif))
+#    error(write_field(ncid, "Tdif", Tdif))
 #    if(present(Rdir)) then
 #      call create_var(ncid, "Rdir", ["col", "lay", "gpt"], [ncol, nlay, ngpt])
-#      call stop_on_err(write_field(ncid, "Rdir", Rdir))
+#      error(write_field(ncid, "Rdir", Rdir))
 #    end if
 #    if(present(Tdir)) then
 #      call create_var(ncid, "Tdir", ["col", "lay", "gpt"], [ncol, nlay, ngpt])
-#      call stop_on_err(write_field(ncid, "Tdir", Tdir))
+#      error(write_field(ncid, "Tdir", Tdir))
 #    end if
 #    if(present(Tnoscat)) then
 #      call create_var(ncid, "Tnoscat", ["col", "lay", "gpt"], [ncol, nlay, ngpt])
-#      call stop_on_err(write_field(ncid, "Tnoscat", Tnoscat))
+#      error(write_field(ncid, "Tnoscat", Tnoscat))
 #    end if
 
 #    ncid = nf90_close(ncid)
@@ -1009,7 +1009,7 @@ module mo_test_files_io
 #    # -------------------
 
 #    if(nf90_open(trim(fileName), NF90_NOWRITE, ncid) /= NF90_NOERR) &
-#      call stop_on_err("read_two_stream: can't open file " // trim(fileName))
+#      error("read_two_stream: can't open file " // trim(fileName))
 
     ncol = ds.dim["col"]
     nlay = ds.dim["lay"]
@@ -1050,7 +1050,7 @@ module mo_test_files_io
 #    integer :: ncol, nlev, ngpt
 #    # -------------------
 #    if(nf90_open(trim(fileName), NF90_WRITE, ncid) /= NF90_NOERR) &
-#      call stop_on_err("write_gpt_fluxes: can't open file " // trim(fileName))
+#      error("write_gpt_fluxes: can't open file " // trim(fileName))
 
 #    ncol = size(gpt_flux_up, 1)
 #    nlev = size(gpt_flux_up, 2)
@@ -1058,13 +1058,13 @@ module mo_test_files_io
 #    call create_dim(ncid, "gpt", ngpt)
 
 #    call create_var(ncid, "gpt_flux_up", ["col", "lev", "gpt"], [ncol, nlev, ngpt])
-#    call stop_on_err(write_field(ncid, "gpt_flux_up", gpt_flux_up))
+#    error(write_field(ncid, "gpt_flux_up", gpt_flux_up))
 #    call create_var(ncid, "gpt_flux_dn", ["col", "lev", "gpt"], [ncol, nlev, ngpt])
-#    call stop_on_err(write_field(ncid, "gpt_flux_dn", gpt_flux_dn))
+#    error(write_field(ncid, "gpt_flux_dn", gpt_flux_dn))
 
 #    if(present(gpt_flux_dn_dir)) then
 #      call create_var(ncid, "gpt_flux_dn_dir", ["col", "lev", "gpt"], [ncol, nlev, ngpt])
-#      call stop_on_err(write_field(ncid, "gpt_flux_dn_dir", gpt_flux_dn_dir))
+#      error(write_field(ncid, "gpt_flux_dn_dir", gpt_flux_dn_dir))
 #    end if
 #    ncid = nf90_close(ncid)
 #  end subroutine write_gpt_fluxes
@@ -1080,7 +1080,7 @@ module mo_test_files_io
 #    integer :: ncol, nlev, ngpt
 #    # -------------------
 #    if(nf90_open(trim(fileName), NF90_NOWRITE, ncid) /= NF90_NOERR) &
-#      call stop_on_err("read_gpt_fluxes: can't open file " // trim(fileName))
+#      error("read_gpt_fluxes: can't open file " // trim(fileName))
 
     ncol = ds.dim["col"]
     nlev = ds.dim["lev"]
@@ -1097,16 +1097,5 @@ module mo_test_files_io
     return gpt_flux_up, gpt_flux_dn, gpt_flux_dn_dir
 #    ncid = nf90_close(ncid)
   end #subroutine read_gpt_fluxes
-  #--------------------------------------------------------------------------------------------------------------------
-  function stop_on_err(msg)
-#    #
-#    # Print error message and stop
-#    #
-#    use iso_fortran_env, only : error_unit
-#    character(len=*), intent(in) :: msg
-    if length(trim(msg)) > 0
-      error(trim(msg))
-    end
-  end
   #--------------------------------------------------------------------------------------------------------------------
 end #module mo_test_files_io

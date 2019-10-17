@@ -22,87 +22,6 @@
 # Error checking: Procedures in rte+rrtmgp return strings which are empty if no errors occured
 #   Check the incoming string, print it out and stop execution if non-empty
 #
-
-
-# -------------------------------------------------------------------------------------------------
-#
-# Main program
-#
-# -------------------------------------------------------------------------------------------------
-module rrtmgp_rfmip_sw
-  # --------------------------------------------------
-  #
-  # Modules for working with rte and rrtmgp
-  #
-  # Working precision for real variables
-  #
-  # use mo_rte_kind,           only: FT
-  #
-  # Array utilities
-  #
-  # use mo_util_array,         only: zero_array
-  using ..mo_util_array
-  #
-  # Optical properties of the atmosphere as array of values
-  #   In the longwave we include only absorption optical depth (_1scl)
-  #   Shortwave calculations use optical depth, single-scattering albedo, asymmetry parameter (_2str)
-  #
-  # use mo_optical_props,      only: ty_optical_props_2str
-  using ..mo_optical_props
-  #
-  # Gas optics: maps physical state of the atmosphere to optical properties
-  #
-  # use mo_gas_optics_rrtmgp,  only: ty_gas_optics_rrtmgp
-  using ..mo_gas_optics_rrtmgp
-  #
-  # Gas optics uses a derived type to represent gas concentrations compactly
-  #
-  # use mo_gas_concentrations, only: ty_gas_concs
-  using ..mo_gas_concentrations
-  #
-  # RTE shortwave driver
-  #
-  # use mo_rte_sw,             only: rte_sw
-  using ..mo_rte_sw
-  #
-  # RTE driver uses a derived type to reduce spectral fluxes to whatever the user wants
-  #   Here we're just reporting broadband fluxes
-  #
-  # use mo_fluxes,             only: ty_fluxes_broadband
-  using ..mo_fluxes
-  # --------------------------------------------------
-  #
-  # modules for reading and writing files
-  #
-  # RRTMGP's gas optics class needs to be initialized with data read from a netCDF files
-  #
-  # use mo_load_coefficients,  only: load_and_init
-  using ..mo_load_coefficients
-  # use mo_rfmip_io,           only: read_size, read_and_block_pt, read_and_block_gases_ty, unblock_and_write, read_and_block_sw_bc, determine_gas_names
-  using ..mo_rfmip_io
-  # ----------------------
-
-
-
-
-
-
-
-
-end
-
-
-#=
-subroutine stop_on_err(error_msg)
-  use iso_fortran_env, only : error_unit
-  character(len=*), intent(in) :: error_msg
-
-  if(error_msg /= "") then
-    write (error_unit,*) trim(error_msg)
-    write (error_unit,*) "rrtmgp_rfmip_lw stopping"
-    stop
-  end if
-end subroutine stop_on_err
 # -------------------------------------------------------------------------------------------------
 #
 # Main program
@@ -377,4 +296,3 @@ program rrtmgp_rfmip_lw
   call unblock_and_write(trim(flxup_file), 'rlu', flux_up)
   call unblock_and_write(trim(flxdn_file), 'rld', flux_dn)
 end program rrtmgp_rfmip_lw
-=#
