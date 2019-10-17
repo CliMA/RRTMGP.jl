@@ -103,7 +103,7 @@ deps = ["Markdown"]
 uuid = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
 
 [[JRRTMGP]]
-deps = ["Compat", "Coverage", "DataDeps", "DelimitedFiles", "DocStringExtensions", "Documenter", "MbedTLS", "NCDatasets", "OffsetArrays", "Pkg", "Requires", "Test"]
+deps = ["Compat", "Coverage", "DataDeps", "DelimitedFiles", "DocStringExtensions", "Documenter", "MbedTLS", "NCDatasets", "OffsetArrays", "Pkg", "Profile", "Requires", "Test"]
 path = ".."
 uuid = "a01a1ee8-cea4-48fc-987c-fc7878d79da1"
 version = "0.1.0"
@@ -134,8 +134,6 @@ uuid = "d6f4376e-aef5-505a-96c1-9c027394607a"
 [[MbedTLS]]
 deps = ["BinaryProvider", "Dates", "Libdl", "Random", "Sockets"]
 git-tree-sha1 = "85f5947b53c8cfd53ccfa3f4abae31faa22c2181"
-repo-rev = "master"
-repo-url = "https://github.com/JuliaWeb/MbedTLS.jl.git"
 uuid = "739be429-bea8-5141-9913-cc70e7f3736d"
 version = "0.7.0"
 
@@ -178,6 +176,10 @@ uuid = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 [[Printf]]
 deps = ["Unicode"]
 uuid = "de0858da-6303-5e67-8744-51eddeeeb8d7"
+
+[[Profile]]
+deps = ["Printf"]
+uuid = "9abbd945-dff8-562f-b5e8-e1ebf5ef1b79"
 
 [[REPL]]
 deps = ["InteractiveUtils", "Markdown", "Sockets"]
