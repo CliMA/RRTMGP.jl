@@ -1,0 +1,45 @@
+## Documentation: http://docs.travis-ci.com/user/languages/julia/
+language: julia
+sudo: false
+dist: trusty
+os:
+  - linux
+julia:
+  - 1.2
+  - nightly
+notifications:
+  email: false
+
+# comment the following lines to disallow failures on nightly julia
+matrix:
+  allow_failures:
+  - julia: nightly
+
+before_script:
+  - |
+    if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
+      brew update
+      brew upgrade cmake
+    fi
+
+after_success:
+  # push coverage results to Codecov
+  - julia -e 'import Pkg;
+                     cd(Pkg.dir("JRRTMGP"));
+                     Pkg.add("Coverage");
+                     using Coverage;
+                     Codecov.submit(Codecov.process_folder())'
+
+jobs:
+  include:
+    - stage: "Documentation"
+      julia: 1.2
+      os: linux
+      script:
+        - export DOCUMENTER_DEBUG="true"
+        - julia --color=yes --project=docs/ -e 'using Pkg;
+                                                      Pkg.develop(PackageSpec(path=pwd()));
+                                                      Pkg.instantiate();
+                                                      Pkg.build("JRRTMGP")'
+        - julia --color=yes --project=docs/ docs/make.jl
+      after_success: skip
