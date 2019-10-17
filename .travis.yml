@@ -4,6 +4,7 @@ sudo: false
 dist: trusty
 os:
   - linux
+  - osx
 julia:
   - 1.2
   - nightly
