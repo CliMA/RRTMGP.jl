@@ -375,10 +375,11 @@ function sw_solver_2stream!(ncol, nlay, ngpt, top_at_1,
       # Cell properties: transmittance and reflectance for direct and diffuse radiation
       #
 
-      Rdif, Tdif, Rdir, Tdir, Tnoscat = sw_two_stream(ncol, nlay, mu0,
-                                                      tau[:,:,igpt],
-                                                      ssa[:,:,igpt],
-                                                      g[:,:,igpt])
+      sw_two_stream!(ncol, nlay, mu0,
+                    tau[:,:,igpt],
+                    ssa[:,:,igpt],
+                    g[:,:,igpt],
+                    Rdif, Tdif, Rdir, Tdir, Tnoscat)
       #
       # Direct-beam and source for diffuse radiation
       #
@@ -431,10 +432,10 @@ real(FT)            :: fact
 real(FT), parameter :: tau_thresh = sqrt(epsilon(tau))
 # ---------------------------------------------------------------
 """
-
 function lw_source_noscat!(ncol, nlay, lay_source, lev_source_up, lev_source_dn, tau, trans,
                               source_dn, source_up)
     FT = eltype(tau)
+    tau_thresh = sqrt(eps(FT))
     for ilay in 1:nlay
       for icol in 1:ncol
       #
@@ -479,7 +480,6 @@ real(FT), dimension(ncol,nlay+1), intent(inout) :: radn_dn    #Top level must co
 integer :: ilev
 # ---------------------------------------------------
 """
-
 function lw_transport_noscat!(ncol, nlay, top_at_1,
                                  tau, trans, sfc_albedo, source_dn, source_up, source_sfc,
                                  radn_up, radn_dn)
@@ -548,7 +548,6 @@ real(FT) :: exp_minusktau(ncol), exp_minus2ktau(ncol)
 real(FT), parameter :: LW_diff_sec = 1.66  # 1./cos(diffusivity angle)
 # ---------------------------------
 """
-
 function lw_two_stream!(ncol, nlay, tau, w0, g,
                                 gamma1, gamma2, Rdif, Tdif)
     FT = eltype(tau)
@@ -731,14 +730,12 @@ function lw_source_2str!(ncol, nlay, top_at_1,
     real(FT) :: mu0_inv(ncol)
     # ---------------------------------
 """
-function sw_two_stream(ncol, nlay, mu0, tau, w0, g)
+function sw_two_stream!(ncol, nlay, mu0, tau, w0, g, Rdif, Tdif, Rdir, Tdir, Tnoscat)
     FT = eltype(tau)
     mu0_inv = 1 ./ mu0
     exp_minusktau = Array{FT}(undef, ncol)
     exp_minus2ktau = Array{FT}(undef, ncol)
     RT_term = Array{FT}(undef, ncol)
-
-    Rdif, Tdif, Rdir, Tdir, Tnoscat = ntuple(i-> Array{FT}(undef, ncol,nlay), 5)
 
     gamma1, gamma2, gamma3, gamma4, alpha1, alpha2, k = ntuple(i->Array{FT}(undef, ncol), 7)
 
@@ -844,7 +841,6 @@ function sw_two_stream(ncol, nlay, mu0, tau, w0, g)
 
     integer :: ilev
 """
-
 function sw_source_2str!(ncol, nlay, top_at_1, Rdir, Tdir, Tnoscat, sfc_albedo,
                             source_up, source_dn, source_sfc, flux_dn_dir)
 
@@ -896,7 +892,6 @@ end
   real(FT), dimension(ncol,nlay  )  :: denom      # beta in SH08
   # ------------------
 """
-
 function adding!(ncol, nlay, top_at_1,
                   albedo_sfc,
                   rdif, tdif,

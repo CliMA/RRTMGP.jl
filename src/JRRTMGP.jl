@@ -1,5 +1,14 @@
 module JRRTMGP
 
+function extract_targz(file)
+  if Sys.iswindows()
+    run(pipeline(`7z x -tgzip -so $file`, `7z x -si -ttar`))
+  else
+    run(`tar -xzf $file`)
+  end
+end
+
+
 include("fortran_intrinsics.jl")
 include(joinpath("rte","mo_util_array.jl"))
 include(joinpath("rte","kernels","mo_fluxes_broadband_kernels.jl"))
@@ -19,8 +28,10 @@ include(joinpath("rrtmgp","mo_gas_optics.jl"))
 include(joinpath("rrtmgp","kernels","mo_gas_optics_kernels.jl"))
 include(joinpath("rrtmgp","mo_gas_concentrations.jl"))
 include(joinpath("rrtmgp","mo_gas_optics_rrtmgp.jl"))
+include(joinpath("examples","mo_simple_netcdf.jl"))
 include(joinpath("examples","mo_load_coefficients.jl"))
 include(joinpath("examples","rfmip-clear-sky","mo_rfmip_io.jl"))
+include(joinpath("utilities","mo_test_files_io.jl"))
 
 # Drivers:
 include(joinpath("examples","rfmip-clear-sky","rrtmgp_rfmip_sw.jl"))

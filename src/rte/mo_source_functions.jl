@@ -16,39 +16,45 @@
 # -------------------------------------------------------------------------------------------------
 module mo_source_functions
 
-  using ..mo_optical_props
+using ..fortran_intrinsics
+using ..mo_optical_props
+import ..mo_optical_props: alloc!, get_ncol, get_nlay, get_ncol
 
-  # -------------------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
+#
+# Type for longwave sources: computed at layer center, at layer edges using
+#   spectral mapping in each direction separately, and at the surface
+
+
+export ty_source_func_lw
+export ty_source_func_sw
+
+mutable struct ty_source_func_lw{FT, I} <: ty_optical_props{FT, I}
+  band2gpt#::Array{T,2}        # (begin g-point, end g-point) = band2gpt(2,band)
+  gpt2band#::Array{I,1}        # band = gpt2band(g-point)
+  band_lims_wvn#::Array{T,2}   # (upper and lower wavenumber by band) = band_lims_wvn(2,band)
+  name#::String
+  tau#::Array{FT,3}
   #
-  # Type for longwave sources: computed at layer center, at layer edges using
-  #   spectral mapping in each direction separately, and at the surface
+  lay_source     # Planck source at layer average temperature [W/m2] (ncol, nlay, ngpt)
+  lev_source_inc # Planck source at layer edge in increasing ilay direction [W/m2] (ncol, nlay+1, ngpt)
+  lev_source_dec # Planck source at layer edge in decreasing ilay direction [W/m2] (ncol, nlay+1, ngpt)
+  sfc_source
+end
+mutable struct ty_source_func_sw{FT, I} <: ty_optical_props{FT, I}
+  band2gpt#::Array{T,2}        # (begin g-point, end g-point) = band2gpt(2,band)
+  gpt2band#::Array{I,1}        # band = gpt2band(g-point)
+  band_lims_wvn#::Array{T,2}   # (upper and lower wavenumber by band) = band_lims_wvn(2,band)
+  name#::String
+  tau#::Array{FT,3}
+  #
+  toa_source
+  lev_source_inc
+  lev_source_dec
+end
+ty_source_func_lw(FT,I) = ty_source_func_lw{FT,I}(ntuple(i->nothing, 9)...)
+ty_source_func_sw(FT,I) = ty_source_func_sw{FT,I}(ntuple(i->nothing, 8)...)
 
-
-  export ty_source_func_lw
-  struct ty_source_func_lw{FT, I} <: ty_optical_props{FT, I}
-    band2gpt::Array{FT,2}        # (begin g-point, end g-point) = band2gpt(2,band)
-    gpt2band::Array{I,1}        # band = gpt2band(g-point)
-    band_lims_wvn::Array{FT,2}   # (upper and lower wavenumber by band) = band_lims_wvn(2,band)
-    name::String
-    tau::Array{FT,3}
-    #
-    lay_source     # Planck source at layer average temperature [W/m2] (ncol, nlay, ngpt)
-    lev_source_inc # Planck source at layer edge in increasing ilay direction [W/m2] (ncol, nlay+1, ngpt)
-    lev_source_dec # Planck source at layer edge in decreasing ilay direction [W/m2] (ncol, nlay+1, ngpt)
-    sfc_source
-  end
-  export ty_source_func_sw
-  struct ty_source_func_sw{FT, I} <: ty_optical_props{FT, I}
-    band2gpt::Array{FT,2}        # (begin g-point, end g-point) = band2gpt(2,band)
-    gpt2band::Array{I,1}        # band = gpt2band(g-point)
-    band_lims_wvn::Array{FT,2}   # (upper and lower wavenumber by band) = band_lims_wvn(2,band)
-    name::String
-    tau::Array{FT,3}
-    #
-    toa_source
-    lev_source_inc
-    lev_source_dec
-  end
   # type, extends(ty_optical_props), public :: ty_source_func_lw
   #   real(FT), allocatable, dimension(:,:,:) :: lay_source,       # Planck source at layer average temperature [W/m2] (ncol, nlay, ngpt)
   #                                              lev_source_inc,   # Planck source at layer edge in increasing ilay direction [W/m2] (ncol, nlay+1, ngpt)
@@ -84,8 +90,8 @@ module mo_source_functions
   #   procedure, public :: get_ncol => get_ncol_sw
   #   # validate?
   # end type ty_source_func_sw
-  # -------------------------------------------------------------------------------------------------
-# contains
+
+
   # ------------------------------------------------------------------------------------------
   #
   #  Routines for initialization, validity checking, finalization
@@ -95,12 +101,9 @@ module mo_source_functions
   # Longwave
   #
   # ------------------------------------------------------------------------------------------
-  is_allocated_lw(this::ty_source_func_lw) = is_initialized(this) && allocated(this.sfc_source)
-    # class(ty_source_func_lw), intent(in) :: this
-    # logical                              :: is_allocated_lw
+  is_allocated(this::ty_source_func_lw) = is_initialized(this) && allocated(this.sfc_source)
 
-  # --------------------------------------------------------------
-  function alloc_lw!(this::ty_source_func_lw{FT}, ncol, nlay) where FT
+  function alloc!(this::ty_source_func_lw{FT}, ncol, nlay) where FT
     # class(ty_source_func_lw),    intent(inout) :: this
     # integer,                     intent(in   ) :: ncol, nlay
     # character(len = 128)                       :: err_message
@@ -108,21 +111,21 @@ module mo_source_functions
     # integer :: ngpt
 
     !is_initialized(this) && error("source_func_lw%alloc: not initialized so can't allocate")
-    any([ncol, nlay] <= 0) && error("source_func_lw%alloc: must provide positive extents for ncol, nlay")
+    any([ncol, nlay] .<= 0) && error("source_func_lw%alloc: must provide positive extents for ncol, nlay")
 
     allocated(this.sfc_source) && deallocate!(this.sfc_source)
     allocated(this.lay_source) && deallocate!(this.lay_source)
     allocated(this.lev_source_inc) && deallocate!(this.lev_source_inc)
     allocated(this.lev_source_dec) && deallocate!(this.lev_source_dec)
     ngpt = get_ngpt(this)
-    this.sfc_source = Array(undef, ncol,ngpt)
-    this.lay_source = Array(undef, ncol,nlay,ngpt)
-    this.lev_source_inc = Array(undef, ncol,nlay,ngpt)
-    this.lev_source_dec = Array(undef, ncol,nlay,ngpt)
+    this.sfc_source = Array{FT}(undef, ncol,ngpt)
+    this.lay_source = Array{FT}(undef, ncol,nlay,ngpt)
+    this.lev_source_inc = Array{FT}(undef, ncol,nlay,ngpt)
+    this.lev_source_dec = Array{FT}(undef, ncol,nlay,ngpt)
   end
 
   # --------------------------------------------------------------
-  function copy_and_alloc_lw(this::ty_source_func_lw{FT}, ncol, nlay, spectral_desc) where FT
+  function alloc!(this::ty_source_func_lw{FT}, ncol, nlay, spectral_desc::ty_optical_props) where FT
     # class(ty_source_func_lw),    intent(inout) :: this
     # integer,                     intent(in   ) :: ncol, nlay
     # class(ty_optical_props ),    intent(in   ) :: spectral_desc
@@ -138,17 +141,12 @@ module mo_source_functions
   # Shortwave
   #
   # ------------------------------------------------------------------------------------------
-  function is_allocated_sw(this::ty_source_func_sw)
-    # class(ty_source_func_sw), intent(in) :: this
-    # logical                              :: is_allocated_sw
+  is_allocated(this::ty_source_func_sw) = is_initialized(this) && allocated(this.toa_source)
 
-    return is_initialized(this) && allocated(this.toa_source)
-  end
   # --------------------------------------------------------------
-  function alloc_sw!(this::ty_source_func_sw{FT}, ncol) where FT
+  function alloc!(this::ty_source_func_sw{FT}, ncol) where FT
     # class(ty_source_func_sw),    intent(inout) :: this
     # integer,                     intent(in   ) :: ncol
-    # character(len = 128)                       :: err_message
 
     !is_initialized(this) && error("source_func_sw%alloc: not initialized so can't allocate")
     ncol <= 0 && error("source_func_sw%alloc: must provide positive extents for ncol")
@@ -157,11 +155,10 @@ module mo_source_functions
     this.toa_source = Array(undef, ncol, get_ngpt(this))
   end
   # --------------------------------------------------------------
-  function copy_and_alloc_sw!(this::ty_source_func_sw, ncol, spectral_desc)
+  function alloc!(this::ty_source_func_sw, ncol, spectral_desc::ty_optical_props)
     # class(ty_source_func_sw),    intent(inout) :: this
     # integer,                     intent(in   ) :: ncol
     # class(ty_optical_props ),    intent(in   ) :: spectral_desc
-    # character(len = 128)                       :: err_message
 
     !is_initialized(spectral_desc) &&  error("source_func_sw%alloc: spectral_desc not initialized")
     init!(this, spectral_desc)
@@ -172,9 +169,7 @@ module mo_source_functions
   # Finalization (memory deallocation)
   #
   # ------------------------------------------------------------------------------------------
-  function finalize_lw!(this::ty_source_func_lw)
-    # class(ty_source_func_lw),    intent(inout) :: this
-
+  function finalize!(this::ty_source_func_lw)
     allocated(this.lay_source    ) && deallocate!(this.lay_source)
     allocated(this.lev_source_inc) && deallocate!(this.lev_source_inc)
     allocated(this.lev_source_dec) && deallocate!(this.lev_source_dec)
@@ -182,9 +177,7 @@ module mo_source_functions
     finalize!(this)
   end
   # --------------------------------------------------------------
-  function finalize_sw!(this::ty_source_func_lw)
-    # class(ty_source_func_sw),    intent(inout) :: this
-
+  function finalize!(this::ty_source_func_sw)
     allocated(this.toa_source    ) && deallocate!(this.toa_source)
     finalize!(this)
   end
@@ -193,38 +186,12 @@ module mo_source_functions
   #  Routines for finding the problem size
   #
   # ------------------------------------------------------------------------------------------
-  function get_ncol_lw(this::ty_source_func_lw)
-    # class(ty_source_func_lw), intent(in) :: this
-    # integer :: get_ncol_lw
+  get_ncol(this::ty_source_func_lw) = is_allocated(this) ? size(this.lay_source,1) : 0
 
-    if is_allocated(this)
-      get_ncol_lw = size(this.lay_source,1)
-    else
-      get_ncol_lw = 0
-    end
-  end
-  # --------------------------------------------------------------
-  function get_nlay_lw(this)
-    # class(ty_source_func_lw), intent(in) :: this
-    # integer :: get_nlay_lw
+  get_nlay(this::ty_source_func_lw) = is_allocated(this) ? size(this.lay_source,2) : 0
 
-    if is_allocated(this)
-      get_nlay_lw = size(this.lay_source,2)
-    else
-      get_nlay_lw = 0
-    end
-  end
-  # --------------------------------------------------------------
-  function get_ncol_sw(this)
-    # class(ty_source_func_sw), intent(in) :: this
-    # integer :: get_ncol_sw
+  get_ncol(this::ty_source_func_sw) = is_allocated(this) ? size(this.toa_source,1) : 0
 
-    if is_allocated(this)
-      get_ncol_sw = size(this.toa_source,1)
-    else
-      get_ncol_sw = 0
-    end
-  end
   # ------------------------------------------------------------------------------------------
   #
   #  Routines for subsetting
