@@ -42,7 +42,7 @@ using JRRTMGP.mo_rfmip_io
 # Main program
 #
 # -------------------------------------------------------------------------------------------------
-function run_driver(nblocks_iterations=nothing)
+function run_driver(rfmip_file, kdist_file, nblocks_iterations=nothing)
   # --------------------------------------------------
   #
   # Modules for working with rte and rrtmgp
@@ -135,10 +135,7 @@ function run_driver(nblocks_iterations=nothing)
   # Code starts
   #   all arguments are optional
   #
-  clear_sky_dir = joinpath("..", "src", "examples","rfmip-clear-sky")
-  data_dir = joinpath("..", "src", "rrtmgp","data")
-  rfmip_file = joinpath(clear_sky_dir, "multiple_input4MIPs_radiation_RFMIP_UColorado-RFMIP-1-2_none.nc")
-  kdist_file = joinpath(data_dir, "rrtmgp-data-sw-g224-2018-12-04.nc")
+
   ds = Dataset(rfmip_file, "r") # reading the NetCDF file in read only mode
   ds_k_dist = Dataset(kdist_file, "r") # reading the NetCDF file in read only mode
 
@@ -402,6 +399,10 @@ function run_driver(nblocks_iterations=nothing)
 end
 
 @testset "Shortwave driver" begin
-  run_driver(1)
-  run_driver()
+  datafolder = JRRTMGP.data_folder_rrtmgp()
+  rfmip_file = joinpath(datafolder, "examples","rfmip-clear-sky", "multiple_input4MIPs_radiation_RFMIP_UColorado-RFMIP-1-2_none.nc")
+  kdist_file = joinpath(datafolder, "rrtmgp", "data", "rrtmgp-data-sw-g224-2018-12-04.nc")
+
+  run_driver(rfmip_file, kdist_file, 1)
+  run_driver(rfmip_file, kdist_file)
 end

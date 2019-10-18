@@ -1,10 +1,8 @@
 using Test
 
 for submodule in [
-                  # "adding",
+                  "DataDeps",
                   "DriverSW",
-                  "RTE",
-                  "RRTMG",
                   ]
 
   println("Testing $submodule")
