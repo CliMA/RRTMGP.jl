@@ -144,7 +144,7 @@ function lw_solver_noscat!(ncol, nlay, ngpt, top_at_1, D, weight,
       #
       lw_transport_noscat!(ncol, nlay, top_at_1,
                                tau_loc, trans, sfc_albedo, source_dn, source_up, source_sfc,
-                               radn_up[:,:,igpt], radn_dn[:,:,igpt])
+                               @view(radn_up[:,:,igpt]), @view(radn_dn[:,:,igpt]))
       #
       # Convert intensity to flux assuming azimuthal isotropy and quadrature weight
       #

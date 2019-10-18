@@ -192,7 +192,6 @@ contains =#
     gpt_flux_dn  = Array{FT}(undef,ncol,nlay+1,ngpt)
     sfc_emis_gpt = Array{FT}(undef,ncol,       ngpt)
 
-
 #    ##$acc enter data copyin(sources, sources%lay_source, sources%lev_source_inc, sources%lev_source_dec, sources%sfc_source)
 #    #$acc enter data copyin(optical_props)
 #    #$acc enter data create(gpt_flux_dn, gpt_flux_up)
@@ -228,7 +227,15 @@ contains =#
 
     elseif optical_props isa ty_optical_props_2str
       # two-stream calculation with scattering
-
+#        call lw_solver_2stream(ncol, nlay, ngpt, logical(top_at_1, wl), 
+#                               optical_props%tau, optical_props%ssa, optical_props%g,              
+#                               sources%lay_source, sources%lev_source_inc, sources%lev_source_dec, 
+#                               sfc_emis_gpt, sources%sfc_source,       
+#                               gpt_flux_up, gpt_flux_dn)
+      lw_solver_2stream!(ncol, nlay, ngpt, top_at_1,
+                                 optical_props.tau, optical_props.ssa, optical_props.g,
+                                 sources.lay_source, sources.lev_source_inc, sources.lev_source_dec, sfc_emis_gpt, sources.sfc_src,
+                                 gpt_flux_up, gpt_flux_dn)
     elseif optical_props isa ty_optical_props_nstr
       # n-stream calculation
       error("lw_solver(...ty_optical_props_nstr...) not yet implemented")

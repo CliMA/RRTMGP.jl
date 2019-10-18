@@ -205,7 +205,14 @@ function run_driver(nblocks_iterations=nothing)
   #
   gas_conc_array = read_and_block_gases_ty(ds, block_size, kdist_gas_names, rfmip_gas_games)
   sfc_emis, sfc_t = read_and_block_lw_bc(ds, block_size)
-
+#@show ("================sfc_emis=================================", size(sfc_emis))
+#@show ("sfc_emis[:,10] = ")
+#@show sfc_emis[:,10]
+#@show ("=========================================================")
+#@show ("================sfc_t=================================", size(sfc_emis))
+#@show ("sfc_t[:,10] = ")
+#@show sfc_t[:,10]
+#@show ("=========================================================")
   # test_data(surface_albedo, "surface_albedo")
   # test_data(total_solar_irradiance, "total_solar_irradiance")
   # test_data(solar_zenith_angle, "solar_zenith_angle")
@@ -225,6 +232,8 @@ function run_driver(nblocks_iterations=nothing)
 
   nbnd = get_nband(k_dist.optical_props)
   ngpt = get_ngpt(k_dist.optical_props)
+@show ("nbnd = ", nbnd)
+@show ("ngpt = ", ngpt)
 
 #  toa_flux = Array{FT}(undef, block_size, get_ngpt(k_dist.optical_props))
 #  def_tsi = Array{FT}(undef, block_size)
@@ -239,6 +248,11 @@ function run_driver(nblocks_iterations=nothing)
   else
     p_lev[:,nlay+1,:] .= get_press_min(k_dist) + eps(FT)
   end
+#@show "==============================================================="
+#@show ("p_lev(:,1,:) = ", size(p_lev[:,1,:]))
+#@show p_lev[:,1,:]
+#@show "==============================================================="
+
   # test_data(p_lev, "p_lev_2")
 
   #
@@ -255,6 +269,7 @@ function run_driver(nblocks_iterations=nothing)
   #
   flux_up = Array{FT}(undef, block_size, nlay+1, nblocks)
   flux_dn = Array{FT}(undef, block_size, nlay+1, nblocks)
+
 #  mu0 = Array{FT}(undef, block_size)
   sfc_emis_spec = Array{FT}(undef, nbnd,block_size)
 
@@ -262,22 +277,6 @@ function run_driver(nblocks_iterations=nothing)
   copy_and_alloc!(optical_props, block_size, nlay, k_dist.optical_props)
   source = ty_source_func_lw(block_size,nlay,k_dist.optical_props)
 
-  # test_data(optical_props.band_lims_wvn, "DriverSW_op_band_lims_wvn")
-  # test_data(optical_props.gpt2band, "DriverSW_op_gpt2band")
-  # test_data(optical_props.band2gpt, "DriverSW_op_band2gpt")
-
-  #$acc enter data create(optical_props, optical_props%tau, optical_props%ssa, optical_props%g)
-  #$acc enter data create (toa_flux, def_tsi)
-  #$acc enter data create (sfc_alb_spec, mu0)
-  # --------------------------------------------------
-#ifdef USE_TIMING
-  #
-  # Initialize timers
-  #
-  # ret = gptlsetoption (gptlpercent, 1)        # Turn on "% of" print
-  # ret = gptlsetoption (gptloverhead, 0)       # Turn off overhead estimate
-  # ret =  gptlinitialize()
-#endif
   #
   # Loop over blocks
   #
@@ -286,8 +285,8 @@ function run_driver(nblocks_iterations=nothing)
 
   for b = 1:nblocks_iterations
 @show ("iteration # ",b," of ", nblocks_iterations)
-    fluxes.flux_up = flux_up[:,:,b]
-    fluxes.flux_dn = flux_dn[:,:,b] 
+    fup = fluxes.flux_up = @view(flux_up[:,:,b])
+    fdn = fluxes.flux_dn = @view(flux_dn[:,:,b])
 
     for icol = 1:block_size
       for ibnd = 1:nbnd
@@ -307,130 +306,19 @@ function run_driver(nblocks_iterations=nothing)
                 t_lev[:,:,b]) 
 
     rte_lw!(optical_props,top_at_1,source,sfc_emis_spec,fluxes,nothing,n_quad_angles)
+    @assert fup === fluxes.flux_up # check if fluxes.flux_up/dn still refers to flux_up[:,:,b]
+    @assert fdn === fluxes.flux_dn
+
+#    flux_up[:,:,b] .= fluxes.flux_up[:,:] # this is a safer version, just in case. 
+#    flux_dn[:,:,b] .= fluxes.flux_dn[:,:] 
   end
-
-@show("size(fluxes.flux_up) = ", size(fluxes.flux_up))
-@show("size(fluxes.flux_dn) = ", size(fluxes.flux_dn))
-@show("fluxes.flux_up / flux_up[:,:,1]  = ")
-@show("======================")
-#@show(flux_up[:,:,1])
-@show(fluxes.flux_up)
-
-
-#  nblocks_iterations==nothing && (nblocks_iterations = nblocks)
-#  for b = 1:nblocks_iterations
-#    @show b/nblocks
-#    fluxes.flux_up = flux_up[:,:,b]
-#    fluxes.flux_dn = flux_dn[:,:,b]
-    #
-    # Compute the optical properties of the atmosphere and the Planck source functions
-    #    from pressures, temperatures, and gas concentrations...
-    #
-#ifdef USE_TIMING
-    # ret =  gptlstart('gas_optics (SW)')
-#endif
-#    gas_optics!(k_dist,
-#                p_lay[:,:,b],
-#                p_lev[:,:,b],
-#                t_lay[:,:,b],
-#                gas_conc_array[b],
-#                optical_props,
-#                toa_flux)
-    # test_data(optical_props.tau, "DriverSW_op_tau")
-#ifdef USE_TIMING
-    # ret =  gptlstop('gas_optics (SW)')
-#endif
-    # Boundary conditions
-    #   (This is partly to show how to keep work on GPUs using OpenACC in a host application)
-    # What's the total solar irradiance assumed by RRTMGP?
-    #
-#ifdef _OPENACC
-#    zero_array!(def_tsi)
-    #$acc parallel loop collapse(2) copy(def_tsi) copyin(toa_flux)
-    # for igpt = 1:ngpt
-    #   for icol = 1:block_size
-    #     #$acc atomic update
-    #     def_tsi[icol] = def_tsi[icol] + toa_flux[icol, igpt]
-    #   end
-    # end
-#else
-    #
-    # More compactly...
-    #
-#    def_tsi[1:block_size] = sum(toa_flux, dims=2)
-    # test_data(def_tsi, "def_tsi")
-#endif
-    #
-    # Normalize incoming solar flux to match RFMIP specification
-    #
-    #$acc parallel loop collapse(2) copyin(total_solar_irradiance, def_tsi) copy(toa_flux)
-#    for igpt = 1:ngpt
-#      for icol = 1:block_size
-#        toa_flux[icol,igpt] = toa_flux[icol,igpt] * total_solar_irradiance[icol,b]/def_tsi[icol]
-#      end
-#    end
-    # test_data(toa_flux, "toa_flux")
-    #
-    # Expand the spectrally-constant surface albedo to a per-band albedo for each column
-    #
-    #$acc parallel loop collapse(2) copyin(surface_albedo)
-#    for icol = 1:block_size
-#      for ibnd = 1:nbnd
-#        sfc_alb_spec[ibnd,icol] = surface_albedo[icol,b]
-#      end
-#    end
-    # test_data(sfc_alb_spec, "sfc_alb_spec")
-    #
-    # Cosine of the solar zenith angle
-    #
-    #$acc parallel loop copyin(solar_zenith_angle, usecol)
-#    for icol = 1:block_size
-#      mu0[icol] = fmerge(cos(solar_zenith_angle[icol,b]*deg_to_rad), FT(1), usecol[icol,b])
-#    end
-    # test_data(mu0, "mu0")
-
-    #
-    # ... and compute the spectrally-resolved fluxes, providing reduced values
-    #    via ty_fluxes_broadband
-    #
-#ifdef USE_TIMING
-    # ret =  gptlstart('rte_sw')
-#endif
-
-#    rte_sw!(optical_props, top_at_1, mu0, toa_flux, sfc_alb_spec, sfc_alb_spec, fluxes)
-
-
-#ifdef USE_TIMING
-    # ret =  gptlstop('rte_sw')
-#endif
-    #
-    # Zero out fluxes for which the original solar zenith angle is > 90 degrees.
-    #
-#    for icol = 1:block_size
-#      if !usecol[icol,b]
-#        flux_up[icol,:,b] .= FT(0)
-#        flux_dn[icol,:,b] .= FT(0)
-#      end
-#    end
-#  end
-  # test_data(fluxes.flux_up, "fluxes_flux_up")
-  # test_data(fluxes.flux_dn, "fluxes_flux_dn")
-
-  #
-  # End timers
-  #
-
-  #$acc exit data delete(optical_props%tau, optical_props%ssa, optical_props%g, optical_props)
-  #$acc exit data delete(sfc_alb_spec, mu0)
-  #$acc exit data delete(toa_flux, def_tsi)
   # --------------------------------------------------
   # unblock_and_write!(trim(flxup_file), "rsu", flux_up)
   # unblock_and_write!(trim(flxdn_file), "rsd", flux_dn)
-
 end
 
 
 @testset "Longwave driver" begin
-  run_driver(1)
-#  run_driver()
+#  run_driver(1)
+  run_driver()
 end
