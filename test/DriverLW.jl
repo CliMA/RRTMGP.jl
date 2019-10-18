@@ -1,7 +1,7 @@
 using Test
 using JRRTMGP
 using NCDatasets
-using BenchmarkTools
+#using BenchmarkTools
 using JRRTMGP.mo_optical_props
 using JRRTMGP.mo_rte_solver_kernels
 using JRRTMGP.fortran_intrinsics
@@ -282,12 +282,19 @@ function run_driver(nblocks_iterations=nothing)
   # Loop over blocks
   #
   fluxes = ty_fluxes_broadband(FT)
+  nblocks_iterations==nothing && (nblocks_iterations = nblocks)
 
-  for b = 1:1#nblocks_iterations
+  for b = 1:nblocks_iterations
+@show ("iteration # ",b," of ", nblocks_iterations)
     fluxes.flux_up = flux_up[:,:,b]
     fluxes.flux_dn = flux_dn[:,:,b] 
 
-#@show sfc_t[:,b]
+    for icol = 1:block_size
+      for ibnd = 1:nbnd
+        sfc_emis_spec[ibnd,icol] = sfc_emis[icol,b]
+      end
+    end
+
     gas_optics!(k_dist,
                 p_lay[:,:,b],
                 p_lev[:,:,b],
@@ -301,6 +308,14 @@ function run_driver(nblocks_iterations=nothing)
 
     rte_lw!(optical_props,top_at_1,source,sfc_emis_spec,fluxes,nothing,n_quad_angles)
   end
+
+@show("size(fluxes.flux_up) = ", size(fluxes.flux_up))
+@show("size(fluxes.flux_dn) = ", size(fluxes.flux_dn))
+@show("fluxes.flux_up / flux_up[:,:,1]  = ")
+@show("======================")
+#@show(flux_up[:,:,1])
+@show(fluxes.flux_up)
+
 
 #  nblocks_iterations==nothing && (nblocks_iterations = nblocks)
 #  for b = 1:nblocks_iterations

@@ -215,50 +215,27 @@ contains =#
     #
     # Compute the radiative transfer...
     #
-#    select type (optical_props)
-#      class is (ty_optical_props_1scl)
-#        #
-#        # No scattering two-stream calculation
-#        #
-#        #$acc enter data copyin(optical_props%tau)
-#        error_msg =  optical_props%validate()
-#        if(len_trim(error_msg) > 0) return
-#        call lw_solver_noscat_GaussQuad(ncol, nlay, ngpt, logical(top_at_1, wl), &
-#                              n_quad_angs, gauss_Ds(1:n_quad_angs,n_quad_angs), gauss_wts(1:n_quad_angs,n_quad_angs), &
-#                              optical_props%tau,                                                  &
-#                              sources%lay_source, sources%lev_source_inc, sources%lev_source_dec, &
-#                              sfc_emis_gpt, sources%sfc_source,  &
-#                              gpt_flux_up, gpt_flux_dn)
-#        #$acc exit data delete(optical_props%tau)
-#      class is (ty_optical_props_2str)
-#        #
-#        # two-stream calculation with scattering
-#        #
-#        #$acc enter data copyin(optical_props%tau, optical_props%ssa, optical_props%g)
-#        error_msg =  optical_props%validate()
-#        if(len_trim(error_msg) > 0) return
-#        call lw_solver_2stream(ncol, nlay, ngpt, logical(top_at_1, wl), &
-#                               optical_props%tau, optical_props%ssa, optical_props%g,              &
-#                               sources%lay_source, sources%lev_source_inc, sources%lev_source_dec, &
-#                               sfc_emis_gpt, sources%sfc_source,       &
-#                               gpt_flux_up, gpt_flux_dn)
-#        #$acc exit data delete(optical_props%tau, optical_props%ssa, optical_props%g)
-#      class is (ty_optical_props_nstr)
-#        #
-#        # n-stream calculation
-#        #
-#        error_msg = 'lw_solver(...ty_optical_props_nstr...) not yet implemented'
-#    end select
 
-#    if (error_msg /= '') return
-#    #
-#    # ...and reduce spectral fluxes to desired output quantities
-#    #
+    if optical_props isa ty_optical_props_1scl
+
+      # No scattering two-stream calculation
+      lw_solver_noscat_GaussQuad!(ncol, nlay, ngpt, top_at_1, 
+                              n_quad_angs, gauss_Ds[1:n_quad_angs,n_quad_angs], gauss_wts[1:n_quad_angs,n_quad_angs], 
+                              optical_props.tau,                                                  
+                              sources.lay_source, sources.lev_source_inc, sources.lev_source_dec, 
+                              sfc_emis_gpt, sources.sfc_source,  
+                              gpt_flux_up, gpt_flux_dn)
+
+    elseif optical_props isa ty_optical_props_2str
+      # two-stream calculation with scattering
+
+    elseif optical_props isa ty_optical_props_nstr
+      # n-stream calculation
+      error("lw_solver(...ty_optical_props_nstr...) not yet implemented")
+    end
 #    error_msg = fluxes%reduce(gpt_flux_up, gpt_flux_dn, optical_props, top_at_1)
-#    #$acc exit data delete(sfc_emis_gpt)
-#    #$acc exit data delete(gpt_flux_up,gpt_flux_dn)
-#    #$acc exit data delete(optical_props)
-#    ##$acc exit data delete(sources%lay_source, sources%lev_source_inc, sources%lev_source_dec, sources%sfc_source,sources)
+
+    reduce!(fluxes,gpt_flux_up, gpt_flux_dn, optical_props, top_at_1)
   end
   #--------------------------------------------------------------------------------------------------------------------
   #
