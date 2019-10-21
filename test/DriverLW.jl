@@ -145,6 +145,10 @@ function run_driver(nblocks_iterations=nothing)
   rfmip_file = joinpath(clear_sky_dir, "multiple_input4MIPs_radiation_RFMIP_UColorado-RFMIP-1-2_none.nc")
 #  kdist_file = joinpath(data_dir, "rrtmgp-data-sw-g224-2018-12-04.nc")
   kdist_file = joinpath(data_dir, "rrtmgp-data-lw-g256-2018-12-04.nc")
+
+  lw_flx_up_for_res_file = joinpath(clear_sky_dir, "rlu_Efx_RTE-RRTMGP-181204_rad-irf_r1i1p1f1_gn.nc") # results from
+  lw_flx_dn_for_res_file = joinpath(clear_sky_dir, "rld_Efx_RTE-RRTMGP-181204_rad-irf_r1i1p1f1_gn.nc") # Fortran code 
+
   ds = Dataset(rfmip_file, "r") # reading the NetCDF file in read only mode
   ds_k_dist = Dataset(kdist_file, "r") # reading the NetCDF file in read only mode
 
@@ -315,6 +319,35 @@ function run_driver(nblocks_iterations=nothing)
   # --------------------------------------------------
   # unblock_and_write!(trim(flxup_file), "rsu", flux_up)
   # unblock_and_write!(trim(flxdn_file), "rsd", flux_dn)
+# reshaping the flux_up and flux_dn arrays for comparison with Fortran code.
+tempu = Array{Float64}(undef,size(flux_up,2),size(flux_up,1),size(flux_up,3))
+tempd = Array{Float64}(undef,size(flux_dn,2),size(flux_dn,1),size(flux_dn,3))
+
+for i = 1:size(flux_up,3)
+  tempu[:,:,i] = transpose( flux_up[:,:,i])
+  tempd[:,:,i] = transpose( flux_dn[:,:,i])
+end
+
+flux_up = reshape(tempu,61,100,18)
+flux_dn = reshape(tempd,61,100,18)
+
+
+# comparing with results from fortran code
+@show lw_flx_up_for_res_file
+  ds_lw_flx_up = Dataset(lw_flx_up_for_res_file, "r") # reading the NetCDF file in read only mode
+  ds_lw_flx_dn = Dataset(lw_flx_dn_for_res_file, "r") # reading the NetCDF file in read only mode
+
+  rlu_for = ds_lw_flx_up["rlu"][:]
+  rld_for = ds_lw_flx_dn["rld"][:]
+
+diff_up = maximum( abs.( flux_up - rlu_for ) )
+diff_dn = maximum( abs.( flux_dn - rld_for ) )
+
+@show diff_up
+@show diff_dn
+
+@test diff_up < 1e-4 && diff_dn < 1e-4
+
 end
 
 
