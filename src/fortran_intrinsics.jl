@@ -22,37 +22,36 @@ export fmerge,
        test_data,
        present
 
-test_data(x::OffsetArray, name) = test_data(reshape([x[:]...], size(x)...), name)
+test_data(x::OffsetArray, args...) = test_data(reshape([x[:]...], size(x)...), args...)
 
-function test_data(x, name)
-  x_correct, s = readdlm(joinpath("..","TestData",name)*".dat", '\t', Float64, header=true, '\n')
+function test_data(x, name, precision = Float64)
+  x_correct, s = readdlm(joinpath("/Users","charliekawczynski","TestData",name)*".dat", '\t', Float64, header=true, '\n')
   s = parse.(Int, filter(i-> i≠"", split(strip(s[1]), " ")))
   x_correct = reshape(x_correct, s...)
   @assert all(size(x_correct) .== size(x))
-  FT = Float32
   x_max = max(x_correct...)
-  d = x .- x_correct
-  if x_max>1
-    d = d ./x_max
-  end
-  ad = abs.(d) .< eps(Float32)
-  # L = sum(abs.(d)) < eps(Float32)
-  L = all(ad)
+  ad = abs.(x .- x_correct)
+  cond = ad .< eps(precision)
+  L = all(cond)
   if !L
     println("\n\n\n\n\n")
     println(" ***************************** Failed comparison: "*name)
+    @show size(ad)
     @show max(x_correct...)
-    @show sum(abs.(d))
-    @show max(abs.(d)...)
+    @show sum(ad)
+    @show max(ad...)
     @show x_correct[1:10]
     @show x[1:10]
-    @show d[1:10]
-    # @show count(ad)
-    # @show count(ad)/length(ad)
+    @show ad[1:10]
+    # @show ad
+    @show count(cond)
+    @show length(cond)
+    @show count(cond)/length(cond)
     @show sum(abs.(x))
     @show sum(abs.(x_correct))
     @show max(abs.(x .- x_correct)...)
     @show sum(abs.(x .- x_correct))
+    error("Done")
   else
     if !occursin("gas_conc",name)
       println(" ----------------------------- Successful comparison: "*name)
@@ -191,7 +190,7 @@ end
 
 
 associated(a::Nothing) = false
-associated(a::Array) = length(a)>0
+associated(a::AbstractArray) = length(a)>0
 allocated(a::Array) = a ≠ nothing
 allocated(a::Nothing) = false
 deallocate!(a) = (a = nothing)
