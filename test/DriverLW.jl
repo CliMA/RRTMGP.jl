@@ -328,8 +328,8 @@ for i = 1:size(flux_up,3)
   tempd[:,:,i] = transpose( flux_dn[:,:,i])
 end
 
-flux_up = reshape(tempu,61,100,18)
-flux_dn = reshape(tempd,61,100,18)
+flux_up = reshape(tempu,nlay+1,ncol,nexp)
+flux_dn = reshape(tempd,nlay+1,ncol,nexp)
 
 
 # comparing with results from fortran code
