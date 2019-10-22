@@ -657,6 +657,15 @@ real(FT) :: planck_function(nbnd,nlay+1,ncol)
                     gpoint_bands, band_lims_gpt,
                     pfracin, temp_ref_min, totplnk_delta, totplnk, gpoint_flavor,
                     sfc_src, lay_src, lev_src_inc, lev_src_dec)
+    FT = eltype(fmajor) #Float64
+
+    pfrac = Array{FT}(undef,ngpt,nlay,ncol)
+    pfrac .= 0.0
+
+    planck_function = Array{FT}(undef,nbnd,nlay+1,ncol)
+    planck_function .= 0.0
+
+    one = FT.([1.0, 1.0])
 
     # Calculation of fraction of band's Planck irradiance associated with each g-point
     for icol in 1:ncol
@@ -667,8 +676,8 @@ real(FT) :: planck_function(nbnd,nlay+1,ncol)
           gptS = band_lims_gpt[1, ibnd]
           gptE = band_lims_gpt[2, ibnd]
           iflav = gpoint_flavor[itropo, gptS] #eta interpolation depends on band's flavor
-          pfrac[gptS:gptE,ilay,icol] =
             # interpolation in temperature, pressure, and eta
+          pfrac[gptS:gptE,ilay,icol] =
             interpolate3D_byflav(FT[1,1], fmajor[:,:,:,iflav,icol,ilay], pfracin,
                           band_lims_gpt[1, ibnd], band_lims_gpt[2, ibnd],
                           jeta[:,iflav,icol,ilay], jtemp[icol,ilay],jpress[icol,ilay]+itropo)
@@ -755,10 +764,10 @@ real(FT) :: frac # fractional term
 """
   function interpolate1D(val, offset, delta, table)
     FT = eltype(delta)
-    res = Vector{FT}(undef, size(table, dim=2))
+    res = Vector{FT}(undef, size(table, 2))
     val0 = (val - offset) / delta
     frac = val0 - fint(val0) # get fractional part
-    index = min(size(table,dim=1)-1, max(1, fint(val0)+1)) # limit the index range
+    index = Integer(min(size(table,1)-1, max(1, fint(val0)+1))) # limit the index range
     res[:] = table[index,:] + frac * (table[index+1,:] - table[index,:])
     return res
   end
@@ -777,7 +786,7 @@ integer, dimension(2),      intent(in) :: jeta # interpolation index for binary 
 real(FT)                             :: res # the result
 """
   function interpolate2D(fminor, k, igpt, jeta, jtemp)
-    res =
+    res = 
       fminor[1,1] * k[igpt, jeta[1]  , jtemp  ] +
       fminor[2,1] * k[igpt, jeta[1]+1, jtemp  ] +
       fminor[1,2] * k[igpt, jeta[2]  , jtemp+1] +
