@@ -46,13 +46,8 @@ module mo_load_coefficients
   scaling_gas_lower               = read_char_vec(ds, "scaling_gas_lower")
   scaling_gas_upper               = read_char_vec(ds, "scaling_gas_upper")
 
-  if haskey(ds,"rayl_lower")
-    rayl_lower         	          = Array{FT}(ds["rayl_lower"][:])
-    rayl_upper         	          = Array{FT}(ds["rayl_upper"][:])
-  else
-    rayl_lower = nothing # []
-    rayl_upper = nothing # []
-  end
+  rayl_lower = haskey(ds,"rayl_lower") ? Array{FT}(ds["rayl_lower"][:]) : nothing
+  rayl_upper = haskey(ds,"rayl_upper") ? Array{FT}(ds["rayl_upper"][:]) : nothing
 
   args = (available_gases,
           gas_names,

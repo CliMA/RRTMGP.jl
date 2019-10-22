@@ -1,7 +1,6 @@
 using Test
 using JRRTMGP
 using NCDatasets
-#using BenchmarkTools
 using JRRTMGP.mo_optical_props
 using JRRTMGP.mo_rte_solver_kernels
 using JRRTMGP.fortran_intrinsics
@@ -39,68 +38,21 @@ using JRRTMGP.mo_source_functions
 #   Check the incoming string, print it out and stop execution if non-empty
 #
 
-# -------------------------------------------------------------------------------------------------
-#
-# Main program
-#
-# -------------------------------------------------------------------------------------------------
-function run_driver(nblocks_iterations=nothing)
-  # --------------------------------------------------
-  #
-  # Modules for working with rte and rrtmgp
-  #
-  # Working precision for real variables
-  #
-  # use mo_rte_kind,           only: FT
-  #
-  # Array utilities
-  #
-  # use mo_util_array,         only: zero_array
+function run_driver(datafolder)
   #
   # Optical properties of the atmosphere as array of values
   #   In the longwave we include only absorption optical depth (_1scl)
   #   Shortwave calculations use optical depth, single-scattering albedo, asymmetry parameter (_2str)
   #
-  # use mo_optical_props,      only: ty_optical_props_2str
-  #
-  # Gas optics: maps physical state of the atmosphere to optical properties
-  #
-  # use mo_gas_optics_rrtmgp,  only: ty_gas_optics_rrtmgp
-  #
-  # Gas optics uses a derived type to represent gas concentrations compactly
-  #
-  # use mo_gas_concentrations, only: ty_gas_concs
-  #
-  # RTE shortwave driver
-  #
-  # use mo_rte_sw,             only: rte_sw
-  #
   # RTE driver uses a derived type to reduce spectral fluxes to whatever the user wants
   #   Here we're just reporting broadband fluxes
   #
-  # use mo_fluxes,             only: ty_fluxes_broadband
-  # --------------------------------------------------
-  #
-  # modules for reading and writing files
-  #
   # RRTMGP's gas optics class needs to be initialized with data read from a netCDF files
   #
-  # use mo_load_coefficients,  only: load_and_init
-  # use mo_rfmip_io,           only: read_size, read_and_block_pt, read_and_block_gases_ty, unblock_and_write, read_and_block_sw_bc, determine_gas_names
-
-#ifdef USE_TIMING
-  #
-  # Timing library
-  #
-  # use gptl,                  only: gptlstart, gptlstop, gptlinitialize, gptlpr, gptlfinalize, gptlsetoption,
-  #                                  gptlpercent, gptloverhead
-#endif
-  # implicit none
   # --------------------------------------------------
   #
   # Local variables
   #
-
 
   # character(len=132) :: flxdn_file, flxup_file
   # integer            :: nargs, ncol, nlay, nbnd, ngpt, nexp, nblocks, block_size, forcing_index
@@ -139,16 +91,17 @@ function run_driver(nblocks_iterations=nothing)
   # Code starts
   #   all arguments are optional
   #
-  pwd()
-  clear_sky_dir = joinpath("..", "src", "examples","rfmip-clear-sky")
-  data_dir = joinpath("..", "src", "rrtmgp","data")
+
+  clear_sky_dir = joinpath(datafolder, "examples","rfmip-clear-sky")
+
   rfmip_file = joinpath(clear_sky_dir, "multiple_input4MIPs_radiation_RFMIP_UColorado-RFMIP-1-2_none.nc")
-#  kdist_file = joinpath(data_dir, "rrtmgp-data-sw-g224-2018-12-04.nc")
-  kdist_file = joinpath(data_dir, "rrtmgp-data-lw-g256-2018-12-04.nc")
+  kdist_file = joinpath(datafolder, "rrtmgp", "data", "rrtmgp-data-lw-g256-2018-12-04.nc")
 
-  lw_flx_up_for_res_file = joinpath(clear_sky_dir, "rlu_Efx_RTE-RRTMGP-181204_rad-irf_r1i1p1f1_gn.nc") # results from
-  lw_flx_dn_for_res_file = joinpath(clear_sky_dir, "rld_Efx_RTE-RRTMGP-181204_rad-irf_r1i1p1f1_gn.nc") # Fortran code 
+  lw_flx_up_for_res_file = joinpath(clear_sky_dir, "rlu_Efx_RTE-RRTMGP-181204_rad-irf_r1i1p1f1_gn.nc") # Results from Fortran code
+  lw_flx_dn_for_res_file = joinpath(clear_sky_dir, "rld_Efx_RTE-RRTMGP-181204_rad-irf_r1i1p1f1_gn.nc") # Results from Fortran code
 
+  ds_lw_flx_up = Dataset(lw_flx_up_for_res_file, "r") # reading the NetCDF file in read only mode
+  ds_lw_flx_dn = Dataset(lw_flx_dn_for_res_file, "r") # reading the NetCDF file in read only mode
   ds = Dataset(rfmip_file, "r") # reading the NetCDF file in read only mode
   ds_k_dist = Dataset(kdist_file, "r") # reading the NetCDF file in read only mode
 
@@ -156,31 +109,23 @@ function run_driver(nblocks_iterations=nothing)
 
   forcing_index = 1
   block_size = 8
-  # error("Done")
 
   #
   # How big is the problem? Does it fit into blocks of the size we've specified?
   #
-  if mod(ncol*nexp, block_size) ≠ 0
-    error("rrtmgp_rfmip_sw: number of columns does not fit evenly into blocks.")
-  end
+  @assert mod(ncol*nexp, block_size) == 0
+
   nblocks = Int((ncol*nexp)/block_size)
   println("Doing $(nblocks) blocks of size $(block_size)")
 
-  # TODO: Fix readme
-  # read(forcing_index_char, "(i4)") forcing_index
-  if (forcing_index < 1 || forcing_index > 3)
-    error("Forcing index is invalid (must be 1,2 or 3)")
-  end
-  flxdn_file = "rld_Efx_RTE-RRTMGP-181204_rad-irf_r1i1p" * string(forcing_index) * "_gn.nc"
-  flxup_file = "rlu_Efx_RTE-RRTMGP-181204_rad-irf_r1i1p" * string(forcing_index) * "_gn.nc"
+  @assert 1 <= forcing_index <= 3
 
   #
   # Identify the set of gases used in the calculation based on the forcing index
   #   A gas might have a different name in the k-distribution than in the files
   #   provided by RFMIP (e.g. 'co2' and 'carbon_dioxide')
   #
-  # names_in_kdist, names_in_file = determine_gas_names(ds_k_dist, forcing_index)
+
   kdist_gas_names, rfmip_gas_games = determine_gas_names(ds_k_dist, forcing_index)
   print("Calculation uses RFMIP gases: ")
   @show rfmip_gas_games
@@ -197,11 +142,6 @@ function run_driver(nblocks_iterations=nothing)
   # Are the arrays ordered in the vertical with 1 at the top or the bottom of the domain?
   #
 
-  # test_data(p_lay, "p_lay")
-  # test_data(p_lev, "p_lev")
-  # test_data(t_lay, "t_lay")
-  # test_data(t_lev, "t_lev")
-
   top_at_1 = p_lay[1, 1, 1] < p_lay[1, nlay, 1]
 
   #
@@ -209,39 +149,20 @@ function run_driver(nblocks_iterations=nothing)
   #
   gas_conc_array = read_and_block_gases_ty(ds, block_size, kdist_gas_names, rfmip_gas_games)
   sfc_emis, sfc_t = read_and_block_lw_bc(ds, block_size)
-#@show ("================sfc_emis=================================", size(sfc_emis))
-#@show ("sfc_emis[:,10] = ")
-#@show sfc_emis[:,10]
-#@show ("=========================================================")
-#@show ("================sfc_t=================================", size(sfc_emis))
-#@show ("sfc_t[:,10] = ")
-#@show sfc_t[:,10]
-#@show ("=========================================================")
-  # test_data(surface_albedo, "surface_albedo")
-  # test_data(total_solar_irradiance, "total_solar_irradiance")
-  # test_data(solar_zenith_angle, "solar_zenith_angle")
 
   #
   # Read k-distribution information. load_and_init() reads data from netCDF and calls
   #   k_dist%init(); users might want to use their own reading methods
   #
   k_dist = load_and_init(ds_k_dist, gas_conc_array[1])
-  if !source_is_internal(k_dist) 
-    error("rrtmgp_rfmip_lw: k-distribution file is not LW")
-  end
 
-  # test_data(k_dist.optical_props.band_lims_wvn, "k_dist_op_band_lims_wvn")
-  # test_data(k_dist.optical_props.gpt2band, "k_dist_op_gpt2band")
-  # test_data(k_dist.optical_props.band2gpt, "k_dist_op_band2gpt")
+  @assert source_is_internal(k_dist)
 
   nbnd = get_nband(k_dist.optical_props)
   ngpt = get_ngpt(k_dist.optical_props)
-@show ("nbnd = ", nbnd)
-@show ("ngpt = ", ngpt)
+  @show ("nbnd = ", nbnd)
+  @show ("ngpt = ", ngpt)
 
-#  toa_flux = Array{FT}(undef, block_size, get_ngpt(k_dist.optical_props))
-#  def_tsi = Array{FT}(undef, block_size)
-#  usecol = Array{Bool}(undef, block_size, nblocks)
   #
   # RRTMGP won't run with pressure less than its minimum. The top level in the RFMIP file
   #   is set to 10^-3 Pa. Here we pretend the layer is just a bit less deep.
@@ -252,19 +173,12 @@ function run_driver(nblocks_iterations=nothing)
   else
     p_lev[:,nlay+1,:] .= get_press_min(k_dist) + eps(FT)
   end
-#@show "==============================================================="
-#@show ("p_lev(:,1,:) = ", size(p_lev[:,1,:]))
-#@show p_lev[:,1,:]
-#@show "==============================================================="
-
-  # test_data(p_lev, "p_lev_2")
 
   #
   # RTE will fail if passed solar zenith angles greater than 90 degree. We replace any with
   #   nighttime columns with a default solar zenith angle. We'll mask these out later, of
   #   course, but this gives us more work and so a better measure of timing.
   #
-  # test_data(usecol, "usecol")
 
   #
   # Allocate space for output fluxes (accessed via pointers in ty_fluxes_broadband),
@@ -274,7 +188,6 @@ function run_driver(nblocks_iterations=nothing)
   flux_up = Array{FT}(undef, block_size, nlay+1, nblocks)
   flux_dn = Array{FT}(undef, block_size, nlay+1, nblocks)
 
-#  mu0 = Array{FT}(undef, block_size)
   sfc_emis_spec = Array{FT}(undef, nbnd,block_size)
 
   optical_props = ty_optical_props_1scl(FT, Int)
@@ -285,10 +198,8 @@ function run_driver(nblocks_iterations=nothing)
   # Loop over blocks
   #
   fluxes = ty_fluxes_broadband(FT)
-  nblocks_iterations==nothing && (nblocks_iterations = nblocks)
 
-  for b = 1:nblocks_iterations
-@show ("iteration # ",b," of ", nblocks_iterations)
+  for b = 1:nblocks
     fup = fluxes.flux_up = @view(flux_up[:,:,b])
     fdn = fluxes.flux_dn = @view(flux_dn[:,:,b])
 
@@ -307,51 +218,42 @@ function run_driver(nblocks_iterations=nothing)
                 optical_props,
                 source,
                 nothing,
-                t_lev[:,:,b]) 
+                t_lev[:,:,b])
 
     rte_lw!(optical_props,top_at_1,source,sfc_emis_spec,fluxes,nothing,n_quad_angles)
     @assert fup === fluxes.flux_up # check if fluxes.flux_up/dn still refers to flux_up[:,:,b]
     @assert fdn === fluxes.flux_dn
 
-#    flux_up[:,:,b] .= fluxes.flux_up[:,:] # this is a safer version, just in case. 
-#    flux_dn[:,:,b] .= fluxes.flux_dn[:,:] 
   end
   # --------------------------------------------------
   # unblock_and_write!(trim(flxup_file), "rsu", flux_up)
   # unblock_and_write!(trim(flxdn_file), "rsd", flux_dn)
-# reshaping the flux_up and flux_dn arrays for comparison with Fortran code.
-tempu = Array{Float64}(undef,size(flux_up,2),size(flux_up,1),size(flux_up,3))
-tempd = Array{Float64}(undef,size(flux_dn,2),size(flux_dn,1),size(flux_dn,3))
 
-for i = 1:size(flux_up,3)
-  tempu[:,:,i] = transpose( flux_up[:,:,i])
-  tempd[:,:,i] = transpose( flux_dn[:,:,i])
-end
+  # reshaping the flux_up and flux_dn arrays for comparison with Fortran code.
+  tempu = Array{Float64}(undef,size(flux_up,2),size(flux_up,1),size(flux_up,3))
+  tempd = Array{Float64}(undef,size(flux_dn,2),size(flux_dn,1),size(flux_dn,3))
 
-flux_up = reshape(tempu,nlay+1,ncol,nexp)
-flux_dn = reshape(tempd,nlay+1,ncol,nexp)
+  for i = 1:size(flux_up,3)
+    tempu[:,:,i] = transpose(flux_up[:,:,i])
+    tempd[:,:,i] = transpose(flux_dn[:,:,i])
+  end
+
+  flux_up = reshape(tempu,nlay+1,ncol,nexp)
+  flux_dn = reshape(tempd,nlay+1,ncol,nexp)
 
 
-# comparing with results from fortran code
-@show lw_flx_up_for_res_file
-  ds_lw_flx_up = Dataset(lw_flx_up_for_res_file, "r") # reading the NetCDF file in read only mode
-  ds_lw_flx_dn = Dataset(lw_flx_dn_for_res_file, "r") # reading the NetCDF file in read only mode
-
+  # comparing with results from fortran code
   rlu_for = ds_lw_flx_up["rlu"][:]
   rld_for = ds_lw_flx_dn["rld"][:]
 
-diff_up = maximum( abs.( flux_up - rlu_for ) )
-diff_dn = maximum( abs.( flux_dn - rld_for ) )
+  diff_up = maximum( abs.( flux_up - rlu_for ) )
+  diff_dn = maximum( abs.( flux_dn - rld_for ) )
 
-@show diff_up
-@show diff_dn
-
-@test diff_up < 1e-4 && diff_dn < 1e-4
+  @test diff_up < 1e-4 && diff_dn < 1e-4
 
 end
 
-
 @testset "Longwave driver" begin
-#  run_driver(1)
-  run_driver()
+  datafolder = JRRTMGP.data_folder_rrtmgp()
+  run_driver(datafolder)
 end

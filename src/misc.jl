@@ -16,8 +16,8 @@ end
 function data_folder_rrtmgp()
   register(DataDep("rte-rrtmgp",
                    "data for rte-rrtmgp repo",
-                   "https://caltech.box.com/shared/static/7uzxzvdvl0hi91eyd1unws8qlojueqq7.gz",
-                   "300a9f398c3239ff8d16adba50d6f8ef87ebf5e32c9308ab6aa3887ba603c55e",
+                   "https://caltech.box.com/shared/static/8x6dsqt9puv8cxsg875dkp45f3g5dvug.gz",
+                   "d3d25ea7c9382fe2016257fe5cb96565da8dc2faa3cd6e3aab6a5503176886dc",
                    post_fetch_method=extract_targz))
   datafolder = datadep"rte-rrtmgp"
   return datafolder
