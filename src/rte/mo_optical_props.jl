@@ -64,7 +64,8 @@ export init!,
        get_band_lims_gpoint,
        get_ncol,
        get_nlay,
-       gpoints_are_equal
+       gpoints_are_equal,
+       is_initialized
 
 export ty_optical_props,
        ty_optical_props_1scl,
@@ -244,12 +245,12 @@ ty_optical_props_nstr(T,I) = ty_optical_props_nstr{T,I}(ntuple(i->nothing, 7)...
     integer,          intent(in) :: ncol, nlay
     character(len=128)           :: err_message
 """
-  function alloc!(this::ty_optical_props_1scl, ncol, nlay)
+  function alloc!(this::ty_optical_props_1scl{FT}, ncol, nlay) where FT
     if any([ncol, nlay] .<= 0)
       error("alloc_only_1scl!: must provide positive extents for ncol, nlay")
     else
       allocated(this.tau) && deallocate!(this.tau)
-      this.tau = Array(undef, ncol, nlay, get_ngpt(this))
+      this.tau = Array{FT}(undef, ncol, nlay, get_ngpt(this))
     end
   end
 
@@ -451,9 +452,9 @@ ty_optical_props_nstr(T,I) = ty_optical_props_nstr{T,I}(ntuple(i->nothing, 7)...
     class(ty_optical_props_1scl), intent(in) :: this
     character(len=128)                       :: err_message
 """
-
   function validate!(this::ty_optical_props_1scl{FT}) where FT
-    !allocated(this) && error("validate: tau not allocated/initialized")
+    !allocated(this.tau) && error("validate: tau not allocated/initialized")
+    # Valid values
     any_vals_less_than(this.tau, FT(0)) && error("validate: tau values out of range")
   end
 

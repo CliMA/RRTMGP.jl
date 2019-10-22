@@ -191,7 +191,7 @@ end
 
 
 associated(a::Nothing) = false
-associated(a::Array) = length(a)>0
+associated(a::AbstractArray) = length(a)>0
 allocated(a::Array) = a ≠ nothing
 allocated(a::Nothing) = false
 deallocate!(a) = (a = nothing)

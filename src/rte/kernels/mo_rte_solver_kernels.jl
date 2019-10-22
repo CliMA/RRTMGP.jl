@@ -93,6 +93,13 @@ integer             :: ilev, igpt, top_level
 function lw_solver_noscat!(ncol, nlay, ngpt, top_at_1, D, weight,
                               tau, lay_source, lev_source_inc, lev_source_dec, sfc_emis, sfc_src,
                               radn_up, radn_dn)
+    FT         = eltype(tau)
+    tau_loc    = Array{FT}(undef,ncol,nlay)
+    trans      = Array{FT}(undef,ncol,nlay)
+    source_up  = Array{FT}(undef,ncol,nlay)
+    source_dn  = Array{FT}(undef,ncol,nlay)
+    source_sfc = Array{FT}(undef,ncol)
+    sfc_albedo = Array{FT}(undef,ncol)
     # Which way is up?
     # Level Planck sources for upward and downward radiation
     # When top_at_1, lev_source_up => lev_source_dec
@@ -106,14 +113,13 @@ function lw_solver_noscat!(ncol, nlay, ngpt, top_at_1, D, weight,
       lev_source_up = lev_source_inc
       lev_source_dn = lev_source_dec
     end
-    FT = eltype(tau)
 
     for igpt in 1:ngpt
       #
       # Transport is for intensity
       #   convert flux at top of domain to intensity assuming azimuthal isotropy
       #
-      radn_dn[:,top_level,igpt] .= radn_dn[:,top_level,igpt]/(FT(2) * π * weight)
+      radn_dn[:,top_level,igpt] .= radn_dn[:,top_level,igpt]./(FT(2) * π * weight)
 
       #
       # Optical path and transmission, used in source function and transport calculations
@@ -131,14 +137,14 @@ function lw_solver_noscat!(ncol, nlay, ngpt, top_at_1, D, weight,
       #
       # Surface albedo, surface source function
       #
-      sfc_albedo[:] .= FT(1) .- sfc_emis[:,igpt]
-      source_sfc[:] .= sfc_emis[:,igpt] .* sfc_src[:,igpt]
+      sfc_albedo .= FT(1) .- sfc_emis[:,igpt]
+      source_sfc .= sfc_emis[:,igpt] .* sfc_src[:,igpt]
       #
       # Transport
       #
       lw_transport_noscat!(ncol, nlay, top_at_1,
                                tau_loc, trans, sfc_albedo, source_dn, source_up, source_sfc,
-                               radn_up[:,:,igpt], radn_dn[:,:,igpt])
+                               @view(radn_up[:,:,igpt]), @view(radn_dn[:,:,igpt]))
       #
       # Convert intensity to flux assuming azimuthal isotropy and quadrature weight
       #
@@ -183,7 +189,10 @@ function lw_solver_noscat_GaussQuad!(ncol, nlay, ngpt, top_at_1, nmus, Ds, weigh
     #
     # For the first angle output arrays store total flux
     #
-    Ds_ncol[:,:] = Ds[1]
+    FT = eltype(tau)
+    Ds_ncol = Array{FT}(undef,ncol,ngpt)
+
+    Ds_ncol .= Ds[1]
     lw_solver_noscat!(ncol, nlay, ngpt,
                       top_at_1, Ds_ncol, weights[1], tau,
                       lay_source, lev_source_inc, lev_source_dec, sfc_emis, sfc_src,
@@ -195,13 +204,13 @@ function lw_solver_noscat_GaussQuad!(ncol, nlay, ngpt, top_at_1, nmus, Ds, weigh
     radn_dn = apply_BC(ncol, nlay, ngpt, top_at_1, flux_dn[:,top_level,:])
 
     for imu in 2:nmus
-      Ds_ncol[:,:] = Ds[imu]
+      Ds_ncol .= Ds[imu]
       lw_solver_noscat!(ncol, nlay, ngpt,
                         top_at_1, Ds_ncol, weights[imu], tau,
                         lay_source, lev_source_inc, lev_source_dec, sfc_emis, sfc_src,
                         radn_up, radn_dn)
-      flux_up[:,:,:] = flux_up[:,:,:] + radn_up[:,:,:]
-      flux_dn[:,:,:] = flux_dn[:,:,:] + radn_dn[:,:,:]
+      flux_up .+= radn_up
+      flux_dn .+= radn_dn
     end
   end
 """
@@ -435,6 +444,8 @@ real(FT), parameter :: tau_thresh = sqrt(epsilon(tau))
 function lw_source_noscat!(ncol, nlay, lay_source, lev_source_up, lev_source_dn, tau, trans,
                               source_dn, source_up)
     FT = eltype(tau)
+    tau_thresh = sqrt(eps(eltype(tau)))
+#    tau_thresh = abs(eps(eltype(tau)))
     for ilay in 1:nlay
       for icol in 1:ncol
       #
@@ -489,15 +500,15 @@ function lw_transport_noscat!(ncol, nlay, top_at_1,
       #
       # Downward propagation
       for ilev in 2:nlay+1
-        radn_dn[:,ilev] = trans[:,ilev-1]*radn_dn[:,ilev-1] + source_dn[:,ilev-1]
+        radn_dn[:,ilev] .= trans[:,ilev-1].*radn_dn[:,ilev-1] .+ source_dn[:,ilev-1]
       end
 
       # Surface reflection and emission
-      radn_up[:,nlay+1] = radn_dn[:,nlay+1]*sfc_albedo[:] + source_sfc[:]
+      radn_up[:,nlay+1] .= radn_dn[:,nlay+1].*sfc_albedo[:] .+ source_sfc[:]
 
       # Upward propagation
       for ilev in nlay:-1:1
-        radn_up[:,ilev] = trans[:,ilev  ]*radn_up[:,ilev+1] + source_up[:,ilev]
+        radn_up[:,ilev] .= trans[:,ilev  ].*radn_up[:,ilev+1] .+ source_up[:,ilev]
       end
     else
       #
@@ -505,15 +516,15 @@ function lw_transport_noscat!(ncol, nlay, top_at_1,
       #
       # Downward propagation
       for ilev in nlay:-1:1
-        radn_dn[:,ilev] = trans[:,ilev  ]*radn_dn[:,ilev+1] + source_dn[:,ilev]
+        radn_dn[:,ilev] .= trans[:,ilev  ].*radn_dn[:,ilev+1] .+ source_dn[:,ilev]
       end
 
       # Surface reflection and emission
-      radn_up[:,     1] = radn_dn[:,     1]*sfc_albedo[:] + source_sfc[:]
+      radn_up[:,     1] .= radn_dn[:,     1].*sfc_albedo[:] .+ source_sfc[:]
 
       # Upward propagation
       for ilev in 2:nlay+1
-        radn_up[:,ilev] = trans[:,ilev-1] * radn_up[:,ilev-1] +  source_up[:,ilev-1]
+        radn_up[:,ilev] .= trans[:,ilev-1] .* radn_up[:,ilev-1] .+  source_up[:,ilev-1]
       end
     end
   end
