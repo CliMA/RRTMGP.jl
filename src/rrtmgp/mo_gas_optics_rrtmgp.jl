@@ -46,7 +46,7 @@ module mo_gas_optics_rrtmgp
   using ..mo_gas_optics # only defines abstract interfaces
   using ..mo_util_reorder
   export gas_optics!, ty_gas_optics_rrtmgp, load_totplnk, load_solar_source
-  export source_is_external, get_press_min
+  export source_is_internal, source_is_external, get_press_min
 
   # -------------------------------------------------------------------------------------------------
   # type, extends(ty_gas_optics), public :: ty_gas_optics_rrtmgp
@@ -190,11 +190,10 @@ module mo_gas_optics_rrtmgp
     # Gas optics
     #
     #$acc enter data create(jtemp, jpress, tropo, fmajor, jeta)
-    compute_gas_taus!(this,
+    jtemp, jpress, jeta, tropo, fmajor = compute_gas_taus!(this,
                      ncol, nlay, ngpt, nband,
                      play, plev, tlay, gas_desc,
                      optical_props,
-                     jtemp, jpress, jeta, tropo, fmajor,
                      col_dry)
 
     # ----------------------------------------------------------
@@ -203,16 +202,16 @@ module mo_gas_optics_rrtmgp
     # input data sizes and values
     #
     check_extent(tsfc, ncol, "tsfc")
-    check_range(tsfc, this%temp_ref_min,  this%temp_ref_max,  "tsfc")
+    check_range(tsfc, this.temp_ref_min,  this.temp_ref_max,  "tsfc")
     if present(tlev)
       check_extent(tlev, (ncol, nlay+1), "tlev")
-      check_range(tlev, this%temp_ref_min, this%temp_ref_max, "tlev")
+      check_range(tlev, this.temp_ref_min, this.temp_ref_max, "tlev")
     end
 
     #
     #   output extents
     #
-    if any([get_ncol(sources), get_nlay(sources), get_ngpt(sources)] .≠ [ncol, nlay, ngpt])
+    if [get_ncol(sources), get_nlay(sources), get_ngpt(sources)] ≠ [ncol, nlay, ngpt]
       error("gas_optics%gas_optics: source function arrays inconsistently sized")
     end
 
@@ -562,6 +561,7 @@ module mo_gas_optics_rrtmgp
     # # Variables for temperature at layer edges [K] (ncol, nlay+1)
     # real(FT), dimension(   ncol,nlay+1), target  :: tlev_arr
     # real(FT), dimension(:,:),            pointer :: tlev_wk
+    FT = eltype(this.vmr_ref) # Float64
 
     lay_source_t = Array{FT}(undef, ngpt,nlay,ncol)
     lev_source_inc_t = Array{FT}(undef, ngpt,nlay,ncol)
@@ -918,7 +918,6 @@ kminor_start_lower                   # kminor_start_atm,
     this.temp_ref  = temp_ref
     this.kmajor    = kmajor
     FT = eltype(kmajor)
-
     # TODO: Check if .neqv. is the same as ≠
     if allocated(rayl_lower) ≠ allocated(rayl_upper)
       error("rayl_lower and rayl_upper must have the same allocation status")
@@ -1060,6 +1059,9 @@ kminor_start_lower                   # kminor_start_atm,
     # class(ty_gas_optics_rrtmgp), intent(in) :: this
     # logical                          :: source_is_internal
     return allocated(this.totplnk) && allocated(this.planck_frac)
+
+#    return size(this.totplnk)>0 && size(this.planck_frac)>0
+
   end
   #--------------------------------------------------------------------------------------------------------------------
   #

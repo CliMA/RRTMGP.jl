@@ -207,18 +207,24 @@ module mo_rfmip_io
       error("read_and_block_lw_bc: number of columns doesn't fit evenly into blocks.")
     end
 
-    nblocks = (ncol_l*nexp_l)/blocksize
+    nblocks = convert(Int,(ncol_l*nexp_l)/blocksize)
 
     #
     # Allocate on assignment
     #
-    surface_emissivity = Array{FT}(ds["surface_emissivity"][:])
-    temp2D = repeat(surface_emissivity,1,nexp_l)
+    temp2D = repeat( FT.(ds["surface_emissivity"][:]) ,1,nexp_l)
     surface_emissivity  = reshape(temp2D,blocksize,nblocks)
 
-    surface_temperature = Array{FT}(ds["surface_temperature"][:])
-    temp2D = repeat(surface_temperature,1,nexp_l)
-    surface_temperature = reshape(temp2D,blocksize,nblocks)
+#comment - SK - Actual array size in rfmip file fo surf_temp is ( nsite/ncol x n_exp ) -> (100 x 18)
+# for some reason, fortran code is only reading the first ncol entries.
+# this needs to be revisited
+#    temp2D = repeat(ds["surface_temperature"][:],1,nexp_l)
+#    surface_temperature = reshape(temp2D,blocksize,nblocks)
+
+#    surface_temperature = reshape( ds["surface_temperature"][:], blocksize, nblocks ) # alternate version
+
+    temp2D = repeat(  FT.(ds["surface_temperature"][:][:,1]),1,nexp_l)
+    surface_temperature = reshape( temp2D, blocksize, nblocks )
 
     return surface_emissivity, surface_temperature
   end

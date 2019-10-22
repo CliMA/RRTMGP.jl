@@ -141,10 +141,10 @@ ty_fluxes_broadband(FT) = ty_fluxes_broadband{FT}(ntuple(i->nothing, 4)...)
     # Broadband fluxes - call the kernels
     #
     if associated(this.flux_up    )
-      this.flux_up = sum_broadband(ncol, nlev, ngpt, gpt_flux_up)
+      this.flux_up .= sum_broadband(ncol, nlev, ngpt, gpt_flux_up)
     end
     if associated(this.flux_dn    )
-      this.flux_dn = sum_broadband(ncol, nlev, ngpt, gpt_flux_dn)
+      this.flux_dn .= sum_broadband(ncol, nlev, ngpt, gpt_flux_dn)
     end
     if associated(this.flux_dn_dir)
       this.flux_dn_dir = sum_broadband(ncol, nlev, ngpt, gpt_flux_dn_dir)

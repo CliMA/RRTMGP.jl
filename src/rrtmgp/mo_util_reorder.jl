@@ -20,7 +20,7 @@ module mo_util_reorder
   # implicit none
   # private
   # public :: reorder123x312, reorder123x321
-  export reorder123x312, reorder123x321
+  export reorder123x312!, reorder123x321!
 # contains
   # -------------------------------------------------------------------------------------------------
   #

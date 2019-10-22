@@ -15,10 +15,10 @@
 
 module mo_reorder_kernels
 
-export reorder_123x312_kernel, reorder_123x321_kernel
+export reorder_123x312_kernel!, reorder_123x321_kernel!
 
 # ----------------------------------------------------------------------------
-function reorder_123x312_kernel(d1, d2, d3, array_in, array_out)
+function reorder_123x312_kernel!(d1, d2, d3, array_in, array_out)
 
   for i2 = 1:d2
     for i1 = 1:d1
@@ -30,7 +30,7 @@ function reorder_123x312_kernel(d1, d2, d3, array_in, array_out)
 
 end
 # ----------------------------------------------------------------------------
-function reorder_123x321_kernel(d1, d2, d3, array_in, array_out) & 
+function reorder_123x321_kernel!(d1, d2, d3, array_in, array_out) 
 
   for i1 = 1:d1
     for i2 = 1:d2
