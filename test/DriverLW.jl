@@ -230,26 +230,25 @@ function run_driver(datafolder)
   # unblock_and_write!(trim(flxdn_file), "rsd", flux_dn)
 
   # reshaping the flux_up and flux_dn arrays for comparison with Fortran code.
-  tempu = Array{Float64}(undef,size(flux_up,2),size(flux_up,1),size(flux_up,3))
-  tempd = Array{Float64}(undef,size(flux_dn,2),size(flux_dn,1),size(flux_dn,3))
-
-  for i = 1:size(flux_up,3)
-    tempu[:,:,i] = transpose(flux_up[:,:,i])
-    tempd[:,:,i] = transpose(flux_dn[:,:,i])
-  end
-
-  flux_up = reshape(tempu,nlay+1,ncol,nexp)
-  flux_dn = reshape(tempd,nlay+1,ncol,nexp)
-
+  flux_up = reshape_for_comparison(flux_up, nlay, ncol, nexp)
+  flux_dn = reshape_for_comparison(flux_dn, nlay, ncol, nexp)
 
   # comparing with results from fortran code
   rlu_for = ds_lw_flx_up["rlu"][:]
   rld_for = ds_lw_flx_dn["rld"][:]
 
-  diff_up = maximum( abs.( flux_up - rlu_for ) )
-  diff_dn = maximum( abs.( flux_dn - rld_for ) )
+  diff_up = maximum( abs.( flux_up .- rlu_for ) )
+  diff_dn = maximum( abs.( flux_dn .- rld_for ) )
 
-  @test diff_up < 1e-4 && diff_dn < 1e-4
+  diff_up_ulps = maximum( abs.( flux_up .- rlu_for ) ./ eps.(rlu_for) )
+  diff_dn_ulps = maximum( abs.( flux_dn .- rld_for ) ./ eps.(rld_for) )
+
+  # @show sqrt(1/eps(FT))
+  # @show diff_up, diff_up_ulps, maximum(abs.(rlu_for))
+  # @show diff_dn, diff_dn_ulps, maximum(abs.(rld_for))
+
+  @test diff_up_ulps < sqrt(1/(1e6eps(FT)))
+  @test diff_dn_ulps < sqrt(1/(1e6eps(FT)))
 
 end
 

@@ -146,9 +146,6 @@ module mo_rte_sw
     sfc_alb_dir_gpt = expand_and_transpose(atmos, sfc_alb_dir)
     sfc_alb_dif_gpt = expand_and_transpose(atmos, sfc_alb_dif)
 
-    # test_data(sfc_alb_dir_gpt, "sfc_alb_dir_gpt")
-    # test_data(sfc_alb_dif_gpt, "sfc_alb_dif_gpt")
-
     # ------------------------------------------------------------------------------------
     #
     # Compute the radiative transfer...
@@ -163,7 +160,6 @@ module mo_rte_sw
 
 #    #$acc enter data copyin(inc_flux)
     gpt_flux_dir = apply_BC(ncol, nlay, ngpt, top_at_1,   inc_flux, mu0)
-    # test_data(gpt_flux_dir, "BC_gpt_flux_dir")
 #    #$acc exit data delete(inc_flux)
     if present(inc_flux_dif)
 #      #$acc enter data copyin(inc_flux_dif)
@@ -172,7 +168,6 @@ module mo_rte_sw
     else
       gpt_flux_dn  = apply_BC(ncol, nlay, ngpt, top_at_1, FT)
     end
-    # test_data(gpt_flux_dn, "BC_gpt_flux_dn")
 #    select type (atmos)
       if ( atmos isa ty_optical_props_1scl )
         #
@@ -196,20 +191,10 @@ module mo_rte_sw
 #        #$acc enter data copyin(atmos, atmos%tau, atmos%ssa, atmos%g)
         validate!(atmos)
 
-        # test_data(atmos.tau, "atmos_tau")
-        # test_data(atmos.ssa, "atmos_ssa")
-        # test_data(atmos.g, "atmos_g")
-        # test_data(gpt_flux_dn, "gpt_flux_dn_in")
-        # test_data(gpt_flux_dir, "gpt_flux_dir_in")
-
         sw_solver_2stream!(ncol, nlay, ngpt, top_at_1,
                                atmos.tau, atmos.ssa, atmos.g, mu0,
                                sfc_alb_dir_gpt, sfc_alb_dif_gpt,
                                gpt_flux_up, gpt_flux_dn, gpt_flux_dir)
-
-        # test_data(gpt_flux_up, "gpt_flux_up")
-        # test_data(gpt_flux_dn, "gpt_flux_dn_out")
-        # test_data(gpt_flux_dir, "gpt_flux_dir_out")
 
 #        #$acc exit data delete(atmos%tau, atmos%ssa, atmos%g, atmos)
 #        #$acc exit data delete(sfc_alb_dir_gpt, sfc_alb_dif_gpt)

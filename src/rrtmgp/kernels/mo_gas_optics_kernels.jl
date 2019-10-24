@@ -119,13 +119,6 @@ integer :: icol, ilay, iflav, igases(2), itropo, itemp
       end
     end
 
-    # test_data(vmr_ref, "vmr_ref_interp")
-    # test_data(ftemp, "ftemp")
-    # test_data(jtemp, "jtemp")
-    # test_data(jpress, "jpress")
-    # test_data(tropo, "tropo")
-    # test_data(col_gas, "col_gas")
-
     for ilay in 1:nlay
       for icol in 1:ncol
         # itropo = 1 lower atmosphere; itropo = 2 upper atmosphere
@@ -159,10 +152,6 @@ integer :: icol, ilay, iflav, igases(2), itropo, itemp
         end # iflav
       end # icol,ilay
     end
-    # test_data(col_mix, "col_mix")
-    # test_data(jeta, "jeta")
-    # test_data(fminor, "fminor")
-    # test_data(fmajor, "fmajor")
     return jtemp,fmajor,fminor,col_mix,tropo,jeta,jpress
 
   end
@@ -253,8 +242,6 @@ integer, dimension(ncol,2) :: itropo_lower, itropo_upper
     top_at_1 = play[1,1] < play[1, nlay]
     itropo_lower = Array{Int}(undef, ncol, 2)
     itropo_upper = similar(itropo_lower)
-    # test_data(tropo, "tropo_compute_tau_absorption")
-    # test_data(play, "play_compute_tau_absorption")
     if top_at_1
       itropo_lower[:, 1] .= fminloc_wrapper(play, dim=2, mask=tropo)
       itropo_lower[:, 2] .= nlay
@@ -279,12 +266,11 @@ integer, dimension(ncol,2) :: itropo_lower, itropo_upper
     #   itropo_upper(:, 2) = nlay
     # end if
 
-    # test_data(itropo_lower, "itropo_lower")
-    # test_data(itropo_upper, "itropo_upper")
     tau = zeros(FT, ngpt,nlay,ncol)
     # ---------------------
     # Major Species
     # ---------------------
+
     gas_optical_depths_major!(
           ncol,nlay,nbnd,ngpt,        # dimensions
           nflav,neta,npres,ntemp,
@@ -294,16 +280,20 @@ integer, dimension(ncol,2) :: itropo_lower, itropo_upper
           col_mix,fmajor,
           jeta,tropo,jtemp,jpress,
           tau)
-    # test_data(tau, "tau_after_gas_optical_depths_major")
-    # test_data(col_gas, "col_gas_after_gas_optical_depths_major")
-    # test_data(idx_minor_lower, "idx_minor_after_gas_optical_depths_major")
     # ---------------------
     # Minor Species - lower
     # ---------------------
+
     gas_optical_depths_minor!(
-           ncol,nlay,ngpt,              # dimensions
-           ngas,nflav,ntemp,neta,
-           nminorlower,nminorklower,
+           ncol,
+           nlay,
+           ngpt,              # dimensions
+           ngas,
+           nflav,
+           ntemp,
+           neta,
+           nminorlower,
+           nminorklower,
            idx_h2o,
            gpoint_flavor[1,:],
            kminor_lower,
@@ -313,11 +303,14 @@ integer, dimension(ncol,2) :: itropo_lower, itropo_upper
            idx_minor_lower,
            idx_minor_scaling_lower,
            kminor_start_lower,
-           play, tlay,
-           col_gas,fminor,jeta,
-           itropo_lower,jtemp,
-           tau)
-    # test_data(tau, "tau_after_gas_optical_depths_minor_lower")
+           play,
+           tlay,
+           col_gas,
+           fminor,
+           jeta,
+           itropo_lower,
+           jtemp,
+           tau,"1")
     # ---------------------
     # Minor Species - upper
     # ---------------------
@@ -337,8 +330,7 @@ integer, dimension(ncol,2) :: itropo_lower, itropo_upper
            play, tlay,
            col_gas,fminor,jeta,
            itropo_upper,jtemp,
-           tau)
-    # test_data(tau, "tau_after_gas_optical_depths_minor_upper")
+           tau,"2")
     return tau
   end
   # --------------------------------------------------------------------------------------
@@ -444,27 +436,40 @@ integer  :: gptS, gptE
 real(FT), dimension(ngpt) :: tau_minor
 
 """
-  function gas_optical_depths_minor!(ncol,nlay,ngpt,
-                                      ngas,nflav,ntemp,neta,
-                                      nminor,nminork,
-                                      idx_h2o,
-                                      gpt_flv,
-                                      kminor,
-                                      minor_limits_gpt,
-                                      minor_scales_with_density,
-                                      scale_by_complement,
-                                      idx_minor, idx_minor_scaling,
-                                      kminor_start,
-                                      play, tlay,
-                                      col_gas,fminor,jeta,
-                                      layer_limits,jtemp,
-                                      tau)
+  function gas_optical_depths_minor!(ncol,
+                                     nlay,
+                                     ngpt,
+                                     ngas,
+                                     nflav,
+                                     ntemp,
+                                     neta,
+                                     nminor,
+                                     nminork,
+                                     idx_h2o,
+                                     gpt_flv,
+                                     kminor,
+                                     minor_limits_gpt,
+                                     minor_scales_with_density,
+                                     scale_by_complement,
+                                     idx_minor,
+                                     idx_minor_scaling,
+                                     kminor_start,
+                                     play,
+                                     tlay,
+                                     col_gas,
+                                     fminor,
+                                     jeta,
+                                     layer_limits,
+                                     jtemp,
+                                     tau,
+                                     callername)
     #
     # Guard against layer limits being 0 -- that means don't do anything i.e. there are no
     #   layers with pressures in the upper or lower atmosphere respectively
     # First check skips the routine entirely if all columns are out of bounds...
     #
     FT = eltype(tau)
+
     tau_minor = Array{FT}(undef, ngpt)
     if any(layer_limits[:,1] .> 0)
       for imnr in 1:size(scale_by_complement,1) # loop over minor absorbers in each band
@@ -507,8 +512,10 @@ real(FT), dimension(ngpt) :: tau_minor
               tau_minor[gptS:gptE] = scaling *
                                       interpolate2D_byflav(fminor[:,:,iflav,icol,ilay],
                                                            kminor,
-                                                           kminor_start[imnr], kminor_start[imnr]+(gptE-gptS),
-                                                           jeta[:,iflav,icol,ilay], jtemp[icol,ilay])
+                                                           kminor_start[imnr],
+                                                           kminor_start[imnr]+(gptE-gptS),
+                                                           jeta[:,iflav,icol,ilay],
+                                                           jtemp[icol,ilay])
               tau[gptS:gptE,ilay,icol] = tau[gptS:gptE,ilay,icol] + tau_minor[gptS:gptE]
             end
           end
