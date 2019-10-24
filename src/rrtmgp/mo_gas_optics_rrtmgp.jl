@@ -289,8 +289,6 @@ module mo_gas_optics_rrtmgp
                      optical_props,
                      col_dry)
 
-    # test_data(jeta, "jeta")
-    # test_data(fmajor, "fmajor")
     #$acc exit data delete(jtemp, jpress, tropo, fmajor, jeta)
 
     # ----------------------------------------------------------
@@ -374,9 +372,8 @@ module mo_gas_optics_rrtmgp
     #
     use_rayl = allocated(this.krayl)
     # Check for initialization
-    if !is_initialized(this.optical_props)
-      error("ERROR: spectral configuration not loaded")
-    end
+    @assert is_initialized(this.optical_props)
+
     #
     # Check for presence of key species in ty_gas_concs; return error if any key species are not present
     #
@@ -410,17 +407,14 @@ module mo_gas_optics_rrtmgp
     #
     # Fill out the array of volume mixing ratios
     #
-    # error("Done")
     for igas in 1:ngas
       #
       # Get vmr if  gas is provided in ty_gas_concs
       #
-      # if any(lower_case(this.gas_names[igas]) == gas_desc.gas_name[:])
       if lowercase(this.gas_names[igas]) in gas_desc.gas_name
          vmr[:,:,igas] = get_vmr(gas_desc, this.gas_names[igas])
       end
     end
-    # test_data(vmr, "vmr_after_get")
 
     #
     # Compute dry air column amounts (number of molecule per cm^2) if user hasn't provided them
@@ -440,25 +434,10 @@ module mo_gas_optics_rrtmgp
       col_gas[1:ncol,1:nlay,igas] .= vmr[1:ncol,1:nlay,igas] .* col_dry_wk[1:ncol,1:nlay]
     end
 
-    if present(col_dry)
-      # test_data(col_dry, "col_dry")
-    end
-    # test_data(col_dry_arr, "col_dry_arr")
-    # test_data(col_dry_wk, "col_dry_wk")
-    # test_data(vmr, "vmr_local")
-    # test_data(col_gas, "col_gas")
-
-
     #
     # ---- calculate gas optical depths ----
     #
-    #$acc enter data create(jtemp, jpress, jeta, tropo, fmajor)
-    #$acc enter data create(tau, tau_rayleigh)
-    #$acc enter data create(col_mix, fminor)
-    #$acc enter data copyin(play, tlay, col_gas)
-    #$acc enter data copyin(this)
-    #$acc enter data copyin(this%gpoint_flavor)
-    zero_array!(tau)
+    tau .= 0
     jtemp,fmajor,fminor,col_mix,tropo,jeta,jpress = interpolation(
             ncol,nlay,                        # problem dimensions
             ngas, nflav, neta, npres, ntemp,  # interpolation dimensions
@@ -501,7 +480,7 @@ module mo_gas_optics_rrtmgp
             play,tlay,col_gas,
             jeta,jtemp,jpress)
     if allocated(this.krayl)
-      #$acc enter data attach(col_dry_wk) copyin(this%krayl)
+
       compute_tau_rayleigh!(          #Rayleigh scattering optical depths
             ncol,nlay,nband,ngpt,
             ngas,nflav,neta,npres,ntemp,  # dimensions
@@ -511,18 +490,12 @@ module mo_gas_optics_rrtmgp
             idx_h2o, col_dry_wk,col_gas,
             fminor,jeta,tropo,jtemp,      # local input
             tau_rayleigh)
-      #$acc exit data detach(col_dry_wk) delete(this%krayl)
+
     end
 
     # Combine optical depths and reorder for radiative transfer solver.
-    # test_data(tau_rayleigh, "tau_rayleigh")
-    # test_data(tau, "tau_before_CAR")
     combine_and_reorder!(tau, tau_rayleigh, allocated(this.krayl), optical_props)
-    #$acc exit data delete(tau, tau_rayleigh)
-    #$acc exit data delete(play, tlay, col_gas)
-    #$acc exit data delete(col_mix, fminor)
-    #$acc exit data delete(this%gpoint_flavor)
-    #$acc exit data copyout(jtemp, jpress, jeta, tropo, fmajor)
+
     return jtemp, jpress, jeta, tropo, fmajor
   end
   #------------------------------------------------------------------------------------------
@@ -637,36 +610,6 @@ module mo_gas_optics_rrtmgp
   # This interface is for the internal-sources object -- includes Plank functions and fractions
   #
   function load_totplnk(totplnk, planck_frac, rayl_lower, rayl_upper, args...) #result(err_message)
-    # class(ty_gas_optics_rrtmgp),     intent(inout) :: this
-    # class(ty_gas_concs),                    intent(in   ) :: available_gases # Which gases does the host model have available?
-    # character(len=*),   dimension(:),       intent(in   ) :: gas_names
-    # integer,            dimension(:,:,:),   intent(in   ) :: key_species
-    # integer,            dimension(:,:),     intent(in   ) :: band2gpt
-    # real(FT),           dimension(:,:),     intent(in   ) :: band_lims_wavenum
-    # real(FT),           dimension(:),       intent(in   ) :: press_ref, temp_ref
-    # real(FT),                               intent(in   ) :: press_ref_trop, temp_ref_p, temp_ref_t
-    # real(FT),           dimension(:,:,:),   intent(in   ) :: vmr_ref
-    # real(FT),           dimension(:,:,:,:), intent(in   ) :: kmajor
-    # real(FT),           dimension(:,:,:),   intent(in   ) :: kminor_lower, kminor_upper
-    # real(FT),           dimension(:,:),     intent(in   ) :: totplnk
-    # real(FT),           dimension(:,:,:,:), intent(in   ) :: planck_frac
-    # real(FT),           dimension(:,:,:),   intent(in   ),
-    #                                           allocatable :: rayl_lower, rayl_upper
-    # character(len=*),   dimension(:),       intent(in   ) :: gas_minor,identifier_minor
-    # character(len=*),   dimension(:),       intent(in   ) :: minor_gases_lower,
-    #                                                          minor_gases_upper
-    # integer,            dimension(:,:),     intent(in   ) :: minor_limits_gpt_lower,
-    #                                                          minor_limits_gpt_upper
-    # logical(wl),        dimension(:),       intent(in   ) :: minor_scales_with_density_lower,
-    #                                                          minor_scales_with_density_upper
-    # character(len=*),   dimension(:),       intent(in   ) :: scaling_gas_lower,
-    #                                                          scaling_gas_upper
-    # logical(wl),        dimension(:),       intent(in   ) :: scale_by_complement_lower,
-    #                                                          scale_by_complement_upper
-    # integer,            dimension(:),       intent(in   ) :: kminor_start_lower,
-    #                                                          kminor_start_upper
-    # character(len = 128) :: err_message
-    # # ----
     this = init_abs_coeffs(rayl_lower, rayl_upper, args...)
     # Planck function tables
     #
@@ -686,45 +629,6 @@ module mo_gas_optics_rrtmgp
   # This interface is for the external-sources object -- includes TOA source function table
   #
   function load_solar_source(solar_src, rayl_lower, rayl_upper, args...)
-    # class(ty_gas_optics_rrtmgp), intent(inout) :: this
-    # class(ty_gas_concs),                intent(in   ) :: available_gases # Which gases does the host model have available?
-    # character(len=*),
-    #           dimension(:),       intent(in) :: gas_names
-    # integer,  dimension(:,:,:),   intent(in) :: key_species
-    # integer,  dimension(:,:),     intent(in) :: band2gpt
-    # real(FT), dimension(:,:),     intent(in) :: band_lims_wavenum
-    # real(FT), dimension(:),       intent(in) :: press_ref, temp_ref
-    # real(FT),                     intent(in) :: press_ref_trop, temp_ref_p, temp_ref_t
-    # real(FT), dimension(:,:,:),   intent(in) :: vmr_ref
-    # real(FT), dimension(:,:,:,:), intent(in) :: kmajor
-    # real(FT), dimension(:,:,:),   intent(in) :: kminor_lower, kminor_upper
-    # character(len=*),   dimension(:),
-    #                               intent(in) :: gas_minor,
-    #                                             identifier_minor
-    # character(len=*),   dimension(:),
-    #                               intent(in) :: minor_gases_lower,
-    #                                             minor_gases_upper
-    # integer,  dimension(:,:),     intent(in) ::
-    #                                             minor_limits_gpt_lower,
-    #                                             minor_limits_gpt_upper
-    # logical(wl), dimension(:),    intent(in) ::
-    #                                             minor_scales_with_density_lower,
-    #                                             minor_scales_with_density_upper
-    # character(len=*),   dimension(:),intent(in) ::
-    #                                             scaling_gas_lower,
-    #                                             scaling_gas_upper
-    # logical(wl), dimension(:),    intent(in) ::
-    #                                             scale_by_complement_lower,
-    #                                             scale_by_complement_upper
-    # integer,  dimension(:),       intent(in) ::
-    #                                             kminor_start_lower,
-    #                                             kminor_start_upper
-    # real(FT), dimension(:),       intent(in), allocatable :: solar_src
-    #                                                         # allocatable status to change when solar source is present in file
-    # real(FT), dimension(:,:,:), intent(in), allocatable :: rayl_lower, rayl_upper
-    # character(len = 128) err_message
-    # ----
-
     this = init_abs_coeffs(rayl_lower, rayl_upper, args...)
     #
     # Solar source table init
@@ -837,7 +741,6 @@ kminor_start_upper)
     #
     this.gas_names = pack(gas_names, gas_is_present)
 
-    # vmr_ref_red = Array{FT}(undef, size(vmr_ref, 1),0:ngas, size(vmr_ref, 3))
     vmr_ref_red = OffsetArray{FT}(undef, 1:size(vmr_ref, 1),0:ngas, 1:size(vmr_ref, 3))
 
     # Gas 0 is used in single-key species method, set to 1.0 (col_dry)
@@ -847,7 +750,6 @@ kminor_start_upper)
       vmr_ref_red[:,i,:] = vmr_ref[:,idx+1,:]
     end
     this.vmr_ref = vmr_ref_red
-    # test_data(this.vmr_ref, "vmr_ref")
     #
     # Reduce minor arrays so variables only contain minor gases that are available
     # Reduce size of minor Arrays
@@ -879,10 +781,6 @@ kminor_start_lower                   # kminor_start_atm,
 # this.kminor_start_lower               # kminor_start_atm_red
 )
 
-    # test_data(this.kminor_lower, "kminor_lower")
-    # test_data(this.minor_limits_gpt_lower, "minor_limits_gpt_lower")
-    # test_data(this.kminor_start_lower, "kminor_start_lower")
-
     this.kminor_upper,
     minor_gases_upper_red,
     this.minor_limits_gpt_upper,
@@ -909,19 +807,14 @@ kminor_start_lower                   # kminor_start_atm,
                              # this.kminor_start_upper
                              )
 
-    # test_data(this.kminor_upper,                    "kminor_upper")
-    # test_data(this.minor_limits_gpt_upper,          "minor_limits_gpt_upper")
-    # test_data(this.kminor_start_upper,              "kminor_start_upper")
-
     # Arrays not reduced by the presence, or lack thereof, of a gas
     this.press_ref = press_ref
     this.temp_ref  = temp_ref
     this.kmajor    = kmajor
     FT = eltype(kmajor)
-    # TODO: Check if .neqv. is the same as ≠
-    if allocated(rayl_lower) ≠ allocated(rayl_upper)
-      error("rayl_lower and rayl_upper must have the same allocation status")
-    end
+
+    @assert allocated(rayl_lower) == allocated(rayl_upper)
+
     if allocated(rayl_lower)
       this.krayl = Array{FT}(undef, size(rayl_lower,1),size(rayl_lower,2),size(rayl_lower,3),2)
       this.krayl[:,:,:,1] = rayl_lower
@@ -941,8 +834,6 @@ kminor_start_lower                   # kminor_start_atm,
     # Get index of gas (if present) for determining col_gas
     this.idx_minor_lower = create_idx_minor(this.gas_names, gas_minor, identifier_minor, minor_gases_lower_red)
     this.idx_minor_upper = create_idx_minor(this.gas_names, gas_minor, identifier_minor, minor_gases_upper_red)
-    # test_data(this.idx_minor_lower, "idx_minor_lower")
-    # test_data(this.idx_minor_lower, "idx_minor_lower")
     # Get index of gas (if present) that has special treatment in density scaling
     this.idx_minor_scaling_lower = create_idx_minor_scaling(this.gas_names, scaling_gas_lower_red)
     this.idx_minor_scaling_upper = create_idx_minor_scaling(this.gas_names, scaling_gas_upper_red)
@@ -951,14 +842,11 @@ kminor_start_lower                   # kminor_start_atm,
     # Reduce (remap) key_species list; checks that all key gases are present in incoming
     key_species_red,key_species_present_init = create_key_species_reduce(gas_names,this.gas_names, key_species)
     check_key_species_present_init(gas_names,key_species_present_init)
-    # test_data(key_species_red, "key_species_red")
 
     # create flavor list
     this.flavor = create_flavor(key_species_red)
-    # test_data(this.flavor, "flavor")
     # create gpoint_flavor list
     this.gpoint_flavor = create_gpoint_flavor(key_species_red, get_gpoint_bands(this.optical_props), this.flavor)
-    # test_data(this.gpoint_flavor, "gpoint_flavor")
 
     # minimum, maximum reference temperature, pressure -- assumes low-to-high ordering
     #   for T, high-to-low ordering for p
@@ -982,7 +870,6 @@ kminor_start_lower                   # kminor_start_atm,
         end
       end
     end
-    # test_data(this.is_key, "is_key")
     return this
 
   end
