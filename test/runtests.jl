@@ -3,8 +3,8 @@ using Test
 # include("AutoRunRRTMGP.jl")
 for submodule in [
                   "DataDeps",
-                  "DriverSW",
-                  "DriverLW",
+                  "rfmip_clear_sky_sw",
+                  "rfmip_clear_sky_lw",
                   ]
 
   println("Testing $submodule")
