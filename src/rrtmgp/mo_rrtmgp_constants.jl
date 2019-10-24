@@ -37,7 +37,7 @@ module mo_rrtmgp_constants
   k_boltz(::Type{FT}) where FT = FT(1.380649e-23)
 
   #  molecular weight of water [kg/mol]
-  m_h2o(::Type{FT}) where FT = FT( 0.018016)
+  m_h2o(::Type{FT}) where FT = FT(0.018016)
 
   # Avogadro's number [molec/mol]
   avogad(::Type{FT}) where FT = FT(6.02214076e23)

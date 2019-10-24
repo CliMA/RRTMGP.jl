@@ -385,7 +385,6 @@ module mo_rfmip_io
     # ORIGINAL: exp_num = reshape(spread([(b, b = 1, nexp_l)], 1, ncopies = ncol_l), shape = [blocksize, nblocks], order=[1,2])
 
     exp_num = freshape(spread(convert(Array,collect(1:nexp_l)'), 1, ncol_l), [blocksize, nblocks], order=[1,2])
-    # test_data(exp_num, "exp_num")
 
 
 #    if(nf90_open(trim(fileName), NF90_NOWRITE, ncid) /= NF90_NOERR) &
@@ -399,7 +398,6 @@ module mo_rfmip_io
 
     water_vapor = Array{FT}(ds["water_vapor"][:])
     gas_conc_temp_3d = reshape(water_vapor, nlay_l, blocksize, nblocks ) .* read_scaling(ds,"water_vapor")
-    # test_data(gas_conc_temp_3d, "water_vapor_gas_conc_temp_3d")
 
     for b = 1:nblocks
       gas_conc_temp_3d_t = transpose(gas_conc_temp_3d[:,:,b])
@@ -410,7 +408,6 @@ module mo_rfmip_io
 
     ozone = Array{FT}(ds["ozone"][:])
     gas_conc_temp_3d = reshape(ozone, nlay_l, blocksize, nblocks ) * read_scaling(ds,"ozone")
-    # test_data(gas_conc_temp_3d, "ozone_gas_conc_temp_3d")
 
     for b = 1:nblocks
       set_vmr!(gas_conc_array[b],"o3", convert(Array, transpose(gas_conc_temp_3d[:,:,b])))

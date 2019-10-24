@@ -289,8 +289,6 @@ module mo_gas_optics_rrtmgp
                      optical_props,
                      col_dry)
 
-    # test_data(jeta, "jeta")
-    # test_data(fmajor, "fmajor")
     #$acc exit data delete(jtemp, jpress, tropo, fmajor, jeta)
 
     # ----------------------------------------------------------
@@ -417,7 +415,6 @@ module mo_gas_optics_rrtmgp
          vmr[:,:,igas] = get_vmr(gas_desc, this.gas_names[igas])
       end
     end
-    test_data(vmr, "vmr_after_get")
 
     #
     # Compute dry air column amounts (number of molecule per cm^2) if user hasn't provided them
@@ -436,13 +433,6 @@ module mo_gas_optics_rrtmgp
     for igas = 1:ngas
       col_gas[1:ncol,1:nlay,igas] .= vmr[1:ncol,1:nlay,igas] .* col_dry_wk[1:ncol,1:nlay]
     end
-
-    present(col_dry) && test_data(col_dry, "col_dry")
-    test_data(col_dry_arr, "col_dry_arr")
-    test_data(col_dry_wk, "col_dry_wk")
-    test_data(vmr, "vmr_local")
-    test_data(col_gas, "col_gas")
-
 
     #
     # ---- calculate gas optical depths ----
@@ -504,8 +494,6 @@ module mo_gas_optics_rrtmgp
     end
 
     # Combine optical depths and reorder for radiative transfer solver.
-    test_data(tau_rayleigh, "tau_rayleigh")
-    test_data(tau, "tau_before_CAR")
     combine_and_reorder!(tau, tau_rayleigh, allocated(this.krayl), optical_props)
 
     return jtemp, jpress, jeta, tropo, fmajor
@@ -762,7 +750,6 @@ kminor_start_upper)
       vmr_ref_red[:,i,:] = vmr_ref[:,idx+1,:]
     end
     this.vmr_ref = vmr_ref_red
-    test_data(this.vmr_ref, "vmr_ref")
     #
     # Reduce minor arrays so variables only contain minor gases that are available
     # Reduce size of minor Arrays
@@ -794,10 +781,6 @@ kminor_start_lower                   # kminor_start_atm,
 # this.kminor_start_lower               # kminor_start_atm_red
 )
 
-    test_data(this.kminor_lower, "kminor_lower")
-    test_data(this.minor_limits_gpt_lower, "minor_limits_gpt_lower")
-    test_data(this.kminor_start_lower, "kminor_start_lower")
-
     this.kminor_upper,
     minor_gases_upper_red,
     this.minor_limits_gpt_upper,
@@ -823,10 +806,6 @@ kminor_start_lower                   # kminor_start_atm,
                              # this.scale_by_complement_upper,
                              # this.kminor_start_upper
                              )
-
-    test_data(this.kminor_upper,                    "kminor_upper")
-    test_data(this.minor_limits_gpt_upper,          "minor_limits_gpt_upper")
-    test_data(this.kminor_start_upper,              "kminor_start_upper")
 
     # Arrays not reduced by the presence, or lack thereof, of a gas
     this.press_ref = press_ref
@@ -855,8 +834,6 @@ kminor_start_lower                   # kminor_start_atm,
     # Get index of gas (if present) for determining col_gas
     this.idx_minor_lower = create_idx_minor(this.gas_names, gas_minor, identifier_minor, minor_gases_lower_red)
     this.idx_minor_upper = create_idx_minor(this.gas_names, gas_minor, identifier_minor, minor_gases_upper_red)
-    # test_data(this.idx_minor_lower, "idx_minor_lower")
-    # test_data(this.idx_minor_lower, "idx_minor_lower")
     # Get index of gas (if present) that has special treatment in density scaling
     this.idx_minor_scaling_lower = create_idx_minor_scaling(this.gas_names, scaling_gas_lower_red)
     this.idx_minor_scaling_upper = create_idx_minor_scaling(this.gas_names, scaling_gas_upper_red)
@@ -865,14 +842,11 @@ kminor_start_lower                   # kminor_start_atm,
     # Reduce (remap) key_species list; checks that all key gases are present in incoming
     key_species_red,key_species_present_init = create_key_species_reduce(gas_names,this.gas_names, key_species)
     check_key_species_present_init(gas_names,key_species_present_init)
-    test_data(key_species_red, "key_species_red")
 
     # create flavor list
     this.flavor = create_flavor(key_species_red)
-    test_data(this.flavor, "flavor")
     # create gpoint_flavor list
     this.gpoint_flavor = create_gpoint_flavor(key_species_red, get_gpoint_bands(this.optical_props), this.flavor)
-    test_data(this.gpoint_flavor, "gpoint_flavor")
 
     # minimum, maximum reference temperature, pressure -- assumes low-to-high ordering
     #   for T, high-to-low ordering for p
@@ -896,7 +870,6 @@ kminor_start_lower                   # kminor_start_atm,
         end
       end
     end
-    test_data(this.is_key, "is_key")
     return this
 
   end

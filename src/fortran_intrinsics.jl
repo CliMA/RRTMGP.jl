@@ -24,14 +24,28 @@ export fmerge,
 
 test_data(x::OffsetArray, args...) = test_data(reshape([x[:]...], size(x)...), args...)
 
-function test_data(x, name, precision = Float64)
-  x_correct, s = readdlm(joinpath("/Users","charliekawczynski","TestData",name)*".dat", '\t', Float64, header=true, '\n')
+function test_data(x, name, tol = nothing)
+  if eltype(x) <: AbstractFloat
+    FT = Float64
+    if eltype(x) ≠ Float64
+      @show eltype(x)
+      error("Data not Float64: $(name)")
+    end
+    tol==nothing && (tol = eps(FT))
+  elseif eltype(x) <: Integer
+    FT = Int64
+    tol = eps(Float64)
+  else
+    @show eltype(x)
+    error("Data not Float64: $(name)")
+  end
+  x_correct, s = readdlm(joinpath("/Users","charliekawczynski","TestData",name)*".dat", '\t', FT, header=true, '\n')
   s = parse.(Int, filter(i-> i≠"", split(strip(s[1]), " ")))
   x_correct = reshape(x_correct, s...)
   @assert all(size(x_correct) .== size(x))
   x_max = max(x_correct...)
   ad = abs.(x .- x_correct)
-  cond = ad .< eps(precision)
+  cond = ad .< tol
   L = all(cond)
   if !L
     println("\n\n\n\n\n")
@@ -51,7 +65,7 @@ function test_data(x, name, precision = Float64)
     @show sum(abs.(x_correct))
     @show max(abs.(x .- x_correct)...)
     @show sum(abs.(x .- x_correct))
-    error("Done")
+    error("Failed comparison in test_data")
   else
     if !occursin("gas_conc",name)
       println(" ----------------------------- Successful comparison: "*name)
