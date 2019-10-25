@@ -388,7 +388,11 @@ function cloud_optics(this::ty_cloud_optics{FT},
     clouds_liq.ssa = compute_from_table(ncol,nlay,nbnd,liqmsk,reliq,this.liq_nsteps,this.liq_step_size,this.radliq_lwr, this.lut_ssaliq)
     clouds_liq.g   = compute_from_table(ncol,nlay,nbnd,liqmsk,reliq,this.liq_nsteps,this.liq_step_size,this.radliq_lwr, this.lut_asyliq)
     for ibnd = 1:nbnd
-      where(liqmsk) clouds_liq.tau[1:ncol,1:nlay,ibnd] .= clouds_liq.tau[1:ncol,1:nlay,ibnd] .* clwp[1:ncol,1:nlay]
+      for icol in 1:ncol
+        for ilay in 1:nlay
+          liqmsk[icol,ilay] && (clouds_liq.tau[icol,ilay,ibnd] = clouds_liq.tau[icol,ilay,ibnd] * clwp[icol,ilay])
+        end
+      end
     end
     #
     # Ice
@@ -397,7 +401,11 @@ function cloud_optics(this::ty_cloud_optics{FT},
     clouds_ice%ssa = compute_from_table(ncol,nlay,nbnd,icemsk,reice,this.ice_nsteps,this.ice_step_size,this.radice_lwr, this.lut_ssaice[:,:,this.icergh])
     clouds_ice%g   = compute_from_table(ncol,nlay,nbnd,icemsk,reice,this.ice_nsteps,this.ice_step_size,this.radice_lwr, this.lut_asyice[:,:,this.icergh])
     for ibnd = 1:nbnd
-      where(icemsk) clouds_ice.tau[1:ncol,1:nlay,ibnd] .= clouds_ice.tau[1:ncol,1:nlay,ibnd] .* ciwp[1:ncol,1:nlay]
+      for icol in 1:ncol
+        for ilay in 1:nlay
+          icemsk[icol,ilay] && (clouds_ice.tau[icol,ilay,ibnd] = clouds_ice.tau[icol,ilay,ibnd] * ciwp[icol,ilay])
+        end
+      end
     end
   else
     #
@@ -412,7 +420,11 @@ function cloud_optics(this::ty_cloud_optics{FT},
     clouds_liq.ssa = FT(1) - max(FT(0), compute_from_pade(ncol,nlay,nbnd,liqmsk,reliq,nsizereg,this.pade_sizreg_ssaliq,2,2,this.pade_ssaliq))
     clouds_liq.g   =                    compute_from_pade(ncol,nlay,nbnd,liqmsk,reliq,nsizereg,this.pade_sizreg_asyliq,2,2,this.pade_asyliq)
     for ibnd = 1:nbnd
-      where(liqmsk) clouds_liq.tau[1:ncol,1:nlay,ibnd] = clouds_liq.tau[1:ncol,1:nlay,ibnd] * clwp[1:ncol,1:nlay]
+      for icol in 1:ncol
+        for ilay in 1:nlay
+          liqmsk[icol,ilay] && (clouds_liq.tau[icol,ilay,ibnd] = clouds_liq.tau[icol,ilay,ibnd] * clwp[icol,ilay])
+        end
+      end
     end
     #
     # Ice
@@ -421,95 +433,75 @@ function cloud_optics(this::ty_cloud_optics{FT},
     clouds_ice.ssa = FT(1) - max(FT(0), compute_from_pade(ncol,nlay,nbnd,icemsk,reice,nsizereg,this.pade_sizreg_ssaice,2,2, this.pade_ssaice[:,:,:,this.icergh]))
     clouds_ice.g   =                    compute_from_pade(ncol,nlay,nbnd,icemsk,reice,nsizereg,this.pade_sizreg_asyice,2,2, this.pade_asyice[:,:,:,this.icergh])
     for ibnd = 1:nbnd
-      where(icemsk) clouds_ice.tau[1:ncol,1:nlay,ibnd] = clouds_ice.tau[1:ncol,1:nlay,ibnd] * ciwp[1:ncol,1:nlay]
+      for icol in 1:ncol
+        for ilay in 1:nlay
+          icemsk[icol,ilay] && (clouds_ice.tau[icol,ilay,ibnd] = clouds_ice.tau[icol,ilay,ibnd] * ciwp[icol,ilay])
+        end
+      end
     end
   end
 
   #
   # Combine liquid and ice contributions into total cloud optical properties
   #
- error_msg = clouds_ice%increment(clouds_liq)
+ increment!(clouds_ice, clouds_liq)
  #
  # Copy total cloud properties onto outputs
  #
- select type(optical_props)
- type is (ty_optical_props_1scl)
-   optical_props%tau(1:ncol,1:nlay,1:nbnd) = clouds_liq%tau(1:ncol,1:nlay,1:nbnd) *
-                                    (1._wp - clouds_liq%ssa(1:ncol,1:nlay,1:nbnd))
- type is (ty_optical_props_2str)
-   optical_props%tau(1:ncol,1:nlay,1:nbnd) = clouds_liq%tau(1:ncol,1:nlay,1:nbnd)
-   optical_props%ssa(1:ncol,1:nlay,1:nbnd) = clouds_liq%ssa(1:ncol,1:nlay,1:nbnd)
-   optical_props%g  (1:ncol,1:nlay,1:nbnd) = clouds_liq%g  (1:ncol,1:nlay,1:nbnd)
- type is (ty_optical_props_nstr)
-   optical_props%tau(  1:ncol,1:nlay,1:nbnd) = clouds_liq%tau(1:ncol,1:nlay,1:nbnd)
-   optical_props%ssa(  1:ncol,1:nlay,1:nbnd) = clouds_liq%ssa(1:ncol,1:nlay,1:nbnd)
-   optical_props%p  (1,1:ncol,1:nlay,1:nbnd) = clouds_liq%g  (1:ncol,1:nlay,1:nbnd)
-   do imom = 2, optical_props%get_nmom()
-     optical_props%p(imom,1:ncol,1:nlay,1:nbnd) = clouds_liq%g   (       1:ncol,1:nlay,1:nbnd) *
-                                                  optical_props%p(imom-1,1:ncol,1:nlay,1:nbnd)
+ if optical_props isa ty_optical_props_1scl
+   optical_props.tau[1:ncol,1:nlay,1:nbnd] = clouds_liq.tau[1:ncol,1:nlay,1:nbnd] *
+                                    (FT(1) - clouds_liq.ssa[1:ncol,1:nlay,1:nbnd])
+ elseif optical_props isa ty_optical_props_2str
+   optical_props.tau[1:ncol,1:nlay,1:nbnd] = clouds_liq.tau[1:ncol,1:nlay,1:nbnd]
+   optical_props.ssa[1:ncol,1:nlay,1:nbnd] = clouds_liq.ssa[1:ncol,1:nlay,1:nbnd]
+   optical_props.g[  1:ncol,1:nlay,1:nbnd] = clouds_liq.g[  1:ncol,1:nlay,1:nbnd]
+ elseif optical_props isa ty_optical_props_nstr
+   optical_props.tau[  1:ncol,1:nlay,1:nbnd] = clouds_liq.tau[1:ncol,1:nlay,1:nbnd]
+   optical_props.ssa[  1:ncol,1:nlay,1:nbnd] = clouds_liq.ssa[1:ncol,1:nlay,1:nbnd]
+   optical_props.p[  1,1:ncol,1:nlay,1:nbnd] = clouds_liq.g[  1:ncol,1:nlay,1:nbnd]
+   for imom = 2:get_nmom(optical_props)
+     optical_props.p[imom,1:ncol,1:nlay,1:nbnd] = clouds_liq.g[          1:ncol,1:nlay,1:nbnd] *
+                                                  optical_props.p[imom-1,1:ncol,1:nlay,1:nbnd]
    end
- end select
+ end
 
 end
-#--------------------------------------------------------------------------------------------------------------------
-#
-# Inquiry functions
-#
-#--------------------------------------------------------------------------------------------------------------------
-function set_ice_roughness(this, icergh) result(error_msg)
-  class(ty_cloud_optics), intent(inout) :: this
-  integer,                intent(in   ) :: icergh
-  character(len=128)                    :: error_msg
 
-  error_msg = ""
-  if(icergh < 1)
-    error_msg = "cloud_optics%set_ice_roughness(): must be > 0"
-  if(error_msg ≠ "") return
+"""
+    set_ice_roughness!
 
-  this%icergh = icergh
+"""
+function set_ice_roughness!(this::ty_cloud_optics, icergh)
+  # class(ty_cloud_optics), intent(inout) :: this
+  # integer,                intent(in   ) :: icergh
+  # character(len=128)                    :: error_msg
+
+  icergh < 1 && error("set_ice_roughness!: must be > 0")
+
+  this.icergh = icergh
 end
-#-----------------------------------------------
-function get_num_ice_roughness_types(this) result(i)
-  class(ty_cloud_optics), intent(in   ) :: this
-  integer                               :: i
+
+function get_num_ice_roughness_types(this::ty_cloud_optics)
+  # class(ty_cloud_optics), intent(in   ) :: this
+  # integer                               :: i
 
   i = 0
-  if(allocated(this%pade_extice)) i = size(this%pade_extice, dim=4)
-  if(allocated(this%lut_extice )) i = size(this%lut_extice,  dim=3)
+  allocated(this.pade_extice) && (i = size(this.pade_extice, 4))
+  allocated(this.lut_extice ) && (i = size(this.lut_extice,  3))
+  return i
 end
-#-----------------------------------------------
-function get_min_radius_liq(this) result(r)
-  class(ty_cloud_optics), intent(in   ) :: this
-  real(FT)                              :: r
 
-  r = this%radliq_lwr
-end
-#-----------------------------------------------
-function get_max_radius_liq(this) result(r)
-  class(ty_cloud_optics), intent(in   ) :: this
-  real(FT)                              :: r
+get_min_radius_liq(this::ty_cloud_optics) = this.radliq_lwr
 
-  r = this%radliq_upr
-end
-#-----------------------------------------------
-function get_min_radius_ice(this) result(r)
-  class(ty_cloud_optics), intent(in   ) :: this
-  real(FT)                              :: r
+get_max_radius_liq(this::ty_cloud_optics) = this.radliq_upr
 
-  r = this%radice_lwr
-end
-#-----------------------------------------------
-function get_max_radius_ice(this) result(r)
-  class(ty_cloud_optics), intent(in   ) :: this
-  real(FT)                              :: r
+get_min_radius_ice(this::ty_cloud_optics) = this.radice_lwr
 
-  r = this%radice_upr
-end
-#--------------------------------------------------------------------------------------------------------------------
+get_max_radius_ice(this::ty_cloud_optics) = this.radice_upr
+
 #
 # Ancillary functions
 #
-#--------------------------------------------------------------------------------------------------------------------
 #
 # Linearly interpolate values from a lookup table with "nsteps" evenly-spaced
 #   elements starting at "offset." The table's second dimension is band.
@@ -517,101 +509,103 @@ end
 # We could also try gather/scatter for efficiency
 #
 function compute_from_table(ncol, nlay, nbnd, mask, size, nsteps, step_size, offset, table)
-  integer,                          intent(in) :: ncol, nlay, nbnd, nsteps
-  logical,  dimension(ncol,  nlay), intent(in) :: mask
-  real(FT), dimension(ncol,  nlay), intent(in) :: size
-  real(FT),                         intent(in) :: step_size, offset
-  real(FT), dimension(nsteps,nbnd), intent(in) :: table
-  real(FT), dimension(ncol,nlay,nbnd)          :: compute_from_table
-  # ---------------------------
-  integer  :: icol, ilay, ibnd
-  integer  :: index
-  real(FT) :: fint
-  # ---------------------------
-  do ilay = 1,nlay
-    do icol = 1, ncol
-      if(mask(icol,ilay))
+  # integer,                          intent(in) :: ncol, nlay, nbnd, nsteps
+  # logical,  dimension(ncol,  nlay), intent(in) :: mask
+  # real(FT), dimension(ncol,  nlay), intent(in) :: size
+  # real(FT),                         intent(in) :: step_size, offset
+  # real(FT), dimension(nsteps,nbnd), intent(in) :: table
+  # real(FT), dimension(ncol,nlay,nbnd)          :: compute_from_table
+  # # ---------------------------
+  # integer  :: icol, ilay, ibnd
+  # integer  :: index
+  # real(FT) :: fint
+  # # ---------------------------
+  for ilay = 1:nlay
+    for icol = 1:ncol
+      if(mask[icol,ilay])
         index = min(floor((size(icol,ilay) - offset)/step_size)+1, nsteps-1)
         fint = (size(icol,ilay) - offset)/step_size - (index-1)
-        do ibnd = 1, nbnd
-          compute_from_table(icol,ilay,ibnd) = table(index,  ibnd) +
-                                       fint * (table(index+1,ibnd) - table(index,ibnd))
+        for ibnd = 1:nbnd
+          compute_from_table[icol,ilay,ibnd] = table[index,  ibnd] +
+                                       fint * (table[index+1,ibnd] - table[index,ibnd])
         end
       else
-        do ibnd = 1, nbnd
-          compute_from_table(icol,ilay,ibnd) = FT(0)
+        for ibnd = 1:nbnd
+          compute_from_table[icol,ilay,ibnd] = FT(0)
         end
       end
     end
   end
 end
-#---------------------------------------------------------------------------
+
 #
 # Pade functions
 #
-#---------------------------------------------------------------------------
-function compute_from_pade(ncol, nlay, nbnd, mask, size, nsizes, size_bounds, m, n, pade_coeffs)
-  integer,                        intent(in) :: ncol, nlay, nbnd, nsizes
-  logical,  dimension(ncol,nlay), intent(in) :: mask
-  real(FT), dimension(ncol,nlay), intent(in) :: size
-  real(FT), dimension(nsizes+1),  intent(in) :: size_bounds
-  integer,                        intent(in) :: m, n
-  real(FT), dimension(nbnd,nsizes,0:m+n),
-                                  intent(in) :: pade_coeffs
-  real(FT), dimension(ncol,nlay,nbnd)        :: compute_from_pade
-  # ---------------------------
-  integer  :: icol, ilay, ibnd, irad
 
-  do ilay = 1,nlay
-    do icol = 1, ncol
-      if(mask(icol,ilay))
+function compute_from_pade(ncol, nlay, nbnd, mask, size, nsizes, size_bounds, m, n, pade_coeffs)
+  # integer,                        intent(in) :: ncol, nlay, nbnd, nsizes
+  # logical,  dimension(ncol,nlay), intent(in) :: mask
+  # real(FT), dimension(ncol,nlay), intent(in) :: size
+  # real(FT), dimension(nsizes+1),  intent(in) :: size_bounds
+  # integer,                        intent(in) :: m, n
+  # real(FT), dimension(nbnd,nsizes,0:m+n),
+  #                                 intent(in) :: pade_coeffs
+  # real(FT), dimension(ncol,nlay,nbnd)        :: compute_from_pade
+  # # ---------------------------
+  # integer  :: icol, ilay, ibnd, irad
+
+  for ilay = 1:nlay
+    for icol = 1:ncol
+      if mask[icol,ilay]
         #
         # Finds index into size regime table
         # This works only if there are precisely three size regimes (four bounds) and it's
         #   previously guaranteed that size_bounds(1) <= size <= size_bounds(4)
         #
         irad = min(floor((size(icol,ilay) - size_bounds(2))/size_bounds(3))+2, 3)
-        compute_from_pade(icol,ilay,1:nbnd) =
+        compute_from_pade[icol,ilay,1:nbnd] =
              pade_eval(nbnd, nsizes, m, n, irad, size(icol,ilay), pade_coeffs)
       else
-        do ibnd = 1, nbnd
-          compute_from_pade(icol,ilay,ibnd) = FT(0)
+        for ibnd = 1:nbnd
+          compute_from_pade[icol,ilay,ibnd] = FT(0)
         end
       end
     end
   end
 
 end
-#---------------------------------------------------------------------------
+
 #
 # Evaluate Pade approximant of order [m/n]
 #
-function pade_eval(nbnd, nrads, m, n, irad, re, pade_coeffs)
-  integer,                intent(in) :: nbnd, nrads, m, n, irad
-  real(FT), dimension(nbnd, nrads, 0:m+n),
-                          intent(in) :: pade_coeffs
-  real(FT),               intent(in) :: re
-  real(FT), dimension(nbnd)         :: pade_eval
+function pade_eval(nbnd, nrads, m, n, irad, re, pade_coeffs::AbstractArray{FT}) where FT
+  # integer,                intent(in) :: nbnd, nrads, m, n, irad
+  # real(FT), dimension(nbnd, nrads, 0:m+n),
+  #                         intent(in) :: pade_coeffs
+  # real(FT),               intent(in) :: re
+  # real(FT), dimension(nbnd)         :: pade_eval
 
-  integer :: iband
-  real(FT) :: numer, denom
-  integer  :: i
+  # integer :: iband
+  # real(FT) :: numer, denom
+  # integer  :: i
+  res = Array{FT}(undef, nbnd)
 
-  do iband = 1, nbnd
-    denom = pade_coeffs(iband,irad,n+m)
-    do i = n-1+m, 1+m, -1
-      denom = pade_coeffs(iband,irad,i)+re*denom
+  for iband = 1:nbnd
+    denom = pade_coeffs[iband,irad,n+m]
+    for i = n-1+m:-1:1+m
+      denom = pade_coeffs[iband,irad,i]+re*denom
     end
-    denom =  1._wp                     +re*denom
+    denom =  FT(1)                     +re*denom
 
-    numer = pade_coeffs(iband,irad,m)
-    do i = m-1, 1, -1
-      numer = pade_coeffs(iband,irad,i)+re*numer
+    numer = pade_coeffs[iband,irad,m]
+    for i = m-1:-1:1
+      numer = pade_coeffs[iband,irad,i]+re*numer
     end
-    numer = pade_coeffs(iband,irad,0)  +re*numer
+    numer = pade_coeffs[iband,irad,0]  +re*numer
 
-    pade_eval(iband) = numer/denom
+    res[iband] = numer/denom
   end
+  return res
 end
 
 end
