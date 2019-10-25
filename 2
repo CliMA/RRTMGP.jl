@@ -133,7 +133,11 @@ module mo_gas_optics_rrtmgp
     return size(this.flavor, 2)
   end
   #--------------------------------------------------------------------------------------------------------------------
-"""
+  #
+  # Compute gas optical depth and Planck source functions,
+  #  given temperature, pressure, and composition
+  #
+```
     gas_optics!(this::ty_gas_optics_rrtmgp,
                        play,
                        plev,
@@ -144,27 +148,28 @@ module mo_gas_optics_rrtmgp
                        sources::ty_source_func_lw,
                        col_dry=nothing,
                        tlev=nothing)
-
 Compute gas optical depth and Planck source functions,
 given temperature, pressure, and composition
 
 Inputs
- - this (`ty_gas_optics_rrtmgp` structure)
- - play[ncol,nlay] ->  layer pressures [Pa, mb]
- - plev[ncol,nlay+1] -> level pressures [Pa, mb]
- - tlay[ncol,nlay] ->  layer temperatures [K]
- - tsfc[ncol]  ->      surface skin temperatures [K]
- - `gas_desc`   ->       gas volume mixing ratios (ty_gas_concs structure) 
+
+ - this (ty_gas_optics_rrtmgp structure)
+ - play[ncol,nlay]   layer pressures [Pa, mb]
+ - plev[ncol,nlay+1] level pressures [Pa, mb]
+ - tlay[ncol,nlay]   layer temperatures [K]
+ - tsfc[ncol]        surface skin temperatures [K]
+ - gas_desc          gas volume mixing ratios (ty_gas_concs structure) 
 
 Optional inputs
- - `col_dry`[ncol,nlay] -> column dry amount
- - tlev[ncol,nlay+1]  -> level temperatures [K]
+ - col_dry[ncol,nlay] Column dry amount
+ - tlev[ncol,nlay+1]  level temperatures [K]
 
 Output
- - `optical_props` (`ty_optical_props_arry` structure) Optical properties
- - sources (`ty_source_func_lw`)      Planck sources
-"""
-function gas_optics!(this::ty_gas_optics_rrtmgp,
+ - optical_props (ty_optical_props_arry structure) Optical properties
+ - sources (ty_source_func_lw )      Planck sources
+```
+
+  function gas_optics!(this::ty_gas_optics_rrtmgp,
                        play,
                        plev,
                        tlay,
@@ -227,45 +232,45 @@ function gas_optics!(this::ty_gas_optics_rrtmgp,
            sources,
            tlev)
     #$acc exit data delete(jtemp, jpress, tropo, fmajor, jeta)
-end
+  end
   #------------------------------------------------------------------------------------------
-"""
-    gas_optics!(this::ty_gas_optics_rrtmgp,
+  #
+  # Compute gas optical depth given temperature, pressure, and composition
+  #
+  function gas_optics!(this::ty_gas_optics_rrtmgp,
                        play,
                        plev,
                        tlay,
                        gas_desc::ty_gas_concs,    # mandatory inputs
                        optical_props::ty_optical_props_arry,
                        toa_src,        # mandatory outputs
-                       col_dry=nothing)
+                       col_dry=nothing) # result(error_msg)      # optional input
 
-Compute gas optical depth given temperature, pressure, and composition
+    # class(ty_gas_optics_rrtmgp), intent(in) :: this
+    # real(FT), dimension(:,:), intent(in   ) :: play,    # layer pressures [Pa, mb]; (ncol,nlay)
+    #                                            plev,    # level pressures [Pa, mb]; (ncol,nlay+1)
+    #                                            tlay      # layer temperatures [K]; (ncol,nlay)
+    # type(ty_gas_concs),       intent(in   ) :: gas_desc  # Gas volume mixing ratios
+    # # output
+    # class(ty_optical_props_arry),
+    #                           intent(inout) :: optical_props
+    # real(FT), dimension(:,:), intent(  out) :: toa_src     # Incoming solar irradiance(ncol,ngpt)
+    # character(len=128)                      :: error_msg
 
-Inputs
- - this (`ty_gas_optics_rrtmgp` structure)
- - play[ncol,nlay] -> layer pressures [Pa, mb]
- - plev[ncol,nlay+1] -> level pressures [Pa, mb]
- - tlay[ncol,nlay] -> layer temperatures [K]
- - `gas_desc` (`ty_gas_concs` structure) -> gas volume mixing ratios
-
-Optional inputs
- - `col_dry`[ncol,nlay] -> column dry amount
-   
-Outputs
- - `optical_props` (`ty_optical_props_arry` structure)
- - `toa_src`[ncol,ngpt] -> incoming solar irradiance
-"""
-function gas_optics!(this::ty_gas_optics_rrtmgp,
-                     play,
-                     plev,
-                     tlay,
-                     gas_desc::ty_gas_concs,    # mandatory inputs
-                     optical_props::ty_optical_props_arry,
-                     toa_src,        # mandatory outputs
-                     col_dry=nothing) # result(error_msg)      # optional input
-
-
+    # Optional inputs
+    # real(FT), dimension(:,:), intent(in   ),
+    #                        optional, target :: col_dry # Column dry amount; dim(ncol,nlay)
     # ----------------------------------------------------------
+    # Local variables
+    # Interpolation coefficients for use in source function
+    # integer,     dimension(size(play,dim=1), size(play,dim=2)) :: jtemp, jpress
+    # logical(wl), dimension(size(play,dim=1), size(play,dim=2)) :: tropo
+    # real(FT),    dimension(2,2,2,get_nflav(this),size(play,dim=1), size(play,dim=2)) :: fmajor
+    # integer,     dimension(2,    get_nflav(this),size(play,dim=1), size(play,dim=2)) :: jeta
+
+    # integer :: ncol, nlay, ngpt, nband, ngas, nflav
+    # integer :: igpt, icol
+    # # ----------------------------------------------------------
 
     FT = eltype(play)
 
@@ -304,42 +309,12 @@ function gas_optics!(this::ty_gas_optics_rrtmgp,
           toa_src[icol,igpt] = this.solar_src[igpt]
        end
     end
-end
+  end
   #------------------------------------------------------------------------------------------
-"""
-    compute_gas_taus!(this::ty_gas_optics_rrtmgp,
-                            ncol, nlay, ngpt, nband,
-                            play, plev, tlay, gas_desc::ty_gas_concs,
-                            optical_props::ty_optical_props_arry,
-                            col_dry=nothing) # result(error_msg)
- 
-Returns optical properties and interpolation coefficients
-
-Inputs
-
- - this -> structure `ty_gas_optics_rrtmgp`
- - ncol -> number of columns
- - nlay -> number of layers
- - ngpt -> number of g-points
- - nband -> number of bands
- - play[ncol,nlay] -> layer pressures [Pa, mb]
- - plev[ncol,nlay+1] -> level pressures [Pa, mb]
- - tlay[ncol,nlay] -> layer temperatures [K]
- - `gas_desc`-> (structure `ty_gas_concs`) Gas volume mixing ratios
-
-Optional inputs
-
- - col_dry[ncol,nlay] -> Column dry amount
-
-Outputs
-Interpolation coefficients for use in internal source function
- - jtemp[ncol,nlay] -> interpolation index for temperature
- - jpress[ncol,nlay] -> interpolation index for pressure
- - jeta[2, get_nflav(this),ncol,nlay] -> interpolation index for eta
- - tropo[ncol,nlay] 
- - fmajor[2,2,2,get_nflav(this),ncol, nlay]
-"""
-function compute_gas_taus!(this::ty_gas_optics_rrtmgp,
+  #
+  # Returns optical properties and interpolation coefficients
+  #
+  function compute_gas_taus!(this::ty_gas_optics_rrtmgp,
                             ncol, nlay, ngpt, nband,
                             play, plev, tlay, gas_desc::ty_gas_concs,
                             optical_props::ty_optical_props_arry,
@@ -352,7 +327,6 @@ function compute_gas_taus!(this::ty_gas_optics_rrtmgp,
     #                                                    plev,    # level pressures [Pa, mb]; (ncol,nlay+1)
     #                                                    tlay      # layer temperatures [K]; (ncol,nlay)
     # type(ty_gas_concs),               intent(in   ) :: gas_desc  # Gas volume mixing ratios
-
     # class(ty_optical_props_arry),     intent(inout) :: optical_props #inout because components are allocated
     # # Interpolation coefficients for use in internal source function
     # integer,     dimension(                       ncol, nlay), intent(  out) :: jtemp, jpress
@@ -364,6 +338,30 @@ function compute_gas_taus!(this::ty_gas_optics_rrtmgp,
     # Optional inputs
     # real(FT), dimension(:,:), intent(in   ),
     #                        optional, target :: col_dry # Column dry amount; dim(ncol,nlay)
+    # ----------------------------------------------------------
+    # Local variables
+    # real(FT), dimension(ngpt,nlay,ncol) :: tau, tau_rayleigh  # absorption, Rayleigh scattering optical depths
+    # # integer :: igas, idx_h2o # index of some gases
+    # # Number of molecules per cm^2
+    # real(FT), dimension(ncol,nlay), target  :: col_dry_arr
+    # real(FT), dimension(:,:),       pointer :: col_dry_wk
+    # #
+    # # Interpolation variables used in major gas but not elsewhere, so don't need exporting
+    # #
+    # real(FT), dimension(ncol,nlay,  this%get_ngas()) :: vmr     # volume mixing ratios
+    # real(FT), dimension(ncol,nlay,0:this%get_ngas()) :: col_gas # column amounts for each gas, plus col_dry
+    # real(FT), dimension(2,    get_nflav(this),ncol,nlay) :: col_mix # combination of major species's column amounts
+    #                                                      # index(1) : reference temperature level
+    #                                                      # index(2) : flavor
+    #                                                      # index(3) : layer
+    # real(FT), dimension(2,2,  get_nflav(this),ncol,nlay) :: fminor # interpolation fractions for minor species
+    #                                                       # index(1) : reference eta level (temperature dependent)
+    #                                                       # index(2) : reference temperature level
+    #                                                       # index(3) : flavor
+    #                                                       # index(4) : layer
+    # integer :: ngas, nflav, neta, npres, ntemp
+    # integer :: nminorlower, nminorklower,nminorupper, nminorkupper
+    # logical :: use_rayl
     # ----------------------------------------------------------
     FT = eltype(play)
     tau = Array{FT}(undef, ngpt,nlay,ncol)          # absorption, Rayleigh scattering optical depths
@@ -508,46 +506,41 @@ function compute_gas_taus!(this::ty_gas_optics_rrtmgp,
     return jtemp, jpress, jeta, tropo, fmajor
   end
   #------------------------------------------------------------------------------------------
-"""
-    source(this::ty_gas_optics_rrtmgp,
+  #
+  # Compute Planck source functions at layer centers and levels
+  #
+  function source(this::ty_gas_optics_rrtmgp,
                   ncol, nlay, nbnd, ngpt,
                   play, plev, tlay, tsfc,
                   jtemp, jpress, jeta, tropo, fmajor,
-                  sources::ty_source_func_lw,
-                  tlev)
-  
-Compute Planck source functions at layer centers and levels
-
-Inputs
- - this -> (structure `ty_gas_optics_rrtmgp`)
- - ncol -> number of columns
- - nlay -> number of layers
- - nbnd -> number of bands
- - ngpt -> number of g-points
- - play[ncol,nlay] -> layer pressures [Pa, mb]
- - plev[ncol,nlay+1] -> level pressures [Pa, mb]
- - tlay[ncol,nlay] -> layer temperatures [K]
- - tsfc[ncol] -> surface skin temperatures [K]
- - jtemp[ncol,nlay] -> interpolation index for temperature
- - jpress[ncol,nlay] -> interpolation index for pressure
- - tropo[ncol,nlay] 
- - fmajor[2,2,2,get_nflav(this),ncol,nlay)]
- - jeta[2,`get_nflav(this)`,ncol,nlay] -> interpolation index for mixing ratio
- - sources -> structure `ty_source_func_lw` -> Planck sources
-
-Optional Inputs
- - tlev[ncol,nlay+1] -> level temperatures [K]
-
-Outputs
- - sources -> structure `ty_source_func_lw`
-"""
-function source(this::ty_gas_optics_rrtmgp,
-                  ncol, nlay, nbnd, ngpt,
-                  play, plev, tlay, tsfc,
-                  jtemp, jpress, jeta, tropo, fmajor,
-                  sources::ty_source_func_lw,          
-                  tlev)
-
+                  sources::ty_source_func_lw,          # Planck sources
+                  tlev)                                # optional input
+                  #result(error_msg)
+    # # inputs
+    # class(ty_gas_optics_rrtmgp),    intent(in ) :: this
+    # integer,                               intent(in   ) :: ncol, nlay, nbnd, ngpt
+    # real(FT), dimension(ncol,nlay),        intent(in   ) :: play   # layer pressures [Pa, mb]
+    # real(FT), dimension(ncol,nlay+1),      intent(in   ) :: plev   # level pressures [Pa, mb]
+    # real(FT), dimension(ncol,nlay),        intent(in   ) :: tlay   # layer temperatures [K]
+    # real(FT), dimension(ncol),             intent(in   ) :: tsfc   # surface skin temperatures [K]
+    # # Interplation coefficients
+    # integer,     dimension(ncol,nlay),     intent(in   ) :: jtemp, jpress
+    # logical(wl), dimension(ncol,nlay),     intent(in   ) :: tropo
+    # real(FT),    dimension(2,2,2,get_nflav(this),ncol,nlay),
+    #                                        intent(in   ) :: fmajor
+    # integer,     dimension(2,    get_nflav(this),ncol,nlay),
+    #                                        intent(in   ) :: jeta
+    # class(ty_source_func_lw    ),          intent(inout) :: sources
+    # real(FT), dimension(ncol,nlay+1),      intent(in   ),
+    #                                   optional, target :: tlev          # level temperatures [K]
+    # character(len=128)                                 :: error_msg
+    # ----------------------------------------------------------
+    # integer                                      :: icol, ilay, igpt
+    # real(FT), dimension(ngpt,nlay,ncol)          :: lay_source_t, lev_source_inc_t, lev_source_dec_t
+    # real(FT), dimension(ngpt,     ncol)          :: sfc_source_t
+    # # Variables for temperature at layer edges [K] (ncol, nlay+1)
+    # real(FT), dimension(   ncol,nlay+1), target  :: tlev_arr
+    # real(FT), dimension(:,:),            pointer :: tlev_wk
     FT = eltype(this.vmr_ref) # Float64
 
     lay_source_t = Array{FT}(undef, ngpt,nlay,ncol)
@@ -586,10 +579,14 @@ function source(this::ty_gas_optics_rrtmgp,
                                  (plev[icol,nlay+1]-play[icol,nlay])*(tlay[icol,nlay]-tlay(icol,nlay-1)) /
                                                                        (play(icol,nlay)-play(icol,nlay-1))
       end
-end
+    end
 
     #-------------------------------------------------------------------
-"""
+    # Compute internal (Planck) source functions at layers and levels,
+    #  which depend on mapping from spectral space that creates k-distribution.
+    #$acc enter data copyin(sources)
+    #$acc enter data create(sources%lay_source, sources%lev_source_inc, sources%lev_source_dec, sources%sfc_source)
+    #$acc enter data create(sfc_source_t, lay_source_t, lev_source_inc_t, lev_source_dec_t) attach(tlev_wk)
     compute_Planck_source!(ncol, nlay, nbnd, ngpt,
                 get_nflav(this), get_neta(this), get_npres(this), get_ntemp(this), get_nPlanckTemp(this),
                 tlay, tlev_wk, tsfc, fmerge(1,nlay,play[1,1] > play[1,nlay]),
@@ -597,19 +594,7 @@ end
                 get_gpoint_bands(this.optical_props), get_band_lims_gpoint(this.optical_props), this.planck_frac, this.temp_ref_min,
                 this.totplnk_delta, this.totplnk, this.gpoint_flavor,
                 sfc_source_t, lay_source_t, lev_source_inc_t, lev_source_dec_t)
-
-Compute internal (Planck) source functions at layers and levels, 
-which depend on mapping from spectral space that creates k-distribution.
-
-"""
-compute_Planck_source!(ncol, nlay, nbnd, ngpt,
-                get_nflav(this), get_neta(this), get_npres(this), get_ntemp(this), get_nPlanckTemp(this),
-                tlay, tlev_wk, tsfc, fmerge(1,nlay,play[1,1] > play[1,nlay]),
-                fmajor, jeta, tropo, jtemp, jpress,
-                get_gpoint_bands(this.optical_props), get_band_lims_gpoint(this.optical_props), this.planck_frac, this.temp_ref_min,
-                this.totplnk_delta, this.totplnk, this.gpoint_flavor,
-                sfc_source_t, lay_source_t, lev_source_inc_t, lev_source_dec_t)
-
+    #$acc parallel loop collapse(2)
     for igpt in 1:ngpt
       for icol in 1:ncol
         sources.sfc_source[icol,igpt] = sfc_source_t[igpt,icol]
@@ -618,8 +603,10 @@ compute_Planck_source!(ncol, nlay, nbnd, ngpt,
     reorder123x321!(lay_source_t, sources.lay_source)
     reorder123x321!(lev_source_inc_t, sources.lev_source_inc)
     reorder123x321!(lev_source_dec_t, sources.lev_source_dec)
-
-end
+    #$acc exit data delete(sfc_source_t, lay_source_t, lev_source_inc_t, lev_source_dec_t) detach(tlev_wk)
+    #$acc exit data copyout(sources%lay_source, sources%lev_source_inc, sources%lev_source_dec, sources%sfc_source)
+    #$acc exit data copyout(sources)
+  end
   #--------------------------------------------------------------------------------------------------------------------
   #
   # Initialization
@@ -658,106 +645,85 @@ end
 
   end
   #--------------------------------------------------------------------------------------------------------------------
-"""
-    init_abs_coeffs(rayl_lower, rayl_upper,
-	available_gases::ty_gas_concs,
-	gas_names,
-	key_species,
-	band2gpt,
-	band_lims_wavenum,
-	press_ref,
-	press_ref_trop,
-	temp_ref,
-	temp_ref_p,
-	temp_ref_t,
-	vmr_ref,
-	kmajor,
-	kminor_lower,
-	kminor_upper,
-	gas_minor,
-	identifier_minor,
-	minor_gases_lower,
-	minor_gases_upper,
-	minor_limits_gpt_lower,
-	minor_limits_gpt_upper,
-	minor_scales_with_density_lower,
-	minor_scales_with_density_upper,
-	scaling_gas_lower,
-	scaling_gas_upper,
-	scale_by_complement_lower,
-	scale_by_complement_upper,
-	kminor_start_lower,
-	kminor_start_upper)
-
-Initialize absorption coefficient arrays,
-including Rayleigh scattering tables if provided (allocated)
-
-Inputs
- - `available_gases` -> structure `ty_gas_concs`
- - `gas_names` -> names of major gases
- - `key_species`[:, :, :] -> Key species pair for each band
- - band2gpt[:, :]
- - `band_lims_wavenum`[:, :]
- - `press_ref`[:]
- - `temp_ref`[:]
- - `press_ref_trop`
- - `temp_ref_p`
- - `temp_ref_t`
- - `vmr_ref`[:, :, :]
- - kmajor[:, :, :, :]
- - `kminor_lower`[:, :, :]
- - `kminor_upper`[:, :, :]
- - `gas_minor` -> names of minor gases
- - `identifier_minor` -> identifier for minor gases
- - `minor_gases_lower` -> minor gases in the lower atmosphere
- - `minor_gases_upper` -> minor gases in the upper atmosphere
- - `minor_limits_gpt_lower`[:, :]
- - `minor_limits_gpt_upper`[:, :]
- - `minor_scales_with_density_lower`[:]
- - `minor_scales_with_density_upper`[:]
- - `scaling_gas_lower`
- - `scaling_gas_upper`
- - `scale_by_complement_lower`
- - `scale_by_complement_upper`
- - `kminor_start_lower`[:],
- - `kminor_start_upper`[:]
- - `rayl_lower`[:, :, :]
- - `rayl_upper`[:, :, :]
-
-Outputs
- - this -> structure (`ty_gas_optics_rrtmgp`)
-
-"""
-function init_abs_coeffs(rayl_lower, rayl_upper,
-	available_gases::ty_gas_concs,
-	gas_names,
-	key_species,
-	band2gpt,
-	band_lims_wavenum,
-	press_ref,
-	press_ref_trop,
-	temp_ref,
-	temp_ref_p,
-	temp_ref_t,
-	vmr_ref,
-	kmajor,
-	kminor_lower,
-	kminor_upper,
-	gas_minor,
-	identifier_minor,
-	minor_gases_lower,
-	minor_gases_upper,
-	minor_limits_gpt_lower,
-	minor_limits_gpt_upper,
-	minor_scales_with_density_lower,
-	minor_scales_with_density_upper,
-	scaling_gas_lower,
-	scaling_gas_upper,
-	scale_by_complement_lower,
-	scale_by_complement_upper,
-	kminor_start_lower,
-	kminor_start_upper)
+  #
+  # Initialize absorption coefficient arrays,
+  #   including Rayleigh scattering tables if provided (allocated)
+  #
+  function init_abs_coeffs(rayl_lower, rayl_upper,
+available_gases::ty_gas_concs,
+gas_names,
+key_species,
+band2gpt,
+band_lims_wavenum,
+press_ref,
+press_ref_trop,
+temp_ref,
+temp_ref_p,
+temp_ref_t,
+vmr_ref,
+kmajor,
+kminor_lower,
+kminor_upper,
+gas_minor,
+identifier_minor,
+minor_gases_lower,
+minor_gases_upper,
+minor_limits_gpt_lower,
+minor_limits_gpt_upper,
+minor_scales_with_density_lower,
+minor_scales_with_density_upper,
+scaling_gas_lower,
+scaling_gas_upper,
+scale_by_complement_lower,
+scale_by_complement_upper,
+kminor_start_lower,
+kminor_start_upper)
+    # class(ty_gas_optics_rrtmgp), intent(inout) :: this
+    # class(ty_gas_concs),                intent(in   ) :: available_gases
+    # character(len=*),
+    #           dimension(:),       intent(in) :: gas_names
+    # integer,  dimension(:,:,:),   intent(in) :: key_species
+    # integer,  dimension(:,:),     intent(in) :: band2gpt
+    # real(FT), dimension(:,:),     intent(in) :: band_lims_wavenum
+    # real(FT), dimension(:),       intent(in) :: press_ref, temp_ref
+    # real(FT),                     intent(in) :: press_ref_trop, temp_ref_p, temp_ref_t
+    # real(FT), dimension(:,:,:),   intent(in) :: vmr_ref
+    # real(FT), dimension(:,:,:,:), intent(in) :: kmajor
+    # real(FT), dimension(:,:,:),   intent(in) :: kminor_lower, kminor_upper
+    # character(len=*),   dimension(:),
+    #                               intent(in) :: gas_minor,
+    #                                             identifier_minor
+    # character(len=*),   dimension(:),
+    #                               intent(in) :: minor_gases_lower,
+    #                                             minor_gases_upper
+    # integer,  dimension(:,:),     intent(in) :: minor_limits_gpt_lower,
+    #                                             minor_limits_gpt_upper
+    # logical(wl), dimension(:),    intent(in) :: minor_scales_with_density_lower,
+    #                                             minor_scales_with_density_upper
+    # character(len=*),   dimension(:),
+    #                               intent(in) :: scaling_gas_lower,
+    #                                             scaling_gas_upper
+    # logical(wl), dimension(:),    intent(in) :: scale_by_complement_lower,
+    #                                             scale_by_complement_upper
+    # integer,  dimension(:),       intent(in) :: kminor_start_lower,
+    #                                             kminor_start_upper
+    # real(FT), dimension(:,:,:),   intent(in),
+    #                              allocatable :: rayl_lower, rayl_upper
+    # character(len=128)                       :: err_message
     # --------------------------------------------------------------------------
+    # logical,  dimension(:),     allocatable :: gas_is_present
+    # logical,  dimension(:),     allocatable :: key_species_present_init
+    # integer,  dimension(:,:,:), allocatable :: key_species_red
+    # real(FT), dimension(:,:,:), allocatable :: vmr_ref_red
+    # character(len=256),
+    #           dimension(:),     allocatable :: minor_gases_lower_red,
+    #                                            minor_gases_upper_red
+    # character(len=256),
+    #           dimension(:),     allocatable :: scaling_gas_lower_red,
+    #                                            scaling_gas_upper_red
+    # integer :: i, j, idx
+    # integer :: ngas
+    # # --------------------------------------
     FT = eltype(kmajor)
 
     this = ty_gas_optics_rrtmgp(FT,Int)
@@ -803,16 +769,16 @@ function init_abs_coeffs(rayl_lower, rayl_upper,
     scaling_gas_lower_red,
     this.scale_by_complement_lower,
     this.kminor_start_lower              = reduce_minor_arrays(available_gases,
-    gas_names,                            # gas_names,
-    gas_minor,                            # gas_minor,
-    identifier_minor,                     # identifier_minor,
-    kminor_lower,                         # kminor_atm,
-    minor_gases_lower,                    # minor_gases_atm,
-    minor_limits_gpt_lower,               # minor_limits_gpt_atm,
-    minor_scales_with_density_lower,      # minor_scales_with_density_atm,
-    scaling_gas_lower,                    # scaling_gas_atm,
-    scale_by_complement_lower,            # scale_by_complement_atm,
-    kminor_start_lower                   # kminor_start_atm,
+gas_names,                            # gas_names,
+gas_minor,                            # gas_minor,
+identifier_minor,                     # identifier_minor,
+kminor_lower,                         # kminor_atm,
+minor_gases_lower,                    # minor_gases_atm,
+minor_limits_gpt_lower,               # minor_limits_gpt_atm,
+minor_scales_with_density_lower,      # minor_scales_with_density_atm,
+scaling_gas_lower,                    # scaling_gas_atm,
+scale_by_complement_lower,            # scale_by_complement_atm,
+kminor_start_lower                   # kminor_start_atm,
 # this.kminor_lower,                    # kminor_atm_red,
 # minor_gases_lower_red,                # minor_gases_atm_red,
 # this.minor_limits_gpt_lower,          # minor_limits_gpt_atm_red,
@@ -820,7 +786,7 @@ function init_abs_coeffs(rayl_lower, rayl_upper,
 # scaling_gas_lower_red,                # scaling_gas_atm_red,
 # this.scale_by_complement_lower,       # scale_by_complement_atm_red,
 # this.kminor_start_lower               # kminor_start_atm_red
-    )
+)
 
     this.kminor_upper,
     minor_gases_upper_red,
@@ -913,7 +879,7 @@ function init_abs_coeffs(rayl_lower, rayl_upper,
     end
     return this
 
-end
+  end
   # ----------------------------------------------------------------------------------------------------
   function check_key_species_present_init(gas_names, key_species_present_init) # result(err_message)
     # logical,          dimension(:), intent(in) :: key_species_present_init
