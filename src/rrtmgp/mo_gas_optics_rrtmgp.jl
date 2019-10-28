@@ -149,20 +149,20 @@ Compute gas optical depth and Planck source functions,
 given temperature, pressure, and composition
 
 Inputs
- - this (`ty_gas_optics_rrtmgp` structure)
- - play[ncol,nlay] ->  layer pressures [Pa, mb]
- - plev[ncol,nlay+1] -> level pressures [Pa, mb]
- - tlay[ncol,nlay] ->  layer temperatures [K]
- - tsfc[ncol]  ->      surface skin temperatures [K]
- - `gas_desc`   ->       gas volume mixing ratios (ty_gas_concs structure) 
+ - `this` (`ty_gas_optics_rrtmgp` structure)
+ - `play[ncol,nlay]` -  layer pressures [Pa, mb]
+ - `plev[ncol,nlay+1]` - level pressures [Pa, mb]
+ - `tlay[ncol,nlay]` -  layer temperatures [K]
+ - `tsfc[ncol]`  -      surface skin temperatures [K]
+ - `gas_desc`   -       gas volume mixing ratios (ty_gas_concs structure) 
 
 Optional inputs
- - `col_dry`[ncol,nlay] -> column dry amount
- - tlev[ncol,nlay+1]  -> level temperatures [K]
+ - `col_dry[ncol,nlay]` - column dry amount
+ - `tlev[ncol,nlay+1]`  - level temperatures [K]
 
 Output
- - `optical_props` (`ty_optical_props_arry` structure) Optical properties
- - sources (`ty_source_func_lw`)      Planck sources
+ - `optical_props` - (`ty_optical_props_arry` structure) Optical properties
+ - `sources` - (`ty_source_func_lw`)      Planck sources
 """
 function gas_optics!(this::ty_gas_optics_rrtmgp,
                        play,
@@ -242,18 +242,18 @@ end
 Compute gas optical depth given temperature, pressure, and composition
 
 Inputs
- - this (`ty_gas_optics_rrtmgp` structure)
- - play[ncol,nlay] -> layer pressures [Pa, mb]
- - plev[ncol,nlay+1] -> level pressures [Pa, mb]
- - tlay[ncol,nlay] -> layer temperatures [K]
- - `gas_desc` (`ty_gas_concs` structure) -> gas volume mixing ratios
+ - `this` - (`ty_gas_optics_rrtmgp` structure)
+ - `play[ncol,nlay]` - layer pressures [Pa, mb]
+ - `plev[ncol,nlay+1]` - level pressures [Pa, mb]
+ - `tlay[ncol,nlay]` - layer temperatures [K]
+ - `gas_desc` - (`ty_gas_concs` structure) gas volume mixing ratios
 
 Optional inputs
- - `col_dry`[ncol,nlay] -> column dry amount
+ - `col_dry[ncol,nlay]` - column dry amount
    
 Outputs
- - `optical_props` (`ty_optical_props_arry` structure)
- - `toa_src`[ncol,ngpt] -> incoming solar irradiance
+ - `optical_props` - (`ty_optical_props_arry` structure)
+ - `toa_src[ncol,ngpt]` - incoming solar irradiance
 """
 function gas_optics!(this::ty_gas_optics_rrtmgp,
                      play,
@@ -317,27 +317,27 @@ Returns optical properties and interpolation coefficients
 
 Inputs
 
- - this -> structure `ty_gas_optics_rrtmgp`
- - ncol -> number of columns
- - nlay -> number of layers
- - ngpt -> number of g-points
- - nband -> number of bands
- - play[ncol,nlay] -> layer pressures [Pa, mb]
- - plev[ncol,nlay+1] -> level pressures [Pa, mb]
- - tlay[ncol,nlay] -> layer temperatures [K]
- - `gas_desc`-> (structure `ty_gas_concs`) Gas volume mixing ratios
+ - `this` - structure `ty_gas_optics_rrtmgp`
+ - `ncol` - number of columns
+ - `nlay` - number of layers
+ - `ngpt` - number of g-points
+ - `nband` - number of bands
+ - `play[ncol,nlay]` - layer pressures [Pa, mb]
+ - `plev[ncol,nlay+1]` - level pressures [Pa, mb]
+ - `tlay[ncol,nlay]` - layer temperatures [K]
+ - `gas_desc`- (structure `ty_gas_concs`) Gas volume mixing ratios
 
 Optional inputs
 
- - col_dry[ncol,nlay] -> Column dry amount
+ - `col_dry[ncol,nlay]` - Column dry amount
 
 Outputs
 Interpolation coefficients for use in internal source function
- - jtemp[ncol,nlay] -> interpolation index for temperature
- - jpress[ncol,nlay] -> interpolation index for pressure
- - jeta[2, get_nflav(this),ncol,nlay] -> interpolation index for eta
- - tropo[ncol,nlay] 
- - fmajor[2,2,2,get_nflav(this),ncol, nlay]
+ - `jtemp[ncol,nlay]` - interpolation index for temperature
+ - `jpress[ncol,nlay]` - interpolation index for pressure
+ - `jeta[2, get_nflav(this),ncol,nlay]` - interpolation index for eta
+ - `tropo[ncol,nlay]` 
+ - `fmajor[2,2,2,get_nflav(this),ncol, nlay]`
 """
 function compute_gas_taus!(this::ty_gas_optics_rrtmgp,
                             ncol, nlay, ngpt, nband,
@@ -519,27 +519,27 @@ function compute_gas_taus!(this::ty_gas_optics_rrtmgp,
 Compute Planck source functions at layer centers and levels
 
 Inputs
- - this -> (structure `ty_gas_optics_rrtmgp`)
- - ncol -> number of columns
- - nlay -> number of layers
- - nbnd -> number of bands
- - ngpt -> number of g-points
- - play[ncol,nlay] -> layer pressures [Pa, mb]
- - plev[ncol,nlay+1] -> level pressures [Pa, mb]
- - tlay[ncol,nlay] -> layer temperatures [K]
- - tsfc[ncol] -> surface skin temperatures [K]
- - jtemp[ncol,nlay] -> interpolation index for temperature
- - jpress[ncol,nlay] -> interpolation index for pressure
- - tropo[ncol,nlay] 
- - fmajor[2,2,2,get_nflav(this),ncol,nlay)]
- - jeta[2,`get_nflav(this)`,ncol,nlay] -> interpolation index for mixing ratio
- - sources -> structure `ty_source_func_lw` -> Planck sources
+ - `this` - (structure `ty_gas_optics_rrtmgp`)
+ - `ncol` - number of columns
+ - `nlay` - number of layers
+ - `nbnd` - number of bands
+ - `ngpt` - number of g-points
+ - `play[ncol,nlay]` - layer pressures [Pa, mb]
+ - `plev[ncol,nlay+1]` - level pressures [Pa, mb]
+ - `tlay[ncol,nlay]` - layer temperatures [K]
+ - `tsfc[ncol]` - surface skin temperatures [K]
+ - `jtemp[ncol,nlay]` - interpolation index for temperature
+ - `jpress[ncol,nlay]` - interpolation index for pressure
+ - `tropo[ncol,nlay]` 
+ - `fmajor[2,2,2,get_nflav(this),ncol,nlay)]`
+ - `jeta[2,`get_nflav(this)`,ncol,nlay]` - interpolation index for mixing ratio
+ - `sources` - (structure `ty_source_func_lw`) - Planck sources
 
 Optional Inputs
- - tlev[ncol,nlay+1] -> level temperatures [K]
+ - `tlev[ncol,nlay+1]` - level temperatures [K]
 
 Outputs
- - sources -> structure `ty_source_func_lw`
+ - `sources` - (structure `ty_source_func_lw`)
 """
 function source(this::ty_gas_optics_rrtmgp,
                   ncol, nlay, nbnd, ngpt,
@@ -693,39 +693,39 @@ Initialize absorption coefficient arrays,
 including Rayleigh scattering tables if provided (allocated)
 
 Inputs
- - `available_gases` -> structure `ty_gas_concs`
- - `gas_names` -> names of major gases
- - `key_species`[:, :, :] -> Key species pair for each band
- - band2gpt[:, :]
- - `band_lims_wavenum`[:, :]
- - `press_ref`[:]
- - `temp_ref`[:]
+ - `available_gases` - (structure `ty_gas_concs`)
+ - `gas_names` - names of major gases
+ - `key_species[:, :, :]` - Key species pair for each band
+ - `band2gpt[:, :]`
+ - `band_lims_wavenum[:, :]`
+ - `press_ref[:]`
+ - `temp_ref[:]`
  - `press_ref_trop`
  - `temp_ref_p`
  - `temp_ref_t`
- - `vmr_ref`[:, :, :]
- - kmajor[:, :, :, :]
- - `kminor_lower`[:, :, :]
- - `kminor_upper`[:, :, :]
- - `gas_minor` -> names of minor gases
- - `identifier_minor` -> identifier for minor gases
- - `minor_gases_lower` -> minor gases in the lower atmosphere
- - `minor_gases_upper` -> minor gases in the upper atmosphere
- - `minor_limits_gpt_lower`[:, :]
- - `minor_limits_gpt_upper`[:, :]
- - `minor_scales_with_density_lower`[:]
- - `minor_scales_with_density_upper`[:]
+ - `vmr_ref[:, :, :]`
+ - `kmajor[:, :, :, :]`
+ - `kminor_lower[:, :, :]`
+ - `kminor_upper[:, :, :]`
+ - `gas_minor` - names of minor gases
+ - `identifier_minor` - identifier for minor gases
+ - `minor_gases_lower` - minor gases in the lower atmosphere
+ - `minor_gases_upper` - minor gases in the upper atmosphere
+ - `minor_limits_gpt_lower[:, :]`
+ - `minor_limits_gpt_upper[:, :]`
+ - `minor_scales_with_density_lower[:]`
+ - `minor_scales_with_density_upper[:]`
  - `scaling_gas_lower`
  - `scaling_gas_upper`
  - `scale_by_complement_lower`
  - `scale_by_complement_upper`
- - `kminor_start_lower`[:],
- - `kminor_start_upper`[:]
- - `rayl_lower`[:, :, :]
- - `rayl_upper`[:, :, :]
+ - `kminor_start_lower[:]`
+ - `kminor_start_upper[:]`
+ - `rayl_lower[:, :, :]`
+ - `rayl_upper[:, :, :]`
 
 Outputs
- - this -> structure (`ty_gas_optics_rrtmgp`)
+ - `this` - (structure `ty_gas_optics_rrtmgp`)
 
 """
 function init_abs_coeffs(rayl_lower, rayl_upper,
