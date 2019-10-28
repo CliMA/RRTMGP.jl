@@ -22,54 +22,99 @@ module mo_cloud_optics
 
 using ..mo_optical_props
 
-
-type, extends(ty_optical_props), public :: ty_cloud_optics
-  private
-  #
+export ty_cloud_optics
+mutable struct ty_cloud_optics{FT, I} <: ty_optical_props{FT, I}
   # Ice surface roughness category - needed for Yang (2013) ice optics parameterization
-  #
-  integer            :: icergh = 0  # (1 = none, 2 = medium, 3 = high)
+  icergh::I
+
   #
   # Lookup table information
   #
-  # Upper and lower limits of the tables
-  real(FT) :: radliq_lwr = FT(0), radliq_upr = FT(0)
-  real(FT) :: radice_lwr = FT(0), radice_upr = FT(0)
-  # How many steps in the table? (for convenience)
-  integer  :: liq_nsteps = 0,        ice_nsteps = 0
-  # How big is each step in the table?
-  real(FT) :: liq_step_size = FT(0), ice_step_size = FT(0)
+  radliq_lwr::FT
+  radice_lwr::FT
+  radliq_upr::FT
+  radice_upr::FT
+  liq_nsteps::I
+  ice_nsteps::I
+
+  liq_step_size::FT
+  ice_step_size::FT
+
   #
   # The tables themselves.
   #
-  real(FT), dimension(:,:    ), allocatable :: lut_extliq, lut_ssaliq, lut_asyliq # (nsize_liq, nbnd)
-  real(FT), dimension(:,:,:  ), allocatable :: lut_extice, lut_ssaice, lut_asyice # (nsize_ice, nbnd, nrghice)
+  lut_extliq # Array{FT,2} (nsize_liq, nbnd)
+  lut_ssaliq # Array{FT,2} (nsize_liq, nbnd)
+  lut_asyliq # Array{FT,2} (nsize_liq, nbnd)
+  lut_extice # Array{FT,3} # (nsize_ice, nbnd, nrghice)
+  lut_ssaice # Array{FT,3} # (nsize_ice, nbnd, nrghice)
+  lut_asyice # Array{FT,3} # (nsize_ice, nbnd, nrghice)
 
   #
   # Pade approximant coefficients
   #
-  real(FT), dimension(:,:,:  ), allocatable :: pade_extliq                 # (nbnd, nsizereg, ncoeff_ext)
-  real(FT), dimension(:,:,:  ), allocatable :: pade_ssaliq,  pade_asyliq   # (nbnd, nsizereg, ncoeff_ssa_g)
-  real(FT), dimension(:,:,:,:), allocatable :: pade_extice                 # (nbnd, nsizereg, ncoeff_ext, nrghice)
-  real(FT), dimension(:,:,:,:), allocatable :: pade_ssaice, pade_asyice    # (nbnd, nsizereg, ncoeff_ssa_g, nrghice)
+  pade_extliq # Array{FT,3} # (nbnd, nsizereg, ncoeff_ext)
+  pade_ssaliq # Array{FT,3} # (nbnd, nsizereg, ncoeff_ssa_g)
+  pade_asyliq # Array{FT,3} # (nbnd, nsizereg, ncoeff_ssa_g)
+  pade_extice # Array{FT,4} # (nbnd, nsizereg, ncoeff_ext, nrghice)
+  pade_ssaice # Array{FT,4} # (nbnd, nsizereg, ncoeff_ssa_g, nrghice)
+  pade_asyice # Array{FT,4} # (nbnd, nsizereg, ncoeff_ssa_g, nrghice)
   # Particle size regimes for Pade formulations
-  real(FT), dimension(:), allocatable :: pade_sizreg_extliq, pade_sizreg_ssaliq, pade_sizreg_asyliq  # (nbound)
-  real(FT), dimension(:), allocatable :: pade_sizreg_extice, pade_sizreg_ssaice, pade_sizreg_asyice  # (nbound)
-  # -----
-# contains
-#   generic,   public :: load  => load_lut, load_pade
-#   procedure, public :: finalize
-#   procedure, public :: cloud_optics
-#   procedure, public :: get_min_radius_liq
-#   procedure, public :: get_min_radius_ice
-#   procedure, public :: get_max_radius_liq
-#   procedure, public :: get_max_radius_ice
-#   procedure, public :: get_num_ice_roughness_types
-#   procedure, public :: set_ice_roughness
-#   # Internal procedures
-#   procedure, private :: load_lut
-#   procedure, private :: load_pade
-# end type ty_cloud_optics
+  pade_sizreg_extliq # Array{FT,1}  # (nbound)
+  pade_sizreg_ssaliq # Array{FT,1}  # (nbound)
+  pade_sizreg_asyliq # Array{FT,1}  # (nbound)
+  pade_sizreg_extice # Array{FT,1}  # (nbound)
+  pade_sizreg_ssaice # Array{FT,1}  # (nbound)
+  pade_sizreg_asyice # Array{FT,1}  # (nbound)
+end
+
+# type, extends(ty_optical_props), public :: ty_cloud_optics
+#   # private
+#   #
+#   # Ice surface roughness category - needed for Yang (2013) ice optics parameterization
+#   #
+#   integer            :: icergh = 0  # (1 = none, 2 = medium, 3 = high)
+#   #
+#   # Lookup table information
+#   #
+#   # Upper and lower limits of the tables
+#   real(FT) :: radliq_lwr = FT(0), radliq_upr = FT(0)
+#   real(FT) :: radice_lwr = FT(0), radice_upr = FT(0)
+#   # How many steps in the table? (for convenience)
+#   integer  :: liq_nsteps = 0,        ice_nsteps = 0
+#   # How big is each step in the table?
+#   real(FT) :: liq_step_size = FT(0), ice_step_size = FT(0)
+#   #
+#   # The tables themselves.
+#   #
+#   real(FT), dimension(:,:    ), allocatable :: lut_extliq, lut_ssaliq, lut_asyliq # (nsize_liq, nbnd)
+#   real(FT), dimension(:,:,:  ), allocatable :: lut_extice, lut_ssaice, lut_asyice # (nsize_ice, nbnd, nrghice)
+
+#   #
+#   # Pade approximant coefficients
+#   #
+#   real(FT), dimension(:,:,:  ), allocatable :: pade_extliq                 # (nbnd, nsizereg, ncoeff_ext)
+#   real(FT), dimension(:,:,:  ), allocatable :: pade_ssaliq,  pade_asyliq   # (nbnd, nsizereg, ncoeff_ssa_g)
+#   real(FT), dimension(:,:,:,:), allocatable :: pade_extice                 # (nbnd, nsizereg, ncoeff_ext, nrghice)
+#   real(FT), dimension(:,:,:,:), allocatable :: pade_ssaice, pade_asyice    # (nbnd, nsizereg, ncoeff_ssa_g, nrghice)
+#   # Particle size regimes for Pade formulations
+#   real(FT), dimension(:), allocatable :: pade_sizreg_extliq, pade_sizreg_ssaliq, pade_sizreg_asyliq  # (nbound)
+#   real(FT), dimension(:), allocatable :: pade_sizreg_extice, pade_sizreg_ssaice, pade_sizreg_asyice  # (nbound)
+#   # -----
+# # contains
+# #   generic,   public :: load  => load_lut, load_pade
+# #   procedure, public :: finalize
+# #   procedure, public :: cloud_optics
+# #   procedure, public :: get_min_radius_liq
+# #   procedure, public :: get_min_radius_ice
+# #   procedure, public :: get_max_radius_liq
+# #   procedure, public :: get_max_radius_ice
+# #   procedure, public :: get_num_ice_roughness_types
+# #   procedure, public :: set_ice_roughness
+# #   # Internal procedures
+# #   procedure, private :: load_lut
+# #   procedure, private :: load_pade
+# # end type ty_cloud_optics
 
 # ------------------------------------------------------------------------------
 #
@@ -112,22 +157,22 @@ function load_lut(this::ty_cloud_optics, band_lims_wvn,
   #   Can we check for consistency between table bounds and _fac?
   #
   if(nbnd ≠ get_nband(this))
-    error("cloud_optics%init(): number of bands inconsistent between lookup tables, spectral discretization")
+    error("init(cloud_optics): number of bands inconsistent between lookup tables, spectral discretization")
   end
   if(size(lut_extice, 2) ≠ nbnd)
-    error("cloud_optics%init(): array lut_extice has the wrong number of bands")
+    error("init(cloud_optics): array lut_extice has the wrong number of bands")
   end
   if(any([size(lut_ssaliq, 1), size(lut_ssaliq, 2)] ≠ [nsize_liq, nbnd]))
-    error("cloud_optics%init(): array lut_ssaliq isn't consistently sized")
+    error("init(cloud_optics): array lut_ssaliq isn't consistently sized")
   end
   if(any([size(lut_asyliq, 1), size(lut_asyliq, 2)] ≠ [nsize_liq, nbnd]))
-    error("cloud_optics%init(): array lut_asyliq isn't consistently sized")
+    error("init(cloud_optics): array lut_asyliq isn't consistently sized")
   end
   if(any([size(lut_ssaice, 1), size(lut_ssaice, 2), size(lut_ssaice, 3)] ≠ [nsize_ice, nbnd, nrghice]))
-    error("cloud_optics%init(): array lut_ssaice  isn't consistently sized")
+    error("init(cloud_optics): array lut_ssaice  isn't consistently sized")
   end
   if(any([size(lut_asyice, 1), size(lut_asyice, 2), size(lut_asyice, 3)] ≠ [nsize_ice, nbnd, nrghice]))
-    error("cloud_optics%init(): array lut_asyice  isn't consistently sized")
+    error("init(cloud_optics): array lut_asyice  isn't consistently sized")
   end
 
   this.liq_nsteps = nsize_liq
@@ -195,28 +240,28 @@ function load_pade(this, band_lims_wvn,
   # Error checking
   #
   if(nbnd ≠ get_nband(this))
-    error("cloud_optics%init(): number of bands inconsistent between lookup tables, spectral discretization")
+    error("init(cloud_optics): number of bands inconsistent between lookup tables, spectral discretization")
   end
   if(any([size(pade_ssaliq, 1), size(pade_ssaliq, 2), size(pade_ssaliq, 3)] ≠ [nbnd, nsizereg, ncoeff_ssa_g]))
-    error("cloud_optics%init(): array pade_ssaliq isn't consistently sized")
+    error("init(cloud_optics): array pade_ssaliq isn't consistently sized")
   end
   if(any([size(pade_asyliq, 1), size(pade_asyliq, 2), size(pade_asyliq, 3)] ≠ [nbnd, nsizereg, ncoeff_ssa_g]))
-    error("cloud_optics%init(): array pade_asyliq isn't consistently sized")
+    error("init(cloud_optics): array pade_asyliq isn't consistently sized")
   end
   if(any([size(pade_extice, 1), size(pade_extice, 2), size(pade_extice, 3), size(pade_extice, 4)] ≠ [nbnd, nsizereg, ncoeff_ext, nrghice]))
-    error("cloud_optics%init(): array pade_extice isn't consistently sized")
+    error("init(cloud_optics): array pade_extice isn't consistently sized")
   end
   if(any([size(pade_ssaice, 1), size(pade_ssaice, 2), size(pade_ssaice, 3), size(pade_ssaice, 4)] ≠ [nbnd, nsizereg, ncoeff_ssa_g, nrghice]))
-    error("cloud_optics%init(): array pade_ssaice isn't consistently sized")
+    error("init(cloud_optics): array pade_ssaice isn't consistently sized")
   end
   if(any([size(pade_asyice, 1), size(pade_asyice, 2), size(pade_asyice, 3), size(pade_asyice, 4)] ≠ [nbnd, nsizereg, ncoeff_ssa_g, nrghice]))
-    error("cloud_optics%init(): array pade_asyice isn't consistently sized")
+    error("init(cloud_optics): array pade_asyice isn't consistently sized")
   end
   if(any([size(pade_sizreg_ssaliq), size(pade_sizreg_asyliq), size(pade_sizreg_extice), size(pade_sizreg_ssaice), size(pade_sizreg_asyice)] ≠ nbound))
-    error("cloud_optics%init(): one or more Pade size regime arrays are inconsistently sized")
+    error("init(cloud_optics): one or more Pade size regime arrays are inconsistently sized")
   end
   if(nsizereg ≠ 3)
-    error("cloud_optics%init(): Expecting precisely three size regimes for Pade approximants")
+    error("init(cloud_optics): Expecting precisely three size regimes for Pade approximants")
   end
 
   #
@@ -227,15 +272,19 @@ function load_pade(this, band_lims_wvn,
   this.radice_lwr = pade_sizreg_extice[1]
   this.radice_upr = pade_sizreg_extice[nbound]
 
-  if(any([pade_sizreg_ssaliq(1), pade_sizreg_asyliq(1)] < this%radliq_lwr))
-    error_msg = "cloud_optics%init(): one or more Pade size regimes have inconsistent lowest values"
-  if(any([pade_sizreg_ssaice(1), pade_sizreg_asyice(1)] < this%radice_lwr))
-    error_msg = "cloud_optics%init(): one or more Pade size regimes have inconsistent lower values"
+  if(any([pade_sizreg_ssaliq(1), pade_sizreg_asyliq(1)] < this.radliq_lwr))
+    error_msg = "init(cloud_optics): one or more Pade size regimes have inconsistent lowest values"
+  end
+  if(any([pade_sizreg_ssaice(1), pade_sizreg_asyice(1)] < this.radice_lwr))
+    error_msg = "init(cloud_optics): one or more Pade size regimes have inconsistent lower values"
+  end
 
-  if(any([pade_sizreg_ssaliq(nbound), pade_sizreg_asyliq(nbound)] > this%radliq_upr))
-    error_msg = "cloud_optics%init(): one or more Pade size regimes have lowest value less than radliq_upr"
-  if(any([pade_sizreg_ssaice(nbound), pade_sizreg_asyice(nbound)] > this%radice_upr))
-    error_msg = "cloud_optics%init(): one or more Pade size regimes have lowest value less than radice_upr"
+  if(any([pade_sizreg_ssaliq(nbound), pade_sizreg_asyliq(nbound)] > this.radliq_upr))
+    error_msg = "init(cloud_optics): one or more Pade size regimes have lowest value less than radliq_upr"
+  end
+  if(any([pade_sizreg_ssaice(nbound), pade_sizreg_asyice(nbound)] > this.radice_upr))
+    error_msg = "init(cloud_optics): one or more Pade size regimes have lowest value less than radice_upr"
+  end
 
   #
   # Allocate Pade coefficients
@@ -397,9 +446,9 @@ function cloud_optics(this::ty_cloud_optics{FT},
     #
     # Ice
     #
-    clouds_ice%tau = compute_from_table(ncol,nlay,nbnd,icemsk,reice,this.ice_nsteps,this.ice_step_size,this.radice_lwr, this.lut_extice[:,:,this.icergh])
-    clouds_ice%ssa = compute_from_table(ncol,nlay,nbnd,icemsk,reice,this.ice_nsteps,this.ice_step_size,this.radice_lwr, this.lut_ssaice[:,:,this.icergh])
-    clouds_ice%g   = compute_from_table(ncol,nlay,nbnd,icemsk,reice,this.ice_nsteps,this.ice_step_size,this.radice_lwr, this.lut_asyice[:,:,this.icergh])
+    clouds_ice.tau = compute_from_table(ncol,nlay,nbnd,icemsk,reice,this.ice_nsteps,this.ice_step_size,this.radice_lwr, this.lut_extice[:,:,this.icergh])
+    clouds_ice.ssa = compute_from_table(ncol,nlay,nbnd,icemsk,reice,this.ice_nsteps,this.ice_step_size,this.radice_lwr, this.lut_ssaice[:,:,this.icergh])
+    clouds_ice.g   = compute_from_table(ncol,nlay,nbnd,icemsk,reice,this.ice_nsteps,this.ice_step_size,this.radice_lwr, this.lut_asyice[:,:,this.icergh])
     for ibnd = 1:nbnd
       for icol in 1:ncol
         for ilay in 1:nlay
