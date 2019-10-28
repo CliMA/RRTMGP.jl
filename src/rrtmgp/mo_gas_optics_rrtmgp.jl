@@ -149,7 +149,7 @@ Compute gas optical depth and Planck source functions,
 given temperature, pressure, and composition
 
 Inputs
- - this (`ty_gas_optics_rrtmgp` structure)
+ - `this` (`ty_gas_optics_rrtmgp` structure)
  - play[ncol,nlay] ->  layer pressures [Pa, mb]
  - plev[ncol,nlay+1] -> level pressures [Pa, mb]
  - tlay[ncol,nlay] ->  layer temperatures [K]
