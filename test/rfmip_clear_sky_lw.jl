@@ -250,6 +250,10 @@ function run_driver(datafolder)
   @test diff_up_ulps < sqrt(1/(1e6eps(FT)))
   @test diff_dn_ulps < sqrt(1/(1e6eps(FT)))
 
+  close(ds_lw_flx_up)
+  close(ds_lw_flx_dn)
+  close(ds)
+  close(ds_k_dist)
 end
 
 @testset "Longwave driver" begin

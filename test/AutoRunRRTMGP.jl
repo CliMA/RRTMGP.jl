@@ -102,8 +102,10 @@ cd(joinpath(root_dir,"rte-rrtmgp","examples","rfmip-clear-sky")) do
 
   for wavelength in ["l","s"]
     for direction in ["u","d"]
-      for forcing_index in ["1","2","3"]
-        for physics_index in ["1","2"]
+      for forcing_index in ["1",]
+      # for forcing_index in ["1","2","3"]
+        for physics_index in ["1",]
+        # for physics_index in ["1","2"]
           @show wavelength,direction,forcing_index,physics_index
           # Arguments: block size, input conditions, coefficient files, forcing index, physics index
           run(`$(rfmip_lw) 8 $(conds_file) $(lw_coeffs) $(forcing_index) $(physics_index)`)

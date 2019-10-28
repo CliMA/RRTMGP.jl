@@ -2,6 +2,7 @@ using Test
 using JRRTMGP
 using NCDatasets
 using JRRTMGP.mo_optical_props
+using JRRTMGP.mo_simple_netcdf
 using JRRTMGP.mo_rte_solver_kernels
 using JRRTMGP.fortran_intrinsics
 using JRRTMGP.mo_util_array
@@ -17,8 +18,9 @@ using JRRTMGP.mo_rte_sw
 using JRRTMGP.mo_load_cloud_coefficients
 using JRRTMGP.mo_garand_atmos_io
 
+include("mo_test_files_io.jl")
 
-function vmr_2d_to_1d(gas_concs, gas_concs_garand, name, sz1, sz2)
+function vmr_2d_to_1d!(gas_concs, gas_concs_garand, name)
   # use mo_gas_concentrations, only: ty_gas_concs
 
   # type(ty_gas_concs), intent(in)    :: gas_concs_garand
@@ -29,12 +31,13 @@ function vmr_2d_to_1d(gas_concs, gas_concs_garand, name, sz1, sz2)
   # real(wp) :: tmp(sz1, sz2), tmp_col(sz2)
 
   tmp = get_vmr(gas_concs_garand, name)
-  tmp_col[:] .= tmp[1, :]
+  tmp_col = tmp[1, :]
 
   set_vmr!(gas_concs, name, tmp_col)
 end
-# ----------------------------------------------------------------------------------
-function run_driver(datafolder)
+
+function run_driver(datafolder; λ_string="")
+  @assert λ_string == "sw" || λ_string == "lw"
 
   # # ----------------------------------------------------------------------------------
   # # Variables
@@ -70,15 +73,15 @@ function run_driver(datafolder)
   # #
   # # Output variables
   # #
-  # real(wp), dimension(:,:), target, &
+  # real(wp), dimension(:,:), target,
   #                           allocatable :: flux_up, flux_dn, flux_dir
   # #
   # # Derived types from the RTE and RRTMGP libraries
   # #
   # type(ty_gas_optics_rrtmgp) :: k_dist
-  # type(ty_cloud_optics)      :: cloud_optics
+  # type(ty_cloud_optics)      :: cloud_optics_
   # type(ty_gas_concs)         :: gas_concs, gas_concs_garand, gas_concs_1col
-  # class(ty_optical_props_arry), &
+  # class(ty_optical_props_arry),
   #                allocatable :: atmos, clouds
   # type(ty_fluxes_broadband)  :: fluxes
 
@@ -95,7 +98,7 @@ function run_driver(datafolder)
   # integer  :: nUserArgs=0, nloops
   # logical :: use_luts = .true., write_fluxes = .true.
   # integer, parameter :: ngas = 8
-  # character(len=3), dimension(ngas) &
+  # character(len=3), dimension(ngas)
   #                    :: gas_names = ['h2o', 'co2', 'o3 ', 'n2o', 'co ', 'ch4', 'o2 ', 'n2 ']
 
   # character(len=256) :: input_file, k_dist_file, cloud_optics_file
@@ -111,272 +114,211 @@ function run_driver(datafolder)
   #
   # rrtmgp_clouds rrtmgp-clouds.nc $RRTMGP_ROOT/rrtmgp/data/rrtmgp-data-lw-g256-2018-12-04.nc $RRTMGP_ROOT/extensions/cloud_optics/rrtmgp-cloud-optics-coeffs-lw.nc  128 1
   # rrtmgp_clouds rrtmgp-clouds.nc $RRTMGP_ROOT/rrtmgp/data/rrtmgp-data-sw-g224-2018-12-04.nc $RRTMGP_ROOT/extensions/cloud_optics/rrtmgp-cloud-optics-coeffs-sw.nc  128 1
-  # nUserArgs = command_argument_count()
+
+  gas_names = ["h2o", "co2", "o3 ", "n2o", "co ", "ch4", "o2 ", "n2 "]
+  ngas = length(gas_names)
   nloops = 1
-#   nUserArgs < 4 && error("Need to supply input_file k_distribution_file ncol.")
-#   if (nUserArgs >= 1) call get_command_argument(1,input_file)
-#   if (nUserArgs >= 2) call get_command_argument(2,k_dist_file)
-#   if (nUserArgs >= 3) call get_command_argument(3,cloud_optics_file)
-#   if nUserArgs >= 4
-#     call get_command_argument(4, char_input)
-#     read(char_input, '(i8)') ncol
-#     ncol <= 0 && error("Specify positive ncol.")
-#   end
-#   if (nUserArgs >= 5)
-#     call get_command_argument(5, char_input)
-#     read(char_input, '(i8)') nloops
-#     if(nloops <= 0) call stop_on_err("Specify positive nloops.")
-#   end
-#   if (nUserArgs >  6) print *, "Ignoring command line arguments beyond the first five..."
-#   if(trim(input_file) == '-h' .or. trim(input_file) == "--help") then
-#     call stop_on_err("rrtmgp_clouds input_file absorption_coefficients_file cloud_optics_file ncol")
-#   end
+  ncol = 128
+  use_luts = true
+  write_fluxes = true
+  λ_string=="lw" && (n_g_points = "256")
+  λ_string=="sw" && (n_g_points = "224")
+  input_file = joinpath(datafolder, "examples", "all-sky", "rrtmgp-allsky.nc")
+  k_dist_file = joinpath(datafolder, "rrtmgp", "data", "rrtmgp-data-$(λ_string)-g"*n_g_points*"-2018-12-04.nc")
+  cloud_optics_file = joinpath(datafolder, "extensions", "cloud_optics", "rrtmgp-cloud-optics-coeffs-$(λ_string).nc")
 
-#   #
-#   # Read temperature, pressure, gas concentrations.
-#   #   Arrays are allocated as they are read
-#   #
-#   call read_atmos(input_file,                 &
-#                   p_lay, t_lay, p_lev, t_lev, &
-#                   gas_concs_garand, col_dry)
-#   deallocate(col_dry)
-#   nlay = size(p_lay, 2)
-#   # For clouds we'll use the first column, repeated over and over
-#   call stop_on_err(gas_concs%init(gas_names))
-#   do igas = 1, ngas
-#     call vmr_2d_to_1d(gas_concs, gas_concs_garand, gas_names(igas), size(p_lay, 1), nlay)
-#   end
-#   #  If we trusted in Fortran allocate-on-assign we could skip the temp_array here
-#   allocate(temp_array(ncol, nlay))
-#   temp_array = spread(p_lay(1,:), dim = 1, ncopies=ncol)
-#   call move_alloc(temp_array, p_lay)
-#   allocate(temp_array(ncol, nlay))
-#   temp_array = spread(t_lay(1,:), dim = 1, ncopies=ncol)
-#   call move_alloc(temp_array, t_lay)
-#   allocate(temp_array(ncol, nlay+1))
-#   temp_array = spread(p_lev(1,:), dim = 1, ncopies=ncol)
-#   call move_alloc(temp_array, p_lev)
-#   allocate(temp_array(ncol, nlay+1))
-#   temp_array = spread(t_lev(1,:), dim = 1, ncopies=ncol)
-#   call move_alloc(temp_array, t_lev)
-#   # This puts pressure and temperature arrays on the GPU
-#   #$acc enter data copyin(p_lay, p_lev, t_lay, t_lev)
-#   # ----------------------------------------------------------------------------
-#   # load data into classes
-#   call load_and_init(k_dist, k_dist_file, gas_concs)
-#   is_sw = k_dist%source_is_external()
-#   is_lw = .not. is_sw
-#   #
-#   # Should also try with Pade calculations
-#   #  call load_cld_padecoeff(cloud_optics, cloud_optics_file)
-#   #
-#   if(use_luts) then
-#     call load_cld_lutcoeff (cloud_optics, cloud_optics_file)
-#   else
-#     call load_cld_padecoeff(cloud_optics, cloud_optics_file)
-#   end
-#   call stop_on_err(cloud_optics%set_ice_roughness(2))
-#   # ----------------------------------------------------------------------------
-#   #
-#   # Problem sizes
-#   #
-#   nbnd = k_dist%get_nband()
-#   ngpt = k_dist%get_ngpt()
-#   top_at_1 = p_lay(1, 1) < p_lay(1, nlay)
+  #
+  # Read temperature, pressure, gas concentrations.
+  #   Arrays are allocated as they are read
+  #
+  FT = Float64
+  I = Int64
+  ds_input = Dataset(input_file, "r")
+  ds_k_dist = Dataset(k_dist_file, "r")
+  ds_cloud_optics = Dataset(cloud_optics_file, "r")
+  p_lay, t_lay, p_lev, t_lev, gas_concs_garand, col_dry = read_atmos(ds_input, FT)
+  deallocate!(col_dry)
+  nlay = size(p_lay, 2)
+  # For clouds we'll use the first column, repeated over and over
+  gas_concs = ty_gas_concs(FT, ncol, nlay)
+  gas_concs.gas_name = gas_names
+  for igas = 1:ngas
+    vmr_2d_to_1d!(gas_concs, gas_concs_garand, gas_names[igas])
+  end
+  #  If we trusted in Fortran allocate-on-assign we could skip the temp_array here
+  temp_array = Array{FT}(undef, ncol, nlay)
+  temp_array .= reshape(spread(p_lay[1,:], 1, ncol), ncol, nlay)
+  p_lay = deepcopy(temp_array)
+  temp_array = Array{FT}(undef, ncol, nlay)
+  temp_array .= reshape(spread(t_lay[1,:], 1, ncol), ncol, nlay)
+  t_lay = deepcopy(temp_array)
+  temp_array = Array{FT}(undef, ncol, nlay+1)
+  temp_array .= reshape(spread(p_lev[1,:], 1, ncol), ncol, nlay+1)
+  p_lev = deepcopy(temp_array)
+  temp_array = Array{FT}(undef, ncol, nlay+1)
+  temp_array .= reshape(spread(t_lev[1,:], 1, ncol), ncol, nlay+1)
+  t_lev = deepcopy(temp_array)
 
-#   # ----------------------------------------------------------------------------
-#   # LW calculations neglect scattering; SW calculations use the 2-stream approximation
-#   #   Here we choose the right variant of optical_props.
-#   #
-#   if(is_sw) then
-#     allocate(ty_optical_props_2str::atmos)
-#     allocate(ty_optical_props_2str::clouds)
-#   else
-#     allocate(ty_optical_props_1scl::atmos)
-#     allocate(ty_optical_props_1scl::clouds)
-#   end
-#   # Clouds optical props are defined by band
-#   call stop_on_err(clouds%init(k_dist%get_band_lims_wavenumber()))
-#   #
-#   # Allocate arrays for the optical properties themselves.
-#   #
-#   select type(atmos)
-#     class is (ty_optical_props_1scl)
-#       #$acc enter data copyin(atmos)
-#       call stop_on_err(atmos%alloc_1scl(ncol, nlay, k_dist))
-#       #$acc enter data copyin(atmos) create(atmos%tau)
-#     class is (ty_optical_props_2str)
-#       call stop_on_err(atmos%alloc_2str( ncol, nlay, k_dist))
-#       #$acc enter data copyin(atmos) create(atmos%tau, atmos%ssa, atmos%g)
-#     class default
-#       call stop_on_err("rte_rrtmgp_clouds: Don't recognize the kind of optical properties ")
-#   end select
-#   select type(clouds)
-#     class is (ty_optical_props_1scl)
-#       call stop_on_err(clouds%alloc_1scl(ncol, nlay))
-#       #$acc enter data copyin(clouds) create(clouds%tau)
-#     class is (ty_optical_props_2str)
-#       call stop_on_err(clouds%alloc_2str(ncol, nlay))
-#       #$acc enter data copyin(clouds) create(clouds%tau, clouds%ssa, clouds%g)
-#     class default
-#       call stop_on_err("rte_rrtmgp_clouds: Don't recognize the kind of optical properties ")
-#   end select
-#   # ----------------------------------------------------------------------------
-#   #  Boundary conditions depending on whether the k-distribution being supplied
-#   #   is LW or SW
-#   if(is_sw) then
-#     # toa_flux is threadprivate
-#     #$omp parallel
-#     allocate(toa_flux(ncol, ngpt))
-#     #$omp end parallel
-#     #
-#     allocate(sfc_alb_dir(nbnd, ncol), sfc_alb_dif(nbnd, ncol), mu0(ncol))
-#     #$acc enter data create(sfc_alb_dir, sfc_alb_dif, mu0)
-#     # Ocean-ish values for no particular reason
-#     #$acc kernels
-#     sfc_alb_dir = 0.06_wp
-#     sfc_alb_dif = 0.06_wp
-#     mu0 = .86_wp
-#     #$acc end kernels
-#   else
-#     # lw_sorces is threadprivate    
-#     #$omp parallel
-#     call stop_on_err(lw_sources%alloc(ncol, nlay, k_dist))
-#     #$omp end parallel
+  # This puts pressure and temperature arrays on the GPU
+  # load data into classes
+  k_dist = load_and_init(ds_k_dist, gas_concs)
+  is_sw = source_is_external(k_dist)
+  is_lw = !is_sw
+  #
+  # Should also try with Pade calculations
+  cloud_optics_ = ty_cloud_optics(FT,I)
+  if use_luts
+    load_cld_lutcoeff!(cloud_optics_, ds_cloud_optics)
+  else
+    load_cld_padecoeff!(cloud_optics_, ds_cloud_optics)
+  end
+  set_ice_roughness!(cloud_optics_, 2)
 
-#     allocate(t_sfc(ncol), emis_sfc(nbnd, ncol))
-#     #$acc enter data create(t_sfc, emis_sfc)
-#     # Surface temperature
-#     #$acc kernels
-#     t_sfc = t_lev(1, merge(nlay+1, 1, top_at_1))
-#     emis_sfc = 0.98_wp
-#     #$acc end kernels
-#   end
-#   # ----------------------------------------------------------------------------
-#   #
-#   # Fluxes
-#   #
-#   #$omp parallel
-#   allocate(flux_up(ncol,nlay+1), flux_dn(ncol,nlay+1))
-#   #$omp end parallel
+  #
+  # Problem sizes
+  #
+  nbnd = get_nband(k_dist.optical_props)
+  ngpt = get_ngpt(k_dist.optical_props)
+  top_at_1 = p_lay[1, 1] < p_lay[1, nlay]
 
-#   #$acc enter data create(flux_up, flux_dn)
-#   if(is_sw) then
-#     allocate(flux_dir(ncol,nlay+1))
-#     #$acc enter data create(flux_dir)
-#   end
-#   #
-#   # Clouds
-#   #
-#   allocate(lwp(ncol,nlay), iwp(ncol,nlay), &
-#            rel(ncol,nlay), rei(ncol,nlay), cloud_mask(ncol,nlay))
-#   #$acc enter data create(cloud_mask, lwp, iwp, rel, rei)
 
-#   # Restrict clouds to troposphere (< 100 hPa = 100*100 Pa)
-#   #   and not very close to the ground
-#   rel_val = 0.5 * (cloud_optics%get_min_radius_liq() + cloud_optics%get_max_radius_liq())
-#   rei_val = 0.5 * (cloud_optics%get_min_radius_ice() + cloud_optics%get_max_radius_ice())
-#   #$acc parallel loop collapse(2) copyin(t_lay) copyout(lwp, iwp, rel, rei)
-#   do ilay=1,nlay
-#     do icol=1,ncol
-#       cloud_mask(icol,ilay) = p_lay(icol,ilay) < 100._wp * 100._wp .and. p_lay(icol,ilay) > 900._wp
-#       #
-#       # Ice and liquid will overlap in a few layers
-#       #
-#       lwp(icol,ilay) = merge(10._wp,  0._wp, cloud_mask(icol,ilay) .and. t_lay(icol,ilay) > 263._wp)
-#       iwp(icol,ilay) = merge(10._wp,  0._wp, cloud_mask(icol,ilay) .and. t_lay(icol,ilay) < 273._wp)
-#       rel(icol,ilay) = merge(rel_val, 0._wp, lwp(icol,ilay) > 0._wp)
-#       rei(icol,ilay) = merge(rei_val, 0._wp, iwp(icol,ilay) > 0._wp)
-#     end
-#   end
-#   #$acc exit data delete(cloud_mask)
-#   # ----------------------------------------------------------------------------
-#   #
-#   # Multiple iterations for big problem sizes, and to help identify data movement
-#   #   For CPUs we can introduce OpenMP threading over loop iterations
-#   #
-#   allocate(elapsed(nloops))
-#   #
-#   call system_clock(start_all)
-#   #
-#   #$omp parallel do firstprivate(fluxes)
-#   do iloop = 1, nloops
-#     call system_clock(start)
-#     call stop_on_err(                                      &
-#       cloud_optics%cloud_optics(lwp, iwp, rel, rei, clouds))
-#     #
-#     # Solvers
-#     #
-#     fluxes%flux_up => flux_up(:,:)
-#     fluxes%flux_dn => flux_dn(:,:)
-#     if(is_lw) then
-#       #$acc enter data create(lw_sources, lw_sources%lay_source, lw_sources%lev_source_inc, lw_sources%lev_source_dec, lw_sources%sfc_source)
-#       call stop_on_err(k_dist%gas_optics(p_lay, p_lev, &
-#                                          t_lay, t_sfc, &
-#                                          gas_concs,    &
-#                                          atmos,        &
-#                                          lw_sources,   &
-#                                          tlev = t_lev))
-#       call stop_on_err(clouds%increment(atmos))
-#       call stop_on_err(rte_lw(atmos, top_at_1, &
-#                               lw_sources,      &
-#                               emis_sfc,        &
-#                               fluxes))
-#       #$acc exit data delete(lw_sources%lay_source, lw_sources%lev_source_inc, lw_sources%lev_source_dec, lw_sources%sfc_source, lw_sources)
-#     else
-#       #$acc enter data create(toa_flux)
-#       fluxes%flux_dn_dir => flux_dir(:,:)
+  # LW calculations neglect scattering; SW calculations use the 2-stream approximation
+  #   Here we choose the right variant of optical_props.
+  #
+  if is_sw
+    clouds = ty_optical_props_2str(FT, I)
+    atmos = ty_optical_props_2str(FT, I)
+  else
+    atmos = ty_optical_props_1scl(FT, I)
+    clouds = ty_optical_props_1scl(FT, I)
+  end
 
-#       call stop_on_err(k_dist%gas_optics(p_lay, p_lev, &
-#                                          t_lay,        &
-#                                          gas_concs,    &
-#                                          atmos,        &
-#                                          toa_flux))
-#       call stop_on_err(clouds%delta_scale())
-#       call stop_on_err(clouds%increment(atmos))
-#       call stop_on_err(rte_sw(atmos, top_at_1, &
-#                               mu0,   toa_flux, &
-#                               sfc_alb_dir, sfc_alb_dif, &
-#                               fluxes))
-#       #$acc exit data delete(toa_flux)
-#     end
-#     #print *, "******************************************************************"
-#     call system_clock(finish, clock_rate)
-#     elapsed(iloop) = finish - start
-#   end
-#   #
-#   call system_clock(finish_all, clock_rate)
-#   #
-#   #$acc exit data delete(lwp, iwp, rel, rei)
-#   #$acc exit data delete(p_lay, p_lev, t_lay, t_lev)
+  # Clouds optical props are defined by band
+  init!(clouds, "Clouds", get_band_lims_wavenumber(k_dist.optical_props))
 
-# #ifdef _OPENACC
-#   avg = sum( elapsed(merge(2,1,nloops>1):) ) / real(merge(nloops-1,nloops,nloops>1))
+  #
+  # Allocate arrays for the optical properties themselves.
+  #
+  copy_and_alloc!(atmos,  ncol, nlay, k_dist.optical_props)
+  alloc!(clouds, ncol, nlay)
 
-#   print *, "Execution times - min(s)        :", minval(elapsed) / real(clock_rate)
-#   print *, "                - avg(s)        :", avg / real(clock_rate)
-#   print *, "                - per column(ms):", avg / real(ncol) / (1.0e-3*clock_rate)
-# #else
-#   print *, "Execution times - total(s)      :", (finish_all-start_all) / real(clock_rate)
-#   print *, "                - per column(ms):", (finish_all-start_all) / real(ncol*nloops) / (1.0e-3*clock_rate)
-# #endif
+  #  Boundary conditions depending on whether the k-distribution being supplied
+  #   is LW or SW
+  if is_sw
+    # toa_flux is thread private
+    toa_flux = Array{FT}(undef, ncol, ngpt)
+    #
+    sfc_alb_dir = Array{FT}(undef, nbnd, ncol)
+    sfc_alb_dif = Array{FT}(undef, nbnd, ncol)
+    mu0 = Array{FT}(undef, ncol)
+    # Ocean-ish values for no particular reason
+    sfc_alb_dir .= FT(0.06)
+    sfc_alb_dif .= FT(0.06)
+    mu0 .= FT(.86)
+  else
+    # lw_sorces is thread private
+    lw_sources = ty_source_func_lw(ncol, nlay, k_dist.optical_props)
 
-#   if(is_lw) then
-#     #$acc exit data copyout(flux_up, flux_dn)
+    t_sfc = Array{FT}(undef, ncol)
+    emis_sfc = Array{FT}(undef, nbnd, ncol)
+    # Surface temperature
+    t_sfc .= t_lev[1, fmerge(nlay+1, 1, top_at_1)]
+    emis_sfc .= FT(0.98)
+  end
+
+  #
+  # Fluxes
+  #
+  flux_up = Array{FT}(undef, ncol,nlay+1)
+  flux_dn = Array{FT}(undef, ncol,nlay+1)
+
+  if is_sw
+    flux_dir = Array{FT}(undef, ncol,nlay+1)
+  end
+  #
+  # Clouds
+  #
+  lwp = Array{FT}(undef, ncol,nlay)
+  iwp = Array{FT}(undef, ncol,nlay)
+  rel = Array{FT}(undef, ncol,nlay)
+  rei = Array{FT}(undef, ncol,nlay)
+  cloud_mask = Array{Bool}(undef, ncol,nlay)
+
+  # Restrict clouds to troposphere (< 100 hPa = 100*100 Pa)
+  #   and not very close to the ground
+  rel_val = FT(0.5) * (get_min_radius_liq(cloud_optics_) + get_max_radius_liq(cloud_optics_))
+  rei_val = FT(0.5) * (get_min_radius_ice(cloud_optics_) + get_max_radius_ice(cloud_optics_))
+  for ilay=1:nlay
+    for icol=1:ncol
+      cloud_mask[icol,ilay] = p_lay[icol,ilay] < FT(100) * FT(100) && p_lay[icol,ilay] > FT(900)
+      #
+      # Ice and liquid will overlap in a few layers
+      #
+      lwp[icol,ilay] = fmerge(FT(10),  FT(0), cloud_mask[icol,ilay] && t_lay[icol,ilay] > FT(263))
+      iwp[icol,ilay] = fmerge(FT(10),  FT(0), cloud_mask[icol,ilay] && t_lay[icol,ilay] < FT(273))
+      rel[icol,ilay] = fmerge(rel_val, FT(0), lwp[icol,ilay] > FT(0))
+      rei[icol,ilay] = fmerge(rei_val, FT(0), iwp[icol,ilay] > FT(0))
+    end
+  end
+  fluxes = ty_fluxes_broadband(FT)
+  #
+  # Multiple iterations for big problem sizes, and to help identify data movement
+  #   For CPUs we can introduce OpenMP threading over loop iterations
+  #
+
+  for iloop = 1:nloops
+    cloud_optics!(cloud_optics_, lwp, iwp, rel, rei, clouds)
+    #
+    # Solvers
+    #
+    fluxes.flux_up = flux_up[:,:]
+    fluxes.flux_dn = flux_dn[:,:]
+    if is_lw
+      gas_optics!(k_dist, p_lay, p_lev,
+                  t_lay, t_sfc,
+                  gas_concs,
+                  atmos,
+                  lw_sources;
+                  tlev = t_lev)
+      increment!(clouds, atmos)
+      rte_lw!(atmos, top_at_1,
+              lw_sources,
+              emis_sfc,
+              fluxes)
+    else
+      fluxes.flux_dn_dir = flux_dir[:,:]
+
+      gas_optics!(k_dist, p_lay, p_lev,
+                  t_lay,
+                  gas_concs,
+                  atmos,
+                  toa_flux)
+      delta_scale!(clouds)
+      increment!(clouds, atmos)
+      rte_sw!(atmos, top_at_1,
+              mu0,   toa_flux,
+              sfc_alb_dir, sfc_alb_dif,
+              fluxes)
+    end
+  end
+
+
+  if is_lw
 #     if(write_fluxes) call write_lw_fluxes(input_file, flux_up, flux_dn)
-#     #$acc exit data delete(t_sfc, emis_sfc)
-#   else
-#     #$acc exit data copyout(flux_up, flux_dn, flux_dir)
+
+  else
 #     if(write_fluxes) call write_sw_fluxes(input_file, flux_up, flux_dn, flux_dir)
-#     #$acc exit data delete(sfc_alb_dir, sfc_alb_dif, mu0)
-#   end
-#   #$acc enter data create(lwp, iwp, rel, rei)
+
+  end
+
+  close(ds_input)
 end
 
 
 @testset "All sky" begin
   datafolder = JRRTMGP.data_folder_rrtmgp()
 
-  run_driver(datafolder)
+  run_driver(datafolder; λ_string = "lw")
+  run_driver(datafolder, λ_string = "sw")
 end
 

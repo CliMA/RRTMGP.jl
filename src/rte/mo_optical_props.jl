@@ -320,14 +320,14 @@ ty_optical_props_nstr(T,I) = ty_optical_props_nstr{T,I}(ntuple(i->nothing, 7)...
     character(len=*), optional,   intent(in) :: name
     character(len=128)                       :: err_message
 """
-  function init_and_alloc!(this::ty_optical_props, ncol, nlay, band_lims_wvn, band_lims_gpt=nothing, name=nothing)
-    if band_lims_gpt==nothing
-      init!(this, name, band_lims_wvn)
-    else
-      init!(this, name, band_lims_wvn, band_lims_gpt)
-    end
-    alloc!(this, ncol, nlay)
+function init_and_alloc!(this::ty_optical_props, ncol, nlay, band_lims_wvn, band_lims_gpt=nothing, name=nothing)
+  if band_lims_gpt==nothing
+    init!(this, name, band_lims_wvn)
+  else
+    init!(this, name, band_lims_wvn, band_lims_gpt)
   end
+  alloc!(this, ncol, nlay)
+end
 
   #-------------------------------------------------------------------------------------------------
   #
@@ -343,12 +343,12 @@ ty_optical_props_nstr(T,I) = ty_optical_props_nstr{T,I}(ntuple(i->nothing, 7)...
     character(len=*), optional,   intent(in) :: name
     character(len=128)                       :: err_message
 """
-  function copy_and_alloc!(this::ty_optical_props_1scl, ncol, nlay, spectral_desc::ty_optical_props, name=nothing)
-    is_initialized(this) && finalize!(this)
-    init!(this, name, get_band_lims_wavenumber(spectral_desc),
-                get_band_lims_gpoint(spectral_desc))
-    alloc!(this, ncol, nlay)
-  end
+function copy_and_alloc!(this::ty_optical_props_1scl, ncol, nlay, spectral_desc::ty_optical_props, name=nothing)
+  is_initialized(this) && finalize!(this)
+  init!(this, name, get_band_lims_wavenumber(spectral_desc),
+              get_band_lims_gpoint(spectral_desc))
+  alloc!(this, ncol, nlay)
+end
 
 """
     copy_and_alloc!(...)
@@ -359,12 +359,12 @@ ty_optical_props_nstr(T,I) = ty_optical_props_nstr{T,I}(ntuple(i->nothing, 7)...
     character(len=*), optional,   intent(in) :: name
     character(len=128)                       :: err_message
 """
-  function copy_and_alloc!(this::ty_optical_props_2str, ncol, nlay, spectral_desc::ty_optical_props, name=nothing)
-    is_initialized(this) && finalize!(this)
-    init!(this, name, get_band_lims_wavenumber(spectral_desc),
-                      get_band_lims_gpoint(spectral_desc))
-    alloc!(this, ncol, nlay)
-  end
+function copy_and_alloc!(this::ty_optical_props_2str, ncol, nlay, spectral_desc::ty_optical_props, name=nothing)
+  is_initialized(this) && finalize!(this)
+  init!(this, name, get_band_lims_wavenumber(spectral_desc),
+                    get_band_lims_gpoint(spectral_desc))
+  alloc!(this, ncol, nlay)
+end
 
 """
     copy_and_alloc_nstr!(...)
@@ -375,12 +375,12 @@ ty_optical_props_nstr(T,I) = ty_optical_props_nstr{T,I}(ntuple(i->nothing, 7)...
     character(len=*), optional,   intent(in) :: name
     character(len=128)                       :: err_message
 """
-  function copy_and_alloc!(this::ty_optical_props_nstr, nmom, ncol, nlay, spectral_desc::ty_optical_props, name=nothing)
-    is_initialized(this) && finalize!(this)
-    init!(this, name, get_band_lims_wavenumber(spectral_desc),
-                      get_band_lims_gpoint(spectral_desc))
-    alloc!(this, nmom, ncol, nlay)
-  end
+function copy_and_alloc!(this::ty_optical_props_nstr, nmom, ncol, nlay, spectral_desc::ty_optical_props, name=nothing)
+  is_initialized(this) && finalize!(this)
+  init!(this, name, get_band_lims_wavenumber(spectral_desc),
+                    get_band_lims_gpoint(spectral_desc))
+  alloc!(this, nmom, ncol, nlay)
+end
 
   # ------------------------------------------------------------------------------------------
   #
@@ -397,7 +397,7 @@ ty_optical_props_nstr(T,I) = ty_optical_props_nstr{T,I}(ntuple(i->nothing, 7)...
                                   intent(in   ) :: for_
     character(128)                              :: err_message
 """
-  delta_scale!(this::ty_optical_props_1scl, for_) = ""
+delta_scale!(this::ty_optical_props_1scl, for_) = ""
 
 
 """
@@ -410,26 +410,27 @@ ty_optical_props_nstr(T,I) = ty_optical_props_nstr{T,I}(ntuple(i->nothing, 7)...
     character(128)                              :: err_message
 
     integer :: ncol, nlay, ngpt
-    # --------------------------------
 """
-  function delta_scale!(this::ty_optical_props_2str{FT}, for_ = nothing) where FT
-    ncol = get_ncol(this)
-    nlay = get_nlay(this)
-    ngpt = get_ngpt(this)
+function delta_scale!(this::ty_optical_props_2str{FT}, for_ = nothing) where FT
+  ncol = get_ncol(this)
+  nlay = get_nlay(this)
+  ngpt = get_ngpt(this)
 
-    if for_ ≠ nothing
-      if any([size(for_, 1), size(for_, 2), size(for_, 3)] ≠ [ncol, nlay, ngpt])
-        error("delta_scale: dimension of 'for_' don't match optical properties arrays")
-      end
-      if any(for_ < FT(0) || for_ > FT(1))
-        error("delta_scale: values of 'for_' out of bounds [0,1]")
-      end
-      delta_scale_2str_kernel!(ncol, nlay, ngpt, this.tau, this.ssa, this.g, for_)
-    else
-      delta_scale_2str_kernel!(ncol, nlay, ngpt, this.tau, this.ssa, this.g)
+  if for_ ≠ nothing
+    if any([size(for_, 1), size(for_, 2), size(for_, 3)] ≠ [ncol, nlay, ngpt])
+      error("delta_scale: dimension of 'for_' don't match optical properties arrays")
     end
+    if any(for_ < FT(0) || for_ > FT(1))
+      error("delta_scale: values of 'for_' out of bounds [0,1]")
+    end
+    # delta_scale_2str_kernel!(ncol, nlay, ngpt, this.tau, this.ssa, this.g, for_)
+    delta_scale_2str_kernel!(this, for_)
+  else
+    # delta_scale_2str_kernel!(ncol, nlay, ngpt, this.tau, this.ssa, this.g)
+    delta_scale_2str_kernel!(this)
   end
-  # ------------------------------------------------------------------------------------------
+end
+
 
 """
     delta_scale!(...)
@@ -896,7 +897,7 @@ ty_optical_props_nstr(T,I) = ty_optical_props_nstr{T,I}(ntuple(i->nothing, 7)...
     if !bands_are_equal
       return bands_are_equal
     end
-    bands_are_equal = all(abs(get_band_lims_wavenumber(this) - get_band_lims_wavenumber(that)) < FT(5) * spacing(get_band_lims_wavenumber(this)))
+    bands_are_equal = all(abs.(get_band_lims_wavenumber(this) .- get_band_lims_wavenumber(that)) .< FT(5) * spacing.(get_band_lims_wavenumber(this)))
     return bands_are_equal
   end
   #--------------------------------------------------------------------------------------------------------------------

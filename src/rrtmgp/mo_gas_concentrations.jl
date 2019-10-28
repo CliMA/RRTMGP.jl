@@ -112,10 +112,7 @@ module mo_gas_concentrations
     # class(ty_gas_concs), intent(inout) :: this
     # character(len=*),    intent(in   ) :: gas
     # real(FT),            intent(in   ) :: w
-    # character(len=128)                 :: error_msg
-    # # ---------
-    # integer :: igas
-    # # ---------
+
     if w < FT(0) || w > FT(1)
       error("ty_gas_concs%set_vmr: concentrations should be >= 0, <= 1")
     end
@@ -143,82 +140,74 @@ module mo_gas_concentrations
     #
 
   end
-  # -------------------------------------------------------------------------------------
-  function set_vmr!(this::ty_gas_concs{FT}, gas, w::Vector{FT}) where FT
-    # class(ty_gas_concs), intent(inout) :: this
-    # character(len=*),    intent(in   ) :: gas
-    # real(FT), dimension(:),
-        #                      intent(in   ) :: w
-    # character(len=128)                 :: error_msg
-    # # ---------
-    # integer :: igas
-    # # ---------
 
-    if any(w < FT(0) || w > FT(1))
-      error("ty_gas_concs%set_vmr: concentrations should be >= 0, <= 1")
-    end
-    if this.nlay ≠ nothing && size(w,2) ≠ this.nlay
-      error("ty_gas_concs%set_vmr: different dimension (nlay)")
-    else
-      this.nlay = size(w)
-    end
+function set_vmr!(this::ty_gas_concs{FT}, gas, w::Vector{FT}) where FT
+  # class(ty_gas_concs), intent(inout) :: this
+  # character(len=*),    intent(in   ) :: gas
+  # real(FT), dimension(:),
+      #                      intent(in   ) :: w
 
-    igas = find_gas(this, gas)
-    conc = Array{FT}(w, 1, this.nlay)
-    gas_name = trim(gas)
-    # @show "Vector", igas, size(this.concs)
-    # if igas == GAS_NOT_IN_LIST || igas>length(this.concs)
-    if igas == GAS_NOT_IN_LIST
-      push!(this.concs, conc_field(conc))
-      push!(this.gas_name, gas_name)
-      igas = length(this.concs)
-    end
-    this.concs[igas].conc = conc
-    this.gas_name[igas] = gas_name
+  if any(w .< FT(0)) || any(w .> FT(1))
+    error("ty_gas_concs%set_vmr: concentrations should be >= 0, <= 1")
   end
-  # --------------------
-  function set_vmr!(this::ty_gas_concs, gas, w::Array{FT}) where FT
-    # class(ty_gas_concs), intent(inout) :: this
-    # character(len=*),    intent(in   ) :: gas
-    # real(FT), dimension(:,:),
-        #                      intent(in   ) :: w
-    # character(len=128)                 :: error_msg
-    # # ---------
-    # integer :: igas
-    # # ---------
-
-    if any(w .< FT(0)) || any(w .> FT(1))
-      error("set_vmr: concentrations should be >= 0, <= 1")
-    end
-    if this.ncol ≠ nothing && size(w, 1) ≠ this.ncol
-      @show size(w)
-      @show size(w, 1)
-      @show this.ncol
-      error("set_vmr: different dimension (ncol)")
-    else
-      this.ncol = size(w, 1)
-    end
-    if this.nlay ≠ nothing && size(w, 2) ≠ this.nlay
-      error("set_vmr: different dimension (nlay)")
-    else
-      this.nlay = size(w, 2)
-    end
-
-    conc = w
-    gas_name = trim(gas)
-    igas = find_gas(this, gas)
-    # @show "Array", gas, igas, igas == GAS_NOT_IN_LIST
-
-    # if igas == GAS_NOT_IN_LIST || igas>length(this.concs)
-    if igas == GAS_NOT_IN_LIST
-      push!(this.concs, conc_field(conc))
-      push!(this.gas_name, gas_name)
-      igas = length(this.concs)
-    end
-    this.concs[igas].conc = conc
-    this.gas_name[igas] = gas_name
+  if this.nlay ≠ nothing && length(w) ≠ this.nlay
+    error("ty_gas_concs%set_vmr: different dimension (nlay)")
+  else
+    this.nlay = length(w)
   end
-  # -------------------------------------------------------------------------------------
+
+  igas = find_gas(this, gas)
+  conc = Array{FT}(undef, 1, this.nlay)
+  conc .= reshape(w, 1, this.nlay)
+  gas_name = trim(gas)
+
+  if igas == GAS_NOT_IN_LIST || igas == length(this.concs)+1
+    push!(this.concs, conc_field(conc))
+    push!(this.gas_name, gas_name)
+    igas = length(this.concs)
+  end
+  this.concs[igas].conc = conc
+  this.gas_name[igas] = gas_name
+end
+
+function set_vmr!(this::ty_gas_concs, gas, w::Array{FT}) where FT
+  # class(ty_gas_concs), intent(inout) :: this
+  # character(len=*),    intent(in   ) :: gas
+  # real(FT), dimension(:,:),
+  #                      intent(in   ) :: w
+
+  if any(w .< FT(0)) || any(w .> FT(1))
+    error("set_vmr: concentrations should be >= 0, <= 1")
+  end
+  if this.ncol ≠ nothing && size(w, 1) ≠ this.ncol
+    @show size(w)
+    @show size(w, 1)
+    @show this.ncol
+    error("set_vmr: different dimension (ncol)")
+  else
+    this.ncol = size(w, 1)
+  end
+  if this.nlay ≠ nothing && size(w, 2) ≠ this.nlay
+    error("set_vmr: different dimension (nlay)")
+  else
+    this.nlay = size(w, 2)
+  end
+
+  conc = w
+  gas_name = trim(gas)
+  igas = find_gas(this, gas)
+  # @show "Array", gas, igas, igas == GAS_NOT_IN_LIST
+
+  # if igas == GAS_NOT_IN_LIST || igas>length(this.concs)
+  if igas == GAS_NOT_IN_LIST
+    push!(this.concs, conc_field(conc))
+    push!(this.gas_name, gas_name)
+    igas = length(this.concs)
+  end
+  this.concs[igas].conc = conc
+  this.gas_name[igas] = gas_name
+end
+
   #
   # Return volume mixing ratio as 1D or 2D array
   #
@@ -249,38 +238,42 @@ module mo_gas_concentrations
     #   array = this.concs[igas].conc[1,1]
     # end
 
-    array = Array{FT}(undef, this.ncol, this.nlay)
-
-
-    if size(conc, 1) > 1     # Concentration stored as 2D
-      array .= conc[:,:]
-    elseif size(conc, 2) > 1 # Concentration stored as 1D
-      array .= spread(conc[1,:], dim=1, ncopies=max(this.ncol, size(array,1)))
-      # array .= conc[1,:]
-    else                     # Concentration stored as scalar
-      fill!(array, conc[1,1])
+    if size(this.concs[igas].conc, 2) > 1
+      array = this.concs[igas].conc[1,:]
+    else
+      array = this.concs[igas].conc[1,1]
     end
 
-    if this.ncol ≠ nothing && this.ncol ≠ size(array,1)
-      @show size(conc, 1) > 1
-      @show size(conc, 2) > 1
-      @show gas, igas
-      @show size(conc)
-      @show size(array)
-      @show this.ncol
-      @show this.nlay
-      error("get_vmr: gas " * trim(gas) * " array is wrong size (ncol)")
-    end
-    if this.nlay ≠ nothing && this.nlay ≠ size(array,2)
-      @show size(conc, 1) > 1
-      @show size(conc, 2) > 1
-      @show gas, igas
-      @show size(conc)
-      @show size(array)
-      @show this.ncol
-      @show this.nlay
-      error("get_vmr: gas " * trim(gas) * " array is wrong size (nlay)")
-    end
+
+    # if size(conc, 1) > 1     # Concentration stored as 2D
+    #   array .= conc[1,:]
+    # elseif size(conc, 2) > 1 # Concentration stored as 1D
+    #   array .= spread(conc[1,:], dim=1, ncopies=max(this.ncol, size(array,1)))
+    #   # array .= conc[1,:]
+    # else                     # Concentration stored as scalar
+    #   fill!(array, conc[1,1])
+    # end
+
+    # if this.ncol ≠ nothing && this.ncol ≠ size(array,1)
+    #   @show size(conc, 1) > 1
+    #   @show size(conc, 2) > 1
+    #   @show gas, igas
+    #   @show size(conc)
+    #   @show size(array)
+    #   @show this.ncol
+    #   @show this.nlay
+    #   error("get_vmr: gas " * trim(gas) * " array is wrong size (ncol)")
+    # end
+    # if this.nlay ≠ nothing && this.nlay ≠ size(array,2)
+    #   @show size(conc, 1) > 1
+    #   @show size(conc, 2) > 1
+    #   @show gas, igas
+    #   @show size(conc)
+    #   @show size(array)
+    #   @show this.ncol
+    #   @show this.nlay
+    #   error("get_vmr: gas " * trim(gas) * " array is wrong size (nlay)")
+    # end
 
     return array
 

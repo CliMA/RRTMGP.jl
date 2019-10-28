@@ -87,7 +87,6 @@ function run_driver(datafolder, nblocks_iterations=nothing)
 
   ds_sw_flx_up = Dataset(sw_flx_up_for_res_file, "r") # reading the NetCDF file in read only mode
   ds_sw_flx_dn = Dataset(sw_flx_dn_for_res_file, "r") # reading the NetCDF file in read only mode
-
   ds = Dataset(rfmip_file, "r") # reading the NetCDF file in read only mode
   ds_k_dist = Dataset(kdist_file, "r") # reading the NetCDF file in read only mode
 
@@ -288,6 +287,10 @@ function run_driver(datafolder, nblocks_iterations=nothing)
   # unblock_and_write!(trim(flxup_file), "rsu", flux_up)
   # unblock_and_write!(trim(flxdn_file), "rsd", flux_dn)
 
+  close(ds_sw_flx_up)
+  close(ds_sw_flx_dn)
+  close(ds)
+  close(ds_k_dist)
 end
 
 @testset "Shortwave driver" begin

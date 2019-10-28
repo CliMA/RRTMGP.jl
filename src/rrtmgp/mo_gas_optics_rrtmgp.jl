@@ -144,7 +144,7 @@ module mo_gas_optics_rrtmgp
                        tsfc,
                        gas_desc::ty_gas_concs,
                        optical_props::ty_optical_props_arry,
-                       sources::ty_source_func_lw,
+                       sources::ty_source_func_lw;
                        col_dry=nothing,
                        tlev=nothing) # result(error_msg)
     # inputs
@@ -311,7 +311,7 @@ module mo_gas_optics_rrtmgp
                             ncol, nlay, ngpt, nband,
                             play, plev, tlay, gas_desc::ty_gas_concs,
                             optical_props::ty_optical_props_arry,
-                            col_dry=nothing) # result(error_msg)
+                            col_dry=nothing)
 
     # class(ty_gas_optics_rrtmgp),
     #                                   intent(in   ) :: this
@@ -412,7 +412,7 @@ module mo_gas_optics_rrtmgp
       # Get vmr if  gas is provided in ty_gas_concs
       #
       if lowercase(this.gas_names[igas]) in gas_desc.gas_name
-         vmr[:,:,igas] = get_vmr(gas_desc, this.gas_names[igas])
+         vmr[:,:,igas] .= get_vmr(gas_desc, this.gas_names[igas])
       end
     end
 

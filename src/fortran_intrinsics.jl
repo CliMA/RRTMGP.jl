@@ -20,6 +20,7 @@ export fmerge,
        fint,
        freshape,
        test_data,
+       deallocate!,
        present
 
 test_data(x::OffsetArray, args...) = test_data(reshape([x[:]...], size(x)...), args...)

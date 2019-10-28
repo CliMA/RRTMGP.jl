@@ -21,24 +21,37 @@
 module mo_cloud_optics
 
 using ..mo_optical_props
+using ..mo_util_array
+using ..fortran_intrinsics
+
+export set_ice_roughness!, load_lut!, load_Pade!
+export cloud_optics!
+export get_min_radius_liq,
+       get_max_radius_liq,
+       get_min_radius_ice,
+       get_max_radius_ice
 
 export ty_cloud_optics
 mutable struct ty_cloud_optics{FT, I} <: ty_optical_props{FT, I}
+  band2gpt#::Array{T,2}        # (begin g-point, end g-point) = band2gpt(2,band)
+  gpt2band#::Array{I,1}        # band = gpt2band(g-point)
+  band_lims_wvn#::Array{T,2}   # (upper and lower wavenumber by band) = band_lims_wvn(2,band)
+  name#::String
   # Ice surface roughness category - needed for Yang (2013) ice optics parameterization
-  icergh::I
+  icergh#::I
 
   #
   # Lookup table information
   #
-  radliq_lwr::FT
-  radice_lwr::FT
-  radliq_upr::FT
-  radice_upr::FT
-  liq_nsteps::I
-  ice_nsteps::I
+  radliq_lwr#::FT
+  radice_lwr#::FT
+  radliq_upr#::FT
+  radice_upr#::FT
+  liq_nsteps#::I
+  ice_nsteps#::I
 
-  liq_step_size::FT
-  ice_step_size::FT
+  liq_step_size#::FT
+  ice_step_size#::FT
 
   #
   # The tables themselves.
@@ -67,6 +80,8 @@ mutable struct ty_cloud_optics{FT, I} <: ty_optical_props{FT, I}
   pade_sizreg_ssaice # Array{FT,1}  # (nbound)
   pade_sizreg_asyice # Array{FT,1}  # (nbound)
 end
+
+ty_cloud_optics(FT, I) = ty_cloud_optics{FT,I}(ntuple(i->nothing, 31)...)
 
 # type, extends(ty_optical_props), public :: ty_cloud_optics
 #   # private
@@ -122,11 +137,20 @@ end
 #    lookup-tables and one for coefficients for Pade approximates
 #
 # ------------------------------------------------------------------------------
-function load_lut(this::ty_cloud_optics, band_lims_wvn,
-                  radliq_lwr, radliq_upr, radliq_fac,
-                  radice_lwr, radice_upr, radice_fac,
-                  lut_extliq, lut_ssaliq, lut_asyliq,
-                  lut_extice, lut_ssaice, lut_asyice)
+function load_lut!(this::ty_cloud_optics{FT},
+               band_lims_wvn,
+               radliq_lwr,
+               radliq_upr,
+               radliq_fac,
+               radice_lwr,
+               radice_upr,
+               radice_fac,
+               lut_extliq,
+               lut_ssaliq,
+               lut_asyliq,
+               lut_extice,
+               lut_ssaice,
+               lut_asyice) where FT
   # class(ty_cloud_optics),     intent(inout) :: this
   # real(FT), dimension(:,:),   intent(in   ) :: band_lims_wvn # Spectral discretization
   # # Lookup table interpolation constants
@@ -206,11 +230,20 @@ end
 # Cloud optics initialization function - Pade
 #
 # ------------------------------------------------------------------------------
-function load_pade(this, band_lims_wvn,
-                   pade_extliq, pade_ssaliq, pade_asyliq,
-                   pade_extice, pade_ssaice, pade_asyice,
-                   pade_sizreg_extliq, pade_sizreg_ssaliq, pade_sizreg_asyliq,
-                   pade_sizreg_extice, pade_sizreg_ssaice, pade_sizreg_asyice)
+function load_Pade!(this::ty_cloud_optics{FT},
+                    band_lims_wvn,
+                    pade_extliq,
+                    pade_ssaliq,
+                    pade_asyliq,
+                    pade_extice,
+                    pade_ssaice,
+                    pade_asyice,
+                    pade_sizreg_extliq,
+                    pade_sizreg_ssaliq,
+                    pade_sizreg_asyliq,
+                    pade_sizreg_extice,
+                    pade_sizreg_ssaice,
+                    pade_sizreg_asyice) where FT
   # class(ty_cloud_optics),       intent(inout) :: this          # cloud specification data
   # real(FT), dimension(:,:),     intent(in   ) :: band_lims_wvn # Spectral discretization
   # #
@@ -239,28 +272,28 @@ function load_pade(this, band_lims_wvn,
   #
   # Error checking
   #
-  if(nbnd ≠ get_nband(this))
+  if nbnd ≠ get_nband(this)
     error("init(cloud_optics): number of bands inconsistent between lookup tables, spectral discretization")
   end
-  if(any([size(pade_ssaliq, 1), size(pade_ssaliq, 2), size(pade_ssaliq, 3)] ≠ [nbnd, nsizereg, ncoeff_ssa_g]))
+  if any([size(pade_ssaliq, 1), size(pade_ssaliq, 2), size(pade_ssaliq, 3)] ≠ [nbnd, nsizereg, ncoeff_ssa_g])
     error("init(cloud_optics): array pade_ssaliq isn't consistently sized")
   end
-  if(any([size(pade_asyliq, 1), size(pade_asyliq, 2), size(pade_asyliq, 3)] ≠ [nbnd, nsizereg, ncoeff_ssa_g]))
+  if any([size(pade_asyliq, 1), size(pade_asyliq, 2), size(pade_asyliq, 3)] ≠ [nbnd, nsizereg, ncoeff_ssa_g])
     error("init(cloud_optics): array pade_asyliq isn't consistently sized")
   end
-  if(any([size(pade_extice, 1), size(pade_extice, 2), size(pade_extice, 3), size(pade_extice, 4)] ≠ [nbnd, nsizereg, ncoeff_ext, nrghice]))
+  if any([size(pade_extice, 1), size(pade_extice, 2), size(pade_extice, 3), size(pade_extice, 4)] ≠ [nbnd, nsizereg, ncoeff_ext, nrghice])
     error("init(cloud_optics): array pade_extice isn't consistently sized")
   end
-  if(any([size(pade_ssaice, 1), size(pade_ssaice, 2), size(pade_ssaice, 3), size(pade_ssaice, 4)] ≠ [nbnd, nsizereg, ncoeff_ssa_g, nrghice]))
+  if any([size(pade_ssaice, 1), size(pade_ssaice, 2), size(pade_ssaice, 3), size(pade_ssaice, 4)] ≠ [nbnd, nsizereg, ncoeff_ssa_g, nrghice])
     error("init(cloud_optics): array pade_ssaice isn't consistently sized")
   end
-  if(any([size(pade_asyice, 1), size(pade_asyice, 2), size(pade_asyice, 3), size(pade_asyice, 4)] ≠ [nbnd, nsizereg, ncoeff_ssa_g, nrghice]))
+  if any([size(pade_asyice, 1), size(pade_asyice, 2), size(pade_asyice, 3), size(pade_asyice, 4)] ≠ [nbnd, nsizereg, ncoeff_ssa_g, nrghice])
     error("init(cloud_optics): array pade_asyice isn't consistently sized")
   end
-  if(any([size(pade_sizreg_ssaliq), size(pade_sizreg_asyliq), size(pade_sizreg_extice), size(pade_sizreg_ssaice), size(pade_sizreg_asyice)] ≠ nbound))
+  if any([size(pade_sizreg_ssaliq), size(pade_sizreg_asyliq), size(pade_sizreg_extice), size(pade_sizreg_ssaice), size(pade_sizreg_asyice)] ≠ nbound)
     error("init(cloud_optics): one or more Pade size regime arrays are inconsistently sized")
   end
-  if(nsizereg ≠ 3)
+  if nsizereg ≠ 3
     error("init(cloud_optics): Expecting precisely three size regimes for Pade approximants")
   end
 
@@ -367,152 +400,118 @@ end
 #
 # Compute single-scattering properties
 #
-function cloud_optics(this::ty_cloud_optics{FT},
-                      ncol, nlay, nbnd, nrghice,
-                      liqmsk, icemsk, clwp, ciwp, reliq, reice,
+function cloud_optics!(this::ty_cloud_optics{FT},
+                      clwp, ciwp, reliq, reice,
                       optical_props) where FT
-  # class(ty_cloud_optics),
-  #           intent(in   ) :: this
-  # integer,  intent(in   ) :: ncol, nlay, nbnd
-  # integer,  intent(in   ) :: nrghice              # number of ice roughness categories
-  # logical,  intent(in   ) :: liqmsk(ncol,nlay),  # Cloud mask for liquid and ice clouds respectively
-  #                            icemsk(ncol,nlay)
-  # real(FT), intent(in   ) :: ciwp  (ncol,nlay),      # cloud ice water path
-  #                            clwp  (ncol,nlay),      # cloud liquid water path
-  #                            reice (ncol,nlay),       # cloud ice particle effective size (microns)
-  #                            reliq (ncol,nlay)      # cloud liquid particle effective radius (microns)
-  # class(ty_optical_props_arry),
-  #           intent(inout) :: optical_props
-  #                                            # Dimensions: (ncol,nlay,nbnd)
+    # class(ty_cloud_optics),
+    #           intent(in   ) :: this
+    # real(wp), intent(in   ) :: clwp  (:,:),    ! cloud ice water path    (units?)
+    #                            ciwp  (:,:),    ! cloud liquid water path (units?)
+    #                            reliq (:,:),    ! cloud ice particle effective size (microns)
+    #                            reice (:,:)      ! cloud liquid particle effective radius (microns)
+    # class(ty_optical_props_arry),
+    #           intent(inout) :: optical_props
+    #                                            ! Dimensions: (ncol,nlay,nbnd)
+
+    # character(len=128)      :: error_msg
+    # ! ------- Local -------
+    # logical(wl), dimension(size(clwp,1), size(clwp,2)) :: liqmsk, icemsk
+    # real(wp),    dimension(size(clwp,1), size(clwp,2), this%get_nband()) ::
+    #             ltau, ltaussa, ltaussag, itau, itaussa, itaussag
 
   # character(len=128)      :: error_msg
   # # ------- Local -------
   # type(ty_optical_props_2str) :: clouds_liq, clouds_ice
   # integer  :: nsizereg, ibnd, imom
-  # # ----------------------------------------
-  # #
-  # # Error checking
-  # #
-  # # ----------------------------------------
-  if !(allocated(this.lut_extliq) || allocated(this.pade_extliq))
-    error("cloud optics: no data has been initialized")
-  end
 
-  if !bands_are_equal(this, optical_props)
-    error("cloud optics: optical properties don't have the same band structure")
-  end
 
-  if get_nband(optical_props) ≠ get_ngpt(optical_props) 
-    error("cloud optics: optical properties must be requested by band not g-points")
-  end
+  ncol = size(clwp,1)
+  nlay = size(clwp,2)
+  nbnd = get_nband(this)
+  liqmsk = BitArray(clwp .> FT(0))
+  icemsk = BitArray(ciwp .> FT(0))
 
-  if this.icergh < 1 || this.icergh > get_num_ice_roughness_types(this)
-     error("cloud optics: cloud ice surface roughness flag is out of bounds")
-   end
+  ltau, ltaussa, ltaussag, itau, itaussa, itaussag = ntuple(i-> Array{FT}(undef, size(clwp,1), size(clwp,2), get_nband(this)), 6)
 
-  if any(liqmsk && (reliq < this.radliq_lwr || reliq > this.radliq_upr))
-    error("cloud optics: liquid effective radius is out of bounds")
-  end
+  # Error checking
+  @assert allocated(this.lut_extliq) || allocated(this.pade_extliq)
+  @assert bands_are_equal(this, optical_props)
+  @assert get_nband(optical_props) == get_ngpt(optical_props)
+  @assert !(this.icergh < 1 || this.icergh > get_num_ice_roughness_types(this))
+  @assert !any_vals_outside(reliq, liqmsk, this.radliq_lwr, this.radliq_upr)
+  @assert !any_vals_outside(reice, icemsk, this.radice_lwr, this.radice_upr)
+  any(liqmsk) && @assert !any_vals_less_than(clwp, liqmsk, FT(0))
+  any(icemsk) && @assert !any_vals_less_than(ciwp, icemsk, FT(0))
 
-  if any(icemsk && (reice < this.radice_lwr || reice > this.radice_upr))
-    error("cloud optics: ice effective radius is out of bounds")
-  end
-
-  if any((liqmsk &&  clwp < FT(0)) || (icemsk &&  ciwp < FT(0)))
-    error("cloud optics: negative clwp or ciwp where clouds are supposed to be")
-  end
-
-  # ----------------------------------------
   #
   # Compute cloud optical properties. Use lookup tables if available, Pade approximants if not.
   #
-  alloc_2str!(clouds_liq, ncol,nlay, this)
 
-  alloc_2str!(clouds_ice, ncol,nlay, this)
   if allocated(this.lut_extliq)
     #
     # Liquid
     #
-    clouds_liq.tau = compute_from_table(ncol,nlay,nbnd,liqmsk,reliq,this.liq_nsteps,this.liq_step_size,this.radliq_lwr, this.lut_extliq)
-    clouds_liq.ssa = compute_from_table(ncol,nlay,nbnd,liqmsk,reliq,this.liq_nsteps,this.liq_step_size,this.radliq_lwr, this.lut_ssaliq)
-    clouds_liq.g   = compute_from_table(ncol,nlay,nbnd,liqmsk,reliq,this.liq_nsteps,this.liq_step_size,this.radliq_lwr, this.lut_asyliq)
-    for ibnd = 1:nbnd
-      for icol in 1:ncol
-        for ilay in 1:nlay
-          liqmsk[icol,ilay] && (clouds_liq.tau[icol,ilay,ibnd] = clouds_liq.tau[icol,ilay,ibnd] * clwp[icol,ilay])
-        end
-      end
-    end
+    compute_all_from_table!(ncol, nlay, nbnd, liqmsk, clwp, reliq,
+                                this.liq_nsteps,this.liq_step_size,this.radliq_lwr,
+                                this.lut_extliq, this.lut_ssaliq, this.lut_asyliq,
+                                ltau, ltaussa, ltaussag)
     #
     # Ice
     #
-    clouds_ice.tau = compute_from_table(ncol,nlay,nbnd,icemsk,reice,this.ice_nsteps,this.ice_step_size,this.radice_lwr, this.lut_extice[:,:,this.icergh])
-    clouds_ice.ssa = compute_from_table(ncol,nlay,nbnd,icemsk,reice,this.ice_nsteps,this.ice_step_size,this.radice_lwr, this.lut_ssaice[:,:,this.icergh])
-    clouds_ice.g   = compute_from_table(ncol,nlay,nbnd,icemsk,reice,this.ice_nsteps,this.ice_step_size,this.radice_lwr, this.lut_asyice[:,:,this.icergh])
-    for ibnd = 1:nbnd
-      for icol in 1:ncol
-        for ilay in 1:nlay
-          icemsk[icol,ilay] && (clouds_ice.tau[icol,ilay,ibnd] = clouds_ice.tau[icol,ilay,ibnd] * ciwp[icol,ilay])
-        end
-      end
-    end
+    compute_all_from_table!(ncol, nlay, nbnd, icemsk, ciwp, reice,
+                                this.ice_nsteps,this.ice_step_size,this.radice_lwr,
+                                this.lut_extice[:,:,this.icergh],
+                                this.lut_ssaice[:,:,this.icergh],
+                                this.lut_asyice[:,:,this.icergh],
+                                itau, itaussa, itaussag)
   else
     #
     # Cloud optical properties from Pade coefficient method
+    #   Hard coded assumptions: order of approximants, three size regimes
     #
-    # This assumes that all the Pade treaments have the same number of size regimes
     nsizereg = size(this.pade_extliq,2)
-    #
-    # Liquid
-    #
-    clouds_liq.tau =                    compute_from_pade(ncol,nlay,nbnd,liqmsk,reliq,nsizereg,this.pade_sizreg_extliq,2,3,this.pade_extliq)
-    clouds_liq.ssa = FT(1) - max(FT(0), compute_from_pade(ncol,nlay,nbnd,liqmsk,reliq,nsizereg,this.pade_sizreg_ssaliq,2,2,this.pade_ssaliq))
-    clouds_liq.g   =                    compute_from_pade(ncol,nlay,nbnd,liqmsk,reliq,nsizereg,this.pade_sizreg_asyliq,2,2,this.pade_asyliq)
-    for ibnd = 1:nbnd
-      for icol in 1:ncol
-        for ilay in 1:nlay
-          liqmsk[icol,ilay] && (clouds_liq.tau[icol,ilay,ibnd] = clouds_liq.tau[icol,ilay,ibnd] * clwp[icol,ilay])
-        end
-      end
-    end
-    #
-    # Ice
-    #
-    clouds_ice.tau =                    compute_from_pade(ncol,nlay,nbnd,icemsk,reice,nsizereg,this.pade_sizreg_extice,2,3, this.pade_extice[:,:,:,this.icergh])
-    clouds_ice.ssa = FT(1) - max(FT(0), compute_from_pade(ncol,nlay,nbnd,icemsk,reice,nsizereg,this.pade_sizreg_ssaice,2,2, this.pade_ssaice[:,:,:,this.icergh]))
-    clouds_ice.g   =                    compute_from_pade(ncol,nlay,nbnd,icemsk,reice,nsizereg,this.pade_sizreg_asyice,2,2, this.pade_asyice[:,:,:,this.icergh])
-    for ibnd = 1:nbnd
-      for icol in 1:ncol
-        for ilay in 1:nlay
-          icemsk[icol,ilay] && (clouds_ice.tau[icol,ilay,ibnd] = clouds_ice.tau[icol,ilay,ibnd] * ciwp[icol,ilay])
-        end
-      end
-    end
+    compute_all_from_pade!(ncol, nlay, nbnd, nsizereg,
+                              liqmsk, clwp, reliq,
+                              2, 3, this.pade_sizreg_extliq, this.pade_extliq,
+                              2, 2, this.pade_sizreg_ssaliq, this.pade_ssaliq,
+                              2, 2, this.pade_sizreg_asyliq, this.pade_asyliq,
+                              ltau, ltaussa, ltaussag)
+    compute_all_from_pade!(ncol, nlay, nbnd, nsizereg,
+                              icemsk, ciwp, reice,
+                              2, 3, this.pade_sizreg_extice, this.pade_extice[:,:,:,this.icergh],
+                              2, 2, this.pade_sizreg_ssaice, this.pade_ssaice[:,:,:,this.icergh],
+                              2, 2, this.pade_sizreg_asyice, this.pade_asyice[:,:,:,this.icergh],
+                              itau, itaussa, itaussag)
   end
 
   #
-  # Combine liquid and ice contributions into total cloud optical properties
+  # Copy total cloud properties onto outputs
   #
- increment!(clouds_ice, clouds_liq)
- #
- # Copy total cloud properties onto outputs
- #
- if optical_props isa ty_optical_props_1scl
-   optical_props.tau[1:ncol,1:nlay,1:nbnd] = clouds_liq.tau[1:ncol,1:nlay,1:nbnd] *
-                                    (FT(1) - clouds_liq.ssa[1:ncol,1:nlay,1:nbnd])
- elseif optical_props isa ty_optical_props_2str
-   optical_props.tau[1:ncol,1:nlay,1:nbnd] = clouds_liq.tau[1:ncol,1:nlay,1:nbnd]
-   optical_props.ssa[1:ncol,1:nlay,1:nbnd] = clouds_liq.ssa[1:ncol,1:nlay,1:nbnd]
-   optical_props.g[  1:ncol,1:nlay,1:nbnd] = clouds_liq.g[  1:ncol,1:nlay,1:nbnd]
- elseif optical_props isa ty_optical_props_nstr
-   optical_props.tau[  1:ncol,1:nlay,1:nbnd] = clouds_liq.tau[1:ncol,1:nlay,1:nbnd]
-   optical_props.ssa[  1:ncol,1:nlay,1:nbnd] = clouds_liq.ssa[1:ncol,1:nlay,1:nbnd]
-   optical_props.p[  1,1:ncol,1:nlay,1:nbnd] = clouds_liq.g[  1:ncol,1:nlay,1:nbnd]
-   for imom = 2:get_nmom(optical_props)
-     optical_props.p[imom,1:ncol,1:nlay,1:nbnd] = clouds_liq.g[          1:ncol,1:nlay,1:nbnd] *
-                                                  optical_props.p[imom-1,1:ncol,1:nlay,1:nbnd]
-   end
- end
+  if optical_props isa ty_optical_props_1scl
+    for ibnd = 1:nbnd
+      for ilay = 1:nlay
+        for icol = 1:ncol
+          # Absorption optical depth  = (1-ssa) * tau = tau - taussa
+          optical_props.tau[icol,ilay,ibnd] = (ltau[icol,ilay,ibnd] - ltaussa[icol,ilay,ibnd]) +
+                                              (itau[icol,ilay,ibnd] - itaussa[icol,ilay,ibnd])
+        end
+      end
+    end
+  elseif optical_props isa ty_optical_props_2str
+    for ibnd = 1:nbnd
+      for ilay = 1:nlay
+        for icol = 1:ncol
+          tau    = ltau[icol,ilay,ibnd]    + itau[icol,ilay,ibnd]
+          taussa = ltaussa[icol,ilay,ibnd] + itaussa[icol,ilay,ibnd]
+          optical_props.g[icol,ilay,ibnd]  = (ltaussag[icol,ilay,ibnd] + itaussag[icol,ilay,ibnd]) / max(eps(FT), taussa...)
+          optical_props.ssa[icol,ilay,ibnd] = taussa/max(eps(FT), tau...)
+          optical_props.tau[icol,ilay,ibnd] = tau
+        end
+      end
+    end
+  elseif optical_props isa ty_optical_props_nstr
+    error("cloud optics: n-stream calculations not yet supported")
+  end
 
 end
 
@@ -521,12 +520,7 @@ end
 
 """
 function set_ice_roughness!(this::ty_cloud_optics, icergh)
-  # class(ty_cloud_optics), intent(inout) :: this
-  # integer,                intent(in   ) :: icergh
-  # character(len=128)                    :: error_msg
-
-  icergh < 1 && error("set_ice_roughness!: must be > 0")
-
+  @assert icergh > 0
   this.icergh = icergh
 end
 
@@ -547,6 +541,116 @@ get_max_radius_liq(this::ty_cloud_optics) = this.radliq_upr
 get_min_radius_ice(this::ty_cloud_optics) = this.radice_lwr
 
 get_max_radius_ice(this::ty_cloud_optics) = this.radice_upr
+
+
+#
+# Ancillary functions
+#
+
+#
+# Linearly interpolate values from a lookup table with "nsteps" evenly-spaced
+#   elements starting at "offset." The table's second dimension is band.
+# Returns 0 where the mask is false.
+# We could also try gather/scatter for efficiency
+#
+function compute_all_from_table!(ncol, nlay, nbnd, mask, lwp, re,
+                                  nsteps, step_size, offset,
+                                  tau_table, ssa_table, asy_table,
+                                  tau::Array{FT}, taussa, taussag) where FT
+  # integer,                                intent(in) :: ncol, nlay, nbnd, nsteps
+  # logical(wl), dimension(ncol,nlay),      intent(in) :: mask
+  # real(wp),    dimension(ncol,nlay),      intent(in) :: lwp, re
+  # real(wp),                               intent(in) :: step_size, offset
+  # real(wp),    dimension(nsteps,   nbnd), intent(in) :: tau_table, ssa_table, asy_table
+  # real(wp),    dimension(ncol,nlay,nbnd)             :: tau, taussa, taussag
+  # # ---------------------------
+  # integer  :: icol, ilay, ibnd
+  # integer  :: index
+  # real(wp) :: fint
+  # real(wp) :: t, ts, tsg  # tau, tau*ssa, tau*ssa*g
+  # # ---------------------------
+  #$acc parallel loop gang vector default(present) collapse(3)
+  for ibnd = 1:nbnd
+    for ilay = 1:nlay
+      for icol = 1:ncol
+        if mask[icol,ilay]
+          index = convert(Int, min(floor((re[icol,ilay] - offset)/step_size)+1, nsteps-1))
+          fint = (re[icol,ilay] - offset)/step_size - (index-1)
+          t   = lwp[icol,ilay] *                  (tau_table[index,  ibnd] + fint * (tau_table[index+1,ibnd] - tau_table[index,ibnd]))
+          ts  = t              *                  (ssa_table[index,  ibnd] + fint * (ssa_table[index+1,ibnd] - ssa_table[index,ibnd]))
+          taussag[icol,ilay,ibnd] = ts          * (asy_table[index,  ibnd] + fint * (asy_table[index+1,ibnd] - asy_table[index,ibnd]))
+          taussa[icol,ilay,ibnd] = ts
+          tau[icol,ilay,ibnd] = t
+        else
+          tau[icol,ilay,ibnd] = FT(0)
+          taussa[icol,ilay,ibnd] = FT(0)
+          taussag[icol,ilay,ibnd] = FT(0)
+        end
+      end
+    end
+  end
+end
+
+#
+# Pade functions
+#
+
+function compute_all_from_pade!(ncol, nlay, nbnd, nsizes,
+                                 mask, lwp, re,
+                                 m_ext, n_ext, re_bounds_ext, coeffs_ext,
+                                 m_ssa, n_ssa, re_bounds_ssa, coeffs_ssa,
+                                 m_asy, n_asy, re_bounds_asy, coeffs_asy,
+                                 tau::Array{FT}, taussa, taussag) where FT
+  # integer,                        intent(in) :: ncol, nlay, nbnd, nsizes
+  # logical(wl),
+  #           dimension(ncol,nlay), intent(in) :: mask
+  # real(wp), dimension(ncol,nlay), intent(in) :: lwp, re
+  # real(wp), dimension(nsizes+1),  intent(in) :: re_bounds_ext, re_bounds_ssa, re_bounds_asy
+  # integer,                        intent(in) :: m_ext, n_ext
+  # real(wp), dimension(nbnd,nsizes,0:m_ext+n_ext),
+  #                                 intent(in) :: coeffs_ext
+  # integer,                        intent(in) :: m_ssa, n_ssa
+  # real(wp), dimension(nbnd,nsizes,0:m_ssa+n_ssa),
+  #                                 intent(in) :: coeffs_ssa
+  # integer,                        intent(in) :: m_asy, n_asy
+  # real(wp), dimension(nbnd,nsizes,0:m_asy+n_asy),
+  #                                 intent(in) :: coeffs_asy
+  # real(wp), dimension(ncol,nlay,nbnd)        :: tau, taussa, taussag
+  # # ---------------------------
+  # integer  :: icol, ilay, ibnd, irad, count
+  # real(wp) :: t, ts
+
+  #$acc parallel loop gang vector default(present) collapse(3)
+  for ibnd = 1:nbnd
+    for ilay = 1:nlay
+      for icol = 1:ncol
+        if mask[icol,ilay]
+          #
+          # Finds index into size regime table
+          # This works only if there are precisely three size regimes (four bounds) and it's
+          #   previously guaranteed that size_bounds(1) <= size <= size_bounds(4)
+          #
+          irad = convert(Int, min(floor((re[icol,ilay] - re_bounds_ext[2])/re_bounds_ext[3])+2, 3))
+          t   = lwp[icol,ilay] * pade_eval(ibnd, nbnd, nsizes, m_ext, n_ext, irad, re[icol,ilay], coeffs_ext)
+
+          irad = min(floor((re[icol,ilay] - re_bounds_ssa[2])/re_bounds_ssa[3])+2, 3)
+          # Pade approximants for co-albedo can sometimes be negative
+          ts   = t               * (FT(1) - max(FT(0), pade_eval(ibnd, nbnd, nsizes, m_ssa, n_ssa, irad, re[icol,ilay], coeffs_ssa)))
+          irad = min(floor((re[icol,ilay] - re_bounds_asy[2])/re_bounds_asy[3])+2, 3)
+          taussag[icol,ilay,ibnd] = ts             * pade_eval(ibnd, nbnd, nsizes, m_asy, n_asy, irad, re[icol,ilay], coeffs_asy)
+
+          taussa[icol,ilay,ibnd] = ts
+          tau[icol,ilay,ibnd] = t
+        else
+          tau[icol,ilay,ibnd] = FT(0)
+          taussa[icol,ilay,ibnd] = FT(0)
+          taussag[icol,ilay,ibnd] = FT(0)
+        end
+      end
+    end
+  end
+
+end
 
 #
 # Ancillary functions
