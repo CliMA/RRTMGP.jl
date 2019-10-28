@@ -65,8 +65,25 @@ cd(rte_rrtmgp_rfmip_clear_sky) do
   # rm("rsd_Efx_RTE-RRTMGP-181204_rad-irf_r1i1p1f1_gn.nc"; force=true)
   # rm("rsu_Efx_RTE-RRTMGP-181204_rad-irf_r1i1p1f1_gn.nc"; force=true)
 
-  # run(`make clean`)
-  # run(`make`)
+cd(joinpath(root_dir,"rte-rrtmgp")) do
+  rm(".DS_store"; force=true)
+end
+cd(joinpath(root_dir,"rte-rrtmgp","examples")) do
+  rm(".DS_store"; force=true)
+end
+cd(joinpath(root_dir,"rte-rrtmgp","examples","rfmip-clear-sky")) do
+  rm(".DS_store"; force=true)
+  rm("generate-output-file-templates.py"; force=true)
+  rm("multiple_input4MIPs_radiation_RFMIP_UColorado-RFMIP-1-2_none.nc"; force=true)
+  rm("rld_Efx_RTE-RRTMGP-181204_rad-irf_r1i1p1f1_gn.nc"; force=true)
+  rm("rlu_Efx_RTE-RRTMGP-181204_rad-irf_r1i1p1f1_gn.nc"; force=true)
+  rm("rrtmgp_rfmip_lw"; force=true)
+  rm("rrtmgp_rfmip_sw"; force=true)
+  rm("rsd_Efx_RTE-RRTMGP-181204_rad-irf_r1i1p1f1_gn.nc"; force=true)
+  rm("rsu_Efx_RTE-RRTMGP-181204_rad-irf_r1i1p1f1_gn.nc"; force=true)
+
+  run(`make clean`)
+  run(`make`)
   # stage_files.py calls urllib.request.urlretrieve, so call sparingly (can get blocked out by too many calls)
   # run(`python stage_files.py`)
 
