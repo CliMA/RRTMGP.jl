@@ -14,7 +14,7 @@ makedocs(
   pages = Any[
     "Home" => "index.md",
     "RTE" => "RTE.md",
-    "RRTMGP" => Any[ "gas optics rrtmgp" => "RRTMGP/mo_gas_optics_rrtmgp.md" ],
+    "RRTMGP" => Any[ "gas optics" => "RRTMGP/mo_gas_optics_rrtmgp.md" ],
   ],
 )
 
