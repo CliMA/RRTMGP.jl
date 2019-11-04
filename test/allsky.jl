@@ -124,6 +124,7 @@ function run_driver(datafolder; λ_string="")
   λ_string=="lw" && (n_g_points = "256")
   λ_string=="sw" && (n_g_points = "224")
   input_file = joinpath(datafolder, "examples", "all-sky", "rrtmgp-allsky.nc")
+  reference_file = joinpath(datafolder, "examples", "all-sky", "ref", "rrtmgp-allsky.nc")
   k_dist_file = joinpath(datafolder, "rrtmgp", "data", "rrtmgp-data-$(λ_string)-g"*n_g_points*"-2018-12-04.nc")
   cloud_optics_file = joinpath(datafolder, "extensions", "cloud_optics", "rrtmgp-cloud-optics-coeffs-$(λ_string).nc")
 
@@ -134,6 +135,7 @@ function run_driver(datafolder; λ_string="")
   FT = Float64
   I = Int64
   ds_input = Dataset(input_file, "r")
+  ds_ref = Dataset(reference_file, "r")
   ds_k_dist = Dataset(k_dist_file, "r")
   ds_cloud_optics = Dataset(cloud_optics_file, "r")
   p_lay, t_lay, p_lev, t_lev, gas_concs_garand, col_dry = read_atmos(ds_input, FT)
@@ -303,15 +305,27 @@ function run_driver(datafolder; λ_string="")
   end
 
 
-  if is_lw
-#     if(write_fluxes) call write_lw_fluxes(input_file, flux_up, flux_dn)
+  # Compare with reference:
+  ref_flux_up = Array{FT}(ds_ref[λ_string*"_flux_up"][:])
+  ref_flux_dn = Array{FT}(ds_ref[λ_string*"_flux_dn"][:])
 
-  else
-#     if(write_fluxes) call write_sw_fluxes(input_file, flux_up, flux_dn, flux_dir)
+  diff_up = maximum( abs.( flux_up .- ref_flux_up ) )
+  diff_dn = maximum( abs.( flux_dn .- ref_flux_dn ) )
 
-  end
+  diff_up_ulps = maximum( abs.( flux_up .- ref_flux_up ) ./ eps.(ref_flux_up) )
+  diff_dn_ulps = maximum( abs.( flux_dn .- ref_flux_dn ) ./ eps.(ref_flux_dn) )
+
+  @show sqrt(1/eps(FT))
+  @show diff_up, diff_up_ulps, maximum(abs.(ref_flux_up))
+  @show diff_dn, diff_dn_ulps, maximum(abs.(ref_flux_dn))
+
+  @test diff_up_ulps < sqrt(1/(1e6eps(FT)))
+  @test diff_dn_ulps < sqrt(1/(1e6eps(FT)))
 
   close(ds_input)
+  close(ds_ref)
+  close(ds_k_dist)
+  close(ds_cloud_optics)
 end
 
 
