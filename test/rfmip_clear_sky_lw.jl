@@ -160,8 +160,8 @@ function run_driver(datafolder)
 
   nbnd = get_nband(k_dist.optical_props)
   ngpt = get_ngpt(k_dist.optical_props)
-  @show ("nbnd = ", nbnd)
-  @show ("ngpt = ", ngpt)
+  @show nbnd
+  @show ngpt
 
   #
   # RRTMGP won't run with pressure less than its minimum. The top level in the RFMIP file
@@ -216,9 +216,8 @@ function run_driver(datafolder)
                 sfc_t[:,  b],
                 gas_conc_array[b],
                 optical_props,
-                source,
-                nothing,
-                t_lev[:,:,b])
+                source;
+                tlev = t_lev[:,:,b])
 
     rte_lw!(optical_props,top_at_1,source,sfc_emis_spec,fluxes,nothing,n_quad_angles)
     @assert fup === fluxes.flux_up # check if fluxes.flux_up/dn still refers to flux_up[:,:,b]

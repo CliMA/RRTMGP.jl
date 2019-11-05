@@ -412,7 +412,8 @@ module mo_gas_optics_rrtmgp
       # Get vmr if  gas is provided in ty_gas_concs
       #
       if lowercase(this.gas_names[igas]) in gas_desc.gas_name
-         vmr[:,:,igas] .= get_vmr(gas_desc, this.gas_names[igas])
+        gas_vmr = get_vmr(gas_desc, this.gas_names[igas])
+        vmr[:,:,igas] .= gas_vmr
       end
     end
 
