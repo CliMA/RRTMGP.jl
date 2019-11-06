@@ -52,7 +52,7 @@ module mo_gas_concentrations
     ncol#::Int
     nlay#::Int
   end
-  function ty_gas_concs(::Type{FT}, ncol, nlay) where FT
+  function ty_gas_concs(::Type{FT}, gas_names, ncol, nlay) where FT
     gas_name = Vector([])
     # conc = Array{FT,2}(undef, ncol, nlay)
     # concs = Vector([conc_field(conc)])
@@ -144,7 +144,7 @@ module mo_gas_concentrations
 
   end
   # -------------------------------------------------------------------------------------
-  function set_vmr!(this::ty_gas_concs{FT}, gas, w::Vector{FT}) where FT
+  function set_vmr!(this::ty_gas_concs{FT}, gas, w::Vector{FT}, debug=false) where FT
     # class(ty_gas_concs), intent(inout) :: this
     # character(len=*),    intent(in   ) :: gas
     # real(FT), dimension(:),
@@ -164,15 +164,10 @@ module mo_gas_concentrations
     end
 
     igas = find_gas(this, gas)
-    conc = Array{FT}(undef, 1, this.nlay)
+    conc = reshape(w, 1, this.nlay)
     gas_name = trim(gas)
-    # @show this.gas_name, gas
-    # @show igas, size(this.concs)
-    # if igas == GAS_NOT_IN_LIST || length(this.concs)==0
-    # if igas == GAS_NOT_IN_LIST
     if igas == GAS_NOT_IN_LIST || igas == length(this.concs)+1
       push!(this.concs, conc_field(conc))
-      push!(this.gas_name, gas_name)
       igas = length(this.concs)
     end
     this.concs[igas].conc = conc
@@ -387,14 +382,14 @@ module mo_gas_concentrations
 
     return size(this.gas_name)
   end
-  # -------------------------------------------------------------------------------------
+
   function get_gas_names(this)
     # class(ty_gas_concs), intent(in) :: this
     # character(len=32), dimension(this%get_num_gases()) :: get_gas_names
 
     return this.gas_name[:]
   end
-  # -------------------------------------------------------------------------------------
+
   #
   # find gas in list; GAS_NOT_IN_LIST if not found
   #
@@ -403,29 +398,5 @@ module mo_gas_concentrations
     !any(L) && return GAS_NOT_IN_LIST
     return argmax(L)
   end
-
-  # function find_gas(this::ty_gas_concs, gas)
-  #   # character(len=*),   intent(in) :: gas
-  #   # class(ty_gas_concs), intent(in) :: this
-  #   # integer                        :: find_gas
-  #   # # -----------------
-  #   # integer :: igas
-  #   # # -----------------
-  #   gas_names = this.gas_name
-  #   return
-  #   if !allocated(this.gas_name)
-  #     return GAS_NOT_IN_LIST
-  #   end
-  #   println("********************************")
-  #   @show gas
-  #   @show this.gas_name
-  #   for igas = 1:length(this.gas_name)
-  #     @show igas, this.gas_name[igas], gas
-  #     if lowercase(trim(this.gas_name[igas])) == lowercase(trim(gas))
-  #       return igas
-  #     end
-  #   end
-  #   println("********************************")
-  # end
 
 end # module

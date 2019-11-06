@@ -31,9 +31,10 @@ function vmr_2d_to_1d!(gas_concs, gas_concs_garand, name)
   # real(wp) :: tmp(sz1, sz2), tmp_col(sz2)
 
   tmp = get_vmr(gas_concs_garand, name)
+  test_data(tmp, "tmp_gas_conc_"*trim(name))
   tmp_col = tmp[1, :]
 
-  set_vmr!(gas_concs, name, tmp_col)
+  set_vmr!(gas_concs, name, tmp_col, true)
 end
 
 function run_driver(datafolder; λ_string="")
@@ -138,28 +139,47 @@ function run_driver(datafolder; λ_string="")
   ds_ref = Dataset(reference_file, "r")
   ds_k_dist = Dataset(k_dist_file, "r")
   ds_cloud_optics = Dataset(cloud_optics_file, "r")
-  p_lay, t_lay, p_lev, t_lev, gas_concs_garand, col_dry = read_atmos(ds_input, FT)
+  p_lay, t_lay, p_lev, t_lev, gas_concs_garand, col_dry = read_atmos(ds_input, FT, gas_names)
+  test_data(p_lay, "p_lay")
+  test_data(t_lay, "t_lay")
+  test_data(p_lev, "p_lev")
+  test_data(t_lev, "t_lev")
+  for igas = 1:length(gas_concs_garand.concs)
+    test_data(gas_concs_garand.concs[igas].conc, "gas_concs_garand_i"*string(igas))
+  end
   deallocate!(col_dry)
   nlay = size(p_lay, 2)
   # For clouds we'll use the first column, repeated over and over
-  gas_concs = ty_gas_concs(FT, ncol, nlay)
+  gas_concs = ty_gas_concs(FT, gas_names, ncol, nlay)
   gas_concs.gas_name = gas_names
   for igas = 1:ngas
     vmr_2d_to_1d!(gas_concs, gas_concs_garand, gas_names[igas])
   end
+
+  for igas = 1:length(gas_concs.concs)
+    test_data(gas_concs.concs[igas].conc, "gas_concs_i"*string(igas))
+  end
+  # for igas = 1:length(gas_concs_1col.concs)
+  #   test_data(gas_concs_1col.concs[igas].conc, "gas_concs_1col_i"*string(igas))
+  # end
+
   #  If we trusted in Fortran allocate-on-assign we could skip the temp_array here
-  temp_array = Array{FT}(undef, ncol, nlay)
-  temp_array .= reshape(spread(p_lay[1,:], 1, ncol), ncol, nlay)
+  temp_array = zeros(FT, ncol, nlay)
+  temp_array .= spread_new(p_lay[1,:], 1, ncol)
   p_lay = deepcopy(temp_array)
-  temp_array = Array{FT}(undef, ncol, nlay)
-  temp_array .= reshape(spread(t_lay[1,:], 1, ncol), ncol, nlay)
+  temp_array = zeros(FT, ncol, nlay)
+  temp_array .= spread_new(t_lay[1,:], 1, ncol)
   t_lay = deepcopy(temp_array)
-  temp_array = Array{FT}(undef, ncol, nlay+1)
-  temp_array .= reshape(spread(p_lev[1,:], 1, ncol), ncol, nlay+1)
+  temp_array = zeros(FT, ncol, nlay+1)
+  temp_array .= spread_new(p_lev[1,:], 1, ncol)
   p_lev = deepcopy(temp_array)
-  temp_array = Array{FT}(undef, ncol, nlay+1)
-  temp_array .= reshape(spread(t_lev[1,:], 1, ncol), ncol, nlay+1)
+  temp_array = zeros(FT, ncol, nlay+1)
+  temp_array .= spread_new(t_lev[1,:], 1, ncol)
   t_lev = deepcopy(temp_array)
+  test_data(p_lay, "p_lay2")
+  test_data(t_lay, "t_lay2")
+  test_data(p_lev, "p_lev2")
+  test_data(t_lev, "t_lev2")
 
   # This puts pressure and temperature arrays on the GPU
   # load data into classes
@@ -208,42 +228,46 @@ function run_driver(datafolder; λ_string="")
   #   is LW or SW
   if is_sw
     # toa_flux is thread private
-    toa_flux = Array{FT}(undef, ncol, ngpt)
+    toa_flux = zeros(FT, ncol, ngpt)
     #
-    sfc_alb_dir = Array{FT}(undef, nbnd, ncol)
-    sfc_alb_dif = Array{FT}(undef, nbnd, ncol)
-    mu0 = Array{FT}(undef, ncol)
+    sfc_alb_dir = zeros(FT, nbnd, ncol)
+    sfc_alb_dif = zeros(FT, nbnd, ncol)
+    mu0 = zeros(FT, ncol)
     # Ocean-ish values for no particular reason
     sfc_alb_dir .= FT(0.06)
     sfc_alb_dif .= FT(0.06)
     mu0 .= FT(.86)
+    test_data(sfc_alb_dir, "sfc_alb_dir")
+    test_data(sfc_alb_dif, "sfc_alb_dif")
   else
     # lw_sorces is thread private
     lw_sources = ty_source_func_lw(ncol, nlay, k_dist.optical_props)
 
-    t_sfc = Array{FT}(undef, ncol)
-    emis_sfc = Array{FT}(undef, nbnd, ncol)
+    t_sfc = zeros(FT, ncol)
+    emis_sfc = zeros(FT, nbnd, ncol)
     # Surface temperature
     t_sfc .= t_lev[1, fmerge(nlay+1, 1, top_at_1)]
     emis_sfc .= FT(0.98)
+    test_data(t_sfc, "t_sfc")
+    test_data(emis_sfc, "emis_sfc")
   end
 
   #
   # Fluxes
   #
-  flux_up = Array{FT}(undef, ncol,nlay+1)
-  flux_dn = Array{FT}(undef, ncol,nlay+1)
+  flux_up = zeros(FT, ncol,nlay+1)
+  flux_dn = zeros(FT, ncol,nlay+1)
 
   if is_sw
-    flux_dir = Array{FT}(undef, ncol,nlay+1)
+    flux_dir = zeros(FT, ncol,nlay+1)
   end
   #
   # Clouds
   #
-  lwp = Array{FT}(undef, ncol,nlay)
-  iwp = Array{FT}(undef, ncol,nlay)
-  rel = Array{FT}(undef, ncol,nlay)
-  rei = Array{FT}(undef, ncol,nlay)
+  lwp = zeros(FT, ncol,nlay)
+  iwp = zeros(FT, ncol,nlay)
+  rel = zeros(FT, ncol,nlay)
+  rei = zeros(FT, ncol,nlay)
   cloud_mask = Array{Bool}(undef, ncol,nlay)
 
   # Restrict clouds to troposphere (< 100 hPa = 100*100 Pa)
@@ -262,6 +286,16 @@ function run_driver(datafolder; λ_string="")
       rei[icol,ilay] = fmerge(rei_val, FT(0), iwp[icol,ilay] > FT(0))
     end
   end
+  test_data(cloud_mask, "cloud_mask")
+  test_data(lwp, "lwp")
+  test_data(iwp, "iwp")
+  test_data(rel, "rel")
+  test_data(rei, "rei")
+  test_data(p_lay, "p_lay3")
+  test_data(t_lay, "t_lay3")
+  test_data(p_lev, "p_lev3")
+  test_data(t_lev, "t_lev3")
+
   fluxes = ty_fluxes_broadband(FT)
   #
   # Multiple iterations for big problem sizes, and to help identify data movement
@@ -273,15 +307,32 @@ function run_driver(datafolder; λ_string="")
     #
     # Solvers
     #
-    fluxes.flux_up = flux_up[:,:]
-    fluxes.flux_dn = flux_dn[:,:]
+    fluxes.flux_up = @view(flux_up[:,:])
+    fluxes.flux_dn = @view(flux_dn[:,:])
     if is_lw
       gas_optics!(k_dist, p_lay, p_lev,
                   t_lay, t_sfc,
                   gas_concs,
                   atmos,
                   lw_sources;
-                  tlev = t_lev)
+                  tlev = t_lev, debug=true)
+      test_data(k_dist.optical_props.band2gpt, "k_dist_band2gpt")
+      test_data(k_dist.optical_props.gpt2band, "k_dist_gpt2band")
+      test_data(k_dist.optical_props.band_lims_wvn, "k_dist_band_lims_wvn")
+
+      test_data(atmos.band2gpt, "atmos_band2gpt")
+      test_data(atmos.gpt2band, "atmos_gpt2band")
+      test_data(atmos.band_lims_wvn, "atmos_band_lims_wvn")
+
+      test_data(lw_sources.optical_props.band2gpt, "lw_sources_band2gpt")
+      test_data(lw_sources.optical_props.gpt2band, "lw_sources_gpt2band")
+      test_data(lw_sources.optical_props.band_lims_wvn, "lw_sources_band_lims_wvn")
+
+      test_data(lw_sources.sfc_source, "sfc_source")
+      test_data(lw_sources.lay_source, "lay_source", 5eps(FT))
+      test_data(lw_sources.lev_source_inc, "lev_source_inc", 5eps(FT))
+      test_data(lw_sources.lev_source_dec, "lev_source_dec", 5eps(FT))
+
       increment!(clouds, atmos)
       rte_lw!(atmos, top_at_1,
               lw_sources,
@@ -319,8 +370,8 @@ function run_driver(datafolder; λ_string="")
   @show diff_up, diff_up_ulps, maximum(abs.(ref_flux_up))
   @show diff_dn, diff_dn_ulps, maximum(abs.(ref_flux_dn))
 
-  @test diff_up_ulps < sqrt(1/(1e6eps(FT)))
-  @test diff_dn_ulps < sqrt(1/(1e6eps(FT)))
+  @test diff_up_ulps < sqrt(1/(10eps(FT)))
+  @test diff_dn_ulps < sqrt(1/(10eps(FT)))
 
   close(ds_input)
   close(ds_ref)
@@ -333,6 +384,6 @@ end
   datafolder = JRRTMGP.data_folder_rrtmgp()
 
   run_driver(datafolder; λ_string = "lw")
-  run_driver(datafolder, λ_string = "sw")
+  # run_driver(datafolder, λ_string = "sw")
 end
 

@@ -9,6 +9,7 @@ export fmerge,
        fminloc_wrapper,
        fmaxloc_wrapper,
        spread,
+       spread_new,
        associated,
        is_initialized,
        allocated,
@@ -21,7 +22,33 @@ export fmerge,
        freshape,
        test_data,
        deallocate!,
+       check_for_NaNs,
        present
+
+check_for_NaNs(x::OffsetArray, args...) = check_for_NaNs(reshape([x[:]...], size(x)...), args...)
+function check_for_NaNs(x, name, tol = nothing)
+  if eltype(x) <: AbstractFloat
+    FT = Float64
+    if eltype(x) ≠ Float64
+      @show eltype(x)
+      error("Data not Float64: $(name)")
+    end
+    tol==nothing && (tol = eps(FT))
+  elseif eltype(x) <: Integer
+    FT = Int64
+    tol = eps(Float64)
+  else
+    @show eltype(x)
+    error("Data not Float64: $(name)")
+  end
+  println("Checking NaNs for $(name)")
+
+  fm = floatmin(FT)
+  if !all(-1/fm .< x .< 1/fm)
+    @show x
+    error("Bad values in $(name)")
+  end
+end
 
 test_data(x::OffsetArray, args...) = test_data(reshape([x[:]...], size(x)...), args...)
 
@@ -43,7 +70,12 @@ function test_data(x, name, tol = nothing)
   x_correct, s = readdlm(joinpath("/Users","charliekawczynski","TestData",name)*".dat", '\t', FT, header=true, '\n')
   s = parse.(Int, filter(i-> i≠"", split(strip(s[1]), " ")))
   x_correct = reshape(x_correct, s...)
-  @assert all(size(x_correct) .== size(x))
+  if !all(size(x_correct) .== size(x))
+    println("\n\n\n\n\n")
+    println(" ***************************** Failed comparison: "*name)
+    @show size(x_correct)
+    @show size(x)
+  end
   x_max = max(x_correct...)
   ad = abs.(x .- x_correct)
   cond = ad .< tol
@@ -66,11 +98,11 @@ function test_data(x, name, tol = nothing)
     @show sum(abs.(x_correct))
     @show max(abs.(x .- x_correct)...)
     @show sum(abs.(x .- x_correct))
-    error("Failed comparison in test_data")
+    # error("Failed comparison in test_data")
   else
-    if !occursin("gas_conc",name)
+    # if !occursin("gas_conc",name)
       println(" ----------------------------- Successful comparison: "*name)
-    end
+    # end
   end
   @test L
 end
@@ -152,7 +184,21 @@ function spread(source::Array{FT,N}, dim::Int, ncopies::Int) where {FT,N}
   @assert 1 <= dim <= N+1
   counts = [1 for i in 1:dim+1]
   counts[dim] = ncopies
+  # println("---------- spread")
+  # @show size(source)
+  # @show N, dim, ncopies
   return squeeze(repeat(source, counts...))
+end
+function spread_new(source::Vector{FT}, dim::Int, ncopies::Int) where {FT}
+  @assert 1 <= dim <= 2
+  # println("---------- spread_new")
+  # @show size(source)
+  # @show dim, ncopies
+  counts = [1 for i in 1:dim+1]
+  counts[dim] = ncopies
+  s = collect(size(source))
+  mat = reshape(source, 1, length(source))
+  return repeat(mat, counts...)
 end
 
 """

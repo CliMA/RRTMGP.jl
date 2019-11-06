@@ -617,8 +617,22 @@ real(FT) :: planck_function(nbnd,nlay+1,ncol)
                     fmajor, jeta, tropo, jtemp, jpress,
                     gpoint_bands, band_lims_gpt,
                     pfracin, temp_ref_min, totplnk_delta, totplnk, gpoint_flavor,
-                    sfc_src, lay_src, lev_src_inc, lev_src_dec)
+                    sfc_src, lay_src, lev_src_inc, lev_src_dec, debug)
     FT = eltype(fmajor) #Float64
+
+    debug && test_data(tlay, "tlay")
+    debug && test_data(tlev, "tlev")
+    debug && test_data(tsfc, "tsfc")
+    debug && test_data(fmajor, "fmajor", 5eps(FT))
+    debug && test_data(jeta, "jeta")
+    debug && test_data(tropo, "tropo")
+    debug && test_data(jtemp, "jtemp")
+    debug && test_data(jpress, "jpress")
+    debug && test_data(gpoint_bands, "gpoint_bands")
+    debug && test_data(band_lims_gpt, "band_lims_gpt")
+    debug && test_data(pfracin, "pfracin")
+    debug && test_data(totplnk, "totplnk")
+    debug && test_data(gpoint_flavor, "gpoint_flavor")
 
     pfrac = Array{FT}(undef,ngpt,nlay,ncol)
     pfrac .= 0.0
@@ -646,6 +660,7 @@ real(FT) :: planck_function(nbnd,nlay+1,ncol)
       end   # layer
     end     # column
 
+    debug && test_data(pfrac, "pfrac")
     #
     # Planck function by band for the surface
     # Compute surface source irradiance for g-point, equals band irradiance x fraction for g-point
@@ -663,6 +678,8 @@ real(FT) :: planck_function(nbnd,nlay+1,ncol)
         end
       end
     end # icol
+    # debug && test_data(planck_function, "planck_function1")
+    debug && test_data(sfc_src, "sfc_src")
 
     for icol in 1:ncol
       for ilay in 1:nlay
@@ -680,6 +697,8 @@ real(FT) :: planck_function(nbnd,nlay+1,ncol)
         end
       end # ilay
     end # icol
+    # debug && test_data(planck_function, "planck_function2")
+    debug && test_data(lay_src, "lay_src", 5eps(FT))
 
     # compute level source irradiances for each g-point, one each for upward and downward paths
     for icol in 1:ncol
@@ -699,6 +718,9 @@ real(FT) :: planck_function(nbnd,nlay+1,ncol)
         end
       end # ilay
     end # icol
+    # debug && test_data(planck_function, "planck_function3")
+    debug && test_data(lev_src_dec, "lev_src_dec", 5eps(FT))
+    debug && test_data(lev_src_inc, "lev_src_inc", 5eps(FT))
 
   end
 

@@ -146,7 +146,7 @@ module mo_gas_optics_rrtmgp
                        optical_props::ty_optical_props_arry,
                        sources::ty_source_func_lw;
                        col_dry=nothing,
-                       tlev=nothing) # result(error_msg)
+                       tlev=nothing, debug=false) # result(error_msg)
     # inputs
     # class(ty_gas_optics_rrtmgp), intent(in) :: this
     # real(FT), dimension(:,:), intent(in   ) :: play,    # layer pressures [Pa, mb]; (ncol,nlay)
@@ -194,7 +194,13 @@ module mo_gas_optics_rrtmgp
                      ncol, nlay, ngpt, nband,
                      play, plev, tlay, gas_desc,
                      optical_props,
-                     col_dry)
+                     col_dry, debug)
+
+    # test_data(jtemp, "jtemp")
+    # test_data(jpress, "jpress")
+    # test_data(jeta, "jeta")
+    # test_data(tropo, "tropo")
+    # test_data(fmajor, "fmajor")
 
     # ----------------------------------------------------------
     #
@@ -223,7 +229,7 @@ module mo_gas_optics_rrtmgp
            play, plev, tlay, tsfc,
            jtemp, jpress, jeta, tropo, fmajor,
            sources,
-           tlev)
+           tlev, debug)
     #$acc exit data delete(jtemp, jpress, tropo, fmajor, jeta)
   end
   #------------------------------------------------------------------------------------------
@@ -237,7 +243,7 @@ module mo_gas_optics_rrtmgp
                        gas_desc::ty_gas_concs,    # mandatory inputs
                        optical_props::ty_optical_props_arry,
                        toa_src,        # mandatory outputs
-                       col_dry=nothing) # result(error_msg)      # optional input
+                       col_dry=nothing, debug=false) # result(error_msg)      # optional input
 
     # class(ty_gas_optics_rrtmgp), intent(in) :: this
     # real(FT), dimension(:,:), intent(in   ) :: play,    # layer pressures [Pa, mb]; (ncol,nlay)
@@ -287,7 +293,7 @@ module mo_gas_optics_rrtmgp
                      ncol, nlay, ngpt, nband,
                      play, plev, tlay, gas_desc,
                      optical_props,
-                     col_dry)
+                     col_dry, debug)
 
     #$acc exit data delete(jtemp, jpress, tropo, fmajor, jeta)
 
@@ -311,7 +317,7 @@ module mo_gas_optics_rrtmgp
                             ncol, nlay, ngpt, nband,
                             play, plev, tlay, gas_desc::ty_gas_concs,
                             optical_props::ty_optical_props_arry,
-                            col_dry=nothing)
+                            col_dry=nothing, debug=false)
 
     # class(ty_gas_optics_rrtmgp),
     #                                   intent(in   ) :: this
@@ -416,6 +422,7 @@ module mo_gas_optics_rrtmgp
         vmr[:,:,igas] .= gas_vmr
       end
     end
+    debug && test_data(vmr, "vmr")
 
     #
     # Compute dry air column amounts (number of molecule per cm^2) if user hasn't provided them
@@ -508,7 +515,7 @@ module mo_gas_optics_rrtmgp
                   play, plev, tlay, tsfc,
                   jtemp, jpress, jeta, tropo, fmajor,
                   sources::ty_source_func_lw,          # Planck sources
-                  tlev)                                # optional input
+                  tlev, debug)                                # optional input
                   #result(error_msg)
     # # inputs
     # class(ty_gas_optics_rrtmgp),    intent(in ) :: this
@@ -574,6 +581,7 @@ module mo_gas_optics_rrtmgp
                                                                        (play(icol,nlay)-play(icol,nlay-1))
       end
     end
+    debug && test_data(tlev_wk, "tlev_wk")
 
     #-------------------------------------------------------------------
     # Compute internal (Planck) source functions at layers and levels,
@@ -587,7 +595,7 @@ module mo_gas_optics_rrtmgp
                 fmajor, jeta, tropo, jtemp, jpress,
                 get_gpoint_bands(this.optical_props), get_band_lims_gpoint(this.optical_props), this.planck_frac, this.temp_ref_min,
                 this.totplnk_delta, this.totplnk, this.gpoint_flavor,
-                sfc_source_t, lay_source_t, lev_source_inc_t, lev_source_dec_t)
+                sfc_source_t, lay_source_t, lev_source_inc_t, lev_source_dec_t, debug)
     #$acc parallel loop collapse(2)
     for igpt in 1:ngpt
       for icol in 1:ncol

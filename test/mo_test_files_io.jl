@@ -19,7 +19,7 @@
 # Read profiles for all columns  -- T, p, and gas concentrations
 #   Allocation occurs on assignments (says the F2003 standard)
 #
-function read_atmos(ds, FT)
+function read_atmos(ds, FT, gas_names)
 #                        p_lay, t_lay, p_lev, t_lev,
 #                        gas_concs, col_dry)
 #    character(len=*),   intent(in   ) :: fileName
@@ -44,7 +44,7 @@ function read_atmos(ds, FT)
   t_lay = Array{FT}(ds["t_lay"][:])
   p_lev = Array{FT}(ds["p_lev"][:])
   t_lev = Array{FT}(ds["t_lev"][:])
-  gas_concs = ty_gas_concs(FT, ncol, nlay)
+  gas_concs = ty_gas_concs(FT, gas_names, ncol, nlay)
 
   var_exists(ds, "vmr_h2o")      &&  set_vmr!(gas_concs,"h2o"    , Array{FT}(read_field(ds, "vmr_h2o")))
   var_exists(ds, "vmr_co2")      &&  set_vmr!(gas_concs,"co2"    , Array{FT}(read_field(ds, "vmr_co2")))
