@@ -144,7 +144,7 @@ module mo_gas_concentrations
 
   end
   # -------------------------------------------------------------------------------------
-  function set_vmr!(this::ty_gas_concs{FT}, gas, w::Vector{FT}, debug=false) where FT
+  function set_vmr!(this::ty_gas_concs{FT}, gas, w::Vector{FT}) where FT
     # class(ty_gas_concs), intent(inout) :: this
     # character(len=*),    intent(in   ) :: gas
     # real(FT), dimension(:),
