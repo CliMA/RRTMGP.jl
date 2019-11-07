@@ -52,7 +52,7 @@ module mo_gas_concentrations
     ncol#::Int
     nlay#::Int
   end
-  function ty_gas_concs(::Type{FT}, ncol, nlay) where FT
+  function ty_gas_concs(::Type{FT}, gas_names, ncol, nlay) where FT
     gas_name = Vector([])
     # conc = Array{FT,2}(undef, ncol, nlay)
     # concs = Vector([conc_field(conc)])
@@ -154,23 +154,20 @@ module mo_gas_concentrations
     # integer :: igas
     # # ---------
 
-    if any(w < FT(0) || w > FT(1))
+    if any(w .< FT(0)) || any(w .> FT(1))
       error("ty_gas_concs%set_vmr: concentrations should be >= 0, <= 1")
     end
-    if this.nlay ≠ nothing && size(w,2) ≠ this.nlay
+    if this.nlay ≠ nothing && length(w) ≠ this.nlay
       error("ty_gas_concs%set_vmr: different dimension (nlay)")
     else
-      this.nlay = size(w)
+      this.nlay = length(w)
     end
 
     igas = find_gas(this, gas)
-    conc = Array{FT}(w, 1, this.nlay)
+    conc = reshape(w, 1, this.nlay)
     gas_name = trim(gas)
-    # @show "Vector", igas, size(this.concs)
-    # if igas == GAS_NOT_IN_LIST || igas>length(this.concs)
-    if igas == GAS_NOT_IN_LIST
+    if igas == GAS_NOT_IN_LIST || igas == length(this.concs)+1
       push!(this.concs, conc_field(conc))
-      push!(this.gas_name, gas_name)
       igas = length(this.concs)
     end
     this.concs[igas].conc = conc
@@ -231,32 +228,21 @@ module mo_gas_concentrations
     # character(len=*),         intent(in ) :: gas
     # real(FT), dimension(:),   intent(out) :: array
     # character(len=128) :: error_msg
-    # # ---------------------
-    # integer :: igas
-    # # ---------------------
 
     igas = find_gas(this, gas)
     if igas == GAS_NOT_IN_LIST
       error("get_vmr: gas " * trim(gas) * " not found")
-    # elseif size(this.concs[igas].conc, 1) > 1 # Are we requesting a single profile when many are present?
-    #   error("get_vmr: gas " * trim(gas) * " requesting single profile but many are available")
     end
     conc = this.concs[igas].conc
 
-    # if size(this.concs[igas].conc, 2) > 1
-    #   array = this.concs[igas].conc[1,:]
-    # else
-    #   array = this.concs[igas].conc[1,1]
-    # end
+    this.ncol == nothing && (this.ncol = 1)
 
     array = Array{FT}(undef, this.ncol, this.nlay)
-
 
     if size(conc, 1) > 1     # Concentration stored as 2D
       array .= conc[:,:]
     elseif size(conc, 2) > 1 # Concentration stored as 1D
-      array .= spread(conc[1,:], dim=1, ncopies=max(this.ncol, size(array,1)))
-      # array .= conc[1,:]
+      array .= reshape(conc[1,:], this.ncol, this.nlay)
     else                     # Concentration stored as scalar
       fill!(array, conc[1,1])
     end
@@ -396,14 +382,14 @@ module mo_gas_concentrations
 
     return size(this.gas_name)
   end
-  # -------------------------------------------------------------------------------------
+
   function get_gas_names(this)
     # class(ty_gas_concs), intent(in) :: this
     # character(len=32), dimension(this%get_num_gases()) :: get_gas_names
 
     return this.gas_name[:]
   end
-  # -------------------------------------------------------------------------------------
+
   #
   # find gas in list; GAS_NOT_IN_LIST if not found
   #
@@ -412,29 +398,5 @@ module mo_gas_concentrations
     !any(L) && return GAS_NOT_IN_LIST
     return argmax(L)
   end
-
-  # function find_gas(this::ty_gas_concs, gas)
-  #   # character(len=*),   intent(in) :: gas
-  #   # class(ty_gas_concs), intent(in) :: this
-  #   # integer                        :: find_gas
-  #   # # -----------------
-  #   # integer :: igas
-  #   # # -----------------
-  #   gas_names = this.gas_name
-  #   return
-  #   if !allocated(this.gas_name)
-  #     return GAS_NOT_IN_LIST
-  #   end
-  #   println("********************************")
-  #   @show gas
-  #   @show this.gas_name
-  #   for igas = 1:length(this.gas_name)
-  #     @show igas, this.gas_name[igas], gas
-  #     if lowercase(trim(this.gas_name[igas])) == lowercase(trim(gas))
-  #       return igas
-  #     end
-  #   end
-  #   println("********************************")
-  # end
 
 end # module

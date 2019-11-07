@@ -30,8 +30,9 @@ function data_folder_rrtmgp()
   register(DataDep("rte-rrtmgp",
                    "data for rte-rrtmgp repo",
                    # "https://caltech.box.com/shared/static/8x6dsqt9puv8cxsg875dkp45f3g5dvug.gz", # commit ed5b0113109fcd23a010a90c61f21bad551146ef (original)
-                   "https://caltech.box.com/shared/static/j64qnw96izvheukk3avvz1j3js2g9kpw.gz", # commit ce295e55713550723797c128fadad7964576617d (cloud_optics added)
-                   "60a1b7015422be8508055400c2303fd5335c432b7c1bf71aa2489277efc3824b",
+                   # "https://caltech.box.com/shared/static/j64qnw96izvheukk3avvz1j3js2g9kpw.gz", # commit ce295e55713550723797c128fadad7964576617d (cloud_optics added)
+                   "https://caltech.box.com/shared/static/urnr3dlv0ff5uwt94t9g8zoon9t5jroa.gz", # commit ce295e55713550723797c128fadad7964576617d (cloud_optics added, with all-sky reference data)
+                   "a30ef1e22aeb1245d838b870449cebc4ea52c3c883f8114f124b0d06457cacc0",
                    post_fetch_method=extract_targz))
   datafolder = datadep"rte-rrtmgp"
   return datafolder

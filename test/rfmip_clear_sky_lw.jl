@@ -160,8 +160,8 @@ function run_driver(datafolder)
 
   nbnd = get_nband(k_dist.optical_props)
   ngpt = get_ngpt(k_dist.optical_props)
-  @show ("nbnd = ", nbnd)
-  @show ("ngpt = ", ngpt)
+  @show nbnd
+  @show ngpt
 
   #
   # RRTMGP won't run with pressure less than its minimum. The top level in the RFMIP file
@@ -209,16 +209,15 @@ function run_driver(datafolder)
       end
     end
 
-    gas_optics!(k_dist,
+    gas_optics_int!(k_dist,
                 p_lay[:,:,b],
                 p_lev[:,:,b],
                 t_lay[:,:,b],
                 sfc_t[:,  b],
                 gas_conc_array[b],
                 optical_props,
-                source,
-                nothing,
-                t_lev[:,:,b])
+                source;
+                tlev = t_lev[:,:,b])
 
     rte_lw!(optical_props,top_at_1,source,sfc_emis_spec,fluxes,nothing,n_quad_angles)
     @assert fup === fluxes.flux_up # check if fluxes.flux_up/dn still refers to flux_up[:,:,b]
@@ -250,6 +249,10 @@ function run_driver(datafolder)
   @test diff_up_ulps < sqrt(1/(1e6eps(FT)))
   @test diff_dn_ulps < sqrt(1/(1e6eps(FT)))
 
+  close(ds_lw_flx_up)
+  close(ds_lw_flx_dn)
+  close(ds)
+  close(ds_k_dist)
 end
 
 @testset "Longwave driver" begin

@@ -367,7 +367,7 @@ module mo_rfmip_io
     end
     nblocks = Int((ncol_l*nexp_l)/blocksize)
     FT = Float64
-    gas_concs = ty_gas_concs(FT, ncol_l, nlay_l)
+    gas_concs = ty_gas_concs(FT, gas_names, ncol_l, nlay_l)
     gas_conc_array = Vector([deepcopy(gas_concs) for i in 1:nblocks])
     # gas_conc_array = Vector()
 #    allocate(gas_conc_array(nblocks))
