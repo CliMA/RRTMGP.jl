@@ -8,6 +8,7 @@ Compute output quantities from RTE based on spectrally-resolved flux profiles
 """
 module mo_fluxes
 
+using DocStringExtensions
 using ..fortran_intrinsics
 using ..mo_optical_props
 using ..mo_fluxes_broadband_kernels
@@ -17,16 +18,18 @@ export ty_fluxes_broadband, are_desired, reduce!
 """
     ty_fluxes{FT}
 
-Fluxes struct
-  reduce! function accepts spectral flux profiles, computes desired outputs
-  are_desired() returns a logical - does it makes sense to invoke reduce()?
+Abstract Fluxes struct
 """
 abstract type ty_fluxes{FT} end
 
 """
     ty_fluxes_broadband{FT} <: ty_fluxes{FT}
 
-Class implementing broadband integration for the complete flux profile
+Contains up, down, net and direct downward fluxes
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
 """
 mutable struct ty_fluxes_broadband{FT} <: ty_fluxes{FT}
   flux_up#::Array{FT,2}
@@ -45,22 +48,22 @@ ty_fluxes_broadband(FT) = ty_fluxes_broadband{FT}(ntuple(i->nothing, 4)...)
                  top_at_1::Bool,
                  gpt_flux_dn_dir=nothing)
 
-Sum over the spectral dimension and return the whole profile
+Compute `ty_fluxes_broadband` `this` by summing over the
+spectral dimension, given
 
- - `this` a `ty_fluxes_broadband` [inout]
- - `gpt_flux_up` a `Array{FT,3}(ncol, nlay+1, ngpt)` [in] Fluxes by gpoint [W/m2]
- - `gpt_flux_dn` a `Array{FT,3}(ncol, nlay+1, ngpt)` [in] Fluxes by gpoint [W/m2]
- - `spectral_disc` a  `ty_optical_props` [in] derived type with spectral information
+ - `gpt_flux_up` upward fluxes by gpoint [W/m2]
+ - `gpt_flux_dn` downward fluxes by gpoint [W/m2]
+ - `spectral_disc` optical properties containing spectral information
  - `top_at_1` bool indicating at top
 optional:
- - `gpt_flux_dn_dir` a `Array{FT,3}` [in] Direct flux down
+ - `gpt_flux_dn_dir` downward direct flux
 """
 function reduce!(this::ty_fluxes_broadband,
-                 gpt_flux_up::A,
-                 gpt_flux_dn::A,
+                 gpt_flux_up::Array{FT,3},
+                 gpt_flux_dn::Array{FT,3},
                  spectral_disc::ty_optical_props,
                  top_at_1::Bool,
-                 gpt_flux_dn_dir=nothing) where A
+                 gpt_flux_dn_dir::Union{Nothing,Array{FT,3}}=nothing) where FT<:Real
 
   ncol,nlev,ngpt = size(gpt_flux_up)
 
