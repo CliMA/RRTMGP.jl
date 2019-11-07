@@ -1,4 +1,5 @@
 using Test
+ENV["DATADEPS_ALWAYS_ACCEPT"] = true
 
 # include("AutoRunRRTMGP.jl")
 for submodule in [

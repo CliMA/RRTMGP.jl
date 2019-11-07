@@ -1,5 +1,3 @@
-ENV["DATADEPS_ALWAYS_ACCEPT"] = true
-
 using Test
 using DataDeps
 using JRRTMGP
