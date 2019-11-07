@@ -2,12 +2,9 @@ using JRRTMGP
 using NCDatasets
 using JRRTMGP.mo_optical_props
 using JRRTMGP.mo_rte_solver_kernels
+using JRRTMGP.mo_simple_netcdf
 using JRRTMGP.fortran_intrinsics
 using Test
-
-get_array(ds, name, FT) = haskey(ds, name) ? convert(Array{FT}, ds[name][:]) : nothing
-get_array(ds, name, FT, s) = haskey(ds, name) ? convert(Array{FT}, ds[name][:]) : zeros(s)
-get_dim_size(ds, name) = ds.dim[name]
 
 function compare(ds, var_tuple)
   D = Dict()
@@ -23,84 +20,8 @@ function compare(ds, var_tuple)
   return D
 end
 
-function read_sw_solar_sources(ds, FT)
-  ncol  = get_dim_size(ds, "col")
-  ngpt = get_dim_size(ds, "gpt")
-  toa_src = get_array(ds, "toa_src", FT, (ncol))
-  return toa_src
-end
 
-function read_sw_bc(ds, FT)
-  ncol  = get_dim_size(ds, "col")
-  nband = get_dim_size(ds, "band")
-  mu0         =  get_array(ds, "mu0", FT, (ncol))
-  tsi         =  get_array(ds, "tsi", FT, (ncol))
-  sfc_alb_dir =  get_array(ds, "sfc_alb_dir", FT, (nband,ncol))
-  sfc_alb_dif =  get_array(ds, "sfc_alb_dif", FT, (nband,ncol))
-
-  tsi_scaling =  get_array(ds, "tsi_scaling", FT)
-  return mu0, tsi, tsi_scaling, sfc_alb_dir, sfc_alb_dif
-end
-
-function read_sources(ds, FT)
-  source_up =  get_array(ds, "source_up", FT)
-  source_dn =  get_array(ds, "source_dn", FT)
-  source_sfc = get_array(ds, "source_sfc", FT)
-  return source_up, source_dn, source_sfc
-end
-
-function read_two_stream(ds, FT)
-  Rdif = get_array(ds, "Rdif", FT)
-  Tdif = get_array(ds, "Tdif", FT)
-  Rdir = get_array(ds, "Rdir", FT)
-  Tdir = get_array(ds, "Tdir", FT)
-  Tnoscat = get_array(ds, "Tnoscat", FT)
-  return Rdif, Tdif, Rdir, Tdir, Tnoscat
-end
-
-function read_spectral_disc(ds, FT)
-    # character(len=*),       intent(in   ) :: fileName
-    # class(ty_optical_props), intent(inout) :: spectral_disc
-
-    # integer :: ncid
-    # integer :: nband
-    # integer,  dimension(:,:), allocatable :: band_lims_gpt
-    # real(FT), dimension(:,:), allocatable :: band_lims_wvn
-
-    # ! -------------------
-    # if(nf90_open(trim(fileName), NF90_WRITE, ncid) /= NF90_NOERR) &
-    #   error("read_spectral_disc: can't open file " // trim(fileName))
-
-    # nband = length(size(ds["band"]))
-    # nband = ds.dim["band"]
-    # if (get_dim_size(ncid, 'pair') /= 2) &
-    #   error("read_spectral_disc: pair dimension not 2 in file "//trim(fileName) )
-    # @show ds["pair"][:]
-    # @show ds["name"][:]
-
-    band_lims_wvn = convert(Array{FT}, ds["band_lims_wvn"][:])
-    band_lims_gpt = convert(Array{FT}, ds["band_lims_gpt"][:])
-    op = ty_optical_props_1scl(FT,Int)
-    init!(op, "spectral_disc", band_lims_wvn, band_lims_gpt)
-    return op
-
-    # ncid = nf90_close(ncid)
-end
-
-# ----------------------------------------------------------------------------------
-# program test_adding
 @testset "test_adding" begin
-  # use mo_rte_kind,      only: FT, wl
-  # use mo_optical_props, only: ty_optical_props, ty_optical_props_arry
-  # use mo_rte_solver_kernels,
-  #                       only: adding
-
-  # use mo_test_files_io, only: is_sw, read_direction, read_spectral_disc,
-  #                             read_sw_solar_sources, read_sw_bc, read_lw_bc,
-  #                             read_two_stream, read_sources,
-  #                             write_gpt_fluxes
-  # implicit none
-  # # ----------------------------------------------------------------------------------
   # integer :: ncol, nlay, ngpt
   # integer :: b, nBlocks, colS, colE
   # integer, parameter :: blockSize = 8

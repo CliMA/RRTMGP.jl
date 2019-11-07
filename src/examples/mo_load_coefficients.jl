@@ -83,8 +83,8 @@ module mo_load_coefficients
  #   ! gas_optics%load() returns a string; a non-empty string indicates an error.
 
   if haskey(ds,"totplnk")
-    totplnk     =      ds["totplnk"][:]
-    planck_frac =      ds["plank_fraction"][:]
+    totplnk     = Array{FT}(ds["totplnk"][:])
+    planck_frac = Array{FT}(ds["plank_fraction"][:])
     kdist = load_totplnk(totplnk, planck_frac, rayl_lower, rayl_upper, args...)
   else
     solar_src = ds["solar_source"][:]

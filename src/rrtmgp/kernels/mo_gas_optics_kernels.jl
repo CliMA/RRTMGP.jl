@@ -620,6 +620,7 @@ real(FT) :: planck_function(nbnd,nlay+1,ncol)
                     sfc_src, lay_src, lev_src_inc, lev_src_dec)
     FT = eltype(fmajor) #Float64
 
+
     pfrac = Array{FT}(undef,ngpt,nlay,ncol)
     pfrac .= 0.0
 
