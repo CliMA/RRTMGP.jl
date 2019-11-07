@@ -209,7 +209,7 @@ function run_driver(datafolder)
       end
     end
 
-    gas_optics!(k_dist,
+    gas_optics_int!(k_dist,
                 p_lay[:,:,b],
                 p_lev[:,:,b],
                 t_lay[:,:,b],

@@ -199,7 +199,7 @@ function run_driver(datafolder, nblocks_iterations=nothing)
     #    from pressures, temperatures, and gas concentrations...
     #
 
-    gas_optics!(k_dist,
+    gas_optics_ext!(k_dist,
                 p_lay[:,:,b],
                 p_lev[:,:,b],
                 t_lay[:,:,b],

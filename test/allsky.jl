@@ -279,14 +279,12 @@ function run_driver(datafolder; λ_string="")
     fluxes.flux_up = @view(flux_up[:,:])
     fluxes.flux_dn = @view(flux_dn[:,:])
     if is_lw
-      gas_optics!(k_dist, p_lay, p_lev,
+      gas_optics_int!(k_dist, p_lay, p_lev,
                   t_lay, t_sfc,
                   gas_concs,
                   atmos,
                   lw_sources;
                   tlev = t_lev)
-
-
 
 
       increment!(clouds, atmos)
@@ -297,7 +295,7 @@ function run_driver(datafolder; λ_string="")
     else
       fluxes.flux_dn_dir = flux_dir[:,:]
 
-      gas_optics!(k_dist, p_lay, p_lev,
+      gas_optics_ext!(k_dist, p_lay, p_lev,
                   t_lay,
                   gas_concs,
                   atmos,
