@@ -1,46 +1,26 @@
-# This code is part of RRTM for GCM Applications - Parallel (RRTMGP)
-#
-# Contacts: Robert Pincus and Eli Mlawer
-# email:  rrtmgp@aer.com
-#
-# Copyright 2015-2018,  Atmospheric and Environmental Research and
-# Regents of the University of Colorado.  All right reserved.
-#
-# Use and duplication is permitted under the terms of the
-#    BSD 3-clause license, see http://opensource.org/licenses/BSD-3-Clause
-# -------------------------------------------------------------------------------------------------
-#
-# Routines for permuting arrays: here one (x,y,z) -> (z,x,y) and (x,y,z) -> (z,y,x)
-#   Routines are just the front end to kernels
-#
-# -------------------------------------------------------------------------------------------------
+"""
+    mo_util_reorder
+
+Routines for permuting arrays:
+  - (x,y,z) -> (z,x,y)
+  - (x,y,z) -> (z,y,x)
+"""
 module mo_util_reorder
-  # use mo_rte_kind, only: FT
-  using ..mo_reorder_kernels
-  # implicit none
-  # private
-  # public :: reorder123x312, reorder123x321
-  export reorder123x312!, reorder123x321!
-# contains
-  # -------------------------------------------------------------------------------------------------
-  #
-  # (x,y,z) -> (z,x,y)
-  #
-  function reorder123x312!(array, array_out)
-    # real(FT), dimension(:,:,:), intent(in ) :: array
-    # real(FT), dimension(:,:,:), intent(out) :: array_out
 
-    reorder_123x312_kernel!(size(array,1), size(array,2), size(array,3), array, array_out)
-  end
-  # -------------------------------------------------------------------------------------------------
-  #
-  # (x,y,z) -> (z,y,x)
-  #
-  function reorder123x321!(array, array_out)
-    # real(FT), dimension(:,:,:), intent(in ) :: array
-    # real(FT), dimension(:,:,:), intent(out) :: array_out
+export reorder123x312!, reorder123x321!
 
-    reorder_123x321_kernel!(size(array,1), size(array,2), size(array,3), array, array_out)
-  end
-  # -------------------------------------------------------------------------------------------------
+"""
+    reorder123x312!(src, dst)
+
+Reorder indexes using mapping: (x,y,z) -> (z,x,y)
+"""
+reorder123x312!(src, dst) = permutedims!(dst, src, [3,1,2])
+
+"""
+    reorder123x321!(src, dst)
+
+Reorder indexes using mapping: (x,y,z) -> (z,y,x)
+"""
+reorder123x321!(src, dst) = permutedims!(dst, src, [3,2,1])
+
 end
