@@ -22,7 +22,6 @@ using ..mo_gas_optics_kernels
 using ..mo_util_string
 using ..mo_gas_concentrations
 using ..mo_optical_props
-using ..mo_util_reorder
 export gas_optics_int!, gas_optics_ext!, ty_gas_optics_rrtmgp, load_totplnk, load_solar_source
 export source_is_internal, source_is_external, get_press_min
 
@@ -522,9 +521,9 @@ function source(this::ty_gas_optics_rrtmgp,
       sources.sfc_source[icol,igpt] = sfc_source_t[igpt,icol]
     end
   end
-  reorder123x321!(lay_source_t, sources.lay_source)
-  reorder123x321!(lev_source_inc_t, sources.lev_source_inc)
-  reorder123x321!(lev_source_dec_t, sources.lev_source_dec)
+  permutedims!(sources.lay_source, lay_source_t, [3,2,1])
+  permutedims!(sources.lev_source_inc, lev_source_inc_t, [3,2,1])
+  permutedims!(sources.lev_source_dec, lev_source_dec_t, [3,2,1])
 end
 
 #--------------------------------------------------------------------------------------------------------------------
@@ -1258,49 +1257,32 @@ function combine_and_reorder!(tau, tau_rayleigh, has_rayleigh, optical_props::ty
   ncol = size(tau, 3)
   nlay = size(tau, 2)
   ngpt = size(tau, 1)
-  #$acc enter data copyin(optical_props)
   if !has_rayleigh
     # index reorder (ngpt, nlay, ncol) -> (ncol,nlay,gpt)
-    #$acc enter data copyin(tau)
-    #$acc enter data create(optical_props%tau)
-    reorder123x321!(tau, optical_props.tau)
+    permutedims!(optical_props.tau, tau, [3,2,1])
       if optical_props isa ty_optical_props_2str
-        #$acc enter data create(optical_props%ssa, optical_props%g)
         optical_props.ssa .= FT(0)
         optical_props.g   .= FT(0)
-        #$acc exit data copyout(optical_props%ssa, optical_props%g)
       elseif optical_props isa ty_optical_props_nstr # We ought to be able to combine this with above
         nmom = size(optical_props.p, 1)
-        #$acc enter data create(optical_props%ssa, optical_props%p)
         optical_props.ssa .= FT(0)
         optical_props.p   .= FT(0)
-        #$acc exit data copyout(optical_props%ssa, optical_props%p)
       end
-    #$acc exit data copyout(optical_props%tau)
-    #$acc exit data delete(tau)
   else
     # combine optical depth and rayleigh scattering
-    #$acc enter data copyin(tau, tau_rayleigh)
       if optical_props isa ty_optical_props_1scl
         # User is asking for absorption optical depth
-        #$acc enter data create(optical_props%tau)
-        reorder123x321!(tau, optical_props.tau)
-        #$acc exit data copyout(optical_props%tau)
+        permutedims!(optical_props.tau, tau, [3,2,1])
+
       elseif optical_props isa ty_optical_props_2str
-        #$acc enter data create(optical_props%tau, optical_props%ssa, optical_props%g)
         optical_props.tau, optical_props.ssa, optical_props.g =
           combine_and_reorder_2str(ncol, nlay, ngpt,       tau, tau_rayleigh)
-        #$acc exit data copyout(optical_props%tau, optical_props%ssa, optical_props%g)
       elseif optical_props isa ty_optical_props_nstr # We ought to be able to combine this with above
         nmom = size(optical_props.p, 1)
-        #$acc enter data create(optical_props%tau, optical_props%ssa, optical_props%p)
         combine_and_reorder_nstr!(ncol, nlay, ngpt, nmom, tau, tau_rayleigh,
                                       optical_props.tau, optical_props.ssa, optical_props.p)
-        #$acc exit data copyout(optical_props%tau, optical_props%ssa, optical_props%p)
       end
-    #$acc exit data delete(tau, tau_rayleigh)
   end
-  #$acc exit data copyout(optical_props)
 end
 
 #--------------------------------------------------------------------------------------------------------------------
