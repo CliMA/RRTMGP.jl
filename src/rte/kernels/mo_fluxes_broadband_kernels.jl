@@ -16,7 +16,7 @@ integer,                               intent(in ) :: ncol, nlev, ngpt
 real(FT), dimension(ncol, nlev, ngpt), intent(in ) :: spectral_flux
 real(FT), dimension(ncol, nlev),       intent(out) :: broadband_flux
 """
-sum_broadband(ncol, nlev, ngpt, spectral_flux::Array{FT}) where FT = sum(spectral_flux, dims=3)
+sum_broadband(ncol, nlev, ngpt, spectral_flux::Array{FT}) where FT = sum(spectral_flux, dims=3)[:,:,1]
 
 # net_broadband_new(ncol, nlev, ngpt, spectral_flux_dn::Array{FT}, spectral_flux_up) where FT = sum(spectral_flux_dn .- spectral_flux_up, dims=3)
 """
