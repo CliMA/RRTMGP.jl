@@ -137,7 +137,7 @@ function gas_optics_int!(this::ty_gas_optics_rrtmgp,
   jpress = Array{Int}(undef, size(play))
   jtemp = Array{Int}(undef, size(play))
   tropo = Array{Bool}(undef, size(play))
-  fmajor = Array{FT}(undef, 2,2,2,get_nflav(this),size(play)...)
+  fmajor = zeros(FT, 2,2,2,get_nflav(this),size(play)...)
   jeta = Array{Int}(undef, 2,    get_nflav(this), size(play)...)
 
   ncol  = size(play, 1)
@@ -217,7 +217,7 @@ function gas_optics_ext!(this::ty_gas_optics_rrtmgp,
   jpress = Array{Int}( undef, size(play))
   jtemp  = Array{Int}( undef, size(play))
   tropo  = Array{Bool}(undef, size(play))
-  fmajor = Array{FT}(  undef, 2,2,2, get_nflav(this), size(play)...)
+  fmajor = zeros(FT, 2,2,2, get_nflav(this), size(play)...)
   jeta   = Array{Int}( undef, 2,     get_nflav(this), size(play)...)
 
   ncol  = size(play, 1)
@@ -302,15 +302,15 @@ function compute_gas_taus!(this::ty_gas_optics_rrtmgp,
                           col_dry=nothing)
 
   FT = eltype(play)
-  tau = Array{FT}(undef, ngpt,nlay,ncol)          # absorption, Rayleigh scattering optical depths
-  tau_rayleigh = Array{FT}(undef, ngpt,nlay,ncol) # absorption, Rayleigh scattering optical depths
-  col_dry_arr = Array{FT}(undef, ncol, nlay)
-  col_dry_wk = Array{FT}(undef, ncol, nlay)
+  tau          = zeros(FT, ngpt,nlay,ncol)          # absorption, Rayleigh scattering optical depths
+  tau_rayleigh = zeros(FT, ngpt,nlay,ncol) # absorption, Rayleigh scattering optical depths
+  col_dry_arr  = zeros(FT, ncol, nlay)
+  col_dry_wk   = zeros(FT, ncol, nlay)
 
-  vmr     = Array{FT}(undef, ncol,nlay,  get_ngas(this)) # volume mixing ratios
+  vmr     = zeros(FT, ncol,nlay,  get_ngas(this)) # volume mixing ratios
   col_gas = OffsetArray{FT}(undef, 1:ncol,1:nlay,0:get_ngas(this)) # column amounts for each gas, plus col_dry
-  col_mix = Array{FT}(undef, 2,    get_nflav(this),ncol,nlay) # combination of major species's column amounts
-  fminor  = Array{FT}(undef, 2,2,  get_nflav(this),ncol,nlay) # interpolation fractions for minor species
+  col_mix = zeros(FT, 2,    get_nflav(this),ncol,nlay) # combination of major species's column amounts
+  fminor  = zeros(FT, 2,2,  get_nflav(this),ncol,nlay) # interpolation fractions for minor species
 
   # Error checking
   use_rayl = allocated(this.krayl)
@@ -473,11 +473,11 @@ function source(this::ty_gas_optics_rrtmgp,
                 tlev)                                # optional input
   FT = eltype(this.vmr_ref) # Float64
 
-  lay_source_t = Array{FT}(undef, ngpt,nlay,ncol)
-  lev_source_inc_t = Array{FT}(undef, ngpt,nlay,ncol)
-  lev_source_dec_t = Array{FT}(undef, ngpt,nlay,ncol)
-  sfc_source_t = Array{FT}(undef, ngpt,ncol)
-  tlev_arr = Array{FT}(undef, ncol,nlay+1)
+  lay_source_t     = zeros(FT, ngpt,nlay,ncol)
+  lev_source_inc_t = zeros(FT, ngpt,nlay,ncol)
+  lev_source_dec_t = zeros(FT, ngpt,nlay,ncol)
+  sfc_source_t     = zeros(FT, ngpt,ncol)
+  tlev_arr         = zeros(FT, ncol,nlay+1)
 
   # Source function needs temperature at interfaces/levels and at layer centers
   if present(tlev)
@@ -731,7 +731,7 @@ kminor_start_lower
   @assert allocated(rayl_lower) == allocated(rayl_upper)
 
   if allocated(rayl_lower)
-    this.krayl = Array{FT}(undef, size(rayl_lower,1),size(rayl_lower,2),size(rayl_lower,3),2)
+    this.krayl = zeros(FT, size(rayl_lower,1),size(rayl_lower,2),size(rayl_lower,3),2)
     this.krayl[:,:,:,1] = rayl_lower
     this.krayl[:,:,:,2] = rayl_upper
   end
@@ -912,9 +912,9 @@ function get_col_dry(vmr_h2o, plev, tlay, latitude=nothing)
   helmert1 = FT(9.80665)
   helmert2 = FT(0.02586)
   # local variables
-  g0         = Array{FT}(undef, size(tlay,1)             ) # (ncol)
-  delta_plev = Array{FT}(undef, size(tlay,1),size(tlay,2)) # (ncol,nlay)
-  m_air      = Array{FT}(undef, size(tlay,1),size(tlay,2)) # average mass of air; (ncol,nlay)
+  g0         = zeros(FT, size(tlay,1)             ) # (ncol)
+  delta_plev = zeros(FT, size(tlay,1),size(tlay,2)) # (ncol,nlay)
+  m_air      = zeros(FT, size(tlay,1),size(tlay,2)) # average mass of air; (ncol,nlay)
   # integer :: nlev, nlay
   # ------------------------------------------------
   nlay = size(tlay, 2)
@@ -931,7 +931,7 @@ function get_col_dry(vmr_h2o, plev, tlay, latitude=nothing)
   m_air[:,:] .= (m_dry(FT) .+ m_h2o(FT) .* vmr_h2o[:,:]) ./ (1 .+ vmr_h2o[:,:])
 
   # Hydrostatic equation
-  col_dry = Array{FT}(undef, size(tlay,1),size(tlay,2))
+  col_dry = zeros(FT, size(tlay,1),size(tlay,2))
   col_dry[:,:] .= FT(10) .* delta_plev[:,:] .* avogad(FT) ./ (FT(1000)*m_air[:,:] .* FT(100) .* spread(g0[:], 2, nlay))
   col_dry[:,:] .= col_dry[:,:] ./ (FT(1) .+ vmr_h2o[:,:])
   return col_dry
@@ -1175,7 +1175,7 @@ kminor_start_atm
       gas_is_present)
 
     minor_limits_gpt_atm_red = Array{Int}(undef, 2, red_nm)
-    kminor_atm_red = Array{FT}(undef, tot_g, size(kminor_atm,2), size(kminor_atm,3))
+    kminor_atm_red = zeros(FT, tot_g, size(kminor_atm,2), size(kminor_atm,3))
 
     icnt = 0
     n_elim = 0
