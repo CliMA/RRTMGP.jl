@@ -46,6 +46,7 @@ export lw_solver_noscat!,
        apply_BC
 
 using ..fortran_intrinsics
+LW_diff_sec(::Type{FT}) where FT = FT(1.66)  # 1./cos(diffusivity angle)
 
 # -------------------------------------------------------------------------------------------------
 #
@@ -253,6 +254,12 @@ real(FT), dimension(ncol       ) :: source_sfc
                                  lay_source, lev_source_inc, lev_source_dec, sfc_emis, sfc_src,
                                  flux_up, flux_dn)
     FT = eltype(tau)
+    lev_source = Array{FT}(undef, ncol,nlay+1)
+    source_sfc = Array{FT}(undef, ncol)
+    source_dn = Array{FT}(undef, ncol, nlay)
+    source_up = Array{FT}(undef, ncol, nlay)
+    sfc_albedo = Array{FT}(undef, ncol)
+    Rdif, Tdif, gamma1, gamma2 = ntuple(i->Array{FT}(undef, ncol, nlay),4)
     for igpt in 1:ngpt
       #
       # RRTMGP provides source functions at each level using the spectral mapping
@@ -279,7 +286,7 @@ real(FT), dimension(ncol       ) :: source_sfc
       #
       # Transport
       #
-      sfc_albedo[1:ncol] = FT(1) - sfc_emis[:,igpt]
+      sfc_albedo[1:ncol] = FT(1) .- sfc_emis[:,igpt]
       adding!(ncol, nlay, top_at_1,
               sfc_albedo,
               Rdif, Tdif,
@@ -563,6 +570,10 @@ real(FT), parameter :: LW_diff_sec = 1.66  # 1./cos(diffusivity angle)
 function lw_two_stream!(ncol, nlay, tau, w0, g,
                                 gamma1, gamma2, Rdif, Tdif)
     FT = eltype(tau)
+    k = Vector{FT}(undef, ncol)
+    RT_term = Vector{FT}(undef, ncol)
+    exp_minusktau = Vector{FT}(undef, ncol)
+    exp_minus2ktau = Vector{FT}(undef, ncol)
     for j in 1:nlay
       for i in 1:ncol
         #
@@ -570,8 +581,8 @@ function lw_two_stream!(ncol, nlay, tau, w0, g,
         #   Here we follow Fu et al. 1997, doi:10.1175/1520-0469(1997)054<2799:MSPITI>2.0.CO;2
         #   and use a diffusivity sec of 1.66
         #
-        gamma1[i,j]= LW_diff_sec * (FT(1) - FT(0.5) * w0[i,j] * (FT(1) + g[i,j])) # Fu et al. Eq 2.9
-        gamma2[i,j]= LW_diff_sec *          FT(0.5) * w0[i,j] * (FT(1) - g[i,j])  # Fu et al. Eq 2.10
+        gamma1[i,j]= LW_diff_sec(FT) * (FT(1) - FT(0.5) * w0[i,j] * (FT(1) + g[i,j])) # Fu et al. Eq 2.9
+        gamma2[i,j]= LW_diff_sec(FT) *          FT(0.5) * w0[i,j] * (FT(1) - g[i,j])  # Fu et al. Eq 2.10
       end
 
       # Written to encourage vectorization of exponential, square root
@@ -579,10 +590,12 @@ function lw_two_stream!(ncol, nlay, tau, w0, g,
       #   k = 0 for isotropic, conservative scattering; this lower limit on k
       #   gives relative error with respect to conservative solution
       #   of < 0.1% in Rdif down to tau = 10^-9
-      k[1:ncol] = sqrt(max((gamma1[1:ncol,j] - gamma2[1:ncol,j]) *
-                           (gamma1[1:ncol,j] + gamma2[1:ncol,j]),
-                           FT(1.e-12)))
-      exp_minusktau[1:ncol] = exp(-tau[1:ncol,j]*k[1:ncol])
+      temp1 = gamma1[1:ncol,j] .- gamma2[1:ncol,j] .*
+              gamma1[1:ncol,j] .+ gamma2[1:ncol,j]
+
+      temp2 = max.(temp1, FT(1.e-12))
+      k[1:ncol] .= sqrt.(temp2)
+      exp_minusktau[1:ncol] .= exp.(-tau[1:ncol,j].*k[1:ncol])
 
       #
       # Diffuse reflection and transmission
