@@ -283,8 +283,8 @@ function run_driver(datafolder, optical_props_constructor, nblocks_iterations=no
     @test diff_up_ulps < sqrt(1/(1e6eps(FT)))
     @test diff_dn_ulps < sqrt(1/(1e6eps(FT)))
   else
-    @test diff_up_ulps < sqrt(1/(1e6eps(FT)))
-    @test diff_dn_ulps < sqrt(1/(1e6eps(FT)))
+    @test diff_up_ulps < sqrt(1/(eps(FT))) # 1.6776966e7
+    @test diff_dn_ulps < sqrt(1/(eps(FT))) # 1.6777158e7
   end
 
   # flxdn_file = "rsd_Efx_RTE-RRTMGP-181204_rad-irf_r1i1p1f" * string(forcing_index) * "_gn.nc"
@@ -301,6 +301,6 @@ end
 @testset "Shortwave driver" begin
   datafolder = JRRTMGP.data_folder_rrtmgp()
 
-  # run_driver(datafolder, ty_optical_props_1scl)
+  run_driver(datafolder, ty_optical_props_1scl)
   run_driver(datafolder, ty_optical_props_2str)
 end

@@ -310,6 +310,7 @@ real(FT) :: mu0_inv(ncol)
 function sw_solver_noscat!(ncol, nlay, ngpt,
                               top_at_1, tau::Array{FT}, mu0, flux_dir) where FT
 
+  mu0_inv = Vector{FT}(undef, ncol)
   mu0_inv[1:ncol] .= FT(1) ./ mu0[1:ncol]
   # Indexing into arrays for upward and downward propagation depends on the vertical
   #   orientation of the arrays (whether the domain top is at the first or last index)
@@ -323,7 +324,7 @@ function sw_solver_noscat!(ncol, nlay, ngpt,
     # previous level is up (-1)
     for igpt in 1:ngpt
       for ilev in 2:nlay+1
-        flux_dir[:,ilev,igpt] .= flux_dir[:,ilev-1,igpt] .* exp(-tau[:,ilev-1,igpt]*mu0_inv[:])
+        flux_dir[:,ilev,igpt] .= flux_dir[:,ilev-1,igpt] .* exp.(-tau[:,ilev-1,igpt].*mu0_inv[:])
       end
     end
   else
@@ -331,7 +332,7 @@ function sw_solver_noscat!(ncol, nlay, ngpt,
     # previous level is up (+1)
     for igpt in 1:ngpt
       for ilev in nlay:-1:1
-        flux_dir[:,ilev,igpt] .= flux_dir[:,ilev+1,igpt] .* exp(-tau[:,ilev,igpt]*mu0_inv[:])
+        flux_dir[:,ilev,igpt] .= flux_dir[:,ilev+1,igpt] .* exp.(-tau[:,ilev,igpt].*mu0_inv[:])
       end
     end
   end
