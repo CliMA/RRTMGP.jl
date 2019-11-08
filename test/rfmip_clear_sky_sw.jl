@@ -32,7 +32,7 @@ using JRRTMGP.mo_rfmip_io
 #   All arguments are optional but need to be specified in order.
 #
 
-function run_driver(datafolder, nblocks_iterations=nothing)
+function run_driver(datafolder, optical_props_constructor, nblocks_iterations=nothing)
   #
   # RTE shortwave driver
   #
@@ -181,7 +181,7 @@ function run_driver(datafolder, nblocks_iterations=nothing)
 
   mu0 = Array{FT}(undef, block_size)
   sfc_alb_spec = Array{FT}(undef, nbnd,block_size)
-  optical_props = ty_optical_props_2str(FT, Int)
+  optical_props = optical_props_constructor(FT, Int)
   copy_and_alloc!(optical_props, block_size, nlay, k_dist.optical_props)
 
   #
@@ -279,8 +279,13 @@ function run_driver(datafolder, nblocks_iterations=nothing)
   # @show diff_up, diff_up_ulps, maximum(abs.(rsu_for))
   # @show diff_dn, diff_dn_ulps, maximum(abs.(rsd_for))
 
-  @test diff_up_ulps < sqrt(1/(1e6eps(FT)))
-  @test diff_dn_ulps < sqrt(1/(1e6eps(FT)))
+  if optical_props_constructor isa ty_optical_props_1scl
+    @test diff_up_ulps < sqrt(1/(eps(FT)))
+    @test diff_dn_ulps < sqrt(1/(eps(FT)))
+  else
+    @test diff_up_ulps < sqrt(1/(1e6eps(FT)))
+    @test diff_dn_ulps < sqrt(1/(1e6eps(FT)))
+  end
 
   # flxdn_file = "rsd_Efx_RTE-RRTMGP-181204_rad-irf_r1i1p1f" * string(forcing_index) * "_gn.nc"
   # flxup_file = "rsu_Efx_RTE-RRTMGP-181204_rad-irf_r1i1p1f" * string(forcing_index) * "_gn.nc"
@@ -296,5 +301,6 @@ end
 @testset "Shortwave driver" begin
   datafolder = JRRTMGP.data_folder_rrtmgp()
 
-  run_driver(datafolder)
+  run_driver(datafolder, ty_optical_props_1scl)
+  run_driver(datafolder, ty_optical_props_2str)
 end

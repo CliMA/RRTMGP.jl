@@ -1,16 +1,5 @@
 """
-
-This code is part of Radiative Transfer for Energetics (RTE)
-
-Contacts: Robert Pincus and Eli Mlawer
-email:  rrtmgp@aer.com
-
-Copyright 2015-2018,  Atmospheric and Environmental Research and
-Regents of the University of Colorado.  All right reserved.
-
-Use and duplication is permitted under the terms of the
-  BSD 3-clause license, see http://opensource.org/licenses/BSD-3-Clause
--------------------------------------------------------------------------------------------------
+    mo_rte_solver_kernels
 
 Numeric calculations for radiative transfer solvers.
  Emission/absorption (no-scattering) calculations
@@ -25,8 +14,6 @@ Numeric calculations for radiative transfer solvers.
      two-stream calculations for LW, SW (using different assumptions about phase function)
      transport (adding)
  Application of boundary conditions
-
--------------------------------------------------------------------------------------------------
 """
 module mo_rte_solver_kernels
 
@@ -94,66 +81,66 @@ integer             :: ilev, igpt, top_level
 function lw_solver_noscat!(ncol, nlay, ngpt, top_at_1, D, weight,
                               tau, lay_source, lev_source_inc, lev_source_dec, sfc_emis, sfc_src,
                               radn_up, radn_dn)
-    FT         = eltype(tau)
-    tau_loc    = Array{FT}(undef,ncol,nlay)
-    trans      = Array{FT}(undef,ncol,nlay)
-    source_up  = Array{FT}(undef,ncol,nlay)
-    source_dn  = Array{FT}(undef,ncol,nlay)
-    source_sfc = Array{FT}(undef,ncol)
-    sfc_albedo = Array{FT}(undef,ncol)
-    # Which way is up?
-    # Level Planck sources for upward and downward radiation
-    # When top_at_1, lev_source_up => lev_source_dec
-    #                lev_source_dn => lev_source_inc, and vice-versa
-    if top_at_1
-      top_level = 1
-      lev_source_up = lev_source_dec
-      lev_source_dn = lev_source_inc
-    else
-      top_level = nlay+1
-      lev_source_up = lev_source_inc
-      lev_source_dn = lev_source_dec
-    end
-
-    for igpt in 1:ngpt
-      #
-      # Transport is for intensity
-      #   convert flux at top of domain to intensity assuming azimuthal isotropy
-      #
-      radn_dn[:,top_level,igpt] .= radn_dn[:,top_level,igpt]./(FT(2) * π * weight)
-
-      #
-      # Optical path and transmission, used in source function and transport calculations
-      #
-      for ilev in 1:nlay
-        tau_loc[:,ilev] .= tau[:,ilev,igpt] .* D[:,igpt]
-        trans[:,ilev]   .= exp.(-tau_loc[:,ilev])
-      end
-      #
-      # Source function for diffuse radiation
-      #
-      lw_source_noscat!(ncol, nlay,
-                            lay_source[:,:,igpt], lev_source_up[:,:,igpt], lev_source_dn[:,:,igpt],
-                            tau_loc, trans, source_dn, source_up)
-      #
-      # Surface albedo, surface source function
-      #
-      sfc_albedo .= FT(1) .- sfc_emis[:,igpt]
-      source_sfc .= sfc_emis[:,igpt] .* sfc_src[:,igpt]
-      #
-      # Transport
-      #
-      lw_transport_noscat!(ncol, nlay, top_at_1,
-                               tau_loc, trans, sfc_albedo, source_dn, source_up, source_sfc,
-                               @view(radn_up[:,:,igpt]), @view(radn_dn[:,:,igpt]))
-      #
-      # Convert intensity to flux assuming azimuthal isotropy and quadrature weight
-      #
-      radn_dn[:,:,igpt] .= FT(2) * π * weight .* radn_dn[:,:,igpt]
-      radn_up[:,:,igpt] .= FT(2) * π * weight .* radn_up[:,:,igpt]
-    end  # g point loop
-
+  FT         = eltype(tau)
+  tau_loc    = Array{FT}(undef,ncol,nlay)
+  trans      = Array{FT}(undef,ncol,nlay)
+  source_up  = Array{FT}(undef,ncol,nlay)
+  source_dn  = Array{FT}(undef,ncol,nlay)
+  source_sfc = Array{FT}(undef,ncol)
+  sfc_albedo = Array{FT}(undef,ncol)
+  # Which way is up?
+  # Level Planck sources for upward and downward radiation
+  # When top_at_1, lev_source_up => lev_source_dec
+  #                lev_source_dn => lev_source_inc, and vice-versa
+  if top_at_1
+    top_level = 1
+    lev_source_up = lev_source_dec
+    lev_source_dn = lev_source_inc
+  else
+    top_level = nlay+1
+    lev_source_up = lev_source_inc
+    lev_source_dn = lev_source_dec
   end
+
+  for igpt in 1:ngpt
+    #
+    # Transport is for intensity
+    #   convert flux at top of domain to intensity assuming azimuthal isotropy
+    #
+    radn_dn[:,top_level,igpt] .= radn_dn[:,top_level,igpt]./(FT(2) * π * weight)
+
+    #
+    # Optical path and transmission, used in source function and transport calculations
+    #
+    for ilev in 1:nlay
+      tau_loc[:,ilev] .= tau[:,ilev,igpt] .* D[:,igpt]
+      trans[:,ilev]   .= exp.(-tau_loc[:,ilev])
+    end
+    #
+    # Source function for diffuse radiation
+    #
+    lw_source_noscat!(ncol, nlay,
+                          lay_source[:,:,igpt], lev_source_up[:,:,igpt], lev_source_dn[:,:,igpt],
+                          tau_loc, trans, source_dn, source_up)
+    #
+    # Surface albedo, surface source function
+    #
+    sfc_albedo .= FT(1) .- sfc_emis[:,igpt]
+    source_sfc .= sfc_emis[:,igpt] .* sfc_src[:,igpt]
+    #
+    # Transport
+    #
+    lw_transport_noscat!(ncol, nlay, top_at_1,
+                             tau_loc, trans, sfc_albedo, source_dn, source_up, source_sfc,
+                             @view(radn_up[:,:,igpt]), @view(radn_dn[:,:,igpt]))
+    #
+    # Convert intensity to flux assuming azimuthal isotropy and quadrature weight
+    #
+    radn_dn[:,:,igpt] .= FT(2) * π * weight .* radn_dn[:,:,igpt]
+    radn_up[:,:,igpt] .= FT(2) * π * weight .* radn_up[:,:,igpt]
+  end  # g point loop
+
+end
 
 """
     lw_solver_noscat_GaussQuad!(...)
@@ -186,34 +173,35 @@ integer :: imu, top_level
 function lw_solver_noscat_GaussQuad!(ncol, nlay, ngpt, top_at_1, nmus, Ds, weights,
                                    tau, lay_source, lev_source_inc, lev_source_dec, sfc_emis, sfc_src, flux_up, flux_dn)
 
-    # ------------------------------------
-    #
-    # For the first angle output arrays store total flux
-    #
-    FT = eltype(tau)
-    Ds_ncol = Array{FT}(undef,ncol,ngpt)
+  # ------------------------------------
+  #
+  # For the first angle output arrays store total flux
+  #
+  FT = eltype(tau)
+  Ds_ncol = Array{FT}(undef,ncol,ngpt)
 
-    Ds_ncol .= Ds[1]
+  Ds_ncol .= Ds[1]
+  lw_solver_noscat!(ncol, nlay, ngpt,
+                    top_at_1, Ds_ncol, weights[1], tau,
+                    lay_source, lev_source_inc, lev_source_dec, sfc_emis, sfc_src,
+                    flux_up, flux_dn)
+  #
+  # For more than one angle use local arrays
+  #
+  top_level = fmerge(1, nlay+1, top_at_1)
+  radn_dn = apply_BC(ncol, nlay, ngpt, top_at_1, flux_dn[:,top_level,:])
+
+  for imu in 2:nmus
+    Ds_ncol .= Ds[imu]
     lw_solver_noscat!(ncol, nlay, ngpt,
-                      top_at_1, Ds_ncol, weights[1], tau,
+                      top_at_1, Ds_ncol, weights[imu], tau,
                       lay_source, lev_source_inc, lev_source_dec, sfc_emis, sfc_src,
-                      flux_up, flux_dn)
-    #
-    # For more than one angle use local arrays
-    #
-    top_level = fmerge(1, nlay+1, top_at_1)
-    radn_dn = apply_BC(ncol, nlay, ngpt, top_at_1, flux_dn[:,top_level,:])
-
-    for imu in 2:nmus
-      Ds_ncol .= Ds[imu]
-      lw_solver_noscat!(ncol, nlay, ngpt,
-                        top_at_1, Ds_ncol, weights[imu], tau,
-                        lay_source, lev_source_inc, lev_source_dec, sfc_emis, sfc_src,
-                        radn_up, radn_dn)
-      flux_up .+= radn_up
-      flux_dn .+= radn_dn
-    end
+                      radn_up, radn_dn)
+    flux_up .+= radn_up
+    flux_dn .+= radn_dn
   end
+end
+
 """
     lw_solver_2stream!(...)
 
@@ -249,52 +237,52 @@ real(FT), dimension(ncol,nlay  ) :: source_dn, source_up
 real(FT), dimension(ncol       ) :: source_sfc
 # ------------------------------------
 """
- function lw_solver_2stream!(ncol, nlay, ngpt, top_at_1,
-                                 tau, ssa, g,
-                                 lay_source, lev_source_inc, lev_source_dec, sfc_emis, sfc_src,
-                                 flux_up, flux_dn)
-    FT = eltype(tau)
-    lev_source = Array{FT}(undef, ncol,nlay+1)
-    source_sfc = Array{FT}(undef, ncol)
-    source_dn = Array{FT}(undef, ncol, nlay)
-    source_up = Array{FT}(undef, ncol, nlay)
-    sfc_albedo = Array{FT}(undef, ncol)
-    Rdif, Tdif, gamma1, gamma2 = ntuple(i->Array{FT}(undef, ncol, nlay),4)
-    for igpt in 1:ngpt
-      #
-      # RRTMGP provides source functions at each level using the spectral mapping
-      #   of each adjacent layer. Combine these for two-stream calculations
-      #
-      lw_combine_sources!(ncol, nlay, top_at_1,
-                          lev_source_inc[:,:,igpt], lev_source_dec[:,:,igpt],
-                          lev_source)
-      #
-      # Cell properties: reflection, transmission for diffuse radiation
-      #   Coupling coefficients needed for source function
-      #
-      lw_two_stream!(ncol, nlay,
-                     tau[:,:,igpt], ssa[:,:,igpt], g[:,:,igpt],
-                     gamma1, gamma2, Rdif, Tdif)
-      #
-      # Source function for diffuse radiation
-      #
-      lw_source_2str!(ncol, nlay, top_at_1,
-                      sfc_emis[:,igpt], sfc_src[:,igpt],
-                      lay_source[:,:,igpt], lev_source,
-                      gamma1, gamma2, Rdif, Tdif, tau[:,:,igpt],
-                      source_dn, source_up, source_sfc)
-      #
-      # Transport
-      #
-      sfc_albedo[1:ncol] = FT(1) .- sfc_emis[:,igpt]
-      adding!(ncol, nlay, top_at_1,
-              sfc_albedo,
-              Rdif, Tdif,
-              source_dn, source_up, source_sfc,
-              @view(flux_up[:,:,igpt]), @view(flux_dn[:,:,igpt]))
-    end
-
+function lw_solver_2stream!(ncol, nlay, ngpt, top_at_1,
+                               tau, ssa, g,
+                               lay_source, lev_source_inc, lev_source_dec, sfc_emis, sfc_src,
+                               flux_up, flux_dn)
+  FT = eltype(tau)
+  lev_source = Array{FT}(undef, ncol,nlay+1)
+  source_sfc = Array{FT}(undef, ncol)
+  source_dn = Array{FT}(undef, ncol, nlay)
+  source_up = Array{FT}(undef, ncol, nlay)
+  sfc_albedo = Array{FT}(undef, ncol)
+  Rdif, Tdif, gamma1, gamma2 = ntuple(i->Array{FT}(undef, ncol, nlay),4)
+  for igpt in 1:ngpt
+    #
+    # RRTMGP provides source functions at each level using the spectral mapping
+    #   of each adjacent layer. Combine these for two-stream calculations
+    #
+    lw_combine_sources!(ncol, nlay, top_at_1,
+                        lev_source_inc[:,:,igpt], lev_source_dec[:,:,igpt],
+                        lev_source)
+    #
+    # Cell properties: reflection, transmission for diffuse radiation
+    #   Coupling coefficients needed for source function
+    #
+    lw_two_stream!(ncol, nlay,
+                   tau[:,:,igpt], ssa[:,:,igpt], g[:,:,igpt],
+                   gamma1, gamma2, Rdif, Tdif)
+    #
+    # Source function for diffuse radiation
+    #
+    lw_source_2str!(ncol, nlay, top_at_1,
+                    sfc_emis[:,igpt], sfc_src[:,igpt],
+                    lay_source[:,:,igpt], lev_source,
+                    gamma1, gamma2, Rdif, Tdif, tau[:,:,igpt],
+                    source_dn, source_up, source_sfc)
+    #
+    # Transport
+    #
+    sfc_albedo[1:ncol] = FT(1) .- sfc_emis[:,igpt]
+    adding!(ncol, nlay, top_at_1,
+            sfc_albedo,
+            Rdif, Tdif,
+            source_dn, source_up, source_sfc,
+            @view(flux_up[:,:,igpt]), @view(flux_dn[:,:,igpt]))
   end
+
+end
 # -------------------------------------------------------------------------------------------------
 #
 #   Top-level shortwave kernels
@@ -322,8 +310,7 @@ real(FT) :: mu0_inv(ncol)
 function sw_solver_noscat!(ncol, nlay, ngpt,
                               top_at_1, tau::Array{FT}, mu0, flux_dir) where FT
 
-    # ------------------------------------
-    mu0_inv[1:ncol] .= FT(1) ./ mu0[1:ncol]
+    mu0_inv = FT(1) ./ mu0
     # Indexing into arrays for upward and downward propagation depends on the vertical
     #   orientation of the arrays (whether the domain top is at the first or last index)
     # We write the loops out explicitly so compilers will have no trouble optimizing them.
@@ -336,7 +323,7 @@ function sw_solver_noscat!(ncol, nlay, ngpt,
       # previous level is up (-1)
       for igpt in 1:ngpt
         for ilev in 2:nlay+1
-          flux_dir[:,ilev,igpt] .= flux_dir[:,ilev-1,igpt] .* exp(-tau[:,ilev-1,igpt]*mu0_inv[:])
+          flux_dir[:,ilev,igpt] .= flux_dir[:,ilev-1,igpt] .* exp.(-tau[:,ilev-1,igpt].*mu0_inv[:])
         end
       end
     else
@@ -344,7 +331,7 @@ function sw_solver_noscat!(ncol, nlay, ngpt,
       # previous level is up (+1)
       for igpt in 1:ngpt
         for ilev in nlay:-1:1
-          flux_dir[:,ilev,igpt] .= flux_dir[:,ilev+1,igpt] .* exp(-tau[:,ilev,igpt]*mu0_inv[:])
+          flux_dir[:,ilev,igpt] .= flux_dir[:,ilev+1,igpt] .* exp.(-tau[:,ilev,igpt].*mu0_inv[:])
         end
       end
     end
