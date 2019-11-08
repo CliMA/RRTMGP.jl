@@ -85,9 +85,9 @@ function rte_sw!(atmos::ty_optical_props_arry,
   @assert !any_vals_outside(sfc_alb_dif, FT(0), FT(1))
   @assert !(atmos isa ty_optical_props_nstr) # not yet implemented...
 
-  gpt_flux_up  = Array{FT}(undef,ncol, nlay+1, ngpt)
-  gpt_flux_dn  = Array{FT}(undef,ncol, nlay+1, ngpt)
-  gpt_flux_dir = Array{FT}(undef,ncol, nlay+1, ngpt)
+  gpt_flux_up  = zeros(FT, ncol, nlay+1, ngpt)
+  gpt_flux_dn  = zeros(FT, ncol, nlay+1, ngpt)
+  gpt_flux_dir = zeros(FT, ncol, nlay+1, ngpt)
 
   # Lower boundary condition -- expand surface albedos by band to gpoints
   #   and switch dimension ordering
@@ -144,7 +144,7 @@ function expand_and_transpose(ops::ty_optical_props,arr_in::Array{FT}) where FT
   ncol  = size(arr_in,2)
   nband = get_nband(ops)
   ngpt  = get_ngpt(ops)
-  arr_out = Array{FT}(undef,ncol, ngpt)
+  arr_out = zeros(FT, ncol, ngpt)
   limits = get_band_lims_gpoint(ops)
   for iband = 1:nband
     for icol = 1:ncol
