@@ -297,4 +297,5 @@ end
   datafolder = JRRTMGP.data_folder_rrtmgp()
 
   run_driver(datafolder)
+  run_driver(datafolder)
 end
