@@ -93,84 +93,52 @@ function rte_lw!(optical_props, top_at_1,
 
   # Error checking -- consistency of sizes and validity of values
   @assert are_desired(fluxes)
-  if any( [get_ncol(sources), get_nlay(sources), get_ngpt(sources)]  ≠ [ncol, nlay, ngpt])
-    error("rte_lw: sources and optical properties inconsistently sized")
-  end
+  @assert all((get_ncol(sources), get_nlay(sources), get_ngpt(sources)) .== (ncol, nlay, ngpt))
   # Also need to validate
 
-  #
   # Surface emissivity
-  #
-  if any( [size(sfc_emis,1), size(sfc_emis,2)] ≠ [nband, ncol])
-    error("rte_lw: sfc_emis inconsistently sized")
-  end
+  @assert all(size(sfc_emis) .== (nband, ncol))
 
-  if any_vals_outside(sfc_emis, FT.(0.), FT.(1.0))
-    error("rte_lw: sfc_emis has values < 0 or > 1")
-  end
+  @assert !any_vals_outside(sfc_emis, FT.(0.), FT.(1.0))
 
-  #
   # Incident flux, if present
-  #
-  if !(inc_flux isa Nothing)
-    if any( [size(inc_flux,1), size(inc_flux,2)] ≠ [ncol, ngpt] )
-      error("rte_lw: inc_flux inconsistently sized")
-    end
-    if any_vals_less_than(inc_flux, FT(0.0))
-      error("rte_lw: inc_flux has values < 0")
-    end
+  inc_flux ≠ nothing
+  if inc_flux ≠ nothing
+    @assert all(size(inc_flux) .== (ncol, ngpt))
+    @assert !any_vals_less_than(inc_flux, FT(0.0))
   end
-  #
+
   # Number of quadrature points for no-scattering calculation
-  #
   n_quad_angs = 1
-  if !(n_gauss_angles isa Nothing)
-    if (n_gauss_angles > max_gauss_pts)
-      error("rte_lw: asking for too many quadrature points for no-scattering calculation")
-    end
-    if(n_gauss_angles < 1)
-      error("rte_lw: have to ask for at least one quadrature point for no-scattering calculation")
-    end
+  if n_gauss_angles ≠ nothing
+    @assert !(n_gauss_angles > max_gauss_pts)
+    @assert !(n_gauss_angles < 1)
     n_quad_angs = n_gauss_angles
   end
-  #
+
   # Ensure values of tau, ssa, and g are reasonable
-  #
   validate!(optical_props)
-  # ------------------------------------------------------------------------------------
-  #
+
   #    Lower boundary condition -- expand surface emissivity by band to gpoints
   #
-#    allocate(gpt_flux_up (ncol, nlay+1, ngpt), gpt_flux_dn(ncol, nlay+1, ngpt))
-#    allocate(sfc_emis_gpt(ncol,         ngpt))
 
   gpt_flux_up  = Array{FT}(undef,ncol,nlay+1,ngpt)
   gpt_flux_dn  = Array{FT}(undef,ncol,nlay+1,ngpt)
   sfc_emis_gpt = Array{FT}(undef,ncol,       ngpt)
 
-#    ##$acc enter data copyin(sources, sources%lay_source, sources%lev_source_inc, sources%lev_source_dec, sources%sfc_source)
-#    #$acc enter data copyin(optical_props)
-#    #$acc enter data create(gpt_flux_dn, gpt_flux_up)
-#    #$acc enter data create(sfc_emis_gpt)
   sfc_emis_gpt = expand_and_transpose(optical_props, sfc_emis)
-  #
+
   #   Upper boundary condition
-  #
-  if !(inc_flux isa Nothing)
-    #$acc enter data copyin(inc_flux)
+  if inc_flux ≠ nothing
     gpt_flux_dn = apply_BC(ncol, nlay, ngpt, top_at_1, inc_flux)
-    #$acc exit data delete(inc_flux)
   else
-    #
+
     # Default is zero incident diffuse flux
-    #
     gpt_flux_dn = apply_BC(ncol, nlay, ngpt, top_at_1, FT)
   end
 
-  #
   # Compute the radiative transfer...
-  #
-
+  @assert !(optical_props isa ty_optical_props_nstr)
   if optical_props isa ty_optical_props_1scl
 
     # No scattering two-stream calculation
@@ -183,31 +151,25 @@ function rte_lw!(optical_props, top_at_1,
 
   elseif optical_props isa ty_optical_props_2str
     # two-stream calculation with scattering
-#        call lw_solver_2stream(ncol, nlay, ngpt, logical(top_at_1, wl),
-#                               optical_props%tau, optical_props%ssa, optical_props%g,
-#                               sources%lay_source, sources%lev_source_inc, sources%lev_source_dec,
-#                               sfc_emis_gpt, sources%sfc_source,
-#                               gpt_flux_up, gpt_flux_dn)
     lw_solver_2stream!(ncol, nlay, ngpt, top_at_1,
                                optical_props.tau, optical_props.ssa, optical_props.g,
                                sources.lay_source, sources.lev_source_inc, sources.lev_source_dec, sfc_emis_gpt, sources.sfc_src,
                                gpt_flux_up, gpt_flux_dn)
-  elseif optical_props isa ty_optical_props_nstr
-    # n-stream calculation
-    error("lw_solver(...ty_optical_props_nstr...) not yet implemented")
   end
 
   reduce!(fluxes,gpt_flux_up, gpt_flux_dn, optical_props, top_at_1)
 end
 
-#
-# Expand from band to g-point dimension, transpose dimensions (nband, ncol) -> (ncol,ngpt)
+"""
+    expand_and_transpose(ops::ty_optical_props,arr_in::Array{FT}) where FT
 
+Expand from band to g-point dimension, transpose dimensions (nband, ncol) -> (ncol,ngpt)
+
+class(ty_optical_props),  intent(in ) :: ops
+real(FT), dimension(:,:), intent(in ) :: arr_in  # (nband, ncol)
+real(FT), dimension(:,:), intent(out) :: arr_out # (ncol, igpt)
+"""
 function expand_and_transpose(ops::ty_optical_props,arr_in::Array{FT}) where FT
-#    class(ty_optical_props),  intent(in ) :: ops
-#    real(FT), dimension(:,:), intent(in ) :: arr_in  # (nband, ncol)
-#    real(FT), dimension(:,:), intent(out) :: arr_out # (ncol, igpt)
-
   ncol  = size(arr_in,2)
   nband = get_nband(ops)
   ngpt  = get_ngpt(ops)
