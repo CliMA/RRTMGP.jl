@@ -6,7 +6,6 @@ NetCDF I/O routines, shared with other RTE+RRTMGP examples
 module mo_garand_atmos_io
 
 using ..mo_gas_concentrations
-using ..mo_util_reorder
 using ..mo_optical_props
 
 export read_atmos!
