@@ -82,12 +82,12 @@ function lw_solver_noscat!(ncol, nlay, ngpt, top_at_1, D, weight,
                               tau, lay_source, lev_source_inc, lev_source_dec, sfc_emis, sfc_src,
                               radn_up, radn_dn)
   FT         = eltype(tau)
-  tau_loc    = Array{FT}(undef,ncol,nlay)
-  trans      = Array{FT}(undef,ncol,nlay)
-  source_up  = Array{FT}(undef,ncol,nlay)
-  source_dn  = Array{FT}(undef,ncol,nlay)
-  source_sfc = Array{FT}(undef,ncol)
-  sfc_albedo = Array{FT}(undef,ncol)
+  tau_loc    = zeros(FT,ncol,nlay)
+  trans      = zeros(FT,ncol,nlay)
+  source_up  = zeros(FT,ncol,nlay)
+  source_dn  = zeros(FT,ncol,nlay)
+  source_sfc = zeros(FT,ncol)
+  sfc_albedo = zeros(FT,ncol)
   # Which way is up?
   # Level Planck sources for upward and downward radiation
   # When top_at_1, lev_source_up => lev_source_dec
@@ -178,7 +178,7 @@ function lw_solver_noscat_GaussQuad!(ncol, nlay, ngpt, top_at_1, nmus, Ds, weigh
   # For the first angle output arrays store total flux
   #
   FT = eltype(tau)
-  Ds_ncol = Array{FT}(undef,ncol,ngpt)
+  Ds_ncol = zeros(FT,ncol,ngpt)
 
   Ds_ncol .= Ds[1]
   lw_solver_noscat!(ncol, nlay, ngpt,
@@ -242,12 +242,12 @@ function lw_solver_2stream!(ncol, nlay, ngpt, top_at_1,
                                lay_source, lev_source_inc, lev_source_dec, sfc_emis, sfc_src,
                                flux_up, flux_dn)
   FT = eltype(tau)
-  lev_source = Array{FT}(undef, ncol,nlay+1)
-  source_sfc = Array{FT}(undef, ncol)
-  source_dn = Array{FT}(undef, ncol, nlay)
-  source_up = Array{FT}(undef, ncol, nlay)
-  sfc_albedo = Array{FT}(undef, ncol)
-  Rdif, Tdif, gamma1, gamma2 = ntuple(i->Array{FT}(undef, ncol, nlay),4)
+  lev_source = zeros(FT, ncol,nlay+1)
+  source_sfc = zeros(FT, ncol)
+  source_dn = zeros(FT, ncol, nlay)
+  source_up = zeros(FT, ncol, nlay)
+  sfc_albedo = zeros(FT, ncol)
+  Rdif, Tdif, gamma1, gamma2 = ntuple(i->zeros(FT, ncol, nlay),4)
   for igpt in 1:ngpt
     #
     # RRTMGP provides source functions at each level using the spectral mapping
@@ -371,8 +371,8 @@ function sw_solver_2stream!(ncol, nlay, ngpt, top_at_1,
                                  sfc_alb_dir, sfc_alb_dif,
                                  flux_up, flux_dn, flux_dir) where FT
 
-  Rdif, Tdif, Rdir, Tdir, Tnoscat, source_up, source_dn = ntuple(i->Array{FT}(undef, ncol,nlay), 7)
-  source_srf = Array{FT}(undef, ncol)
+  Rdif, Tdif, Rdir, Tdir, Tnoscat, source_up, source_dn = ntuple(i->zeros(FT, ncol,nlay), 7)
+  source_srf = zeros(FT, ncol)
 
   for igpt in 1:ngpt
     #
@@ -746,13 +746,13 @@ end
 function sw_two_stream(ncol, nlay, mu0, tau, w0, g)
   FT = eltype(tau)
   mu0_inv = 1 ./ mu0
-  exp_minusktau = Array{FT}(undef, ncol)
-  exp_minus2ktau = Array{FT}(undef, ncol)
-  RT_term = Array{FT}(undef, ncol)
+  exp_minusktau = zeros(FT, ncol)
+  exp_minus2ktau = zeros(FT, ncol)
+  RT_term = zeros(FT, ncol)
 
-  Rdif, Tdif, Rdir, Tdir, Tnoscat = ntuple(i-> Array{FT}(undef, ncol,nlay), 5)
+  Rdif, Tdif, Rdir, Tdir, Tnoscat = ntuple(i-> zeros(FT, ncol,nlay), 5)
 
-  gamma1, gamma2, gamma3, gamma4, alpha1, alpha2, k = ntuple(i->Array{FT}(undef, ncol), 7)
+  gamma1, gamma2, gamma3, gamma4, alpha1, alpha2, k = ntuple(i->zeros(FT, ncol), 7)
 
   for j in 1:nlay
     for i in 1:ncol
@@ -915,9 +915,9 @@ function adding!(ncol, nlay, top_at_1,
                   src_dn, src_up, src_sfc,
                   flux_up, flux_dn)
   FT = eltype(albedo_sfc)
-  albedo = Array{FT}(undef, ncol,nlay+1)
-  src = Array{FT}(undef, ncol,nlay+1)
-  denom = Array{FT}(undef, ncol,nlay)
+  albedo = zeros(FT, ncol,nlay+1)
+  src = zeros(FT, ncol,nlay+1)
+  denom = zeros(FT, ncol,nlay)
   #
   # Indexing into arrays for upward and downward propagation depends on the vertical
   #   orientation of the arrays (whether the domain top is at the first or last index)
@@ -1023,7 +1023,7 @@ function apply_BC(ncol::I, nlay::I, ngpt::I,
                    top_at_1::B,
                    inc_flux::Array{FT,2}) where {I<:Integer,B<:Bool,FT}
   #   Upper boundary condition
-  flux_dn = Array{FT}(undef, ncol,nlay+1,ngpt)
+  flux_dn = zeros(FT, ncol,nlay+1,ngpt)
   fill!(flux_dn, 0)
   if top_at_1
     flux_dn[1:ncol,      1, 1:ngpt]  .= inc_flux[1:ncol,1:ngpt]
@@ -1047,7 +1047,7 @@ function apply_BC(ncol::I, nlay::I, ngpt::I,
                    inc_flux::Array{FT,2},
                    factor::Array{FT,1}) where {I<:Integer,B<:Bool,FT}
   #   Upper boundary condition
-  flux_dn = Array{FT}(undef, ncol,nlay+1,ngpt)
+  flux_dn = zeros(FT, ncol,nlay+1,ngpt)
   # flux_dn = zeros(FT, ncol,nlay+1,ngpt)
   fill!(flux_dn, 0)
   if top_at_1
@@ -1070,7 +1070,7 @@ end
 function apply_BC(ncol::I, nlay::I, ngpt::I,
                    top_at_1::B, FT) where {I<:Integer,B<:Bool}
   #   Upper boundary condition
-  flux_dn = Array{FT}(undef, ncol,nlay+1,ngpt)
+  flux_dn = zeros(FT, ncol,nlay+1,ngpt)
   if top_at_1
     # flux_dn[1:ncol,      1, 1:ngpt]  .= FT(0)
     flux_dn .= FT(0)

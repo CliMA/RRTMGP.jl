@@ -148,8 +148,8 @@ function run_driver(datafolder, optical_props_constructor, nblocks_iterations=no
   nbnd = get_nband(k_dist.optical_props)
   ngpt = get_ngpt(k_dist.optical_props)
 
-  toa_flux = Array{FT}(undef, block_size, get_ngpt(k_dist.optical_props))
-  def_tsi = Array{FT}(undef, block_size)
+  toa_flux = zeros(FT, block_size, get_ngpt(k_dist.optical_props))
+  def_tsi = zeros(FT, block_size)
   usecol = Array{Bool}(undef, block_size, nblocks)
   #
   # RRTMGP won't run with pressure less than its minimum. The top level in the RFMIP file
@@ -179,8 +179,8 @@ function run_driver(datafolder, optical_props_constructor, nblocks_iterations=no
   flux_up = zeros(FT, block_size, nlay+1, nblocks)
   flux_dn = zeros(FT, block_size, nlay+1, nblocks)
 
-  mu0 = Array{FT}(undef, block_size)
-  sfc_alb_spec = Array{FT}(undef, nbnd,block_size)
+  mu0 = zeros(FT, block_size)
+  sfc_alb_spec = zeros(FT, nbnd,block_size)
   optical_props = optical_props_constructor(FT, Int)
   copy_and_alloc!(optical_props, block_size, nlay, k_dist.optical_props)
 
