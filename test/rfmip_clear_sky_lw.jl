@@ -38,7 +38,7 @@ using JRRTMGP.mo_source_functions
 #   Check the incoming string, print it out and stop execution if non-empty
 #
 
-function run_driver(datafolder)
+function run_driver(datafolder, optical_props_constructor)
   #
   # Optical properties of the atmosphere as array of values
   #   In the longwave we include only absorption optical depth (_1scl)
@@ -190,7 +190,7 @@ function run_driver(datafolder)
 
   sfc_emis_spec = Array{FT}(undef, nbnd,block_size)
 
-  optical_props = ty_optical_props_1scl(FT, Int)
+  optical_props = optical_props_constructor(FT, Int)
   copy_and_alloc!(optical_props, block_size, nlay, k_dist.optical_props)
   source = ty_source_func_lw(block_size,nlay,k_dist.optical_props)
 
@@ -246,8 +246,13 @@ function run_driver(datafolder)
   # @show diff_up, diff_up_ulps, maximum(abs.(rlu_for))
   # @show diff_dn, diff_dn_ulps, maximum(abs.(rld_for))
 
-  @test diff_up_ulps < sqrt(1/(1e6eps(FT)))
-  @test diff_dn_ulps < sqrt(1/(1e6eps(FT)))
+  if optical_props_constructor isa ty_optical_props_2str
+    @test diff_up_ulps < sqrt(1/(1e6eps(FT)))
+    @test diff_dn_ulps < sqrt(1/(1e6eps(FT)))
+  else
+    @test diff_up_ulps < sqrt(1/(1e5eps(FT)))
+    @test diff_dn_ulps < sqrt(1/(1e3eps(FT)))
+  end
 
   close(ds_lw_flx_up)
   close(ds_lw_flx_dn)
@@ -257,5 +262,6 @@ end
 
 @testset "Longwave driver" begin
   datafolder = JRRTMGP.data_folder_rrtmgp()
-  run_driver(datafolder)
+  run_driver(datafolder, ty_optical_props_2str)
+  run_driver(datafolder, ty_optical_props_1scl)
 end
