@@ -298,9 +298,14 @@ function run_driver(datafolder, optical_props_constructor, nblocks_iterations=no
   close(ds_k_dist)
 end
 
-@testset "Shortwave driver" begin
+@testset "Shortwave driver ty_optical_props_1scl" begin
   datafolder = JRRTMGP.data_folder_rrtmgp()
 
   run_driver(datafolder, ty_optical_props_1scl)
+end
+
+@testset "Shortwave driver ty_optical_props_2str" begin
+  datafolder = JRRTMGP.data_folder_rrtmgp()
+
   run_driver(datafolder, ty_optical_props_2str)
 end
