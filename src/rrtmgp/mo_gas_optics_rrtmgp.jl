@@ -1247,7 +1247,7 @@ end
 # Utility function to combine optical depths from gas absorption and Rayleigh scattering
 #   (and reorder them for convenience, while we're at it)
 #
-function combine_and_reorder!(tau, tau_rayleigh, has_rayleigh, optical_props::ty_optical_props_arry)
+function combine_and_reorder!(tau, tau_rayleigh, has_rayleigh, optical_props::ty_optical_props_arry{FT}) where FT
   # real(FT), dimension(:,:,:),   intent(in) :: tau
   # real(FT), dimension(:,:,:),   intent(in) :: tau_rayleigh
   # logical,                      intent(in) :: has_rayleigh
@@ -1266,14 +1266,14 @@ function combine_and_reorder!(tau, tau_rayleigh, has_rayleigh, optical_props::ty
     reorder123x321!(tau, optical_props.tau)
       if optical_props isa ty_optical_props_2str
         #$acc enter data create(optical_props%ssa, optical_props%g)
-        zero_array!(optical_props.ssa)
-        zero_array!(optical_props.g  )
+        optical_props.ssa .= FT(0)
+        optical_props.g   .= FT(0)
         #$acc exit data copyout(optical_props%ssa, optical_props%g)
       elseif optical_props isa ty_optical_props_nstr # We ought to be able to combine this with above
         nmom = size(optical_props.p, 1)
         #$acc enter data create(optical_props%ssa, optical_props%p)
-        zero_array!(optical_props.ssa)
-        zero_array!(optical_props.p  )
+        optical_props.ssa .= FT(0)
+        optical_props.p   .= FT(0)
         #$acc exit data copyout(optical_props%ssa, optical_props%p)
       end
     #$acc exit data copyout(optical_props%tau)
