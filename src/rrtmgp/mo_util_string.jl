@@ -9,17 +9,7 @@ export string_in_array, string_loc_in_array
 
 Checks if a string `s` is in the array `array`.
 """
-function string_in_array(s, array)
-  s_in_array = false
-  lc_string = lowercase(trim(s))
-  for i in eachindex(array)
-    if lc_string == lowercase(trim(array[i]))
-      s_in_array = true
-      break
-    end
-  end
-  return s_in_array
-end
+string_in_array(s, array) = s in array
 
 """
   string_in_array
@@ -28,15 +18,8 @@ Location of string `s` in the array `array`. If the
 string is not in the array, returns -1.
 """
 function string_loc_in_array(s, array)
-  s_loc_in_array = -1
-  lc_string = lowercase(trim(s))
-  for i in eachindex(array)
-    if lc_string == lowercase(trim(array[i]))
-      s_loc_in_array = i
-      break
-    end
-  end
-  return s_loc_in_array
+  i = findfirst(s,array)
+  i==nothing ? -1 : i
 end
 
 end

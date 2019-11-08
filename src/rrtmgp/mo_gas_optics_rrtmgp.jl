@@ -657,7 +657,7 @@ kminor_start_upper)
   gas_is_present = Vector{Bool}(undef, ngas...)
 
   for i in 1:ngas
-    gas_is_present[i] = string_in_array(gas_names[i], available_gases.gas_name)
+    gas_is_present[i] = gas_names[i] in available_gases.gas_name
   end
   #
   # Now the number of gases is the union of those known to the k-distribution and provided
@@ -798,9 +798,7 @@ function check_key_species_present(this::ty_gas_optics_rrtmgp, gas_desc::ty_gas_
   # class(ty_gas_concs),                intent(in) :: gas_desc
   key_gas_names = pack(this.gas_names, this.is_key)
   for igas = 1:length(key_gas_names)
-    if !string_in_array(key_gas_names[igas], gas_desc.gas_name)
-      error("gas_optics: required gases" * trim(key_gas_names[igas]) * " are not provided")
-    end
+    @assert key_gas_names[igas] in gas_desc.gas_name
   end
 end
 
@@ -822,7 +820,7 @@ function get_minor_list(this::ty_gas_optics_rrtmgp, gas_desc::ty_gas_concs, ngas
 
   allocated(get_minor_list) && deallocate!(get_minor_list)
   for igas = 1:get_ngas(this)
-    gas_is_present[igas] = string_in_array(names_spec[igas], gas_desc.gas_name)
+    gas_is_present[igas] = names_spec[igas] in gas_desc.gas_name
   end
   icnt = count(gas_is_present)
   get_minor_list = Vector{String}(undef, icnt)
@@ -1072,9 +1070,7 @@ function create_key_species_reduce(gas_names, gas_names_red, key_species)
   np = size(key_species,1)
   na = size(key_species,2)
   nt = size(key_species,3)
-  key_species_red = Array{Int}(undef, size(key_species,1),
-                                      size(key_species,2),
-                                      size(key_species,3))
+  key_species_red = Array{Int}(undef, size(key_species)...)
   key_species_present_init = Vector{Bool}(undef, size(gas_names))
   key_species_present_init = true
 
@@ -1148,7 +1144,7 @@ kminor_start_atm
   gas_is_present = Vector{Bool}(undef, nm)
   for i = 1:length(minor_gases_atm)
     idx_mnr = string_loc_in_array(minor_gases_atm[i], identifier_minor)
-    gas_is_present[i] = string_in_array(gas_minor[idx_mnr],available_gases.gas_name)
+    gas_is_present[i] = gas_minor[idx_mnr] in available_gases.gas_name
     if gas_is_present[i]
       tot_g = tot_g + (minor_limits_gpt_atm[2,i]-minor_limits_gpt_atm[1,i]+1)
     end
