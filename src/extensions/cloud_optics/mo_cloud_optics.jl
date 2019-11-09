@@ -20,6 +20,7 @@
 
 module mo_cloud_optics
 
+using OffsetArrays
 using ..mo_optical_props
 using ..mo_util_array
 using ..fortran_intrinsics
@@ -267,35 +268,22 @@ function load_Pade!(this::ty_cloud_optics{FT},
   ncoeff_ext   = size(pade_extliq, 3)
   ncoeff_ssa_g = size(pade_ssaliq, 3)
   nrghice      = size(pade_extice, 4)
-  nbound       = size(pade_sizreg_extliq)
+  nbound       = length(pade_sizreg_extliq)
   init!(this, "RRTMGP cloud optics", band_lims_wvn)
-  #
+
   # Error checking
-  #
-  if nbnd ≠ get_nband(this)
-    error("init(cloud_optics): number of bands inconsistent between lookup tables, spectral discretization")
-  end
-  if any([size(pade_ssaliq, 1), size(pade_ssaliq, 2), size(pade_ssaliq, 3)] ≠ [nbnd, nsizereg, ncoeff_ssa_g])
-    error("init(cloud_optics): array pade_ssaliq isn't consistently sized")
-  end
-  if any([size(pade_asyliq, 1), size(pade_asyliq, 2), size(pade_asyliq, 3)] ≠ [nbnd, nsizereg, ncoeff_ssa_g])
-    error("init(cloud_optics): array pade_asyliq isn't consistently sized")
-  end
-  if any([size(pade_extice, 1), size(pade_extice, 2), size(pade_extice, 3), size(pade_extice, 4)] ≠ [nbnd, nsizereg, ncoeff_ext, nrghice])
-    error("init(cloud_optics): array pade_extice isn't consistently sized")
-  end
-  if any([size(pade_ssaice, 1), size(pade_ssaice, 2), size(pade_ssaice, 3), size(pade_ssaice, 4)] ≠ [nbnd, nsizereg, ncoeff_ssa_g, nrghice])
-    error("init(cloud_optics): array pade_ssaice isn't consistently sized")
-  end
-  if any([size(pade_asyice, 1), size(pade_asyice, 2), size(pade_asyice, 3), size(pade_asyice, 4)] ≠ [nbnd, nsizereg, ncoeff_ssa_g, nrghice])
-    error("init(cloud_optics): array pade_asyice isn't consistently sized")
-  end
-  if any([size(pade_sizreg_ssaliq), size(pade_sizreg_asyliq), size(pade_sizreg_extice), size(pade_sizreg_ssaice), size(pade_sizreg_asyice)] ≠ nbound)
-    error("init(cloud_optics): one or more Pade size regime arrays are inconsistently sized")
-  end
-  if nsizereg ≠ 3
-    error("init(cloud_optics): Expecting precisely three size regimes for Pade approximants")
-  end
+  @assert nbnd == get_nband(this)
+  @assert all(size(pade_ssaliq) .== (nbnd, nsizereg, ncoeff_ssa_g))
+  @assert all(size(pade_asyliq) .== (nbnd, nsizereg, ncoeff_ssa_g))
+  @assert all(size(pade_extice) .== (nbnd, nsizereg, ncoeff_ext, nrghice))
+  @assert all(size(pade_ssaice) .== (nbnd, nsizereg, ncoeff_ssa_g, nrghice))
+  @assert all(size(pade_asyice) .== (nbnd, nsizereg, ncoeff_ssa_g, nrghice))
+  @assert length(pade_sizreg_ssaliq) == nbound
+  @assert length(pade_sizreg_asyliq) == nbound
+  @assert length(pade_sizreg_extice) == nbound
+  @assert length(pade_sizreg_ssaice) == nbound
+  @assert length(pade_sizreg_asyice) == nbound
+  @assert nsizereg == 3
 
   #
   # Consistency among size regimes
@@ -305,18 +293,18 @@ function load_Pade!(this::ty_cloud_optics{FT},
   this.radice_lwr = pade_sizreg_extice[1]
   this.radice_upr = pade_sizreg_extice[nbound]
 
-  if(any([pade_sizreg_ssaliq(1), pade_sizreg_asyliq(1)] < this.radliq_lwr))
-    error_msg = "init(cloud_optics): one or more Pade size regimes have inconsistent lowest values"
+  if any([pade_sizreg_ssaliq[1], pade_sizreg_asyliq[1]] .< this.radliq_lwr)
+    error("init(cloud_optics): one or more Pade size regimes have inconsistent lowest values")
   end
-  if(any([pade_sizreg_ssaice(1), pade_sizreg_asyice(1)] < this.radice_lwr))
-    error_msg = "init(cloud_optics): one or more Pade size regimes have inconsistent lower values"
+  if any([pade_sizreg_ssaice[1], pade_sizreg_asyice[1]] .< this.radice_lwr)
+    error("init(cloud_optics): one or more Pade size regimes have inconsistent lower values")
   end
 
-  if(any([pade_sizreg_ssaliq(nbound), pade_sizreg_asyliq(nbound)] > this.radliq_upr))
-    error_msg = "init(cloud_optics): one or more Pade size regimes have lowest value less than radliq_upr"
+  if any([pade_sizreg_ssaliq[nbound], pade_sizreg_asyliq[nbound]] .> this.radliq_upr)
+    error("init(cloud_optics): one or more Pade size regimes have lowest value less than radliq_upr")
   end
-  if(any([pade_sizreg_ssaice(nbound), pade_sizreg_asyice(nbound)] > this.radice_upr))
-    error_msg = "init(cloud_optics): one or more Pade size regimes have lowest value less than radice_upr"
+  if any([pade_sizreg_ssaice[nbound], pade_sizreg_asyice[nbound]] .> this.radice_upr)
+    error("init(cloud_optics): one or more Pade size regimes have lowest value less than radice_upr")
   end
 
   #
@@ -633,10 +621,10 @@ function compute_all_from_pade!(ncol, nlay, nbnd, nsizes,
           irad = convert(Int, min(floor((re[icol,ilay] - re_bounds_ext[2])/re_bounds_ext[3])+2, 3))
           t   = lwp[icol,ilay] * pade_eval(ibnd, nbnd, nsizes, m_ext, n_ext, irad, re[icol,ilay], coeffs_ext)
 
-          irad = min(floor((re[icol,ilay] - re_bounds_ssa[2])/re_bounds_ssa[3])+2, 3)
+          irad = convert(Int,min(floor((re[icol,ilay] - re_bounds_ssa[2])/re_bounds_ssa[3])+2, 3))
           # Pade approximants for co-albedo can sometimes be negative
           ts   = t               * (FT(1) - max(FT(0), pade_eval(ibnd, nbnd, nsizes, m_ssa, n_ssa, irad, re[icol,ilay], coeffs_ssa)))
-          irad = min(floor((re[icol,ilay] - re_bounds_asy[2])/re_bounds_asy[3])+2, 3)
+          irad = convert(Int, min(floor((re[icol,ilay] - re_bounds_asy[2])/re_bounds_asy[3])+2, 3))
           taussag[icol,ilay,ibnd] = ts             * pade_eval(ibnd, nbnd, nsizes, m_asy, n_asy, irad, re[icol,ilay], coeffs_asy)
 
           taussa[icol,ilay,ibnd] = ts
@@ -673,6 +661,7 @@ function compute_from_table(ncol, nlay, nbnd, mask, size, nsteps, step_size, off
   # integer  :: index
   # real(FT) :: fint
   # # ---------------------------
+  FT = eltype(table)
   for ilay = 1:nlay
     for icol = 1:ncol
       if(mask[icol,ilay])
@@ -706,6 +695,7 @@ function compute_from_pade(ncol, nlay, nbnd, mask, size, nsizes, size_bounds, m,
   # real(FT), dimension(ncol,nlay,nbnd)        :: compute_from_pade
   # # ---------------------------
   # integer  :: icol, ilay, ibnd, irad
+  FT = eltype(pade_coeffs)
 
   for ilay = 1:nlay
     for icol = 1:ncol
@@ -728,20 +718,22 @@ function compute_from_pade(ncol, nlay, nbnd, mask, size, nsizes, size_bounds, m,
 
 end
 
+
 #
 # Evaluate Pade approximant of order [m/n]
 #
-function pade_eval(nbnd, nrads, m, n, irad, re, pade_coeffs::AbstractArray{FT}) where FT
+function pade_eval(nbnd, nrads, m, n, irad, re, pade_coeffs)
   # integer,                intent(in) :: nbnd, nrads, m, n, irad
-  # real(FT), dimension(nbnd, nrads, 0:m+n),
+  # real(wp), dimension(nbnd, nrads, 0:m+n), &
   #                         intent(in) :: pade_coeffs
-  # real(FT),               intent(in) :: re
-  # real(FT), dimension(nbnd)         :: pade_eval
+  # real(wp),               intent(in) :: re
+  # real(wp), dimension(nbnd)          :: pade_eval_nbnd
 
   # integer :: iband
-  # real(FT) :: numer, denom
+  # real(wp) :: numer, denom
   # integer  :: i
-  res = Array{FT}(undef, nbnd)
+  FT = eltype(pade_coeffs)
+  res = Vector{FT}(undef, nbnd)
 
   for iband = 1:nbnd
     denom = pade_coeffs[iband,irad,n+m]
@@ -759,6 +751,40 @@ function pade_eval(nbnd, nrads, m, n, irad, re, pade_coeffs::AbstractArray{FT}) 
     res[iband] = numer/denom
   end
   return res
+end
+
+#
+# Evaluate Pade approximant of order [m/n]
+#
+function pade_eval(iband, nbnd, nrads, m, n, irad, re, pade_coeffs_array)
+  # !$acc routine seq
+  # !
+  # integer,                intent(in) :: iband, nbnd, nrads, m, n, irad
+  # real(wp), dimension(nbnd, nrads, 0:m+n), &
+  #                         intent(in) :: pade_coeffs
+  # real(wp),               intent(in) :: re
+  # real(wp)                           :: pade_eval_1
+
+  # real(wp) :: numer, denom
+  # integer  :: i
+  FT = eltype(re)
+  pade_coeffs = OffsetArray{FT}(undef, 1:nbnd, 1:nrads, 0:m+n)
+  pade_coeffs[:,:,:] = pade_coeffs_array[:,:,:]
+
+  denom = pade_coeffs[iband,irad,n+m]
+  for i = n-1+m:-1:1+m
+    denom = pade_coeffs[iband,irad,i]+re*denom
+  end
+  denom =  FT(1)                     +re*denom
+
+  numer = pade_coeffs[iband,irad,m]
+  for i = m-1:-11
+    numer = pade_coeffs[iband,irad,i]+re*numer
+  end
+  numer = pade_coeffs[iband,irad,0]  +re*numer
+
+  pade_eval_1 = numer/denom
+  return pade_eval_1
 end
 
 end
