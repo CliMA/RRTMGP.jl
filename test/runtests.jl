@@ -3,6 +3,7 @@ ENV["DATADEPS_ALWAYS_ACCEPT"] = true
 
 # include("AutoRunRRTMGP.jl")
 for submodule in [
+                  "PartialImplementations", # compile only
                   "DataDeps",
                   "rfmip_clear_sky_sw",
                   "rfmip_clear_sky_lw",
