@@ -22,7 +22,6 @@ include(joinpath("rrtmgp","mo_gas_optics_rrtmgp.jl"))
 include(joinpath("examples","mo_load_coefficients.jl"))
 include(joinpath("examples","mo_simple_netcdf.jl"))
 include(joinpath("examples","rfmip-clear-sky","mo_rfmip_io.jl"))
-include(joinpath("examples","mo_garand_atmos_io.jl"))
 include(joinpath("examples","mo_load_cloud_coefficients.jl"))
 
 end # module
