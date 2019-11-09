@@ -18,6 +18,7 @@ using JRRTMGP.mo_rte_sw
 using JRRTMGP.mo_load_cloud_coefficients
 using JRRTMGP.mo_garand_atmos_io
 
+include("mo_cloud_sampling.jl")
 include("mo_test_files_io.jl")
 
 function vmr_2d_to_1d!(gas_concs, gas_concs_garand, name)
