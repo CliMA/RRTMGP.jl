@@ -181,24 +181,12 @@ function load_lut!(this::ty_cloud_optics{FT},
   # Error checking
   #   Can we check for consistency between table bounds and _fac?
   #
-  if(nbnd ≠ get_nband(this))
-    error("init(cloud_optics): number of bands inconsistent between lookup tables, spectral discretization")
-  end
-  if(size(lut_extice, 2) ≠ nbnd)
-    error("init(cloud_optics): array lut_extice has the wrong number of bands")
-  end
-  if(any([size(lut_ssaliq, 1), size(lut_ssaliq, 2)] ≠ [nsize_liq, nbnd]))
-    error("init(cloud_optics): array lut_ssaliq isn't consistently sized")
-  end
-  if(any([size(lut_asyliq, 1), size(lut_asyliq, 2)] ≠ [nsize_liq, nbnd]))
-    error("init(cloud_optics): array lut_asyliq isn't consistently sized")
-  end
-  if(any([size(lut_ssaice, 1), size(lut_ssaice, 2), size(lut_ssaice, 3)] ≠ [nsize_ice, nbnd, nrghice]))
-    error("init(cloud_optics): array lut_ssaice  isn't consistently sized")
-  end
-  if(any([size(lut_asyice, 1), size(lut_asyice, 2), size(lut_asyice, 3)] ≠ [nsize_ice, nbnd, nrghice]))
-    error("init(cloud_optics): array lut_asyice  isn't consistently sized")
-  end
+  @assert nbnd == get_nband(this)
+  @assert size(lut_extice, 2) == nbnd
+  @assert all(size(lut_ssaliq) .== (nsize_liq, nbnd))
+  @assert all(size(lut_asyliq) .== (nsize_liq, nbnd))
+  @assert all(size(lut_ssaice) .== (nsize_ice, nbnd, nrghice))
+  @assert all(size(lut_asyice) .== (nsize_ice, nbnd, nrghice))
 
   this.liq_nsteps = nsize_liq
   this.ice_nsteps = nsize_ice
@@ -293,19 +281,10 @@ function load_Pade!(this::ty_cloud_optics{FT},
   this.radice_lwr = pade_sizreg_extice[1]
   this.radice_upr = pade_sizreg_extice[nbound]
 
-  if any([pade_sizreg_ssaliq[1], pade_sizreg_asyliq[1]] .< this.radliq_lwr)
-    error("init(cloud_optics): one or more Pade size regimes have inconsistent lowest values")
-  end
-  if any([pade_sizreg_ssaice[1], pade_sizreg_asyice[1]] .< this.radice_lwr)
-    error("init(cloud_optics): one or more Pade size regimes have inconsistent lower values")
-  end
-
-  if any([pade_sizreg_ssaliq[nbound], pade_sizreg_asyliq[nbound]] .> this.radliq_upr)
-    error("init(cloud_optics): one or more Pade size regimes have lowest value less than radliq_upr")
-  end
-  if any([pade_sizreg_ssaice[nbound], pade_sizreg_asyice[nbound]] .> this.radice_upr)
-    error("init(cloud_optics): one or more Pade size regimes have lowest value less than radice_upr")
-  end
+  @assert !any([pade_sizreg_ssaliq[1], pade_sizreg_asyliq[1]] .< this.radliq_lwr)
+  @assert !any([pade_sizreg_ssaice[1], pade_sizreg_asyice[1]] .< this.radice_lwr)
+  @assert !any([pade_sizreg_ssaliq[nbound], pade_sizreg_asyliq[nbound]] .> this.radliq_upr)
+  @assert !any([pade_sizreg_ssaice[nbound], pade_sizreg_asyice[nbound]] .> this.radice_upr)
 
   #
   # Allocate Pade coefficients
@@ -340,45 +319,6 @@ function load_Pade!(this::ty_cloud_optics{FT},
   this.pade_sizreg_extice .= pade_sizreg_extice
   this.pade_sizreg_ssaice .= pade_sizreg_ssaice
   this.pade_sizreg_asyice .= pade_sizreg_asyice
-end
-
-function finalize!(this::ty_cloud_optics{FT}) where FT
-  # class(ty_cloud_optics), intent(inout) :: this
-
-  this.radliq_lwr = FT(0)
-  this.radliq_upr = FT(0)
-  this.radice_lwr = FT(0)
-  this.radice_upr = FT(0)
-
-  # Lookup table cloud optics coefficients
-  if allocated(this.lut_extliq)
-    deallocate!(this.lut_extliq)
-    deallocate!(this.lut_ssaliq)
-    deallocate!(this.lut_asyliq)
-    deallocate!(this.lut_extice)
-    deallocate!(this.lut_ssaice)
-    deallocate!(this.lut_asyice)
-    this.liq_nsteps = 0
-    this.ice_nsteps = 0
-    this.liq_step_size = FT(0)
-    this.ice_step_size = FT(0)
-  end
-
-  # Pade cloud optics coefficients
-  if allocated(this.pade_extliq)
-    deallocate!(this.pade_extliq)
-    deallocate!(this.pade_ssaliq)
-    deallocate!(this.pade_asyliq)
-    deallocate!(this.pade_extice)
-    deallocate!(this.pade_ssaice)
-    deallocate!(this.pade_asyice)
-    deallocate!(this.pade_sizreg_extliq)
-    deallocate!(this.pade_sizreg_ssaliq)
-    deallocate!(this.pade_sizreg_asyliq)
-    deallocate!(this.pade_sizreg_extice)
-    deallocate!(this.pade_sizreg_ssaice)
-    deallocate!(this.pade_sizreg_asyice)
-  end
 end
 
 
@@ -644,80 +584,10 @@ end
 # Ancillary functions
 #
 #
-# Linearly interpolate values from a lookup table with "nsteps" evenly-spaced
-#   elements starting at "offset." The table's second dimension is band.
-# Returns 0 where the mask is false.
-# We could also try gather/scatter for efficiency
-#
-function compute_from_table(ncol, nlay, nbnd, mask, size, nsteps, step_size, offset, table)
-  # integer,                          intent(in) :: ncol, nlay, nbnd, nsteps
-  # logical,  dimension(ncol,  nlay), intent(in) :: mask
-  # real(FT), dimension(ncol,  nlay), intent(in) :: size
-  # real(FT),                         intent(in) :: step_size, offset
-  # real(FT), dimension(nsteps,nbnd), intent(in) :: table
-  # real(FT), dimension(ncol,nlay,nbnd)          :: compute_from_table
-  # # ---------------------------
-  # integer  :: icol, ilay, ibnd
-  # integer  :: index
-  # real(FT) :: fint
-  # # ---------------------------
-  FT = eltype(table)
-  for ilay = 1:nlay
-    for icol = 1:ncol
-      if(mask[icol,ilay])
-        index = min(floor((size(icol,ilay) - offset)/step_size)+1, nsteps-1)
-        fint = (size(icol,ilay) - offset)/step_size - (index-1)
-        for ibnd = 1:nbnd
-          compute_from_table[icol,ilay,ibnd] = table[index,  ibnd] +
-                                       fint * (table[index+1,ibnd] - table[index,ibnd])
-        end
-      else
-        for ibnd = 1:nbnd
-          compute_from_table[icol,ilay,ibnd] = FT(0)
-        end
-      end
-    end
-  end
-end
 
 #
 # Pade functions
 #
-
-function compute_from_pade(ncol, nlay, nbnd, mask, size, nsizes, size_bounds, m, n, pade_coeffs)
-  # integer,                        intent(in) :: ncol, nlay, nbnd, nsizes
-  # logical,  dimension(ncol,nlay), intent(in) :: mask
-  # real(FT), dimension(ncol,nlay), intent(in) :: size
-  # real(FT), dimension(nsizes+1),  intent(in) :: size_bounds
-  # integer,                        intent(in) :: m, n
-  # real(FT), dimension(nbnd,nsizes,0:m+n),
-  #                                 intent(in) :: pade_coeffs
-  # real(FT), dimension(ncol,nlay,nbnd)        :: compute_from_pade
-  # # ---------------------------
-  # integer  :: icol, ilay, ibnd, irad
-  FT = eltype(pade_coeffs)
-
-  for ilay = 1:nlay
-    for icol = 1:ncol
-      if mask[icol,ilay]
-        #
-        # Finds index into size regime table
-        # This works only if there are precisely three size regimes (four bounds) and it's
-        #   previously guaranteed that size_bounds(1) <= size <= size_bounds(4)
-        #
-        irad = min(floor((size(icol,ilay) - size_bounds(2))/size_bounds(3))+2, 3)
-        compute_from_pade[icol,ilay,1:nbnd] =
-             pade_eval(nbnd, nsizes, m, n, irad, size(icol,ilay), pade_coeffs)
-      else
-        for ibnd = 1:nbnd
-          compute_from_pade[icol,ilay,ibnd] = FT(0)
-        end
-      end
-    end
-  end
-
-end
-
 
 #
 # Evaluate Pade approximant of order [m/n]
@@ -778,7 +648,7 @@ function pade_eval(iband, nbnd, nrads, m, n, irad, re, pade_coeffs_array)
   denom =  FT(1)                     +re*denom
 
   numer = pade_coeffs[iband,irad,m]
-  for i = m-1:-11
+  for i = m-1:-1:1
     numer = pade_coeffs[iband,irad,i]+re*numer
   end
   numer = pade_coeffs[iband,irad,0]  +re*numer
