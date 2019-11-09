@@ -1,4 +1,3 @@
-
 using JRRTMGP
 using JRRTMGP.mo_optical_props
 using JRRTMGP.mo_simple_netcdf
@@ -16,4 +15,7 @@ using JRRTMGP.mo_cloud_optics
 using JRRTMGP.mo_rte_sw
 using JRRTMGP.mo_load_cloud_coefficients
 
+import JRRTMGP.mo_optical_props: alloc!, copy_and_alloc!, validate!, subset_range!, delta_scale!, get_nmom
+
 include("mo_optical_props_kernels_nstream.jl")
+include("mo_optical_props_nstream.jl")
