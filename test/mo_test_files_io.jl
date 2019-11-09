@@ -46,28 +46,28 @@ function read_atmos(ds, FT, gas_names)
   t_lev = Array{FT}(ds["t_lev"][:])
   gas_concs = ty_gas_concs(FT, gas_names, ncol, nlay)
 
-  var_exists(ds, "vmr_h2o")      &&  set_vmr!(gas_concs,"h2o"    , Array{FT}(read_field(ds, "vmr_h2o")))
-  var_exists(ds, "vmr_co2")      &&  set_vmr!(gas_concs,"co2"    , Array{FT}(read_field(ds, "vmr_co2")))
-  var_exists(ds, "vmr_o3")       &&  set_vmr!(gas_concs,"o3"     , Array{FT}(read_field(ds, "vmr_o3")))
-  var_exists(ds, "vmr_n2o")      &&  set_vmr!(gas_concs,"n2o"    , Array{FT}(read_field(ds, "vmr_n2o")))
-  var_exists(ds, "vmr_co")       &&  set_vmr!(gas_concs,"co"     , Array{FT}(read_field(ds, "vmr_co")))
-  var_exists(ds, "vmr_ch4")      &&  set_vmr!(gas_concs,"ch4"    , Array{FT}(read_field(ds, "vmr_ch4")))
-  var_exists(ds, "vmr_o2")       &&  set_vmr!(gas_concs,"o2"     , Array{FT}(read_field(ds, "vmr_o2")))
-  var_exists(ds, "vmr_n2")       &&  set_vmr!(gas_concs,"n2"     , Array{FT}(read_field(ds, "vmr_n2")))
-  var_exists(ds, "vmr_ccl4")     &&  set_vmr!(gas_concs,"ccl4"   , Array{FT}(read_field(ds, "vmr_ccl4")))
-  var_exists(ds, "vmr_cfc11")    &&  set_vmr!(gas_concs,"cfc11"  , Array{FT}(read_field(ds, "vmr_cfc11")))
-  var_exists(ds, "vmr_cfc12")    &&  set_vmr!(gas_concs,"cfc12"  , Array{FT}(read_field(ds, "vmr_cfc12")))
-  var_exists(ds, "vmr_cfc22")    &&  set_vmr!(gas_concs,"cfc22"  , Array{FT}(read_field(ds, "vmr_cfc22")))
-  var_exists(ds, "vmr_hfc143a")  &&  set_vmr!(gas_concs,"hfc143a", Array{FT}(read_field(ds, "vmr_hfc143a")))
-  var_exists(ds, "vmr_hfc125")   &&  set_vmr!(gas_concs,"hfc125" , Array{FT}(read_field(ds, "vmr_hfc125")))
-  var_exists(ds, "vmr_hfc23")    &&  set_vmr!(gas_concs,"hfc23"  , Array{FT}(read_field(ds, "vmr_hfc23")))
-  var_exists(ds, "vmr_hfc32")    &&  set_vmr!(gas_concs,"hfc32"  , Array{FT}(read_field(ds, "vmr_hfc32")))
-  var_exists(ds, "vmr_hfc134a")  &&  set_vmr!(gas_concs,"hfc134a", Array{FT}(read_field(ds, "vmr_hfc134a")))
-  var_exists(ds, "vmr_cf4")      &&  set_vmr!(gas_concs,"cf4"    , Array{FT}(read_field(ds, "vmr_cf4")))
-  var_exists(ds, "vmr_no2")      &&  set_vmr!(gas_concs,"no2"    , Array{FT}(read_field(ds, "vmr_no2")))
+  haskey(ds, "vmr_h2o")      &&  set_vmr!(gas_concs,"h2o"    , Array{FT}(read_field(ds, "vmr_h2o")))
+  haskey(ds, "vmr_co2")      &&  set_vmr!(gas_concs,"co2"    , Array{FT}(read_field(ds, "vmr_co2")))
+  haskey(ds, "vmr_o3")       &&  set_vmr!(gas_concs,"o3"     , Array{FT}(read_field(ds, "vmr_o3")))
+  haskey(ds, "vmr_n2o")      &&  set_vmr!(gas_concs,"n2o"    , Array{FT}(read_field(ds, "vmr_n2o")))
+  haskey(ds, "vmr_co")       &&  set_vmr!(gas_concs,"co"     , Array{FT}(read_field(ds, "vmr_co")))
+  haskey(ds, "vmr_ch4")      &&  set_vmr!(gas_concs,"ch4"    , Array{FT}(read_field(ds, "vmr_ch4")))
+  haskey(ds, "vmr_o2")       &&  set_vmr!(gas_concs,"o2"     , Array{FT}(read_field(ds, "vmr_o2")))
+  haskey(ds, "vmr_n2")       &&  set_vmr!(gas_concs,"n2"     , Array{FT}(read_field(ds, "vmr_n2")))
+  haskey(ds, "vmr_ccl4")     &&  set_vmr!(gas_concs,"ccl4"   , Array{FT}(read_field(ds, "vmr_ccl4")))
+  haskey(ds, "vmr_cfc11")    &&  set_vmr!(gas_concs,"cfc11"  , Array{FT}(read_field(ds, "vmr_cfc11")))
+  haskey(ds, "vmr_cfc12")    &&  set_vmr!(gas_concs,"cfc12"  , Array{FT}(read_field(ds, "vmr_cfc12")))
+  haskey(ds, "vmr_cfc22")    &&  set_vmr!(gas_concs,"cfc22"  , Array{FT}(read_field(ds, "vmr_cfc22")))
+  haskey(ds, "vmr_hfc143a")  &&  set_vmr!(gas_concs,"hfc143a", Array{FT}(read_field(ds, "vmr_hfc143a")))
+  haskey(ds, "vmr_hfc125")   &&  set_vmr!(gas_concs,"hfc125" , Array{FT}(read_field(ds, "vmr_hfc125")))
+  haskey(ds, "vmr_hfc23")    &&  set_vmr!(gas_concs,"hfc23"  , Array{FT}(read_field(ds, "vmr_hfc23")))
+  haskey(ds, "vmr_hfc32")    &&  set_vmr!(gas_concs,"hfc32"  , Array{FT}(read_field(ds, "vmr_hfc32")))
+  haskey(ds, "vmr_hfc134a")  &&  set_vmr!(gas_concs,"hfc134a", Array{FT}(read_field(ds, "vmr_hfc134a")))
+  haskey(ds, "vmr_cf4")      &&  set_vmr!(gas_concs,"cf4"    , Array{FT}(read_field(ds, "vmr_cf4")))
+  haskey(ds, "vmr_no2")      &&  set_vmr!(gas_concs,"no2"    , Array{FT}(read_field(ds, "vmr_no2")))
 
   # col_dry has unchanged allocation status on return if the variable isn't present in the netCDF file
-  col_dry = var_exists(ds, "col_dry") ? Array{FT}(read_field(ds, "col_dry")) : nothing
+  col_dry = haskey(ds, "col_dry") ? Array{FT}(read_field(ds, "col_dry")) : nothing
 
   return p_lay, t_lay, p_lev, t_lev, gas_concs, col_dry
 end
@@ -179,7 +179,7 @@ function read_optical_prop_values!(ds, opt_props)
 
   init!(opt_props, " ",band_lims_wvn, band_lims_gpt) #check for the initializing string
 
-  if(var_exists(ds, "p"))
+  if(haskey(ds, "p"))
     # n-stream calculation
     nmom = ds.dim["mom"]
     allocate!(opt_props)
@@ -188,7 +188,7 @@ function read_optical_prop_values!(ds, opt_props)
     opt_props.ssa[:,:,:] = ds["ssa"][:] #,       ncol, nlay, ngpt)
     opt_props.p[:,:,:]   = ds["p"][:]   #,   nmom, ncol, nlay, ngpt)
 
-  elseif (var_exists(ds, "g"))
+  elseif (haskey(ds, "g"))
     # two-stream calculation
     allocate(ty_optical_props_2str::opt_props)
     error(opt_props%alloc_2str(ncol, nlay))
@@ -204,8 +204,6 @@ function read_optical_prop_values!(ds, opt_props)
   #
   # Spectral discretization
   #
-#    if (get_dim_size(ncid, 'pair') /= 2) &
-#      error("read_optical_prop_values: pair dimension not 2 in file " // trim(fileName) )
 #    band_lims_wvn = read_field(ncid, 'band_lims_wvn', 2, nband)
 #    band_lims_gpt = read_field(ncid, 'band_lims_gpt', 2, nband)
 

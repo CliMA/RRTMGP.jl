@@ -32,9 +32,9 @@ function read_atmos!(ds, p_lay, t_lay, p_lev, t_lev, gas_concs, col_dry)
   ngas = 8
   gas_names = ["h2o", "co2", "o3 ", "n2o", "co ", "ch4", "o2 ", "n2 "]
 
-  ncol = get_dim_size(ds, "col")
-  nlay = get_dim_size(ds, "lay")
-  nlev = get_dim_size(ds, "lev")
+  ncol = ds.dim["col"]
+  nlay = ds.dim["lay"]
+  nlev = ds.dim["lev"]
   nlev ≠ nlay+1 && error("read_atmos: nlev should be nlay+1")
 
   #
@@ -50,12 +50,12 @@ function read_atmos!(ds, p_lay, t_lay, p_lev, t_lev, gas_concs, col_dry)
   init!(gas_concs, gas_names)
   for igas = 1:ngas
     vmr_name = "vmr_" * strip(gas_names(igas))
-    !var_exists(ds, strip(vmr_name)) && error("read_atmos: can't read concentration of "*strip(gas_names(igas)))
+    !haskey(ds, strip(vmr_name)) && error("read_atmos: can't read concentration of "*strip(gas_names(igas)))
     set_vmr!(gas_concs, strip(gas_names(igas)), read_field(ds, strip(vmr_name), ncol, nlay))
   end
 
   # col_dry has unchanged allocation status on return if the variable isn't present in the netCDF file
-  var_exists(ds, "col_dry") && (col_dry = read_field(ds, "col_dry", ncol, nlay))
+  haskey(ds, "col_dry") && (col_dry = read_field(ds, "col_dry", ncol, nlay))
 end
 
 end # module
