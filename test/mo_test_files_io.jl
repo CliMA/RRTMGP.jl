@@ -15,31 +15,23 @@
 #   netCDF file layout
 
 
-#
-# Read profiles for all columns  -- T, p, and gas concentrations
-#   Allocation occurs on assignments (says the F2003 standard)
-#
+"""
+    read_atmos(ds, FT, gas_names)
+
+Read profiles for all columns
+ - `p_lay` pressure (layers)
+ - `t_lay` temperature (layers)
+ - `p_lev` pressure (levels)
+ - `t_lev` temperature (levels)
+ - `col_dry` gas concentrations
+"""
 function read_atmos(ds, FT, gas_names)
-#                        p_lay, t_lay, p_lev, t_lev,
-#                        gas_concs, col_dry)
-#    character(len=*),   intent(in   ) :: fileName
-#    real(FT), dimension(:,:), allocatable,                 &
-#                        intent(inout) :: p_lay, t_lay, p_lev, t_lev, col_dry
-#    type(ty_gas_concs), intent(inout) :: gas_concs
-#    # -------------------
-#    integer :: ncid
-#    integer :: ncol, nlay, nlev
 
   ncol = ds.dim["col"]
   nlay = ds.dim["lay"]
   nlev = ds.dim["lev"]
   @assert nlev == nlay+1
 
-  #
-  # These lines assume that compilers follow the Fortran 2003 standard for
-  #   allocating on assignment. This may require explicit compiler support
-  #   e.g. -assume realloc_lhs flag for Intel
-  #
   p_lay = Array{FT}(ds["p_lay"][:])
   t_lay = Array{FT}(ds["t_lay"][:])
   p_lev = Array{FT}(ds["p_lev"][:])
