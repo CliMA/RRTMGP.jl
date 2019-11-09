@@ -36,7 +36,7 @@ function vmr_2d_to_1d!(gas_concs, gas_concs_garand, name)
   set_vmr!(gas_concs, name, tmp_col, true)
 end
 
-function run_driver(datafolder; λ_string="")
+function run_driver(datafolder; use_luts=false, λ_string="")
   @assert λ_string == "sw" || λ_string == "lw"
 
   # # ----------------------------------------------------------------------------------
@@ -119,7 +119,6 @@ function run_driver(datafolder; λ_string="")
   ngas = length(gas_names)
   nloops = 1
   ncol = 128
-  use_luts = true
   write_fluxes = true
   λ_string=="lw" && (n_g_points = "256")
   λ_string=="sw" && (n_g_points = "224")
@@ -323,9 +322,14 @@ function run_driver(datafolder; λ_string="")
   @show sqrt(1/eps(FT))
   @show diff_up, diff_up_ulps, maximum(abs.(ref_flux_up))
   @show diff_dn, diff_dn_ulps, maximum(abs.(ref_flux_dn))
-
-  @test diff_up_ulps < sqrt(1/(10eps(FT)))
-  @test diff_dn_ulps < sqrt(1/(10eps(FT)))
+  if use_luts
+    @test diff_up_ulps < sqrt(1/(10eps(FT)))
+    @test diff_dn_ulps < sqrt(1/(10eps(FT)))
+  else
+    # Need tests
+    @show diff_up_ulps < sqrt(1/(10eps(FT)))
+    @show diff_dn_ulps < sqrt(1/(10eps(FT)))
+  end
 
   close(ds_input)
   close(ds_ref)
@@ -337,7 +341,11 @@ end
 @testset "All sky" begin
   datafolder = JRRTMGP.data_folder_rrtmgp()
 
-  run_driver(datafolder; λ_string = "lw")
-  run_driver(datafolder, λ_string = "sw")
+  run_driver(datafolder; use_luts=false, λ_string = "lw")
+  run_driver(datafolder; use_luts=false, λ_string = "sw")
+
+  run_driver(datafolder; use_luts=true, λ_string = "lw")
+  run_driver(datafolder; use_luts=true , λ_string = "sw")
+
 end
 
