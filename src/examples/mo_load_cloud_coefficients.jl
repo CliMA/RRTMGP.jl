@@ -37,10 +37,10 @@ function load_cld_lutcoeff!(cloud_spec::ty_cloud_optics{FT}, ds_cld_coeff) where
   # Open cloud optical property coefficient file
 
   # Read LUT coefficient dimensions
-  nband     = get_dim_size(ds_cld_coeff,"nband")
-  nrghice   = get_dim_size(ds_cld_coeff,"nrghice")
-  nsize_liq = get_dim_size(ds_cld_coeff,"nsize_liq")
-  nsize_ice = get_dim_size(ds_cld_coeff,"nsize_ice")
+  nband     = ds_cld_coeff.dim["nband"]
+  nrghice   = ds_cld_coeff.dim["nrghice"]
+  nsize_liq = ds_cld_coeff.dim["nsize_liq"]
+  nsize_ice = ds_cld_coeff.dim["nsize_ice"]
 
   band_lims_wvn = Array{FT}(undef, 2, nband)
   band_lims_wvn .= read_field(ds_cld_coeff, "bnd_limits_wavenumber", 2, nband)
@@ -110,12 +110,12 @@ function load_cld_padecoeff!(cloud_spec::ty_cloud_optics{FT}, ds_cld_coeff) wher
   # Open cloud optical property coefficient file
 
   # Read Pade coefficient dimensions
-  nband        = get_dim_size(ds_cld_coeff,"nband")
-  nrghice      = get_dim_size(ds_cld_coeff,"nrghice")
-  nsizereg     = get_dim_size(ds_cld_coeff,"nsizereg")
-  ncoeff_ext   = get_dim_size(ds_cld_coeff,"ncoeff_ext")
-  ncoeff_ssa_g = get_dim_size(ds_cld_coeff,"ncoeff_ssa_g")
-  nbound       = get_dim_size(ds_cld_coeff,"nbound")
+  nband        = ds_cld_coeff.dim["nband"]
+  nrghice      = ds_cld_coeff.dim["nrghice"]
+  nsizereg     = ds_cld_coeff.dim["nsizereg"]
+  ncoeff_ext   = ds_cld_coeff.dim["ncoeff_ext"]
+  ncoeff_ssa_g = ds_cld_coeff.dim["ncoeff_ssa_g"]
+  nbound       = ds_cld_coeff.dim["nbound"]
 
   #
   band_lims_wvn = Array{FT}(undef, 2, nband)
