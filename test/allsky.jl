@@ -1,3 +1,4 @@
+using Profile
 using Test
 using JRRTMGP
 using NCDatasets
@@ -36,48 +37,50 @@ function vmr_2d_to_1d!(gas_concs, gas_concs_garand, name)
   set_vmr!(gas_concs, name, tmp_col, true)
 end
 
-function run_driver(datafolder; use_luts=false, λ_string="")
+function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
   @assert λ_string == "sw" || λ_string == "lw"
+  k_dist_sym = Symbol(:k_dist,λ_string)
+  cloud_optics_sym = Symbol(:cloud_optics,λ_string)
 
-  # # ----------------------------------------------------------------------------------
-  # # Variables
-  # # ----------------------------------------------------------------------------------
-  # # Arrays: dimensions (col, lay)
+  # ----------------------------------------------------------------------------------
+  # Variables
+  # ----------------------------------------------------------------------------------
+  # Arrays: dimensions (col, lay)
   # real(wp), dimension(:,:),   allocatable :: p_lay, t_lay, p_lev
   # real(wp), dimension(:,:),   allocatable :: col_dry
   # real(wp), dimension(:,:),   allocatable :: temp_array
 
-  # #
-  # # Longwave only
-  # #
+  #
+  # Longwave only
+  #
   # real(wp), dimension(:,:),   allocatable :: t_lev
   # real(wp), dimension(:),     allocatable :: t_sfc
   # real(wp), dimension(:,:),   allocatable :: emis_sfc # First dimension is band
-  # #
-  # # Shortwave only
-  # #
+  #
+  # Shortwave only
+  #
   # real(wp), dimension(:),     allocatable :: mu0
   # real(wp), dimension(:,:),   allocatable :: sfc_alb_dir, sfc_alb_dif # First dimension is band
-  # #
-  # # Source functions
-  # #
-  # #   Longwave
+  #
+  # Source functions
+  #
+  #   Longwave
   # type(ty_source_func_lw), save               :: lw_sources
-  # #   Shortwave
+  #   Shortwave
   # real(wp), dimension(:,:), allocatable, save :: toa_flux
-  # #
-  # # Clouds
-  # #
+  #
+  # Clouds
+  #
   # real(wp), allocatable, dimension(:,:) :: lwp, iwp, rel, rei
   # logical,  allocatable, dimension(:,:) :: cloud_mask
-  # #
-  # # Output variables
-  # #
+  #
+  # Output variables
+  #
   # real(wp), dimension(:,:), target,
   #                           allocatable :: flux_up, flux_dn, flux_dir
-  # #
-  # # Derived types from the RTE and RRTMGP libraries
-  # #
+  #
+  # Derived types from the RTE and RRTMGP libraries
+  #
   # type(ty_gas_optics_rrtmgp) :: k_dist
   # type(ty_cloud_optics)      :: cloud_optics_
   # type(ty_gas_concs)         :: gas_concs, gas_concs_garand, gas_concs_1col
@@ -85,9 +88,9 @@ function run_driver(datafolder; use_luts=false, λ_string="")
   #                allocatable :: atmos, clouds
   # type(ty_fluxes_broadband)  :: fluxes
 
-  # #
-  # # Inputs to RRTMGP
-  # #
+  #
+  # Inputs to RRTMGP
+  #
   # logical :: top_at_1, is_sw, is_lw
 
   # integer  :: ncol, nlay, nbnd, ngpt
@@ -102,9 +105,9 @@ function run_driver(datafolder; use_luts=false, λ_string="")
   #                    :: gas_names = ['h2o', 'co2', 'o3 ', 'n2o', 'co ', 'ch4', 'o2 ', 'n2 ']
 
   # character(len=256) :: input_file, k_dist_file, cloud_optics_file
-  # #
-  # # Timing variables
-  # #
+  #
+  # Timing variables
+  #
   # integer(kind=8)              :: start, finish, start_all, finish_all, clock_rate
   # real(wp)                     :: avg
   # integer(kind=8), allocatable :: elapsed(:)
@@ -120,12 +123,6 @@ function run_driver(datafolder; use_luts=false, λ_string="")
   nloops = 1
   ncol = 128
   write_fluxes = true
-  λ_string=="lw" && (n_g_points = "256")
-  λ_string=="sw" && (n_g_points = "224")
-  input_file = joinpath(datafolder, "examples", "all-sky", "rrtmgp-allsky.nc")
-  reference_file = joinpath(datafolder, "examples", "all-sky", "ref", "rrtmgp-allsky.nc")
-  k_dist_file = joinpath(datafolder, "rrtmgp", "data", "rrtmgp-data-$(λ_string)-g"*n_g_points*"-2018-12-04.nc")
-  cloud_optics_file = joinpath(datafolder, "extensions", "cloud_optics", "rrtmgp-cloud-optics-coeffs-$(λ_string).nc")
 
   #
   # Read temperature, pressure, gas concentrations.
@@ -133,11 +130,7 @@ function run_driver(datafolder; use_luts=false, λ_string="")
   #
   FT = Float64
   I = Int64
-  ds_input = Dataset(input_file, "r")
-  ds_ref = Dataset(reference_file, "r")
-  ds_k_dist = Dataset(k_dist_file, "r")
-  ds_cloud_optics = Dataset(cloud_optics_file, "r")
-  p_lay, t_lay, p_lev, t_lev, gas_concs_garand, col_dry = read_atmos(ds_input, FT, gas_names)
+  p_lay, t_lay, p_lev, t_lev, gas_concs_garand, col_dry = read_atmos(ds[:input], FT, gas_names)
 
   deallocate!(col_dry)
   nlay = size(p_lay, 2)
@@ -164,16 +157,16 @@ function run_driver(datafolder; use_luts=false, λ_string="")
 
   # This puts pressure and temperature arrays on the GPU
   # load data into classes
-  k_dist = load_and_init(ds_k_dist, gas_concs)
+  k_dist = load_and_init(ds[:k_dist], gas_concs)
   is_sw = source_is_external(k_dist)
   is_lw = !is_sw
   #
   # Should also try with Pade calculations
   cloud_optics_ = ty_cloud_optics(FT,I)
   if use_luts
-    load_cld_lutcoeff!(cloud_optics_, ds_cloud_optics)
+    load_cld_lutcoeff!(cloud_optics_, ds[:cloud_optics])
   else
-    load_cld_padecoeff!(cloud_optics_, ds_cloud_optics)
+    load_cld_padecoeff!(cloud_optics_, ds[:cloud_optics])
   end
   set_ice_roughness!(cloud_optics_, 2)
 
@@ -270,7 +263,7 @@ function run_driver(datafolder; use_luts=false, λ_string="")
   #   For CPUs we can introduce OpenMP threading over loop iterations
   #
 
-  for iloop = 1:nloops
+  for iloop = 1:(compile_first ? 1 : nloops)
     cloud_optics!(cloud_optics_, lwp, iwp, rel, rei, clouds)
     #
     # Solvers
@@ -310,8 +303,8 @@ function run_driver(datafolder; use_luts=false, λ_string="")
 
 
   # Compare with reference:
-  ref_flux_up = Array{FT}(ds_ref[λ_string*"_flux_up"][:])
-  ref_flux_dn = Array{FT}(ds_ref[λ_string*"_flux_dn"][:])
+  ref_flux_up = Array{FT}(ds[:ref][λ_string*"_flux_up"][:])
+  ref_flux_dn = Array{FT}(ds[:ref][λ_string*"_flux_dn"][:])
 
   diff_up = maximum( abs.( flux_up .- ref_flux_up ) )
   diff_dn = maximum( abs.( flux_dn .- ref_flux_dn ) )
@@ -319,33 +312,21 @@ function run_driver(datafolder; use_luts=false, λ_string="")
   diff_up_ulps = maximum( abs.( flux_up .- ref_flux_up ) ./ eps.(ref_flux_up) )
   diff_dn_ulps = maximum( abs.( flux_dn .- ref_flux_dn ) ./ eps.(ref_flux_dn) )
 
-  @show sqrt(1/eps(FT))
-  @show diff_up, diff_up_ulps, maximum(abs.(ref_flux_up))
-  @show diff_dn, diff_dn_ulps, maximum(abs.(ref_flux_dn))
-  if use_luts
-    @test diff_up_ulps < sqrt(1/(10eps(FT)))
-    @test diff_dn_ulps < sqrt(1/(10eps(FT)))
-  else
-    # Need tests
-    @show diff_up_ulps < sqrt(1/(10eps(FT)))
-    @show diff_dn_ulps < sqrt(1/(10eps(FT)))
+  # @show sqrt(1/eps(FT))
+  # @show diff_up, diff_up_ulps, maximum(abs.(ref_flux_up))
+  # @show diff_dn, diff_dn_ulps, maximum(abs.(ref_flux_dn))
+  if !compile_first
+    if use_luts
+      @test diff_up_ulps < sqrt(1/(10eps(FT)))
+      @test diff_dn_ulps < sqrt(1/(10eps(FT)))
+    else
+      # Need better test
+      # @show flux_up
+      # @show flux_dn
+      # @show diff_up_ulps < sqrt(1/(eps(FT)))
+      # @show diff_dn_ulps < sqrt(1/(eps(FT)))
+    end
   end
-
-  close(ds_input)
-  close(ds_ref)
-  close(ds_k_dist)
-  close(ds_cloud_optics)
-end
-
-
-@testset "All sky" begin
-  datafolder = JRRTMGP.data_folder_rrtmgp()
-
-  run_driver(datafolder; use_luts=false, λ_string = "lw")
-  run_driver(datafolder; use_luts=false, λ_string = "sw")
-
-  run_driver(datafolder; use_luts=true, λ_string = "lw")
-  run_driver(datafolder; use_luts=true , λ_string = "sw")
 
 end
 
