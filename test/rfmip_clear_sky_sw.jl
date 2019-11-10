@@ -1,5 +1,7 @@
 using Test
 using JRRTMGP
+# using ProfileView
+using Profile
 using NCDatasets
 using JRRTMGP.mo_optical_props
 using JRRTMGP.mo_rte_solver_kernels
@@ -32,7 +34,7 @@ using JRRTMGP.mo_rfmip_io
 #   All arguments are optional but need to be specified in order.
 #
 
-function run_driver(datafolder, optical_props_constructor, nblocks_iterations=nothing)
+function run_driver(datafolder, optical_props_constructor; compile_first=false)
   #
   # RTE shortwave driver
   #
@@ -189,7 +191,7 @@ function run_driver(datafolder, optical_props_constructor, nblocks_iterations=no
   #
   fluxes = ty_fluxes_broadband(FT)
 
-  nblocks_iterations==nothing && (nblocks_iterations = nblocks)
+  nblocks_iterations = compile_first ? 1 : nblocks
   for b = 1:nblocks_iterations
     @show b/nblocks
     fup = fluxes.flux_up = @view(flux_up[:,:,b])
@@ -279,12 +281,14 @@ function run_driver(datafolder, optical_props_constructor, nblocks_iterations=no
   # @show diff_up, diff_up_ulps, maximum(abs.(rsu_for))
   # @show diff_dn, diff_dn_ulps, maximum(abs.(rsd_for))
 
-  if optical_props_constructor isa ty_optical_props_2str
-    @test diff_up_ulps < sqrt(1/(1e6eps(FT)))
-    @test diff_dn_ulps < sqrt(1/(1e6eps(FT)))
-  else
-    @test diff_up_ulps < sqrt(1/(eps(FT))) # 1.6776966e7
-    @test diff_dn_ulps < sqrt(1/(eps(FT))) # 1.6777158e7
+  if !compile_first
+    if optical_props_constructor isa ty_optical_props_2str
+      @test diff_up_ulps < sqrt(1/(1e6eps(FT)))
+      @test diff_dn_ulps < sqrt(1/(1e6eps(FT)))
+    else
+      @test diff_up_ulps < sqrt(1/(eps(FT))) # 1.6776966e7
+      @test diff_dn_ulps < sqrt(1/(eps(FT))) # 1.6777158e7
+    end
   end
 
   # flxdn_file = "rsd_Efx_RTE-RRTMGP-181204_rad-irf_r1i1p1f" * string(forcing_index) * "_gn.nc"
@@ -302,5 +306,5 @@ end
   datafolder = JRRTMGP.data_folder_rrtmgp()
 
   run_driver(datafolder, ty_optical_props_1scl)
-  run_driver(datafolder, ty_optical_props_2str)
+  run_driver(datafolder, ty_optical_props_1scl)
 end
