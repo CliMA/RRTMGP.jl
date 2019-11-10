@@ -509,14 +509,22 @@ real(FT), dimension(ngpt) :: tau_minor
               gptS = minor_limits_gpt[1,imnr]
               gptE = minor_limits_gpt[2,imnr]
               iflav = gpt_flv[gptS]
-              tau_minor[gptS:gptE] = scaling *
-                                      interpolate2D_byflav(fminor[:,:,iflav,icol,ilay],
-                                                           kminor,
-                                                           kminor_start[imnr],
-                                                           kminor_start[imnr]+(gptE-gptS),
-                                                           jeta[:,iflav,icol,ilay],
-                                                           jtemp[icol,ilay])
-              tau[gptS:gptE,ilay,icol] = tau[gptS:gptE,ilay,icol] + tau_minor[gptS:gptE]
+              # tau_minor[gptS:gptE] = scaling *
+              interpolate2D_byflav!(@view(tau_minor[gptS:gptE]),
+                                   fminor[:,:,iflav,icol,ilay],
+                                   kminor,
+                                   kminor_start[imnr],
+                                   kminor_start[imnr]+(gptE-gptS),
+                                   jeta[:,iflav,icol,ilay],
+                                   jtemp[icol,ilay])
+              # tau_minor[gptS:gptE] = scaling *
+              #                         interpolate2D_byflav(fminor[:,:,iflav,icol,ilay],
+              #                                              kminor,
+              #                                              kminor_start[imnr],
+              #                                              kminor_start[imnr]+(gptE-gptS),
+              #                                              jeta[:,iflav,icol,ilay],
+              #                                              jtemp[icol,ilay])
+              tau[gptS:gptE,ilay,icol] = tau[gptS:gptE,ilay,icol] + scaling*tau_minor[gptS:gptE]
             end
           end
         end
@@ -550,31 +558,36 @@ integer  :: icol, ilay, iflav, ibnd, igpt, gptS, gptE
 integer  :: itropo
 # -----------------
 """
-  function compute_tau_rayleigh!(ncol,nlay,nbnd,ngpt,
-                                  ngas,nflav,neta,npres,ntemp,
-                                  gpoint_flavor,band_lims_gpt,
-                                  krayl,
-                                  idx_h2o, col_dry,col_gas,
-                                  fminor,jeta,tropo,jtemp,
-                                  tau_rayleigh)
-    FT = eltype(fminor)
-    k = Array{FT}(undef, ngpt)
-    for ilay in 1:nlay
-      for icol in 1:ncol
-        itropo = fmerge(1,2,tropo[icol,ilay]) # itropo = 1 lower atmosphere; itropo = 2 upper atmosphere
-        for ibnd in 1:nbnd
-          gptS = band_lims_gpt[1, ibnd]
-          gptE = band_lims_gpt[2, ibnd]
-          iflav = gpoint_flavor[itropo, gptS] #eta interpolation depends on band's flavor
-          k[gptS:gptE] = interpolate2D_byflav(fminor[:,:,iflav,icol,ilay],
-                                              krayl[:,:,:,itropo],
-                                              gptS, gptE, jeta[:,iflav,icol,ilay], jtemp[icol,ilay])
-          tau_rayleigh[gptS:gptE,ilay,icol] = k[gptS:gptE] *
-                                              (col_gas[icol,ilay,idx_h2o]+col_dry[icol,ilay])
-        end
+function compute_tau_rayleigh!(ncol::I,nlay::I,nbnd::I,ngpt::I,
+                               ngas,nflav,neta,npres,ntemp::I,
+                               gpoint_flavor::Array{I,2},
+                               band_lims_gpt::Array{I,2},
+                               krayl::Array{FT,4},
+                               idx_h2o::I,
+                               col_dry::Array{FT,2},
+                               col_gas::AbstractArray{FT,3},
+                               fminor::Array{FT,5},
+                               jeta::Array{I,4},
+                               tropo::Array{B,2},
+                               jtemp::Array{I,2},
+                               tau_rayleigh::Array{FT}) where {FT<:Real, I<:Integer, B<:Bool}
+  k = Array{FT}(undef, ngpt)
+  @inbounds for ilay in 1:nlay
+    @inbounds for icol in 1:ncol
+      itropo = fmerge(1,2,tropo[icol,ilay]) # itropo = 1 lower atmosphere; itropo = 2 upper atmosphere
+      @inbounds for ibnd in 1:nbnd
+        gptS = band_lims_gpt[1, ibnd]
+        gptE = band_lims_gpt[2, ibnd]
+        iflav = gpoint_flavor[itropo, gptS] #eta interpolation depends on band's flavor
+        interpolate2D_byflav!(@view(k[gptS:gptE]), fminor[:,:,iflav,icol,ilay],
+                                            krayl[:,:,:,itropo],
+                                            gptS, gptE, jeta[:,iflav,icol,ilay], jtemp[icol,ilay])
+        tau_rayleigh[gptS:gptE,ilay,icol] .= k[gptS:gptE] .*
+                                            (col_gas[icol,ilay,idx_h2o]+col_dry[icol,ilay])
       end
     end
   end
+end
 
 """
     compute_Planck_source!(...)
@@ -748,7 +761,7 @@ integer, dimension(2),      intent(in) :: jeta # interpolation index for binary 
 real(FT)                             :: res # the result
 """
   function interpolate2D(fminor, k, igpt, jeta, jtemp)
-    res = 
+    res =
       fminor[1,1] * k[igpt, jeta[1]  , jtemp  ] +
       fminor[2,1] * k[igpt, jeta[1]+1, jtemp  ] +
       fminor[1,2] * k[igpt, jeta[2]  , jtemp+1] +
@@ -771,18 +784,21 @@ real(FT), dimension(gptE-gptS+1)       :: res # the result
 # Local variable
 integer :: igpt
 """
-  function interpolate2D_byflav(fminor, k, gptS, gptE, jeta, jtemp)
-    FT = eltype(fminor)
-    res = Vector{FT}(undef, gptE-gptS+1)
-    # each code block is for a different reference temperature
-    for igpt in 1:gptE-gptS+1
-      res[igpt] = fminor[1,1] * k[gptS+igpt-1, jeta[1]  , jtemp  ] +
-                  fminor[2,1] * k[gptS+igpt-1, jeta[1]+1, jtemp  ] +
-                  fminor[1,2] * k[gptS+igpt-1, jeta[2]  , jtemp+1] +
-                  fminor[2,2] * k[gptS+igpt-1, jeta[2]+1, jtemp+1]
-    end
-    return res
+function interpolate2D_byflav!(res::AbstractArray{FT,1},
+                              fminor::Array{FT,2},
+                              k::Array{FT,3},
+                              gptS::I, gptE::I, jeta::Vector{I}, jtemp::I) where {FT<:Real,I<:Integer}
+  # each code block is for a different reference temperature
+  # res .= interpolate2D(fminor, k, gptS+igpt-1, jeta, jtemp)
+  # res .= FT[interpolate2D(fminor, k, gptS+igpt-1, jeta, jtemp) for igpt in 1:gptE-gptS+1]
+  @inbounds for igpt in 1:gptE-gptS+1
+    @inbounds res[igpt] = fminor[1,1] * k[gptS+igpt-1, jeta[1]  , jtemp  ] +
+                          fminor[2,1] * k[gptS+igpt-1, jeta[1]+1, jtemp  ] +
+                          fminor[1,2] * k[gptS+igpt-1, jeta[2]  , jtemp+1] +
+                          fminor[2,2] * k[gptS+igpt-1, jeta[2]+1, jtemp+1]
   end
+  nothing
+end
 
 """
     interpolate3D(...)
