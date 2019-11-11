@@ -116,9 +116,7 @@ function read_spectral_disc!(ds, spectral_disc)
 #    real(FT), dimension(:,:), allocatable :: band_lims_wvn
 
   nband = ds.dim["band"]
-  if ds.dim["pair"] ≠ 2
-    error("read_spectral_disc: pair dimension not 2 in file ")
-  end
+  @assert ds.dim["pair"] == 2
 
   band_lims_wvn = ds["band_lims_wvn"][:]
   band_lims_gpt = ds["band_lims_gpt"][:]
@@ -182,8 +180,8 @@ function read_optical_prop_values!(ds, opt_props)
 
   elseif (haskey(ds, "g"))
     # two-stream calculation
-    allocate(ty_optical_props_2str::opt_props)
-    error(opt_props%alloc_2str(ncol, nlay))
+    # allocate(ty_optical_props_2str::opt_props)
+    alloc_2str!(opt_props, ncol, nlay)
     opt_props.ssa[:,:,:] = ds["ssa"][:]
     opt_props.g[:,:,:]   = ds["g"][:]
   else
