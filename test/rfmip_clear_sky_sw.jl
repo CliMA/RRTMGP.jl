@@ -71,9 +71,7 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
   #
   # How big is the problem? Does it fit into blocks of the size we've specified?
   #
-  if mod(ncol*nexp, block_size) ≠ 0
-    error("rrtmgp_rfmip_sw: number of columns does not fit evenly into blocks.")
-  end
+  @assert mod(ncol*nexp, block_size) == 0 # number of columns must fit evenly into blocks
   nblocks = Int((ncol*nexp)/block_size)
   # println("Doing $(nblocks) blocks of size $(block_size)")
 
@@ -115,7 +113,7 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
   #   k_dist%init(); users might want to use their own reading methods
   #
   k_dist = load_and_init(ds[:k_dist], gas_conc_array[1])
-  !source_is_external(k_dist) && error("rrtmgp_rfmip_sw: k-distribution file is not SW")
+  @assert source_is_external(k_dist)
 
   nbnd = get_nband(k_dist.optical_props)
   ngpt = get_ngpt(k_dist.optical_props)
