@@ -245,12 +245,9 @@ end
   character(len=128)           :: err_message
 """
 function alloc!(this::ty_optical_props_1scl{FT}, ncol, nlay) where FT
-  if any([ncol, nlay] .<= 0)
-    error("alloc_only_1scl!: must provide positive extents for ncol, nlay")
-  else
-    allocated(this.tau) && deallocate!(this.tau)
-    this.tau = Array{FT}(undef, ncol, nlay, get_ngpt(this))
-  end
+  @assert !any([ncol, nlay] .<= 0)
+  allocated(this.tau) && deallocate!(this.tau)
+  this.tau = Array{FT}(undef, ncol, nlay, get_ngpt(this))
 end
 
 # --- 2 stream ------------------------------------------------------------------------
@@ -263,12 +260,11 @@ end
 """
 
 function alloc!(this::ty_optical_props_2str{FT}, ncol, nlay) where FT
-  if any([ncol, nlay] .<= 0)
-    error("alloc_only_2str!: must provide positive extents for ncol, nlay")
-  else
-    allocated(this.tau) && deallocate!(this.tau)
-    this.tau = Array{FT}(undef, ncol,nlay,get_ngpt(this))
-  end
+  @assert !any([ncol, nlay] .<= 0)
+
+  allocated(this.tau) && deallocate!(this.tau)
+  this.tau = Array{FT}(undef, ncol,nlay,get_ngpt(this))
+
   allocated(this.ssa) && deallocate!(this.ssa)
   this.ssa = Array{FT}(undef, ncol,nlay,get_ngpt(this))
   allocated(this.g) && deallocate!(this.g)
@@ -378,12 +374,8 @@ function delta_scale!(this::ty_optical_props_2str{FT}, for_ = nothing) where FT
   ngpt = get_ngpt(this)
 
   if for_ ≠ nothing
-    if any([size(for_, 1), size(for_, 2), size(for_, 3)] ≠ [ncol, nlay, ngpt])
-      error("delta_scale: dimension of 'for_' don't match optical properties arrays")
-    end
-    if any(for_ < FT(0) || for_ > FT(1))
-      error("delta_scale: values of 'for_' out of bounds [0,1]")
-    end
+    @assert all(size(for_) .== (ncol, nlay, ngpt))
+    @assert !any(for_ < FT(0) || for_ > FT(1))
     # delta_scale_2str_kernel!(ncol, nlay, ngpt, this.tau, this.ssa, this.g, for_)
     delta_scale_2str_kernel!(this, for_)
   else
@@ -405,9 +397,9 @@ end
   character(len=128)                       :: err_message
 """
 function validate!(this::ty_optical_props_1scl{FT}) where FT
-  !allocated(this.tau) && error("validate: tau not allocated/initialized")
+  @assert allocated(this.tau)
   # Valid values
-  any_vals_less_than(this.tau, FT(0)) && error("validate: tau values out of range")
+  @assert !any_vals_less_than(this.tau, FT(0))
 end
 
 """
@@ -422,20 +414,17 @@ function validate!(this::ty_optical_props_2str{FT}) where FT
   #
   # Array allocation status, sizing
   #
-  if !all([allocated(this.tau), allocated(this.ssa), allocated(this.g)])
-    error("validate: arrays not allocated/initialized")
-  end
-  varSizes =   [size(this.tau, 1), size(this.tau, 2), size(this.tau, 3)]
-  if !all([size(this.ssa, 1), size(this.ssa, 2), size(this.ssa, 3)] == varSizes) ||
-     !all([size(this.g,   1), size(this.g,   2), size(this.g,   3)] == varSizes)
-    error("validate: arrays not sized consistently")
-  end
+  @assert allocated(this.tau)
+  @assert allocated(this.ssa)
+  @assert allocated(this.g)
+  @assert all(size(this.ssa) == size(this.tau))
+  @assert all(size(this.g) == size(this.tau))
   #
   # Valid values
   #
-  any_vals_less_than(this.tau,  FT(0)) && error("validate: tau values out of range")
-  any_vals_outside(this.ssa,  FT(0), FT(1)) && error("validate: ssa values out of range")
-  any_vals_outside(this.g  , FT(-1), FT(1)) && error("validate: g values out of range")
+  @assert !any_vals_less_than(this.tau,  FT(0))
+  @assert !any_vals_outside(this.ssa,  FT(0), FT(1))
+  @assert !any_vals_outside(this.g  , FT(-1), FT(1))
 end
 
 # ------------------------------------------------------------------------------------------
@@ -455,9 +444,8 @@ end
   # -----
 """
 function increment!(op_in, op_io)
-  if !bands_are_equal(op_in, op_io)
-    error("ty_optical_props%increment: optical properties objects have different band structures")
-  end
+  @assert bands_are_equal(op_in, op_io)
+
   ncol = get_ncol(op_io)
   nlay = get_nlay(op_io)
   ngpt = get_ngpt(op_io)
@@ -474,9 +462,7 @@ function increment!(op_in, op_io)
     # We can use values by band in op_in to increment op_io
     #   Anything else is an error
 
-    if get_ngpt(op_in) ≠ get_nband(op_io)
-      error("ty_optical_props%increment: optical properties objects have incompatible g-point structures")
-    end
+    @assert get_ngpt(op_in) == get_nband(op_io)
     #
     # Increment by band
     #
