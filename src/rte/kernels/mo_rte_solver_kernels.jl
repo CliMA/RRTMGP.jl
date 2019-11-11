@@ -509,7 +509,7 @@ function lw_transport_noscat!(ncol::I, nlay::I, top_at_1::B,
                               source_dn::Array{FT},
                               source_up::Array{FT},
                               source_sfc::Array{FT},
-                              radn_up::Array{FT}, radn_dn::Array{FT}) where {I<:Int, B<:Bool, FT<:AbstractFloat}
+                              radn_up::AbstractArray{FT}, radn_dn::AbstractArray{FT}) where {I<:Int, B<:Bool, FT<:AbstractFloat}
   if top_at_1
     #
     # Top of domain is index 1

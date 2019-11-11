@@ -145,7 +145,7 @@ function gas_optics_int!(this::ty_gas_optics_rrtmgp,
   nband = get_nband(this.optical_props)
 
   # Gas optics
-  jtemp, jpress, jeta, tropo, fmajor = compute_gas_taus!(this,
+  compute_gas_taus!(jtemp, jpress, jeta, tropo, fmajor, this,
                    ncol, nlay, ngpt, nband,
                    play, plev, tlay, gas_desc,
                    optical_props,
@@ -166,12 +166,13 @@ function gas_optics_int!(this::ty_gas_optics_rrtmgp,
   @assert get_ngpt(sources) == ngpt
 
   # Interpolate source function
-  source(this,
+  source!(this,
          ncol, nlay, nband, ngpt,
          play, plev, tlay, tsfc,
          jtemp, jpress, jeta, tropo, fmajor,
          sources,
          tlev)
+  nothing
 end
 
 """
@@ -300,16 +301,15 @@ function compute_gas_taus!(jtemp, jpress, jeta, tropo, fmajor, this::ty_gas_opti
                           optical_props::ty_optical_props_arry,
                           col_dry=nothing) where FT
 
-  FT = eltype(play)
-  tau          = zeros(FT, ngpt,nlay,ncol)          # absorption, Rayleigh scattering optical depths
-  tau_rayleigh = zeros(FT, ngpt,nlay,ncol) # absorption, Rayleigh scattering optical depths
-  col_dry_arr  = zeros(FT, ncol, nlay)
-  col_dry_wk   = zeros(FT, ncol, nlay)
+  tau          = Array{FT}(undef, ngpt,nlay,ncol)          # absorption, Rayleigh scattering optical depths
+  tau_rayleigh = Array{FT}(undef, ngpt,nlay,ncol) # absorption, Rayleigh scattering optical depths
+  col_dry_arr  = Array{FT}(undef, ncol, nlay)
+  col_dry_wk   = Array{FT}(undef, ncol, nlay)
 
-  vmr     = zeros(FT, ncol,nlay,  get_ngas(this)) # volume mixing ratios
+  vmr     = Array{FT}(undef, ncol,nlay,  get_ngas(this)) # volume mixing ratios
   col_gas = OffsetArray{FT}(undef, 1:ncol,1:nlay,0:get_ngas(this)) # column amounts for each gas, plus col_dry
-  col_mix = zeros(FT, 2,    get_nflav(this),ncol,nlay) # combination of major species's column amounts
-  fminor  = zeros(FT, 2,2,  get_nflav(this),ncol,nlay) # interpolation fractions for minor species
+  col_mix = Array{FT}(undef, 2,    get_nflav(this),ncol,nlay) # combination of major species's column amounts
+  fminor  = Array{FT}(undef, 2,2,  get_nflav(this),ncol,nlay) # interpolation fractions for minor species
 
   # Error checking
   use_rayl = allocated(this.krayl)
@@ -428,7 +428,7 @@ function compute_gas_taus!(jtemp, jpress, jeta, tropo, fmajor, this::ty_gas_opti
 end
 
 """
-    source(this::ty_gas_optics_rrtmgp,
+    source!(this::ty_gas_optics_rrtmgp,
                 ncol, nlay, nbnd, ngpt,
                 play, plev, tlay, tsfc,
                 jtemp, jpress, jeta, tropo, fmajor,
@@ -463,7 +463,7 @@ real(FT), dimension(ngpt,     ncol)          :: sfc_source_t
 real(FT), dimension(   ncol,nlay+1), target  :: tlev_arr
 real(FT), dimension(:,:),            pointer :: tlev_wk
 """
-function source(this::ty_gas_optics_rrtmgp,
+function source!(this::ty_gas_optics_rrtmgp,
                 ncol, nlay, nbnd, ngpt,
                 play, plev, tlay, tsfc,
                 jtemp, jpress, jeta, tropo, fmajor,
@@ -532,7 +532,7 @@ end
 #  Rayleigh scattering tables may or may not be present; this is indicated with allocation status
 # This interface is for the internal-sources object -- includes Plank functions and fractions
 #
-function load_totplnk(totplnk, planck_frac, rayl_lower, rayl_upper, args...) #result(err_message)
+function load_totplnk(totplnk, planck_frac, rayl_lower, rayl_upper, args...)
   this = init_abs_coeffs(rayl_lower, rayl_upper, args...)
   # Planck function tables
   #
