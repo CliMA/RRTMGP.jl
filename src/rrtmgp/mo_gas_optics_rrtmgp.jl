@@ -161,9 +161,9 @@ function gas_optics_int!(this::ty_gas_optics_rrtmgp,
   end
 
   #   output extents
-  if [get_ncol(sources), get_nlay(sources), get_ngpt(sources)] ≠ [ncol, nlay, ngpt]
-    error("gas_optics%gas_optics: source function arrays inconsistently sized")
-  end
+  @assert get_ncol(sources) == ncol
+  @assert get_nlay(sources) == nlay
+  @assert get_ngpt(sources) == ngpt
 
   # Interpolate source function
   source(this,
@@ -797,9 +797,7 @@ function check_key_species_present(this::ty_gas_optics_rrtmgp, gas_desc::ty_gas_
   # class(ty_gas_concs),                intent(in) :: gas_desc
   key_gas_names = pack(this.gas_names, this.is_key)
   for igas = 1:length(key_gas_names)
-    if !string_in_array(key_gas_names[igas], gas_desc.gas_name)
-      error("gas_optics: required gases" * trim(key_gas_names[igas]) * " are not provided")
-    end
+    @assert string_in_array(key_gas_names[igas], gas_desc.gas_name)
   end
 end
 

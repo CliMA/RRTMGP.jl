@@ -412,6 +412,7 @@ function cloud_optics!(this::ty_cloud_optics{FT},
                               itau, itaussa, itaussag)
   end
 
+  @assert optical_props isa ty_optical_props_1scl || optical_props isa ty_optical_props_2str
   #
   # Copy total cloud properties onto outputs
   #
@@ -437,8 +438,6 @@ function cloud_optics!(this::ty_cloud_optics{FT},
         end
       end
     end
-  elseif optical_props isa ty_optical_props_nstr
-    error("cloud optics: n-stream calculations not yet supported")
   end
 
 end
