@@ -100,12 +100,12 @@ function rte_sw!(atmos::ty_optical_props_arry,
   #   On input flux_dn is the diffuse component; the last action in each solver is to add
   #   direct and diffuse to represent the total, consistent with the LW
   #
-  gpt_flux_dir = apply_BC(ncol, nlay, ngpt, top_at_1,   inc_flux, mu0)
+  apply_BC!(gpt_flux_dir, ncol, nlay, ngpt, top_at_1,   inc_flux, mu0)
 
   if present(inc_flux_dif)
-    gpt_flux_dn  = apply_BC(ncol, nlay, ngpt, top_at_1, inc_flux_dif)
+    apply_BC!(gpt_flux_dn, ncol, nlay, ngpt, top_at_1, inc_flux_dif)
   else
-    gpt_flux_dn  = apply_BC(ncol, nlay, ngpt, top_at_1, FT)
+    apply_BC!(gpt_flux_dn, ncol, nlay, ngpt, top_at_1)
   end
 
   if atmos isa ty_optical_props_1scl

@@ -227,7 +227,7 @@ function gas_optics_ext!(this::ty_gas_optics_rrtmgp,
   nflav = get_nflav(this)
 
   # Gas optics
-  jtemp, jpress, jeta, tropo, fmajor = compute_gas_taus!(this,
+  compute_gas_taus!(jtemp, jpress, jeta, tropo, fmajor, this,
                    ncol, nlay, ngpt, nband,
                    play, plev, tlay, gas_desc,
                    optical_props,
@@ -294,11 +294,11 @@ integer :: nminorlower, nminorklower,nminorupper, nminorkupper
 logical :: use_rayl
 ----------------------------------------------------------
 """
-function compute_gas_taus!(this::ty_gas_optics_rrtmgp,
+function compute_gas_taus!(jtemp, jpress, jeta, tropo, fmajor, this::ty_gas_optics_rrtmgp{FT},
                           ncol, nlay, ngpt, nband,
                           play, plev, tlay, gas_desc::ty_gas_concs,
                           optical_props::ty_optical_props_arry,
-                          col_dry=nothing)
+                          col_dry=nothing) where FT
 
   FT = eltype(play)
   tau          = zeros(FT, ngpt,nlay,ncol)          # absorption, Rayleigh scattering optical depths
@@ -367,7 +367,7 @@ function compute_gas_taus!(this::ty_gas_optics_rrtmgp,
 
   # ---- calculate gas optical depths ----
   tau .= 0
-  jtemp,fmajor,fminor,col_mix,tropo,jeta,jpress = interpolation(
+  interpolation!(jtemp,fmajor,fminor,col_mix,tropo,jeta,jpress,
           ncol,nlay,                        # problem dimensions
           ngas, nflav, neta, npres, ntemp,  # interpolation dimensions
           this.flavor,
@@ -381,7 +381,7 @@ function compute_gas_taus!(this::ty_gas_optics_rrtmgp,
           play,
           tlay,
           col_gas)
-  tau = compute_tau_absorption!(
+  compute_tau_absorption!(tau,
           ncol,nlay,nband,ngpt,                      # dimensions
           ngas,nflav,neta,npres,ntemp,
           nminorlower, nminorklower,                # number of minor contributors, total num absorption coeffs
@@ -425,7 +425,6 @@ function compute_gas_taus!(this::ty_gas_optics_rrtmgp,
   # Combine optical depths and reorder for radiative transfer solver.
   combine_and_reorder!(tau, tau_rayleigh, allocated(this.krayl), optical_props)
 
-  return jtemp, jpress, jeta, tropo, fmajor
 end
 
 """

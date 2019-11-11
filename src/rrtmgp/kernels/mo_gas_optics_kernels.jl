@@ -80,81 +80,73 @@ real(FT) :: ftemp_term
 # local indexes
 integer :: icol, ilay, iflav, igases(2), itropo, itemp
 """
-  function interpolation(
-                ncol,nlay,ngas,nflav,neta, npres, ntemp,
-                flavor,
-                press_ref_log, temp_ref,press_ref_log_delta,
-                temp_ref_min,temp_ref_delta,press_ref_trop_log,
-                vmr_ref,
-                play,
-                tlay,
-                col_gas)
-    # input dimensions
-    FT = eltype(temp_ref)
-    ftemp = Array{FT}(undef, ncol, nlay)
-    fpress = Array{FT}(undef, ncol, nlay)
-    igases = Vector{Int}(undef, 2)
-    jtemp = Array{Int}(undef, ncol, nlay)
-    fmajor = Array{FT}(undef, 2,2,2,nflav,ncol,nlay)
-    fminor = Array{FT}(undef, 2,2,nflav,ncol,nlay)
-    col_mix = Array{FT}(undef, 2, nflav, ncol, nlay)
-    tropo = Array{Bool}(undef, ncol, nlay)
-    jeta = Array{Int}(undef, 2, nflav, ncol, nlay)
-    jpress = Array{Int}(undef, ncol, nlay)
+function interpolation!(jtemp,fmajor,fminor,col_mix,tropo,jeta,jpress,
+              ncol::I,nlay::I,ngas::I,nflav::I,neta::I,npres::I,ntemp::I,
+              flavor::Array{I},
+              press_ref_log::Array{FT}, temp_ref::Array{FT},press_ref_log_delta::FT,
+              temp_ref_min::FT,temp_ref_delta::FT,press_ref_trop_log::FT,
+              vmr_ref::AbstractArray{FT},
+              play::Array{FT},
+              tlay::Array{FT},
+              col_gas::AbstractArray{FT}) where {I<:Int,FT<:AbstractFloat}
+  # input dimensions
+  ftemp = Array{FT}(undef, ncol, nlay)
+  fpress = Array{FT}(undef, ncol, nlay)
+  igases = Vector{Int}(undef, 2)
 
-    for ilay in 1:nlay
-      for icol in 1:ncol
-        # index and factor for temperature interpolation
-        jtemp[icol,ilay] = fint((tlay[icol,ilay] - (temp_ref_min - temp_ref_delta)) / temp_ref_delta)
-        jtemp[icol,ilay] = min(ntemp - 1, max(1, jtemp[icol,ilay])) # limit the index range
-        ftemp[icol,ilay] = (tlay[icol,ilay] - temp_ref[jtemp[icol,ilay]]) / temp_ref_delta
+  @inbounds for ilay in 1:nlay
+    @inbounds for icol in 1:ncol
+      # index and factor for temperature interpolation
+      jtemp[icol,ilay] = fint((tlay[icol,ilay] - (temp_ref_min - temp_ref_delta)) / temp_ref_delta)
+      jtemp[icol,ilay] = min(ntemp - 1, max(1, jtemp[icol,ilay])) # limit the index range
+      ftemp[icol,ilay] = (tlay[icol,ilay] - temp_ref[jtemp[icol,ilay]]) / temp_ref_delta
 
-        # index and factor for pressure interpolation
-        locpress = FT(1) + (log(play[icol,ilay]) - press_ref_log[1]) / press_ref_log_delta
-        jpress[icol,ilay] = min(npres-1, max(1, fint(locpress)))
-        fpress[icol,ilay] = locpress - FT(jpress[icol,ilay])
+      # index and factor for pressure interpolation
+      locpress = FT(1) + (log(play[icol,ilay]) - press_ref_log[1]) / press_ref_log_delta
+      jpress[icol,ilay] = min(npres-1, max(1, fint(locpress)))
+      fpress[icol,ilay] = locpress - FT(jpress[icol,ilay])
 
-        # determine if in lower or upper part of atmosphere
-        tropo[icol,ilay] = log(play[icol,ilay]) > press_ref_trop_log
-      end
+      # determine if in lower or upper part of atmosphere
+      tropo[icol,ilay] = log(play[icol,ilay]) > press_ref_trop_log
     end
-
-    for ilay in 1:nlay
-      for icol in 1:ncol
-        # itropo = 1 lower atmosphere; itropo = 2 upper atmosphere
-        itropo = fmerge(1,2,tropo[icol,ilay])
-        # loop over implemented combinations of major species
-        for iflav in 1:nflav
-          igases[:] .= flavor[:,iflav]
-          for itemp in 1:2
-            # compute interpolation fractions needed for lower, then upper reference temperature level
-            # compute binary species parameter (eta) for flavor and temperature and
-            #  associated interpolation index and factors
-            ratio_eta_half = vmr_ref[itropo,igases[1],(jtemp[icol,ilay]+itemp-1)] /
-                             vmr_ref[itropo,igases[2],(jtemp[icol,ilay]+itemp-1)]
-            col_mix[itemp,iflav,icol,ilay] = col_gas[icol,ilay,igases[1]] + ratio_eta_half * col_gas[icol,ilay,igases[2]]
-            eta = fmerge(col_gas[icol,ilay,igases[1]] / col_mix[itemp,iflav,icol,ilay], FT(0.5),
-                        col_mix[itemp,iflav,icol,ilay] > FT(2) * floatmin(FT))
-            loceta = eta * FT(neta-1)
-            jeta[itemp,iflav,icol,ilay] = min(fint(loceta)+1, neta-1)
-            feta = mod(loceta, 1)
-            # compute interpolation fractions needed for minor species
-            # ftemp_term = (FT(1)-ftemp(icol,ilay)) for itemp = 1, ftemp(icol,ilay) for itemp=2
-            ftemp_term = (FT(2-itemp) + FT(2*itemp-3) * ftemp[icol,ilay])
-            fminor[1,itemp,iflav,icol,ilay] = (1-feta) * ftemp_term
-            fminor[2,itemp,iflav,icol,ilay] =        feta  * ftemp_term
-            # compute interpolation fractions needed for major species
-            fmajor[1,1,itemp,iflav,icol,ilay] = (FT(1)-fpress[icol,ilay]) * fminor[1,itemp,iflav,icol,ilay]
-            fmajor[2,1,itemp,iflav,icol,ilay] = (FT(1)-fpress[icol,ilay]) * fminor[2,itemp,iflav,icol,ilay]
-            fmajor[1,2,itemp,iflav,icol,ilay] =        fpress[icol,ilay]  * fminor[1,itemp,iflav,icol,ilay]
-            fmajor[2,2,itemp,iflav,icol,ilay] =        fpress[icol,ilay]  * fminor[2,itemp,iflav,icol,ilay]
-          end # reference temperatures
-        end # iflav
-      end # icol,ilay
-    end
-    return jtemp,fmajor,fminor,col_mix,tropo,jeta,jpress
-
   end
+
+  @inbounds for ilay in 1:nlay
+    @inbounds for icol in 1:ncol
+      # itropo = 1 lower atmosphere; itropo = 2 upper atmosphere
+      itropo = fmerge(1,2,tropo[icol,ilay])
+      # loop over implemented combinations of major species
+      @inbounds for iflav in 1:nflav
+        igases .= flavor[:,iflav]
+        @inbounds for itemp in 1:2
+          # compute interpolation fractions needed for lower, then upper reference temperature level
+          # compute binary species parameter (eta) for flavor and temperature and
+          #  associated interpolation index and factors
+          ratio_eta_half = vmr_ref[itropo,igases[1],(jtemp[icol,ilay]+itemp-1)] /
+                           vmr_ref[itropo,igases[2],(jtemp[icol,ilay]+itemp-1)]
+          col_mix[itemp,iflav,icol,ilay] = col_gas[icol,ilay,igases[1]] + ratio_eta_half * col_gas[icol,ilay,igases[2]]
+          eta = fmerge(col_gas[icol,ilay,igases[1]] / col_mix[itemp,iflav,icol,ilay], FT(0.5),
+                      col_mix[itemp,iflav,icol,ilay] > FT(2) * floatmin(FT))
+          loceta = eta * FT(neta-1)
+          jeta[itemp,iflav,icol,ilay] = min(fint(loceta)+1, neta-1)
+          feta = mod(loceta, 1)
+          # compute interpolation fractions needed for minor species
+          # ftemp_term = (FT(1)-ftemp(icol,ilay)) for itemp = 1, ftemp(icol,ilay) for itemp=2
+          ftemp_term = (FT(2-itemp) + FT(2*itemp-3) * ftemp[icol,ilay])
+          fminor[1,itemp,iflav,icol,ilay] = (1-feta) * ftemp_term
+          fminor[2,itemp,iflav,icol,ilay] =        feta  * ftemp_term
+          # compute interpolation fractions needed for major species
+          fmajor[1,1,itemp,iflav,icol,ilay] = (FT(1)-fpress[icol,ilay]) * fminor[1,itemp,iflav,icol,ilay]
+          fmajor[2,1,itemp,iflav,icol,ilay] = (FT(1)-fpress[icol,ilay]) * fminor[2,itemp,iflav,icol,ilay]
+          fmajor[1,2,itemp,iflav,icol,ilay] =        fpress[icol,ilay]  * fminor[1,itemp,iflav,icol,ilay]
+          fmajor[2,2,itemp,iflav,icol,ilay] =        fpress[icol,ilay]  * fminor[2,itemp,iflav,icol,ilay]
+        end # reference temperatures
+      end # iflav
+    end # icol,ilay
+  end
+  nothing
+
+end
 
 """
     compute_tau_absorption!(...)
@@ -570,7 +562,7 @@ function compute_tau_rayleigh!(ncol::I,nlay::I,nbnd::I,ngpt::I,
                                jeta::Array{I,4},
                                tropo::Array{B,2},
                                jtemp::Array{I,2},
-                               tau_rayleigh::Array{FT}) where {FT<:Real, I<:Integer, B<:Bool}
+                               tau_rayleigh::Array{FT}) where {FT<:AbstractFloat, I<:Integer, B<:Bool}
   k = Array{FT}(undef, ngpt)
   @inbounds for ilay in 1:nlay
     @inbounds for icol in 1:ncol
@@ -787,7 +779,7 @@ integer :: igpt
 function interpolate2D_byflav!(res::AbstractArray{FT,1},
                               fminor::Array{FT,2},
                               k::Array{FT,3},
-                              gptS::I, gptE::I, jeta::Vector{I}, jtemp::I) where {FT<:Real,I<:Integer}
+                              gptS::I, gptE::I, jeta::Vector{I}, jtemp::I) where {FT<:AbstractFloat,I<:Integer}
   # each code block is for a different reference temperature
   # res .= interpolate2D(fminor, k, gptS+igpt-1, jeta, jtemp)
   # res .= FT[interpolate2D(fminor, k, gptS+igpt-1, jeta, jtemp) for igpt in 1:gptE-gptS+1]
