@@ -5,9 +5,10 @@ ENV["DATADEPS_ALWAYS_ACCEPT"] = true
 for submodule in [
                   "PartialImplementations", # compile only
                   "DataDeps",
-                  "rfmip_clear_sky_sw",
-                  "rfmip_clear_sky_lw",
-                  "allsky",
+                  "test_rfmip_clear_sky_sw",
+                  "test_rfmip_clear_sky_lw",
+                  "test_allsky",
+                  "Benchmarks",
                   ]
 
   println("Testing $submodule")

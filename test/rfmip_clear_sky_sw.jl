@@ -1,7 +1,5 @@
 using Test
 using JRRTMGP
-# using ProfileView
-using Profile
 using NCDatasets
 using JRRTMGP.mo_optical_props
 using JRRTMGP.mo_rte_solver_kernels
@@ -14,37 +12,24 @@ using JRRTMGP.mo_fluxes
 using JRRTMGP.mo_load_coefficients
 using JRRTMGP.mo_rfmip_io
 
-# This code is part of RRTM for GCM Applications - Parallel (RRTMGP)
-#
-# Contacts: Robert Pincus and Eli Mlawer
-# email:  rrtmgp@aer.com
-#
-# Copyright 2015-2018,  Atmospheric and Environmental Research and
-# Regents of the University of Colorado.  All right reserved.
-#
-# Use and duplication is permitted under the terms of the
-#    BSD 3-clause license, see http://opensource.org/licenses/BSD-3-Clause
-# -------------------------------------------------------------------------------------------------
-#
-# Example program to demonstrate the calculation of shortwave radiative fluxes in clear, aerosol-free skies.
-#   The example files come from the Radiative Forcing MIP (https://www.earthsystemcog.org/projects/rfmip/)
-#   The large problem (1800 profiles) is divided into blocks
-#
-# Program is invoked as rrtmgp_rfmip_sw [block_size input_file  coefficient_file upflux_file downflux_file]
-#   All arguments are optional but need to be specified in order.
-#
+"""
+Example program to demonstrate the calculation of shortwave radiative fluxes in clear, aerosol-free skies.
+   The example files come from the Radiative Forcing MIP (https://www.earthsystemcog.org/projects/rfmip/)
+   The large problem (1800 profiles) is divided into blocks
 
-function run_driver(datafolder, optical_props_constructor; compile_first=false)
-  #
-  # RTE shortwave driver
-  #
-  # RTE driver uses a derived type to reduce spectral fluxes to whatever the user wants
-  #   Here we're just reporting broadband fluxes
-  #
-  # modules for reading and writing files
-  #
-  # RRTMGP's gas optics class needs to be initialized with data read from a netCDF files
-  #
+Program is invoked as rrtmgp_rfmip_sw [block_size input_file  coefficient_file upflux_file downflux_file]
+   All arguments are optional but need to be specified in order.
+
+RTE shortwave driver
+
+RTE driver uses a derived type to reduce spectral fluxes to whatever the user wants
+ Here we're just reporting broadband fluxes
+
+modules for reading and writing files
+
+RRTMGP's gas optics class needs to be initialized with data read from a netCDF files
+"""
+function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
 
   # character(len=4)   :: block_size_char, forcing_index_char = '1'
 
@@ -78,21 +63,7 @@ function run_driver(datafolder, optical_props_constructor; compile_first=false)
   #   all arguments are optional
   #
 
-  rfmip_file = joinpath(datafolder, "examples","rfmip-clear-sky", "multiple_input4MIPs_radiation_RFMIP_UColorado-RFMIP-1-2_none.nc")
-  kdist_file = joinpath(datafolder, "rrtmgp", "data", "rrtmgp-data-sw-g224-2018-12-04.nc")
-  clear_sky_dir = joinpath(datafolder, "examples","rfmip-clear-sky")
-
-  # sw_flx_up_for_res_file = joinpath("..","..","rte-rrtmgp", "examples","rfmip-clear-sky", "rsu_Efx_RTE-RRTMGP-181204_rad-irf_r1i1p1f1_gn.nc") # Results from Fortran code
-  # sw_flx_dn_for_res_file = joinpath("..","..","rte-rrtmgp", "examples","rfmip-clear-sky", "rsd_Efx_RTE-RRTMGP-181204_rad-irf_r1i1p1f1_gn.nc") # Results from Fortran code
-  sw_flx_up_for_res_file = joinpath(clear_sky_dir, "rsu_Efx_RTE-RRTMGP-181204_rad-irf_r1i1p1f1_gn.nc") # Results from Fortran code
-  sw_flx_dn_for_res_file = joinpath(clear_sky_dir, "rsd_Efx_RTE-RRTMGP-181204_rad-irf_r1i1p1f1_gn.nc") # Results from Fortran code
-
-  ds_sw_flx_up = Dataset(sw_flx_up_for_res_file, "r") # reading the NetCDF file in read only mode
-  ds_sw_flx_dn = Dataset(sw_flx_dn_for_res_file, "r") # reading the NetCDF file in read only mode
-  ds = Dataset(rfmip_file, "r") # reading the NetCDF file in read only mode
-  ds_k_dist = Dataset(kdist_file, "r") # reading the NetCDF file in read only mode
-
-  ncol, nlay, nexp = read_size(ds)
+  ncol, nlay, nexp = read_size(ds[:rfmip])
 
   forcing_index = 1
   block_size = 8
@@ -104,7 +75,7 @@ function run_driver(datafolder, optical_props_constructor; compile_first=false)
     error("rrtmgp_rfmip_sw: number of columns does not fit evenly into blocks.")
   end
   nblocks = Int((ncol*nexp)/block_size)
-  println("Doing $(nblocks) blocks of size $(block_size)")
+  # println("Doing $(nblocks) blocks of size $(block_size)")
 
   # TODO: Fix readme
   # read(forcing_index_char, "(i4)") forcing_index
@@ -115,10 +86,9 @@ function run_driver(datafolder, optical_props_constructor; compile_first=false)
   #   A gas might have a different name in the k-distribution than in the files
   #   provided by RFMIP (e.g. 'co2' and 'carbon_dioxide')
   #
-  # names_in_kdist, names_in_file = determine_gas_names(ds_k_dist, forcing_index)
-  kdist_gas_names, rfmip_gas_games = determine_gas_names(ds_k_dist, forcing_index)
-  print("Calculation uses RFMIP gases: ")
-  @show rfmip_gas_games
+  kdist_gas_names, rfmip_gas_games = determine_gas_names(ds[:k_dist], forcing_index)
+  # print("Calculation uses RFMIP gases: ")
+  # @show rfmip_gas_games
 
   # --------------------------------------------------
   #
@@ -127,7 +97,7 @@ function run_driver(datafolder, optical_props_constructor; compile_first=false)
   #
   # Allocation on assignment within reading routines
   #
-  p_lay, p_lev, t_lay, t_lev = read_and_block_pt(ds, block_size)
+  p_lay, p_lev, t_lay, t_lev = read_and_block_pt(ds[:rfmip], block_size)
   #
   # Are the arrays ordered in the vertical with 1 at the top or the bottom of the domain?
   #
@@ -137,14 +107,14 @@ function run_driver(datafolder, optical_props_constructor; compile_first=false)
   #
   # Read the gas concentrations and surface properties
   #
-  gas_conc_array = read_and_block_gases_ty(ds, block_size, kdist_gas_names, rfmip_gas_games)
-  surface_albedo, total_solar_irradiance, solar_zenith_angle = read_and_block_sw_bc(ds, block_size)
+  gas_conc_array = read_and_block_gases_ty(ds[:rfmip], block_size, kdist_gas_names, rfmip_gas_games)
+  surface_albedo, total_solar_irradiance, solar_zenith_angle = read_and_block_sw_bc(ds[:rfmip], block_size)
 
   #
   # Read k-distribution information. load_and_init() reads data from netCDF and calls
   #   k_dist%init(); users might want to use their own reading methods
   #
-  k_dist = load_and_init(ds_k_dist, gas_conc_array[1])
+  k_dist = load_and_init(ds[:k_dist], gas_conc_array[1])
   !source_is_external(k_dist) && error("rrtmgp_rfmip_sw: k-distribution file is not SW")
 
   nbnd = get_nband(k_dist.optical_props)
@@ -191,8 +161,7 @@ function run_driver(datafolder, optical_props_constructor; compile_first=false)
   #
   fluxes = ty_fluxes_broadband(FT)
 
-  nblocks_iterations = compile_first ? 1 : nblocks
-  for b = 1:nblocks_iterations
+  for b = 1:(compile_first ? 1 : nblocks)
     @show b/nblocks
     fup = fluxes.flux_up = @view(flux_up[:,:,b])
     fdn = fluxes.flux_dn = @view(flux_dn[:,:,b])
@@ -268,18 +237,19 @@ function run_driver(datafolder, optical_props_constructor; compile_first=false)
   flux_up = reshape_for_comparison(flux_up, nlay, ncol, nexp)
   flux_dn = reshape_for_comparison(flux_dn, nlay, ncol, nexp)
 
-  rsu_for = ds_sw_flx_up["rsu"][:]
-  rsd_for = ds_sw_flx_dn["rsd"][:]
+  # comparing with reference data
+  rsu_ref = ds[:flx_up]["rsu"][:]
+  rsd_ref = ds[:flx_dn]["rsd"][:]
 
-  diff_up = maximum( abs.( flux_up .- rsu_for ) )
-  diff_dn = maximum( abs.( flux_dn .- rsd_for ) )
+  diff_up = maximum( abs.( flux_up .- rsu_ref ) )
+  diff_dn = maximum( abs.( flux_dn .- rsd_ref ) )
 
-  diff_up_ulps = maximum( abs.( flux_up .- rsu_for ) ./ eps.(rsu_for) )
-  diff_dn_ulps = maximum( abs.( flux_dn .- rsd_for ) ./ eps.(rsd_for) )
+  diff_up_ulps = maximum( abs.( flux_up .- rsu_ref ) ./ eps.(rsu_ref) )
+  diff_dn_ulps = maximum( abs.( flux_dn .- rsd_ref ) ./ eps.(rsd_ref) )
 
   # @show sqrt(1/eps(FT))
-  # @show diff_up, diff_up_ulps, maximum(abs.(rsu_for))
-  # @show diff_dn, diff_dn_ulps, maximum(abs.(rsd_for))
+  # @show diff_up, diff_up_ulps, maximum(abs.(rsu_ref))
+  # @show diff_dn, diff_dn_ulps, maximum(abs.(rsd_ref))
 
   if !compile_first
     if optical_props_constructor isa ty_optical_props_2str
@@ -290,21 +260,4 @@ function run_driver(datafolder, optical_props_constructor; compile_first=false)
       @test diff_dn_ulps < sqrt(1/(eps(FT))) # 1.6777158e7
     end
   end
-
-  # flxdn_file = "rsd_Efx_RTE-RRTMGP-181204_rad-irf_r1i1p1f" * string(forcing_index) * "_gn.nc"
-  # flxup_file = "rsu_Efx_RTE-RRTMGP-181204_rad-irf_r1i1p1f" * string(forcing_index) * "_gn.nc"
-  # unblock_and_write!(trim(flxup_file), "rsu", flux_up)
-  # unblock_and_write!(trim(flxdn_file), "rsd", flux_dn)
-
-  close(ds_sw_flx_up)
-  close(ds_sw_flx_dn)
-  close(ds)
-  close(ds_k_dist)
-end
-
-@testset "Shortwave driver" begin
-  datafolder = JRRTMGP.data_folder_rrtmgp()
-
-  run_driver(datafolder, ty_optical_props_1scl)
-  run_driver(datafolder, ty_optical_props_1scl)
 end
