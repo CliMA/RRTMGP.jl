@@ -126,10 +126,10 @@ function rte_lw!(optical_props, top_at_1,
 
   #   Upper boundary condition
   if inc_flux ≠ nothing
-    gpt_flux_dn = apply_BC(ncol, nlay, ngpt, top_at_1, inc_flux)
+    apply_BC!(gpt_flux_dn, ncol, nlay, ngpt, top_at_1, inc_flux)
   else
     # Default is zero incident diffuse flux
-    gpt_flux_dn = apply_BC(ncol, nlay, ngpt, top_at_1, FT)
+    apply_BC!(gpt_flux_dn, ncol, nlay, ngpt, top_at_1)
   end
 
   # Compute the radiative transfer...

@@ -63,7 +63,7 @@ function reduce!(this::ty_fluxes_broadband,
                  gpt_flux_dn::Array{FT,3},
                  spectral_disc::ty_optical_props,
                  top_at_1::Bool,
-                 gpt_flux_dn_dir::Union{Nothing,Array{FT,3}}=nothing) where FT<:Real
+                 gpt_flux_dn_dir::Union{Nothing,Array{FT,3}}=nothing) where FT<:AbstractFloat
 
   ncol,nlev,ngpt = size(gpt_flux_up)
 
