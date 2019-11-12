@@ -32,11 +32,10 @@ export interpolation!,
        compute_Planck_source!,
        interpolate1D,
        interpolate2D,
-       interpolate2D_byflav,
+       interpolate2D_byflav!,
        interpolate3D,
-       interpolate3D_byflav,
-       combine_and_reorder_2str,
-       combine_and_reorder_nstr!
+       interpolate3D_byflav!,
+       combine_and_reorder_2str!
 
 """
     interpolation!(...)
@@ -246,7 +245,6 @@ function compute_tau_absorption!(tau,
     itropo_upper[:, 2] .= nlay
   end
 
-  fill!(tau, FT(0))
   # ---------------------
   # Major Species
   # ---------------------
@@ -354,27 +352,26 @@ function gas_optical_depths_major!(ncol,nlay,nbnd,ngpt,
                                     tau::Array{FT}) where {FT<:AbstractFloat}
 
   tau_major = Array{FT}(undef, ngpt)
-  for icol in 1:ncol
-    for ilay in 1:nlay
+  @inbounds for icol in 1:ncol
+    @inbounds for ilay in 1:nlay
       # itropo = 1 lower atmosphere; itropo = 2 upper atmosphere
       itropo = fmerge(1,2,tropo[icol,ilay])
       # optical depth calculation for major species
-      for ibnd in 1:nbnd
+      @inbounds for ibnd in 1:nbnd
         gptS = band_lims_gpt[1, ibnd]
         gptE = band_lims_gpt[2, ibnd]
         iflav = gpoint_flavor[itropo, gptS] #eta interpolation depends on band's flavor
-        tau_major[gptS:gptE] .=
-          # interpolation in temperature, pressure, and eta
-          interpolate3D_byflav(col_mix[:,iflav,icol,ilay],
-                               fmajor[:,:,:,iflav,icol,ilay],
-                               kmajor,
-                               band_lims_gpt[1, ibnd],
-                               band_lims_gpt[2, ibnd],
-                               jeta[:,iflav,icol,ilay],
-                               jtemp[icol,ilay],
-                               jpress[icol,ilay]+itropo
-                               )
-        tau[gptS:gptE,ilay,icol] = tau[gptS:gptE,ilay,icol] .+ tau_major[gptS:gptE]
+        # interpolation in temperature, pressure, and eta
+        @inbounds interpolate3D_byflav!(@view(tau_major[gptS:gptE]), col_mix[:,iflav,icol,ilay],
+                             fmajor[:,:,:,iflav,icol,ilay],
+                             kmajor,
+                             band_lims_gpt[1, ibnd],
+                             band_lims_gpt[2, ibnd],
+                             jeta[:,iflav,icol,ilay],
+                             jtemp[icol,ilay],
+                             jpress[icol,ilay]+itropo
+                             )
+        @inbounds tau[gptS:gptE,ilay,icol] .= tau[gptS:gptE,ilay,icol] .+ tau_major[gptS:gptE]
       end # igpt
     end
   end # ilay
@@ -451,13 +448,13 @@ function gas_optical_depths_minor!(ncol,
 
   tau_minor = Array{FT}(undef, ngpt)
   if any(layer_limits[:,1] .> 0)
-    for imnr in 1:size(scale_by_complement,1) # loop over minor absorbers in each band
-      for icol in 1:ncol
+    @inbounds for imnr in 1:size(scale_by_complement,1) # loop over minor absorbers in each band
+      @inbounds for icol in 1:ncol
         #
         # This check skips individual columns with no pressures in range
         #
         if layer_limits[icol,1] > 0
-          for ilay in layer_limits[icol,1]:layer_limits[icol,2]
+          @inbounds for ilay in layer_limits[icol,1]:layer_limits[icol,2]
             #
             # Scaling of minor gas absortion coefficient begins with column amount of minor gas
             #
@@ -488,8 +485,7 @@ function gas_optical_depths_minor!(ncol,
             gptS = minor_limits_gpt[1,imnr]
             gptE = minor_limits_gpt[2,imnr]
             iflav = gpt_flv[gptS]
-            # tau_minor[gptS:gptE] = scaling *
-            interpolate2D_byflav!(@view(tau_minor[gptS:gptE]),
+            @inbounds interpolate2D_byflav!(@view(tau_minor[gptS:gptE]),
                                  fminor[:,:,iflav,icol,ilay],
                                  kminor,
                                  kminor_start[imnr],
@@ -631,10 +627,10 @@ function compute_Planck_source!(
         gptE = band_lims_gpt[2, ibnd]
         iflav = gpoint_flavor[itropo, gptS] #eta interpolation depends on band's flavor
           # interpolation in temperature, pressure, and eta
-        pfrac[gptS:gptE,ilay,icol] =
-          interpolate3D_byflav(FT[1,1], fmajor[:,:,:,iflav,icol,ilay], pfracin,
-                        band_lims_gpt[1, ibnd], band_lims_gpt[2, ibnd],
-                        jeta[:,iflav,icol,ilay], jtemp[icol,ilay],jpress[icol,ilay]+itropo)
+        interpolate3D_byflav!(@view(pfrac[gptS:gptE,ilay,icol]),
+                             FT[1,1], fmajor[:,:,:,iflav,icol,ilay], pfracin,
+                      band_lims_gpt[1, ibnd], band_lims_gpt[2, ibnd],
+                      jeta[:,iflav,icol,ilay], jtemp[icol,ilay],jpress[icol,ilay]+itropo)
       end # band
     end   # layer
   end     # column
@@ -769,8 +765,6 @@ function interpolate2D_byflav!(res::AbstractArray{FT,1},
                               k::Array{FT,3},
                               gptS::I, gptE::I, jeta::Vector{I}, jtemp::I) where {FT<:AbstractFloat,I<:Integer}
   # each code block is for a different reference temperature
-  # res .= interpolate2D(fminor, k, gptS+igpt-1, jeta, jtemp)
-  # res .= FT[interpolate2D(fminor, k, gptS+igpt-1, jeta, jtemp) for igpt in 1:gptE-gptS+1]
   @inbounds for igpt in 1:gptE-gptS+1
     @inbounds res[igpt] = fminor[1,1] * k[gptS+igpt-1, jeta[1]  , jtemp  ] +
                           fminor[2,1] * k[gptS+igpt-1, jeta[1]+1, jtemp  ] +
@@ -814,7 +808,7 @@ function interpolate3D(scaling, fmajor, k, igpt, jeta, jtemp, jpress)
 end
 
 """
-    interpolate3D_byflav(...)
+    interpolate3D_byflav!(...)
 
 real(FT), dimension(2),     intent(in) :: scaling
 real(FT), dimension(2,2,2), intent(in) :: fmajor # interpolation fractions for major species
@@ -831,11 +825,18 @@ real(FT), dimension(gptE-gptS+1)        :: res # the result
 # Local variable
 integer :: igpt
 """
-function interpolate3D_byflav(scaling, fmajor, k, gptS, gptE, jeta, jtemp, jpress)
+function interpolate3D_byflav!(res::AbstractArray{FT},
+                               scaling::Array{FT},
+                               fmajor::Array{FT},
+                               k::Array{FT},
+                               gptS::I,
+                               gptE::I,
+                               jeta::Array{I},
+                               jtemp::I,
+                               jpress::I) where {I<:Int,FT<:AbstractFloat}
   # each code block is for a different reference temperature
-  FT = eltype(k)
-  res = Vector{FT}(undef, gptE-gptS+1)
-  for igpt = 1:gptE-gptS+1
+
+  @inbounds for igpt = 1:gptE-gptS+1
     res[igpt] =
       scaling[1] *
       ( fmajor[1,1,1] * k[gptS+igpt-1, jeta[1]  , jpress-1, jtemp  ] +
@@ -848,7 +849,7 @@ function interpolate3D_byflav(scaling, fmajor, k, gptS, gptE, jeta, jtemp, jpres
         fmajor[1,2,2] * k[gptS+igpt-1, jeta[2]  , jpress  , jtemp+1] +
         fmajor[2,2,2] * k[gptS+igpt-1, jeta[2]+1, jpress  , jtemp+1] )
   end
-  return res
+  nothing
 end
 
 """
@@ -864,14 +865,15 @@ integer  :: icol, ilay, igpt
 real(FT) :: t
 # -----------------------
 """
-function combine_and_reorder_2str(ncol, nlay, ngpt, tau_abs, tau_rayleigh)
-  FT = eltype(tau_abs)
-  tau = Array{FT}(undef,ncol, nlay, ngpt)
-  ssa = Array{FT}(undef,ncol, nlay, ngpt)
-  g = Array{FT}(undef,ncol, nlay, ngpt)
-  for icol in 1:ncol
-    for ilay in 1:nlay
-      for igpt in 1:ngpt
+function combine_and_reorder_2str!(tau::Array{FT},
+                                   ssa::Array{FT},
+                                   g::Array{FT},
+                                   ncol::I, nlay::I, ngpt::I,
+                                   tau_abs::Array{FT},
+                                   tau_rayleigh::Array{FT}) where {I<:Int,FT<:AbstractFloat}
+  @inbounds for icol in 1:ncol
+    @inbounds for ilay in 1:nlay
+      @inbounds for igpt in 1:ngpt
          t = tau_abs[igpt,ilay,icol] + tau_rayleigh[igpt,ilay,icol]
          tau[icol,ilay,igpt] = t
          g[icol,ilay,igpt] = FT(0)
@@ -883,47 +885,7 @@ function combine_and_reorder_2str(ncol, nlay, ngpt, tau_abs, tau_rayleigh)
       end
     end
   end
-  return tau, ssa, g
-end
-
-"""
-    combine_and_reorder_nstr!(...)
-
-Combine absoprtion and Rayleigh optical depths for total tau, ssa, p
-using Rayleigh scattering phase function
-
-integer, intent(in) :: ncol, nlay, ngpt, nmom
-real(FT), dimension(ngpt,nlay,ncol), intent(in ) :: tau_abs, tau_rayleigh
-real(FT), dimension(ncol,nlay,ngpt), intent(inout) :: tau, ssa
-real(FT), dimension(ncol,nlay,ngpt,nmom),
-                                     intent(inout) :: p
-# -----------------------
-integer :: icol, ilay, igpt, imom
-real(FT) :: t
-# -----------------------
-"""
-function combine_and_reorder_nstr!(ncol, nlay, ngpt, nmom, tau_abs, tau_rayleigh, tau, ssa, p)
-  FT = eltype(tau_abs)
-
-  for icol in 1:ncol
-    for ilay in 1:nlay
-      for igpt in 1:ngpt
-        t = tau_abs[igpt,ilay,icol] + tau_rayleigh[igpt,ilay,icol]
-        tau[icol,ilay,igpt] = t
-        if (t > FT(2) * realmin(FT))
-          ssa[icol,ilay,igpt] = tau_rayleigh[igpt,ilay,icol] / t
-        else
-          ssa[icol,ilay,igpt] = FT(0)
-        end
-        for imom = 1:nmom
-          p[imom,icol,ilay,igpt] = FT(0)
-        end
-        if (nmom >= 2)
-          p[2,icol,ilay,igpt] = FT(0.1)
-        end
-      end
-    end
-  end
+  nothing
 end
 
 end #module

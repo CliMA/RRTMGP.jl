@@ -211,21 +211,18 @@ function gas_optics_ext!(this::ty_gas_optics_rrtmgp,
                      toa_src,        # mandatory outputs
                      col_dry=nothing)
 
-
   FT = eltype(play)
 
   jpress = Array{Int}( undef, size(play))
   jtemp  = Array{Int}( undef, size(play))
   tropo  = Array{Bool}(undef, size(play))
-  fmajor = zeros(FT, 2,2,2, get_nflav(this), size(play)...)
+  fmajor = Array{FT}(undef, 2,2,2, get_nflav(this), size(play)...)
   jeta   = Array{Int}( undef, 2,     get_nflav(this), size(play)...)
 
   ncol  = size(play, 1)
   nlay  = size(play, 2)
   ngpt  = get_ngpt(this.optical_props)
   nband = get_nband(this.optical_props)
-  ngas  = get_ngas(this)
-  nflav = get_nflav(this)
 
   # Gas optics
   compute_gas_taus!(jtemp, jpress, jeta, tropo, fmajor, this,
@@ -236,8 +233,8 @@ function gas_optics_ext!(this::ty_gas_optics_rrtmgp,
 
   # External source function is constant
   check_extent(toa_src,     (ncol,         ngpt), "toa_src")
-  for igpt in 1:ngpt
-     for icol in 1:ncol
+  @inbounds for igpt in 1:ngpt
+     @inbounds for icol in 1:ncol
         toa_src[icol,igpt] = this.solar_src[igpt]
      end
   end
@@ -343,7 +340,7 @@ function compute_gas_taus!(jtemp, jpress, jeta, tropo, fmajor, this::ty_gas_opti
   nminorkupper = size(this.kminor_upper, 1)
 
   # Fill out the array of volume mixing ratios
-  for igas in 1:ngas
+  @inbounds for igas in 1:ngas
     # Get vmr if  gas is provided in ty_gas_concs
     if lowercase(this.gas_names[igas]) in gas_desc.gas_name
       vmr[:,:,igas] .= get_vmr(gas_desc, this.gas_names[igas])
@@ -360,8 +357,8 @@ function compute_gas_taus!(jtemp, jpress, jeta, tropo, fmajor, this::ty_gas_opti
   end
 
   # compute column gas amounts [molec/cm^2]
-  col_gas[1:ncol,1:nlay,0] .= col_dry_wk[1:ncol,1:nlay]
-  for igas = 1:ngas
+  @inbounds col_gas[1:ncol,1:nlay,0] .= col_dry_wk[1:ncol,1:nlay]
+  @inbounds for igas = 1:ngas
     col_gas[1:ncol,1:nlay,igas] .= vmr[1:ncol,1:nlay,igas] .* col_dry_wk[1:ncol,1:nlay]
   end
 
@@ -1272,8 +1269,8 @@ function combine_and_reorder!(tau, tau_rayleigh, has_rayleigh, optical_props::ty
         permutedims!(optical_props.tau, tau, [3,2,1])
 
       elseif optical_props isa ty_optical_props_2str
-        optical_props.tau, optical_props.ssa, optical_props.g =
-          combine_and_reorder_2str(ncol, nlay, ngpt,       tau, tau_rayleigh)
+          combine_and_reorder_2str!(optical_props.tau, optical_props.ssa, optical_props.g,
+                                    ncol, nlay, ngpt,       tau, tau_rayleigh)
       elseif optical_props isa ty_optical_props_nstr # We ought to be able to combine this with above
         nmom = size(optical_props.p, 1)
         combine_and_reorder_nstr!(ncol, nlay, ngpt, nmom, tau, tau_rayleigh,

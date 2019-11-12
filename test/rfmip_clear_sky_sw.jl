@@ -159,7 +159,7 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
   #
   fluxes = ty_fluxes_broadband(FT)
 
-  for b = 1:(compile_first ? 1 : nblocks)
+  @inbounds for b = 1:(compile_first ? 1 : nblocks)
     @show b/nblocks
     fup = fluxes.flux_up = @view(flux_up[:,:,b])
     fdn = fluxes.flux_dn = @view(flux_dn[:,:,b])
@@ -183,23 +183,23 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
     #
     # Normalize incoming solar flux to match RFMIP specification
     #
-    for igpt = 1:ngpt
-      for icol = 1:block_size
+    @inbounds for igpt = 1:ngpt
+      @inbounds for icol = 1:block_size
         toa_flux[icol,igpt] = toa_flux[icol,igpt] * total_solar_irradiance[icol,b]/def_tsi[icol]
       end
     end
     #
     # Expand the spectrally-constant surface albedo to a per-band albedo for each column
     #
-    for icol = 1:block_size
-      for ibnd = 1:nbnd
+    @inbounds for icol = 1:block_size
+      @inbounds for ibnd = 1:nbnd
         sfc_alb_spec[ibnd,icol] = surface_albedo[icol,b]
       end
     end
     #
     # Cosine of the solar zenith angle
     #
-    for icol = 1:block_size
+    @inbounds for icol = 1:block_size
       mu0[icol] = fmerge(cos(solar_zenith_angle[icol,b]*deg_to_rad), FT(1), usecol[icol,b])
     end
 
@@ -220,7 +220,7 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
     #
     # Zero out fluxes for which the original solar zenith angle is > 90 degrees.
     #
-    for icol = 1:block_size
+    @inbounds for icol = 1:block_size
       if !usecol[icol,b]
         flux_up[icol,:,b] .= FT(0)
         flux_dn[icol,:,b] .= FT(0)

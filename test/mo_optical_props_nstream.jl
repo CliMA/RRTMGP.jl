@@ -245,3 +245,44 @@ end
     integer                                     :: get_nmom
 """
 get_nmom(this::ty_optical_props_nstr) = allocated(this.p) ? size(this.p, 1) : 0
+
+
+"""
+    combine_and_reorder_nstr!(...)
+
+Combine absoprtion and Rayleigh optical depths for total tau, ssa, p
+using Rayleigh scattering phase function
+
+integer, intent(in) :: ncol, nlay, ngpt, nmom
+real(FT), dimension(ngpt,nlay,ncol), intent(in ) :: tau_abs, tau_rayleigh
+real(FT), dimension(ncol,nlay,ngpt), intent(inout) :: tau, ssa
+real(FT), dimension(ncol,nlay,ngpt,nmom),
+                                     intent(inout) :: p
+# -----------------------
+integer :: icol, ilay, igpt, imom
+real(FT) :: t
+# -----------------------
+"""
+function combine_and_reorder_nstr!(ncol, nlay, ngpt, nmom, tau_abs, tau_rayleigh, tau, ssa, p)
+  FT = eltype(tau_abs)
+
+  for icol in 1:ncol
+    for ilay in 1:nlay
+      for igpt in 1:ngpt
+        t = tau_abs[igpt,ilay,icol] + tau_rayleigh[igpt,ilay,icol]
+        tau[icol,ilay,igpt] = t
+        if (t > FT(2) * realmin(FT))
+          ssa[icol,ilay,igpt] = tau_rayleigh[igpt,ilay,icol] / t
+        else
+          ssa[icol,ilay,igpt] = FT(0)
+        end
+        for imom = 1:nmom
+          p[imom,icol,ilay,igpt] = FT(0)
+        end
+        if (nmom >= 2)
+          p[2,icol,ilay,igpt] = FT(0.1)
+        end
+      end
+    end
+  end
+end

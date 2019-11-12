@@ -150,7 +150,8 @@ end
 # Incrementing when the second set of optical properties is defined at lower spectral resolution
 #   (e.g. by band instead of by gpoint)
 #
-function increment_bybnd!(op_1::ty_optical_props_1scl{FT}, op_2::ty_optical_props_1scl{FT}) where FT
+function increment_bybnd!(op_1::ty_optical_props_1scl{FT},
+                          op_2::ty_optical_props_1scl{FT}) where FT
 #    integer,                             intent(in   ) :: ncol, nlay, ngpt, nbnd
 #    real(FT), dimension(ncol,nlay,ngpt), intent(inout) :: tau1
 #    real(FT), dimension(ncol,nlay,nbnd), intent(in   ) :: tau2
@@ -169,13 +170,12 @@ function increment_bybnd!(op_1::ty_optical_props_1scl{FT}, op_2::ty_optical_prop
 end
 # ---------------------------------
 # increment 1scalar by 2stream
-function increment_bybnd!(op_1::ty_optical_props_1scl{FT}, op_2::ty_optical_props_2str{FT}) where FT
+function increment_bybnd!(op_1::ty_optical_props_1scl{FT},
+                          op_2::ty_optical_props_2str{FT}) where FT
 #    integer,                             intent(in   ) :: ncol, nlay, ngpt, nbnd
 #    real(FT), dimension(ncol,nlay,ngpt), intent(inout) :: tau1
 #    real(FT), dimension(ncol,nlay,nbnd), intent(in   ) :: tau2, ssa2
 #    integer,  dimension(2,nbnd),         intent(in   ) :: gpt_lims # Starting and ending gpoint for each band
-
-#    integer :: ibnd, igpt
 
   ngpt = get_ngpt(op_1)
   nlay = get_nlay(op_1)
@@ -202,7 +202,8 @@ integer,  dimension(2,nbnd),         intent(in   ) :: gpt_lims # Starting and en
 integer  :: icol, ilay, igpt, ibnd
 real(FT) :: tau12
 """
-function increment_bybnd!(op_1::ty_optical_props_2str{FT}, op_2::ty_optical_props_1scl{FT}) where FT
+function increment_bybnd!(op_1::ty_optical_props_2str{FT},
+                          op_2::ty_optical_props_1scl{FT}) where FT
   ngpt = get_ngpt(op_1)
   nlay = get_nlay(op_1)
   ncol = get_ncol(op_1)
@@ -235,7 +236,8 @@ integer,  dimension(2,nbnd),         intent(in   ) :: gpt_lims # Starting and en
 integer  :: icol, ilay, igpt, ibnd
 real(FT) :: tau12, tauscat12
 """
-function increment_bybnd!(op_1::ty_optical_props_2str{FT}, op_2::ty_optical_props_2str{FT}) where FT
+function increment_bybnd!(op_1::ty_optical_props_2str{FT},
+                          op_2::ty_optical_props_2str{FT}) where FT
 
   ngpt = get_ngpt(op_1)
   nlay = get_nlay(op_1)
