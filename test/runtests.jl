@@ -1,9 +1,9 @@
 using Test
 ENV["DATADEPS_ALWAYS_ACCEPT"] = true
 
-# include("AutoRunRRTMGP.jl")
+# include(joinpath("OriginalRRTMGP","AutoRunRRTMGP.jl"))
 for submodule in [
-                  "PartialImplementations", # compile only
+                  joinpath("..","PartialImplementations", "PartialImplementations"), # compile only
                   "DataDeps",
                   "test_rfmip_clear_sky_sw",
                   "test_rfmip_clear_sky_lw",
