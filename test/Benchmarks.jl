@@ -20,9 +20,9 @@ include("DataSetFiles.jl")
   refresh_pr = true
   refresh_params = true
   refresh_master = true
-  params_file = "params.json"
-  master_file = "master.json"
-  pr_file = "pr.json"
+  params_file = joinpath("BenchmarkResults", "params.json")
+  master_file = joinpath("BenchmarkResults", "master.json")
+  pr_file     = joinpath("BenchmarkResults", "pr.json")
   refresh_params && rm(params_file, force=true)
   refresh_master && rm(master_file, force=true)
   refresh_pr && rm(pr_file, force=true)
