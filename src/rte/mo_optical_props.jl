@@ -523,7 +523,7 @@ get_nband(this::ty_optical_props) = is_initialized(this.band2gpt) ? size(this.ba
   class(ty_optical_props), intent(in) :: this
   integer                             :: get_ngpt
 """
-get_ngpt(this::ty_optical_props) = is_initialized(this.band2gpt) ? maxval(this.band2gpt) : 0
+get_ngpt(this::ty_optical_props) = is_initialized(this.band2gpt) ? max(this.band2gpt...) : 0
 
 #--------------------------------------------------------------------------------------------------------------------
 #
