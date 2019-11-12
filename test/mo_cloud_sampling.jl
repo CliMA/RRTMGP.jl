@@ -1,18 +1,9 @@
-"""
-    mo_cloud_sampling
-
-This module provides a simple implementation of sampling for the
-Monte Carlo Independent Pixel Approximation (McICA, doi:10.1029/2002jd003322)
-Cloud optical properties, defined by band and assumed homogenous within each cell (column/layer),
-are randomly sampled to preserve the mean cloud fraction and one of several possible overlap assumptions
-Users supply random numbers with order ngpt,nlay,ncol
-These are only accessed if cloud_fraction(icol,ilay) > 0 so many values don't need to be filled in
-"""
-module mo_cloud_sampling
-
-using ..mo_optical_props
-
-export draw_samples, sampled_mask_max_ran, sampled_mask_exp_ran
+# This file provides a simple implementation of sampling for the
+# Monte Carlo Independent Pixel Approximation (McICA, doi:10.1029/2002jd003322)
+# Cloud optical properties, defined by band and assumed homogenous within each cell (column/layer),
+# are randomly sampled to preserve the mean cloud fraction and one of several possible overlap assumptions
+# Users supply random numbers with order ngpt,nlay,ncol
+# These are only accessed if cloud_fraction(icol,ilay) > 0 so many values don't need to be filled in
 
 """
     draw_samples
@@ -275,5 +266,3 @@ function apply_cloud_mask(ncol,nlay,nbnd,ngpt,band_lims_gpt,cloud_mask,input_fie
     end
   end
 end
-
-end # module
