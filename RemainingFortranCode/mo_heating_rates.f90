@@ -1,34 +1,34 @@
-#
-# Eli Mlawer and Robert Pincus
-# Andre Wehe and Jennifer Delamere
-# email:  rrtmgp@aer.com
-#
-# Copyright 2016-2017,  Atmospheric and Environmental Research and
-# Regents of the University of Colorado.  All right reserved.
-#
-# Use and duplication is permitted under the terms of the
-#    BSD 3-clause license, see http://opensource.org/licenses/BSD-3-Clause
-#
-# Description:  Heating rate calculation
+!
+! Eli Mlawer and Robert Pincus
+! Andre Wehe and Jennifer Delamere
+! email:  rrtmgp@aer.com
+!
+! Copyright 2016-2017,  Atmospheric and Environmental Research and
+! Regents of the University of Colorado.  All right reserved.
+!
+! Use and duplication is permitted under the terms of the
+!    BSD 3-clause license, see http://opensource.org/licenses/BSD-3-Clause
+!
+! Description:  Heating rate calculation
 
 module mo_heating_rates
   use mo_rte_kind,      only: FT, wl
-  use mo_rrtmgp_constants, only: cp_dry, grav # Only needed for heating rate calculation
+  use mo_rrtmgp_constants, only: cp_dry, grav ! Only needed for heating rate calculation
   implicit none
   private
   public ::  compute_heating_rate
 contains
-  # Compute heating rate from fluxes
-  # heating rate H [K/sec] = 1/(rho cp) d f_net/d z
-  # Here use hydrostatic equation for density and heat capacity of dry air
+  ! Compute heating rate from fluxes
+  ! heating rate H [K/sec] = 1/(rho cp) d f_net/d z
+  ! Here use hydrostatic equation for density and heat capacity of dry air
   function compute_heating_rate(flux_up, flux_dn, plev, heating_rate) result(error_msg)
-    real(FT), dimension(:,:), intent(in ) :: flux_up, flux_dn, & #< fluxes at interfaces [W/m2]
-                                             plev                #< pressure at interfaces [Pa]
-    real(FT), dimension(:,:), intent(out) :: heating_rate        #< heating rate within layer [K/sec]
+    real(FT), dimension(:,:), intent(in ) :: flux_up, flux_dn, & !< fluxes at interfaces [W/m2]
+                                             plev                !< pressure at interfaces [Pa]
+    real(FT), dimension(:,:), intent(out) :: heating_rate        !< heating rate within layer [K/sec]
     character(len=128)                    :: error_msg
-    # ---------
+    ! ---------
     integer :: ncol, nlay, ilay
-    # ---------
+    ! ---------
     error_msg = ""
     ncol = size(flux_up, 1)
     nlay = size(flux_up, 2) - 1
