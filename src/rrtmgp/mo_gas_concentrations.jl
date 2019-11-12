@@ -178,41 +178,6 @@ function get_vmr(this::ty_gas_concs, gas::String, array::Array{FT,2}) where FT
 
 end
 
-# Extract a subset of n columns starting with column 'start'
-function get_subset_range(this::ty_gas_concs, start::I, n::I, subset::ty_gas_concs) where I
-  # class(ty_gas_concs),      intent(in   ) :: this
-  # integer,                  intent(in   ) :: start, n
-  # class(ty_gas_concs),      intent(inout) :: subset
-  @assert !(n <= 0)
-  @assert !(start < 1 )
-  @assert !(this.ncol ≠ nothing && start > this.ncol || start+n-1 > this.ncol )
-
-  this.nlay = 0
-  this.ncol = 0
-  # reset!(subset)
-  # These two arrays should be the same length
-  subset.gas_name = Array(undef, size(this.gas_name))
-  subset.concs = Array(undef, size(this.concs))
-  subset.nlay = this.nlay
-  subset.ncol = fmerge(n, 0, this.ncol ≠ nothing)
-  subset.gas_name[:] .= this.gas_name[:]
-
-  for i = 1:size(this.gas_name)
-    #
-    # Preserve scalar/1D/2D representation in subset,
-    #   but need to ensure at least extent 1 in col dimension (ncol = 0 means no gas exploits this dimension)
-    #
-    allocate(subset.concs[i].conc(min(max(subset.ncol,1), size(this.concs[i].conc, 1)),
-                                        min(    subset.nlay,    size(this.concs[i].conc, 2))))
-    if size(this.concs[i].conc, 1) > 1      # Concentration stored as 2D
-      subset.concs[i].conc[:,:] .= this.concs[i].conc[start:(start+n-1),:]
-    else
-      subset.concs[i].conc[:,:] .= this.concs[i].conc[:,:]
-    end
-  end
-
-end
-
 # Inquiry functions
 get_num_gases(this::ty_gas_concs) = size(this.gas_name)
 
