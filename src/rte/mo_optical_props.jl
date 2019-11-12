@@ -630,12 +630,12 @@ end
     logical                             :: bands_are_equal
 """
 function bands_are_equal(this::ty_optical_props{FT}, that::ty_optical_props{FT}) where FT
-  bands_are_equal = get_nband(this) == get_nband(that) && get_nband(this) > 0
-  if !bands_are_equal
-    return bands_are_equal
+  bands_equal = get_nband(this) == get_nband(that) && get_nband(this) > 0
+  if !bands_equal
+    return bands_equal
   end
-  bands_are_equal = all(abs.(get_band_lims_wavenumber(this) .- get_band_lims_wavenumber(that)) .< FT(5) * spacing.(get_band_lims_wavenumber(this)))
-  return bands_are_equal
+  bands_equal = all(abs.(get_band_lims_wavenumber(this) .- get_band_lims_wavenumber(that)) .< FT(5) * spacing.(get_band_lims_wavenumber(this)))
+  return bands_equal
 end
 
 #
@@ -648,11 +648,11 @@ end
 """
 function gpoints_are_equal(this::T1, that::T2) where {T1,T2}
 
-  gpoints_are_equal = bands_are_equal(this, that) && get_ngpt(this) == get_ngpt(that)
-  if !gpoints_are_equal
-    return gpoints_are_equal
+  gpoints_equal = bands_are_equal(this, that) && get_ngpt(this) == get_ngpt(that)
+  if !gpoints_equal
+    return gpoints_equal
   end
-  gpoints_are_equal = all(get_gpoint_bands(this) == get_gpoint_bands(that))
+  gpoints_equal = all(get_gpoint_bands(this) == get_gpoint_bands(that))
 end
 
 """
