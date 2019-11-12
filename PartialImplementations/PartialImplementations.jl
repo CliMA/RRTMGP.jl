@@ -19,3 +19,4 @@ import JRRTMGP.mo_optical_props: alloc!, copy_and_alloc!, validate!, subset_rang
 
 include("mo_optical_props_kernels_nstream.jl")
 include("mo_optical_props_nstream.jl")
+include("ExtractSubset.jl")
