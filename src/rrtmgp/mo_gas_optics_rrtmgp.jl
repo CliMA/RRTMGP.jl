@@ -12,6 +12,8 @@ Two variants apply to internal Planck sources (longwave radiation in the Earth's
 """
 module mo_gas_optics_rrtmgp
 using OffsetArrays
+using TimerOutputs
+const to_gor = TimerOutput()
 using ..fortran_intrinsics
 using ..mo_rrtmgp_constants
 using ..mo_util_array
@@ -209,8 +211,7 @@ function gas_optics_ext!(this::ty_gas_optics_rrtmgp,
                      gas_desc::ty_gas_concs,    # mandatory inputs
                      optical_props::ty_optical_props_arry,
                      toa_src,        # mandatory outputs
-                     col_dry=nothing)
-
+                     col_dry=nothing, last_call=false)
 
   FT = eltype(play)
 
@@ -228,11 +229,11 @@ function gas_optics_ext!(this::ty_gas_optics_rrtmgp,
   nflav = get_nflav(this)
 
   # Gas optics
-  compute_gas_taus!(jtemp, jpress, jeta, tropo, fmajor, this,
+  @timeit to_gor "compute_gas_taus!" compute_gas_taus!(jtemp, jpress, jeta, tropo, fmajor, this,
                    ncol, nlay, ngpt, nband,
                    play, plev, tlay, gas_desc,
                    optical_props,
-                   col_dry)
+                   col_dry, last_call)
 
   # External source function is constant
   check_extent(toa_src,     (ncol,         ngpt), "toa_src")
@@ -241,6 +242,8 @@ function gas_optics_ext!(this::ty_gas_optics_rrtmgp,
         toa_src[icol,igpt] = this.solar_src[igpt]
      end
   end
+  last_call && println("--------------- last_call")
+  last_call && @show to_gor
 end
 
 
@@ -299,7 +302,7 @@ function compute_gas_taus!(jtemp, jpress, jeta, tropo, fmajor, this::ty_gas_opti
                           ncol, nlay, ngpt, nband,
                           play, plev, tlay, gas_desc::ty_gas_concs,
                           optical_props::ty_optical_props_arry,
-                          col_dry=nothing) where FT
+                          col_dry=nothing, last_call=false) where FT
 
   tau          = Array{FT}(undef, ngpt,nlay,ncol)          # absorption, Rayleigh scattering optical depths
   tau_rayleigh = Array{FT}(undef, ngpt,nlay,ncol) # absorption, Rayleigh scattering optical depths
@@ -367,7 +370,7 @@ function compute_gas_taus!(jtemp, jpress, jeta, tropo, fmajor, this::ty_gas_opti
 
   # ---- calculate gas optical depths ----
   tau .= 0
-  interpolation!(jtemp,fmajor,fminor,col_mix,tropo,jeta,jpress,
+  @timeit to_gor "interpolation!" interpolation!(jtemp,fmajor,fminor,col_mix,tropo,jeta,jpress,
           ncol,nlay,                        # problem dimensions
           ngas, nflav, neta, npres, ntemp,  # interpolation dimensions
           this.flavor,
@@ -381,7 +384,7 @@ function compute_gas_taus!(jtemp, jpress, jeta, tropo, fmajor, this::ty_gas_opti
           play,
           tlay,
           col_gas)
-  compute_tau_absorption!(tau,
+  @timeit to_gor "compute_tau_absorption!" compute_tau_absorption!(tau,
           ncol,nlay,nband,ngpt,                      # dimensions
           ngas,nflav,neta,npres,ntemp,
           nminorlower, nminorklower,                # number of minor contributors, total num absorption coeffs
@@ -410,7 +413,7 @@ function compute_gas_taus!(jtemp, jpress, jeta, tropo, fmajor, this::ty_gas_opti
           jeta,jtemp,jpress)
   if allocated(this.krayl)
 
-    compute_tau_rayleigh!(          #Rayleigh scattering optical depths
+    @timeit to_gor "compute_tau_rayleigh!" compute_tau_rayleigh!(          #Rayleigh scattering optical depths
           ncol,nlay,nband,ngpt,
           ngas,nflav,neta,npres,ntemp,  # dimensions
           this.gpoint_flavor,
@@ -423,7 +426,7 @@ function compute_gas_taus!(jtemp, jpress, jeta, tropo, fmajor, this::ty_gas_opti
   end
 
   # Combine optical depths and reorder for radiative transfer solver.
-  combine_and_reorder!(tau, tau_rayleigh, allocated(this.krayl), optical_props)
+  @timeit to_gor "combine_and_reorder!" combine_and_reorder!(tau, tau_rayleigh, allocated(this.krayl), optical_props)
 
 end
 

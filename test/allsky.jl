@@ -1,6 +1,8 @@
 using Profile
 using Test
 using JRRTMGP
+using TimerOutputs
+const to = TimerOutput()
 using NCDatasets
 using JRRTMGP.mo_optical_props
 using JRRTMGP.mo_simple_netcdf
@@ -130,7 +132,7 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
   #
   FT = Float64
   I = Int64
-  p_lay, t_lay, p_lev, t_lev, gas_concs_garand, col_dry = read_atmos(ds[:input], FT, gas_names)
+  p_lay, t_lay, p_lev, t_lev, gas_concs_garand, col_dry = @timeit to "read_atmos" read_atmos(ds[:input], FT, gas_names)
 
   deallocate!(col_dry)
   nlay = size(p_lay, 2)

@@ -2,6 +2,8 @@ using Test
 using JRRTMGP
 using NCDatasets
 using ProgressMeter
+using TimerOutputs
+const to = TimerOutput()
 using JRRTMGP.mo_optical_props
 using JRRTMGP.mo_rte_solver_kernels
 using JRRTMGP.fortran_intrinsics
@@ -85,7 +87,7 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
   #   A gas might have a different name in the k-distribution than in the files
   #   provided by RFMIP (e.g. 'co2' and 'carbon_dioxide')
   #
-  kdist_gas_names, rfmip_gas_games = determine_gas_names(ds[:k_dist], forcing_index)
+  kdist_gas_names, rfmip_gas_games = @timeit to "determine_gas_names" determine_gas_names(ds[:k_dist], forcing_index)
   # print("Calculation uses RFMIP gases: ")
   # @show rfmip_gas_games
 
@@ -96,7 +98,7 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
   #
   # Allocation on assignment within reading routines
   #
-  p_lay, p_lev, t_lay, t_lev = read_and_block_pt(ds[:rfmip], block_size)
+  p_lay, p_lev, t_lay, t_lev = @timeit to "read_and_block_pt" read_and_block_pt(ds[:rfmip], block_size)
   #
   # Are the arrays ordered in the vertical with 1 at the top or the bottom of the domain?
   #
@@ -106,14 +108,14 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
   #
   # Read the gas concentrations and surface properties
   #
-  gas_conc_array = read_and_block_gases_ty(ds[:rfmip], block_size, kdist_gas_names, rfmip_gas_games)
-  surface_albedo, total_solar_irradiance, solar_zenith_angle = read_and_block_sw_bc(ds[:rfmip], block_size)
+  gas_conc_array = @timeit to "read_and_block_gases_ty" read_and_block_gases_ty(ds[:rfmip], block_size, kdist_gas_names, rfmip_gas_games)
+  surface_albedo, total_solar_irradiance, solar_zenith_angle = @timeit to "read_and_block_sw_bc" read_and_block_sw_bc(ds[:rfmip], block_size)
 
   #
   # Read k-distribution information. load_and_init() reads data from netCDF and calls
   #   k_dist%init(); users might want to use their own reading methods
   #
-  k_dist = load_and_init(ds[:k_dist], gas_conc_array[1])
+  k_dist = @timeit to "load_and_init" load_and_init(ds[:k_dist], gas_conc_array[1])
   @assert source_is_external(k_dist)
 
   nbnd = get_nband(k_dist.optical_props)
@@ -153,14 +155,15 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
   mu0 = zeros(FT, block_size)
   sfc_alb_spec = zeros(FT, nbnd,block_size)
   optical_props = optical_props_constructor(FT, Int)
-  copy_and_alloc!(optical_props, block_size, nlay, k_dist.optical_props)
+  @timeit to "copy_and_alloc!" copy_and_alloc!(optical_props, block_size, nlay, k_dist.optical_props)
 
   #
   # Loop over blocks
   #
   fluxes = ty_fluxes_broadband(FT)
 
-  @showprogress 1 "Computing..." for b = 1:(compile_first ? 1 : nblocks)
+  b_tot = (compile_first ? 1 : nblocks)
+  @showprogress 1 "Computing..." for b = 1:b_tot
     fup = fluxes.flux_up = @view(flux_up[:,:,b])
     fdn = fluxes.flux_dn = @view(flux_dn[:,:,b])
     #
@@ -168,13 +171,15 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
     #    from pressures, temperatures, and gas concentrations...
     #
 
-    gas_optics_ext!(k_dist,
+    @timeit to "gas_optics_ext!" gas_optics_ext!(k_dist,
                 p_lay[:,:,b],
                 p_lev[:,:,b],
                 t_lay[:,:,b],
                 gas_conc_array[b],
                 optical_props,
-                toa_flux)
+                toa_flux,
+                nothing,
+                b==b_tot)
     # Boundary conditions
     #   (This is partly to show how to keep work on GPUs using OpenACC in a host application)
     # What's the total solar irradiance assumed by RRTMGP?
@@ -208,7 +213,7 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
     #    via ty_fluxes_broadband
     #
 
-    rte_sw!(optical_props,
+    @timeit to "rte_sw!" rte_sw!(optical_props,
             top_at_1,
             mu0,
             toa_flux,
@@ -258,5 +263,6 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
       @test diff_dn_ulps < sqrt(1/(eps(FT))) # 1.6777158e7
     end
   end
+  @show to
   return nothing
 end
