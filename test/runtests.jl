@@ -6,9 +6,9 @@ for submodule in [
                   joinpath("..","PartialImplementations", "PartialImplementations"), # compile only
                   "DataDeps",
                   "test_rfmip_clear_sky_sw",
-                  "test_rfmip_clear_sky_lw",
-                  "test_allsky",
-                  "Benchmarks",
+                  # "test_allsky",
+                  # "test_rfmip_clear_sky_lw",
+                  # "Benchmarks",
                   ]
 
   println("Testing $submodule")

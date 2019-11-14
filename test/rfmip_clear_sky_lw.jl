@@ -215,4 +215,5 @@ function rfmip_clear_sky_lw(ds, optical_props_constructor; compile_first=false)
       @test diff_dn_ulps < sqrt(1/(1e3eps(FT)))
     end
   end
+  return nothing
 end
