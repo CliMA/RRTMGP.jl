@@ -1,6 +1,7 @@
 using Test
 using JRRTMGP
 using NCDatasets
+using ProgressMeter
 using JRRTMGP.mo_optical_props
 using JRRTMGP.mo_rte_solver_kernels
 using JRRTMGP.fortran_intrinsics
@@ -159,8 +160,7 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
   #
   fluxes = ty_fluxes_broadband(FT)
 
-  for b = 1:(compile_first ? 1 : nblocks)
-    @show b/nblocks
+  @showprogress 1 "Computing..." for b = 1:(compile_first ? 1 : nblocks)
     fup = fluxes.flux_up = @view(flux_up[:,:,b])
     fdn = fluxes.flux_dn = @view(flux_dn[:,:,b])
     #
@@ -258,4 +258,5 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
       @test diff_dn_ulps < sqrt(1/(eps(FT))) # 1.6777158e7
     end
   end
+  return nothing
 end
