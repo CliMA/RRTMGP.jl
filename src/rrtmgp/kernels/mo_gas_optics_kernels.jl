@@ -20,6 +20,9 @@ Description: Numeric calculations for gas optics. Absorption and Rayleigh optica
 """
 module mo_gas_optics_kernels
 
+using TimerOutputs
+const to_gok = TimerOutput()
+
 PaTohPa(::Type{FT}) where FT = FT(0.01)
 
 using ..fortran_intrinsics
@@ -488,21 +491,17 @@ function gas_optical_depths_minor!(ncol,
             gptS = minor_limits_gpt[1,imnr]
             gptE = minor_limits_gpt[2,imnr]
             iflav = gpt_flv[gptS]
-            # tau_minor[gptS:gptE] = scaling *
+            jeta_tup = (jeta[1,iflav,icol,ilay],
+                        jeta[2,iflav,icol,ilay])
+
             interpolate2D_byflav!(@view(tau_minor[gptS:gptE]),
-                                 fminor[:,:,iflav,icol,ilay],
-                                 kminor,
-                                 kminor_start[imnr],
-                                 kminor_start[imnr]+(gptE-gptS),
-                                 jeta[:,iflav,icol,ilay],
-                                 jtemp[icol,ilay])
-            # tau_minor[gptS:gptE] = scaling *
-            #                         interpolate2D_byflav(fminor[:,:,iflav,icol,ilay],
-            #                                              kminor,
-            #                                              kminor_start[imnr],
-            #                                              kminor_start[imnr]+(gptE-gptS),
-            #                                              jeta[:,iflav,icol,ilay],
-            #                                              jtemp[icol,ilay])
+                                  @view(fminor[:,:,iflav,icol,ilay]),
+                                  kminor,
+                                  gptS,
+                                  kminor_start[imnr],
+                                  kminor_start[imnr]+(gptE-gptS),
+                                  jeta_tup,
+                                  jtemp[icol,ilay])
             tau[gptS:gptE,ilay,icol] = tau[gptS:gptE,ilay,icol] + scaling*tau_minor[gptS:gptE]
           end
         end
@@ -558,14 +557,24 @@ function compute_tau_rayleigh!(ncol::I,nlay::I,nbnd::I,ngpt::I,
         gptS = band_lims_gpt[1, ibnd]
         gptE = band_lims_gpt[2, ibnd]
         iflav = gpoint_flavor[itropo, gptS] #eta interpolation depends on band's flavor
-        interpolate2D_byflav!(@view(k[gptS:gptE]), fminor[:,:,iflav,icol,ilay],
-                                            krayl[:,:,:,itropo],
-                                            gptS, gptE, jeta[:,iflav,icol,ilay], jtemp[icol,ilay])
+
+        fminor_tup = (fminor[1,1,iflav,icol,ilay],fminor[2,1,iflav,icol,ilay],fminor[1,2,iflav,icol,ilay],fminor[2,2,iflav,icol,ilay])
+        jeta_tup = (jeta[1,iflav,icol,ilay],jeta[2,iflav,icol,ilay])
+        interpolate2D_byflav!(@view(k[gptS:gptE]),
+                              fminor_tup,
+                              @view(krayl[:,:,:,itropo]),
+                              gptS,
+                              gptS,
+                              gptE,
+                              jeta_tup,
+                              jtemp[icol,ilay])
+
         tau_rayleigh[gptS:gptE,ilay,icol] .= k[gptS:gptE] .*
                                             (col_gas[icol,ilay,idx_h2o]+col_dry[icol,ilay])
       end
     end
   end
+  nothing
 end
 
 """
@@ -765,18 +774,22 @@ real(FT), dimension(gptE-gptS+1)       :: res # the result
 integer :: igpt
 """
 function interpolate2D_byflav!(res::AbstractArray{FT,1},
-                              fminor::Array{FT,2},
-                              k::Array{FT,3},
-                              gptS::I, gptE::I, jeta::Vector{I}, jtemp::I) where {FT<:AbstractFloat,I<:Integer}
+                               fminor,
+                               k::AbstractArray{FT,3},
+                               resS::I,
+                               gptS::I,
+                               gptE::I,
+                               jeta,
+                               jtemp::I) where {FT<:AbstractFloat,I<:Int}
   # each code block is for a different reference temperature
-  # res .= interpolate2D(fminor, k, gptS+igpt-1, jeta, jtemp)
-  # res .= FT[interpolate2D(fminor, k, gptS+igpt-1, jeta, jtemp) for igpt in 1:gptE-gptS+1]
-  @inbounds for igpt in 1:gptE-gptS+1
-    @inbounds res[igpt] = fminor[1,1] * k[gptS+igpt-1, jeta[1]  , jtemp  ] +
-                          fminor[2,1] * k[gptS+igpt-1, jeta[1]+1, jtemp  ] +
-                          fminor[1,2] * k[gptS+igpt-1, jeta[2]  , jtemp+1] +
-                          fminor[2,2] * k[gptS+igpt-1, jeta[2]+1, jtemp+1]
+  for igpt in 1:gptE-gptS+1
+    i_gpt = gptS+igpt-1
+    res[igpt] = fminor[1] * k[i_gpt, jeta[1]  , jtemp  ] +
+                fminor[2] * k[i_gpt, jeta[1]+1, jtemp  ] +
+                fminor[3] * k[i_gpt, jeta[2]  , jtemp+1] +
+                fminor[4] * k[i_gpt, jeta[2]+1, jtemp+1]
   end
+
   nothing
 end
 

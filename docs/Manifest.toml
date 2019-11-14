@@ -3,6 +3,12 @@
 [[Base64]]
 uuid = "2a0f44e3-6c83-55bd-87e4-b1978d98bd5f"
 
+[[BenchmarkTools]]
+deps = ["JSON", "Printf", "Statistics"]
+git-tree-sha1 = "90b73db83791c5f83155016dd1cc1f684d4e1361"
+uuid = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
+version = "0.4.3"
+
 [[BinDeps]]
 deps = ["Compat", "Libdl", "SHA", "URIParser"]
 git-tree-sha1 = "12093ca6cdd0ee547c39b1870e0c9c3f154d9ca9"
@@ -88,9 +94,9 @@ version = "0.23.4"
 
 [[HTTP]]
 deps = ["Base64", "Dates", "IniFile", "MbedTLS", "Sockets"]
-git-tree-sha1 = "f1e1b417a34cf73a70cbed919915bf8f8bad1806"
+git-tree-sha1 = "806f2a5d66d1b78e5349fd463a41f0c10ca5fff3"
 uuid = "cd3eb016-35fb-5094-929b-558a96fad6f3"
-version = "0.8.6"
+version = "0.8.7"
 
 [[IniFile]]
 deps = ["Test"]
@@ -103,7 +109,7 @@ deps = ["Markdown"]
 uuid = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
 
 [[JRRTMGP]]
-deps = ["Compat", "Coverage", "DataDeps", "DelimitedFiles", "DocStringExtensions", "Documenter", "MbedTLS", "NCDatasets", "OffsetArrays", "Pkg", "Quadmath", "Requires", "Test"]
+deps = ["BenchmarkTools", "Compat", "Coverage", "DataDeps", "DelimitedFiles", "DocStringExtensions", "Documenter", "MbedTLS", "NCDatasets", "OffsetArrays", "Pkg", "Profile", "ProgressMeter", "Quadmath", "Requires", "Test", "TimerOutputs"]
 path = ".."
 uuid = "a01a1ee8-cea4-48fc-987c-fc7878d79da1"
 version = "0.1.0"
@@ -177,6 +183,16 @@ uuid = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 deps = ["Unicode"]
 uuid = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 
+[[Profile]]
+deps = ["Printf"]
+uuid = "9abbd945-dff8-562f-b5e8-e1ebf5ef1b79"
+
+[[ProgressMeter]]
+deps = ["Distributed", "Printf"]
+git-tree-sha1 = "ea1f4fa0ff5e8b771bf130d87af5b7ef400760bd"
+uuid = "92933f4c-e287-5a05-a399-4b506db050ca"
+version = "1.2.0"
+
 [[Quadmath]]
 deps = ["Printf", "Random", "Requires"]
 git-tree-sha1 = "7a11344be0bd27a98ce3038573c4df518f051a8f"
@@ -227,6 +243,12 @@ uuid = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 [[Test]]
 deps = ["Distributed", "InteractiveUtils", "Logging", "Random"]
 uuid = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[[TimerOutputs]]
+deps = ["Printf"]
+git-tree-sha1 = "8f22dc0c23e1cd4ab8070a01ba32285926f104f1"
+uuid = "a759f4b9-e2f1-59dc-863e-4aeb61b1ea8f"
+version = "0.5.2"
 
 [[URIParser]]
 deps = ["Test", "Unicode"]
