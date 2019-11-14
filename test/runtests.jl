@@ -5,9 +5,9 @@ ENV["DATADEPS_ALWAYS_ACCEPT"] = true
 for submodule in [
                   joinpath("..","PartialImplementations", "PartialImplementations"), # compile only
                   "DataDeps",
+                  "test_allsky",
+                  "test_rfmip_clear_sky_lw",
                   "test_rfmip_clear_sky_sw",
-                  # "test_allsky",
-                  # "test_rfmip_clear_sky_lw",
                   # "Benchmarks",
                   ]
 
