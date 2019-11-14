@@ -327,6 +327,7 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
       # @show diff_dn_ulps < sqrt(1/(eps(FT)))
     end
   end
+  return nothing
 
 end
 
