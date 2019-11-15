@@ -120,7 +120,7 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
   # rrtmgp_clouds rrtmgp-clouds.nc $RRTMGP_ROOT/rrtmgp/data/rrtmgp-data-lw-g256-2018-12-04.nc $RRTMGP_ROOT/extensions/cloud_optics/rrtmgp-cloud-optics-coeffs-lw.nc  128 1
   # rrtmgp_clouds rrtmgp-clouds.nc $RRTMGP_ROOT/rrtmgp/data/rrtmgp-data-sw-g224-2018-12-04.nc $RRTMGP_ROOT/extensions/cloud_optics/rrtmgp-cloud-optics-coeffs-sw.nc  128 1
 
-  gas_names = ["h2o", "co2", "o3 ", "n2o", "co ", "ch4", "o2 ", "n2 "]
+  gas_names = lowercase.(strip.(["h2o", "co2", "o3", "n2o", "co", "ch4", "o2", "n2"]))
   ngas = length(gas_names)
   nloops = 1
   ncol = 128

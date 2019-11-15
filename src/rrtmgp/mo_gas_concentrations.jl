@@ -21,6 +21,7 @@ module mo_gas_concentrations
 
 using DocStringExtensions
 using ..fortran_intrinsics
+using ..Utilities
 export ty_gas_concs
 export set_vmr!, get_vmr
 
@@ -68,7 +69,7 @@ function set_vmr!(this::ty_gas_concs{FT}, gas::String, w::FT) where FT # result(
   # real(FT),            intent(in   ) :: w
   @assert !(w < FT(0) || w > FT(1))
 
-  igas = find_gas(this, gas)
+  igas = loc_in_array(gas, this.gas_name)
 
   conc = Array{FT}(undef, 1,1)
   fill!(conc, w)
@@ -91,7 +92,7 @@ function set_vmr!(this::ty_gas_concs{FT}, gas::String, w::Vector{FT}) where FT
 
   this.nlay = length(w)
 
-  igas = find_gas(this, gas)
+  igas = loc_in_array(gas, this.gas_name)
   conc = reshape(w, 1, this.nlay)
   gas_name = trim(gas)
   if igas == GAS_NOT_IN_LIST || igas == length(this.concs)+1
@@ -116,7 +117,7 @@ function set_vmr!(this::ty_gas_concs, gas::String, w::Array{FT}) where FT
 
   conc = w
   gas_name = trim(gas)
-  igas = find_gas(this, gas)
+  igas = loc_in_array(gas, this.gas_name)
 
   if igas == GAS_NOT_IN_LIST
     push!(this.concs, conc_field(conc))
@@ -133,7 +134,7 @@ end
 function get_vmr(this::ty_gas_concs{FT}, gas::String) where FT #result(error_msg)
   # real(FT), dimension(:),   intent(out) :: array
 
-  igas = find_gas(this, gas)
+  igas = loc_in_array(gas, this.gas_name)
   @assert igas ≠ GAS_NOT_IN_LIST
   conc = this.concs[igas].conc
 
@@ -160,7 +161,7 @@ end
 function get_vmr(this::ty_gas_concs, gas::String, array::Array{FT,2}) where FT
   # real(FT), dimension(:,:), intent(out) :: array
 
-  igas = find_gas(this, gas)
+  igas = loc_in_array(gas, this.gas_name)
   @assert igas ≠ GAS_NOT_IN_LIST
 
   # Is the requested array the correct size?
@@ -182,12 +183,5 @@ end
 get_num_gases(this::ty_gas_concs) = size(this.gas_name)
 
 get_gas_names(this) = this.gas_name[:]
-
-# find gas in list; GAS_NOT_IN_LIST if not found
-function find_gas(this::ty_gas_concs, gas)
-  L = lowercase.(strip.(this.gas_name)) .== lowercase(trim(gas))
-  !any(L) && return GAS_NOT_IN_LIST
-  return argmax(L)
-end
 
 end # module
