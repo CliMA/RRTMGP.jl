@@ -15,7 +15,7 @@ The protocol does not specify the treatmet of gases like CO
 module mo_rfmip_io
 
 using ..mo_gas_concentrations
-using ..mo_util_string
+using ..Utilities
 using ..fortran_intrinsics
 using NCDatasets
 
@@ -199,8 +199,8 @@ function determine_gas_names(ds, forcing_index)
       #
       # Use a mapping between chemical formula and name if it exists
       #
-      if string_in_array(names_in_file[i], chem_name)
-        names_in_file[i] = conc_name[string_loc_in_array(names_in_file[i], chem_name)]
+      if names_in_file[i] in chem_name
+        names_in_file[i] = conc_name[loc_in_array(names_in_file[i], chem_name)]
       end
     end
   elseif forcing_index == 2
@@ -297,7 +297,7 @@ function read_and_block_gases_ty(ds, blocksize, gas_names, names_in_file)
   for g = 1:length(gas_names)
 
     # Skip 3D fields above, also NO2 since RFMIP doesn't have this
-    if string_in_array(gas_names[g], ["h2o", "o3", "no2"])
+    if gas_names[g] in ["h2o", "o3", "no2"]
       continue
     end
 
