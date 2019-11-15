@@ -2,7 +2,7 @@ module JRRTMGP
 
 include("misc.jl")
 include("fortran_intrinsics.jl")
-include("mo_util_string.jl")
+include("Utilities.jl")
 
 include(joinpath("rte","mo_util_array.jl"))
 include(joinpath("rte","kernels","mo_fluxes_broadband_kernels.jl"))

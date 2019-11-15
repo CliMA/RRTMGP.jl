@@ -21,7 +21,7 @@ using ..mo_optical_props
 using ..mo_source_functions
 using ..mo_gas_optics_kernels
 
-using ..mo_util_string
+using ..Utilities
 using ..mo_gas_concentrations
 using ..mo_optical_props
 export gas_optics_int!, gas_optics_ext!, ty_gas_optics_rrtmgp, load_totplnk, load_solar_source
@@ -354,7 +354,7 @@ function compute_gas_taus!(jtemp, jpress, jeta, tropo, fmajor, this::ty_gas_opti
   end
 
   # Compute dry air column amounts (number of molecule per cm^2) if user hasn't provided them
-  idx_h2o = string_loc_in_array("h2o", this.gas_names)
+  idx_h2o = loc_in_array("h2o", this.gas_names)
   if present(col_dry)
     col_dry_wk = col_dry
   else
@@ -676,7 +676,7 @@ kminor_start_upper)
   # Gas 0 is used in single-key species method, set to 1.0 (col_dry)
   vmr_ref_red[:,0,:] = vmr_ref[:,1,:]
   for i = 1:ngas
-    idx = string_loc_in_array(this.gas_names[i], gas_names)
+    idx = loc_in_array(this.gas_names[i], gas_names)
     vmr_ref_red[:,i,:] = vmr_ref[:,idx+1,:]
   end
   this.vmr_ref = vmr_ref_red
@@ -1028,9 +1028,9 @@ function create_idx_minor(gas_names, gas_minor, identifier_minor, minor_gases_at
   idx_minor_atm = Vector{Int}(undef, size(minor_gases_atm,1))
   for imnr = 1:size(minor_gases_atm,1) # loop over minor absorbers in each band
         # Find identifying string for minor species in list of possible identifiers (e.g. h2o_slf)
-        idx_mnr     = string_loc_in_array(minor_gases_atm[imnr], identifier_minor)
+        idx_mnr     = loc_in_array(minor_gases_atm[imnr], identifier_minor)
         # Find name of gas associated with minor species identifier (e.g. h2o)
-        idx_minor_atm[imnr] = string_loc_in_array(gas_minor[idx_mnr],    gas_names)
+        idx_minor_atm[imnr] = loc_in_array(gas_minor[idx_mnr],    gas_names)
   end
   return idx_minor_atm
 
@@ -1051,7 +1051,7 @@ function create_idx_minor_scaling(gas_names, scaling_gas_atm)
   idx_minor_scaling_atm = Vector{Int}(undef, size(scaling_gas_atm,1))
   for imnr = 1:size(scaling_gas_atm,1) # loop over minor absorbers in each band
         # This will be -1 if there's no interacting gas
-        idx_minor_scaling_atm[imnr] = string_loc_in_array(scaling_gas_atm[imnr], gas_names)
+        idx_minor_scaling_atm[imnr] = loc_in_array(scaling_gas_atm[imnr], gas_names)
   end
   return idx_minor_scaling_atm
 
@@ -1081,7 +1081,7 @@ function create_key_species_reduce(gas_names, gas_names_red, key_species)
     for ia = 1:na
       for it = 1:nt
         if key_species[ip,ia,it] ≠ 0
-          key_species_red[ip,ia,it] = string_loc_in_array(gas_names[key_species[ip,ia,it]],gas_names_red)
+          key_species_red[ip,ia,it] = loc_in_array(gas_names[key_species[ip,ia,it]],gas_names_red)
           if key_species_red[ip,ia,it] == -1
             key_species_present_init[key_species[ip,ia,it]] = false
           end
@@ -1146,7 +1146,7 @@ kminor_start_atm
   tot_g=0
   gas_is_present = Vector{Bool}(undef, nm)
   for i = 1:length(minor_gases_atm)
-    idx_mnr = string_loc_in_array(minor_gases_atm[i], identifier_minor)
+    idx_mnr = loc_in_array(minor_gases_atm[i], identifier_minor)
     gas_is_present[i] = gas_minor[idx_mnr] in available_gases.gas_name
     if gas_is_present[i]
       tot_g = tot_g + (minor_limits_gpt_atm[2,i]-minor_limits_gpt_atm[1,i]+1)

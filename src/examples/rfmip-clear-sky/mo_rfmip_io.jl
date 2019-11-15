@@ -15,7 +15,7 @@ The protocol does not specify the treatmet of gases like CO
 module mo_rfmip_io
 
 using ..mo_gas_concentrations
-using ..mo_util_string
+using ..Utilities
 using ..fortran_intrinsics
 using NCDatasets
 
@@ -200,7 +200,7 @@ function determine_gas_names(ds, forcing_index)
       # Use a mapping between chemical formula and name if it exists
       #
       if names_in_file[i] in chem_name
-        names_in_file[i] = conc_name[string_loc_in_array(names_in_file[i], chem_name)]
+        names_in_file[i] = conc_name[loc_in_array(names_in_file[i], chem_name)]
       end
     end
   elseif forcing_index == 2
