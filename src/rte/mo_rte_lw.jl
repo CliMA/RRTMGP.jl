@@ -57,17 +57,16 @@ real(FT), dimension(:,:),   &
 integer,          optional, intent(in   ) :: n_gauss_angles # Number of angles used in Gaussian quadrature
                                                             # (no-scattering solution)
 """
-function rte_lw!(optical_props, top_at_1,
+function rte_lw!(optical_props::ty_optical_props_arry{FT}, top_at_1,
                 sources, sfc_emis,
                 fluxes,
-                inc_flux=nothing, n_gauss_angles=nothing)
+                inc_flux=nothing, n_gauss_angles=nothing) where FT
 
   #
   # Weights and angle secants for first order (k=1) Gaussian quadrature.
   #   Values from Table 2, Clough et al, 1992, doi:10.1029/92JD01419
   #   after Abramowitz & Stegun 1972, page 921
   #
-  FT = eltype(optical_props.band_lims_wvn)
 
   max_gauss_pts = Integer.(4)
   # Diffusivity angle, not Gaussian angle

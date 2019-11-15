@@ -68,9 +68,6 @@ mutable struct ty_gas_optics_rrtmgp{T,I} <: ty_gas_optics{T,I}
   is_key#::Vector{Bool}
 end
 
-ty_gas_optics_rrtmgp(T,I) = ty_gas_optics_rrtmgp{T,I}(ty_optical_props_base(T,I), ntuple(i->nothing, 35)...)
-
-
 # col_dry is the number of molecules per cm-2 of dry air
 export get_col_dry
 
@@ -649,8 +646,9 @@ kminor_start_lower,
 kminor_start_upper)
   FT = eltype(kmajor)
 
-  this = ty_gas_optics_rrtmgp(FT,Int)
-  init!(this.optical_props, "ty_gas_optics_rrtmgp optical props", band_lims_wavenum, band2gpt)
+  this = ty_gas_optics_rrtmgp{FT,Int}(
+    ty_optical_props_base("ty_gas_optics_rrtmgp optical props", band_lims_wavenum, band2gpt),
+    ntuple(i->nothing, 35)...)
   #
   # Which gases known to the gas optics are present in the host model (available_gases)?
   #

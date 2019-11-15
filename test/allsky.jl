@@ -192,12 +192,12 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
   end
 
   # Clouds optical props are defined by band
-  init!(clouds, "Clouds", get_band_lims_wavenumber(k_dist.optical_props))
+  clouds.base = ty_optical_props_base("Clouds", get_band_lims_wavenumber(k_dist.optical_props))
 
   #
   # Allocate arrays for the optical properties themselves.
   #
-  copy_and_alloc!(atmos,  ncol, nlay, k_dist.optical_props)
+  copy_and_alloc!(atmos, ncol, nlay, k_dist.optical_props)
   alloc!(clouds, ncol, nlay)
 
   #  Boundary conditions depending on whether the k-distribution being supplied

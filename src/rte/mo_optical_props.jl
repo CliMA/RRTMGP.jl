@@ -1,15 +1,5 @@
 """
-This code is part of Radiative Transfer for Energetics (RTE)
-
-Contacts: Robert Pincus and Eli Mlawer
-email:  rrtmgp@aer.com
-
-Copyright 2015-2018,  Atmospheric and Environmental Research and
-Regents of the University of Colorado.  All right reserved.
-
-Use and duplication is permitted under the terms of the
-  BSD 3-clause license, see http://opensource.org/licenses/BSD-3-Clause
--------------------------------------------------------------------------------------------------
+    mo_optical_props
 
 Encapsulate optical properties defined on a spectral grid of N bands.
  The bands are described by their limiting wavenumbers. They need not be contiguous or complete.
@@ -23,8 +13,8 @@ Encapsulate optical properties defined on a spectral grid of N bands.
  The type holds arrays depending on how much information is needed
  There are three possibilites
     ty_optical_props_1scl holds absorption optical depth tau, used in calculations accounting for extinction and emission
-    ty_optical_props_2str holds extincion optical depth tau, single-scattering albedo (ssa), and asymmetry parameter g.
-    ty_optical_props_nstr holds extincion optical depth tau, ssa, and phase function moments p with leading dimension nmom.
+    ty_optical_props_2str holds extinction optical depth tau, single-scattering albedo (ssa), and asymmetry parameter g.
+    ty_optical_props_nstr holds extinction optical depth tau, ssa, and phase function moments p with leading dimension nmom.
  These classes must be allocated before use. Initialization and allocation can be combined.
  The classes have a validate() function that checks all arrays for valid values (e.g. tau > 0.)
 
@@ -36,23 +26,20 @@ Optical properties can increment or "add themselves to" a set of properties repr
 
 Subsets of optical properties held as arrays may be extracted along the column dimension.
 
--------------------------------------------------------------------------------------------------
 """
 module mo_optical_props
 
+using DocStringExtensions
 using ..fortran_intrinsics
 import ..fortran_intrinsics: is_initialized
 using ..mo_util_array
 
-export init!,
-       init_base_from_copy!,
-       finalize!,
+export init_base_from_copy!,
        alloc!,
        init_and_alloc!,
        copy_and_alloc!,
        delta_scale!,
        validate!,
-       subset_range!,
        increment!,
        convert_band2gpt,
        get_band_lims_wavenumber,
@@ -76,59 +63,78 @@ export ty_optical_props,
 
 export get_nband, get_ngpt
 
-
-  # -------------------------------------------------------------------------------------------------
-  #
-  # Base class for optical properties
-  #   Describes the spectral discretization including the wavenumber limits
-  #   of each band (spectral region) and the mapping between g-points and bands
-  #
-  # -------------------------------------------------------------------------------------------------
-
 export ty_optical_props
-abstract type ty_optical_props{T,I} end
+abstract type ty_optical_props{FT,I} end
 export ty_optical_props_arry
-abstract type ty_optical_props_arry{T,I} <: ty_optical_props{T,I} end
+abstract type ty_optical_props_arry{FT,I} <: ty_optical_props{FT,I} end
 
-mutable struct ty_optical_props_base{T,I} <: ty_optical_props{T,I}
-  band2gpt#::Array{T,2}        # (begin g-point, end g-point) = band2gpt(2,band)
-  gpt2band#::Array{I,1}        # band = gpt2band(g-point)
-  band_lims_wvn#::Array{T,2}   # (upper and lower wavenumber by band) = band_lims_wvn(2,band)
-  name#::String
+"""
+    ty_optical_props_base{FT,I} <: ty_optical_props{FT,I}
+
+Base class for optical properties. Describes the spectral
+discretization including the wavenumber limits of each band
+(spectral region) and the mapping between g-points and bands.
+
+ - (begin g-point, end g-point) = band2gpt(2,band)
+ - band = gpt2band(g-point)
+ - (upper and lower wavenumber by band) = band_lims_wvn(2,band)
+
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
+struct ty_optical_props_base{FT,I} <: ty_optical_props{FT,I}
+  band2gpt::Array{I,2}
+  gpt2band::Array{I,1}
+  band_lims_wvn::Array{FT,2}
+  name::AbstractString
 end
 
-mutable struct ty_optical_props_1scl{T,I} <: ty_optical_props_arry{T,I}
-  band2gpt#::Array{T,2}        # (begin g-point, end g-point) = band2gpt(2,band)
-  gpt2band#::Array{I,1}        # band = gpt2band(g-point)
-  band_lims_wvn#::Array{T,2}   # (upper and lower wavenumber by band) = band_lims_wvn(2,band)
-  name#::String
-  tau#::Array{T,3}
+function ty_optical_props_base(name, band_lims_wvn::Array{FT}, band_lims_gpt=nothing) where FT
+  @assert size(band_lims_wvn,1) == 2
+  @assert !any(band_lims_wvn.<FT(0))
+  band_lims_gpt_lcl = Array{Int}(undef, 2, size(band_lims_wvn, 2))
+  if band_lims_gpt ≠ nothing
+    @assert size(band_lims_gpt,1) == 2
+    @assert size(band_lims_gpt,2) == size(band_lims_wvn,2)
+    @assert !any(band_lims_gpt .< 1)
+    band_lims_gpt_lcl .= band_lims_gpt
+  else
+    for iband in 1:size(band_lims_wvn, 2)
+      band_lims_gpt_lcl[1:2,iband] .= iband
+    end
+  end
+
+  band2gpt = band_lims_gpt_lcl
+
+  # Make a map between g-points and bands
+  gpt2band = Array{Int}(undef, max(band_lims_gpt_lcl...))
+  for iband in 1:size(band_lims_gpt_lcl, 2)
+    gpt2band[band_lims_gpt_lcl[1,iband]:band_lims_gpt_lcl[2,iband]] .= iband
+  end
+  return ty_optical_props_base{FT,Int}(band2gpt,gpt2band,band_lims_wvn,name)
 end
 
-mutable struct ty_optical_props_2str{T,I} <: ty_optical_props_arry{T,I}
-  band2gpt#::Array{T,2}        # (begin g-point, end g-point) = band2gpt(2,band)
-  gpt2band#::Array{I,1}        # band = gpt2band(g-point)
-  band_lims_wvn#::Array{T,2}   # (upper and lower wavenumber by band) = band_lims_wvn(2,band)
-  name#::String
-  tau#::Array{T,3}
-  ssa#::Array{T,3}
-  g#::Array{T,3}
+mutable struct ty_optical_props_1scl{FT,I} <: ty_optical_props_arry{FT,I}
+  base
+  tau#::Array{FT,3}
 end
 
-mutable struct ty_optical_props_nstr{T,I} <: ty_optical_props_arry{T,I}
-  band2gpt#::Array{T,2}        # (begin g-point, end g-point) = band2gpt(2,band)
-  gpt2band#::Array{I,1}        # band = gpt2band(g-point)
-  band_lims_wvn#::Array{T,2}   # (upper and lower wavenumber by band) = band_lims_wvn(2,band)
-  name#::String
-  tau#::Array{T,3}
-  ssa#::Array{T,3}
-  p#::Array{T,4}
+mutable struct ty_optical_props_2str{FT,I} <: ty_optical_props_arry{FT,I}
+  base
+  tau#::Array{FT,3}
+  ssa#::Array{FT,3}
+  g#::Array{FT,3}
 end
 
+mutable struct ty_optical_props_nstr{FT,I} <: ty_optical_props_arry{FT,I}
+  base
+  tau#::Array{FT,3}
+  ssa#::Array{FT,3}
+  p#::Array{FT,4}
+end
 
-ty_optical_props_base(T,I) = ty_optical_props_base{T,I}(ntuple(i->nothing, 4)...)
-ty_optical_props_1scl(T,I) = ty_optical_props_1scl{T,I}(ntuple(i->nothing, 5)...)
-ty_optical_props_2str(T,I) = ty_optical_props_2str{T,I}(ntuple(i->nothing, 7)...)
+ty_optical_props_1scl(FT,I) = ty_optical_props_1scl{FT,I}(ntuple(i->nothing, 2)...)
+ty_optical_props_2str(FT,I) = ty_optical_props_2str{FT,I}(ntuple(i->nothing, 4)...)
 
 # band_lims_wvn, band_lims_gpt
 # -------------------------------------------------------------------------------------------------
@@ -143,62 +149,15 @@ ty_optical_props_2str(T,I) = ty_optical_props_2str{T,I}(ntuple(i->nothing, 7)...
 # -------------------------------------------------------------------------------------------------
 
 """
-  init_base!(...)
-
-
-  class(ty_optical_props),    intent(inout) :: this
-  real(FT), dimension(:,:),   intent(in   ) :: band_lims_wvn
-  integer,  dimension(:,:),
-                    optional, intent(in   ) :: band_lims_gpt
-  character(len=*), optional, intent(in   ) :: name
-  character(len = 128)                      :: err_message
-
-  integer :: iband
-  integer, dimension(2, size(band_lims_wvn, 2)) :: band_lims_gpt_lcl
-"""
-function init!(this::ty_optical_props, name, band_lims_wvn, band_lims_gpt=nothing)
-  FT = eltype(band_lims_wvn)
-
-  @assert size(band_lims_wvn,1) == 2
-  @assert !any(band_lims_wvn.<FT(0))
-  band_lims_gpt_lcl = Array{Int}(undef, 2, size(band_lims_wvn, 2))
-  if band_lims_gpt ≠ nothing
-    @assert size(band_lims_gpt,1) == 2
-    @assert size(band_lims_gpt,2) == size(band_lims_wvn,2)
-    @assert !any(band_lims_gpt .< 1)
-    band_lims_gpt_lcl[:,:] .= band_lims_gpt[:,:]
-  else
-    for iband in 1:size(band_lims_wvn, 2)
-      band_lims_gpt_lcl[1:2,iband] .= iband
-    end
-  end
-
-  band2gpt = band_lims_gpt_lcl
-
-  # Make a map between g-points and bands
-  #   Efficient only when g-point indexes start at 1 and are contiguous.
-
-  gpt2band = Array{Int}(undef, max(band_lims_gpt_lcl...))
-  for iband in 1:size(band_lims_gpt_lcl, 2)
-    gpt2band[band_lims_gpt_lcl[1,iband]:band_lims_gpt_lcl[2,iband]] .= iband
-  end
-  this.band2gpt = band2gpt
-  this.gpt2band = gpt2band
-  this.band_lims_wvn = deepcopy(band_lims_wvn)
-  this.name = name
-  nothing
-end
-
-"""
   init_base_from_copy!(...)
 
   class(ty_optical_props),    intent(inout) :: this
   class(ty_optical_props),    intent(in   ) :: spectral_desc
   character(len = 128)                        :: err_message
 """
-function init_base_from_copy!(this::ty_optical_props, spectral_desc::ty_optical_props)
-  init!(this, "called_from_init_base_from_copy" ,get_band_lims_wavenumber(spectral_desc), get_band_lims_gpoint(spectral_desc))
-end
+init_base_from_copy(spectral_desc::ty_optical_props) =
+ ty_optical_props_base("called_from_init_base_from_copy" ,get_band_lims_wavenumber(spectral_desc), get_band_lims_gpoint(spectral_desc))
+
 #-------------------------------------------------------------------------------------------------
 #
 # Base class: return true if initialized, false otherwise
@@ -210,23 +169,9 @@ end
   class(ty_optical_props), intent(in) :: this
   logical                             :: is_initialized_base
 """
-is_initialized(this::ty_optical_props) = allocated(this.band2gpt)
-#-------------------------------------------------------------------------------------------------
-#
-# Base class: finalize (deallocate memory)
-#
-# -------------------------------------------------------------------------------------------------
-"""
-  finalize!(...)
+is_initialized(this::ty_optical_props_base) = allocated(this.band2gpt)
+is_initialized(this::ty_optical_props) = is_initialized(this.base)
 
-  class(ty_optical_props),    intent(inout) :: this
-"""
-function finalize!(this::ty_optical_props)
-  allocated(this.band2gpt) && deallocate!(this.band2gpt)
-  allocated(this.gpt2band) && deallocate!(this.gpt2band)
-  allocated(this.band_lims_wvn) && deallocate!(this.band_lims_wvn)
-  this.name = ""
-end
 # ------------------------------------------------------------------------------------------
 #
 #  Routines for array classes: initialization, allocation, and finalization
@@ -293,36 +238,20 @@ end
     character(len=*), optional,   intent(in) :: name
     character(len=128)                       :: err_message
 """
-function init_and_alloc!(this::ty_optical_props, ncol, nlay, band_lims_wvn, band_lims_gpt=nothing, name=nothing)
+function init_and_alloc!(this::ty_optical_props_1scl, ncol, nlay, band_lims_wvn, band_lims_gpt=nothing, name=nothing)
   if band_lims_gpt==nothing
-    init!(this, name, band_lims_wvn)
+    this.base = ty_optical_props_base(name, band_lims_wvn)
   else
-    init!(this, name, band_lims_wvn, band_lims_gpt)
+    this.base = ty_optical_props_base(name, band_lims_wvn, band_lims_gpt)
   end
   alloc!(this, ncol, nlay)
 end
 
-  #-------------------------------------------------------------------------------------------------
-  #
-  # Initialization from an existing spectral discretization/ty_optical_props
-  #
-  #-------------------------------------------------------------------------------------------------
-"""
-    copy_and_alloc!(...)
-
-    class(ty_optical_props_1scl)             :: this
-    integer,                      intent(in) :: ncol, nlay
-    class(ty_optical_props     ), intent(in) :: spectral_desc
-    character(len=*), optional,   intent(in) :: name
-    character(len=128)                       :: err_message
-"""
-function copy_and_alloc!(this::ty_optical_props_1scl, ncol, nlay, spectral_desc::ty_optical_props, name=nothing)
-  is_initialized(this) && finalize!(this)
-  init!(this, name, get_band_lims_wavenumber(spectral_desc),
-              get_band_lims_gpoint(spectral_desc))
-  alloc!(this, ncol, nlay)
-end
-
+#-------------------------------------------------------------------------------------------------
+#
+# Initialization from an existing spectral discretization/ty_optical_props
+#
+#-------------------------------------------------------------------------------------------------
 """
     copy_and_alloc!(...)
 
@@ -332,20 +261,19 @@ end
     character(len=*), optional,   intent(in) :: name
     character(len=128)                       :: err_message
 """
-function copy_and_alloc!(this::ty_optical_props_2str, ncol, nlay, spectral_desc::ty_optical_props, name=nothing)
-  is_initialized(this) && finalize!(this)
-  init!(this, name, get_band_lims_wavenumber(spectral_desc),
-                    get_band_lims_gpoint(spectral_desc))
+function copy_and_alloc!(this::ty_optical_props, ncol, nlay, spectral_desc::ty_optical_props, name="optical props")
+  this.base = ty_optical_props_base(name, get_band_lims_wavenumber(spectral_desc),
+                                     get_band_lims_gpoint(spectral_desc))
   alloc!(this, ncol, nlay)
 end
 
-  # ------------------------------------------------------------------------------------------
-  #
-  #  Routines for array classes: delta-scaling, validation (ensuring all values can be used )
-  #
-  # ------------------------------------------------------------------------------------------
-  # --- delta scaling
-  # ------------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------------------
+#
+#  Routines for array classes: delta-scaling, validation (ensuring all values can be used )
+#
+# ------------------------------------------------------------------------------------------
+# --- delta scaling
+# ------------------------------------------------------------------------------------------
 """
     delta_scale!(...)
 
@@ -513,7 +441,8 @@ get_nlay(this::ty_optical_props) = get_arry_extent(this, 2)
   class(ty_optical_props), intent(in) :: this
   integer                             :: get_nband
 """
-get_nband(this::ty_optical_props) = is_initialized(this.band2gpt) ? size(this.band2gpt,2) : 0
+get_nband(this::ty_optical_props) = get_nband(this.base)
+get_nband(this::ty_optical_props_base) = is_initialized(this) ? size(this.band2gpt,2) : 0
 
 # -----------------------------------------------------------------------------------------------
 #
@@ -523,7 +452,8 @@ get_nband(this::ty_optical_props) = is_initialized(this.band2gpt) ? size(this.ba
   class(ty_optical_props), intent(in) :: this
   integer                             :: get_ngpt
 """
-get_ngpt(this::ty_optical_props) = is_initialized(this.band2gpt) ? max(this.band2gpt...) : 0
+get_ngpt(this::ty_optical_props) = get_ngpt(this.base)
+get_ngpt(this::ty_optical_props_base) = is_initialized(this) ? max(this.band2gpt...) : 0
 
 #--------------------------------------------------------------------------------------------------------------------
 #
@@ -536,63 +466,55 @@ get_ngpt(this::ty_optical_props) = is_initialized(this.band2gpt) ? max(this.band
   integer, dimension(size(this%band2gpt,dim=1), size(this%band2gpt,dim=2))
                                       :: get_band_lims_gpoint
 """
-get_band_lims_gpoint(this::ty_optical_props) = this.band2gpt
+get_band_lims_gpoint(this::ty_optical_props) = get_band_lims_gpoint(this.base)
+get_band_lims_gpoint(this::ty_optical_props_base) = this.band2gpt
 
-#--------------------------------------------------------------------------------------------------------------------
-#
+
 # First and last g-point of a specific band
-#
 """
   class(ty_optical_props), intent(in) :: this
   integer,                 intent(in) :: band
   integer, dimension(2)               :: convert_band2gpt
 """
-function convert_band2gpt(this::ty_optical_props{FT}, band) where FT
+convert_band2gpt(this::ty_optical_props, band) = convert_band2gpt(this.base)
+convert_band2gpt(this::ty_optical_props_base{FT}, band) where FT =
   is_initialized(this) ? this.band2gpt[:,band] : zeros(FT,length(this.band2gpt[:,band]))
-end
 
-#--------------------------------------------------------------------------------------------------------------------
-#
+
 # Lower and upper wavenumber of all bands
 # (upper and lower wavenumber by band) = band_lims_wvn(2,band)
-#
 """
   class(ty_optical_props), intent(in) :: this
   real(FT), dimension(size(this%band_lims_wvn,1), size(this%band_lims_wvn,2))
                                       :: get_band_lims_wavenumber
 """
-function get_band_lims_wavenumber(this::ty_optical_props{FT}) where FT
-  is_initialized(this.band_lims_wvn) ? this.band_lims_wvn[:,:] : zeros(FT, size(this.band_lims_wvn))
-end
+get_band_lims_wavenumber(this::ty_optical_props) = get_band_lims_wavenumber(this.base)
+get_band_lims_wavenumber(this::ty_optical_props_base{FT}) where FT =
+  is_initialized(this) ? this.band_lims_wvn[:,:] : zeros(FT, size(this.band_lims_wvn))
 
-#--------------------------------------------------------------------------------------------------------------------
-#
+
 # Lower and upper wavelength of all bands
-#
 """
   class(ty_optical_props), intent(in) :: this
   real(FT), dimension(size(this%band_lims_wvn,1), size(this%band_lims_wvn,2))
                                       :: get_band_lims_wavelength
 """
-function get_band_lims_wavelength(this::ty_optical_props{FT}) where FT
-  is_initialized(this.band_lims_wvn) ? 1 ./ this.band_lims_wvn[:,:] : zeros(FT, size(this.band_lims_wvn))
-end
+get_band_lims_wavelength(this::ty_optical_props) = get_band_lims_wavelength(this.base)
+get_band_lims_wavelength(this::ty_optical_props_base{FT}) where FT =
+  is_initialized(this) ? 1 ./ this.band_lims_wvn[:,:] : zeros(FT, size(this.band_lims_wvn))
 
-#--------------------------------------------------------------------------------------------------------------------
+
 # Bands for all the g-points at once
 # dimension (ngpt)
-#
 """
   class(ty_optical_props), intent(in) :: this
   integer, dimension(size(this%gpt2band,dim=1))
                                       :: get_gpoint_bands
 """
-function get_gpoint_bands(this::ty_optical_props)
-  is_initialized(this.gpt2band) ? this.gpt2band[:] : zeros(Int,length(this.gpt2band))
-end
+get_gpoint_bands(this::ty_optical_props) = get_gpoint_bands(this.base)
+get_gpoint_bands(this::ty_optical_props_base) =
+  is_initialized(this) ? this.gpt2band[:] : zeros(Int,length(this.gpt2band))
 
-#--------------------------------------------------------------------------------------------------------------------
-#
 #
 # Band associated with a specific g-point
 
@@ -601,9 +523,9 @@ end
     integer,                            intent(in) :: gpt
     integer                             :: convert_gpt2band
 """
-convert_gpt2band(this::ty_optical_props, gpt) = is_initialized(this.gpt2band) ? this.gpt2band[gpt] : 0
+convert_gpt2band(this::ty_optical_props, gpt) = convert_gpt2band(this.base)
+convert_gpt2band(this::ty_optical_props_base, gpt) = is_initialized(this) ? this.gpt2band[gpt] : 0
 
-#--------------------------------------------------------------------------------------------------------------------
 #
 # Expand an array of dimension arr_in(nband) to dimension arr_out(ngpt)
 #
@@ -659,14 +581,13 @@ end
     class(ty_optical_props),  intent(inout) :: this
     character(len=*),         intent(in   ) :: name
 """
-set_name!(this, name) = (this.name = trim(name))
+set_name!(this, name) = (this.name = name)
 
-  # --------------------------------------------------------
 """
     class(ty_optical_props),  intent(in   ) :: this
     character(len=name_len)                 :: get_name
 """
-get_name(this) = trim(this.name)
+get_name(this) = this.name
 
 
 include(joinpath("kernels","mo_optical_props_kernels.jl"))

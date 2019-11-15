@@ -120,7 +120,7 @@ function read_spectral_disc!(ds, spectral_disc)
 
   band_lims_wvn = ds["band_lims_wvn"][:]
   band_lims_gpt = ds["band_lims_gpt"][:]
-  init!(spectral_disc, " ", band_lims_wvn, band_lims_gpt) # blank string used for now
+  spectral_disc.base = ty_optical_props_base("read_spectral_disc!", band_lims_wvn, band_lims_gpt) # blank string used for now
 
 end
 
@@ -167,7 +167,7 @@ function read_optical_prop_values!(ds, opt_props)
   band_lims_wvn = ds["band_lims_wvn"][:]
   band_lims_gpt = ds["band_lims_gpt"][:]
 
-  init!(opt_props, " ",band_lims_wvn, band_lims_gpt) #check for the initializing string
+  opt_props.base = ty_optical_props_base("read_optical_prop_values!",band_lims_wvn, band_lims_gpt) #check for the initializing string
 
   if(haskey(ds, "p"))
     # n-stream calculation
