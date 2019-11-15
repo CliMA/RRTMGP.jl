@@ -2,6 +2,8 @@ module JRRTMGP
 
 include("misc.jl")
 include("fortran_intrinsics.jl")
+include("mo_util_string.jl")
+
 include(joinpath("rte","mo_util_array.jl"))
 include(joinpath("rte","kernels","mo_fluxes_broadband_kernels.jl"))
 include(joinpath("rte","kernels","mo_rte_solver_kernels.jl"))
@@ -14,7 +16,6 @@ include(joinpath("extensions", "cloud_optics", "mo_cloud_optics.jl"))
 include(joinpath("rte","mo_rte_sw.jl"))
 include(joinpath("rte","mo_rte_lw.jl"))
 
-include(joinpath("rrtmgp","mo_util_string.jl"))
 include(joinpath("rrtmgp","mo_rrtmgp_constants.jl"))
 include(joinpath("rrtmgp","kernels","mo_gas_optics_kernels.jl"))
 include(joinpath("rrtmgp","mo_gas_concentrations.jl"))
