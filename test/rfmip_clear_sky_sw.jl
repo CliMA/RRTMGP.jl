@@ -155,7 +155,7 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
   mu0 = zeros(FT, block_size)
   sfc_alb_spec = zeros(FT, nbnd,block_size)
   optical_props = optical_props_constructor(FT, Int)
-  @timeit to "copy_and_alloc!" copy_and_alloc!(optical_props, block_size, nlay, k_dist.optical_props)
+  copy_and_alloc!(optical_props, block_size, nlay, k_dist.optical_props)
 
   #
   # Loop over blocks

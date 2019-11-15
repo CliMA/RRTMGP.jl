@@ -34,10 +34,7 @@ export get_min_radius_liq,
 
 export ty_cloud_optics
 mutable struct ty_cloud_optics{FT, I} <: ty_optical_props{FT, I}
-  band2gpt#::Array{T,2}        # (begin g-point, end g-point) = band2gpt(2,band)
-  gpt2band#::Array{I,1}        # band = gpt2band(g-point)
-  band_lims_wvn#::Array{T,2}   # (upper and lower wavenumber by band) = band_lims_wvn(2,band)
-  name#::String
+  base
   # Ice surface roughness category - needed for Yang (2013) ice optics parameterization
   icergh#::I
 
@@ -82,7 +79,7 @@ mutable struct ty_cloud_optics{FT, I} <: ty_optical_props{FT, I}
   pade_sizreg_asyice # Array{FT,1}  # (nbound)
 end
 
-ty_cloud_optics(FT, I) = ty_cloud_optics{FT,I}(ntuple(i->nothing, 31)...)
+ty_cloud_optics(FT, I) = ty_cloud_optics{FT,I}(ntuple(i->nothing, 28)...)
 
 # type, extends(ty_optical_props), public :: ty_cloud_optics
 #   # private
@@ -169,7 +166,7 @@ function load_lut!(this::ty_cloud_optics{FT},
   # #
   # integer               :: nbnd, nrghice, nsize_liq, nsize_ice
 
-  init!(this, "RRTMGP cloud optics", band_lims_wvn)
+  this.base = ty_optical_props_base("RRTMGP cloud optics", band_lims_wvn)
   #
   # LUT coefficient dimensions
   #
@@ -257,7 +254,7 @@ function load_Pade!(this::ty_cloud_optics{FT},
   ncoeff_ssa_g = size(pade_ssaliq, 3)
   nrghice      = size(pade_extice, 4)
   nbound       = length(pade_sizreg_extliq)
-  init!(this, "RRTMGP cloud optics", band_lims_wvn)
+  this.base = ty_optical_props_base("RRTMGP cloud optics", band_lims_wvn)
 
   # Error checking
   @assert nbnd == get_nband(this)
