@@ -132,8 +132,6 @@ function rte_lw!(optical_props::ty_optical_props_arry{FT}, top_at_1,
   end
 
   # Compute the radiative transfer...
-  @assert !(optical_props isa ty_optical_props_nstr)
-
   if optical_props isa ty_optical_props_1scl
 
     # No scattering two-stream calculation

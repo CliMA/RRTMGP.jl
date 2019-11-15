@@ -1261,10 +1261,6 @@ function combine_and_reorder!(tau, tau_rayleigh, has_rayleigh, optical_props::ty
       if optical_props isa ty_optical_props_2str
         optical_props.ssa .= FT(0)
         optical_props.g   .= FT(0)
-      elseif optical_props isa ty_optical_props_nstr # We ought to be able to combine this with above
-        nmom = size(optical_props.p, 1)
-        optical_props.ssa .= FT(0)
-        optical_props.p   .= FT(0)
       end
   else
     # combine optical depth and rayleigh scattering
@@ -1273,12 +1269,7 @@ function combine_and_reorder!(tau, tau_rayleigh, has_rayleigh, optical_props::ty
         permutedims!(optical_props.tau, tau, [3,2,1])
 
       elseif optical_props isa ty_optical_props_2str
-        optical_props.tau, optical_props.ssa, optical_props.g =
-          combine_and_reorder_2str(ncol, nlay, ngpt,       tau, tau_rayleigh)
-      elseif optical_props isa ty_optical_props_nstr # We ought to be able to combine this with above
-        nmom = size(optical_props.p, 1)
-        combine_and_reorder_nstr!(ncol, nlay, ngpt, nmom, tau, tau_rayleigh,
-                                      optical_props.tau, optical_props.ssa, optical_props.p)
+        combine_and_reorder_2str!(optical_props, ncol, nlay, ngpt,       tau, tau_rayleigh)
       end
   end
 end

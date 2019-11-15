@@ -83,7 +83,6 @@ function rte_sw!(atmos::ty_optical_props_arry,
   @assert !any_vals_outside(sfc_alb_dir,  FT(0), FT(1))
   @assert all(size(sfc_alb_dif) .== (nband, ncol))
   @assert !any_vals_outside(sfc_alb_dif, FT(0), FT(1))
-  @assert !(atmos isa ty_optical_props_nstr) # not yet implemented...
 
   gpt_flux_up  = zeros(FT, ncol, nlay+1, ngpt)
   gpt_flux_dn  = zeros(FT, ncol, nlay+1, ngpt)
