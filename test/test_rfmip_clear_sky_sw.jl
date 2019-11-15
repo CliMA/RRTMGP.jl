@@ -3,7 +3,7 @@ include("rfmip_clear_sky_sw.jl")
 include("DataSetFiles.jl")
 
 @testset "rfmip clear sky shortwave driver" begin
-  datafolder = JRRTMGP.data_folder_rrtmgp()
+  datafolder = RRTMGP.data_folder_rrtmgp()
 
   ds = dataset_dict(data_files_dict(datafolder, "sw"))
 

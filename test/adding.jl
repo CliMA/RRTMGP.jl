@@ -1,9 +1,9 @@
-using JRRTMGP
+using RRTMGP
 using NCDatasets
-using JRRTMGP.mo_optical_props
-using JRRTMGP.mo_rte_solver_kernels
-using JRRTMGP.mo_simple_netcdf
-using JRRTMGP.fortran_intrinsics
+using RRTMGP.mo_optical_props
+using RRTMGP.mo_rte_solver_kernels
+using RRTMGP.mo_simple_netcdf
+using RRTMGP.fortran_intrinsics
 using Test
 
 get_array(ds, name, FT) = haskey(ds, name) ? convert(Array{FT}, ds[name][:]) : nothing

@@ -1,6 +1,6 @@
 using Test
-using JRRTMGP
-using JRRTMGP.mo_optical_props
+using RRTMGP
+using RRTMGP.mo_optical_props
 using Profile
 using BenchmarkTools
 
@@ -10,7 +10,7 @@ include("allsky.jl")
 include("DataSetFiles.jl")
 
 @testset "Benchmark suite" begin
-  datafolder = JRRTMGP.data_folder_rrtmgp()
+  datafolder = RRTMGP.data_folder_rrtmgp()
 
   ds_clearsky_sw = dataset_dict(data_files_dict(datafolder, "sw"))
   ds_clearsky_lw = dataset_dict(data_files_dict(datafolder, "lw"))

@@ -1,4 +1,4 @@
-# JRRTMGP
+# RRTMGP.jl
 
 Julia implementation of
 Rapid and accurate
