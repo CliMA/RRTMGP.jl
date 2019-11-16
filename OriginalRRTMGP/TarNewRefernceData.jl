@@ -1,4 +1,4 @@
-using JRRTMGP
+using RRTMGP
 
 # include("AutoRunRRTMGP.jl")
 
@@ -23,5 +23,5 @@ end
 
 cd(data_dir) do
   rm(data_dir_tar; force=true)
-  JRRTMGP.compress_targz(data_dir_tar)
+  RRTMGP.compress_targz(data_dir_tar)
 end
