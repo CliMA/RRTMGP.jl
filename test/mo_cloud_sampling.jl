@@ -36,11 +36,7 @@ function draw_samples(cloud_mask,clouds,clouds_sampled)
   if clouds isa ty_optical_props_1scl
     if clouds_sampled isa ty_optical_props_2str
       error("draw_samples: by-band and sampled cloud properties need to be the same variable type")
-    elseif clouds_sampled isa ty_optical_props_nstr
-      error("draw_samples: by-band and sampled cloud properties need to be the same variable type")
     end
-  elseif clouds isa ty_optical_props_nstr
-    error("draw_samples: sampling isn't implemented yet for ty_optical_props_nstr")
   end
 
   #

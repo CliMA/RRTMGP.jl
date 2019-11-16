@@ -1,22 +1,8 @@
 """
-
-This code is part of
-
-RRTM for GCM Applications - Parallel (RRTMGP)
-
-Eli Mlawer and Robert Pincus
-Andre Wehe and Jennifer Delamere
-email:  rrtmgp@aer.com
-
-Copyright 2015,  Atmospheric and Environmental Research and
-Regents of the University of Colorado.  All right reserved.
-
-Use and duplication is permitted under the terms of the
-  BSD 3-clause license, see http://opensource.org/licenses/BSD-3-Clause
+    mo_gas_optics_kernels
 
 Description: Numeric calculations for gas optics. Absorption and Rayleigh optical depths,
  source functions.
-
 """
 module mo_gas_optics_kernels
 
@@ -26,6 +12,7 @@ const to_gok = TimerOutput()
 PaTohPa(::Type{FT}) where FT = FT(0.01)
 
 using ..fortran_intrinsics
+using ..mo_optical_props
 
 export interpolation!,
        compute_tau_absorption!,
@@ -38,7 +25,7 @@ export interpolation!,
        interpolate2D_byflav,
        interpolate3D,
        interpolate3D_byflav,
-       combine_and_reorder_2str,
+       combine_and_reorder_2str!,
        combine_and_reorder_nstr!
 
 """
@@ -872,71 +859,23 @@ Combine absoprtion and Rayleigh optical depths for total tau, ssa, g
 integer,                             intent(in) :: ncol, nlay, ngpt
 real(FT), dimension(ngpt,nlay,ncol), intent(in   ) :: tau_abs, tau_rayleigh
 real(FT), dimension(ncol,nlay,ngpt), intent(inout) :: tau, ssa, g # inout because components are allocated
-# -----------------------
-integer  :: icol, ilay, igpt
-real(FT) :: t
-# -----------------------
 """
-function combine_and_reorder_2str(ncol, nlay, ngpt, tau_abs, tau_rayleigh)
-  FT = eltype(tau_abs)
-  tau = Array{FT}(undef,ncol, nlay, ngpt)
-  ssa = Array{FT}(undef,ncol, nlay, ngpt)
-  g = Array{FT}(undef,ncol, nlay, ngpt)
+function combine_and_reorder_2str!(op::ty_optical_props{FT}, ncol, nlay, ngpt, tau_abs, tau_rayleigh) where FT
   for icol in 1:ncol
     for ilay in 1:nlay
       for igpt in 1:ngpt
          t = tau_abs[igpt,ilay,icol] + tau_rayleigh[igpt,ilay,icol]
-         tau[icol,ilay,igpt] = t
-         g[icol,ilay,igpt] = FT(0)
+         op.tau[icol,ilay,igpt] = t
+         op.g[icol,ilay,igpt] = FT(0)
          if (t > FT(2) * floatmin(FT))
-           ssa[icol,ilay,igpt] = tau_rayleigh[igpt,ilay,icol] / t
+           op.ssa[icol,ilay,igpt] = tau_rayleigh[igpt,ilay,icol] / t
          else
-           ssa[icol,ilay,igpt] = FT(0)
+           op.ssa[icol,ilay,igpt] = FT(0)
          end
       end
     end
   end
-  return tau, ssa, g
-end
-
-"""
-    combine_and_reorder_nstr!(...)
-
-Combine absoprtion and Rayleigh optical depths for total tau, ssa, p
-using Rayleigh scattering phase function
-
-integer, intent(in) :: ncol, nlay, ngpt, nmom
-real(FT), dimension(ngpt,nlay,ncol), intent(in ) :: tau_abs, tau_rayleigh
-real(FT), dimension(ncol,nlay,ngpt), intent(inout) :: tau, ssa
-real(FT), dimension(ncol,nlay,ngpt,nmom),
-                                     intent(inout) :: p
-# -----------------------
-integer :: icol, ilay, igpt, imom
-real(FT) :: t
-# -----------------------
-"""
-function combine_and_reorder_nstr!(ncol, nlay, ngpt, nmom, tau_abs, tau_rayleigh, tau, ssa, p)
-  FT = eltype(tau_abs)
-
-  for icol in 1:ncol
-    for ilay in 1:nlay
-      for igpt in 1:ngpt
-        t = tau_abs[igpt,ilay,icol] + tau_rayleigh[igpt,ilay,icol]
-        tau[icol,ilay,igpt] = t
-        if (t > FT(2) * realmin(FT))
-          ssa[icol,ilay,igpt] = tau_rayleigh[igpt,ilay,icol] / t
-        else
-          ssa[icol,ilay,igpt] = FT(0)
-        end
-        for imom = 1:nmom
-          p[imom,icol,ilay,igpt] = FT(0)
-        end
-        if (nmom >= 2)
-          p[2,icol,ilay,igpt] = FT(0.1)
-        end
-      end
-    end
-  end
+  return nothing
 end
 
 end #module

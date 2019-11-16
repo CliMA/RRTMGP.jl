@@ -120,6 +120,7 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
 
   nbnd = get_nband(k_dist.optical_props)
   ngpt = get_ngpt(k_dist.optical_props)
+  ps = ProblemSize(block_size, nlay, ngpt)
 
   toa_flux = zeros(FT, block_size, get_ngpt(k_dist.optical_props))
   def_tsi = zeros(FT, block_size)
@@ -154,8 +155,7 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
 
   mu0 = zeros(FT, block_size)
   sfc_alb_spec = zeros(FT, nbnd,block_size)
-  optical_props = optical_props_constructor(FT, Int)
-  copy_and_alloc!(optical_props, block_size, nlay, k_dist.optical_props)
+  optical_props = optical_props_constructor(k_dist.optical_props, ps)
 
   #
   # Loop over blocks

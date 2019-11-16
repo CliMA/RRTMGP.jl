@@ -153,8 +153,8 @@ function rfmip_clear_sky_lw(ds, optical_props_constructor; compile_first=false)
 
   sfc_emis_spec = Array{FT}(undef, nbnd,block_size)
 
-  optical_props = optical_props_constructor(FT, Int)
-  copy_and_alloc!(optical_props, block_size, nlay, k_dist.optical_props)
+  ps = ProblemSize(block_size, nlay, ngpt)
+  optical_props = optical_props_constructor(k_dist.optical_props, ps)
   source = ty_source_func_lw(block_size,nlay,k_dist.optical_props)
 
   #

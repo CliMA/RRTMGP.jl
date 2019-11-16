@@ -179,26 +179,24 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
   ngpt = get_ngpt(k_dist.optical_props)
   top_at_1 = p_lay[1, 1] < p_lay[1, nlay]
 
+  ps = ProblemSize(ncol, nlay, ngpt)
+
+  # Clouds optical props are defined by band
+  clouds_base = ty_optical_props_base("Clouds", get_band_lims_wavenumber(k_dist.optical_props))
 
   # LW calculations neglect scattering; SW calculations use the 2-stream approximation
   #   Here we choose the right variant of optical_props.
-  #
   if is_sw
-    clouds = ty_optical_props_2str(FT, I)
-    atmos = ty_optical_props_2str(FT, I)
+    clouds = ty_optical_props_2str(clouds_base, ps)
+    atmos = ty_optical_props_2str(k_dist.optical_props,ps)
   else
-    atmos = ty_optical_props_1scl(FT, I)
-    clouds = ty_optical_props_1scl(FT, I)
+    clouds = ty_optical_props_1scl(clouds_base, ps)
+    atmos = ty_optical_props_1scl(k_dist.optical_props, ps)
   end
-
-  # Clouds optical props are defined by band
-  clouds.base = ty_optical_props_base("Clouds", get_band_lims_wavenumber(k_dist.optical_props))
 
   #
   # Allocate arrays for the optical properties themselves.
   #
-  copy_and_alloc!(atmos, ncol, nlay, k_dist.optical_props)
-  alloc!(clouds, ncol, nlay)
 
   #  Boundary conditions depending on whether the k-distribution being supplied
   #   is LW or SW

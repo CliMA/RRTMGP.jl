@@ -1,23 +1,13 @@
-# This code is part of Radiative Transfer for Energetics (RTE)
-#
-# Contacts: Robert Pincus and Eli Mlawer
-# email:  rrtmgp@aer.com
-#
-# Copyright 2015-2018,  Atmospheric and Environmental Research and
-# Regents of the University of Colorado.  All right reserved.
-#
-# Use and duplication is permitted under the terms of the
-#    BSD 3-clause license, see http://opensource.org/licenses/BSD-3-Clause
-# -------------------------------------------------------------------------------------------------
-# Provides cloud optical properties as a function of effective radius for the RRTMGP bands
-#   Based on Mie calculations for liquid
-#     and results from doi:10.1175/JAS-D-12-039.1 for ice with variable surface roughness
-#   Can use either look-up tables or Pade approximates according to which data has been loaded
-#   Mike Iacono (AER) is the original author
-#
-# The class can be used as-is but is also intended as an example of how to extend the RTE framework
-# -------------------------------------------------------------------------------------------------
+"""
+    mo_cloud_optics
 
+Provides cloud optical properties as a function of effective radius for the RRTMGP bands
+  Based on Mie calculations for liquid
+    and results from doi:10.1175/JAS-D-12-039.1 for ice with variable surface roughness
+  Can use either look-up tables or Pade approximates according to which data has been loaded
+  Mike Iacono (AER) is the original author
+The class can be used as-is but is also intended as an example of how to extend the RTE framework
+"""
 module mo_cloud_optics
 
 using OffsetArrays
