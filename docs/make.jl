@@ -1,16 +1,16 @@
 Base.HOME_PROJECT[] = abspath(Base.HOME_PROJECT[]) # JuliaLang/julia/pull/28625
 
-using JRRTMGP, Documenter
+using RRTMGP, Documenter
 
 makedocs(
-  sitename = "JRRTMGP",
+  sitename = "RRTMGP",
   doctest = false,
   strict = false,
   format = Documenter.HTML(
     prettyurls = get(ENV, "CI", nothing) == "true",
   ),
   clean = false,
-  modules = [Documenter, JRRTMGP],
+  modules = [Documenter, RRTMGP],
   pages = Any[
     "Home" => "index.md",
     "RTE" => "RTE.md",
@@ -19,6 +19,6 @@ makedocs(
 )
 
 deploydocs(
-           repo = "github.com/climate-machine/JRRTMGP.git",
+           repo = "github.com/climate-machine/RRTMGP.git",
            target = "build",
           )

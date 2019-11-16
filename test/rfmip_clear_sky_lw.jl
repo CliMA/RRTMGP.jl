@@ -1,17 +1,17 @@
 using Test
-using JRRTMGP
+using RRTMGP
 using NCDatasets
-using JRRTMGP.mo_optical_props
-using JRRTMGP.mo_rte_solver_kernels
-using JRRTMGP.fortran_intrinsics
-using JRRTMGP.mo_util_array
-using JRRTMGP.mo_gas_optics_rrtmgp
-using JRRTMGP.mo_gas_concentrations
-using JRRTMGP.mo_rte_lw
-using JRRTMGP.mo_fluxes
-using JRRTMGP.mo_load_coefficients
-using JRRTMGP.mo_rfmip_io
-using JRRTMGP.mo_source_functions
+using RRTMGP.mo_optical_props
+using RRTMGP.mo_rte_solver_kernels
+using RRTMGP.fortran_intrinsics
+using RRTMGP.mo_util_array
+using RRTMGP.mo_gas_optics_rrtmgp
+using RRTMGP.mo_gas_concentrations
+using RRTMGP.mo_rte_lw
+using RRTMGP.mo_fluxes
+using RRTMGP.mo_load_coefficients
+using RRTMGP.mo_rfmip_io
+using RRTMGP.mo_source_functions
 """
 Example program to demonstrate the calculation of shortwave radiative fluxes in clear, aerosol-free skies.
   The example files come from the Radiative Forcing MIP (https://www.earthsystemcog.org/projects/rfmip/)

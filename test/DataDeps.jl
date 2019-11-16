@@ -1,9 +1,9 @@
 using Test
 using DataDeps
-using JRRTMGP
+using RRTMGP
 
 @testset "DataDep" begin
-  testfolder = JRRTMGP.data_folder_rrtmgp_test_val()
+  testfolder = RRTMGP.data_folder_rrtmgp_test_val()
   @test testfolder isa String
 end
 
