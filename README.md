@@ -24,6 +24,6 @@ Julia implementation of Rapid and accurate Radiative Transfer Model for General 
 [travis-url]: https://travis-ci.org/climate-machine/RRTMGP.jl
 
 [appveyor-img]: https://ci.appveyor.com/api/projects/status/c6eykd0w94pmyjt8/branch/master?svg=true
-[appveyor-url]: https://ci.appveyor.com/project/climate-machine/RRTMGP.jl/branch/master
+[appveyor-url]: https://ci.appveyor.com/project/climate-machine/rrtmgp-jl/branch/master
 
 This is based off of the [rte-rrtmgp](https://github.com/RobertPincus/rte-rrtmgp) repository.
