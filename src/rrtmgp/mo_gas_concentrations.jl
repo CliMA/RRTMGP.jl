@@ -56,9 +56,7 @@ end
 
 # Set concentrations --- scalar, 1D, 2D
 function set_vmr!(this::ty_gas_concs{FT}, gas::String, w, sw) where FT
-  if length(sw)==1 && length(w)==1
-    set_vmr!(this, gas, w[1])
-  elseif length(sw)==1 && length(w)>1
+  if length(sw)==1 && length(w)>1
     set_vmr!(this, gas, w)
   else
     set_vmr!(this, gas, w)
@@ -178,10 +176,5 @@ function get_vmr(this::ty_gas_concs, gas::String, array::Array{FT,2}) where FT
   return array
 
 end
-
-# Inquiry functions
-get_num_gases(this::ty_gas_concs) = size(this.gas_name)
-
-get_gas_names(this) = this.gas_name[:]
 
 end # module
