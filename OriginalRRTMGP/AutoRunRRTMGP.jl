@@ -1,7 +1,7 @@
 # This file assumes that the directories are organized as follows:
 #
-# ./SomeDirectory/JRRTMGP
-# ./SomeDirectory/rte-rrtmgp
+# ./SomeDirectory/RRTMGP.jl/
+# ./SomeDirectory/rte-rrtmgp/
 #
 
 include("ConfigRRTMGP.jl")
