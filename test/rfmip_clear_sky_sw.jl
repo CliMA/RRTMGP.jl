@@ -1,19 +1,19 @@
 using Test
-using JRRTMGP
+using RRTMGP
 using NCDatasets
 using ProgressMeter
 using TimerOutputs
 const to = TimerOutput()
-using JRRTMGP.mo_optical_props
-using JRRTMGP.mo_rte_solver_kernels
-using JRRTMGP.fortran_intrinsics
-using JRRTMGP.mo_util_array
-using JRRTMGP.mo_gas_optics_rrtmgp
-using JRRTMGP.mo_gas_concentrations
-using JRRTMGP.mo_rte_sw
-using JRRTMGP.mo_fluxes
-using JRRTMGP.mo_load_coefficients
-using JRRTMGP.mo_rfmip_io
+using RRTMGP.mo_optical_props
+using RRTMGP.mo_rte_solver_kernels
+using RRTMGP.fortran_intrinsics
+using RRTMGP.mo_util_array
+using RRTMGP.mo_gas_optics_rrtmgp
+using RRTMGP.mo_gas_concentrations
+using RRTMGP.mo_rte_sw
+using RRTMGP.mo_fluxes
+using RRTMGP.mo_load_coefficients
+using RRTMGP.mo_rfmip_io
 
 """
 Example program to demonstrate the calculation of shortwave radiative fluxes in clear, aerosol-free skies.

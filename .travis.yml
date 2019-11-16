@@ -25,7 +25,7 @@ before_script:
 after_success:
   # push coverage results to Codecov
   - julia -e 'import Pkg;
-                     cd(Pkg.dir("JRRTMGP"));
+                     cd(Pkg.dir("RRTMGP"));
                      Pkg.add("Coverage");
                      using Coverage;
                      Codecov.submit(Codecov.process_folder())'
@@ -40,6 +40,6 @@ jobs:
         - julia --color=yes --project=docs/ -e 'using Pkg;
                                                       Pkg.develop(PackageSpec(path=pwd()));
                                                       Pkg.instantiate();
-                                                      Pkg.build("JRRTMGP")'
+                                                      Pkg.build("RRTMGP")'
         - julia --color=yes --project=docs/ docs/make.jl
       after_success: skip

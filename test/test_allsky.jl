@@ -3,7 +3,7 @@ include("allsky.jl")
 include("DataSetFiles.jl")
 
 @testset "All sky" begin
-  datafolder = JRRTMGP.data_folder_rrtmgp()
+  datafolder = RRTMGP.data_folder_rrtmgp()
 
   ds_sw = dataset_dict(data_files_dict(datafolder, "sw"; allsky=true))
   ds_lw = dataset_dict(data_files_dict(datafolder, "lw"; allsky=true))

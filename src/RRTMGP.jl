@@ -1,4 +1,4 @@
-module JRRTMGP
+module RRTMGP
 
 include("misc.jl")
 include("fortran_intrinsics.jl")
