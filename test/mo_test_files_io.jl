@@ -24,16 +24,19 @@ function read_atmos(ds, FT, gas_names)
   t_lay = Array{FT}(ds["t_lay"][:])
   p_lev = Array{FT}(ds["p_lev"][:])
   t_lev = Array{FT}(ds["t_lev"][:])
-  gas_concs = ty_gas_concs(FT, gas_names, ncol, nlay)
 
   available_gases = ["h2o", "co2", "o3", "n2o", "co",
                      "ch4", "o2", "n2", "ccl4", "cfc11",
                      "cfc12", "cfc22", "hfc143a", "hfc125", "hfc23",
                      "hfc32", "hfc134a", "cf4", "no2"]
 
-  for ug in available_gases
-    k = "vmr_"*ug
-    haskey(ds, k) && set_vmr!(gas_concs,ug, Array{FT}(read_field(ds, k)))
+  existing_gases = filter(ug->haskey(ds, "vmr_"*ug), available_gases)
+
+  gsc = GasConcSize(ncol, nlay, (ncol, nlay), length(existing_gases))
+  gas_concs = ty_gas_concs(FT, gas_names, ncol, nlay, gsc)
+
+  for eg in existing_gases
+    set_vmr!(gas_concs, eg, Array{FT}(read_field(ds, "vmr_"*eg)))
   end
 
   # col_dry has unchanged allocation status on return if the variable isn't present in the netCDF file

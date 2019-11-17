@@ -269,10 +269,11 @@ function read_and_block_gases_ty(ds, blocksize, gas_names, names_in_file)
   @assert (ncol_l*nexp_l)%blocksize == 0
   nblocks = Int((ncol_l*nexp_l)/blocksize)
   FT = Float64
-  gas_concs = ty_gas_concs(FT, gas_names, ncol_l, nlay_l)
+  gsc = GasConcSize(ncol_l, nlay_l, (blocksize, nlay_l), length(gas_names))
+  gas_concs = ty_gas_concs(FT, gas_names, ncol_l, nlay_l, gsc)
   gas_conc_array = Vector([deepcopy(gas_concs) for i in 1:nblocks])
 
-  # Experiment index for each colum
+  # Experiment index for each column
   exp_num = freshape(spread(convert(Array,collect(1:nexp_l)'), 1, ncol_l), [blocksize, nblocks], order=[1,2])
 
   # Water vapor and ozone depend on col, lay, exp: look just like other fields
@@ -283,7 +284,7 @@ function read_and_block_gases_ty(ds, blocksize, gas_names, names_in_file)
     gas_conc_temp_3d_t = transpose(gas_conc_temp_3d[:,:,b])
     gas_conc_temp_3d_a = convert(Array, gas_conc_temp_3d_t)
 
-    set_vmr!(gas_conc_array[b], "h2o", gas_conc_temp_3d_a, size(gas_conc_temp_3d_a))
+    set_vmr!(gas_conc_array[b], "h2o", gas_conc_temp_3d_a)
   end
 
   ozone = Array{FT}(ds["ozone"][:])

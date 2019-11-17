@@ -36,7 +36,7 @@ function vmr_2d_to_1d!(gas_concs, gas_concs_garand, name)
   tmp = get_vmr(gas_concs_garand, name)
   tmp_col = tmp[1, :]
 
-  set_vmr!(gas_concs, name, tmp_col, true)
+  set_vmr!(gas_concs, name, tmp_col)
 end
 
 function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
@@ -137,8 +137,8 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
   deallocate!(col_dry)
   nlay = size(p_lay, 2)
   # For clouds we'll use the first column, repeated over and over
-  gas_concs = ty_gas_concs(FT, gas_names, ncol, nlay)
-  gas_concs.gas_name = gas_names
+  gsc = GasConcSize(ncol, nlay, (ncol, nlay), ngas)
+  gas_concs = ty_gas_concs(FT, gas_names, ncol, nlay, gsc)
   for igas = 1:ngas
     vmr_2d_to_1d!(gas_concs, gas_concs_garand, gas_names[igas])
   end

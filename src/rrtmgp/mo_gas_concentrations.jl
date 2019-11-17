@@ -23,11 +23,20 @@ using DocStringExtensions
 using ..fortran_intrinsics
 using ..Utilities
 export ty_gas_concs
-export set_vmr!, get_vmr
+export get_vmr
+export set_vmr!
+export GasConcSize
 
 const GAS_NOT_IN_LIST = -1
 
-mutable struct conc_field{FT}
+struct GasConcSize{N,I}
+  ncol::I
+  nlay::I
+  s::NTuple{N,I}
+  nconcs::I
+end
+
+struct conc_field{FT}
   conc::Array{FT,2}
 end
 
@@ -40,103 +49,56 @@ Encapsulates a collection of volume mixing ratios (concentrations) of gases.
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-mutable struct ty_gas_concs{FT}
+struct ty_gas_concs{FT}
   gas_name::Vector{String}
   concs
   ncol#::Int
   nlay#::Int
+  gsc::GasConcSize
 end
 
-function ty_gas_concs(::Type{FT}, gas_names, ncol, nlay) where FT
-  gas_name = Vector([])
-  concs = Vector([])
-  ncol, nlay = nothing, nothing
-  return ty_gas_concs{FT}(gas_name, concs, ncol, nlay)
+function ty_gas_concs(::Type{FT}, gas_names, ncol, nlay, gsc::GasConcSize) where FT
+  concs = [conc_field(Array{FT}(undef, gsc.s...)) for i in 1:gsc.nconcs]
+  return ty_gas_concs{FT}(gas_names, concs, gsc.s..., gsc)
 end
 
 # Set concentrations --- scalar, 1D, 2D
-function set_vmr!(this::ty_gas_concs{FT}, gas::String, w, sw) where FT
-  if length(sw)==1 && length(w)>1
-    set_vmr!(this, gas, w)
-  else
-    set_vmr!(this, gas, w)
-  end
-end
-
-function set_vmr!(this::ty_gas_concs{FT}, gas::String, w::FT) where FT # result(error_msg)
-  # real(FT),            intent(in   ) :: w
+function set_vmr!(this::ty_gas_concs{FT}, gas::String, w::FT) where FT
   @assert !(w < FT(0) || w > FT(1))
-
   igas = loc_in_array(gas, this.gas_name)
-
-  conc = Array{FT}(undef, 1,1)
-  fill!(conc, w)
-  gas_name = trim(gas)
-
-  if igas == GAS_NOT_IN_LIST
-    push!(this.concs, conc_field(conc))
-    push!(this.gas_name, gas_name)
-    igas = length(this.concs)
-  end
-  this.concs[igas].conc = conc
-  this.gas_name[igas] = gas_name
+  this.concs[igas].conc .= w
+  this.gas_name[igas] = gas
 end
 
 function set_vmr!(this::ty_gas_concs{FT}, gas::String, w::Vector{FT}) where FT
-  # real(FT), dimension(:),intent(in   ) :: w
-
   @assert !any(w .< FT(0)) || any(w .> FT(1))
   @assert !(this.nlay ≠ nothing && length(w) ≠ this.nlay)
-
-  this.nlay = length(w)
-
   igas = loc_in_array(gas, this.gas_name)
-  conc = reshape(w, 1, this.nlay)
-  gas_name = trim(gas)
-  if igas == GAS_NOT_IN_LIST || igas == length(this.concs)+1
-    push!(this.concs, conc_field(conc))
-    igas = length(this.concs)
-  end
-  this.concs[igas].conc = conc
-  this.gas_name[igas] = gas_name
+  @assert igas ≠ GAS_NOT_IN_LIST
+  this.concs[igas].conc .= reshape(w, 1, this.nlay)
+  this.gas_name[igas] = gas
 end
 
-function set_vmr!(this::ty_gas_concs, gas::String, w::Array{FT}) where FT
-  # real(FT), dimension(:,:),intent(in   ) :: w
-
+function set_vmr!(this::ty_gas_concs, gas::String, w::Array{FT, 2}) where FT
   @assert !any(w .< FT(0)) || any(w .> FT(1))
-
   @assert !(this.ncol ≠ nothing && size(w, 1) ≠ this.ncol)
-  this.ncol = size(w, 1)
-
   @assert !(this.nlay ≠ nothing && size(w, 2) ≠ this.nlay)
-
-  this.nlay = size(w, 2)
-
-  conc = w
-  gas_name = trim(gas)
   igas = loc_in_array(gas, this.gas_name)
-
-  if igas == GAS_NOT_IN_LIST
-    push!(this.concs, conc_field(conc))
-    push!(this.gas_name, gas_name)
-    igas = length(this.concs)
-  end
-  this.concs[igas].conc = conc
-  this.gas_name[igas] = gas_name
+  @assert igas ≠ GAS_NOT_IN_LIST
+  this.concs[igas].conc .= w
+  this.gas_name[igas] = gas
 end
 
 # Return volume mixing ratio as 1D or 2D array
 # 1D array ( lay depdendence only)
-#
-function get_vmr(this::ty_gas_concs{FT}, gas::String) where FT #result(error_msg)
+function get_vmr(this::ty_gas_concs{FT}, gas::String) where FT
   # real(FT), dimension(:),   intent(out) :: array
 
   igas = loc_in_array(gas, this.gas_name)
   @assert igas ≠ GAS_NOT_IN_LIST
   conc = this.concs[igas].conc
 
-  this.ncol == nothing && (this.ncol = 1)
+  # this.ncol == nothing && (this.ncol = 1)
 
   array = Array{FT}(undef, this.ncol, this.nlay)
 
@@ -152,7 +114,6 @@ function get_vmr(this::ty_gas_concs{FT}, gas::String) where FT #result(error_msg
   @assert !(this.nlay ≠ nothing && this.nlay ≠ size(array,2))
 
   return array
-
 end
 
 # 2D array (col, lay)
@@ -174,7 +135,6 @@ function get_vmr(this::ty_gas_concs, gas::String, array::Array{FT,2}) where FT
     array = this.concs[igas].conc[1,1]
   end
   return array
-
 end
 
 end # module
