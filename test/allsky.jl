@@ -129,7 +129,7 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
   I = Int64
   p_lay, t_lay, p_lev, t_lev, gas_concs_garand, col_dry = @timeit to "read_atmos" read_atmos(ds[:input], FT, gas_names)
 
-  deallocate!(col_dry)
+  col_dry = nothing
   nlay = size(p_lay, 2)
   # For clouds we'll use the first column, repeated over and over
   gsc = GasConcSize(ncol, nlay, (ncol, nlay), ngas)

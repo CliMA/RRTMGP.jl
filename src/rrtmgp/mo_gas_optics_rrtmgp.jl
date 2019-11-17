@@ -815,13 +815,13 @@ function get_minor_list(this::ty_gas_optics_rrtmgp, gas_desc::ty_gas_concs, ngas
   # logical, dimension(size(names_spec))                 :: gas_is_present
   # integer                                              :: igas, icnt
 
-  allocated(get_minor_list) && deallocate!(get_minor_list)
   for igas = 1:get_ngas(this)
     gas_is_present[igas] = names_spec[igas] in gas_desc.gas_name
   end
   icnt = count(gas_is_present)
-  get_minor_list = Vector{String}(undef, icnt)
-  get_minor_list[:] .= pack(this.gas_names, gas_is_present)
+  minor_list = Vector{String}(undef, icnt)
+  minor_list .= pack(this.gas_names, gas_is_present)
+  return minor_list
 end
 
 #### Inquiry functions
@@ -910,25 +910,24 @@ function get_col_dry(vmr_h2o, plev, tlay, latitude=nothing)
   g0         = zeros(FT, size(tlay,1)             ) # (ncol)
   delta_plev = zeros(FT, size(tlay,1),size(tlay,2)) # (ncol,nlay)
   m_air      = zeros(FT, size(tlay,1),size(tlay,2)) # average mass of air; (ncol,nlay)
-  # integer :: nlev, nlay
-  # ------------------------------------------------
+
   nlay = size(tlay, 2)
   nlev = size(plev, 2)
 
   if present(latitude)
-    g0[:] .= helmert1 - helmert2 * cos(FT(2) * π * latitude[:] / FT(180)) # acceleration due to gravity [m/s^2]
+    g0 .= helmert1 - helmert2 * cos(FT(2) * π * latitude / FT(180)) # acceleration due to gravity [m/s^2]
   else
-    g0[:] .= grav(FT)
+    g0 .= grav(FT)
   end
-  delta_plev[:,:] .= abs.(plev[:,1:nlev-1] .- plev[:,2:nlev])
+  delta_plev .= abs.(plev[:,1:nlev-1] .- plev[:,2:nlev])
 
   # Get average mass of moist air per mole of moist air
-  m_air[:,:] .= (m_dry(FT) .+ m_h2o(FT) .* vmr_h2o[:,:]) ./ (1 .+ vmr_h2o[:,:])
+  m_air .= (m_dry(FT) .+ m_h2o(FT) .* vmr_h2o) ./ (1 .+ vmr_h2o)
 
   # Hydrostatic equation
   col_dry = zeros(FT, size(tlay,1),size(tlay,2))
-  col_dry[:,:] .= FT(10) .* delta_plev[:,:] .* avogad(FT) ./ (FT(1000)*m_air[:,:] .* FT(100) .* spread(g0[:], 2, nlay))
-  col_dry[:,:] .= col_dry[:,:] ./ (FT(1) .+ vmr_h2o[:,:])
+  col_dry .= FT(10) .* delta_plev .* avogad(FT) ./ (FT(1000)*m_air .* FT(100) .* spread(g0, 2, nlay))
+  col_dry .= col_dry ./ (FT(1) .+ vmr_h2o)
   return col_dry
 end
 

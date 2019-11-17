@@ -156,21 +156,21 @@ function read_optical_prop_values!(ds, opt_props)
     allocate!(opt_props)
 
     alloc_nstr!(opt_props,nmom, ncol, nlay)
-    opt_props.ssa[:,:,:] = ds["ssa"][:] #,       ncol, nlay, ngpt)
-    opt_props.p[:,:,:]   = ds["p"][:]   #,   nmom, ncol, nlay, ngpt)
+    opt_props.ssa .= ds["ssa"][:] #,       ncol, nlay, ngpt)
+    opt_props.p   .= ds["p"][:]   #,   nmom, ncol, nlay, ngpt)
 
   elseif (haskey(ds, "g"))
     # two-stream calculation
     # allocate(ty_optical_props_2str::opt_props)
     alloc_2str!(opt_props, ncol, nlay)
-    opt_props.ssa[:,:,:] = ds["ssa"][:]
-    opt_props.g[:,:,:]   = ds["g"][:]
+    opt_props.ssa .= ds["ssa"][:]
+    opt_props.g   .= ds["g"][:]
   else
     # No scattering
     allocate(ty_optical_props_1scl::opt_props)
     alloc_1scl!(opt_props,ncol, nlay)
   end
-  opt_props.tau[:,:,:] = ds["tau"][:] #, ncol, nlay, ngpt)
+  opt_props.tau .= ds["tau"][:] #, ncol, nlay, ngpt)
 
   #
   # Spectral discretization
@@ -226,7 +226,7 @@ end
 #   Also directionality since this will be needed for solution
 #
 
-function read_lw_Planck_sources!(ds, sources)
+function read_lw_Planck_sources!(ds, sources::ty_source_func_lw{FT}) where FT
 #    character(len=*),        intent(in   ) :: fileName
 #    type(ty_source_func_lw), intent(inout) :: sources
 #    # -------------------
@@ -251,13 +251,13 @@ function read_lw_Planck_sources!(ds, sources)
   band_lims_wvn = ds["band_lims_wvn"][:]
   band_lims_gpt = ds["band_lims_gpt"][:]
 
-  init(sources, " " ,band_lims_wvn, band_lims_gpt)
-  alloc!(sources,ncol,nlay)
+  sources.optical_props = ty_optical_props_base("ty_source_func_lw", band_lims_wvn, band_lims_gpt)
+  sources.tau = Array{FT}(undef, ncol, nlay)
 
-  sources.lay_source[:,:,:]     = ds["lay_src"][:]
-  sources.lev_source_inc[:,:,:] = ds["lev_src_inc"][:]
-  sources.lev_source_dec[:,:,:] = ds["lev_src_dec"][:]
-  sources.sfc_source[:,:]       = ds["sfc_src"][:]
+  sources.lay_source     .= ds["lay_src"][:]
+  sources.lev_source_inc .= ds["lev_src_inc"][:]
+  sources.lev_source_dec .= ds["lev_src_dec"][:]
+  sources.sfc_source     .= ds["sfc_src"][:]
 
 #    error(sources%init(band_lims_wvn, band_lims_gpt, read_string(ncid, 'name', 32)))
 #    error(sources%alloc(ncol, nlay))

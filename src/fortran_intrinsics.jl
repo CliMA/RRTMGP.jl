@@ -4,8 +4,6 @@ using OffsetArrays
 using Test
 
 export fmerge,
-       fminloc,
-       fmaxloc,
        fminloc_wrapper,
        fmaxloc_wrapper,
        spread,
@@ -17,7 +15,6 @@ export fmerge,
        spacing,
        fint,
        freshape,
-       deallocate!,
        present
 
 """
@@ -145,7 +142,6 @@ associated(a::Nothing) = false
 associated(a::AbstractArray) = length(a)>0
 allocated(a::Array) = a ≠ nothing
 allocated(a::Nothing) = false
-deallocate!(a) = (a = nothing)
 present(arg) = arg ≠ nothing
 trim(s::AbstractString) = strip(s)
 trim(s::Char) = s
