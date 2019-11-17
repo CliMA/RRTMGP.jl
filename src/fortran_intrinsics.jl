@@ -11,7 +11,6 @@ export fmerge,
        spread,
        spread_new,
        associated,
-       is_initialized,
        allocated,
        trim,
        pack,
@@ -147,8 +146,6 @@ associated(a::AbstractArray) = length(a)>0
 allocated(a::Array) = a ≠ nothing
 allocated(a::Nothing) = false
 deallocate!(a) = (a = nothing)
-is_initialized(a::Array) = allocated(a) && length(a)>0
-is_initialized(a::Nothing) = false
 present(arg) = arg ≠ nothing
 trim(s::AbstractString) = strip(s)
 trim(s::Char) = s

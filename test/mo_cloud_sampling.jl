@@ -20,12 +20,6 @@ function draw_samples(cloud_mask,clouds,clouds_sampled)
   # integer :: ncol,nlay,nbnd,ngpt
   # integer :: imom
   # # ------------------------
-  #
-  # Error checking
-  #
-
-  @assert is_initialized(clouds)
-  @assert is_initialized(clouds_sampled)
 
   #
   # Variables clouds and clouds_sampled have to be of the same type (have the same set of fields)
