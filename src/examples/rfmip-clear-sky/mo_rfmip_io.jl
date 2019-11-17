@@ -192,32 +192,22 @@ function determine_gas_names(ds, forcing_index)
   @assert any(forcing_index .== [1,2,3])
   if forcing_index == 1
     names_in_kdist = read_kdist_gas_names(ds)
-    names_in_file = Array{String}(undef,length(names_in_kdist))
 
-    for i = 1:length(names_in_kdist)
-      names_in_file[i] = trim(lowercase(names_in_kdist[i]))
-      #
-      # Use a mapping between chemical formula and name if it exists
-      #
-      if names_in_file[i] in chem_name
-        names_in_file[i] = conc_name[loc_in_array(names_in_file[i], chem_name)]
-      end
-    end
+    # Use a mapping between chemical formula and name if it exists
+    names_in_file = map(x->x in chem_name ?
+      conc_name[loc_in_array(x,chem_name)] : x, names_in_kdist)
+
   elseif forcing_index == 2
-    num_gases = 6
-    #
+
     # Not part of the RFMIP specification, but oxygen is included because it's a major
     #    gas in some bands in the SW
-    #
     names_in_kdist = ["co2", "ch4", "n2o", "o2", "cfc12", "cfc11"]
     names_in_file =  ["carbon_dioxide", "methane", "nitrous_oxide",
                       "oxygen", "cfc12", "cfc11eq"]
   elseif forcing_index == 3
-    num_gases = 6
-    #
+
     # Not part of the RFMIP specification, but oxygen is included because it's a major
     #    gas in some bands in the SW
-    #
     names_in_kdist = ["co2", "ch4", "n2o", "o2", "cfc12", "hfc134a"]
     names_in_file =  ["carbon_dioxide", "methane", "nitrous_oxide",
                       "oxygen", "cfc12eq", "hfc134aeq"]
@@ -227,17 +217,8 @@ function determine_gas_names(ds, forcing_index)
 end
 
 # Read the names of the gases known to the k-distribution
-function read_kdist_gas_names(ds)
-  varName = "gas_names"
-  ngases = ds.dim["absorber"]
-  kdist_gas_names = Array{String}(undef, ngases)
-  @assert haskey(ds,varName)
-  temp_str = ds[varName][:]
-  for i = 1:ngases
-    kdist_gas_names[i] = trim(join(temp_str[:,i]))
-  end
-  return kdist_gas_names
-end
+read_kdist_gas_names(ds) =
+  lowercase.(strip.( String[join(ds["gas_names"][:][:,i]) for i = 1:ds.dim["absorber"]] ))
 
 """
     read_and_block_gases_ty(ds, blocksize, gas_names, names_in_file)
