@@ -318,9 +318,9 @@ function compute_gas_taus!(jtemp, jpress, jeta, tropo, fmajor, this::ty_gas_opti
   check_key_species_present(this, gas_desc)
 
   # Check input data sizes and values
-  check_extent(play, (ncol, nlay  ),   "play")
+  check_extent(play, (ncol, nlay  ), "play")
   check_extent(plev, (ncol, nlay+1), "plev")
-  check_extent(tlay, (ncol, nlay  ),   "tlay")
+  check_extent(tlay, (ncol, nlay  ), "tlay")
   check_range(play, this.press_ref_min,this.press_ref_max, "play")
   check_range(plev, this.press_ref_min, this.press_ref_max, "plev")
   check_range(tlay, this.temp_ref_min,  this.temp_ref_max,  "tlay")
@@ -343,8 +343,8 @@ function compute_gas_taus!(jtemp, jpress, jeta, tropo, fmajor, this::ty_gas_opti
   # Fill out the array of volume mixing ratios
   for igas in 1:ngas
     # Get vmr if  gas is provided in ty_gas_concs
-    if lowercase(this.gas_names[igas]) in gas_desc.gas_name
-      vmr[:,:,igas] .= get_vmr(gas_desc, this.gas_names[igas])
+    if this.gas_names[igas] in gas_desc.gas_name
+      get_vmr!(@view(vmr[:,:,igas]), gas_desc, this.gas_names[igas])
     end
   end
 
