@@ -12,10 +12,10 @@ Encapsulate optical properties defined on a spectral grid of N bands.
  (abstract class ty_optical_props_arry).
  The type holds arrays depending on how much information is needed
  There are three possibilities
-    ty_optical_props_1scl holds absorption optical depth tau, used in calculations accounting for extinction and emission
-    ty_optical_props_2str holds extinction optical depth tau, single-scattering albedo (ssa), and asymmetry parameter g.
+    `ty_optical_props_1scl` holds absorption optical depth `tau`, used in calculations accounting for extinction and emission
+    `ty_optical_props_2str` holds extinction optical depth `tau`, single-scattering albedo (`ssa`), and asymmetry parameter `g`.
  These classes must be allocated before use. Initialization and allocation can be combined.
- The classes have a validate() function that checks all arrays for valid values (e.g. tau > 0.)
+ The classes have a validate() function that checks all arrays for valid values (e.g. `tau` > 0.)
 
 Optical properties can be delta-scaled (though this is currently implemented only for two-stream arrays)
 
@@ -30,7 +30,6 @@ module mo_optical_props
 
 using DocStringExtensions
 using ..fortran_intrinsics
-import ..fortran_intrinsics: is_initialized
 using ..mo_util_array
 
 export init_base_from_copy!,
@@ -51,13 +50,11 @@ export init_base_from_copy!,
        get_band_lims_gpoint,
        get_ncol,
        get_nlay,
-       gpoints_are_equal,
-       is_initialized
+       gpoints_are_equal
 
 export ty_optical_props,
        ty_optical_props_1scl,
        ty_optical_props_2str,
-       init!,
        ty_optical_props_base
 
 export get_nband, get_ngpt
@@ -157,19 +154,6 @@ ty_optical_props_2str(base::ty_optical_props_base{FT}, ps::ProblemSize{I}) where
   ty_optical_props_2str{FT,I}(base, ntuple(i->Array{FT}(undef, ps.s...),3)... )
 
 #####
-##### Base class routines
-#####
-
-"""
-  is_initialized(...)
-
-  class(ty_optical_props), intent(in) :: this
-  logical                             :: is_initialized_base
-"""
-is_initialized(this::ty_optical_props_base) = allocated(this.band2gpt)
-is_initialized(this::ty_optical_props) = is_initialized(this.base)
-
-#####
 #####  Delta-scaling
 #####
 
@@ -180,7 +164,6 @@ is_initialized(this::ty_optical_props) = is_initialized(this.base)
     real(FT), dimension(:,:,:), optional, intent(in   ) :: for_
 """
 delta_scale!(this::ty_optical_props_1scl, for_) = ""
-
 
 """
     delta_scale!()
@@ -199,10 +182,8 @@ function delta_scale!(this::ty_optical_props_2str{FT}, for_ = nothing) where FT
   if for_ ≠ nothing
     @assert all(size(for_) .== (ncol, nlay, ngpt))
     @assert !any(for_ < FT(0) || for_ > FT(1))
-    # delta_scale_2str_kernel!(ncol, nlay, ngpt, this.tau, this.ssa, this.g, for_)
     delta_scale_2str_kernel!(this, for_)
   else
-    # delta_scale_2str_kernel!(ncol, nlay, ngpt, this.tau, this.ssa, this.g)
     delta_scale_2str_kernel!(this)
   end
 end
@@ -216,8 +197,7 @@ end
 
 """
 function validate!(this::ty_optical_props_1scl{FT}) where FT
-  @assert allocated(this.tau)
-  # Valid values
+  # Validate sizes
   @assert !any_vals_less_than(this.tau, FT(0))
 end
 
@@ -226,10 +206,7 @@ end
 
 """
 function validate!(this::ty_optical_props_2str{FT}) where FT
-  # Array allocation status, sizing
-  @assert allocated(this.tau)
-  @assert allocated(this.ssa)
-  @assert allocated(this.g)
+  # Validate sizes
   @assert all(size(this.ssa) == size(this.tau))
   @assert all(size(this.g) == size(this.tau))
   # Valid values
@@ -243,37 +220,26 @@ end
 #####
 
 """
-  increment(op_in, op_io)
+  increment!(op_in::ty_optical_props_arry, op_io::ty_optical_props_arry)
 
-  class(ty_optical_props_arry), intent(in   ) :: op_in
-  class(ty_optical_props_arry), intent(inout) :: op_io
-  # -----
-  integer :: ncol, nlay, ngpt, nmom
-  # -----
 """
-function increment!(op_in, op_io)
+function increment!(op_in::ty_optical_props_arry, op_io::ty_optical_props_arry)
   @assert bands_are_equal(op_in, op_io)
 
-  ncol = get_ncol(op_io)
-  nlay = get_nlay(op_io)
-  ngpt = get_ngpt(op_io)
   if gpoints_are_equal(op_in, op_io)
-    #
+
     # Increment by gpoint
     #   (or by band if both op_in and op_io are defined that way)
-    #
     increment_by_gpoint!(op_io, op_in)
 
   else
 
-    # Values defined by-band will have ngpt() = nband()
+    # Values defined by-band will have ngpt = nband
     # We can use values by band in op_in to increment op_io
     #   Anything else is an error
 
     @assert get_ngpt(op_in) == get_nband(op_io)
-    #
     # Increment by band
-    #
     increment_bybnd!(op_io, op_in)
   end
 end
@@ -287,7 +253,7 @@ end
   integer,                      intent(in   ) :: dim
   integer                                     :: get_arry_extent
 """
-get_arry_extent(this::ty_optical_props, dim) = allocated(this.tau) ? size(this.tau, dim) : 0
+get_arry_extent(this::ty_optical_props, dim) = size(this.tau, dim)
 
 """
   class(ty_optical_props_arry), intent(in   ) :: this
@@ -311,7 +277,7 @@ get_nlay(this::ty_optical_props) = get_arry_extent(this, 2)
 Number of bands
 """
 get_nband(this::ty_optical_props) = get_nband(this.base)
-get_nband(this::ty_optical_props_base) = is_initialized(this) ? size(this.band2gpt,2) : 0
+get_nband(this::ty_optical_props_base) = size(this.band2gpt,2)
 
 """
     get_ngpt(this::ty_optical_props)
@@ -321,7 +287,7 @@ Number of g-points
   integer                             :: get_ngpt
 """
 get_ngpt(this::ty_optical_props) = get_ngpt(this.base)
-get_ngpt(this::ty_optical_props_base) = is_initialized(this) ? max(this.band2gpt...) : 0
+get_ngpt(this::ty_optical_props_base) = max(this.band2gpt...)
 
 
 """
@@ -347,8 +313,7 @@ First and last g-point of a specific band
   integer, dimension(2)               :: convert_band2gpt
 """
 convert_band2gpt(this::ty_optical_props, band) = convert_band2gpt(this.base)
-convert_band2gpt(this::ty_optical_props_base{FT}, band) where FT =
-  is_initialized(this) ? this.band2gpt[:,band] : zeros(FT,length(this.band2gpt[:,band]))
+convert_band2gpt(this::ty_optical_props_base, band) = this.band2gpt[:,band]
 
 """
     get_band_lims_wavenumber(this::ty_optical_props)
@@ -361,8 +326,7 @@ Lower and upper wavenumber of all bands
                                       :: get_band_lims_wavenumber
 """
 get_band_lims_wavenumber(this::ty_optical_props) = get_band_lims_wavenumber(this.base)
-get_band_lims_wavenumber(this::ty_optical_props_base{FT}) where FT =
-  is_initialized(this) ? this.band_lims_wvn[:,:] : zeros(FT, size(this.band_lims_wvn))
+get_band_lims_wavenumber(this::ty_optical_props_base) = this.band_lims_wvn
 
 """
     get_band_lims_wavelength(this::ty_optical_props)
@@ -374,9 +338,7 @@ real(FT), dimension(size(this%band_lims_wvn,1), size(this%band_lims_wvn,2))
                                     :: get_band_lims_wavelength
 """
 get_band_lims_wavelength(this::ty_optical_props) = get_band_lims_wavelength(this.base)
-get_band_lims_wavelength(this::ty_optical_props_base{FT}) where FT =
-  is_initialized(this) ? 1 ./ this.band_lims_wvn[:,:] : zeros(FT, size(this.band_lims_wvn))
-
+get_band_lims_wavelength(this::ty_optical_props_base) = 1 ./ this.band_lims_wvn
 
 """
     get_gpoint_bands(this::ty_optical_props)
@@ -388,8 +350,7 @@ dimension (ngpt)
   integer, dimension(size(this%gpt2band,dim=1)) :: get_gpoint_bands
 """
 get_gpoint_bands(this::ty_optical_props) = get_gpoint_bands(this.base)
-get_gpoint_bands(this::ty_optical_props_base) =
-  is_initialized(this) ? this.gpt2band[:] : zeros(Int,length(this.gpt2band))
+get_gpoint_bands(this::ty_optical_props_base) = this.gpt2band
 
 """
     convert_gpt2band(this::ty_optical_props, gpt)
@@ -401,7 +362,7 @@ Band associated with a specific g-point
     integer                             :: convert_gpt2band
 """
 convert_gpt2band(this::ty_optical_props, gpt) = convert_gpt2band(this.base)
-convert_gpt2band(this::ty_optical_props_base, gpt) = is_initialized(this) ? this.gpt2band[gpt] : 0
+convert_gpt2band(this::ty_optical_props_base, gpt) = this.gpt2band[gpt]
 
 """
     expand(this::ty_optical_props{FT}, arr_in) where FT
@@ -431,12 +392,13 @@ Are the bands of two objects the same? (same number, same wavelength limits)
     logical                             :: bands_are_equal
 """
 function bands_are_equal(this::ty_optical_props{FT}, that::ty_optical_props{FT}) where FT
-  bands_equal = get_nband(this) == get_nband(that) && get_nband(this) > 0
-  if !bands_equal
-    return bands_equal
+  if get_nband(this) == get_nband(that) && get_nband(this) > 0
+    return all(abs.(get_band_lims_wavenumber(this) .-
+                    get_band_lims_wavenumber(that)) .<
+    FT(5) * spacing.(get_band_lims_wavenumber(this)))
+  else
+    return false
   end
-  bands_equal = all(abs.(get_band_lims_wavenumber(this) .- get_band_lims_wavenumber(that)) .< FT(5) * spacing.(get_band_lims_wavenumber(this)))
-  return bands_equal
 end
 
 """
@@ -449,25 +411,12 @@ Is the g-point structure of two objects the same?
     logical                             :: gpoints_are_equal
 """
 function gpoints_are_equal(this::ty_optical_props{FT}, that::ty_optical_props{FT}) where {FT}
-
-  gpoints_equal = bands_are_equal(this, that) && get_ngpt(this) == get_ngpt(that)
-  if !gpoints_equal
-    return gpoints_equal
+  if bands_are_equal(this, that) && get_ngpt(this) == get_ngpt(that)
+    return all(get_gpoint_bands(this) == get_gpoint_bands(that))
+  else
+    return false
   end
-  gpoints_equal = all(get_gpoint_bands(this) == get_gpoint_bands(that))
 end
-
-"""
-    class(ty_optical_props),  intent(inout) :: this
-    character(len=*),         intent(in   ) :: name
-"""
-set_name!(this, name) = (this.name = name)
-
-"""
-    class(ty_optical_props),  intent(in   ) :: this
-    character(len=name_len)                 :: get_name
-"""
-get_name(this) = this.name
 
 include(joinpath("kernels","mo_optical_props_kernels.jl"))
 

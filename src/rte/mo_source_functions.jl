@@ -66,7 +66,7 @@ struct ty_source_func_sw{FT, I} <: ty_optical_props{FT, I}
   lev_source_dec
 end
 
-is_allocated(this::ty_source_func_lw) = is_initialized(this.optical_props) && allocated(this.sfc_source)
+is_allocated(this::ty_source_func_lw) = allocated(this.sfc_source)
 
 get_ncol(this::ty_source_func_lw) = is_allocated(this) ? size(this.lay_source,1) : 0
 

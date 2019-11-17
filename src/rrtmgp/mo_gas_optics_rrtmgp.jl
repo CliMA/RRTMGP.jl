@@ -313,8 +313,6 @@ function compute_gas_taus!(jtemp, jpress, jeta, tropo, fmajor, this::ty_gas_opti
 
   # Error checking
   use_rayl = allocated(this.krayl)
-  # Check for initialization
-  @assert is_initialized(this.optical_props)
 
   # Check for presence of key species in ty_gas_concs; return error if any key species are not present
   check_key_species_present(this, gas_desc)
