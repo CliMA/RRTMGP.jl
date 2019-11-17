@@ -1,19 +1,7 @@
-# This code is part of
-# RRTM for GCM Applications - Parallel (RRTMGP)
-#
-# Eli Mlawer and Robert Pincus
-# Andre Wehe and Jennifer Delamere
-# email:  rrtmgp@aer.com
-#
-# Copyright 2015,  Atmospheric and Environmental Research and
-# Regents of the University of Colorado.  All right reserved.
-#
-# Use and duplication is permitted under the terms of the
-#    BSD 3-clause license, see http://opensource.org/licenses/BSD-3-Clause
-#
-# This module reads profiles needed for RRTMGP and related calculations assuming a certain
-#   netCDF file layout
-
+####
+#### Reads profiles needed for RRTMGP and related
+#### calculations assuming a certain netCDF file layout
+####
 
 """
     read_atmos(ds, FT, gas_names)
@@ -36,27 +24,20 @@ function read_atmos(ds, FT, gas_names)
   t_lay = Array{FT}(ds["t_lay"][:])
   p_lev = Array{FT}(ds["p_lev"][:])
   t_lev = Array{FT}(ds["t_lev"][:])
-  gas_concs = ty_gas_concs(FT, gas_names, ncol, nlay)
 
-  haskey(ds, "vmr_h2o")      &&  set_vmr!(gas_concs,"h2o"    , Array{FT}(read_field(ds, "vmr_h2o")))
-  haskey(ds, "vmr_co2")      &&  set_vmr!(gas_concs,"co2"    , Array{FT}(read_field(ds, "vmr_co2")))
-  haskey(ds, "vmr_o3")       &&  set_vmr!(gas_concs,"o3"     , Array{FT}(read_field(ds, "vmr_o3")))
-  haskey(ds, "vmr_n2o")      &&  set_vmr!(gas_concs,"n2o"    , Array{FT}(read_field(ds, "vmr_n2o")))
-  haskey(ds, "vmr_co")       &&  set_vmr!(gas_concs,"co"     , Array{FT}(read_field(ds, "vmr_co")))
-  haskey(ds, "vmr_ch4")      &&  set_vmr!(gas_concs,"ch4"    , Array{FT}(read_field(ds, "vmr_ch4")))
-  haskey(ds, "vmr_o2")       &&  set_vmr!(gas_concs,"o2"     , Array{FT}(read_field(ds, "vmr_o2")))
-  haskey(ds, "vmr_n2")       &&  set_vmr!(gas_concs,"n2"     , Array{FT}(read_field(ds, "vmr_n2")))
-  haskey(ds, "vmr_ccl4")     &&  set_vmr!(gas_concs,"ccl4"   , Array{FT}(read_field(ds, "vmr_ccl4")))
-  haskey(ds, "vmr_cfc11")    &&  set_vmr!(gas_concs,"cfc11"  , Array{FT}(read_field(ds, "vmr_cfc11")))
-  haskey(ds, "vmr_cfc12")    &&  set_vmr!(gas_concs,"cfc12"  , Array{FT}(read_field(ds, "vmr_cfc12")))
-  haskey(ds, "vmr_cfc22")    &&  set_vmr!(gas_concs,"cfc22"  , Array{FT}(read_field(ds, "vmr_cfc22")))
-  haskey(ds, "vmr_hfc143a")  &&  set_vmr!(gas_concs,"hfc143a", Array{FT}(read_field(ds, "vmr_hfc143a")))
-  haskey(ds, "vmr_hfc125")   &&  set_vmr!(gas_concs,"hfc125" , Array{FT}(read_field(ds, "vmr_hfc125")))
-  haskey(ds, "vmr_hfc23")    &&  set_vmr!(gas_concs,"hfc23"  , Array{FT}(read_field(ds, "vmr_hfc23")))
-  haskey(ds, "vmr_hfc32")    &&  set_vmr!(gas_concs,"hfc32"  , Array{FT}(read_field(ds, "vmr_hfc32")))
-  haskey(ds, "vmr_hfc134a")  &&  set_vmr!(gas_concs,"hfc134a", Array{FT}(read_field(ds, "vmr_hfc134a")))
-  haskey(ds, "vmr_cf4")      &&  set_vmr!(gas_concs,"cf4"    , Array{FT}(read_field(ds, "vmr_cf4")))
-  haskey(ds, "vmr_no2")      &&  set_vmr!(gas_concs,"no2"    , Array{FT}(read_field(ds, "vmr_no2")))
+  available_gases = ["h2o", "co2", "o3", "n2o", "co",
+                     "ch4", "o2", "n2", "ccl4", "cfc11",
+                     "cfc12", "cfc22", "hfc143a", "hfc125", "hfc23",
+                     "hfc32", "hfc134a", "cf4", "no2"]
+
+  existing_gases = filter(ug->haskey(ds, "vmr_"*ug), available_gases)
+
+  gsc = GasConcSize(ncol, nlay, (ncol, nlay), length(existing_gases))
+  gas_concs = ty_gas_concs(FT, gas_names, ncol, nlay, gsc)
+
+  for eg in existing_gases
+    set_vmr!(gas_concs, eg, Array{FT}(read_field(ds, "vmr_"*eg)))
+  end
 
   # col_dry has unchanged allocation status on return if the variable isn't present in the netCDF file
   col_dry = haskey(ds, "col_dry") ? Array{FT}(read_field(ds, "col_dry")) : nothing
