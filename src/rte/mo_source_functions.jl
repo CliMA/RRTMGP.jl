@@ -11,9 +11,8 @@ using ..mo_optical_props
 using ..fortran_intrinsics
 import ..mo_optical_props:get_ncol,get_nlay,get_ngpt
 
-export ty_source_func_lw
+export ty_source_func_lw, ty_source_func_sw
 export get_ncol, get_nlay, get_ngpt
-export ty_source_func_sw
 
 """
     ty_source_func_lw{FT, I} <: ty_optical_props{FT, I}
@@ -66,12 +65,10 @@ struct ty_source_func_sw{FT, I} <: ty_optical_props{FT, I}
   lev_source_dec
 end
 
-is_allocated(this::ty_source_func_lw) = allocated(this.sfc_source)
+get_ncol(this::ty_source_func_lw) = size(this.lay_source,1)
 
-get_ncol(this::ty_source_func_lw) = is_allocated(this) ? size(this.lay_source,1) : 0
+get_nlay(this::ty_source_func_lw) = size(this.lay_source,2)
 
-get_nlay(this::ty_source_func_lw) = is_allocated(this) ? size(this.lay_source,2) : 0
-
-get_ngpt(this::ty_source_func_lw) = is_allocated(this) ? size(this.lay_source,3) : 0
+get_ngpt(this::ty_source_func_lw) = size(this.lay_source,3)
 
 end # module

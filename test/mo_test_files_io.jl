@@ -226,7 +226,7 @@ end
 #   Also directionality since this will be needed for solution
 #
 
-function read_lw_Planck_sources!(ds, sources)
+function read_lw_Planck_sources!(ds, sources::ty_source_func_lw{FT}) where FT
 #    character(len=*),        intent(in   ) :: fileName
 #    type(ty_source_func_lw), intent(inout) :: sources
 #    # -------------------
@@ -251,8 +251,8 @@ function read_lw_Planck_sources!(ds, sources)
   band_lims_wvn = ds["band_lims_wvn"][:]
   band_lims_gpt = ds["band_lims_gpt"][:]
 
-  init(sources, " " ,band_lims_wvn, band_lims_gpt)
-  alloc!(sources,ncol,nlay)
+  sources.optical_props.base = ty_optical_props_base("ty_source_func_lw", band_lims_wvn, band_lims_gpt)
+  sources.optical_props.tau = Array{FT}(undef, ncol,nlay)
 
   sources.lay_source[:,:,:]     = ds["lay_src"][:]
   sources.lev_source_inc[:,:,:] = ds["lev_src_inc"][:]

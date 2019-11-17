@@ -32,11 +32,7 @@ using DocStringExtensions
 using ..fortran_intrinsics
 using ..mo_util_array
 
-export init_base_from_copy!,
-       alloc!,
-       init_and_alloc!,
-       copy_and_alloc!,
-       delta_scale!,
+export delta_scale!,
        validate!,
        increment!,
        convert_band2gpt,

@@ -23,19 +23,14 @@ using RRTMGP.mo_load_cloud_coefficients
 include("mo_cloud_sampling.jl")
 include("mo_test_files_io.jl")
 
-function vmr_2d_to_1d!(gas_concs, gas_concs_garand, name)
-  # use mo_gas_concentrations, only: ty_gas_concs
-
-  # type(ty_gas_concs), intent(in)    :: gas_concs_garand
-  # type(ty_gas_concs), intent(inout) :: gas_concs
-  # character(len=*),   intent(in)    :: name
-  # integer,            intent(in)    :: sz1, sz2
-
-  # real(wp) :: tmp(sz1, sz2), tmp_col(sz2)
-
-  tmp = get_vmr(gas_concs_garand, name)
+function vmr_2d_to_1d!(gas_concs::ty_gas_concs{FT},
+                       gas_concs_garand::ty_gas_concs{FT},
+                       name::String,
+                       sz1::I,
+                       sz2::I) where {FT<:AbstractFloat,I<:Int}
+  tmp = Array{FT}(undef, sz1, sz2)
+  get_vmr!(tmp, gas_concs_garand, name)
   tmp_col = tmp[1, :]
-
   set_vmr!(gas_concs, name, tmp_col)
 end
 
@@ -140,7 +135,7 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
   gsc = GasConcSize(ncol, nlay, (ncol, nlay), ngas)
   gas_concs = ty_gas_concs(FT, gas_names, ncol, nlay, gsc)
   for igas = 1:ngas
-    vmr_2d_to_1d!(gas_concs, gas_concs_garand, gas_names[igas])
+    vmr_2d_to_1d!(gas_concs, gas_concs_garand, gas_names[igas], size(p_lay, 1), nlay)
   end
 
   #  If we trusted in Fortran allocate-on-assign we could skip the temp_array here

@@ -35,23 +35,6 @@ function alloc!(this::ty_optical_props_nstr, nmom, ncol, nlay)
   this.p = Array(undef, nmom,ncol,nlay,get_ngpt(this))
 end
 
-
-"""
-    copy_and_alloc_nstr!(...)
-
-    class(ty_optical_props_nstr)             :: this
-    integer,                      intent(in) :: nmom, ncol, nlay
-    class(ty_optical_props     ), intent(in) :: spectral_desc
-    character(len=*), optional,   intent(in) :: name
-    character(len=128)                       :: err_message
-"""
-function copy_and_alloc!(this::ty_optical_props_nstr, nmom, ncol, nlay, spectral_desc::ty_optical_props, name=nothing)
-  is_initialized(this) && finalize!(this)
-  init!(this, name, get_band_lims_wavenumber(spectral_desc),
-                    get_band_lims_gpoint(spectral_desc))
-  alloc!(this, nmom, ncol, nlay)
-end
-
 """
     delta_scale!(...)
 
@@ -62,7 +45,6 @@ end
 """
 delta_scale!(this::ty_optical_props_nstr, for_) = "delta_scale_nstr: Not yet implemented"
 
-
 """
 
   class(ty_optical_props_nstr), intent(in) :: this
@@ -72,9 +54,7 @@ delta_scale!(this::ty_optical_props_nstr, for_) = "delta_scale_nstr: Not yet imp
 """
 function validate!(this::ty_optical_props_nstr{FT}) where FT
 
-  #
   # Array allocation status, sizing
-  #
   if !all([allocated(this.tau), allocated(this.ssa), allocated(this.p)])
     error("validate: arrays not allocated/initialized")
   end
@@ -83,9 +63,8 @@ function validate!(this::ty_optical_props_nstr{FT}) where FT
           !all([size(this.p,   2), size(this.p,   3), size(this.p,   4)] == varSizes)
     error("validate: arrays not sized consistently")
   end
-  #
+
   # Valid values
-  #
   any_vals_less_than(this.tau,  FT(0)) && error("validate: tau values out of range")
   any_vals_outside(this.ssa,  FT(0), FT(1)) && error("validate: ssa values out of range")
   any_vals_outside(this.p[1,:,:,:], FT(-1), FT(1)) && error("validate: p(1,:,:,:)  = g values out of range")

@@ -4,8 +4,6 @@ using OffsetArrays
 using Test
 
 export fmerge,
-       fminloc,
-       fmaxloc,
        fminloc_wrapper,
        fmaxloc_wrapper,
        spread,
@@ -125,7 +123,6 @@ Based on: https://gnu.huihoo.org/gcc/gcc-4.4.5/gfortran/SPACING.html
 TODO: Verify
 """
 spacing(x) = nextfloat(x)-x
-
 
 """
     pack

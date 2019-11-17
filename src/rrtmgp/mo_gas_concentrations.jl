@@ -23,8 +23,7 @@ using DocStringExtensions
 using ..fortran_intrinsics
 using ..Utilities
 export ty_gas_concs
-export get_vmr
-export set_vmr!
+export set_vmr!, get_vmr!
 export GasConcSize
 
 const GAS_NOT_IN_LIST = -1
@@ -89,52 +88,42 @@ function set_vmr!(this::ty_gas_concs, gas::String, w::Array{FT, 2}) where FT
   this.gas_name[igas] = gas
 end
 
-# Return volume mixing ratio as 1D or 2D array
-# 1D array ( lay depdendence only)
-function get_vmr(this::ty_gas_concs{FT}, gas::String) where FT
-  # real(FT), dimension(:),   intent(out) :: array
+"""
+    get_vmr!(array::Array{FT,1}, this::ty_gas_concs{FT}, gas::String) where FT
 
+Volume mixing ratio ( nlay dependence only)
+"""
+function get_vmr!(array::AbstractArray{FT,1}, this::ty_gas_concs{FT}, gas::String) where FT
   igas = loc_in_array(gas, this.gas_name)
   @assert igas ≠ GAS_NOT_IN_LIST
+  @assert !(this.ncol ≠ nothing && this.ncol ≠ size(array,1))
+  @assert !(this.nlay ≠ nothing && this.nlay ≠ size(array,2))
   conc = this.concs[igas].conc
 
-  # this.ncol == nothing && (this.ncol = 1)
-
-  array = Array{FT}(undef, this.ncol, this.nlay)
-
   if size(conc, 1) > 1     # Concentration stored as 2D
-    array .= conc[:,:]
+    array .= conc
   elseif size(conc, 2) > 1 # Concentration stored as 1D
     array .= reshape(conc[1,:], this.ncol, this.nlay)
   else                     # Concentration stored as scalar
-    fill!(array, conc[1,1])
+    array .= conc[1,1]
   end
-
-  @assert !(this.ncol ≠ nothing && this.ncol ≠ size(array,1))
-  @assert !(this.nlay ≠ nothing && this.nlay ≠ size(array,2))
-
-  return array
+  return nothing
 end
-
-# 2D array (col, lay)
-function get_vmr(this::ty_gas_concs, gas::String, array::Array{FT,2}) where FT
-  # real(FT), dimension(:,:), intent(out) :: array
-
+function get_vmr!(array::AbstractArray{FT,2}, this::ty_gas_concs{FT}, gas::String) where FT
   igas = loc_in_array(gas, this.gas_name)
   @assert igas ≠ GAS_NOT_IN_LIST
-
-  # Is the requested array the correct size?
   @assert !(this.ncol ≠ nothing && this.ncol ≠ size(array,1))
   @assert !(this.nlay ≠ nothing && this.nlay ≠ size(array,2))
+  conc = this.concs[igas].conc
 
-  if size(this.concs[igas].conc, 1) > 1      # Concentration stored as 2D
-    array = this.concs[igas].conc[:,:]
-  elseif size(this.concs(igas).conc, 2) > 1 # Concentration stored as 1D
-    array = spread(this.concs(igas).conc(1,:), dim=1, ncopies=max(this.ncol, size(array,1)))
-  else                                                   # Concentration stored as scalar
-    array = this.concs[igas].conc[1,1]
+  if size(conc, 1) > 1                      # Concentration stored as 2D
+    array .= conc
+  elseif size(this.concs[igas].conc, 2) > 1 # Concentration stored as 1D
+    array .= spread(conc[1,:], 1, max(this.ncol, size(array,1)))
+  else                                      # Concentration stored as scalar
+    array .= conc[1,1]
   end
-  return array
+  return nothing
 end
 
 end # module
