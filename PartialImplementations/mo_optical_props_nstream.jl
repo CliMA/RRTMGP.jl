@@ -13,45 +13,6 @@ struct ty_optical_props_nstr{FT,I} <: ty_optical_props_arry{FT,I}
   p#::Array{FT,4}
 end
 
-
-"""
-  alloc!()
-
-  class(ty_optical_props_nstr)    :: this
-  integer,             intent(in) :: nmom # number of moments
-  integer,             intent(in) :: ncol, nlay
-  character(len=128)              :: err_message
-"""
-function alloc!(this::ty_optical_props_nstr, nmom, ncol, nlay)
-  if any([ncol, nlay] .<= 0)
-    error("optical_props%alloc: must provide positive extents for ncol, nlay")
-  else
-    allocated(this.tau) && deallocate!(this.tau)
-    this.tau = Array(undef, ncol,nlay,get_ngpt(this))
-  end
-  allocated(this.ssa) && deallocate!(this.ssa)
-  this.ssa = Array(undef, ncol,nlay,get_ngpt(this))
-  allocated(this.p) && deallocate!(this.p)
-  this.p = Array(undef, nmom,ncol,nlay,get_ngpt(this))
-end
-
-
-"""
-    copy_and_alloc_nstr!(...)
-
-    class(ty_optical_props_nstr)             :: this
-    integer,                      intent(in) :: nmom, ncol, nlay
-    class(ty_optical_props     ), intent(in) :: spectral_desc
-    character(len=*), optional,   intent(in) :: name
-    character(len=128)                       :: err_message
-"""
-function copy_and_alloc!(this::ty_optical_props_nstr, nmom, ncol, nlay, spectral_desc::ty_optical_props, name=nothing)
-  is_initialized(this) && finalize!(this)
-  init!(this, name, get_band_lims_wavenumber(spectral_desc),
-                    get_band_lims_gpoint(spectral_desc))
-  alloc!(this, nmom, ncol, nlay)
-end
-
 """
     delta_scale!(...)
 
@@ -75,9 +36,6 @@ function validate!(this::ty_optical_props_nstr{FT}) where FT
   #
   # Array allocation status, sizing
   #
-  if !all([allocated(this.tau), allocated(this.ssa), allocated(this.p)])
-    error("validate: arrays not allocated/initialized")
-  end
   varSizes =   [size(this.tau, 1), size(this.tau, 2), size(this.tau, 3)]
   if      !all([size(this.ssa, 1), size(this.ssa, 2), size(this.ssa, 3)] == varSizes) ||
           !all([size(this.p,   2), size(this.p,   3), size(this.p,   4)] == varSizes)
@@ -111,9 +69,6 @@ end
   integer :: ncol, nlay, ngpt, nmom
 """
 function subset_range!(full::ty_optical_props_1scl{FT}, start, n, subset) where FT
-  if !is_initialized(full)
-    error("optical_props%subset: Asking for a subset of uninitialized data")
-  end
   ncol = get_ncol(full)
   nlay = get_nlay(full)
   ngpt = get_ngpt(full)
@@ -121,25 +76,19 @@ function subset_range!(full::ty_optical_props_1scl{FT}, start, n, subset) where 
      error("optical_props%subset: Asking for columns outside range")
   end
 
-  is_initialized(subset) && finalize!(subset)
   init!(subset, full)
   # Seems like the deallocation statements should be needed under Fortran 2003
   #   but Intel compiler doesn't run without them
 
-  allocated(subset.tau) && deallocate!(subset.tau)
   if subset isa ty_optical_props_1scl
       alloc!(subset, n, nlay)
   elseif subset isa ty_optical_props_2str
-      allocated(subset.ssa) && deallocate!(subset.ssa)
-      allocated(subset.g  ) && deallocate!(subset.g  )
       alloc!(subset, n, nlay)
       subset.ssa[1:n,:,:] .= FT(0)
       subset.g[1:n,:,:] .= FT(0)
   elseif subset isa ty_optical_props_nstr
-      allocated(subset.ssa) && deallocate!(subset.ssa)
       if allocated(subset.p)
         nmom = get_nmom(subset)
-        allocated(subset.p  ) && deallocate!(subset.p  )
       else
         nmom = 1
       end
@@ -166,9 +115,6 @@ end
 """
 function subset_range!(full::ty_optical_props_2str{FT}, start, n, subset) where FT
 
-  if !is_initialized(full)
-    error("optical_props%subset: Asking for a subset of uninitialized data")
-  end
   ncol = get_ncol(full)
   nlay = get_nlay(full)
   ngpt = get_ngpt(full)
@@ -176,24 +122,19 @@ function subset_range!(full::ty_optical_props_2str{FT}, start, n, subset) where 
      error("optical_props%subset: Asking for columns outside range")
   end
 
-  is_initialized(subset) && finalize!(subset)
   init!(subset, full)
 
   if subset isa ty_optical_props_1scl # TODO: check logic
     alloc!(subset, n, nlay)
     extract_subset!(ncol, nlay, ngpt, full.tau, full.ssa, start, start+n-1, subset.tau)
   elseif subset isa ty_optical_props_2str
-    allocated(subset.ssa) && deallocate!(subset.ssa)
-    allocated(subset.g  ) && deallocate!(subset.g  )
     alloc!(subset, n, nlay)
     extract_subset!(ncol, nlay, ngpt, full.tau, start, start+n-1, subset.tau)
     extract_subset!(ncol, nlay, ngpt, full.ssa, start, start+n-1, subset.ssa)
     extract_subset!(ncol, nlay, ngpt, full.g  , start, start+n-1, subset.g  )
   elseif subset isa ty_optical_props_nstr
-    allocated(subset.ssa) && deallocate!(subset.ssa)
     if allocated(subset.p)
       nmom = get_nmom(subset)
-      allocated(subset.p  ) && deallocate!(subset.p  )
     else
       nmom = 1
     end
@@ -219,9 +160,6 @@ end
 """
 function subset_range!(full::ty_optical_props_nstr, start, n, subset)
 
-  if !is_initialized(full)
-    error("optical_props%subset: Asking for a subset of uninitialized data")
-  end
   ncol = get_ncol(full)
   nlay = get_nlay(full)
   ngpt = get_ngpt(full)
@@ -229,23 +167,17 @@ function subset_range!(full::ty_optical_props_nstr, start, n, subset)
      error("optical_props%subset: Asking for columns outside range")
   end
 
-  is_initialized(subset) && finalize!(subset)
   init!(subset, full)
 
-  allocated(subset.tau) && deallocate!(subset.tau)
   if subset isa ty_optical_props_1scl # TODO: check logic
     alloc!(subset, n, nlay)
     extract_subset!(ncol, nlay, ngpt, full.tau, full.ssa, start, start+n-1, subset.tau)
   elseif subset isa ty_optical_props_2str
-    allocated(subset.ssa) && deallocate!(subset.ssa)
-    allocated(subset.g  ) && deallocate!(subset.g  )
     alloc!(subset, n, nlay)
     extract_subset!(ncol, nlay, ngpt, full.tau, start, start+n-1, subset.tau)
     extract_subset!(ncol, nlay, ngpt, full.ssa, start, start+n-1, subset.ssa)
     subset.g[1:n,:,:] .= full.p[1,start:start+n-1,:,:]
   elseif subset isa ty_optical_props_nstr
-    allocated(subset.ssa) && deallocate!(subset.ssa)
-    allocated(subset.p  ) && deallocate!(subset.p  )
     alloc!(subset, nmom, n, nlay)
     extract_subset!(      ncol, nlay, ngpt, full.tau, start, start+n-1, subset.tau)
     extract_subset!(      ncol, nlay, ngpt, full.ssa, start, start+n-1, subset.ssa)
@@ -260,7 +192,7 @@ end
     class(ty_optical_props_nstr), intent(in   ) :: this
     integer                                     :: get_nmom
 """
-get_nmom(this::ty_optical_props_nstr) = allocated(this.p) ? size(this.p, 1) : 0
+get_nmom(this::ty_optical_props_nstr) = size(this.p, 1)
 
 
 """
