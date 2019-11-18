@@ -160,13 +160,10 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
   #
   # Should also try with Pade calculations
   if use_luts
-    cloud_optics_ = ty_cloud_optics_new(FT,I)
-    load_cld_lutcoeff!(cloud_optics_, ds[:cloud_optics])
+    cloud_optics_ = load_cld_lutcoeff(FT,ds[:cloud_optics], 2)
   else
-    cloud_optics_ = ty_cloud_optics(FT,I)
-    load_cld_padecoeff!(cloud_optics_, ds[:cloud_optics])
+    cloud_optics_ = load_cld_padecoeff(FT,ds[:cloud_optics], 2)
   end
-  set_ice_roughness!(cloud_optics_, 2)
 
   #
   # Problem sizes
@@ -238,8 +235,8 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
 
   # Restrict clouds to troposphere (< 100 hPa = 100*100 Pa)
   #   and not very close to the ground
-  rel_val = FT(0.5) * (get_min_radius_liq(cloud_optics_) + get_max_radius_liq(cloud_optics_))
-  rei_val = FT(0.5) * (get_min_radius_ice(cloud_optics_) + get_max_radius_ice(cloud_optics_))
+  rel_val = FT(0.5) * (get_min_radius(cloud_optics_.liq) + get_max_radius(cloud_optics_.liq))
+  rei_val = FT(0.5) * (get_min_radius(cloud_optics_.ice) + get_max_radius(cloud_optics_.ice))
   for ilay=1:nlay
     for icol=1:ncol
       cloud_mask[icol,ilay] = p_lay[icol,ilay] < FT(100) * FT(100) && p_lay[icol,ilay] > FT(900)
@@ -317,8 +314,6 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
       @test diff_dn_ulps < sqrt(1/(10eps(FT)))
     else
       # Need better test
-      # @show flux_up
-      # @show flux_dn
       # @show diff_up_ulps < sqrt(1/(eps(FT)))
       # @show diff_dn_ulps < sqrt(1/(eps(FT)))
     end
