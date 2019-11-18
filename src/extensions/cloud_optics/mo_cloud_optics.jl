@@ -23,6 +23,57 @@ export get_min_radius_liq,
        get_max_radius_ice
 
 export ty_cloud_optics
+
+export PadeMethod
+export LookUpTable
+export ty_cloud_optics_new
+
+abstract type AbstractInterpolationMethod end
+
+struct PadeMethod <: AbstractInterpolationMethod
+  # Pade approximation coefficients
+  ext
+  ssa
+  asy
+  # Particle size regimes for Pade formulations
+  sizreg_ext
+  sizreg_ssa
+  sizreg_asy
+end
+
+struct LookUpTable{FT,I} <: AbstractInterpolationMethod
+  rad_lwr::FT
+  rad_upr::FT
+  rad_fac::FT
+  nsteps::I
+  step_size::FT
+  ext::Array{FT}
+  ssa::Array{FT}
+  asy::Array{FT}
+  function LookUpTable(rad_lwr::FT,
+                       rad_upr::FT,
+                       rad_fac::FT,
+                       ext::Array{FT},
+                       ssa::Array{FT},
+                       asy::Array{FT}) where {FT<:AbstractFloat}
+    nsteps = size(ext, 1)
+    step_size = (rad_upr - rad_lwr)/FT(nsteps-1)
+    return new{FT,Int}(rad_lwr,rad_upr,rad_fac,nsteps,step_size,ext,ssa,asy)
+  end
+end
+get_min_radius(lut::LookUpTable) = lut.rad_lwr
+get_max_radius(lut::LookUpTable) = lut.rad_upr
+
+mutable struct ty_cloud_optics_new{FT, I} <: ty_optical_props{FT, I}
+  base
+  # Ice surface roughness category - needed for Yang (2013) ice optics parameterization
+  icergh#::I
+  liq#AbstractInterpolationMethod
+  ice#AbstractInterpolationMethod
+end
+ty_cloud_optics_new(FT, I) = ty_cloud_optics_new{FT,I}(ntuple(i->nothing, 4)...)
+
+
 mutable struct ty_cloud_optics{FT, I} <: ty_optical_props{FT, I}
   base
   # Ice surface roughness category - needed for Yang (2013) ice optics parameterization
@@ -125,20 +176,10 @@ ty_cloud_optics(FT, I) = ty_cloud_optics{FT,I}(ntuple(i->nothing, 28)...)
 #    lookup-tables and one for coefficients for Pade approximates
 #
 # ------------------------------------------------------------------------------
-function load_lut!(this::ty_cloud_optics{FT},
-               band_lims_wvn,
-               radliq_lwr,
-               radliq_upr,
-               radliq_fac,
-               radice_lwr,
-               radice_upr,
-               radice_fac,
-               lut_extliq,
-               lut_ssaliq,
-               lut_asyliq,
-               lut_extice,
-               lut_ssaice,
-               lut_asyice) where FT
+function load_lut!(this::ty_cloud_optics_new{FT},
+                   band_lims_wvn,
+                   liq::LookUpTable,
+                   ice::LookUpTable) where FT
   # class(ty_cloud_optics),     intent(inout) :: this
   # real(FT), dimension(:,:),   intent(in   ) :: band_lims_wvn # Spectral discretization
   # # Lookup table interpolation constants
@@ -149,7 +190,6 @@ function load_lut!(this::ty_cloud_optics{FT},
   # # Extinction, single-scattering albedo, and asymmetry parameter for liquid and ice respectively
   # real(FT), dimension(:,:),   intent(in)    :: lut_extliq, lut_ssaliq, lut_asyliq
   # real(FT), dimension(:,:,:), intent(in)    :: lut_extice, lut_ssaice, lut_asyice
-  # character(len=128)    :: error_msg
   # # -------
   # #
   # # Local variables
@@ -160,46 +200,23 @@ function load_lut!(this::ty_cloud_optics{FT},
   #
   # LUT coefficient dimensions
   #
-  nsize_liq = size(lut_extliq,1)
-  nsize_ice = size(lut_extice,1)
-  nbnd      = size(lut_extliq,2)
-  nrghice   = size(lut_extice,3)
+  nsize_liq = size(liq.ext,1)
+  nsize_ice = size(ice.ext,1)
+  nbnd      = size(liq.ext,2)
+  nrghice   = size(ice.ext,3)
   #
   # Error checking
   #   Can we check for consistency between table bounds and _fac?
   #
   @assert nbnd == get_nband(this)
-  @assert size(lut_extice, 2) == nbnd
-  @assert all(size(lut_ssaliq) .== (nsize_liq, nbnd))
-  @assert all(size(lut_asyliq) .== (nsize_liq, nbnd))
-  @assert all(size(lut_ssaice) .== (nsize_ice, nbnd, nrghice))
-  @assert all(size(lut_asyice) .== (nsize_ice, nbnd, nrghice))
+  @assert size(ice.ext, 2) == nbnd
+  @assert all(size(liq.ssa) .== (nsize_liq, nbnd))
+  @assert all(size(liq.asy) .== (nsize_liq, nbnd))
+  @assert all(size(ice.ssa) .== (nsize_ice, nbnd, nrghice))
+  @assert all(size(ice.asy) .== (nsize_ice, nbnd, nrghice))
 
-  this.liq_nsteps = nsize_liq
-  this.ice_nsteps = nsize_ice
-  this.liq_step_size = (radliq_upr - radliq_lwr)/FT(nsize_liq-1)
-  this.ice_step_size = (radice_upr - radice_lwr)/FT(nsize_ice-1)
-  # Allocate LUT coefficients
-  this.lut_extliq = Array{FT}(undef, nsize_liq, nbnd)
-  this.lut_ssaliq = Array{FT}(undef, nsize_liq, nbnd)
-  this.lut_asyliq = Array{FT}(undef, nsize_liq, nbnd)
-  this.lut_extice = Array{FT}(undef, nsize_ice, nbnd, nrghice)
-  this.lut_ssaice = Array{FT}(undef, nsize_ice, nbnd, nrghice)
-  this.lut_asyice = Array{FT}(undef, nsize_ice, nbnd, nrghice)
-
-  # Load LUT constants
-  this.radliq_lwr = radliq_lwr
-  this.radliq_upr = radliq_upr
-  this.radice_lwr = radice_lwr
-  this.radice_upr = radice_upr
-
-  # Load LUT coefficients
-  this.lut_extliq .= lut_extliq
-  this.lut_ssaliq .= lut_ssaliq
-  this.lut_asyliq .= lut_asyliq
-  this.lut_extice .= lut_extice
-  this.lut_ssaice .= lut_ssaice
-  this.lut_asyice .= lut_asyice
+  this.liq = liq
+  this.ice = ice
 end
 # ------------------------------------------------------------------------------
 #
@@ -233,7 +250,6 @@ function load_Pade!(this::ty_cloud_optics{FT},
   # #
   # real(FT),  dimension(:),       intent(in)    :: pade_sizreg_extliq, pade_sizreg_ssaliq, pade_sizreg_asyliq
   # real(FT),  dimension(:),       intent(in)    :: pade_sizreg_extice, pade_sizreg_ssaice, pade_sizreg_asyice
-  # character(len=128)    :: error_msg
 
   # integer               :: nbnd, nrghice, nsizereg, ncoeff_ext, ncoeff_ssa_g, nbound
 
@@ -328,13 +344,11 @@ function cloud_optics!(this::ty_cloud_optics{FT},
     #           intent(inout) :: optical_props
     #                                            ! Dimensions: (ncol,nlay,nbnd)
 
-    # character(len=128)      :: error_msg
     # ! ------- Local -------
     # logical(wl), dimension(size(clwp,1), size(clwp,2)) :: liqmsk, icemsk
     # real(wp),    dimension(size(clwp,1), size(clwp,2), this%get_nband()) ::
     #             ltau, ltaussa, ltaussag, itau, itaussa, itaussag
 
-  # character(len=128)      :: error_msg
   # # ------- Local -------
   # type(ty_optical_props_2str) :: clouds_liq, clouds_ice
   # integer  :: nsizereg, ibnd, imom
@@ -362,42 +376,120 @@ function cloud_optics!(this::ty_cloud_optics{FT},
   # Compute cloud optical properties. Use lookup tables if available, Pade approximants if not.
   #
 
-  if allocated(this.lut_extliq)
-    #
-    # Liquid
-    #
-    compute_all_from_table!(ncol, nlay, nbnd, liqmsk, clwp, reliq,
-                                this.liq_nsteps,this.liq_step_size,this.radliq_lwr,
-                                this.lut_extliq, this.lut_ssaliq, this.lut_asyliq,
-                                ltau, ltaussa, ltaussag)
-    #
-    # Ice
-    #
-    compute_all_from_table!(ncol, nlay, nbnd, icemsk, ciwp, reice,
-                                this.ice_nsteps,this.ice_step_size,this.radice_lwr,
-                                this.lut_extice[:,:,this.icergh],
-                                this.lut_ssaice[:,:,this.icergh],
-                                this.lut_asyice[:,:,this.icergh],
-                                itau, itaussa, itaussag)
-  else
-    #
-    # Cloud optical properties from Pade coefficient method
-    #   Hard coded assumptions: order of approximants, three size regimes
-    #
-    nsizereg = size(this.pade_extliq,2)
-    compute_all_from_pade!(ncol, nlay, nbnd, nsizereg,
-                              liqmsk, clwp, reliq,
-                              2, 3, this.pade_sizreg_extliq, this.pade_extliq,
-                              2, 2, this.pade_sizreg_ssaliq, this.pade_ssaliq,
-                              2, 2, this.pade_sizreg_asyliq, this.pade_asyliq,
-                              ltau, ltaussa, ltaussag)
-    compute_all_from_pade!(ncol, nlay, nbnd, nsizereg,
-                              icemsk, ciwp, reice,
-                              2, 3, this.pade_sizreg_extice, this.pade_extice[:,:,:,this.icergh],
-                              2, 2, this.pade_sizreg_ssaice, this.pade_ssaice[:,:,:,this.icergh],
-                              2, 2, this.pade_sizreg_asyice, this.pade_asyice[:,:,:,this.icergh],
-                              itau, itaussa, itaussag)
+  #
+  # Cloud optical properties from Pade coefficient method
+  #   Hard coded assumptions: order of approximants, three size regimes
+  #
+  nsizereg = size(this.pade_extliq,2)
+  compute_all_from_pade!(ncol, nlay, nbnd, nsizereg,
+                            liqmsk, clwp, reliq,
+                            2, 3, this.pade_sizreg_extliq, this.pade_extliq,
+                            2, 2, this.pade_sizreg_ssaliq, this.pade_ssaliq,
+                            2, 2, this.pade_sizreg_asyliq, this.pade_asyliq,
+                            ltau, ltaussa, ltaussag)
+  compute_all_from_pade!(ncol, nlay, nbnd, nsizereg,
+                            icemsk, ciwp, reice,
+                            2, 3, this.pade_sizreg_extice, this.pade_extice[:,:,:,this.icergh],
+                            2, 2, this.pade_sizreg_ssaice, this.pade_ssaice[:,:,:,this.icergh],
+                            2, 2, this.pade_sizreg_asyice, this.pade_asyice[:,:,:,this.icergh],
+                            itau, itaussa, itaussag)
+
+  @assert optical_props isa ty_optical_props_1scl || optical_props isa ty_optical_props_2str
+  #
+  # Copy total cloud properties onto outputs
+  #
+  if optical_props isa ty_optical_props_1scl
+    for ibnd = 1:nbnd
+      for ilay = 1:nlay
+        for icol = 1:ncol
+          # Absorption optical depth  = (1-ssa) * tau = tau - taussa
+          optical_props.tau[icol,ilay,ibnd] = (ltau[icol,ilay,ibnd] - ltaussa[icol,ilay,ibnd]) +
+                                              (itau[icol,ilay,ibnd] - itaussa[icol,ilay,ibnd])
+        end
+      end
+    end
+  elseif optical_props isa ty_optical_props_2str
+    for ibnd = 1:nbnd
+      for ilay = 1:nlay
+        for icol = 1:ncol
+          tau    = ltau[icol,ilay,ibnd]    + itau[icol,ilay,ibnd]
+          taussa = ltaussa[icol,ilay,ibnd] + itaussa[icol,ilay,ibnd]
+          optical_props.g[icol,ilay,ibnd]  = (ltaussag[icol,ilay,ibnd] + itaussag[icol,ilay,ibnd]) / max(eps(FT), taussa...)
+          optical_props.ssa[icol,ilay,ibnd] = taussa/max(eps(FT), tau...)
+          optical_props.tau[icol,ilay,ibnd] = tau
+        end
+      end
+    end
   end
+
+end
+function cloud_optics!(this::ty_cloud_optics_new{FT},
+                      clwp, ciwp, reliq, reice,
+                      optical_props) where FT
+    # class(ty_cloud_optics),
+    #           intent(in   ) :: this
+    # real(wp), intent(in   ) :: clwp  (:,:),    ! cloud ice water path    (units?)
+    #                            ciwp  (:,:),    ! cloud liquid water path (units?)
+    #                            reliq (:,:),    ! cloud ice particle effective size (microns)
+    #                            reice (:,:)      ! cloud liquid particle effective radius (microns)
+    # class(ty_optical_props_arry),
+    #           intent(inout) :: optical_props
+    #                                            ! Dimensions: (ncol,nlay,nbnd)
+
+    # ! ------- Local -------
+    # logical(wl), dimension(size(clwp,1), size(clwp,2)) :: liqmsk, icemsk
+    # real(wp),    dimension(size(clwp,1), size(clwp,2), this%get_nband()) ::
+    #             ltau, ltaussa, ltaussag, itau, itaussa, itaussag
+
+  # # ------- Local -------
+  # type(ty_optical_props_2str) :: clouds_liq, clouds_ice
+  # integer  :: nsizereg, ibnd, imom
+
+
+  ncol = size(clwp,1)
+  nlay = size(clwp,2)
+  nbnd = get_nband(this)
+  liqmsk = BitArray(clwp .> FT(0))
+  icemsk = BitArray(ciwp .> FT(0))
+
+  ltau, ltaussa, ltaussag, itau, itaussa, itaussag = ntuple(i-> Array{FT}(undef, size(clwp,1), size(clwp,2), get_nband(this)), 6)
+
+  # Error checking
+  @assert allocated(this.liq.ext)
+  @assert bands_are_equal(this, optical_props)
+  @assert get_nband(optical_props) == get_ngpt(optical_props)
+  @assert !(this.icergh < 1 || this.icergh > get_num_ice_roughness_types(this))
+  @assert !any_vals_outside(reliq, liqmsk, this.liq.rad_lwr, this.liq.rad_upr)
+  @assert !any_vals_outside(reice, icemsk, this.ice.rad_lwr, this.ice.rad_upr)
+  any(liqmsk) && @assert !any_vals_less_than(clwp, liqmsk, FT(0))
+  any(icemsk) && @assert !any_vals_less_than(ciwp, icemsk, FT(0))
+
+  #
+  # Compute cloud optical properties. Use lookup tables if available, Pade approximants if not.
+  #
+
+  #
+  # Liquid
+  #
+  compute_all_from_table!(ncol, nlay, nbnd, liqmsk, clwp, reliq,
+                              this.liq.nsteps,
+                              this.liq.step_size,
+                              this.liq.rad_lwr,
+                              this.liq.ext,
+                              this.liq.ssa,
+                              this.liq.asy,
+                              ltau, ltaussa, ltaussag)
+  #
+  # Ice
+  #
+  compute_all_from_table!(ncol, nlay, nbnd, icemsk, ciwp, reice,
+                              this.ice.nsteps,
+                              this.ice.step_size,
+                              this.ice.rad_lwr,
+                              this.ice.ext[:,:,this.icergh],
+                              this.ice.ssa[:,:,this.icergh],
+                              this.ice.asy[:,:,this.icergh],
+                              itau, itaussa, itaussag)
 
   @assert optical_props isa ty_optical_props_1scl || optical_props isa ty_optical_props_2str
   #
@@ -433,28 +525,24 @@ end
     set_ice_roughness!
 
 """
-function set_ice_roughness!(this::ty_cloud_optics, icergh)
+function set_ice_roughness!(this::ty_optical_props, icergh)
   @assert icergh > 0
   this.icergh = icergh
 end
 
-function get_num_ice_roughness_types(this::ty_cloud_optics)
-  # class(ty_cloud_optics), intent(in   ) :: this
-  # integer                               :: i
-
-  i = 0
-  allocated(this.pade_extice) && (i = size(this.pade_extice, 4))
-  allocated(this.lut_extice ) && (i = size(this.lut_extice,  3))
-  return i
-end
+get_num_ice_roughness_types(this::ty_cloud_optics) =
+  allocated(this.pade_extice) ? size(this.pade_extice, 4) : 0
+get_num_ice_roughness_types(this::ty_cloud_optics_new) =
+  allocated(this.ice.ext ) ? size(this.ice.ext,  3) : 0
 
 get_min_radius_liq(this::ty_cloud_optics) = this.radliq_lwr
-
 get_max_radius_liq(this::ty_cloud_optics) = this.radliq_upr
-
 get_min_radius_ice(this::ty_cloud_optics) = this.radice_lwr
-
 get_max_radius_ice(this::ty_cloud_optics) = this.radice_upr
+get_min_radius_liq(this::ty_cloud_optics_new) = get_min_radius(this.liq)
+get_max_radius_liq(this::ty_cloud_optics_new) = get_max_radius(this.liq)
+get_min_radius_ice(this::ty_cloud_optics_new) = get_min_radius(this.ice)
+get_max_radius_ice(this::ty_cloud_optics_new) = get_max_radius(this.ice)
 
 
 #

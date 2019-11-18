@@ -159,10 +159,11 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
   is_lw = !is_sw
   #
   # Should also try with Pade calculations
-  cloud_optics_ = ty_cloud_optics(FT,I)
   if use_luts
+    cloud_optics_ = ty_cloud_optics_new(FT,I)
     load_cld_lutcoeff!(cloud_optics_, ds[:cloud_optics])
   else
+    cloud_optics_ = ty_cloud_optics(FT,I)
     load_cld_padecoeff!(cloud_optics_, ds[:cloud_optics])
   end
   set_ice_roughness!(cloud_optics_, 2)

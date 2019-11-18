@@ -11,7 +11,7 @@ export load_cld_lutcoeff!, load_cld_padecoeff!
 
 read cloud optical property LUT coefficients from NetCDF file
 """
-function load_cld_lutcoeff!(cloud_spec::ty_cloud_optics{FT}, ds_cld_coeff) where FT
+function load_cld_lutcoeff!(cloud_spec::ty_cloud_optics_new{FT}, ds_cld_coeff) where FT
   # class(ty_cloud_optics),     intent(inout) :: cloud_spec
   # character(len=*),           intent(in   ) :: ds_cld_coeff
   # # -----------------
@@ -38,42 +38,26 @@ function load_cld_lutcoeff!(cloud_spec::ty_cloud_optics{FT}, ds_cld_coeff) where
 
   # Read LUT coefficient dimensions
   nband     = ds_cld_coeff.dim["nband"]
-  nrghice   = ds_cld_coeff.dim["nrghice"]
-  nsize_liq = ds_cld_coeff.dim["nsize_liq"]
-  nsize_ice = ds_cld_coeff.dim["nsize_ice"]
 
-  band_lims_wvn = Array{FT}(undef, 2, nband)
-  band_lims_wvn .= read_field(ds_cld_coeff, "bnd_limits_wavenumber", 2, nband)
+  band_lims_wvn = Array{FT}(read_field(ds_cld_coeff, "bnd_limits_wavenumber", 2, nband))
 
   # Read LUT constants
-  radliq_lwr = read_field(ds_cld_coeff, "radliq_lwr")
-  radliq_upr = read_field(ds_cld_coeff, "radliq_upr")
-  radliq_fac = read_field(ds_cld_coeff, "radliq_fac")
-  radice_lwr = read_field(ds_cld_coeff, "radice_lwr")
-  radice_upr = read_field(ds_cld_coeff, "radice_upr")
-  radice_fac = read_field(ds_cld_coeff, "radice_fac")
+  liq = LookUpTable(read_field(ds_cld_coeff, "radliq_lwr"),
+                    read_field(ds_cld_coeff, "radliq_upr"),
+                    read_field(ds_cld_coeff, "radliq_fac"),
+                    Array{FT}(read_field(ds_cld_coeff, "lut_extliq")),
+                    Array{FT}(read_field(ds_cld_coeff, "lut_ssaliq")),
+                    Array{FT}(read_field(ds_cld_coeff, "lut_asyliq")))
 
-  # Allocate cloud property lookup table input arrays
-  lut_extliq = Array{FT}(undef, nsize_liq, nband)
-  lut_ssaliq = Array{FT}(undef, nsize_liq, nband)
-  lut_asyliq = Array{FT}(undef, nsize_liq, nband)
-  lut_extice = Array{FT}(undef, nsize_ice, nband, nrghice)
-  lut_ssaice = Array{FT}(undef, nsize_ice, nband, nrghice)
-  lut_asyice = Array{FT}(undef, nsize_ice, nband, nrghice)
+  ice = LookUpTable(read_field(ds_cld_coeff, "radice_lwr"),
+                    read_field(ds_cld_coeff, "radice_upr"),
+                    read_field(ds_cld_coeff, "radice_fac"),
+                    Array{FT}(read_field(ds_cld_coeff, "lut_extice")),
+                    Array{FT}(read_field(ds_cld_coeff, "lut_ssaice")),
+                    Array{FT}(read_field(ds_cld_coeff, "lut_asyice")))
 
-  # Read LUT coefficients
-  lut_extliq .= read_field(ds_cld_coeff, "lut_extliq",  nsize_liq, nband)
-  lut_ssaliq .= read_field(ds_cld_coeff, "lut_ssaliq",  nsize_liq, nband)
-  lut_asyliq .= read_field(ds_cld_coeff, "lut_asyliq",  nsize_liq, nband)
-  lut_extice .= read_field(ds_cld_coeff, "lut_extice",  nsize_ice, nband, nrghice)
-  lut_ssaice .= read_field(ds_cld_coeff, "lut_ssaice",  nsize_ice, nband, nrghice)
-  lut_asyice .= read_field(ds_cld_coeff, "lut_asyice",  nsize_ice, nband, nrghice)
 
-  load_lut!(cloud_spec, band_lims_wvn,
-        radliq_lwr, radliq_upr, radliq_fac,
-        radice_lwr, radice_upr, radice_fac,
-        lut_extliq, lut_ssaliq, lut_asyliq,
-        lut_extice, lut_ssaice, lut_asyice)
+  load_lut!(cloud_spec, band_lims_wvn, liq, ice)
 end
 
 """
