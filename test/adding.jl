@@ -118,7 +118,7 @@ end
   #   t_sfc, sfc_alb_dif = read_lw_bc(fileName)
   #   FT = eltype(Rdif)
   #   # Read emissivity; convert to surface albedo
-  #   sfc_alb_dif[:,:] .= FT(1) .- sfc_alb_dif[:,:]
+  #   sfc_alb_dif .= FT(1) .- sfc_alb_dif
   end
 
   ncol = size(source_up, 1)
@@ -156,12 +156,12 @@ end
     flux_dn_dir = Array{FT}(undef, ncol, nlay+1, ngpt)
 
     if top_at_1
-      flux_dn_dir[:,    1,:]  .= toa_src[:,:] .* spread(mu0, 2, ngpt)
+      flux_dn_dir[:,    1,:]  .= toa_src .* spread(mu0, 2, ngpt)
       for j = 1:nlay
         flux_dn_dir[:,j+1,:] .= Tnoscat[:,j,:] .* flux_dn_dir[:,j,:]
       end
     else
-      flux_dn_dir[:,nlay+1,:] .= toa_src[:,:] .* spread(mu0, 2, ngpt)
+      flux_dn_dir[:,nlay+1,:] .= toa_src .* spread(mu0, 2, ngpt)
       for j = nlay:-1:1
         flux_dn_dir[:,j,:] .= Tnoscat[:,j,:] .* flux_dn_dir[:,j+1,:]
       end
@@ -169,7 +169,7 @@ end
     #
     # Add direct beam so flux_dn is total
     #
-    flux_dn[:,:,:] .= flux_dn[:,:,:] .+ flux_dn_dir[:,:,:]
+    flux_dn .+= flux_dn_dir
     # write_gpt_fluxes!(fileName, flux_up, flux_dn, flux_dn_dir)
   else
     # write_gpt_fluxes!(fileName, flux_up, flux_dn)
