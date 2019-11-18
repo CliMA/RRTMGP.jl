@@ -937,8 +937,8 @@ function rewrite_key_species_pair(key_species_pair)
   # integer, dimension(2) :: rewrite_key_species_pair
   # integer, dimension(2), intent(in) :: key_species_pair
   result = key_species_pair
-  if all(key_species_pair[:] .== [0,0])
-    result[:] .= [2,2]
+  if all(key_species_pair .== [0,0])
+    result .= [2,2]
   end
   return result
 end
@@ -951,7 +951,7 @@ function key_species_pair_exists(key_species_list, key_species_pair)
   # integer, dimension(2),   intent(in) :: key_species_pair
   # integer :: i
   for i=1:size(key_species_list,2)
-    if all(key_species_list[:,i] .== key_species_pair[:])
+    if all(key_species_list[:,i] .== key_species_pair)
       result = true
       return result
     end
@@ -1203,7 +1203,7 @@ function key_species_pair2flavor(flavor, key_species_pair)
   # integer, dimension(2), intent(in) :: key_species_pair
   # integer :: iflav
   for iflav=1:size(flavor,2)
-    if all(key_species_pair[:] == flavor[:,iflav])
+    if all(key_species_pair .== flavor[:,iflav])
       return iflav
     end
   end

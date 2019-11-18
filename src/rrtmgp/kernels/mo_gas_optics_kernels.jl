@@ -718,7 +718,7 @@ function interpolate1D(val, offset, delta, table)
   val0 = (val - offset) / delta
   frac = val0 - fint(val0) # get fractional part
   index = Integer(min(size(table,1)-1, max(1, fint(val0)+1))) # limit the index range
-  res[:] = table[index,:] + frac * (table[index+1,:] - table[index,:])
+  res .= table[index,:] + frac * (table[index+1,:] - table[index,:])
   return res
 end
 

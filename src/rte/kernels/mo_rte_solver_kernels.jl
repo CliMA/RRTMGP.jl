@@ -338,7 +338,7 @@ function sw_solver_noscat!(ncol, nlay, ngpt,
     # previous level is up (-1)
     for igpt in 1:ngpt
       for ilev in 2:nlay+1
-        flux_dir[:,ilev,igpt] .= flux_dir[:,ilev-1,igpt] .* exp.(-tau[:,ilev-1,igpt].*mu0_inv[:])
+        flux_dir[:,ilev,igpt] .= flux_dir[:,ilev-1,igpt] .* exp.(-tau[:,ilev-1,igpt].*mu0_inv)
       end
     end
   else
@@ -346,7 +346,7 @@ function sw_solver_noscat!(ncol, nlay, ngpt,
     # previous level is up (+1)
     for igpt in 1:ngpt
       for ilev in nlay:-1:1
-        flux_dir[:,ilev,igpt] .= flux_dir[:,ilev+1,igpt] .* exp.(-tau[:,ilev,igpt].*mu0_inv[:])
+        flux_dir[:,ilev,igpt] .= flux_dir[:,ilev+1,igpt] .* exp.(-tau[:,ilev,igpt].*mu0_inv)
       end
     end
   end
@@ -520,7 +520,7 @@ function lw_transport_noscat!(ncol::I, nlay::I, top_at_1::B,
     end
 
     # Surface reflection and emission
-    radn_up[:,nlay+1] .= radn_dn[:,nlay+1].*sfc_albedo[:] .+ source_sfc[:]
+    radn_up[:,nlay+1] .= radn_dn[:,nlay+1].*sfc_albedo .+ source_sfc
 
     # Upward propagation
     @inbounds for ilev in nlay:-1:1
@@ -536,7 +536,7 @@ function lw_transport_noscat!(ncol::I, nlay::I, top_at_1::B,
     end
 
     # Surface reflection and emission
-    radn_up[:,     1] .= radn_dn[:,     1].*sfc_albedo[:] .+ source_sfc[:]
+    radn_up[:,     1] .= radn_dn[:,     1].*sfc_albedo .+ source_sfc
 
     # Upward propagation
     @inbounds for ilev in 2:nlay+1
@@ -999,9 +999,9 @@ function adding!(ncol::I, nlay::I, top_at_1::B,
   else
     ilev = 1
     # Albedo of lowest level is the surface albedo...
-    albedo[:,ilev] .= albedo_sfc[:]
+    albedo[:,ilev] .= albedo_sfc
     # ... and source of diffuse radiation is surface emission
-    src[:,ilev] .= src_sfc[:]
+    src[:,ilev] .= src_sfc
 
     #
     # From bottom to top of atmosphere --
