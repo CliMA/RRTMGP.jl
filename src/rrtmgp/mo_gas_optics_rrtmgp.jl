@@ -513,11 +513,9 @@ function source!(this::ty_gas_optics_rrtmgp,
               get_gpoint_bands(this.optical_props), get_band_lims_gpoint(this.optical_props), this.planck_frac, this.temp_ref_min,
               this.totplnk_delta, this.totplnk, this.gpoint_flavor,
               sfc_source_t, lay_source_t, lev_source_inc_t, lev_source_dec_t)
-  for igpt in 1:ngpt
-    for icol in 1:ncol
-      sources.sfc_source[icol,igpt] = sfc_source_t[igpt,icol]
-    end
-  end
+
+  sources.sfc_source .= convert(Array,transpose(sfc_source_t))
+
   permutedims!(sources.lay_source, lay_source_t, [3,2,1])
   permutedims!(sources.lev_source_inc, lev_source_inc_t, [3,2,1])
   permutedims!(sources.lev_source_dec, lev_source_dec_t, [3,2,1])
