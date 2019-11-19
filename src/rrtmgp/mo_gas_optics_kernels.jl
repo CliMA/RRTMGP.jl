@@ -1,32 +1,8 @@
-"""
-    mo_gas_optics_kernels
-
-Description: Numeric calculations for gas optics. Absorption and Rayleigh optical depths,
- source functions.
-"""
-module mo_gas_optics_kernels
-
-using TimerOutputs
-const to_gok = TimerOutput()
+####
+#### mo_gas_optics_kernels: Numeric calculations for gas optics. Absorption and Rayleigh optical depths, source functions.
+####
 
 PaTohPa(::Type{FT}) where FT = FT(0.01)
-
-using ..fortran_intrinsics
-using ..mo_optical_props
-
-export interpolation!,
-       compute_tau_absorption!,
-       gas_optical_depths_major!,
-       gas_optical_depths_minor!,
-       compute_tau_rayleigh!,
-       compute_Planck_source!,
-       interpolate1D,
-       interpolate2D,
-       interpolate2D_byflav,
-       interpolate3D,
-       interpolate3D_byflav,
-       combine_and_reorder_2str!,
-       combine_and_reorder_nstr!
 
 """
     interpolation!(...)
@@ -70,15 +46,25 @@ real(FT) :: ftemp_term
 # local indexes
 integer :: icol, ilay, iflav, igases(2), itropo, itemp
 """
-function interpolation!(jtemp::Array{I},fmajor::Array{FT},fminor::Array{FT},col_mix::Array{FT},tropo::Array{B},jeta::Array{I},jpress::Array{I},
-              ncol::I,nlay::I,ngas::I,nflav::I,neta::I,npres::I,ntemp::I,
-              flavor::Array{I},
-              press_ref_log::Array{FT}, temp_ref::Array{FT},press_ref_log_delta::FT,
-              temp_ref_min::FT,temp_ref_delta::FT,press_ref_trop_log::FT,
-              vmr_ref::AbstractArray{FT},
-              play::Array{FT},
-              tlay::Array{FT},
-              col_gas::AbstractArray{FT}) where {I<:Int,B<:Bool,FT<:AbstractFloat}
+function interpolation!(jtemp::Array{I},
+                        fmajor::Array{FT},
+                        fminor::Array{FT},
+                        col_mix::Array{FT},
+                        tropo::Array{B},
+                        jeta::Array{I},
+                        jpress::Array{I},
+                        ncol::I,
+                        nlay::I,
+                        ngas::I,
+                        nflav::I,
+                        neta::I,
+                        npres::I,
+                        ntemp::I,
+                        flavor::Array{I},
+                        ref::Reference{FT},
+                        play::Array{FT},
+                        tlay::Array{FT},
+                        col_gas::AbstractArray{FT}) where {I<:Int,B<:Bool,FT<:AbstractFloat}
   # input dimensions
   ftemp = Array{FT}(undef, ncol, nlay)
   fpress = Array{FT}(undef, ncol, nlay)
@@ -87,17 +73,17 @@ function interpolation!(jtemp::Array{I},fmajor::Array{FT},fminor::Array{FT},col_
   @inbounds for ilay in 1:nlay
     @inbounds for icol in 1:ncol
       # index and factor for temperature interpolation
-      jtemp[icol,ilay] = fint((tlay[icol,ilay] - (temp_ref_min - temp_ref_delta)) / temp_ref_delta)
+      jtemp[icol,ilay] = fint((tlay[icol,ilay] - (ref.temp_min - ref.temp_delta)) / ref.temp_delta)
       jtemp[icol,ilay] = min(ntemp - 1, max(1, jtemp[icol,ilay])) # limit the index range
-      ftemp[icol,ilay] = (tlay[icol,ilay] - temp_ref[jtemp[icol,ilay]]) / temp_ref_delta
+      ftemp[icol,ilay] = (tlay[icol,ilay] - ref.temp[jtemp[icol,ilay]]) / ref.temp_delta
 
       # index and factor for pressure interpolation
-      locpress = FT(1) + (log(play[icol,ilay]) - press_ref_log[1]) / press_ref_log_delta
+      locpress = FT(1) + (log(play[icol,ilay]) - ref.press_log[1]) / ref.press_log_delta
       jpress[icol,ilay] = min(npres-1, max(1, fint(locpress)))
       fpress[icol,ilay] = locpress - FT(jpress[icol,ilay])
 
       # determine if in lower or upper part of atmosphere
-      tropo[icol,ilay] = log(play[icol,ilay]) > press_ref_trop_log
+      tropo[icol,ilay] = log(play[icol,ilay]) > ref.press_trop_log
     end
   end
 
@@ -112,8 +98,8 @@ function interpolation!(jtemp::Array{I},fmajor::Array{FT},fminor::Array{FT},col_
           # compute interpolation fractions needed for lower, then upper reference temperature level
           # compute binary species parameter (eta) for flavor and temperature and
           #  associated interpolation index and factors
-          ratio_eta_half = vmr_ref[itropo,igases[1],(jtemp[icol,ilay]+itemp-1)] /
-                           vmr_ref[itropo,igases[2],(jtemp[icol,ilay]+itemp-1)]
+          ratio_eta_half = ref.vmr[itropo,igases[1],(jtemp[icol,ilay]+itemp-1)] /
+                           ref.vmr[itropo,igases[2],(jtemp[icol,ilay]+itemp-1)]
           col_mix[itemp,iflav,icol,ilay] = col_gas[icol,ilay,igases[1]] + ratio_eta_half * col_gas[icol,ilay,igases[2]]
           eta = fmerge(col_gas[icol,ilay,igases[1]] / col_mix[itemp,iflav,icol,ilay], FT(0.5),
                       col_mix[itemp,iflav,icol,ilay] > FT(2) * floatmin(FT))
@@ -198,20 +184,10 @@ function compute_tau_absorption!(tau,
               gpoint_flavor,
               band_lims_gpt,
               kmajor,
-              kminor_lower,
-              kminor_upper,
-              minor_limits_gpt_lower,
-              minor_limits_gpt_upper,
-              minor_scales_with_density_lower,
-              minor_scales_with_density_upper,
-              scale_by_complement_lower,
-              scale_by_complement_upper,
-              idx_minor_lower,
-              idx_minor_upper,
-              idx_minor_scaling_lower,
-              idx_minor_scaling_upper,
-              kminor_start_lower,
-              kminor_start_upper,
+              lower,
+              upper,
+              lower_aux,
+              upper_aux,
               tropo,
               col_mix,fmajor,fminor,
               play,tlay,col_gas,
@@ -266,13 +242,8 @@ function compute_tau_absorption!(tau,
          nminorklower,
          idx_h2o,
          gpoint_flavor[1,:],
-         kminor_lower,
-         minor_limits_gpt_lower,
-         minor_scales_with_density_lower,
-         scale_by_complement_lower,
-         idx_minor_lower,
-         idx_minor_scaling_lower,
-         kminor_start_lower,
+         lower,
+         lower_aux,
          play,
          tlay,
          col_gas,
@@ -290,13 +261,8 @@ function compute_tau_absorption!(tau,
          nminorupper,nminorkupper,
          idx_h2o,
          gpoint_flavor[2,:],
-         kminor_upper,
-         minor_limits_gpt_upper,
-         minor_scales_with_density_upper,
-         scale_by_complement_upper,
-         idx_minor_upper,
-         idx_minor_scaling_upper,
-         kminor_start_upper,
+         upper,
+         upper_aux,
          play, tlay,
          col_gas,fminor,jeta,
          itropo_upper,jtemp,
@@ -416,13 +382,8 @@ function gas_optical_depths_minor!(ncol,
                                    nminork,
                                    idx_h2o,
                                    gpt_flv,
-                                   kminor,
-                                   minor_limits_gpt,
-                                   minor_scales_with_density,
-                                   scale_by_complement,
-                                   idx_minor,
-                                   idx_minor_scaling,
-                                   kminor_start,
+                                   atmos,
+                                   aux,
                                    play,
                                    tlay,
                                    col_gas,
@@ -441,7 +402,7 @@ function gas_optical_depths_minor!(ncol,
 
   tau_minor = Array{FT}(undef, ngpt)
   if any(layer_limits[:,1] .> 0)
-    for imnr in 1:size(scale_by_complement,1) # loop over minor absorbers in each band
+    for imnr in 1:size(atmos.scale_by_complement,1) # loop over minor absorbers in each band
       for icol in 1:ncol
         #
         # This check skips individual columns with no pressures in range
@@ -451,23 +412,23 @@ function gas_optical_depths_minor!(ncol,
             #
             # Scaling of minor gas absortion coefficient begins with column amount of minor gas
             #
-            scaling = col_gas[icol,ilay,idx_minor[imnr]]
+            scaling = col_gas[icol,ilay,aux.idx_minor[imnr]]
             #
             # Density scaling (e.g. for h2o continuum, collision-induced absorption)
             #
-            if minor_scales_with_density[imnr]
+            if atmos.minor_scales_with_density[imnr]
               #
               # NOTE: P needed in hPa to properly handle density scaling.
               #
               scaling = scaling * (PaTohPa(FT)*play[icol,ilay]/tlay[icol,ilay])
-              if idx_minor_scaling[imnr] > 0  # there is a second gas that affects this gas's absorption
+              if aux.idx_minor_scaling[imnr] > 0  # there is a second gas that affects this gas's absorption
                 vmr_fact = FT(1) / col_gas[icol,ilay,0]
                 dry_fact = FT(1) / (FT(1) + col_gas[icol,ilay,idx_h2o] * vmr_fact)
                 # scale by density of special gas
-                if scale_by_complement[imnr] # scale by densities of all gases but the special one
-                  scaling = scaling * (FT(1) - col_gas[icol,ilay,idx_minor_scaling[imnr]] * vmr_fact * dry_fact)
+                if atmos.scale_by_complement[imnr] # scale by densities of all gases but the special one
+                  scaling = scaling * (FT(1) - col_gas[icol,ilay,aux.idx_minor_scaling[imnr]] * vmr_fact * dry_fact)
                 else
-                  scaling = scaling *          col_gas[icol,ilay,idx_minor_scaling[imnr]] * vmr_fact * dry_fact
+                  scaling = scaling *          col_gas[icol,ilay,aux.idx_minor_scaling[imnr]] * vmr_fact * dry_fact
                 end
               end
             end
@@ -475,18 +436,18 @@ function gas_optical_depths_minor!(ncol,
             # Interpolation of absorption coefficient and calculation of optical depth
             #
             # Which gpoint range does this minor gas affect?
-            gptS = minor_limits_gpt[1,imnr]
-            gptE = minor_limits_gpt[2,imnr]
+            gptS = atmos.minor_limits_gpt[1,imnr]
+            gptE = atmos.minor_limits_gpt[2,imnr]
             iflav = gpt_flv[gptS]
             jeta_tup = (jeta[1,iflav,icol,ilay],
                         jeta[2,iflav,icol,ilay])
 
             interpolate2D_byflav!(@view(tau_minor[gptS:gptE]),
                                   @view(fminor[:,:,iflav,icol,ilay]),
-                                  kminor,
+                                  atmos.kminor,
                                   gptS,
-                                  kminor_start[imnr],
-                                  kminor_start[imnr]+(gptE-gptS),
+                                  atmos.kminor_start[imnr],
+                                  atmos.kminor_start[imnr]+(gptE-gptS),
                                   jeta_tup,
                                   jtemp[icol,ilay])
             tau[gptS:gptE,ilay,icol] = tau[gptS:gptE,ilay,icol] + scaling*tau_minor[gptS:gptE]
@@ -877,5 +838,3 @@ function combine_and_reorder_2str!(op::ty_optical_props{FT}, ncol, nlay, ngpt, t
   end
   return nothing
 end
-
-end #module

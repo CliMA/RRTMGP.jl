@@ -19,7 +19,6 @@ using ..mo_rrtmgp_constants
 using ..mo_util_array
 using ..mo_optical_props
 using ..mo_source_functions
-using ..mo_gas_optics_kernels
 
 using ..Utilities
 using ..mo_gas_concentrations
@@ -27,39 +26,96 @@ using ..mo_optical_props
 export gas_optics_int!, gas_optics_ext!, ty_gas_optics_rrtmgp, load_totplnk, load_solar_source
 export source_is_internal, source_is_external, get_press_min
 
+export Reference
+export AtmosVars
+
 abstract type ty_gas_optics{T,I} <: ty_optical_props{T,I} end
+
+struct Reference{FT}
+  press#::Vector{T}
+  press_log#::Vector{T}
+  temp#::Vector{T}
+  press_min#::T
+  press_max#::T
+  temp_min#::T
+  temp_max#::T
+  press_log_delta#::T
+  temp_delta#::T
+  press_trop_log#::T
+  vmr#::Array{T,3}   # vmr(lower or upper atmosphere, gas, temp)
+  function Reference(press::Array{FT},
+                     temp::Array{FT},
+                     press_ref_trop::FT,
+                     vmr_ref::Array{FT},
+                     available_gases::Array{S},
+                     gas_names::Array{S}) where {FT<:AbstractFloat,S<:AbstractString}
+
+    gas_is_present = map(x->x in available_gases, gas_names)
+    ngas = count(gas_is_present)
+
+    press_log = log.(press)
+    # TODO: remove assumption of ordering
+    temp_min = temp[1]
+    temp_max = temp[length(temp)]
+    press_min = press[length(press)]
+    press_max = press[1]
+
+    press_trop_log = log(press_ref_trop)
+
+    press_log_delta = (log(press_min)-log(press_max))/(length(press)-1)
+    temp_delta      = (temp_max-temp_min)/(length(temp)-1)
+
+    vmr_ref_red = OffsetArray{FT}(undef, 1:size(vmr_ref, 1),0:ngas, 1:size(vmr_ref, 3))
+
+    # Gas 0 is used in single-key species method, set to 1.0 (col_dry)
+    vmr_ref_red[:,0,:] = vmr_ref[:,1,:]
+    for i = 1:ngas
+      idx = loc_in_array(available_gases[i], gas_names)
+      vmr_ref_red[:,i,:] = vmr_ref[:,idx+1,:]
+    end
+    return new{FT}(press,
+                   press_log,
+                   temp,
+                   press_min,
+                   press_max,
+                   temp_min,
+                   temp_max,
+                   press_log_delta,
+                   temp_delta,
+                   press_trop_log,
+                   vmr_ref_red)
+  end
+end
+
+mutable struct AuxVars{FT}
+  idx_minor#::Vector{I}
+  idx_minor_scaling#::Vector{I}
+end
+AuxVars(FT) = AuxVars{FT}(ntuple(i->nothing,2)...)
+
+mutable struct AtmosVars{FT}
+  minor_limits_gpt#::Array{I,2}
+  minor_scales_with_density#::Vector{Bool}
+  scale_by_complement#::Vector{Bool}
+  kminor_start#::Vector{I}
+  kminor#::Array{T,3}
+  scaling_gas
+  minor_gases
+  # AtmosVars(args::FT...) = AtmosVars{FT}(args..., nothing)
+end
+AtmosVars(FT) = AtmosVars{FT}(ntuple(i->nothing,7)...)
 
 mutable struct ty_gas_optics_rrtmgp{T,I} <: ty_gas_optics{T,I}
   optical_props#::ty_optical_props
-  press_ref#::Vector{T}
-  press_ref_log#::Vector{T}
-  temp_ref#::Vector{T}
-  press_ref_min#::T
-  press_ref_max#::T
-  temp_ref_min#::T
-  temp_ref_max#::T
-  press_ref_log_delta#::T
-  temp_ref_delta#::T
-  press_ref_trop_log#::T
+  ref#::Reference
+  lower
+  upper
+  lower_aux
+  upper_aux
   gas_names#::Vector{String}     # gas names
-  vmr_ref#::Array{T,3}       # vmr_ref(lower or upper atmosphere, gas, temp)
   flavor#::Array{I, 2}        # major species pair; (2,nflav)
   gpoint_flavor#::Array{I, 2} # flavor = gpoint_flavor(2, g-point)
   kmajor#::Array{T,4}        #  kmajor(g-point,eta,pressure,temperature)
-  minor_limits_gpt_lower#::Array{I,2}
-  minor_limits_gpt_upper#::Array{I,2}
-  minor_scales_with_density_lower#::Vector{Bool}
-  minor_scales_with_density_upper#::Vector{Bool}
-  scale_by_complement_lower#::Vector{Bool}
-  scale_by_complement_upper#::Vector{Bool}
-  idx_minor_lower#::Vector{I}
-  idx_minor_upper#::Vector{I}
-  idx_minor_scaling_lower#::Vector{I}
-  idx_minor_scaling_upper#::Vector{I}
-  kminor_start_lower#::Vector{I}
-  kminor_start_upper#::Vector{I}
-  kminor_lower#::Array{T,3}
-  kminor_upper#::Array{T,3} # kminor_lower(n_minor,eta,temperature)
   krayl#::Array{T, 4} # krayl(g-point,eta,temperature,upper/lower atmosphere)
   planck_frac#::Array{T, 4}   # stored fraction of Planck irradiance in band for given g-point
   totplnk#::Array{T,2}       # integrated Planck irradiance by band; (Planck temperatures,band)
@@ -153,10 +209,10 @@ function gas_optics_int!(this::ty_gas_optics_rrtmgp,
   # External source -- check arrays sizes and values
   # input data sizes and values
   check_extent(tsfc, ncol, "tsfc")
-  check_range(tsfc, this.temp_ref_min,  this.temp_ref_max,  "tsfc")
+  check_range(tsfc, this.ref.temp_min,  this.ref.temp_max,  "tsfc")
   if present(tlev)
     check_extent(tlev, (ncol, nlay+1), "tlev")
-    check_range(tlev, this.temp_ref_min, this.temp_ref_max, "tlev")
+    check_range(tlev, this.ref.temp_min, this.ref.temp_max, "tlev")
   end
 
   #   output extents
@@ -321,9 +377,9 @@ function compute_gas_taus!(jtemp, jpress, jeta, tropo, fmajor, this::ty_gas_opti
   check_extent(play, (ncol, nlay  ), "play")
   check_extent(plev, (ncol, nlay+1), "plev")
   check_extent(tlay, (ncol, nlay  ), "tlay")
-  check_range(play, this.press_ref_min,this.press_ref_max, "play")
-  check_range(plev, this.press_ref_min, this.press_ref_max, "plev")
-  check_range(tlay, this.temp_ref_min,  this.temp_ref_max,  "tlay")
+  check_range(play, this.ref.press_min, this.ref.press_max, "play")
+  check_range(plev, this.ref.press_min, this.ref.press_max, "plev")
+  check_range(tlay, this.ref.temp_min,  this.ref.temp_max,  "tlay")
   if present(col_dry)
     check_extent(col_dry, (ncol, nlay), "col_dry")
     check_range(col_dry, FT(0), floatmax(FT), "col_dry")
@@ -335,10 +391,10 @@ function compute_gas_taus!(jtemp, jpress, jeta, tropo, fmajor, this::ty_gas_opti
   npres = get_npres(this)
   ntemp = get_ntemp(this)
   # number of minor contributors, total num absorption coeffs
-  nminorlower  = size(this.minor_scales_with_density_lower)
-  nminorklower = size(this.kminor_lower, 1)
-  nminorupper  = size(this.minor_scales_with_density_upper)
-  nminorkupper = size(this.kminor_upper, 1)
+  nminorlower  = size(this.lower.minor_scales_with_density)
+  nminorklower = size(this.lower.kminor, 1)
+  nminorupper  = size(this.upper.minor_scales_with_density)
+  nminorkupper = size(this.upper.kminor, 1)
 
   # Fill out the array of volume mixing ratios
   for igas in 1:ngas
@@ -369,13 +425,7 @@ function compute_gas_taus!(jtemp, jpress, jeta, tropo, fmajor, this::ty_gas_opti
           ncol,nlay,                        # problem dimensions
           ngas, nflav, neta, npres, ntemp,  # interpolation dimensions
           this.flavor,
-          this.press_ref_log,
-          this.temp_ref,
-          this.press_ref_log_delta,
-          this.temp_ref_min,
-          this.temp_ref_delta,
-          this.press_ref_trop_log,
-          this.vmr_ref,
+          this.ref,
           play,
           tlay,
           col_gas)
@@ -388,20 +438,10 @@ function compute_gas_taus!(jtemp, jpress, jeta, tropo, fmajor, this::ty_gas_opti
           this.gpoint_flavor,
           get_band_lims_gpoint(this.optical_props),
           this.kmajor,
-          this.kminor_lower,
-          this.kminor_upper,
-          this.minor_limits_gpt_lower,
-          this.minor_limits_gpt_upper,
-          this.minor_scales_with_density_lower,
-          this.minor_scales_with_density_upper,
-          this.scale_by_complement_lower,
-          this.scale_by_complement_upper,
-          this.idx_minor_lower,
-          this.idx_minor_upper,
-          this.idx_minor_scaling_lower,
-          this.idx_minor_scaling_upper,
-          this.kminor_start_lower,
-          this.kminor_start_upper,
+          this.lower,
+          this.upper,
+          this.lower_aux,
+          this.upper_aux,
           tropo,
           col_mix,fmajor,fminor,
           play,tlay,col_gas,
@@ -467,7 +507,7 @@ function source!(this::ty_gas_optics_rrtmgp,
                 jtemp, jpress, jeta, tropo, fmajor,
                 sources::ty_source_func_lw,          # Planck sources
                 tlev)                                # optional input
-  FT = eltype(this.vmr_ref) # Float64
+  FT = eltype(this.ref.vmr) # Float64
 
   lay_source_t     = zeros(FT, ngpt,nlay,ncol)
   lev_source_inc_t = zeros(FT, ngpt,nlay,ncol)
@@ -510,7 +550,7 @@ function source!(this::ty_gas_optics_rrtmgp,
               get_nflav(this), get_neta(this), get_npres(this), get_ntemp(this), get_nPlanckTemp(this),
               tlay, tlev_wk, tsfc, fmerge(1,nlay,play[1,1] > play[1,nlay]),
               fmajor, jeta, tropo, jtemp, jpress,
-              get_gpoint_bands(this.optical_props), get_band_lims_gpoint(this.optical_props), this.planck_frac, this.temp_ref_min,
+              get_gpoint_bands(this.optical_props), get_band_lims_gpoint(this.optical_props), this.planck_frac, this.ref.temp_min,
               this.totplnk_delta, this.totplnk, this.gpoint_flavor,
               sfc_source_t, lay_source_t, lev_source_inc_t, lev_source_dec_t)
 
@@ -537,7 +577,7 @@ function load_totplnk(totplnk, planck_frac, rayl_lower, rayl_upper, args...)
   # Temperature steps for Planck function interpolation
   #   Assumes that temperature minimum and max are the same for the absorption coefficient grid and the
   #   Planck grid and the Planck grid is equally spaced
-  this.totplnk_delta =  (this.temp_ref_max-this.temp_ref_min) / (size(this.totplnk, 1)-1)
+  this.totplnk_delta =  (this.ref.temp_max-this.ref.temp_min) / (size(this.totplnk, 1)-1)
   return this
 end
 
@@ -584,15 +624,15 @@ character(len=*),   dimension(:),
                                            minor_gases_upper
 integer,  dimension(:,:),     intent(in) :: minor_limits_gpt_lower,
                                            minor_limits_gpt_upper
-logical(wl), dimension(:),    intent(in) :: minor_scales_with_density_lower,
-                                           minor_scales_with_density_upper
+logical(wl), dimension(:),    intent(in) :: lower.minor_scales_with_density,
+                                           upper.minor_scales_with_density
 character(len=*),   dimension(:),
                              intent(in) :: scaling_gas_lower,
                                            scaling_gas_upper
-logical(wl), dimension(:),    intent(in) :: scale_by_complement_lower,
-                                           scale_by_complement_upper
-integer,  dimension(:),       intent(in) :: kminor_start_lower,
-                                           kminor_start_upper
+logical(wl), dimension(:),    intent(in) :: lower.scale_by_complement,
+                                           upper.scale_by_complement
+integer,  dimension(:),       intent(in) :: lower.kminor_start,
+                                           upper.kminor_start
 real(FT), dimension(:,:,:),   intent(in),
                             allocatable :: rayl_lower, rayl_upper
 character(len=128)                       :: err_message
@@ -617,34 +657,22 @@ gas_names,
 key_species,
 band2gpt,
 band_lims_wavenum,
-press_ref,
-press_ref_trop,
-temp_ref,
-temp_ref_p,
-temp_ref_t,
-vmr_ref,
+ref,
 kmajor,
-kminor_lower,
-kminor_upper,
 gas_minor,
 identifier_minor,
-minor_gases_lower,
-minor_gases_upper,
-minor_limits_gpt_lower,
-minor_limits_gpt_upper,
-minor_scales_with_density_lower,
-minor_scales_with_density_upper,
-scaling_gas_lower,
-scaling_gas_upper,
-scale_by_complement_lower,
-scale_by_complement_upper,
-kminor_start_lower,
-kminor_start_upper)
+lower,
+upper)
   FT = eltype(kmajor)
 
   this = ty_gas_optics_rrtmgp{FT,Int}(
     ty_optical_props_base("ty_gas_optics_rrtmgp optical props", band_lims_wavenum, band2gpt),
-    ntuple(i->nothing, 35)...)
+    ref,
+    AtmosVars(FT),
+    AtmosVars(FT),
+    AuxVars(FT),
+    AuxVars(FT),
+    ntuple(i->nothing, 10)...)
   #
   # Which gases known to the gas optics are present in the host model (available_gases)?
   #
@@ -665,61 +693,50 @@ kminor_start_upper)
   #
   this.gas_names = pack(gas_names, gas_is_present)
 
-  vmr_ref_red = OffsetArray{FT}(undef, 1:size(vmr_ref, 1),0:ngas, 1:size(vmr_ref, 3))
-
-  # Gas 0 is used in single-key species method, set to 1.0 (col_dry)
-  vmr_ref_red[:,0,:] = vmr_ref[:,1,:]
-  for i = 1:ngas
-    idx = loc_in_array(this.gas_names[i], gas_names)
-    vmr_ref_red[:,i,:] = vmr_ref[:,idx+1,:]
-  end
-  this.vmr_ref = vmr_ref_red
   #
   # Reduce minor arrays so variables only contain minor gases that are available
   # Reduce size of minor Arrays
   #
 
-  this.kminor_lower,
+  this.lower.kminor,
   minor_gases_lower_red,
-  this.minor_limits_gpt_lower,
-  this.minor_scales_with_density_lower,
+  this.lower.minor_limits_gpt,
+  this.lower.minor_scales_with_density,
   scaling_gas_lower_red,
-  this.scale_by_complement_lower,
-  this.kminor_start_lower              = reduce_minor_arrays(available_gases,
+  this.lower.scale_by_complement,
+  this.lower.kminor_start              = reduce_minor_arrays(available_gases,
 gas_names,
 gas_minor,
 identifier_minor,
-kminor_lower,
-minor_gases_lower,
-minor_limits_gpt_lower,
-minor_scales_with_density_lower,
-scaling_gas_lower,
-scale_by_complement_lower,
-kminor_start_lower
+lower.kminor,
+lower.minor_gases,
+lower.minor_limits_gpt,
+lower.minor_scales_with_density,
+lower.scaling_gas,
+lower.scale_by_complement,
+lower.kminor_start
 )
 
-  this.kminor_upper,
+  this.upper.kminor,
   minor_gases_upper_red,
-  this.minor_limits_gpt_upper,
-  this.minor_scales_with_density_upper,
+  this.upper.minor_limits_gpt,
+  this.upper.minor_scales_with_density,
   scaling_gas_upper_red,
-  this.scale_by_complement_upper,
-  this.kminor_start_upper = reduce_minor_arrays(available_gases,
+  this.upper.scale_by_complement,
+  this.upper.kminor_start = reduce_minor_arrays(available_gases,
                            gas_names,
                            gas_minor,
                            identifier_minor,
-                           kminor_upper,
-                           minor_gases_upper,
-                           minor_limits_gpt_upper,
-                           minor_scales_with_density_upper,
-                           scaling_gas_upper,
-                           scale_by_complement_upper,
-                           kminor_start_upper
+                           upper.kminor,
+                           upper.minor_gases,
+                           upper.minor_limits_gpt,
+                           upper.minor_scales_with_density,
+                           upper.scaling_gas,
+                           upper.scale_by_complement,
+                           upper.kminor_start
                            )
 
   # Arrays not reduced by the presence, or lack thereof, of a gas
-  this.press_ref = press_ref
-  this.temp_ref  = temp_ref
   this.kmajor    = kmajor
   FT = eltype(kmajor)
 
@@ -732,21 +749,13 @@ kminor_start_lower
   end
 
   # ---- post processing ----
-  # Incoming coefficients file has units of Pa
-  this.press_ref .= this.press_ref
-
-  # creates log reference pressure
-  this.press_ref_log = log.(this.press_ref)
-
-  # log scale of reference pressure
-  this.press_ref_trop_log = log(press_ref_trop)
 
   # Get index of gas (if present) for determining col_gas
-  this.idx_minor_lower = create_idx_minor(this.gas_names, gas_minor, identifier_minor, minor_gases_lower_red)
-  this.idx_minor_upper = create_idx_minor(this.gas_names, gas_minor, identifier_minor, minor_gases_upper_red)
+  this.lower_aux.idx_minor = create_idx_minor(this.gas_names, gas_minor, identifier_minor, minor_gases_lower_red)
+  this.upper_aux.idx_minor = create_idx_minor(this.gas_names, gas_minor, identifier_minor, minor_gases_upper_red)
   # Get index of gas (if present) that has special treatment in density scaling
-  this.idx_minor_scaling_lower = create_idx_minor_scaling(this.gas_names, scaling_gas_lower_red)
-  this.idx_minor_scaling_upper = create_idx_minor_scaling(this.gas_names, scaling_gas_upper_red)
+  this.lower_aux.idx_minor_scaling = create_idx_minor_scaling(this.gas_names, scaling_gas_lower_red)
+  this.upper_aux.idx_minor_scaling = create_idx_minor_scaling(this.gas_names, scaling_gas_upper_red)
 
   # create flavor list
   # Reduce (remap) key_species list; checks that all key gases are present in incoming
@@ -757,17 +766,6 @@ kminor_start_lower
   this.flavor = create_flavor(key_species_red)
   # create gpoint_flavor list
   this.gpoint_flavor = create_gpoint_flavor(key_species_red, get_gpoint_bands(this.optical_props), this.flavor)
-
-  # minimum, maximum reference temperature, pressure -- assumes low-to-high ordering
-  #   for T, high-to-low ordering for p
-  this.temp_ref_min  = this.temp_ref[1]
-  this.temp_ref_max  = this.temp_ref[length(this.temp_ref)]
-  this.press_ref_min = this.press_ref[length(this.press_ref)]
-  this.press_ref_max = this.press_ref[1]
-
-  # creates press_ref_log, temp_ref_delta
-  this.press_ref_log_delta = (log(this.press_ref_min)-log(this.press_ref_max))/(length(this.press_ref)-1)
-  this.temp_ref_delta      = (this.temp_ref_max-this.temp_ref_min)/(length(this.temp_ref)-1)
 
   # Which species are key in one or more bands?
   #   this%flavor is an index into this%gas_names
@@ -850,28 +848,28 @@ get_gases(this::ty_gas_optics_rrtmgp) = this.gas_names
 
 Minimum pressure on the interpolation grids
 """
-get_press_min(this::ty_gas_optics_rrtmgp) = this.press_ref_min
+get_press_min(this::ty_gas_optics_rrtmgp) = this.ref.press_min
 
 """
     get_press_max(this::ty_gas_optics_rrtmgp)
 
 Maximum pressure on the interpolation grids
 """
-get_press_max(this::ty_gas_optics_rrtmgp) = this.press_ref_max
+get_press_max(this::ty_gas_optics_rrtmgp) = this.ref.press_max
 
 """
     get_temp_min(this::ty_gas_optics_rrtmgp)
 
 Minimum temparature on the interpolation grids
 """
-get_temp_min(this::ty_gas_optics_rrtmgp) = this.temp_ref_min
+get_temp_min(this::ty_gas_optics_rrtmgp) = this.ref.temp_min
 
 """
     get_temp_max(this::ty_gas_optics_rrtmgp)
 
 Maximum temparature on the interpolation grids
 """
-get_temp_max(this::ty_gas_optics_rrtmgp) = this.temp_ref_max
+get_temp_max(this::ty_gas_optics_rrtmgp) = this.ref.temp_max
 
 """
     get_col_dry(vmr_h2o, plev, tlay, latitude=nothing)
@@ -1296,5 +1294,7 @@ check_extent(array, s, label) = @assert all(size(array).==s)
 
 # Values
 check_range(val, minV, maxV, label) = any(val .< minV) || any(val .> maxV) ? trim(label) * " values out of range." : ""
+
+include("mo_gas_optics_kernels.jl")
 
 end #module
