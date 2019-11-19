@@ -87,13 +87,12 @@ struct Reference{FT}
   end
 end
 
-mutable struct AuxVars{FT}
+struct AuxVars{I}
   idx_minor#::Vector{I}
   idx_minor_scaling#::Vector{I}
 end
-AuxVars(FT) = AuxVars{FT}(ntuple(i->nothing,2)...)
 
-mutable struct AtmosVars{FT}
+struct AtmosVars{FT}
   minor_limits_gpt#::Array{I,2}
   minor_scales_with_density#::Vector{Bool}
   scale_by_complement#::Vector{Bool}
@@ -101,9 +100,7 @@ mutable struct AtmosVars{FT}
   kminor#::Array{T,3}
   scaling_gas
   minor_gases
-  # AtmosVars(args::FT...) = AtmosVars{FT}(args..., nothing)
 end
-AtmosVars(FT) = AtmosVars{FT}(ntuple(i->nothing,7)...)
 
 mutable struct ty_gas_optics_rrtmgp{T,I} <: ty_gas_optics{T,I}
   optical_props#::ty_optical_props
@@ -113,15 +110,16 @@ mutable struct ty_gas_optics_rrtmgp{T,I} <: ty_gas_optics{T,I}
   lower_aux
   upper_aux
   gas_names#::Vector{String}     # gas names
+  kmajor#::Array{T,4}        #  kmajor(g-point,eta,pressure,temperature)
   flavor#::Array{I, 2}        # major species pair; (2,nflav)
   gpoint_flavor#::Array{I, 2} # flavor = gpoint_flavor(2, g-point)
-  kmajor#::Array{T,4}        #  kmajor(g-point,eta,pressure,temperature)
+  is_key#::Vector{Bool}
+
   krayl#::Array{T, 4} # krayl(g-point,eta,temperature,upper/lower atmosphere)
   planck_frac#::Array{T, 4}   # stored fraction of Planck irradiance in band for given g-point
   totplnk#::Array{T,2}       # integrated Planck irradiance by band; (Planck temperatures,band)
   totplnk_delta#::T # temperature steps in totplnk
   solar_src#::Vector{T} # incoming solar irradiance(g-point)
-  is_key#::Vector{Bool}
 end
 
 # col_dry is the number of molecules per cm-2 of dry air
@@ -658,44 +656,57 @@ lower,
 upper)
   FT = eltype(kmajor)
 
-  this = ty_gas_optics_rrtmgp{FT,Int}(
-    ty_optical_props_base("ty_gas_optics_rrtmgp optical props", band_lims_wavenum, band2gpt),
-    ref,
-    AtmosVars(FT),
-    AtmosVars(FT),
-    AuxVars(FT),
-    AuxVars(FT),
-    ntuple(i->nothing, 10)...)
-  #
+
   # Which gases known to the gas optics are present in the host model (available_gases)?
-  #
-
   gas_is_present = map(x->x in available_gases.gas_name, gas_names)
+  gas_names_present = pack(gas_names, gas_is_present)
 
-  #
-  # Now the number of gases is the union of those known to the k-distribution and provided
-  #   by the host model
-  #
-  ngas = count(gas_is_present)
-  #
-  # Initialize the gas optics object, keeping only those gases known to the
-  #   gas optics and also present in the host model
-  #
-  this.gas_names = pack(gas_names, gas_is_present)
+  reduced_lower = reduce_minor_arrays(available_gases, gas_minor, identifier_minor, lower)
+  reduced_upper = reduce_minor_arrays(available_gases, gas_minor, identifier_minor, upper)
 
-  #
-  # Reduce minor arrays so variables only contain minor gases that are available
-  # Reduce size of minor Arrays
-  #
+  # Get index of gas (if present) for determining col_gas
+  # Get index of gas (if present) that has special treatment in density scaling
+  lower_aux = AuxVars{Int}(create_idx_minor(gas_names_present, gas_minor, identifier_minor, reduced_lower.minor_gases),
+                           create_idx_minor_scaling(gas_names_present, reduced_lower.scaling_gas))
 
-  minor_gases_lower_red, scaling_gas_lower_red =
-    reduce_minor_arrays!(available_gases, gas_minor, identifier_minor, lower, this.lower)
+  upper_aux = AuxVars{Int}(create_idx_minor(gas_names_present, gas_minor, identifier_minor, reduced_upper.minor_gases),
+                           create_idx_minor_scaling(gas_names_present, reduced_upper.scaling_gas))
 
-  minor_gases_upper_red, scaling_gas_upper_red =
-    reduce_minor_arrays!(available_gases, gas_minor, identifier_minor, upper, this.upper)
+  # create flavor list
+  # Reduce (remap) key_species list; checks that all key gases are present in incoming
+  key_species_red,key_species_present_init = create_key_species_reduce(gas_names, gas_names_present, key_species)
+  check_key_species_present_init(gas_names, key_species_present_init)
 
-  # Arrays not reduced by the presence, or lack thereof, of a gas
-  this.kmajor = kmajor
+  flavor = create_flavor(key_species_red)
+  optical_props = ty_optical_props_base("ty_gas_optics_rrtmgp optical props", band_lims_wavenum, band2gpt)
+
+  # create gpoint_flavor list
+  gpoint_flavor = create_gpoint_flavor(key_species_red, get_gpoint_bands(optical_props), flavor)
+
+  # Which species are key in one or more bands?
+  #   flavor is an index into gas_names_present
+  is_key = [false for i in 1:length(gas_names_present)]
+  for j in 1:size(flavor, 2)
+    for i in 1:size(flavor, 1) # should be 2
+      if flavor[i,j] ≠ 0
+        is_key[flavor[i,j]] = true
+      end
+    end
+  end
+
+  this = ty_gas_optics_rrtmgp{FT,Int}(
+    optical_props,
+    ref,
+    reduced_lower,
+    reduced_upper,
+    lower_aux,
+    upper_aux,
+    gas_names_present,
+    kmajor,
+    flavor,
+    gpoint_flavor,
+    is_key,
+    ntuple(i->nothing, 5)...)
 
   if allocated(rayl_lower)
     this.krayl = zeros(FT, size(rayl_lower)...,2)
@@ -703,36 +714,6 @@ upper)
     this.krayl[:,:,:,2] = rayl_upper
   end
 
-  # ---- post processing ----
-
-  # Get index of gas (if present) for determining col_gas
-  this.lower_aux.idx_minor = create_idx_minor(this.gas_names, gas_minor, identifier_minor, minor_gases_lower_red)
-  this.upper_aux.idx_minor = create_idx_minor(this.gas_names, gas_minor, identifier_minor, minor_gases_upper_red)
-  # Get index of gas (if present) that has special treatment in density scaling
-  this.lower_aux.idx_minor_scaling = create_idx_minor_scaling(this.gas_names, scaling_gas_lower_red)
-  this.upper_aux.idx_minor_scaling = create_idx_minor_scaling(this.gas_names, scaling_gas_upper_red)
-
-  # create flavor list
-  # Reduce (remap) key_species list; checks that all key gases are present in incoming
-  key_species_red,key_species_present_init = create_key_species_reduce(gas_names,this.gas_names, key_species)
-  check_key_species_present_init(gas_names,key_species_present_init)
-
-  # create flavor list
-  this.flavor = create_flavor(key_species_red)
-  # create gpoint_flavor list
-  this.gpoint_flavor = create_gpoint_flavor(key_species_red, get_gpoint_bands(this.optical_props), this.flavor)
-
-  # Which species are key in one or more bands?
-  #   this%flavor is an index into this%gas_names
-  #
-  this.is_key = [false for i in 1:get_ngas(this)]
-  for j in 1:size(this.flavor, 2)
-    for i in 1:size(this.flavor, 1) # should be 2
-      if this.flavor[i,j] ≠ 0
-        this.is_key[this.flavor[i,j]] = true
-      end
-    end
-  end
   return this
 
 end
@@ -1013,12 +994,8 @@ function create_key_species_reduce(gas_names, gas_names_red, key_species)
   # logical, dimension(:), allocatable, intent(out) :: key_species_present_init
   # integer :: ip, ia, it, np, na, nt
 
-  np = size(key_species,1)
-  na = size(key_species,2)
-  nt = size(key_species,3)
-  key_species_red = Array{Int}(undef, size(key_species,1),
-                                      size(key_species,2),
-                                      size(key_species,3))
+  np,na,nt = size(key_species)
+  key_species_red = Array{Int}(undef, size(key_species)...)
   key_species_present_init = Vector{Bool}(undef, size(gas_names))
   key_species_present_init = true
 
@@ -1053,19 +1030,17 @@ Reduce minor arrays so variables only contain minor gases that are available
  - `gas_minor` array of minor gases
  - `identifier_minor`
  - `atmos` original minor `AtmosVars` (in)
- - `atmos_red` reduced minor `AtmosVars` (out)
 
-# # Local variables
-# integer :: i, j
-# integer :: idx_mnr, nm, tot_g, red_nm
-# integer :: icnt, n_elim, ng
-# logical, dimension(:), allocatable :: gas_is_present
+# Local variables
+integer :: i, j
+integer :: idx_mnr, nm, tot_g, red_nm
+integer :: icnt, n_elim, ng
+logical, dimension(:), allocatable :: gas_is_present
 """
-function reduce_minor_arrays!(available_gases::ty_gas_concs,
-                              gas_minor,
-                              identifier_minor,
-                              atmos::AtmosVars{FT},
-                              atmos_red::AtmosVars{FT}) where FT
+function reduce_minor_arrays(available_gases::ty_gas_concs,
+                             gas_minor,
+                             identifier_minor,
+                             atmos::AtmosVars{FT}) where FT
 
   nm = length(atmos.minor_gases)
   tot_g=0
@@ -1084,22 +1059,22 @@ function reduce_minor_arrays!(available_gases::ty_gas_concs,
     atmos_red_minor_gases               = atmos.minor_gases
     atmos_red_scaling_gas               = atmos.scaling_gas
 
-    atmos_red.minor_scales_with_density = atmos.minor_scales_with_density
-    atmos_red.scale_by_complement       = atmos.scale_by_complement
-    atmos_red.kminor_start              = atmos.kminor_start
+    atmos_red_minor_scales_with_density = atmos.minor_scales_with_density
+    atmos_red_scale_by_complement       = atmos.scale_by_complement
+    atmos_red_kminor_start              = atmos.kminor_start
 
-    atmos_red.kminor                    = atmos.kminor
-    atmos_red.minor_limits_gpt          = atmos.minor_limits_gpt
+    atmos_red_kminor                    = atmos.kminor
+    atmos_red_minor_limits_gpt          = atmos.minor_limits_gpt
   else
     atmos_red_minor_gases               = pack(atmos.minor_gases              , gas_is_present)
     atmos_red_scaling_gas               = pack(atmos.scaling_gas              , gas_is_present)
 
-    atmos_red.minor_scales_with_density = pack(atmos.minor_scales_with_density, gas_is_present)
-    atmos_red.scale_by_complement       = pack(atmos.scale_by_complement      , gas_is_present)
-    atmos_red.kminor_start              = pack(atmos.kminor_start       , gas_is_present)
+    atmos_red_minor_scales_with_density = pack(atmos.minor_scales_with_density, gas_is_present)
+    atmos_red_scale_by_complement       = pack(atmos.scale_by_complement      , gas_is_present)
+    atmos_red_kminor_start              = pack(atmos.kminor_start       , gas_is_present)
 
-    atmos_red.kminor = zeros(FT, tot_g, size(atmos.kminor,2), size(atmos.kminor,3))
-    atmos_red.minor_limits_gpt = Array{Int}(undef, 2, red_nm)
+    atmos_red_kminor = zeros(FT, tot_g, size(atmos.kminor,2), size(atmos.kminor,3))
+    atmos_red_minor_limits_gpt = Array{Int}(undef, 2, red_nm)
 
     icnt = 0
     n_elim = 0
@@ -1107,17 +1082,23 @@ function reduce_minor_arrays!(available_gases::ty_gas_concs,
       ng = atmos.minor_limits_gpt[2,i]-atmos.minor_limits_gpt[1,i]+1
       if gas_is_present[i]
         icnt = icnt + 1
-        atmos_red.minor_limits_gpt[1:2,icnt] = atmos.minor_limits_gpt[1:2,i]
-        atmos_red.kminor_start[icnt] = atmos.kminor_start[i]-n_elim
+        atmos_red_minor_limits_gpt[1:2,icnt] = atmos.minor_limits_gpt[1:2,i]
+        atmos_red_kminor_start[icnt] = atmos.kminor_start[i]-n_elim
         for j = 1:ng
-          atmos_red.kminor[atmos_red.kminor_start[icnt]+j-1,:,:] = atmos.kminor[atmos.kminor_start[i]+j-1,:,:]
+          atmos_red_kminor[atmos_red_kminor_start[icnt]+j-1,:,:] = atmos.kminor[atmos.kminor_start[i]+j-1,:,:]
         end
       else
         n_elim = n_elim + ng
       end
     end
   end
-  return atmos_red_minor_gases, atmos_red_scaling_gas, atmos_red
+  return AtmosVars{FT}(atmos_red_minor_limits_gpt,
+                       atmos_red_minor_scales_with_density,
+                       atmos_red_scale_by_complement,
+                       atmos_red_kminor_start,
+                       atmos_red_kminor,
+                       atmos_red_scaling_gas,
+                       atmos_red_minor_gases)
 
 end
 
