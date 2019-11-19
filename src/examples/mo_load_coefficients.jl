@@ -1,19 +1,24 @@
 module mo_load_coefficients
 
-  using ..mo_gas_concentrations
-  using ..mo_gas_optics_rrtmgp
-  using ..fortran_intrinsics
-  using NCDatasets
+using ..mo_gas_concentrations
+using ..mo_gas_optics_rrtmgp
+using ..fortran_intrinsics
+using NCDatasets
 
-  export load_and_init
+export load_and_init
 
-  function read_char_vec(ds, var_name)
-    tmp = ds[var_name][:]
-    return Array{String}([trim(join(tmp[:,i])) for i = 1:size(tmp, 2)])
-  end
+function read_char_vec(ds, var_name)
+  tmp = ds[var_name][:]
+  return Array{String}([trim(join(tmp[:,i])) for i = 1:size(tmp, 2)])
+end
 
-#--------------------------
-  function load_and_init(ds, available_gases::ty_gas_concs{FT}) where FT
+"""
+    load_and_init(ds, available_gases::ty_gas_concs{FT}) where FT
+
+Initialize the gas optics class with data. The calls look slightly different depending
+  on whether the radiation sources are internal to the atmosphere (longwave) or external (shortwave)
+"""
+function load_and_init(ds, available_gases::ty_gas_concs{FT}) where FT
 
   # Reading the properties from the NetCDF file
 
@@ -28,15 +33,9 @@ module mo_load_coefficients
   scale_by_complement_lower       = Array{Bool}(ds["scale_by_complement_lower"][:])
   scale_by_complement_upper       = Array{Bool}(ds["scale_by_complement_upper"][:])
   band_lims                       = Array{FT}(ds["bnd_limits_wavenumber"][:])
-  press_ref                       = Array{FT}(ds["press_ref"][:])
-  temp_ref                        = Array{FT}(ds["temp_ref"][:])
   kminor_lower                    = Array{FT}(ds["kminor_lower"][:])
   kminor_upper                    = Array{FT}(ds["kminor_upper"][:])
-  vmr_ref                         = Array{FT}(ds["vmr_ref"][:])
   kmajor                          = Array{FT}(ds["kmajor"][:])
-  temp_ref_p                      = FT(ds["absorption_coefficient_ref_P"][:])
-  temp_ref_t                      = FT(ds["absorption_coefficient_ref_T"][:])
-  press_ref_trop                  = FT(ds["press_ref_trop"][:])
 
   gas_names                       = read_char_vec(ds, "gas_names")
   gas_minor                       = read_char_vec(ds, "gas_minor")
@@ -49,17 +48,20 @@ module mo_load_coefficients
   rayl_lower = haskey(ds,"rayl_lower") ? Array{FT}(ds["rayl_lower"][:]) : nothing
   rayl_upper = haskey(ds,"rayl_upper") ? Array{FT}(ds["rayl_upper"][:]) : nothing
 
+  ref = Reference(Array{FT}(ds["press_ref"][:]),
+                  Array{FT}(ds["temp_ref"][:]),
+                  FT(ds["press_ref_trop"][:]),
+                  Array{FT}(ds["vmr_ref"][:]),
+                  available_gases.gas_name,
+                  gas_names
+                  )
+
   args = (available_gases,
           gas_names,
           key_species,
           band2gpt,
           band_lims,
-          press_ref,
-          press_ref_trop,
-          temp_ref,
-          temp_ref_p,
-          temp_ref_t,
-          vmr_ref,
+          ref,
           kmajor,
           kminor_lower,
           kminor_upper,
@@ -78,10 +80,6 @@ module mo_load_coefficients
           kminor_start_lower,
           kminor_start_upper,)
 
- #   ! Initialize the gas optics class with data. The calls look slightly different depending
- #   !   on whether the radiation sources are internal to the atmosphere (longwave) or external (shortwave)
- #   ! gas_optics%load() returns a string; a non-empty string indicates an error.
-
   if haskey(ds,"totplnk")
     totplnk     = Array{FT}(ds["totplnk"][:])
     planck_frac = Array{FT}(ds["plank_fraction"][:])
@@ -92,10 +90,7 @@ module mo_load_coefficients
   end
   return kdist
 
-  #-------------------------------
-
-  end
-#--------------------------
-
-
 end
+
+
+end #module
