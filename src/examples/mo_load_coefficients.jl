@@ -32,6 +32,7 @@ function load_and_init(ds, available_gases::ty_gas_concs{FT}) where FT
 
   rayl_lower = haskey(ds,"rayl_lower") ? Array{FT}(ds["rayl_lower"][:]) : nothing
   rayl_upper = haskey(ds,"rayl_upper") ? Array{FT}(ds["rayl_upper"][:]) : nothing
+  @assert haskey(ds,"rayl_lower") == haskey(ds,"rayl_upper")
 
   lower = AtmosVars{FT}(Array{Int}(ds["minor_limits_gpt_lower"][:]),
                         Array{Bool}(ds["minor_scales_with_density_lower"][:]),

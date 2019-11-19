@@ -390,11 +390,6 @@ function compute_gas_taus!(jtemp, jpress, jeta, tropo, fmajor, this::ty_gas_opti
   neta  = get_neta(this)
   npres = get_npres(this)
   ntemp = get_ntemp(this)
-  # number of minor contributors, total num absorption coeffs
-  nminorlower  = size(this.lower.minor_scales_with_density)
-  nminorklower = size(this.lower.kminor, 1)
-  nminorupper  = size(this.upper.minor_scales_with_density)
-  nminorkupper = size(this.upper.kminor, 1)
 
   # Fill out the array of volume mixing ratios
   for igas in 1:ngas
@@ -432,8 +427,6 @@ function compute_gas_taus!(jtemp, jpress, jeta, tropo, fmajor, this::ty_gas_opti
   @timeit to_gor "compute_tau_absorption!" compute_tau_absorption!(tau,
           ncol,nlay,nband,ngpt,                      # dimensions
           ngas,nflav,neta,npres,ntemp,
-          nminorlower, nminorklower,                # number of minor contributors, total num absorption coeffs
-          nminorupper, nminorkupper,
           idx_h2o,
           this.gpoint_flavor,
           get_band_lims_gpoint(this.optical_props),
@@ -676,12 +669,9 @@ upper)
   #
   # Which gases known to the gas optics are present in the host model (available_gases)?
   #
-  ngas = length(gas_names)
-  gas_is_present = Vector{Bool}(undef, ngas...)
 
-  for i in 1:ngas
-    gas_is_present[i] = gas_names[i] in available_gases.gas_name
-  end
+  gas_is_present = map(x->x in available_gases.gas_name, gas_names)
+
   #
   # Now the number of gases is the union of those known to the k-distribution and provided
   #   by the host model
@@ -698,52 +688,17 @@ upper)
   # Reduce size of minor Arrays
   #
 
-  this.lower.kminor,
-  minor_gases_lower_red,
-  this.lower.minor_limits_gpt,
-  this.lower.minor_scales_with_density,
-  scaling_gas_lower_red,
-  this.lower.scale_by_complement,
-  this.lower.kminor_start              = reduce_minor_arrays(available_gases,
-gas_names,
-gas_minor,
-identifier_minor,
-lower.kminor,
-lower.minor_gases,
-lower.minor_limits_gpt,
-lower.minor_scales_with_density,
-lower.scaling_gas,
-lower.scale_by_complement,
-lower.kminor_start
-)
+  minor_gases_lower_red, scaling_gas_lower_red =
+    reduce_minor_arrays!(available_gases, gas_minor, identifier_minor, lower, this.lower)
 
-  this.upper.kminor,
-  minor_gases_upper_red,
-  this.upper.minor_limits_gpt,
-  this.upper.minor_scales_with_density,
-  scaling_gas_upper_red,
-  this.upper.scale_by_complement,
-  this.upper.kminor_start = reduce_minor_arrays(available_gases,
-                           gas_names,
-                           gas_minor,
-                           identifier_minor,
-                           upper.kminor,
-                           upper.minor_gases,
-                           upper.minor_limits_gpt,
-                           upper.minor_scales_with_density,
-                           upper.scaling_gas,
-                           upper.scale_by_complement,
-                           upper.kminor_start
-                           )
+  minor_gases_upper_red, scaling_gas_upper_red =
+    reduce_minor_arrays!(available_gases, gas_minor, identifier_minor, upper, this.upper)
 
   # Arrays not reduced by the presence, or lack thereof, of a gas
-  this.kmajor    = kmajor
-  FT = eltype(kmajor)
-
-  @assert allocated(rayl_lower) == allocated(rayl_upper)
+  this.kmajor = kmajor
 
   if allocated(rayl_lower)
-    this.krayl = zeros(FT, size(rayl_lower,1),size(rayl_lower,2),size(rayl_lower,3),2)
+    this.krayl = zeros(FT, size(rayl_lower)...,2)
     this.krayl[:,:,:,1] = rayl_lower
     this.krayl[:,:,:,2] = rayl_upper
   end
@@ -811,12 +766,11 @@ function get_minor_list(this::ty_gas_optics_rrtmgp, gas_desc::ty_gas_concs, ngas
   # logical, dimension(size(names_spec))                 :: gas_is_present
   # integer                                              :: igas, icnt
 
+  # gas_is_present = map(x->x in gas_desc.gas_name, names_spec)
   for igas = 1:get_ngas(this)
     gas_is_present[igas] = names_spec[igas] in gas_desc.gas_name
   end
-  icnt = count(gas_is_present)
-  minor_list = Vector{String}(undef, icnt)
-  minor_list .= pack(this.gas_names, gas_is_present)
+  minor_list = pack(this.gas_names, gas_is_present)
   return minor_list
 end
 
@@ -1086,110 +1040,84 @@ function create_key_species_reduce(gas_names, gas_names_red, key_species)
 
 end
 
-# ---------------------------------------------------------------------------------------
-function reduce_minor_arrays(available_gases::ty_gas_concs,
-gas_names,
-gas_minor,
-identifier_minor,
-kminor_atm,
-minor_gases_atm,
-minor_limits_gpt_atm,
-minor_scales_with_density_atm,
-scaling_gas_atm,
-scale_by_complement_atm,
-kminor_start_atm
-# kminor_atm_red,
-# minor_gases_atm_red,
-# minor_limits_gpt_atm_red,
-# minor_scales_with_density_atm_red,
-# scaling_gas_atm_red,
-# scale_by_complement_atm_red,
-# kminor_start_atm_red
-)
+"""
+    reduce_minor_arrays!(available_gases::ty_gas_concs,
+                              gas_minor,
+                              identifier_minor,
+                              atmos::AtmosVars{FT},
+                              atmos_red::AtmosVars{FT})
 
-  # class(ty_gas_concs),                intent(in   ) :: available_gases
-  # character(len=*), dimension(:),     intent(in) :: gas_names
-  # real(FT),         dimension(:,:,:), intent(in) :: kminor_atm
-  # character(len=*), dimension(:),     intent(in) :: gas_minor,
-  #                                                   identifier_minor
-  # character(len=*), dimension(:),     intent(in) :: minor_gases_atm
-  # integer,          dimension(:,:),   intent(in) :: minor_limits_gpt_atm
-  # logical(wl),      dimension(:),     intent(in) :: minor_scales_with_density_atm
-  # character(len=*), dimension(:),     intent(in) :: scaling_gas_atm
-  # logical(wl),      dimension(:),     intent(in) :: scale_by_complement_atm
-  # integer,          dimension(:),     intent(in) :: kminor_start_atm
-  # real(FT),         dimension(:,:,:), allocatable, intent(out) :: kminor_atm_red
-  # character(len=*), dimension(:),     allocatable, intent(out) :: minor_gases_atm_red
-  # integer,          dimension(:,:),   allocatable, intent(out) :: minor_limits_gpt_atm_red
-  # logical(wl),      dimension(:),     allocatable, intent(out) :: minor_scales_with_density_atm_red
-  # character(len=*), dimension(:),     allocatable, intent(out) :: scaling_gas_atm_red
-  # logical(wl),      dimension(:),     allocatable, intent(out) :: scale_by_complement_atm_red
-  # integer,          dimension(:),     allocatable, intent(out) :: kminor_start_atm_red
+Reduce minor arrays so variables only contain minor gases that are available
 
-  # # Local variables
-  # integer :: i, j
-  # integer :: idx_mnr, nm, tot_g, red_nm
-  # integer :: icnt, n_elim, ng
-  # logical, dimension(:), allocatable :: gas_is_present
-  FT = eltype(kminor_atm)
+ - `available_gases` gas concentrations `ty_gas_concs`
+ - `gas_minor` array of minor gases
+ - `identifier_minor`
+ - `atmos` original minor `AtmosVars` (in)
+ - `atmos_red` reduced minor `AtmosVars` (out)
 
-  nm = length(minor_gases_atm)
+# # Local variables
+# integer :: i, j
+# integer :: idx_mnr, nm, tot_g, red_nm
+# integer :: icnt, n_elim, ng
+# logical, dimension(:), allocatable :: gas_is_present
+"""
+function reduce_minor_arrays!(available_gases::ty_gas_concs,
+                              gas_minor,
+                              identifier_minor,
+                              atmos::AtmosVars{FT},
+                              atmos_red::AtmosVars{FT}) where FT
+
+  nm = length(atmos.minor_gases)
   tot_g=0
-  gas_is_present = Vector{Bool}(undef, nm)
-  for i = 1:length(minor_gases_atm)
-    idx_mnr = loc_in_array(minor_gases_atm[i], identifier_minor)
-    gas_is_present[i] = gas_minor[idx_mnr] in available_gases.gas_name
+
+  mask = map(x->loc_in_array(x, identifier_minor), atmos.minor_gases)
+  gas_is_present = map(x->x in available_gases.gas_name, gas_minor[mask])
+
+  for i = 1:length(atmos.minor_gases)
     if gas_is_present[i]
-      tot_g = tot_g + (minor_limits_gpt_atm[2,i]-minor_limits_gpt_atm[1,i]+1)
+      tot_g = tot_g + (atmos.minor_limits_gpt[2,i]-atmos.minor_limits_gpt[1,i]+1)
     end
   end
   red_nm = count(gas_is_present)
 
   if red_nm == nm
-    kminor_atm_red = kminor_atm
-    minor_gases_atm_red = minor_gases_atm
-    minor_limits_gpt_atm_red = minor_limits_gpt_atm
-    minor_scales_with_density_atm_red = minor_scales_with_density_atm
-    scaling_gas_atm_red = scaling_gas_atm
-    scale_by_complement_atm_red = scale_by_complement_atm
-    kminor_start_atm_red = kminor_start_atm
-  else
-    minor_gases_atm_red= pack(minor_gases_atm, gas_is_present)
-    minor_scales_with_density_atm_red = pack(minor_scales_with_density_atm,
-      gas_is_present)
-    scaling_gas_atm_red = pack(scaling_gas_atm,
-      gas_is_present)
-    scale_by_complement_atm_red = pack(scale_by_complement_atm,
-      gas_is_present)
-    kminor_start_atm_red = pack(kminor_start_atm,
-      gas_is_present)
+    atmos_red_minor_gases               = atmos.minor_gases
+    atmos_red_scaling_gas               = atmos.scaling_gas
 
-    minor_limits_gpt_atm_red = Array{Int}(undef, 2, red_nm)
-    kminor_atm_red = zeros(FT, tot_g, size(kminor_atm,2), size(kminor_atm,3))
+    atmos_red.minor_scales_with_density = atmos.minor_scales_with_density
+    atmos_red.scale_by_complement       = atmos.scale_by_complement
+    atmos_red.kminor_start              = atmos.kminor_start
+
+    atmos_red.kminor                    = atmos.kminor
+    atmos_red.minor_limits_gpt          = atmos.minor_limits_gpt
+  else
+    atmos_red_minor_gases               = pack(atmos.minor_gases              , gas_is_present)
+    atmos_red_scaling_gas               = pack(atmos.scaling_gas              , gas_is_present)
+
+    atmos_red.minor_scales_with_density = pack(atmos.minor_scales_with_density, gas_is_present)
+    atmos_red.scale_by_complement       = pack(atmos.scale_by_complement      , gas_is_present)
+    atmos_red.kminor_start              = pack(atmos.kminor_start       , gas_is_present)
+
+    atmos_red.kminor = zeros(FT, tot_g, size(atmos.kminor,2), size(atmos.kminor,3))
+    atmos_red.minor_limits_gpt = Array{Int}(undef, 2, red_nm)
 
     icnt = 0
     n_elim = 0
     for i = 1:nm
-      ng = minor_limits_gpt_atm[2,i]-minor_limits_gpt_atm[1,i]+1
+      ng = atmos.minor_limits_gpt[2,i]-atmos.minor_limits_gpt[1,i]+1
       if gas_is_present[i]
         icnt = icnt + 1
-        minor_limits_gpt_atm_red[1:2,icnt] = minor_limits_gpt_atm[1:2,i]
-        kminor_start_atm_red[icnt] = kminor_start_atm[i]-n_elim
+        atmos_red.minor_limits_gpt[1:2,icnt] = atmos.minor_limits_gpt[1:2,i]
+        atmos_red.kminor_start[icnt] = atmos.kminor_start[i]-n_elim
         for j = 1:ng
-          kminor_atm_red[kminor_start_atm_red[icnt]+j-1,:,:] = kminor_atm[kminor_start_atm[i]+j-1,:,:]
+          atmos_red.kminor[atmos_red.kminor_start[icnt]+j-1,:,:] = atmos.kminor[atmos.kminor_start[i]+j-1,:,:]
         end
       else
         n_elim = n_elim + ng
       end
     end
   end
-  return kminor_atm_red,
-         minor_gases_atm_red,
-         minor_limits_gpt_atm_red,
-         minor_scales_with_density_atm_red,
-         scaling_gas_atm_red,
-         scale_by_complement_atm_red,
-         kminor_start_atm_red
+  return atmos_red_minor_gases, atmos_red_scaling_gas, atmos_red
 
 end
 

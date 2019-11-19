@@ -178,8 +178,6 @@ integer, dimension(ncol,2) :: itropo_lower, itropo_upper
 function compute_tau_absorption!(tau,
               ncol,nlay,nbnd,ngpt,                  # dimensions
               ngas,nflav,neta,npres,ntemp,
-              nminorlower, nminorklower,           # number of minor contributors, total num absorption coeffs
-              nminorupper, nminorkupper,
               idx_h2o,
               gpoint_flavor,
               band_lims_gpt,
@@ -238,8 +236,6 @@ function compute_tau_absorption!(tau,
          nflav,
          ntemp,
          neta,
-         nminorlower,
-         nminorklower,
          idx_h2o,
          gpoint_flavor[1,:],
          lower,
@@ -258,7 +254,6 @@ function compute_tau_absorption!(tau,
   gas_optical_depths_minor!(
          ncol,nlay,ngpt,              # dimensions
          ngas,nflav,ntemp,neta,
-         nminorupper,nminorkupper,
          idx_h2o,
          gpoint_flavor[2,:],
          upper,
@@ -378,8 +373,6 @@ function gas_optical_depths_minor!(ncol,
                                    nflav,
                                    ntemp,
                                    neta,
-                                   nminor,
-                                   nminork,
                                    idx_h2o,
                                    gpt_flv,
                                    atmos,
@@ -393,6 +386,10 @@ function gas_optical_depths_minor!(ncol,
                                    jtemp,
                                    tau,
                                    callername)
+
+  # number of minor contributors, total num absorption coeffs
+  nminork = size(atmos.kminor, 1)
+  nminor  = size(atmos.minor_scales_with_density)
   #
   # Guard against layer limits being 0 -- that means don't do anything i.e. there are no
   #   layers with pressures in the upper or lower atmosphere respectively
