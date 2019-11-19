@@ -31,14 +31,15 @@ Contains up, down, net and direct downward fluxes
 
 $(DocStringExtensions.FIELDS)
 """
-mutable struct ty_fluxes_broadband{FT} <: ty_fluxes{FT}
+struct ty_fluxes_broadband{FT} <: ty_fluxes{FT}
   flux_up#::Array{FT,2}
   flux_dn#::Array{FT,2}
   flux_net#::Array{FT,2}
   flux_dn_dir#::Array{FT,2}
+  ty_fluxes_broadband(FT, s, include_direct::Bool=false) =
+    include_direct ? new{FT}(ntuple(i->Array{FT}(undef, s...),4)...) :
+                     new{FT}(ntuple(i->Array{FT}(undef, s...),3)...,nothing)
 end
-
-ty_fluxes_broadband(FT) = ty_fluxes_broadband{FT}(ntuple(i->nothing, 4)...)
 
 """
     reduce!(this::ty_fluxes_broadband,
@@ -86,16 +87,16 @@ function reduce!(this::ty_fluxes_broadband,
     this.flux_dn .= sum_broadband(ncol, nlev, ngpt, gpt_flux_dn)
   end
   if associated(this.flux_dn_dir)
-    this.flux_dn_dir = sum_broadband(ncol, nlev, ngpt, gpt_flux_dn_dir)
+    this.flux_dn_dir .= sum_broadband(ncol, nlev, ngpt, gpt_flux_dn_dir)
   end
 
   if associated(this.flux_net)
 
     #  Reuse down and up results if possible
     if associated(this.flux_dn) && associated(this.flux_up)
-      this.flux_net = net_broadband(ncol, nlev,      this.flux_dn, this.flux_up)
+      this.flux_net .= net_broadband(ncol, nlev,      this.flux_dn, this.flux_up)
     else
-      this.flux_net = net_broadband(ncol, nlev, ngpt, gpt_flux_dn,  gpt_flux_up)
+      this.flux_net .= net_broadband(ncol, nlev, ngpt, gpt_flux_dn,  gpt_flux_up)
     end
   end
 end
@@ -113,4 +114,4 @@ are_desired(this::ty_fluxes_broadband) =
         associated(this.flux_dn_dir),
         associated(this.flux_net)] )
 
-end
+end #module

@@ -160,12 +160,12 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
   #
   # Loop over blocks
   #
-  fluxes = ty_fluxes_broadband(FT)
+  fluxes = ty_fluxes_broadband(FT, (size(flux_up,1),size(flux_up,2)), true)
 
   b_tot = (compile_first ? 1 : nblocks)
   @showprogress 1 "Computing..." for b = 1:b_tot
-    fup = fluxes.flux_up = @view(flux_up[:,:,b])
-    fdn = fluxes.flux_dn = @view(flux_dn[:,:,b])
+    fluxes.flux_up .= FT(0)
+    fluxes.flux_dn .= FT(0)
     #
     # Compute the optical properties of the atmosphere and the Planck source functions
     #    from pressures, temperatures, and gas concentrations...
@@ -222,6 +222,8 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
             fluxes)
 
 
+    flux_up[:,:,b] .= fluxes.flux_up
+    flux_dn[:,:,b] .= fluxes.flux_dn
     #
     # Zero out fluxes for which the original solar zenith angle is > 90 degrees.
     #
@@ -232,8 +234,6 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
       end
     end
 
-    @assert fup === fluxes.flux_up
-    @assert fdn === fluxes.flux_dn
   end
 
   # reshaping the flux_up and flux_dn arrays for comparison with Fortran code.

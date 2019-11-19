@@ -250,7 +250,7 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
     end
   end
 
-  fluxes = ty_fluxes_broadband(FT)
+  fluxes = ty_fluxes_broadband(FT, size(flux_up), is_sw)
   #
   # Multiple iterations for big problem sizes, and to help identify data movement
   #   For CPUs we can introduce OpenMP threading over loop iterations
@@ -261,8 +261,8 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
     #
     # Solvers
     #
-    fluxes.flux_up = @view(flux_up[:,:])
-    fluxes.flux_dn = @view(flux_dn[:,:])
+    fluxes.flux_up .= FT(0)
+    fluxes.flux_dn .= FT(0)
     if is_lw
       gas_optics_int!(k_dist, p_lay, p_lev,
                   t_lay, t_sfc,
@@ -278,7 +278,7 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
               emis_sfc,
               fluxes)
     else
-      fluxes.flux_dn_dir = flux_dir[:,:]
+      fluxes.flux_dn_dir .= flux_dir
 
       gas_optics_ext!(k_dist, p_lay, p_lev,
                   t_lay,
@@ -292,6 +292,8 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
               sfc_alb_dir, sfc_alb_dif,
               fluxes)
     end
+    flux_up .= fluxes.flux_up
+    flux_dn .= fluxes.flux_dn
   end
 
 

@@ -160,11 +160,11 @@ function rfmip_clear_sky_lw(ds, optical_props_constructor; compile_first=false)
   #
   # Loop over blocks
   #
-  fluxes = ty_fluxes_broadband(FT)
+  fluxes = ty_fluxes_broadband(FT, (size(flux_up,1),size(flux_up,2)))
 
   for b = 1:(compile_first ? 1 : nblocks)
-    fup = fluxes.flux_up = @view(flux_up[:,:,b])
-    fdn = fluxes.flux_dn = @view(flux_dn[:,:,b])
+    fluxes.flux_up .= FT(0)
+    fluxes.flux_dn .= FT(0)
 
     for icol = 1:block_size
       for ibnd = 1:nbnd
@@ -183,8 +183,9 @@ function rfmip_clear_sky_lw(ds, optical_props_constructor; compile_first=false)
                 tlev = t_lev[:,:,b])
 
     rte_lw!(optical_props,top_at_1,source,sfc_emis_spec,fluxes,nothing,n_quad_angles)
-    @assert fup === fluxes.flux_up # check if fluxes.flux_up/dn still refers to flux_up[:,:,b]
-    @assert fdn === fluxes.flux_dn
+
+    flux_up[:,:,b] .= fluxes.flux_up
+    flux_dn[:,:,b] .= fluxes.flux_dn
 
   end
 
