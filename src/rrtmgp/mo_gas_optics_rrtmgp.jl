@@ -109,10 +109,10 @@ AtmosVars(FT) = AtmosVars{FT}(ntuple(i->nothing,7)...)
 mutable struct ty_gas_optics_rrtmgp{T,I} <: ty_gas_optics{T,I}
   optical_props#::ty_optical_props
   ref#::Reference
-  upper
   lower
-  upper_aux
+  upper
   lower_aux
+  upper_aux
   gas_names#::Vector{String}     # gas names
   flavor#::Array{I, 2}        # major species pair; (2,nflav)
   gpoint_flavor#::Array{I, 2} # flavor = gpoint_flavor(2, g-point)
@@ -641,15 +641,15 @@ character(len=*),   dimension(:),
                                            minor_gases_upper
 integer,  dimension(:,:),     intent(in) :: minor_limits_gpt_lower,
                                            minor_limits_gpt_upper
-logical(wl), dimension(:),    intent(in) :: minor_scales_with_density_lower,
-                                           minor_scales_with_density_upper
+logical(wl), dimension(:),    intent(in) :: lower.minor_scales_with_density,
+                                           upper.minor_scales_with_density
 character(len=*),   dimension(:),
                              intent(in) :: scaling_gas_lower,
                                            scaling_gas_upper
-logical(wl), dimension(:),    intent(in) :: scale_by_complement_lower,
-                                           scale_by_complement_upper
-integer,  dimension(:),       intent(in) :: kminor_start_lower,
-                                           kminor_start_upper
+logical(wl), dimension(:),    intent(in) :: lower.scale_by_complement,
+                                           upper.scale_by_complement
+integer,  dimension(:),       intent(in) :: lower.kminor_start,
+                                           upper.kminor_start
 real(FT), dimension(:,:,:),   intent(in),
                             allocatable :: rayl_lower, rayl_upper
 character(len=128)                       :: err_message
@@ -676,22 +676,10 @@ band2gpt,
 band_lims_wavenum,
 ref,
 kmajor,
-kminor_lower,
-kminor_upper,
 gas_minor,
 identifier_minor,
-minor_gases_lower,
-minor_gases_upper,
-minor_limits_gpt_lower,
-minor_limits_gpt_upper,
-minor_scales_with_density_lower,
-minor_scales_with_density_upper,
-scaling_gas_lower,
-scaling_gas_upper,
-scale_by_complement_lower,
-scale_by_complement_upper,
-kminor_start_lower,
-kminor_start_upper)
+lower,
+upper)
   FT = eltype(kmajor)
 
   this = ty_gas_optics_rrtmgp{FT,Int}(
@@ -737,13 +725,13 @@ kminor_start_upper)
 gas_names,
 gas_minor,
 identifier_minor,
-kminor_lower,
-minor_gases_lower,
-minor_limits_gpt_lower,
-minor_scales_with_density_lower,
-scaling_gas_lower,
-scale_by_complement_lower,
-kminor_start_lower
+lower.kminor,
+lower.minor_gases,
+lower.minor_limits_gpt,
+lower.minor_scales_with_density,
+lower.scaling_gas,
+lower.scale_by_complement,
+lower.kminor_start
 )
 
   this.upper.kminor,
@@ -756,13 +744,13 @@ kminor_start_lower
                            gas_names,
                            gas_minor,
                            identifier_minor,
-                           kminor_upper,
-                           minor_gases_upper,
-                           minor_limits_gpt_upper,
-                           minor_scales_with_density_upper,
-                           scaling_gas_upper,
-                           scale_by_complement_upper,
-                           kminor_start_upper
+                           upper.kminor,
+                           upper.minor_gases,
+                           upper.minor_limits_gpt,
+                           upper.minor_scales_with_density,
+                           upper.scaling_gas,
+                           upper.scale_by_complement,
+                           upper.kminor_start
                            )
 
   # Arrays not reduced by the presence, or lack thereof, of a gas

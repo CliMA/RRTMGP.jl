@@ -22,31 +22,31 @@ function load_and_init(ds, available_gases::ty_gas_concs{FT}) where FT
 
   # Reading the properties from the NetCDF file
 
-  band2gpt                        = Array{Int}(ds["bnd_limits_gpt"][:])
-  minor_limits_gpt_lower          = Array{Int}(ds["minor_limits_gpt_lower"][:])
-  minor_limits_gpt_upper          = Array{Int}(ds["minor_limits_gpt_upper"][:])
-  key_species                     = Array{Int}(ds["key_species"][:])
-  kminor_start_lower              = Array{Int}(ds["kminor_start_lower"][:])
-  kminor_start_upper              = Array{Int}(ds["kminor_start_upper"][:])
-  minor_scales_with_density_lower = Array{Bool}(ds["minor_scales_with_density_lower"][:])
-  minor_scales_with_density_upper = Array{Bool}(ds["minor_scales_with_density_upper"][:])
-  scale_by_complement_lower       = Array{Bool}(ds["scale_by_complement_lower"][:])
-  scale_by_complement_upper       = Array{Bool}(ds["scale_by_complement_upper"][:])
-  band_lims                       = Array{FT}(ds["bnd_limits_wavenumber"][:])
-  kminor_lower                    = Array{FT}(ds["kminor_lower"][:])
-  kminor_upper                    = Array{FT}(ds["kminor_upper"][:])
   kmajor                          = Array{FT}(ds["kmajor"][:])
-
+  key_species                     = Array{Int}(ds["key_species"][:])
+  band2gpt                        = Array{Int}(ds["bnd_limits_gpt"][:])
+  band_lims                       = Array{FT}(ds["bnd_limits_wavenumber"][:])
   gas_names                       = read_char_vec(ds, "gas_names")
   gas_minor                       = read_char_vec(ds, "gas_minor")
   identifier_minor                = read_char_vec(ds, "identifier_minor")
-  minor_gases_lower               = read_char_vec(ds, "minor_gases_lower")
-  minor_gases_upper               = read_char_vec(ds, "minor_gases_upper")
-  scaling_gas_lower               = read_char_vec(ds, "scaling_gas_lower")
-  scaling_gas_upper               = read_char_vec(ds, "scaling_gas_upper")
 
   rayl_lower = haskey(ds,"rayl_lower") ? Array{FT}(ds["rayl_lower"][:]) : nothing
   rayl_upper = haskey(ds,"rayl_upper") ? Array{FT}(ds["rayl_upper"][:]) : nothing
+
+  lower = AtmosVars{FT}(Array{Int}(ds["minor_limits_gpt_lower"][:]),
+                        Array{Bool}(ds["minor_scales_with_density_lower"][:]),
+                        Array{Bool}(ds["scale_by_complement_lower"][:]),
+                        Array{Int}(ds["kminor_start_lower"][:]),
+                        Array{FT}(ds["kminor_lower"][:]),
+                        read_char_vec(ds, "scaling_gas_lower"),
+                        read_char_vec(ds, "minor_gases_lower"))
+  upper = AtmosVars{FT}(Array{Int}(ds["minor_limits_gpt_upper"][:]),
+                        Array{Bool}(ds["minor_scales_with_density_upper"][:]),
+                        Array{Bool}(ds["scale_by_complement_upper"][:]),
+                        Array{Int}(ds["kminor_start_upper"][:]),
+                        Array{FT}(ds["kminor_upper"][:]),
+                        read_char_vec(ds, "scaling_gas_upper"),
+                        read_char_vec(ds, "minor_gases_upper"))
 
   ref = Reference(Array{FT}(ds["press_ref"][:]),
                   Array{FT}(ds["temp_ref"][:]),
@@ -63,22 +63,10 @@ function load_and_init(ds, available_gases::ty_gas_concs{FT}) where FT
           band_lims,
           ref,
           kmajor,
-          kminor_lower,
-          kminor_upper,
           gas_minor,
           identifier_minor,
-          minor_gases_lower,
-          minor_gases_upper,
-          minor_limits_gpt_lower,
-          minor_limits_gpt_upper,
-          minor_scales_with_density_lower,
-          minor_scales_with_density_upper,
-          scaling_gas_lower,
-          scaling_gas_upper,
-          scale_by_complement_lower,
-          scale_by_complement_upper,
-          kminor_start_lower,
-          kminor_start_upper,)
+          lower,
+          upper)
 
   if haskey(ds,"totplnk")
     totplnk     = Array{FT}(ds["totplnk"][:])
