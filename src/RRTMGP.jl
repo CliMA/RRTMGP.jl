@@ -17,7 +17,6 @@ include(joinpath("rte","mo_rte_sw.jl"))
 include(joinpath("rte","mo_rte_lw.jl"))
 
 include(joinpath("rrtmgp","mo_rrtmgp_constants.jl"))
-include(joinpath("rrtmgp","kernels","mo_gas_optics_kernels.jl"))
 include(joinpath("rrtmgp","mo_gas_concentrations.jl"))
 include(joinpath("rrtmgp","mo_gas_optics_rrtmgp.jl"))
 include(joinpath("examples","mo_load_coefficients.jl"))

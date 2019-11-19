@@ -19,7 +19,6 @@ using ..mo_rrtmgp_constants
 using ..mo_util_array
 using ..mo_optical_props
 using ..mo_source_functions
-using ..mo_gas_optics_kernels
 
 using ..Utilities
 using ..mo_gas_concentrations
@@ -1311,5 +1310,7 @@ check_extent(array, s, label) = @assert all(size(array).==s)
 
 # Values
 check_range(val, minV, maxV, label) = any(val .< minV) || any(val .> maxV) ? trim(label) * " values out of range." : ""
+
+include("mo_gas_optics_kernels.jl")
 
 end #module

@@ -1,32 +1,8 @@
-"""
-    mo_gas_optics_kernels
-
-Description: Numeric calculations for gas optics. Absorption and Rayleigh optical depths,
- source functions.
-"""
-module mo_gas_optics_kernels
-
-using TimerOutputs
-const to_gok = TimerOutput()
+####
+#### mo_gas_optics_kernels: Numeric calculations for gas optics. Absorption and Rayleigh optical depths, source functions.
+####
 
 PaTohPa(::Type{FT}) where FT = FT(0.01)
-
-using ..fortran_intrinsics
-using ..mo_optical_props
-
-export interpolation!,
-       compute_tau_absorption!,
-       gas_optical_depths_major!,
-       gas_optical_depths_minor!,
-       compute_tau_rayleigh!,
-       compute_Planck_source!,
-       interpolate1D,
-       interpolate2D,
-       interpolate2D_byflav,
-       interpolate3D,
-       interpolate3D_byflav,
-       combine_and_reorder_2str!,
-       combine_and_reorder_nstr!
 
 """
     interpolation!(...)
@@ -70,15 +46,31 @@ real(FT) :: ftemp_term
 # local indexes
 integer :: icol, ilay, iflav, igases(2), itropo, itemp
 """
-function interpolation!(jtemp::Array{I},fmajor::Array{FT},fminor::Array{FT},col_mix::Array{FT},tropo::Array{B},jeta::Array{I},jpress::Array{I},
-              ncol::I,nlay::I,ngas::I,nflav::I,neta::I,npres::I,ntemp::I,
-              flavor::Array{I},
-              press_ref_log::Array{FT}, temp_ref::Array{FT},press_ref_log_delta::FT,
-              temp_ref_min::FT,temp_ref_delta::FT,press_ref_trop_log::FT,
-              vmr_ref::AbstractArray{FT},
-              play::Array{FT},
-              tlay::Array{FT},
-              col_gas::AbstractArray{FT}) where {I<:Int,B<:Bool,FT<:AbstractFloat}
+function interpolation!(jtemp::Array{I},
+                        fmajor::Array{FT},
+                        fminor::Array{FT},
+                        col_mix::Array{FT},
+                        tropo::Array{B},
+                        jeta::Array{I},
+                        jpress::Array{I},
+                        ncol::I,
+                        nlay::I,
+                        ngas::I,
+                        nflav::I,
+                        neta::I,
+                        npres::I,
+                        ntemp::I,
+                        flavor::Array{I},
+                        press_ref_log::Array{FT},
+                        temp_ref::Array{FT},
+                        press_ref_log_delta::FT,
+                        temp_ref_min::FT,
+                        temp_ref_delta::FT,
+                        press_ref_trop_log::FT,
+                        vmr_ref::AbstractArray{FT},
+                        play::Array{FT},
+                        tlay::Array{FT},
+                        col_gas::AbstractArray{FT}) where {I<:Int,B<:Bool,FT<:AbstractFloat}
   # input dimensions
   ftemp = Array{FT}(undef, ncol, nlay)
   fpress = Array{FT}(undef, ncol, nlay)
@@ -877,5 +869,3 @@ function combine_and_reorder_2str!(op::ty_optical_props{FT}, ncol, nlay, ngpt, t
   end
   return nothing
 end
-
-end #module
