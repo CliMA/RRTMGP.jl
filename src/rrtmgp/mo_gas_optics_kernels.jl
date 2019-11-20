@@ -11,16 +11,11 @@ Compute interpolation coefficients
 for calculations of major optical depths, minor optical depths, Rayleigh,
 and Planck fractions
 
+ - `ref` a `Reference` struct containing all reference variables
+
 integer,                            intent(in) :: ncol,nlay
 integer,                            intent(in) :: ngas,nflav,neta,npres,ntemp
 integer,     dimension(2,nflav),    intent(in) :: flavor
-real(FT),    dimension(npres),      intent(in) :: press_ref_log
-real(FT),    dimension(ntemp),      intent(in) :: temp_ref
-real(FT),                           intent(in) :: press_ref_log_delta,
-                                                  temp_ref_min, temp_ref_delta,
-                                                  press_ref_trop_log
-real(FT),    dimension(2,0:ngas,ntemp), intent(in) :: vmr_ref
-
 # inputs from profile or parent function
 real(FT),    dimension(ncol,nlay),        intent(in) :: play, tlay
 real(FT),    dimension(ncol,nlay,0:ngas), intent(in) :: col_gas
@@ -55,7 +50,6 @@ function interpolation!(jtemp::Array{I},
                         jpress::Array{I},
                         ncol::I,
                         nlay::I,
-                        ngas::I,
                         nflav::I,
                         neta::I,
                         npres::I,
@@ -82,10 +76,10 @@ function interpolation!(jtemp::Array{I},
       jpress[icol,ilay] = min(npres-1, max(1, fint(locpress)))
       fpress[icol,ilay] = locpress - FT(jpress[icol,ilay])
 
-      # determine if in lower or upper part of atmosphere
-      tropo[icol,ilay] = log(play[icol,ilay]) > ref.press_trop_log
     end
   end
+  # determine if in lower or upper part of atmosphere
+  tropo .= log.(play) .> ref.press_trop_log
 
   @inbounds for ilay in 1:nlay
     @inbounds for icol in 1:ncol
@@ -127,34 +121,24 @@ end
 """
     compute_tau_absorption!(...)
 
-Compute minor and major species opitcal depth from pre-computed interpolation coefficients
+ - `lower` - lower atmospheric variables
+ - `upper` - upper atmospheric variables
+ - `lower_aux` - lower atmospheric auxiliary variables
+ - `upper_aux` - upper atmospheric auxiliary variables
+
+Compute minor and major species optical depth from pre-computed interpolation coefficients
  (jeta,jtemp,jpress)
 
 # ---------------------
 # input dimensions
 integer,                                intent(in) :: ncol,nlay,nbnd,ngpt
 integer,                                intent(in) :: ngas,nflav,neta,npres,ntemp
-integer,                                intent(in) :: nminorlower, nminorklower,nminorupper, nminorkupper
 integer,                                intent(in) :: idx_h2o
 # ---------------------
 # inputs from object
 integer,     dimension(2,ngpt),                  intent(in) :: gpoint_flavor
 integer,     dimension(2,nbnd),                  intent(in) :: band_lims_gpt
 real(FT),    dimension(ngpt,neta,npres+1,ntemp), intent(in) :: kmajor
-real(FT),    dimension(nminorklower,neta,ntemp), intent(in) :: kminor_lower
-real(FT),    dimension(nminorkupper,neta,ntemp), intent(in) :: kminor_upper
-integer,     dimension(2,nminorlower),           intent(in) :: minor_limits_gpt_lower
-integer,     dimension(2,nminorupper),           intent(in) :: minor_limits_gpt_upper
-logical(wl), dimension(  nminorlower),           intent(in) :: minor_scales_with_density_lower
-logical(wl), dimension(  nminorupper),           intent(in) :: minor_scales_with_density_upper
-logical(wl), dimension(  nminorlower),           intent(in) :: scale_by_complement_lower
-logical(wl), dimension(  nminorupper),           intent(in) :: scale_by_complement_upper
-integer,     dimension(  nminorlower),           intent(in) :: idx_minor_lower
-integer,     dimension(  nminorupper),           intent(in) :: idx_minor_upper
-integer,     dimension(  nminorlower),           intent(in) :: idx_minor_scaling_lower
-integer,     dimension(  nminorupper),           intent(in) :: idx_minor_scaling_upper
-integer,     dimension(  nminorlower),           intent(in) :: kminor_start_lower
-integer,     dimension(  nminorupper),           intent(in) :: kminor_start_upper
 logical(wl), dimension(ncol,nlay),               intent(in) :: tropo
 # ---------------------
 # inputs from profile or parent function
@@ -177,7 +161,6 @@ integer, dimension(ncol,2) :: itropo_lower, itropo_upper
 """
 function compute_tau_absorption!(tau,
               ncol,nlay,nbnd,ngpt,                  # dimensions
-              ngas,nflav,neta,npres,ntemp,
               idx_h2o,
               gpoint_flavor,
               band_lims_gpt,
@@ -216,8 +199,7 @@ function compute_tau_absorption!(tau,
   # ---------------------
 
   gas_optical_depths_major!(
-        ncol,nlay,nbnd,ngpt,        # dimensions
-        nflav,neta,npres,ntemp,
+        ncol,nlay,nbnd,ngpt,
         gpoint_flavor,
         band_lims_gpt,
         kmajor,
@@ -230,12 +212,7 @@ function compute_tau_absorption!(tau,
 
   gas_optical_depths_minor!(
          ncol,
-         nlay,
-         ngpt,              # dimensions
-         ngas,
-         nflav,
-         ntemp,
-         neta,
+         ngpt,
          idx_h2o,
          gpoint_flavor[1,:],
          lower,
@@ -252,8 +229,8 @@ function compute_tau_absorption!(tau,
   # Minor Species - upper
   # ---------------------
   gas_optical_depths_minor!(
-         ncol,nlay,ngpt,              # dimensions
-         ngas,nflav,ntemp,neta,
+         ncol,
+         ngpt,
          idx_h2o,
          gpoint_flavor[2,:],
          upper,
@@ -297,7 +274,6 @@ integer :: icol, ilay, iflav, ibnd, igpt, itropo
 integer :: gptS, gptE
 """
 function gas_optical_depths_major!(ncol,nlay,nbnd,ngpt,
-                                    nflav,neta,npres,ntemp,       # dimensions
                                     gpoint_flavor, band_lims_gpt,    # inputs from object
                                     kmajor,
                                     col_mix,fmajor,
@@ -367,12 +343,7 @@ real(FT), dimension(ngpt) :: tau_minor
 
 """
 function gas_optical_depths_minor!(ncol,
-                                   nlay,
                                    ngpt,
-                                   ngas,
-                                   nflav,
-                                   ntemp,
-                                   neta,
                                    idx_h2o,
                                    gpt_flv,
                                    atmos,
@@ -482,7 +453,6 @@ integer  :: itropo
 # -----------------
 """
 function compute_tau_rayleigh!(ncol::I,nlay::I,nbnd::I,ngpt::I,
-                               ngas,nflav,neta,npres,ntemp::I,
                                gpoint_flavor::Array{I,2},
                                band_lims_gpt::Array{I,2},
                                krayl::Array{FT,4},
