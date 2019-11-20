@@ -416,7 +416,7 @@ function compute_gas_taus!(jtemp, jpress, jeta, tropo, fmajor, this::ty_gas_opti
   tau .= 0
   @timeit to_gor "interpolation!" interpolation!(jtemp,fmajor,fminor,col_mix,tropo,jeta,jpress,
           ncol,nlay,                        # problem dimensions
-          ngas, nflav, neta, npres, ntemp,  # interpolation dimensions
+          nflav, neta, npres, ntemp,  # interpolation dimensions
           this.flavor,
           this.ref,
           play,
@@ -424,7 +424,6 @@ function compute_gas_taus!(jtemp, jpress, jeta, tropo, fmajor, this::ty_gas_opti
           col_gas)
   @timeit to_gor "compute_tau_absorption!" compute_tau_absorption!(tau,
           ncol,nlay,nband,ngpt,                      # dimensions
-          ngas,nflav,neta,npres,ntemp,
           idx_h2o,
           this.gpoint_flavor,
           get_band_lims_gpoint(this.optical_props),
@@ -440,8 +439,7 @@ function compute_gas_taus!(jtemp, jpress, jeta, tropo, fmajor, this::ty_gas_opti
   if allocated(this.krayl)
 
     @timeit to_gor "compute_tau_rayleigh!" compute_tau_rayleigh!(          #Rayleigh scattering optical depths
-          ncol,nlay,nband,ngpt,
-          ngas,nflav,neta,npres,ntemp,  # dimensions
+          ncol,nlay,nband,ngpt,# dimensions
           this.gpoint_flavor,
           get_band_lims_gpoint(this.optical_props),
           this.krayl,                   # inputs from object
