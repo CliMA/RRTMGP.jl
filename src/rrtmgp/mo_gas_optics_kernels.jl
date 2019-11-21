@@ -1,6 +1,6 @@
-####
-#### mo_gas_optics_kernels: Numeric calculations for gas optics. Absorption and Rayleigh optical depths, source functions.
-####
+#####
+##### mo_gas_optics_kernels: Numeric calculations for gas optics. Absorption and Rayleigh optical depths, source functions.
+#####
 
 PaTohPa(::Type{FT}) where FT = FT(0.01)
 
@@ -121,10 +121,10 @@ end
 """
     compute_tau_absorption!(...)
 
- - `lower` - lower atmospheric variables
- - `upper` - upper atmospheric variables
- - `lower_aux` - lower atmospheric auxiliary variables
- - `upper_aux` - upper atmospheric auxiliary variables
+ - `lower` lower atmospheric variables
+ - `upper` upper atmospheric variables
+ - `lower_aux` lower atmospheric auxiliary variables
+ - `upper_aux` upper atmospheric auxiliary variables
 
 Compute minor and major species optical depth from pre-computed interpolation coefficients
  (jeta,jtemp,jpress)
