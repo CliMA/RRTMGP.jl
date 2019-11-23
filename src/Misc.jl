@@ -13,19 +13,6 @@ function extract_targz(file)
   end
 end
 
-"""
-    compress_targz(file)
-
-Platform-independent file compression
-"""
-function compress_targz(file)
-  if Sys.iswindows()
-    error("Needs to be implemented")
-  else
-    run(`tar -zcvf $file $(readdir())`)
-  end
-end
-
 function data_folder_rrtmgp()
   register(DataDep("rte-rrtmgp",
                    "data for rte-rrtmgp repo",

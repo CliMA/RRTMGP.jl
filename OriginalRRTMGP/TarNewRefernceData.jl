@@ -2,6 +2,19 @@ using RRTMGP
 
 # include("AutoRunRRTMGP.jl")
 
+"""
+    compress_targz(file)
+
+Platform-independent file compression
+"""
+function compress_targz(file)
+  if Sys.iswindows()
+    error("Needs to be implemented")
+  else
+    run(`tar -zcvf $file $(readdir())`)
+  end
+end
+
 root_dir = dirname(pwd())
 rte_rrtmgp_folder = "rte-rrtmgp"
 rte_rrtmgp_dir = joinpath(root_dir,rte_rrtmgp_folder)
@@ -23,5 +36,5 @@ end
 
 cd(data_dir) do
   rm(data_dir_tar; force=true)
-  RRTMGP.compress_targz(data_dir_tar)
+  compress_targz(data_dir_tar)
 end
