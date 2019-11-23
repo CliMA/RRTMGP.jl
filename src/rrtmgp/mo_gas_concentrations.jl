@@ -28,6 +28,11 @@ export GasConcSize
 
 const GAS_NOT_IN_LIST = -1
 
+"""
+    GasConcSize
+
+Sizes for gas concentrations
+"""
 struct GasConcSize{N,I}
   ncol::I
   nlay::I
@@ -35,6 +40,11 @@ struct GasConcSize{N,I}
   nconcs::I
 end
 
+"""
+    conc_field
+
+Gas concentration arrays
+"""
 struct conc_field{FT}
   conc::Array{FT,2}
 end
@@ -49,10 +59,15 @@ Encapsulates a collection of volume mixing ratios (concentrations) of gases.
 $(DocStringExtensions.FIELDS)
 """
 struct ty_gas_concs{FT}
+  "gas names"
   gas_name::Vector{String}
+  "gas concentrations"
   concs
+  "number of columns"
   ncol#::Int
+  "number of layers"
   nlay#::Int
+  "gas concentration problem size"
   gsc::GasConcSize
 end
 
@@ -61,14 +76,17 @@ function ty_gas_concs(::Type{FT}, gas_names, ncol, nlay, gsc::GasConcSize) where
   return ty_gas_concs{FT}(gas_names, concs, gsc.s..., gsc)
 end
 
-# Set concentrations --- scalar, 1D, 2D
+"""
+    set_vmr!(this::ty_gas_concs{FT}, gas::String, w) where FT
+
+Set volume mixing ratio (vmr)
+"""
 function set_vmr!(this::ty_gas_concs{FT}, gas::String, w::FT) where FT
   @assert !(w < FT(0) || w > FT(1))
   igas = loc_in_array(gas, this.gas_name)
   this.concs[igas].conc .= w
   this.gas_name[igas] = gas
 end
-
 function set_vmr!(this::ty_gas_concs{FT}, gas::String, w::Vector{FT}) where FT
   @assert !any(w .< FT(0)) || any(w .> FT(1))
   @assert !(this.nlay ≠ nothing && length(w) ≠ this.nlay)
@@ -77,7 +95,6 @@ function set_vmr!(this::ty_gas_concs{FT}, gas::String, w::Vector{FT}) where FT
   this.concs[igas].conc .= reshape(w, 1, this.nlay)
   this.gas_name[igas] = gas
 end
-
 function set_vmr!(this::ty_gas_concs, gas::String, w::Array{FT, 2}) where FT
   @assert !any(w .< FT(0)) || any(w .> FT(1))
   @assert !(this.ncol ≠ nothing && size(w, 1) ≠ this.ncol)

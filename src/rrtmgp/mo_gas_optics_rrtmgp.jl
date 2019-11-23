@@ -105,7 +105,7 @@ and lower levels of the atmosphere.
 $(DocStringExtensions.FIELDS)
 """
 struct AuxVars{I}
-  "indexes for determining col_gas"
+  "indexes for determining `col_gas`"
   idx_minor#::Vector{I}
   "indexes that have special treatment in density scaling"
   idx_minor_scaling#::Vector{I}
@@ -133,19 +133,19 @@ levels of the atmosphere for both full and reduced sets of gases.
 $(DocStringExtensions.FIELDS)
 """
 struct AtmosVars{FT}
-  "minor_limits_gpt"
+  "minor g-point limits"
   minor_limits_gpt#::Array{I,2}
-  "minor_scales_with_density"
+  "minor scales with density"
   minor_scales_with_density#::Vector{Bool}
-  "scale_by_complement"
+  "scale by complement"
   scale_by_complement#::Vector{Bool}
-  "kminor_start"
+  "kminor start"
   kminor_start#::Vector{I}
   "kminor"
   kminor#::Array{T,3}, (n_minor,eta,temperature)
-  "scaling_gas"
+  "scaling gas"
   scaling_gas
-  "minor_gases"
+  "minor gases"
   minor_gases
 end
 
@@ -178,7 +178,7 @@ struct InternalSourceGasOptics{FT,I} <: ty_gas_optics{FT,I}
   kmajor::Array{FT,4}
   "major species pair; [2, nflav]"
   flavor::Array{I,2}
-  "Flavor per g-point: lower.flavor = gpoint_flavor[1, g-point], upper.flavor = gpoint_flavor[2, g-point]"
+  "Flavor per g-point: `lower.flavor = gpoint_flavor[1, 1:ngpt]`, `upper.flavor = gpoint_flavor[2, 1:ngpt]`"
   gpoint_flavor::Array{I,2}
   "Indicates whether a key species is in any band"
   is_key::Vector{Bool}

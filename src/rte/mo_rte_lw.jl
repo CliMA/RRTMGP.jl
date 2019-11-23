@@ -43,19 +43,14 @@ export rte_lw!, expand_and_transpose
 
 Interface using only optical properties and source functions as inputs; fluxes as outputs.
 
-class(ty_optical_props_arry), intent(in   ) :: optical_props     # Array of ty_optical_props. This type is abstract
-                                                                 # and needs to be made concrete, either as an array
-                                                                 # (class ty_optical_props_arry) or in some user-defined way
-logical,                      intent(in   ) :: top_at_1          # Is the top of the domain at index 1?
-                                                                 # (if not, ordering is bottom-to-top)
-type(ty_source_func_lw),      intent(in   ) :: sources
-real(FT), dimension(:,:),     intent(in   ) :: sfc_emis    # emissivity at surface [] (nband, ncol)
-class(ty_fluxes),             intent(inout) :: fluxes      # Array of ty_fluxes. Default computes broadband fluxes at all levels
-                                                           #   if output arrays are defined. Can be extended per user desires.
-real(FT), dimension(:,:),   &
-          target, optional, intent(in   ) :: inc_flux    # incident flux at domain top [W/m2] (ncol, ngpts)
-integer,          optional, intent(in   ) :: n_gauss_angles # Number of angles used in Gaussian quadrature
-                                                            # (no-scattering solution)
+ - `optical_props` optical properties
+ - `top_at_1` indicates that the top of the domain is at index 1
+ - `sources` radiation sources
+ - `sfc_emis` emissivity at surface (nband, ncol)
+ - `fluxes` Array of ty_fluxes. Default computes broadband fluxes at all levels
+            if output arrays are defined. Can be extended per user desires.
+ - [`inc_flux`] incident flux at domain top [W/m2] (ncol, ngpts)
+ - [`n_gauss_angles`] Number of angles used in Gaussian quadrature (no-scattering solution)
 """
 function rte_lw!(optical_props::ty_optical_props_arry{FT}, top_at_1,
                 sources, sfc_emis,
@@ -156,10 +151,6 @@ end
 # Expand from band to g-point dimension, transpose dimensions (nband, ncol) -> (ncol,ngpt)
 
 function expand_and_transpose(ops::ty_optical_props,arr_in::Array{FT}) where FT
-#    class(ty_optical_props),  intent(in ) :: ops
-#    real(FT), dimension(:,:), intent(in ) :: arr_in  # (nband, ncol)
-#    real(FT), dimension(:,:), intent(out) :: arr_out # (ncol, igpt)
-
   ncol  = size(arr_in,2)
   nband = get_nband(ops)
   ngpt  = get_ngpt(ops)
