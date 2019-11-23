@@ -31,8 +31,6 @@ export get_col_dry
 export Reference
 export AtmosVars
 
-abstract type ty_gas_optics{T,I} <: ty_optical_props{T,I} end
-
 """
     Reference{FT}
 
@@ -135,52 +133,100 @@ levels of the atmosphere for both full and reduced sets of gases.
 $(DocStringExtensions.FIELDS)
 """
 struct AtmosVars{FT}
+  "minor_limits_gpt"
   minor_limits_gpt#::Array{I,2}
+  "minor_scales_with_density"
   minor_scales_with_density#::Vector{Bool}
+  "scale_by_complement"
   scale_by_complement#::Vector{Bool}
+  "kminor_start"
   kminor_start#::Vector{I}
-  kminor#::Array{T,3}
+  "kminor"
+  kminor#::Array{T,3}, (n_minor,eta,temperature)
+  "scaling_gas"
   scaling_gas
+  "minor_gases"
   minor_gases
 end
 
+abstract type ty_gas_optics{T,I} <: ty_optical_props{T,I} end
 
-  # Temperature steps for Planck function interpolation
-  #   Assumes that temperature minimum and max are the same for the absorption coefficient grid and the
-  #   Planck grid and the Planck grid is equally spaced
-struct InternalSourceGasOptics{T,I} <: ty_gas_optics{T,I}
-  ref#::Reference
-  optical_props#::ty_optical_props
-  lower
-  upper
-  lower_aux
-  upper_aux
-  gas_names#::Vector{String}     # gas names
-  kmajor#::Array{T,4}        #  kmajor(g-point,eta,pressure,temperature)
-  flavor#::Array{I, 2}        # major species pair; (2,nflav)
-  gpoint_flavor#::Array{I, 2} # flavor = gpoint_flavor(2, g-point)
-  is_key#::Vector{Bool}
-  "Planck function tables"
-  planck_frac#::Array{T, 4}   # stored fraction of Planck irradiance in band for given g-point
-  totplnk#::Array{T,2}       # integrated Planck irradiance by band; (Planck temperatures,band)
-  totplnk_delta#::T # temperature steps in totplnk
-  krayl#::Array{T, 4} # krayl(g-point,eta,temperature,upper/lower atmosphere)
+"""
+    InternalSourceGasOptics{FT,I} <: ty_gas_optics{FT,I}
+
+Gas optics with internal sources (for longwave radiation)
+
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
+struct InternalSourceGasOptics{FT,I} <: ty_gas_optics{FT,I}
+  "Reference data"
+  ref::Reference{FT}
+  "Base optical properties"
+  optical_props::ty_optical_props_base{FT,I}
+  "AtmosVars in the lower atmosphere"
+  lower::AtmosVars
+  "AtmosVars in the upper atmosphere"
+  upper::AtmosVars
+  "Auxiliary variables (index maps) in the lower atmosphere"
+  lower_aux::AuxVars{I}
+  "Auxiliary variables (index maps) in the upper atmosphere"
+  upper_aux::AuxVars{I}
+  "Present gas names"
+  gas_names::Vector{String}
+  "Absorption coefficient for major species (g-point,eta,pressure,temperature)"
+  kmajor::Array{FT,4}
+  "major species pair; [2, nflav]"
+  flavor::Array{I,2}
+  "Flavor per g-point: lower.flavor = gpoint_flavor[1, g-point], upper.flavor = gpoint_flavor[2, g-point]"
+  gpoint_flavor::Array{I,2}
+  "Indicates whether a key species is in any band"
+  is_key::Vector{Bool}
+  "Stored fraction of Planck irradiance in band for given g-point"
+  planck_frac::Array{FT,4}
+  "integrated Planck irradiance by band; [Planck temperatures,band]"
+  totplnk::Array{FT,2}
+  "temperature steps in totplnk"
+  totplnk_delta::FT
+  "Absorption coefficient for Rayleigh scattering [g-point,eta,temperature,upper/lower atmosphere]"
+  krayl::Union{Array{FT,4},Nothing}
 end
 
-struct ExternalSourceGasOptics{T,I} <: ty_gas_optics{T,I}
-  ref#::Reference
-  optical_props#::ty_optical_props
-  lower
-  upper
-  lower_aux
-  upper_aux
-  gas_names#::Vector{String}     # gas names
-  kmajor#::Array{T,4}        #  kmajor(g-point,eta,pressure,temperature)
-  flavor#::Array{I, 2}        # major species pair; (2,nflav)
-  gpoint_flavor#::Array{I, 2} # flavor = gpoint_flavor(2, g-point)
-  is_key#::Vector{Bool}
-  solar_src#::Vector{T} # incoming solar irradiance(g-point)
-  krayl#::Array{T, 4} # krayl(g-point,eta,temperature,upper/lower atmosphere)
+"""
+    ExternalSourceGasOptics{FT,I} <: ty_gas_optics{FT,I}
+
+Gas optics with external sources (for shortwave radiation)
+
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
+struct ExternalSourceGasOptics{FT,I} <: ty_gas_optics{FT,I}
+  "Reference data"
+  ref::Reference{FT}
+  "Base optical properties"
+  optical_props::ty_optical_props_base{FT,I}
+  "AtmosVars in the lower atmosphere"
+  lower::AtmosVars
+  "AtmosVars in the upper atmosphere"
+  upper::AtmosVars
+  "Auxiliary variables (index maps) in the lower atmosphere"
+  lower_aux::AuxVars{I}
+  "Auxiliary variables (index maps) in the upper atmosphere"
+  upper_aux::AuxVars{I}
+  "Present gas names"
+  gas_names::Vector{String}
+  "Absorption coefficient for major species (g-point,eta,pressure,temperature)"
+  kmajor::Array{FT,4}
+  "major species pair; [2, nflav]"
+  flavor::Array{I,2}
+  "Flavor per g-point: lower.flavor = gpoint_flavor[1, g-point], upper.flavor = gpoint_flavor[2, g-point]"
+  gpoint_flavor::Array{I,2}
+  "Indicates whether a key species is in any band"
+  is_key::Vector{Bool}
+  "incoming solar irradiance (g-point)"
+  solar_src::Vector{FT} # incoming solar irradiance(g-point)
+  "absorption coefficient for Rayleigh scattering (g-point,eta,temperature,upper/lower atmosphere)"
+  krayl::Union{Array{FT,4},Nothing}
 end
 
 """
@@ -360,12 +406,11 @@ end
                           optical_props::ty_optical_props_arry,
                           col_dry=nothing)
 
-class(ty_gas_optics),
-                                 intent(in   ) :: this
+class(ty_gas_optics), intent(in   ) :: this
 integer,                          intent(in   ) :: ncol, nlay, ngpt, nband
 real(FT), dimension(:,:),         intent(in   ) :: play,    # layer pressures [Pa, mb]; (ncol,nlay)
-                                                  plev,    # level pressures [Pa, mb]; (ncol,nlay+1)
-                                                  tlay      # layer temperatures [K]; (ncol,nlay)
+                                                   plev,    # level pressures [Pa, mb]; (ncol,nlay+1)
+                                                   tlay      # layer temperatures [K]; (ncol,nlay)
 type(ty_gas_concs),               intent(in   ) :: gas_desc  # Gas volume mixing ratios
 class(ty_optical_props_arry),     intent(inout) :: optical_props #inout because components are allocated
 # Interpolation coefficients for use in internal source function
@@ -374,8 +419,7 @@ integer,     dimension(2,    get_nflav(this),ncol, nlay), intent(  out) :: jeta
 logical(wl), dimension(                       ncol, nlay), intent(  out) :: tropo
 real(FT),    dimension(2,2,2,get_nflav(this),ncol, nlay), intent(  out) :: fmajor
 Optional inputs
-real(FT), dimension(:,:), intent(in   ),
-                      optional, target :: col_dry # Column dry amount; dim(ncol,nlay)
+real(FT), dimension(:,:), intent(in   ), optional, target :: col_dry # Column dry amount; dim(ncol,nlay)
 ----------------------------------------------------------
 Local variables
 real(FT), dimension(ngpt,nlay,ncol) :: tau, tau_rayleigh  # absorption, Rayleigh scattering optical depths
@@ -398,7 +442,6 @@ real(FT), dimension(2,2,  get_nflav(this),ncol,nlay) :: fminor # interpolation f
                                                      # index(3) : flavor
                                                      # index(4) : layer
 integer :: ngas, nflav, neta, npres, ntemp
-logical :: use_rayl
 ----------------------------------------------------------
 """
 function compute_gas_taus!(jtemp, jpress, jeta, tropo, fmajor, this::ty_gas_optics{FT},
@@ -416,9 +459,6 @@ function compute_gas_taus!(jtemp, jpress, jeta, tropo, fmajor, this::ty_gas_opti
   col_gas = OffsetArray{FT}(undef, 1:ncol,1:nlay,0:get_ngas(this)) # column amounts for each gas, plus col_dry
   col_mix = Array{FT}(undef, 2,    get_nflav(this),ncol,nlay) # combination of major species's column amounts
   fminor  = Array{FT}(undef, 2,2,  get_nflav(this),ncol,nlay) # interpolation fractions for minor species
-
-  # Error checking
-  use_rayl = allocated(this.krayl)
 
   # Check for presence of key species in ty_gas_concs; return error if any key species are not present
   check_key_species_present(this, gas_desc)
@@ -485,9 +525,15 @@ function compute_gas_taus!(jtemp, jpress, jeta, tropo, fmajor, this::ty_gas_opti
           this.lower_aux,
           this.upper_aux,
           tropo,
-          col_mix,fmajor,fminor,
-          play,tlay,col_gas,
-          jeta,jtemp,jpress)
+          col_mix,
+          fmajor,
+          fminor,
+          play,
+          tlay,
+          col_gas,
+          jeta,
+          jtemp,
+          jpress)
   if allocated(this.krayl)
 
     @timeit to_gor "compute_tau_rayleigh!" compute_tau_rayleigh!(          #Rayleigh scattering optical depths
@@ -495,8 +541,13 @@ function compute_gas_taus!(jtemp, jpress, jeta, tropo, fmajor, this::ty_gas_opti
           this.gpoint_flavor,
           get_band_lims_gpoint(this.optical_props),
           this.krayl,                   # inputs from object
-          idx_h2o, col_dry_wk,col_gas,
-          fminor,jeta,tropo,jtemp,      # local input
+          idx_h2o,
+          col_dry_wk,
+          col_gas,
+          fminor,
+          jeta,
+          tropo,
+          jtemp,      # local input
           tau_rayleigh)
 
   end
@@ -538,13 +589,12 @@ real(FT), dimension(ngpt,     ncol)          :: sfc_source_t
 real(FT), dimension(   ncol,nlay+1), target  :: tlev_arr
 real(FT), dimension(:,:),            pointer :: tlev_wk
 """
-function source!(this::InternalSourceGasOptics,
-                ncol, nlay, nbnd, ngpt,
-                play, plev, tlay, tsfc,
-                jtemp, jpress, jeta, tropo, fmajor,
-                sources::ty_source_func_lw,          # Planck sources
-                tlev)                                # optional input
-  FT = eltype(this.ref.vmr) # Float64
+function source!(this::InternalSourceGasOptics{FT},
+                 ncol, nlay, nbnd, ngpt,
+                 play, plev, tlay, tsfc,
+                 jtemp, jpress, jeta, tropo, fmajor,
+                 sources::ty_source_func_lw,
+                 tlev=nothing) where {FT<:AbstractFloat}
 
   lay_source_t     = zeros(FT, ngpt,nlay,ncol)
   lev_source_inc_t = zeros(FT, ngpt,nlay,ncol)
@@ -564,32 +614,51 @@ function source!(this::InternalSourceGasOptics,
     #
     for icol = 1:ncol
        tlev_arr[icol,1] = tlay[icol,1] +
-                           (plev[icol,1]-play[icol,1])*(tlay[icol,2]-tlay[icol,1]) /
-                                                       (play[icol,2]-play[icol,1])
+                         (plev[icol,1]-play[icol,1])*
+                         (tlay[icol,2]-tlay[icol,1])/
+                         (play[icol,2]-play[icol,1])
     end
     for ilay in 2:nlay
       for icol in 1:ncol
-         tlev_arr[icol,ilay] = (play[icol,ilay-1]*tlay[icol,ilay-1]*(plev[icol,ilay]-play[icol,ilay]) +
-                                play[icol,ilay]*tlay[icol,ilay]*(play[icol,ilay-1]-plev[icol,ilay])) /
-                                (plev[icol,ilay]*(play[icol,ilay-1] - play[icol,ilay]))
+         tlev_arr[icol,ilay] = (play[icol,ilay-1]*tlay[icol,ilay-1]*
+                               (plev[icol,ilay]-play[icol,ilay]) +
+                                play[icol,ilay]*tlay[icol,ilay]*
+                               (play[icol,ilay-1]-plev[icol,ilay]))/
+                               (plev[icol,ilay]*(play[icol,ilay-1] - play[icol,ilay]))
       end
     end
     for icol = 1:ncol
        tlev_arr[icol,nlay+1] = tlay[icol,nlay] +
-                               (plev[icol,nlay+1]-play[icol,nlay])*(tlay[icol,nlay]-tlay(icol,nlay-1)) /
-                                                                     (play(icol,nlay)-play(icol,nlay-1))
+                              (plev[icol,nlay+1]-play[icol,nlay])*
+                              (tlay[icol,nlay]-tlay[icol,nlay-1])/
+                              (play[icol,nlay]-play[icol,nlay-1])
     end
   end
 
   # Compute internal (Planck) source functions at layers and levels,
   #  which depend on mapping from spectral space that creates k-distribution.
-  compute_Planck_source!(ncol, nlay, nbnd, ngpt,
-              get_nflav(this), get_neta(this), get_npres(this), get_ntemp(this), get_nPlanckTemp(this),
+  compute_Planck_source!(ncol,
+              nlay,
+              nbnd,
+              ngpt,
+              get_nflav(this),
+              get_neta(this),
+              get_npres(this),
+              get_ntemp(this),
+              get_nPlanckTemp(this),
               tlay, tlev_wk, tsfc, fmerge(1,nlay,play[1,1] > play[1,nlay]),
               fmajor, jeta, tropo, jtemp, jpress,
-              get_gpoint_bands(this.optical_props), get_band_lims_gpoint(this.optical_props), this.planck_frac, this.ref.temp_min,
-              this.totplnk_delta, this.totplnk, this.gpoint_flavor,
-              sfc_source_t, lay_source_t, lev_source_inc_t, lev_source_dec_t)
+              get_gpoint_bands(this.optical_props),
+              get_band_lims_gpoint(this.optical_props),
+              this.planck_frac,
+              this.ref.temp_min,
+              this.totplnk_delta,
+              this.totplnk,
+              this.gpoint_flavor,
+              sfc_source_t,
+              lay_source_t,
+              lev_source_inc_t,
+              lev_source_dec_t)
 
   sources.sfc_source .= convert(Array,transpose(sfc_source_t))
 
@@ -605,7 +674,7 @@ end
 # Initialize object based on data read from netCDF file however the user desires.
 #  Rayleigh scattering tables may or may not be present; this is indicated with allocation status
 # This interface is for the internal-sources object -- includes Plank functions and fractions
-function load_totplnk(totplnk, planck_frac, rayl_lower, rayl_upper, args...)
+function load_totplnk(totplnk, planck_frac, rayl_lower, rayl_upper, ref, args...)
   abs_coeffs = init_abs_coeffs(args...)
 
   FT = Float64
@@ -616,10 +685,10 @@ function load_totplnk(totplnk, planck_frac, rayl_lower, rayl_upper, args...)
   else
     krayl = nothing
   end
-  ref = abs_coeffs[1]
   totplnk_delta =  (ref.temp_max-ref.temp_min) / (size(totplnk, 1)-1)
 
-  return InternalSourceGasOptics{FT,Int}(abs_coeffs...,
+  return InternalSourceGasOptics{FT,Int}(ref,
+                                         abs_coeffs...,
                                          planck_frac,
                                          totplnk,
                                          totplnk_delta,
@@ -630,7 +699,7 @@ end
 # Initialize object based on data read from netCDF file however the user desires.
 #  Rayleigh scattering tables may or may not be present; this is indicated with allocation status
 # This interface is for the external-sources object -- includes TOA source function table
-function load_solar_source(solar_src, rayl_lower, rayl_upper, args...)
+function load_solar_source(solar_src, rayl_lower, rayl_upper, ref, args...)
   abs_coeffs = init_abs_coeffs(args...)
   FT = Float64
 
@@ -642,7 +711,8 @@ function load_solar_source(solar_src, rayl_lower, rayl_upper, args...)
     krayl = nothing
   end
 
-  return ExternalSourceGasOptics{FT,Int}(abs_coeffs...,
+  return ExternalSourceGasOptics{FT,Int}(ref,
+                                         abs_coeffs...,
                                          solar_src,
                                          krayl)
 
@@ -653,7 +723,6 @@ end
 
 Initialize absorption coefficient arrays
 
- - `ref` reference variables
  - `lower` lower atmospheric variables
  - `upper` upper atmospheric variables
  - `lower_aux` lower atmospheric auxiliary variables
@@ -676,7 +745,6 @@ function init_abs_coeffs(available_gases::ty_gas_concs,
                          key_species,
                          band2gpt,
                          band_lims_wavenum,
-                         ref,
                          kmajor,
                          gas_minor,
                          identifier_minor,
@@ -716,8 +784,7 @@ function init_abs_coeffs(available_gases::ty_gas_concs,
     end
   end
 
-  return (ref,
-          optical_props,
+  return (optical_props,
           reduced_lower,
           reduced_upper,
           lower_aux,
@@ -830,8 +897,7 @@ computes column amounts of dry air using hydrostatic equation
 real(FT), dimension(:,:), intent(in) :: vmr_h2o  # volume mixing ratio of water vapor to dry air; (ncol,nlay)
 real(FT), dimension(:,:), intent(in) :: plev     # Layer boundary pressures [Pa] (ncol,nlay+1)
 real(FT), dimension(:,:), intent(in) :: tlay     # Layer temperatures [K] (ncol,nlay)
-real(FT), dimension(:),   optional,
-                         intent(in) :: latitude # Latitude [degrees] (ncol)
+real(FT), dimension(:),   optional, intent(in) :: latitude # Latitude [degrees] (ncol)
 # output
 real(FT), dimension(size(tlay,dim=1),size(tlay,dim=2)) :: col_dry # Column dry amount (ncol,nlay)
 ------------------------------------------------
@@ -955,12 +1021,9 @@ end
 #
 function create_idx_minor(gas_names, gas_minor, identifier_minor, minor_gases_atm)
   # character(len=*), dimension(:), intent(in) :: gas_names
-  # character(len=*), dimension(:), intent(in) ::
-  #                                               gas_minor,
-  #                                               identifier_minor
+  # character(len=*), dimension(:), intent(in) :: gas_minor, identifier_minor
   # character(len=*), dimension(:), intent(in) :: minor_gases_atm
-  # integer, dimension(:), allocatable,
-  #                                intent(out) :: idx_minor_atm
+  # integer, dimension(:), allocatable, intent(out) :: idx_minor_atm
 
   # # local
   # integer :: imnr
@@ -983,9 +1046,7 @@ end
 function create_idx_minor_scaling(gas_names, scaling_gas_atm)
   # character(len=*), dimension(:), intent(in) :: gas_names
   # character(len=*), dimension(:), intent(in) :: scaling_gas_atm
-  # integer, dimension(:), allocatable,
-  #                                intent(out) :: idx_minor_scaling_atm
-
+  # integer, dimension(:), allocatable, intent(out) :: idx_minor_scaling_atm
   # # local
   # integer :: imnr
   idx_minor_scaling_atm = Vector{Int}(undef, size(scaling_gas_atm,1))
@@ -998,13 +1059,10 @@ function create_idx_minor_scaling(gas_names, scaling_gas_atm)
 end
 # ---------------------------------------------------------------------------------------
 function create_key_species_reduce(gas_names, gas_names_red, key_species)
-  # character(len=*),
-  #           dimension(:),       intent(in) :: gas_names
-  # character(len=*),
-  #           dimension(:),       intent(in) :: gas_names_red
+  # character(len=*), dimension(:),       intent(in) :: gas_names
+  # character(len=*), dimension(:),       intent(in) :: gas_names_red
   # integer,  dimension(:,:,:),   intent(in) :: key_species
   # integer,  dimension(:,:,:), allocatable, intent(out) :: key_species_red
-
   # logical, dimension(:), allocatable, intent(out) :: key_species_present_init
   # integer :: ip, ia, it, np, na, nt
 
@@ -1049,7 +1107,6 @@ Reduce minor arrays so variables only contain minor gases that are available
 integer :: i, j
 integer :: idx_mnr, nm, tot_g, red_nm
 integer :: icnt, n_elim, ng
-logical, dimension(:), allocatable :: gas_is_present
 """
 function reduce_minor_arrays(available_gases::ty_gas_concs,
                              gas_minor,
