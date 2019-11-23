@@ -18,8 +18,8 @@ using RRTMGP.mo_source_functions
 using RRTMGP.mo_cloud_optics
 using RRTMGP.mo_load_cloud_coefficients
 
-include("mo_cloud_sampling.jl")
-include("mo_test_files_io.jl")
+include("CloudSampling.jl")
+include("TestFilesIO.jl")
 
 function vmr_2d_to_1d!(gas_concs::ty_gas_concs{FT},
                        gas_concs_garand::ty_gas_concs{FT},
