@@ -27,6 +27,6 @@ makedocs(
 )
 
 deploydocs(
-           repo = "github.com/climate-machine/RRTMGP.git",
+           repo = "github.com/climate-machine/RRTMGP.jl.git",
            target = "build",
           )
