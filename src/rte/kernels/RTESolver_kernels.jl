@@ -1,6 +1,4 @@
-"""
-    mo_rte_solver_kernels
-
+#=
 Numeric calculations for radiative transfer solvers.
  Emission/absorption (no-scattering) calculations
    solver for multi-angle Gaussian quadrature
@@ -14,38 +12,21 @@ Numeric calculations for radiative transfer solvers.
      two-stream calculations for LW, SW (using different assumptions about phase function)
      transport (adding)
  Application of boundary conditions
-"""
-module mo_rte_solver_kernels
+=#
 
-export lw_solver_noscat!,
-       lw_solver_noscat_GaussQuad!,
-       lw_solver_2stream!,
-       sw_solver_noscat!,
-       sw_solver_2stream!,
-       lw_source_noscat!,
-       lw_transport_noscat!,
-       lw_two_stream!,
-       lw_combine_sources!,
-       lw_source_2str!,
-       sw_two_stream!,
-       sw_source_2str!,
-       adding!,
-       apply_BC!
 
-using ..fortran_intrinsics
 LW_diff_sec(::Type{FT}) where FT = FT(1.66)  # 1./cos(diffusivity angle)
 
-# -------------------------------------------------------------------------------------------------
-#
-# Top-level long-wave kernels
-#
-# -------------------------------------------------------------------------------------------------
+
+#####
+##### Top-level long-wave kernels
+#####
+
 #
 # LW fluxes, no scattering, mu (cosine of integration angle) specified by column
 #  Does radiation calculation at user-supplied angles; converts radiances to flux
 #  using user-supplied weights
 #
-# ---------------------------------------------------------------
 
 """
     lw_solver_noscat!(...)
@@ -76,7 +57,6 @@ real(FT), dimension(:,:,:), pointer :: lev_source_up, lev_source_dn # Mapping in
 
 real(FT), parameter :: π = acos(-1._wp)
 integer             :: ilev, igpt, top_level
-# ------------------------------------
 """
 function lw_solver_noscat!(ncol::I, nlay::I, ngpt::I,
                            top_at_1::B, D::Array{FT}, weight::FT,
@@ -299,15 +279,13 @@ function lw_solver_2stream!(ncol::I, nlay::I, ngpt::I, top_at_1::B,
 
 end
 
-# -------------------------------------------------------------------------------------------------
-#
-#   Top-level shortwave kernels
-#
-# -------------------------------------------------------------------------------------------------
-#
-#   Extinction-only i.e. solar direct beam
-#
-# -------------------------------------------------------------------------------------------------
+#####
+#####   Top-level shortwave kernels
+#####
+
+#####
+#####   Extinction-only i.e. solar direct beam
+#####
 
 """
     sw_solver_noscat!(...)
@@ -356,7 +334,6 @@ end
 #   compute layer reflectance, transmittance
 #   compute solar source function for diffuse radiation
 #   transport
-
 
 """
     sw_solver_2stream!(...)
@@ -420,16 +397,14 @@ function sw_solver_2stream!(ncol, nlay, ngpt, top_at_1,
   end
 end
 
-# -------------------------------------------------------------------------------------------------
-#
-#   Lower-level longwave kernels
-#
-# -------------------------------------------------------------------------------------------------
+#####
+#####   Lower-level longwave kernels
+#####
+
 #
 # Compute LW source function for upward and downward emission at levels using linear-in-tau assumption
 # See Clough et al., 1992, doi: 10.1029/92JD01419, Eq 13
 #
-# ---------------------------------------------------------------
 
 """
     lw_source_noscat!(...)
@@ -478,11 +453,9 @@ function lw_source_noscat!(ncol::I, nlay::I,
   end
 end
 
-# -------------------------------------------------------------------------------------------------
-#
-# Longwave no-scattering transport
-#
-# -------------------------------------------------------------------------------------------------
+#####
+##### Longwave no-scattering transport
+#####
 
 """
     lw_transport_noscat!(...)
@@ -499,9 +472,7 @@ real(FT), dimension(ncol,nlay+1), intent(  out) :: radn_up    # Radiances [W/m2-
 real(FT), dimension(ncol,nlay+1), intent(inout) :: radn_dn    #Top level must contain incident flux boundary condition
 # Local variables
 integer :: ilev
-# ---------------------------------------------------
 """
-
 function lw_transport_noscat!(ncol::I, nlay::I, top_at_1::B,
                               tau::Array{FT},
                               trans::Array{FT},
@@ -575,7 +546,6 @@ real(FT) :: exp_minusktau(ncol), exp_minus2ktau(ncol)
 real(FT), parameter :: LW_diff_sec = 1.66  # 1./cos(diffusivity angle)
 # ---------------------------------
 """
-
 function lw_two_stream!(ncol::I, nlay::I,
                         tau::Array{FT},
                         w0::Array{FT},
@@ -1110,4 +1080,3 @@ function apply_BC!(flux_dn::Array{FT}, ncol::I, nlay::I, ngpt::I,
   nothing
 end
 
-end # module

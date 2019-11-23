@@ -1,7 +1,7 @@
 using RRTMGP
 using NCDatasets
 using RRTMGP.mo_optical_props
-using RRTMGP.mo_rte_solver_kernels
+using RRTMGP.RTESolver
 using RRTMGP.mo_simple_netcdf
 using RRTMGP.fortran_intrinsics
 using Test

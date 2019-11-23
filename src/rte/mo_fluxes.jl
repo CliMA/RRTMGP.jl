@@ -11,7 +11,6 @@ module mo_fluxes
 using DocStringExtensions
 using ..fortran_intrinsics
 using ..mo_optical_props
-using ..mo_fluxes_broadband_kernels
 
 export ty_fluxes_broadband, are_desired, reduce!
 
@@ -113,5 +112,7 @@ are_desired(this::ty_fluxes_broadband) =
         associated(this.flux_dn),
         associated(this.flux_dn_dir),
         associated(this.flux_net)] )
+
+include(joinpath("kernels","BroadbandFlux_kernels.jl"))
 
 end #module
