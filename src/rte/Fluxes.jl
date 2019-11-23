@@ -12,7 +12,7 @@ using DocStringExtensions
 using ..fortran_intrinsics
 using ..mo_optical_props
 
-export ty_fluxes_broadband, are_desired, reduce!
+export ty_fluxes, ty_fluxes_broadband, are_desired, reduce!
 
 """
     ty_fluxes{FT}

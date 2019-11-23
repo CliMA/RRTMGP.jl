@@ -16,6 +16,6 @@ using RRTMGP.mo_load_cloud_coefficients
 
 import RRTMGP.mo_optical_props: validate!, subset_range!, delta_scale!, get_nmom
 
-include("mo_optical_props_nstream.jl")
-include("mo_optical_props_kernels_nstream.jl")
+include("OpticalPropsNStream.jl")
+include("OpticalPropsNStream_kernels.jl")
 include("ExtractSubset.jl")

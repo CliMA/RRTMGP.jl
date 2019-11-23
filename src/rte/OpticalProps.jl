@@ -414,6 +414,6 @@ function gpoints_are_equal(this::ty_optical_props{FT}, that::ty_optical_props{FT
   end
 end
 
-include(joinpath("kernels","mo_optical_props_kernels.jl"))
+include(joinpath("kernels","OpticalProps_kernels.jl"))
 
 end # module

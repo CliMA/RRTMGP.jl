@@ -1275,6 +1275,6 @@ check_extent(array, s, label) = @assert all(size(array).==s)
 # Values
 check_range(val, minV, maxV, label) = any(val .< minV) || any(val .> maxV) ? trim(label) * " values out of range." : ""
 
-include("mo_gas_optics_kernels.jl")
+include("GasOptics_kernels.jl")
 
 end #module
