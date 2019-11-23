@@ -1,12 +1,7 @@
-"""
-    mo_fluxes_broadband_kernels
-
-Kernels for computing broadband fluxes by summing
-over all elements in the spectral dimension.
-"""
-module mo_fluxes_broadband_kernels
-
-export sum_broadband, net_broadband
+#####
+##### Kernels for computing broadband fluxes by summing
+##### over all elements in the spectral dimension.
+#####
 
 """
     sum_broadband(ncol, nlev, ngpt, spectral_flux::Array{FT}) where FT
@@ -54,5 +49,3 @@ end
 Net flux when bradband flux up and down are already available
 """
 net_broadband(ncol, nlev, flux_dn, flux_up) = flux_dn .- flux_up
-
-end

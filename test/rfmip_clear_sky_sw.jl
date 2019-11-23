@@ -4,13 +4,11 @@ using NCDatasets
 using ProgressMeter
 using TimerOutputs
 const to = TimerOutput()
-using RRTMGP.mo_optical_props
-using RRTMGP.mo_rte_solver_kernels
 using RRTMGP.fortran_intrinsics
 using RRTMGP.mo_util_array
 using RRTMGP.mo_gas_optics_rrtmgp
 using RRTMGP.mo_gas_concentrations
-using RRTMGP.mo_rte_sw
+using RRTMGP.RTESolver
 using RRTMGP.mo_fluxes
 using RRTMGP.mo_load_coefficients
 using RRTMGP.mo_rfmip_io
