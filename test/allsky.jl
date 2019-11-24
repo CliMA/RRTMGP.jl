@@ -4,25 +4,25 @@ using RRTMGP
 using TimerOutputs
 const to = TimerOutput()
 using NCDatasets
-using RRTMGP.mo_optical_props
-using RRTMGP.mo_simple_netcdf
-using RRTMGP.fortran_intrinsics
-using RRTMGP.mo_util_array
-using RRTMGP.mo_gas_optics_rrtmgp
-using RRTMGP.mo_gas_concentrations
+using RRTMGP.OpticalProps
+using RRTMGP.SimpleNetCDF
+using RRTMGP.FortranIntrinsics
+using RRTMGP.ArrayUtilities
+using RRTMGP.GasOptics
+using RRTMGP.GasConcentrations
 using RRTMGP.RTESolver
-using RRTMGP.mo_fluxes
-using RRTMGP.mo_load_coefficients
-using RRTMGP.mo_rfmip_io
-using RRTMGP.mo_source_functions
-using RRTMGP.mo_cloud_optics
-using RRTMGP.mo_load_cloud_coefficients
+using RRTMGP.Fluxes
+using RRTMGP.LoadCoefficients
+using RRTMGP.RFMIPIO
+using RRTMGP.SourceFunctions
+using RRTMGP.CloudOptics
+using RRTMGP.LoadCloudCoefficients
 
 include("CloudSampling.jl")
 include("TestFilesIO.jl")
 
-function vmr_2d_to_1d!(gas_concs::ty_gas_concs{FT},
-                       gas_concs_garand::ty_gas_concs{FT},
+function vmr_2d_to_1d!(gas_concs::GasConcs{FT},
+                       gas_concs_garand::GasConcs{FT},
                        name::String,
                        sz1::I,
                        sz2::I) where {FT<:AbstractFloat,I<:Int}
@@ -60,7 +60,7 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
   # Source functions
   #
   #   Longwave
-  # type(ty_source_func_lw), save               :: lw_sources
+  # type(SourceFuncLW), save               :: lw_sources
   #   Shortwave
   # real(wp), dimension(:,:), allocatable, save :: toa_flux
   #
@@ -76,12 +76,12 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
   #
   # Derived types from the RTE and RRTMGP libraries
   #
-  # type(ty_gas_optics_rrtmgp) :: k_dist
-  # type(ty_cloud_optics)      :: cloud_optics_
-  # type(ty_gas_concs)         :: gas_concs, gas_concs_garand, gas_concs_1col
-  # class(ty_optical_props_arry),
+  # type(AbstractGasOptics_rrtmgp) :: k_dist
+  # type(AbstractCloudOptics)      :: cloud_optics_
+  # type(GasConcs)         :: gas_concs, gas_concs_garand, gas_concs_1col
+  # class(AbstractOpticalPropsArry),
   #                allocatable :: atmos, clouds
-  # type(ty_fluxes_broadband)  :: fluxes
+  # type(FluxesBroadBand)  :: fluxes
 
   #
   # Inputs to RRTMGP
@@ -131,7 +131,7 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
   nlay = size(p_lay, 2)
   # For clouds we'll use the first column, repeated over and over
   gsc = GasConcSize(ncol, nlay, (ncol, nlay), ngas)
-  gas_concs = ty_gas_concs(FT, gas_names, ncol, nlay, gsc)
+  gas_concs = GasConcs(FT, gas_names, ncol, nlay, gsc)
   for igas = 1:ngas
     vmr_2d_to_1d!(gas_concs, gas_concs_garand, gas_names[igas], size(p_lay, 1), nlay)
   end
@@ -173,16 +173,16 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
   ps = ProblemSize(ncol, nlay, ngpt)
 
   # Clouds optical props are defined by band
-  clouds_base = ty_optical_props_base("Clouds", get_band_lims_wavenumber(k_dist.optical_props))
+  clouds_base = OpticalPropsBase("Clouds", get_band_lims_wavenumber(k_dist.optical_props))
 
   # LW calculations neglect scattering; SW calculations use the 2-stream approximation
   #   Here we choose the right variant of optical_props.
   if is_sw
-    clouds = ty_optical_props_2str(clouds_base, ps)
-    atmos = ty_optical_props_2str(k_dist.optical_props,ps)
+    clouds = TwoStream(clouds_base, ps)
+    atmos = TwoStream(k_dist.optical_props,ps)
   else
-    clouds = ty_optical_props_1scl(clouds_base, ps)
-    atmos = ty_optical_props_1scl(k_dist.optical_props, ps)
+    clouds = OneScalar(clouds_base, ps)
+    atmos = OneScalar(k_dist.optical_props, ps)
   end
 
   #
@@ -204,7 +204,7 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
     mu0 .= FT(.86)
   else
     # lw_sorces is thread private
-    lw_sources = ty_source_func_lw(ncol, nlay, k_dist.optical_props)
+    lw_sources = SourceFuncLW(ncol, nlay, k_dist.optical_props)
 
     t_sfc = zeros(FT, ncol)
     emis_sfc = zeros(FT, nbnd, ncol)
@@ -248,7 +248,7 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
     end
   end
 
-  fluxes = ty_fluxes_broadband(FT, size(flux_up), is_sw)
+  fluxes = FluxesBroadBand(FT, size(flux_up), is_sw)
   #
   # Multiple iterations for big problem sizes, and to help identify data movement
   #   For CPUs we can introduce OpenMP threading over loop iterations

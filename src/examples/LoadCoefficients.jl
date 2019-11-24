@@ -1,8 +1,8 @@
-module mo_load_coefficients
+module LoadCoefficients
 
-using ..mo_gas_concentrations
-using ..mo_gas_optics_rrtmgp
-using ..fortran_intrinsics
+using ..GasConcentrations
+using ..GasOptics
+using ..FortranIntrinsics
 using NCDatasets
 
 export load_and_init
@@ -13,12 +13,12 @@ function read_char_vec(ds, var_name)
 end
 
 """
-    load_and_init(ds, available_gases::ty_gas_concs{FT}) where FT
+    load_and_init(ds, available_gases::GasConcs{FT}) where FT
 
 Initialize the gas optics class with data. The calls look slightly different depending
   on whether the radiation sources are internal to the atmosphere (longwave) or external (shortwave)
 """
-function load_and_init(ds, available_gases::ty_gas_concs{FT}) where FT
+function load_and_init(ds, available_gases::GasConcs{FT}) where FT
 
   # Reading the properties from the NetCDF file
 

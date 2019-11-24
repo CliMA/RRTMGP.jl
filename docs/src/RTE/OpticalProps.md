@@ -1,13 +1,13 @@
 # Optical Properties
 
 ```@meta
-CurrentModule = RRTMGP.mo_optical_props
+CurrentModule = RRTMGP.OpticalProps
 ```
 
 ```@docs
-ty_optical_props_base
-ty_optical_props_1scl
-ty_optical_props_2str
+OpticalPropsBase
+OneScalar
+TwoStream
 ```
 
 ```@docs

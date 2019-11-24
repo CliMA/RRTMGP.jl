@@ -1,9 +1,9 @@
 using RRTMGP
 using NCDatasets
-using RRTMGP.mo_optical_props
+using RRTMGP.OpticalProps
 using RRTMGP.RTESolver
-using RRTMGP.mo_simple_netcdf
-using RRTMGP.fortran_intrinsics
+using RRTMGP.SimpleNetCDF
+using RRTMGP.FortranIntrinsics
 using Test
 
 get_array(ds, name, FT) = haskey(ds, name) ? convert(Array{FT}, ds[name][:]) : nothing
@@ -44,7 +44,7 @@ end
 
 function read_spectral_disc(ds, FT)
     # character(len=*),       intent(in   ) :: fileName
-    # class(ty_optical_props), intent(inout) :: spectral_disc
+    # class(AbstractOpticalProps), intent(inout) :: spectral_disc
 
     # integer :: ncid
     # integer :: nband
@@ -53,7 +53,7 @@ function read_spectral_disc(ds, FT)
 
     band_lims_wvn = convert(Array{FT}, ds["band_lims_wvn"][:])
     band_lims_gpt = convert(Array{FT}, ds["band_lims_gpt"][:])
-    op = ty_optical_props_1scl(FT,Int)
+    op = OneScalar(FT,Int)
     init!(op, "spectral_disc", band_lims_wvn, band_lims_gpt)
     return op
 end
@@ -86,7 +86,7 @@ end
   # data_dir = "../rte-rrtmgp-test-val/test/adding/ref/"
   # fileName = data_dir*"rrtmgp-sw-inputs-outputs-clear.nc"
 
-  # class(ty_optical_props_arry), allocatable :: atmos
+  # class(AbstractOpticalPropsArry), allocatable :: atmos
 
   # real(FT), dimension(:,:,:), allocatable :: Rdif, Tdif, source_up, source_dn
   # real(FT), dimension(:,  :), allocatable :: source_sfc
@@ -101,7 +101,7 @@ end
 
   # logical :: top_at_1, do_sw
   # integer :: i, j, k, ibnd, igpt
-  # type(ty_optical_props) :: spectral_disc
+  # type(AbstractOpticalProps) :: spectral_disc
   # # ----------------------------------------------------------------------------------
   ds = Dataset(fileName, "r")
   do_sw = haskey(ds, "solar_zenith_angle")

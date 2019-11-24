@@ -1,14 +1,16 @@
-# Optical Properties
+# Fluxes
 
 ```@meta
-CurrentModule = RRTMGP.mo_fluxes
+CurrentModule = RRTMGP.Fluxes
 ```
 
 ```@docs
-ty_fluxes_broadband
+FluxesBroadBand
+FluxesByBand
 ```
 
 ```@docs
 reduce!
+are_desired
 ```
 

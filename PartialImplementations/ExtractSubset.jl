@@ -68,10 +68,10 @@ end
 
 
 # Extract a subset of n columns starting with column 'start'
-function get_subset_range(this::ty_gas_concs, start::I, n::I, subset::ty_gas_concs) where I
-  # class(ty_gas_concs),      intent(in   ) :: this
+function get_subset_range(this::GasConcs, start::I, n::I, subset::GasConcs) where I
+  # class(GasConcs),      intent(in   ) :: this
   # integer,                  intent(in   ) :: start, n
-  # class(ty_gas_concs),      intent(inout) :: subset
+  # class(GasConcs),      intent(inout) :: subset
   @assert !(n <= 0)
   @assert !(start < 1 )
   @assert !(this.ncol ≠ nothing && start > this.ncol || start+n-1 > this.ncol )

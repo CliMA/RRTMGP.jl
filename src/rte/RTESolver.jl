@@ -17,7 +17,7 @@ boundary conditions (incident fluxes, surface
 albedos) are on the same spectral grid as the
 optical properties.
 
-Final output is via user-extensible `ty_fluxes`
+Final output is via user-extensible `AbstractFluxes`
 which must reduce the detailed spectral fluxes to
 whatever summary the user needs.
 
@@ -35,15 +35,15 @@ Contains a single routine to compute direct and diffuse fluxes of solar radiatio
  - optionally, a boundary condition for incident diffuse radiation
  - optionally, an integer number of angles at which to do Gaussian quadrature if scattering is neglected
 
-If optical properties are supplied via a `ty_optical_props_1scl` (absorption optical thickenss only)
+If optical properties are supplied via a `OneScalar` (absorption optical thickenss only)
   then an emission/absorption solver is called
-  If optical properties are supplied via a `ty_optical_props_2str` fluxes are computed via
+  If optical properties are supplied via a `TwoStream` fluxes are computed via
   two-stream calculations and adding.
 
 It is the user's responsibility to ensure that emissivity is on the same
  spectral grid as the optical properties.
 
-Final output is via user-extensible ty_fluxes which must reduce the detailed spectral fluxes to
+Final output is via user-extensible AbstractFluxes which must reduce the detailed spectral fluxes to
  whatever summary the user needs.
 
 The routine does error checking and choses which lower-level kernel to invoke based on
@@ -52,15 +52,15 @@ The routine does error checking and choses which lower-level kernel to invoke ba
 """
 module RTESolver
 
-using ..mo_util_array
-using ..mo_optical_props
-using ..mo_fluxes
-using ..fortran_intrinsics
+using ..ArrayUtilities
+using ..OpticalProps
+using ..Fluxes
+using ..FortranIntrinsics
 
 export rte_lw!, rte_sw!, expand_and_transpose
 
 """
-    rte_sw!(atmos::ty_optical_props_arry,
+    rte_sw!(atmos::AbstractOpticalPropsArry,
                  top_at_1,
                  mu0::Array{FT},
                  inc_flux,
@@ -69,9 +69,9 @@ export rte_lw!, rte_sw!, expand_and_transpose
                  fluxes,
                  inc_flux_dif=nothing)
 
-Compute fluxes `fluxes` (`ty_fluxes`), given
+Compute fluxes `fluxes` (`AbstractFluxes`), given
 
- - `atmos` Optical properties provided as arrays (`ty_optical_props_arry`)
+ - `atmos` Optical properties provided as arrays (`AbstractOpticalPropsArry`)
  - `top_at_1` bool indicating if the top of the domain is at index 1
              (if not, ordering is bottom-to-top)
  - `mu0` cosine of solar zenith angle (ncol)
@@ -81,7 +81,7 @@ Compute fluxes `fluxes` (`ty_fluxes`), given
 and, optionally,
  - `inc_flux_dif` incident diffuse flux at top of domain [W/m2] (ncol, ngpt)
 """
-function rte_sw!(atmos::ty_optical_props_arry,
+function rte_sw!(atmos::AbstractOpticalPropsArry,
                  top_at_1,
                  mu0::Array{FT},
                  inc_flux,
@@ -133,7 +133,7 @@ function rte_sw!(atmos::ty_optical_props_arry,
     apply_BC!(gpt_flux_dn, ncol, nlay, ngpt, top_at_1)
   end
 
-  if atmos isa ty_optical_props_1scl
+  if atmos isa OneScalar
     # Direct beam only
     validate!(atmos)
     sw_solver_noscat!(ncol, nlay, ngpt, top_at_1,
@@ -142,7 +142,7 @@ function rte_sw!(atmos::ty_optical_props_arry,
     # No diffuse flux
     # gpt_flux_up .= FT(0)
     # gpt_flux_dn .= FT(0)
-  elseif atmos isa ty_optical_props_2str
+  elseif atmos isa TwoStream
     # two-stream calculation with scattering
     validate!(atmos)
 
@@ -168,12 +168,12 @@ Interface using only optical properties and source functions as inputs; fluxes a
  - `top_at_1` indicates that the top of the domain is at index 1
  - `sources` radiation sources
  - `sfc_emis` emissivity at surface (nband, ncol)
- - `fluxes` Array of ty_fluxes. Default computes broadband fluxes at all levels
+ - `fluxes` Array of AbstractFluxes. Default computes broadband fluxes at all levels
             if output arrays are defined. Can be extended per user desires.
  - [`inc_flux`] incident flux at domain top [W/m2] (ncol, ngpts)
  - [`n_gauss_angles`] Number of angles used in Gaussian quadrature (no-scattering solution)
 """
-function rte_lw!(optical_props::ty_optical_props_arry{FT}, top_at_1,
+function rte_lw!(optical_props::AbstractOpticalPropsArry{FT}, top_at_1,
                 sources, sfc_emis,
                 fluxes,
                 inc_flux=nothing, n_gauss_angles=nothing) where FT
@@ -248,7 +248,7 @@ function rte_lw!(optical_props::ty_optical_props_arry{FT}, top_at_1,
   end
 
   # Compute the radiative transfer...
-  if optical_props isa ty_optical_props_1scl
+  if optical_props isa OneScalar
 
     # No scattering two-stream calculation
     lw_solver_noscat_GaussQuad!(ncol, nlay, ngpt, top_at_1,
@@ -258,7 +258,7 @@ function rte_lw!(optical_props::ty_optical_props_arry{FT}, top_at_1,
                             sfc_emis_gpt, sources.sfc_source,
                             gpt_flux_up, gpt_flux_dn)
 
-  elseif optical_props isa ty_optical_props_2str
+  elseif optical_props isa TwoStream
     # two-stream calculation with scattering
     lw_solver_2stream!(ncol, nlay, ngpt, top_at_1,
                                optical_props.tau, optical_props.ssa, optical_props.g,
@@ -270,15 +270,15 @@ function rte_lw!(optical_props::ty_optical_props_arry{FT}, top_at_1,
 end
 
 """
-    expand_and_transpose(ops::ty_optical_props,arr_in::Array{FT}) where FT
+    expand_and_transpose(ops::AbstractOpticalProps,arr_in::Array{FT}) where FT
 
 Expand from band to g-point dimension, transpose
 dimensions (nband, ncol) -> (ncol,ngpt), of `arr_out`, given
 
- - `ops` - a `ty_optical_props`
+ - `ops` - a `AbstractOpticalProps`
  - `arr_in` - input array
 """
-function expand_and_transpose(ops::ty_optical_props,arr_in::Array{FT}) where FT
+function expand_and_transpose(ops::AbstractOpticalProps,arr_in::Array{FT}) where FT
   ncol  = size(arr_in,2)
   nband = get_nband(ops)
   ngpt  = get_ngpt(ops)

@@ -4,14 +4,14 @@ using NCDatasets
 using ProgressMeter
 using TimerOutputs
 const to = TimerOutput()
-using RRTMGP.fortran_intrinsics
-using RRTMGP.mo_util_array
-using RRTMGP.mo_gas_optics_rrtmgp
-using RRTMGP.mo_gas_concentrations
+using RRTMGP.FortranIntrinsics
+using RRTMGP.ArrayUtilities
+using RRTMGP.GasOptics
+using RRTMGP.GasConcentrations
 using RRTMGP.RTESolver
-using RRTMGP.mo_fluxes
-using RRTMGP.mo_load_coefficients
-using RRTMGP.mo_rfmip_io
+using RRTMGP.Fluxes
+using RRTMGP.LoadCoefficients
+using RRTMGP.RFMIPIO
 
 """
 Example program to demonstrate the calculation of shortwave radiative fluxes in clear, aerosol-free skies.
@@ -43,18 +43,18 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
   #
   # Classes used by rte+rrtmgp
   #
-  # type(ty_gas_optics_rrtmgp)                     :: k_dist
-  # type(ty_optical_props_2str)                    :: optical_props
-  # type(ty_fluxes_broadband)                      :: fluxes
+  # type(AbstractGasOptics_rrtmgp)                     :: k_dist
+  # type(TwoStream)                    :: optical_props
+  # type(FluxesBroadBand)                      :: fluxes
 
   # real(FT), dimension(:,:), allocatable          :: toa_flux # block_size, ngpt
   # real(FT), dimension(:  ), allocatable          :: def_tsi, mu0    # block_size
   # logical , dimension(:,:), allocatable          :: usecol # block_size, nblocks
   #
-  # ty_gas_concentration holds multiple columns; we make an array of these objects to
+  # GasConcs holds multiple columns; we make an array of these objects to
   #   leverage what we know about the input file
   #
-  # type(ty_gas_concs), dimension(:), allocatable  :: gas_conc_array
+  # type(GasConcs), dimension(:), allocatable  :: gas_conc_array
   FT = Float64
   deg_to_rad = acos(-FT(1))/FT(180)
 
@@ -144,7 +144,7 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
   end
 
   #
-  # Allocate space for output fluxes (accessed via pointers in ty_fluxes_broadband),
+  # Allocate space for output fluxes (accessed via pointers in FluxesBroadBand),
   #   gas optical properties, and source functions. The %alloc() routines carry along
   #   the spectral discretization from the k-distribution.
   #
@@ -158,7 +158,7 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
   #
   # Loop over blocks
   #
-  fluxes = ty_fluxes_broadband(FT, (size(flux_up,1),size(flux_up,2)), true)
+  fluxes = FluxesBroadBand(FT, (size(flux_up,1),size(flux_up,2)), true)
 
   b_tot = (compile_first ? 1 : nblocks)
   @showprogress 1 "Computing..." for b = 1:b_tot
@@ -208,7 +208,7 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
 
     #
     # ... and compute the spectrally-resolved fluxes, providing reduced values
-    #    via ty_fluxes_broadband
+    #    via FluxesBroadBand
     #
 
     @timeit to "rte_sw!" rte_sw!(optical_props,
@@ -253,7 +253,7 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
   # @show diff_dn, diff_dn_ulps, maximum(abs.(rsd_ref))
 
   if !compile_first
-    if optical_props_constructor isa ty_optical_props_2str
+    if optical_props_constructor isa TwoStream
       @test diff_up_ulps < sqrt(1/(1e6eps(FT)))
       @test diff_dn_ulps < sqrt(1/(1e6eps(FT)))
     else

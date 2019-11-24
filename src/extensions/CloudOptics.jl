@@ -1,5 +1,5 @@
 """
-    mo_cloud_optics
+    CloudOptics
 
 Provides cloud optical properties as a function of effective radius for the RRTMGP bands
   Based on Mie calculations for liquid
@@ -8,19 +8,19 @@ Provides cloud optical properties as a function of effective radius for the RRTM
   Mike Iacono (AER) is the original author
 The class can be used as-is but is also intended as an example of how to extend the RTE framework
 """
-module mo_cloud_optics
+module CloudOptics
 
 using OffsetArrays
-using ..mo_optical_props
-using ..mo_util_array
-using ..fortran_intrinsics
+using ..OpticalProps
+using ..ArrayUtilities
+using ..FortranIntrinsics
 
 export cloud_optics!
 export get_min_radius, get_max_radius
 
 export PadeMethod, LookUpTable
-export ty_cloud_optics_lut
-export ty_cloud_optics_pade
+export CloudOpticsLUT
+export CloudOpticsPade
 
 abstract type AbstractInterpolationMethod end
 
@@ -142,7 +142,7 @@ get_max_radius(aim::AbstractInterpolationMethod) = aim.rad_upr
 get_num_roughness_types(this::PadeMethod) = size(this.ext, 4)
 get_num_roughness_types(this::LookUpTable) = size(this.ext,  3)
 
-struct ty_cloud_optics_lut{FT, I} <: ty_optical_props{FT, I}
+struct CloudOpticsLUT{FT, I} <: AbstractOpticalProps{FT, I}
   base
   # Ice surface roughness category - needed for Yang (2013) ice optics parameterization
   icergh#::I
@@ -150,7 +150,7 @@ struct ty_cloud_optics_lut{FT, I} <: ty_optical_props{FT, I}
   ice#AbstractInterpolationMethod
 end
 
-struct ty_cloud_optics_pade{FT, I} <: ty_optical_props{FT, I}
+struct CloudOpticsPade{FT, I} <: AbstractOpticalProps{FT, I}
   base
   # Ice surface roughness category - needed for Yang (2013) ice optics parameterization
   icergh#::I
@@ -162,12 +162,12 @@ end
 # Derive cloud optical properties from provided cloud physical properties
 
 """
-    combine_optical_props!(optical_props::ty_optical_props, ltau, ltaussa, ltaussag, itau, itaussa, itaussag, nbnd, nlay, ncol)
+    combine_optical_props!(optical_props::AbstractOpticalProps, ltau, ltaussa, ltaussag, itau, itaussa, itaussag, nbnd, nlay, ncol)
 
 Combine liquid and ice contributions into total cloud optical properties
-   See also the `increment!` routines in `mo_optical_props_kernels`
+   See also the `increment!` routines in `OpticalProps_kernels`
 """
-function combine_optical_props!(optical_props::ty_optical_props_1scl, ltau, ltaussa, ltaussag, itau, itaussa, itaussag, nbnd, nlay, ncol)
+function combine_optical_props!(optical_props::OneScalar, ltau, ltaussa, ltaussag, itau, itaussa, itaussag, nbnd, nlay, ncol)
   # Absorption optical depth  = (1-ssa) * tau = tau - taussa
   for ibnd = 1:nbnd
     for ilay = 1:nlay
@@ -179,7 +179,7 @@ function combine_optical_props!(optical_props::ty_optical_props_1scl, ltau, ltau
     end
   end
 end
-function combine_optical_props!(optical_props::ty_optical_props_2str{FT}, ltau, ltaussa, ltaussag, itau, itaussa, itaussag, nbnd, nlay, ncol) where FT
+function combine_optical_props!(optical_props::TwoStream{FT}, ltau, ltaussa, ltaussag, itau, itaussa, itaussag, nbnd, nlay, ncol) where FT
   for ibnd = 1:nbnd
     for ilay = 1:nlay
       for icol = 1:ncol
@@ -193,7 +193,7 @@ function combine_optical_props!(optical_props::ty_optical_props_2str{FT}, ltau, 
   end
 end
 
-function validate_cloud_optics!(this::ty_optical_props{FT},
+function validate_cloud_optics!(this::AbstractOpticalProps{FT},
                       clwp, ciwp, reliq, reice,
                       optical_props) where FT
   liqmsk = BitArray(clwp .> FT(0))
@@ -210,27 +210,27 @@ function validate_cloud_optics!(this::ty_optical_props{FT},
 end
 
 """
-    cloud_optics!(this::ty_cloud_optics_pade{FT},
+    cloud_optics!(this::CloudOpticsPade{FT},
                       clwp, ciwp, reliq, reice,
                       optical_props)
 
 Compute single-scattering properties
 
-class(ty_cloud_optics), intent(in   ) :: this
+class(CloudOpticsPade), intent(in   ) :: this
 real(wp), intent(in   ) :: clwp  (:,:),    ! cloud ice water path    (units?)
                            ciwp  (:,:),    ! cloud liquid water path (units?)
                            reliq (:,:),    ! cloud ice particle effective size (microns)
                            reice (:,:)      ! cloud liquid particle effective radius (microns)
-class(ty_optical_props_arry), intent(inout) :: optical_props Dimensions: (ncol,nlay,nbnd)
+class(AbstractOpticalPropsArry), intent(inout) :: optical_props Dimensions: (ncol,nlay,nbnd)
 ! ------- Local -------
 logical(wl), dimension(size(clwp,1), size(clwp,2)) :: liqmsk, icemsk
 real(wp),    dimension(size(clwp,1), size(clwp,2), this%get_nband()) ::
             ltau, ltaussa, ltaussag, itau, itaussa, itaussag
 # ------- Local -------
-type(ty_optical_props_2str) :: clouds_liq, clouds_ice
+type(TwoStream) :: clouds_liq, clouds_ice
 integer  :: nsizereg, ibnd, imom
 """
-function cloud_optics!(this::ty_cloud_optics_pade{FT},
+function cloud_optics!(this::CloudOpticsPade{FT},
                       clwp, ciwp, reliq, reice,
                       optical_props) where FT
   ncol,nlay = size(clwp)
@@ -263,7 +263,7 @@ function cloud_optics!(this::ty_cloud_optics_pade{FT},
   combine_optical_props!(optical_props, ltau, ltaussa, ltaussag, itau, itaussa, itaussag, nbnd, nlay, ncol)
 
 end
-function cloud_optics!(this::ty_cloud_optics_lut{FT},
+function cloud_optics!(this::CloudOpticsLUT{FT},
                       clwp, ciwp, reliq, reice,
                       optical_props) where FT
   ncol = size(clwp,1)

@@ -1,12 +1,12 @@
 """
-    ty_optical_props_nstr{FT,I} <: ty_optical_props_arry{FT,I}
+    NStream{FT,I} <: AbstractOpticalPropsArry{FT,I}
 
 Holds extinction optical depth `tau`, `ssa`, and phase function moments `p` with leading dimension nmom.
 
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct ty_optical_props_nstr{FT,I} <: ty_optical_props_arry{FT,I}
+struct NStream{FT,I} <: AbstractOpticalPropsArry{FT,I}
   base
   tau#::Array{FT,3}
   ssa#::Array{FT,3}
@@ -16,22 +16,22 @@ end
 """
     delta_scale!(...)
 
-    class(ty_optical_props_nstr), intent(inout) :: this
+    class(NStream), intent(inout) :: this
     real(FT), dimension(:,:,:), optional,
                                  intent(in   ) :: for_
     character(128)                             :: err_message
 """
-delta_scale!(this::ty_optical_props_nstr, for_) = "delta_scale_nstr: Not yet implemented"
+delta_scale!(this::NStream, for_) = "delta_scale_nstr: Not yet implemented"
 
 
 """
 
-  class(ty_optical_props_nstr), intent(in) :: this
+  class(NStream), intent(in) :: this
   character(len=128)                       :: err_message
 
   integer :: varSizes(3)
 """
-function validate!(this::ty_optical_props_nstr{FT}) where FT
+function validate!(this::NStream{FT}) where FT
 
   #
   # Array allocation status, sizing
@@ -61,14 +61,14 @@ end
 # ------------------------------------------------------------------------------------------
 
 """
-  class(ty_optical_props_1scl), intent(inout) :: full
+  class(OneScalar), intent(inout) :: full
   integer,                      intent(in   ) :: start, n
-  class(ty_optical_props_arry), intent(inout) :: subset
+  class(AbstractOpticalPropsArry), intent(inout) :: subset
   character(128)                              :: err_message
 
   integer :: ncol, nlay, ngpt, nmom
 """
-function subset_range!(full::ty_optical_props_1scl{FT}, start, n, subset) where FT
+function subset_range!(full::OneScalar{FT}, start, n, subset) where FT
   ncol = get_ncol(full)
   nlay = get_nlay(full)
   ngpt = get_ngpt(full)
@@ -80,13 +80,13 @@ function subset_range!(full::ty_optical_props_1scl{FT}, start, n, subset) where 
   # Seems like the deallocation statements should be needed under Fortran 2003
   #   but Intel compiler doesn't run without them
 
-  if subset isa ty_optical_props_1scl
+  if subset isa OneScalar
       alloc!(subset, n, nlay)
-  elseif subset isa ty_optical_props_2str
+  elseif subset isa TwoStream
       alloc!(subset, n, nlay)
       subset.ssa[1:n,:,:] .= FT(0)
       subset.g[1:n,:,:] .= FT(0)
-  elseif subset isa ty_optical_props_nstr
+  elseif subset isa NStream
       if allocated(subset.p)
         nmom = get_nmom(subset)
       else
@@ -96,7 +96,7 @@ function subset_range!(full::ty_optical_props_1scl{FT}, start, n, subset) where 
       subset.ssa[1:n,:,:] .= FT(0)
       subset.p[:,1:n,:,:] .= FT(0)
   else
-    error("Uncaught case in subset_range!(full::ty_optical_props_1scl{FT}")
+    error("Uncaught case in subset_range!(full::OneScalar{FT}")
   end
   extract_subset!(ncol, nlay, ngpt, full.tau, start, start+n-1, subset.tau)
 
@@ -106,14 +106,14 @@ end
 """
   subset_range!(...)
 
-  class(ty_optical_props_2str), intent(inout) :: full
+  class(TwoStream), intent(inout) :: full
   integer,                      intent(in   ) :: start, n
-  class(ty_optical_props_arry), intent(inout) :: subset
+  class(AbstractOpticalPropsArry), intent(inout) :: subset
   character(128)                              :: err_message
 
   integer :: ncol, nlay, ngpt, nmom
 """
-function subset_range!(full::ty_optical_props_2str{FT}, start, n, subset) where FT
+function subset_range!(full::TwoStream{FT}, start, n, subset) where FT
 
   ncol = get_ncol(full)
   nlay = get_nlay(full)
@@ -124,15 +124,15 @@ function subset_range!(full::ty_optical_props_2str{FT}, start, n, subset) where 
 
   init!(subset, full)
 
-  if subset isa ty_optical_props_1scl # TODO: check logic
+  if subset isa OneScalar # TODO: check logic
     alloc!(subset, n, nlay)
     extract_subset!(ncol, nlay, ngpt, full.tau, full.ssa, start, start+n-1, subset.tau)
-  elseif subset isa ty_optical_props_2str
+  elseif subset isa TwoStream
     alloc!(subset, n, nlay)
     extract_subset!(ncol, nlay, ngpt, full.tau, start, start+n-1, subset.tau)
     extract_subset!(ncol, nlay, ngpt, full.ssa, start, start+n-1, subset.ssa)
     extract_subset!(ncol, nlay, ngpt, full.g  , start, start+n-1, subset.g  )
-  elseif subset isa ty_optical_props_nstr
+  elseif subset isa NStream
     if allocated(subset.p)
       nmom = get_nmom(subset)
     else
@@ -144,21 +144,21 @@ function subset_range!(full::ty_optical_props_2str{FT}, start, n, subset) where 
     subset.p[1,1:n,:,:] .= full.g[start:start+n-1,:,:]
     subset.p[2:end,:, :,:] .= FT(0) # TODO Verify this line
   else
-    error("Uncaught case in subset_range!(full::ty_optical_props_2str{FT}")
+    error("Uncaught case in subset_range!(full::TwoStream{FT}")
   end
 end
 
 """
-    subset_range!(full::ty_optical_props_nstr, start, n, subset)
+    subset_range!(full::NStream, start, n, subset)
 
-    class(ty_optical_props_nstr), intent(inout) :: full
+    class(NStream), intent(inout) :: full
     integer,                      intent(in   ) :: start, n
-    class(ty_optical_props_arry), intent(inout) :: subset
+    class(AbstractOpticalPropsArry), intent(inout) :: subset
     character(128)                              :: err_message
 
     integer :: ncol, nlay, ngpt, nmom
 """
-function subset_range!(full::ty_optical_props_nstr, start, n, subset)
+function subset_range!(full::NStream, start, n, subset)
 
   ncol = get_ncol(full)
   nlay = get_nlay(full)
@@ -169,30 +169,30 @@ function subset_range!(full::ty_optical_props_nstr, start, n, subset)
 
   init!(subset, full)
 
-  if subset isa ty_optical_props_1scl # TODO: check logic
+  if subset isa OneScalar # TODO: check logic
     alloc!(subset, n, nlay)
     extract_subset!(ncol, nlay, ngpt, full.tau, full.ssa, start, start+n-1, subset.tau)
-  elseif subset isa ty_optical_props_2str
+  elseif subset isa TwoStream
     alloc!(subset, n, nlay)
     extract_subset!(ncol, nlay, ngpt, full.tau, start, start+n-1, subset.tau)
     extract_subset!(ncol, nlay, ngpt, full.ssa, start, start+n-1, subset.ssa)
     subset.g[1:n,:,:] .= full.p[1,start:start+n-1,:,:]
-  elseif subset isa ty_optical_props_nstr
+  elseif subset isa NStream
     alloc!(subset, nmom, n, nlay)
     extract_subset!(      ncol, nlay, ngpt, full.tau, start, start+n-1, subset.tau)
     extract_subset!(      ncol, nlay, ngpt, full.ssa, start, start+n-1, subset.ssa)
     extract_subset!(nmom, ncol, nlay, ngpt, full.p  , start, start+n-1, subset.p  )
   else
-    error("Uncaught case in subset_range!(full::ty_optical_props_nstr, start, n, subset)")
+    error("Uncaught case in subset_range!(full::NStream, start, n, subset)")
   end
 end
 
 
 """
-    class(ty_optical_props_nstr), intent(in   ) :: this
+    class(NStream), intent(in   ) :: this
     integer                                     :: get_nmom
 """
-get_nmom(this::ty_optical_props_nstr) = size(this.p, 1)
+get_nmom(this::NStream) = size(this.p, 1)
 
 
 """

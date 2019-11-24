@@ -1,5 +1,5 @@
 #####
-##### mo_gas_optics_kernels: Numeric calculations for gas optics. Absorption and Rayleigh optical depths, source functions.
+##### Numeric calculations for gas optics. Absorption and Rayleigh optical depths, source functions.
 #####
 
 PaTohPa(::Type{FT}) where FT = FT(0.01)
@@ -788,7 +788,7 @@ integer,                             intent(in) :: ncol, nlay, ngpt
 real(FT), dimension(ngpt,nlay,ncol), intent(in   ) :: tau_abs, tau_rayleigh
 real(FT), dimension(ncol,nlay,ngpt), intent(inout) :: tau, ssa, g # inout because components are allocated
 """
-function combine_and_reorder_2str!(op::ty_optical_props{FT}, ncol, nlay, ngpt, tau_abs, tau_rayleigh) where FT
+function combine_and_reorder_2str!(op::AbstractOpticalProps{FT}, ncol, nlay, ngpt, tau_abs, tau_rayleigh) where FT
   for icol in 1:ncol
     for ilay in 1:nlay
       for igpt in 1:ngpt
