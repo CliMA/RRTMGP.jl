@@ -1,6 +1,6 @@
 using Test
 using RRTMGP
-using RRTMGP.mo_optical_props
+using RRTMGP.OpticalProps
 using Profile
 using BenchmarkTools
 
@@ -42,10 +42,10 @@ include("DataSetFiles.jl")
       @benchmarkable all_sky($(ds_allsky_lw); use_luts=$(use_luts), λ_string=$("lw"))
   end
   suite["clearsky"] = BenchmarkGroup(["clear"])
-  suite["clearsky"]["lw_1scl"] = @benchmarkable rfmip_clear_sky_lw($(ds_clearsky_lw), ty_optical_props_1scl)
-  suite["clearsky"]["lw_2str"] = @benchmarkable rfmip_clear_sky_lw($(ds_clearsky_lw), ty_optical_props_2str)
-  suite["clearsky"]["sw_1scl"] = @benchmarkable rfmip_clear_sky_sw($(ds_clearsky_sw), ty_optical_props_1scl)
-  suite["clearsky"]["sw_2str"] = @benchmarkable rfmip_clear_sky_sw($(ds_clearsky_sw), ty_optical_props_2str)
+  suite["clearsky"]["lw_1scl"] = @benchmarkable rfmip_clear_sky_lw($(ds_clearsky_lw), OneScalar)
+  suite["clearsky"]["lw_2str"] = @benchmarkable rfmip_clear_sky_lw($(ds_clearsky_lw), TwoStream)
+  suite["clearsky"]["sw_1scl"] = @benchmarkable rfmip_clear_sky_sw($(ds_clearsky_sw), OneScalar)
+  suite["clearsky"]["sw_2str"] = @benchmarkable rfmip_clear_sky_sw($(ds_clearsky_sw), TwoStream)
 
   refresh_params && tune!(suite)
 
@@ -66,7 +66,7 @@ include("DataSetFiles.jl")
   close.(values(ds_allsky_lw))
 
   # Profile.clear()
-  # Profile.@profile run_driver(datafolder, ty_optical_props_1scl)
-  # Profile.@profile run_driver(datafolder, ty_optical_props_2str)
+  # Profile.@profile run_driver(datafolder, OneScalar)
+  # Profile.@profile run_driver(datafolder, TwoStream)
   # Profile.print()
 end

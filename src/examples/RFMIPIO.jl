@@ -1,5 +1,5 @@
 """
-    mo_rfmip_io
+    RFMIPIO
 
 This module reads an example file containing atomspheric conditions (temperature, pressure, gas concentrations)
  and surface properties (emissivity, temperature), defined on nlay layers across a set of ncol columns subject to
@@ -12,11 +12,11 @@ The example files comes from the Radiative Forcing MIP (https://www.earthsystemc
 all gases, (CO2, CH4, N2O) + {CFC11eq; CFC12eq + HFC-134eq}. Ozone is always included
 The protocol does not specify the treatmet of gases like CO
 """
-module mo_rfmip_io
+module RFMIPIO
 
-using ..mo_gas_concentrations
+using ..GasConcentrations
 using ..Utilities
-using ..fortran_intrinsics
+using ..FortranIntrinsics
 using NCDatasets
 
 export read_kdist_gas_names, determine_gas_names, read_size, read_and_block_pt,
@@ -224,7 +224,7 @@ read_kdist_gas_names(ds) =
     read_and_block_gases_ty(ds, blocksize, gas_names, names_in_file)
 
 Read and reshape gas concentrations. RRTMGP requires gas concentrations to be supplied via a class
- (ty_gas_concs). Gas concentrations are set via a call to gas_concs%set_vmr(name, values)
+ (GasConcs). Gas concentrations are set via a call to gas_concs%set_vmr(name, values)
  where `name` is nominally the chemical formula for the gas in question and `values` may be
  a scalar, a 1-d profile assumed to apply to all columns, or an array of dimension (ncol, nlay).
 This routine outputs a vector nblocks long of these types so each element of the array can be passed to
@@ -241,7 +241,7 @@ Fields in the RFMIP file have a trailing _GM (global mean); some fields use a ch
                               intent(in   ) :: gas_names ! Names used by the k-distribution/gas concentration type
   character(len=*),  dimension(:), &
                               intent(in   ) :: names_in_file ! Corresponding names in the RFMIP file
-  type(ty_gas_concs), dimension(:), allocatable, &
+  type(GasConcs), dimension(:), allocatable, &
                               intent(  out) :: gas_conc_array
 """
 function read_and_block_gases_ty(ds, blocksize, gas_names, names_in_file)
@@ -251,7 +251,7 @@ function read_and_block_gases_ty(ds, blocksize, gas_names, names_in_file)
   nblocks = Int((ncol_l*nexp_l)/blocksize)
   FT = Float64
   gsc = GasConcSize(ncol_l, nlay_l, (blocksize, nlay_l), length(gas_names))
-  gas_concs = ty_gas_concs(FT, gas_names, ncol_l, nlay_l, gsc)
+  gas_concs = GasConcs(FT, gas_names, ncol_l, nlay_l, gsc)
   gas_conc_array = Vector([deepcopy(gas_concs) for i in 1:nblocks])
 
   # Experiment index for each column

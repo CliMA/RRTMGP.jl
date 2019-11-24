@@ -33,7 +33,7 @@ function read_atmos(ds, FT, gas_names)
   existing_gases = filter(ug->haskey(ds, "vmr_"*ug), available_gases)
 
   gsc = GasConcSize(ncol, nlay, (ncol, nlay), length(existing_gases))
-  gas_concs = ty_gas_concs(FT, gas_names, ncol, nlay, gsc)
+  gas_concs = GasConcs(FT, gas_names, ncol, nlay, gsc)
 
   for eg in existing_gases
     set_vmr!(gas_concs, eg, Array{FT}(read_field(ds, "vmr_"*eg)))
@@ -89,7 +89,7 @@ end
 #
 function read_spectral_disc!(ds, spectral_disc)
 #    character(len=*),       intent(in   ) :: fileName
-#    class(ty_optical_props), intent(inout) :: spectral_disc
+#    class(AbstractOpticalProps), intent(inout) :: spectral_disc
 
 #    integer :: ncid
 #    integer :: nband
@@ -101,7 +101,7 @@ function read_spectral_disc!(ds, spectral_disc)
 
   band_lims_wvn = ds["band_lims_wvn"][:]
   band_lims_gpt = ds["band_lims_gpt"][:]
-  spectral_disc.base = ty_optical_props_base("read_spectral_disc!", band_lims_wvn, band_lims_gpt) # blank string used for now
+  spectral_disc.base = OpticalPropsBase("read_spectral_disc!", band_lims_wvn, band_lims_gpt) # blank string used for now
 
 end
 
@@ -128,7 +128,7 @@ end
 #  #
 function read_optical_prop_values!(ds, opt_props)
 #    character(len=*),                          intent(in ) :: fileName
-#    class(ty_optical_props_arry), allocatable, intent(out) :: opt_props
+#    class(AbstractOpticalPropsArry), allocatable, intent(out) :: opt_props
 #    # -------------------
 #    integer :: ncid
 #    integer :: ncol, nlay, ngpt, nmom, nband
@@ -148,7 +148,7 @@ function read_optical_prop_values!(ds, opt_props)
   band_lims_wvn = ds["band_lims_wvn"][:]
   band_lims_gpt = ds["band_lims_gpt"][:]
 
-  opt_props.base = ty_optical_props_base("read_optical_prop_values!",band_lims_wvn, band_lims_gpt) #check for the initializing string
+  opt_props.base = OpticalPropsBase("read_optical_prop_values!",band_lims_wvn, band_lims_gpt) #check for the initializing string
 
   if(haskey(ds, "p"))
     # n-stream calculation
@@ -161,13 +161,13 @@ function read_optical_prop_values!(ds, opt_props)
 
   elseif (haskey(ds, "g"))
     # two-stream calculation
-    # allocate(ty_optical_props_2str::opt_props)
+    # allocate(TwoStream::opt_props)
     alloc_2str!(opt_props, ncol, nlay)
     opt_props.ssa .= ds["ssa"][:]
     opt_props.g   .= ds["g"][:]
   else
     # No scattering
-    allocate(ty_optical_props_1scl::opt_props)
+    allocate(OneScalar::opt_props)
     alloc_1scl!(opt_props,ncol, nlay)
   end
   opt_props.tau .= ds["tau"][:] #, ncol, nlay, ngpt)
@@ -180,16 +180,12 @@ function read_optical_prop_values!(ds, opt_props)
 
 #    error(opt_props%init(band_lims_wvn, band_lims_gpt, read_string(ncid, 'name', 32)))
 #    select type (opt_props)
-#      class is (ty_optical_props_1scl)      # No scattering
+#      class is (OneScalar)      # No scattering
 #        error(opt_props%alloc_1scl(ncol, nlay))
-#      class is (ty_optical_props_2str) # two-stream calculation
+#      class is (TwoStream) # two-stream calculation
 #        error(opt_props%alloc_2str(ncol, nlay))
 #        opt_props%ssa = read_field(ncid, "ssa", ncol, nlay, ngpt)
 #        opt_props%g   = read_field(ncid, "g",   ncol, nlay, ngpt)
-#      class is (ty_optical_props_nstr) # n-stream calculation
-#        error(opt_props%alloc_nstr(nmom, ncol, nlay))
-#        opt_props%ssa = read_field(ncid, "ssa",       ncol, nlay, ngpt)
-#        opt_props%p   = read_field(ncid, "p",   nmom, ncol, nlay, ngpt)
 #    end select
 #    opt_props%tau = read_field(ncid, "tau", ncol, nlay, ngpt)
 end
@@ -226,9 +222,9 @@ end
 #   Also directionality since this will be needed for solution
 #
 
-function read_lw_Planck_sources!(ds, sources::ty_source_func_lw{FT}) where FT
+function read_lw_Planck_sources!(ds, sources::SourceFuncLW{FT}) where FT
 #    character(len=*),        intent(in   ) :: fileName
-#    type(ty_source_func_lw), intent(inout) :: sources
+#    type(SourceFuncLW), intent(inout) :: sources
 #    # -------------------
 #    integer :: ncid
 #    integer :: ncol, nlay, ngpt, nmom, nband
@@ -251,7 +247,7 @@ function read_lw_Planck_sources!(ds, sources::ty_source_func_lw{FT}) where FT
   band_lims_wvn = ds["band_lims_wvn"][:]
   band_lims_gpt = ds["band_lims_gpt"][:]
 
-  sources.optical_props = ty_optical_props_base("ty_source_func_lw", band_lims_wvn, band_lims_gpt)
+  sources.optical_props = OpticalPropsBase("SourceFuncLW", band_lims_wvn, band_lims_gpt)
   sources.tau = Array{FT}(undef, ncol, nlay)
 
   sources.lay_source     .= ds["lay_src"][:]

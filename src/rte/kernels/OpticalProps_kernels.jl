@@ -24,7 +24,7 @@
 #    real(FT) :: wf
 #    integer  :: icol, ilay, igpt
 """
-function delta_scale_2str_kernel!(op::ty_optical_props{FT}, f) where FT
+function delta_scale_2str_kernel!(op::AbstractOpticalProps{FT}, f) where FT
   for igpt = 1:get_ngpt(op)
     for ilay = 1:get_nlay(op)
       for icol = 1:get_ncol(op)
@@ -47,7 +47,7 @@ end
 
 #    real(FT) :: f, wf
 #    integer  :: icol, ilay, igpt
-function delta_scale_2str_kernel!(op::ty_optical_props{FT}) where FT
+function delta_scale_2str_kernel!(op::AbstractOpticalProps{FT}) where FT
   for igpt = 1:get_ngpt(op)
     for ilay = 1:get_nlay(op)
       for icol = 1:get_ncol(op)
@@ -80,18 +80,18 @@ end
 #    real(FT), dimension(ncol,nlay,ngpt), intent(inout) :: op_1.tau
 #    real(FT), dimension(ncol,nlay,ngpt), intent(in   ) :: op_2.tau
 #    integer  :: icol, ilay, igpt
-function increment_by_gpoint!(op_1::ty_optical_props_1scl{FT}, op_2::ty_optical_props_1scl{FT}) where FT
+function increment_by_gpoint!(op_1::OneScalar{FT}, op_2::OneScalar{FT}) where FT
   op_1.tau .= op_1.tau .+ op_2.tau
 end
 # ---------------------------------
 # increment 1scalar by 2stream
-function increment_by_gpoint!(op_1::ty_optical_props_1scl{FT}, op_2::ty_optical_props_2str{FT}) where FT
+function increment_by_gpoint!(op_1::OneScalar{FT}, op_2::TwoStream{FT}) where FT
   op_1.tau .= op_1.tau .+ op_2.tau .* ( FT(1) .- op_2.ssa )
 end
 # ---------------------------------
 # ---------------------------------
 # increment 2stream by 1scalar
-function increment_by_gpoint!(op_1::ty_optical_props_2str{FT}, op_2::ty_optical_props_1scl{FT}) where FT
+function increment_by_gpoint!(op_1::TwoStream{FT}, op_2::OneScalar{FT}) where FT
 #    integer,                             intent(in   ) :: ncol, nlay, ngpt
 #    real(FT), dimension(ncol,nlay,ngpt), intent(inout) :: op_1.tau, op_1.ssa
 #    real(FT), dimension(ncol,nlay,ngpt), intent(in   ) :: op_2.tau
@@ -116,7 +116,7 @@ function increment_by_gpoint!(op_1::ty_optical_props_2str{FT}, op_2::ty_optical_
 end
 # ---------------------------------
 # increment 2stream by 2stream
-function increment_by_gpoint!(op_1::ty_optical_props_2str{FT}, op_2::ty_optical_props_2str{FT}) where FT
+function increment_by_gpoint!(op_1::TwoStream{FT}, op_2::TwoStream{FT}) where FT
 #    integer,                              intent(in   ) :: ncol, nlay, ngpt
 #    real(FT), dimension(ncol,nlay,ngpt), intent(inout) :: op_1.tau, op_1.ssa, op_1.g
 #    real(FT), dimension(ncol,nlay,ngpt), intent(in   ) :: op_2.tau, op_2.ssa, op_2.g
@@ -150,7 +150,7 @@ end
 # Incrementing when the second set of optical properties is defined at lower spectral resolution
 #   (e.g. by band instead of by gpoint)
 #
-function increment_bybnd!(op_1::ty_optical_props_1scl{FT}, op_2::ty_optical_props_1scl{FT}) where FT
+function increment_bybnd!(op_1::OneScalar{FT}, op_2::OneScalar{FT}) where FT
 #    integer,                             intent(in   ) :: ncol, nlay, ngpt, nbnd
 #    real(FT), dimension(ncol,nlay,ngpt), intent(inout) :: tau1
 #    real(FT), dimension(ncol,nlay,nbnd), intent(in   ) :: tau2
@@ -169,7 +169,7 @@ function increment_bybnd!(op_1::ty_optical_props_1scl{FT}, op_2::ty_optical_prop
 end
 # ---------------------------------
 # increment 1scalar by 2stream
-function increment_bybnd!(op_1::ty_optical_props_1scl{FT}, op_2::ty_optical_props_2str{FT}) where FT
+function increment_bybnd!(op_1::OneScalar{FT}, op_2::TwoStream{FT}) where FT
 #    integer,                             intent(in   ) :: ncol, nlay, ngpt, nbnd
 #    real(FT), dimension(ncol,nlay,ngpt), intent(inout) :: tau1
 #    real(FT), dimension(ncol,nlay,nbnd), intent(in   ) :: tau2, ssa2
@@ -191,7 +191,7 @@ function increment_bybnd!(op_1::ty_optical_props_1scl{FT}, op_2::ty_optical_prop
 end
 
 """
-    increment_bybnd!(op_1::ty_optical_props_2str{FT}, op_2::ty_optical_props_1scl{FT})
+    increment_bybnd!(op_1::TwoStream{FT}, op_2::OneScalar{FT})
 
 increment 2stream by 1scalar
 integer,                             intent(in   ) :: ncol, nlay, ngpt, nbnd
@@ -202,7 +202,7 @@ integer,  dimension(2,nbnd),         intent(in   ) :: gpt_lims # Starting and en
 integer  :: icol, ilay, igpt, ibnd
 real(FT) :: tau12
 """
-function increment_bybnd!(op_1::ty_optical_props_2str{FT}, op_2::ty_optical_props_1scl{FT}) where FT
+function increment_bybnd!(op_1::TwoStream{FT}, op_2::OneScalar{FT}) where FT
   ngpt = get_ngpt(op_1)
   nlay = get_nlay(op_1)
   ncol = get_ncol(op_1)
@@ -224,7 +224,7 @@ function increment_bybnd!(op_1::ty_optical_props_2str{FT}, op_2::ty_optical_prop
 end
 
 """
-    increment_bybnd!(op_1::ty_optical_props_2str{FT}, op_2::ty_optical_props_2str{FT}) where FT
+    increment_bybnd!(op_1::TwoStream{FT}, op_2::TwoStream{FT}) where FT
 
 increment 2stream by 2stream
 integer,                             intent(in   ) :: ncol, nlay, ngpt, nbnd
@@ -235,7 +235,7 @@ integer,  dimension(2,nbnd),         intent(in   ) :: gpt_lims # Starting and en
 integer  :: icol, ilay, igpt, ibnd
 real(FT) :: tau12, tauscat12
 """
-function increment_bybnd!(op_1::ty_optical_props_2str{FT}, op_2::ty_optical_props_2str{FT}) where FT
+function increment_bybnd!(op_1::TwoStream{FT}, op_2::TwoStream{FT}) where FT
 
   ngpt = get_ngpt(op_1)
   nlay = get_nlay(op_1)

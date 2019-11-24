@@ -1,19 +1,19 @@
 """
-    mo_optical_props
+    OpticalProps
 
 Encapsulate optical properties defined on a spectral grid of N bands.
  The bands are described by their limiting wavenumbers. They need not be contiguous or complete.
  A band may contain more than one spectral sub-point (g-point) in which case a mapping must be supplied.
  A name may be provided and will be prepended to error messages.
- The base class (ty_optical_props) encapsulates only this spectral discretization and must be initialized
+ The base class (AbstractOpticalProps) encapsulates only this spectral discretization and must be initialized
     with the spectral information before use.
 
  Optical properties may be represented as arrays with dimensions ncol, nlay, ngpt
- (abstract class ty_optical_props_arry).
+ (abstract class AbstractOpticalPropsArry).
  The type holds arrays depending on how much information is needed
  There are three possibilities
-    `ty_optical_props_1scl` holds absorption optical depth `tau`, used in calculations accounting for extinction and emission
-    `ty_optical_props_2str` holds extinction optical depth `tau`, single-scattering albedo (`ssa`), and asymmetry parameter `g`.
+    `OneScalar` holds absorption optical depth `tau`, used in calculations accounting for extinction and emission
+    `TwoStream` holds extinction optical depth `tau`, single-scattering albedo (`ssa`), and asymmetry parameter `g`.
  These classes must be allocated before use. Initialization and allocation can be combined.
  The classes have a validate() function that checks all arrays for valid values (e.g. `tau` > 0.)
 
@@ -26,11 +26,11 @@ Optical properties can increment or "add themselves to" a set of properties repr
 Subsets of optical properties held as arrays may be extracted along the column dimension.
 
 """
-module mo_optical_props
+module OpticalProps
 
 using DocStringExtensions
-using ..fortran_intrinsics
-using ..mo_util_array
+using ..FortranIntrinsics
+using ..ArrayUtilities
 
 export delta_scale!,
        validate!,
@@ -48,17 +48,17 @@ export delta_scale!,
        get_nlay,
        gpoints_are_equal
 
-export ty_optical_props,
-       ty_optical_props_1scl,
-       ty_optical_props_2str,
-       ty_optical_props_base
+export AbstractOpticalProps,
+       OneScalar,
+       TwoStream,
+       OpticalPropsBase
 
 export get_nband, get_ngpt
 
-export ty_optical_props
-abstract type ty_optical_props{FT,I} end
-export ty_optical_props_arry
-abstract type ty_optical_props_arry{FT,I} <: ty_optical_props{FT,I} end
+export AbstractOpticalProps
+abstract type AbstractOpticalProps{FT,I} end
+export AbstractOpticalPropsArry
+abstract type AbstractOpticalPropsArry{FT,I} <: AbstractOpticalProps{FT,I} end
 
 struct ProblemSize{I}
   ncol::I
@@ -70,7 +70,7 @@ struct ProblemSize{I}
 end
 
 """
-    ty_optical_props_base{FT,I} <: ty_optical_props{FT,I}
+    OpticalPropsBase{FT,I} <: AbstractOpticalProps{FT,I}
 
 Base class for optical properties. Describes the spectral
 discretization including the wavenumber limits of each band
@@ -83,12 +83,12 @@ discretization including the wavenumber limits of each band
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct ty_optical_props_base{FT,I} <: ty_optical_props{FT,I}
+struct OpticalPropsBase{FT,I} <: AbstractOpticalProps{FT,I}
   band2gpt::Array{I,2}
   gpt2band::Array{I,1}
   band_lims_wvn::Array{FT,2}
   name::AbstractString
-  function ty_optical_props_base(name, band_lims_wvn::Array{FT}, band_lims_gpt=nothing) where FT
+  function OpticalPropsBase(name, band_lims_wvn::Array{FT}, band_lims_gpt=nothing) where FT
     @assert size(band_lims_wvn,1) == 2
     @assert !any(band_lims_wvn.<FT(0))
     band_lims_gpt_lcl = Array{Int}(undef, 2, size(band_lims_wvn, 2))
@@ -116,38 +116,38 @@ end
 
 
 """
-    ty_optical_props_1scl{FT,I} <: ty_optical_props_arry{FT,I}
+    OneScalar{FT,I} <: AbstractOpticalPropsArry{FT,I}
 
 Holds absorption optical depth `tau`, used in calculations accounting for extinction and emission
 
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct ty_optical_props_1scl{FT,I} <: ty_optical_props_arry{FT,I}
+struct OneScalar{FT,I} <: AbstractOpticalPropsArry{FT,I}
   base
   tau#::Array{FT,3}
 end
 
-ty_optical_props_1scl(base::ty_optical_props_base{FT}, ps::ProblemSize{I}) where {FT<:AbstractFloat,I<:Int} =
-  ty_optical_props_1scl{FT,I}(base, Array{FT}(undef, ps.s...))
+OneScalar(base::OpticalPropsBase{FT}, ps::ProblemSize{I}) where {FT<:AbstractFloat,I<:Int} =
+  OneScalar{FT,I}(base, Array{FT}(undef, ps.s...))
 
 """
-    ty_optical_props_2str{FT,I} <: ty_optical_props_arry{FT,I}
+    TwoStream{FT,I} <: AbstractOpticalPropsArry{FT,I}
 
 Holds extinction optical depth `tau`, single-scattering albedo (`ssa`), and asymmetry parameter `g`.
 
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct ty_optical_props_2str{FT,I} <: ty_optical_props_arry{FT,I}
+struct TwoStream{FT,I} <: AbstractOpticalPropsArry{FT,I}
   base
   tau#::Array{FT,3}
   ssa#::Array{FT,3}
   g#::Array{FT,3}
 end
 
-ty_optical_props_2str(base::ty_optical_props_base{FT}, ps::ProblemSize{I}) where {FT<:AbstractFloat,I<:Int} =
-  ty_optical_props_2str{FT,I}(base, ntuple(i->Array{FT}(undef, ps.s...),3)... )
+TwoStream(base::OpticalPropsBase{FT}, ps::ProblemSize{I}) where {FT<:AbstractFloat,I<:Int} =
+  TwoStream{FT,I}(base, ntuple(i->Array{FT}(undef, ps.s...),3)... )
 
 #####
 #####  Delta-scaling
@@ -156,21 +156,21 @@ ty_optical_props_2str(base::ty_optical_props_base{FT}, ps::ProblemSize{I}) where
 """
     delta_scale!(...)
 
-    class(ty_optical_props_1scl), intent(inout) :: this
+    class(OneScalar), intent(inout) :: this
     real(FT), dimension(:,:,:), optional, intent(in   ) :: for_
 """
-delta_scale!(this::ty_optical_props_1scl, for_) = ""
+delta_scale!(this::OneScalar, for_) = ""
 
 """
     delta_scale!()
 
-    class(ty_optical_props_2str), intent(inout) :: this
+    class(TwoStream), intent(inout) :: this
     real(FT), dimension(:,:,:), optional, intent(in   ) :: for_
     # Forward scattering fraction; g**2 if not provided
 
     integer :: ncol, nlay, ngpt
 """
-function delta_scale!(this::ty_optical_props_2str{FT}, for_ = nothing) where FT
+function delta_scale!(this::TwoStream{FT}, for_ = nothing) where FT
   ncol = get_ncol(this)
   nlay = get_nlay(this)
   ngpt = get_ngpt(this)
@@ -189,19 +189,19 @@ end
 #####
 
 """
-  validate!(this::ty_optical_props_1scl{FT}) where FT
+  validate!(this::OneScalar{FT}) where FT
 
 """
-function validate!(this::ty_optical_props_1scl{FT}) where FT
+function validate!(this::OneScalar{FT}) where FT
   # Validate sizes
   @assert !any_vals_less_than(this.tau, FT(0))
 end
 
 """
-    validate!(this::ty_optical_props_2str{FT}) where FT
+    validate!(this::TwoStream{FT}) where FT
 
 """
-function validate!(this::ty_optical_props_2str{FT}) where FT
+function validate!(this::TwoStream{FT}) where FT
   # Validate sizes
   @assert all(size(this.ssa) == size(this.tau))
   @assert all(size(this.g) == size(this.tau))
@@ -216,10 +216,10 @@ end
 #####
 
 """
-  increment!(op_in::ty_optical_props_arry, op_io::ty_optical_props_arry)
+  increment!(op_in::AbstractOpticalPropsArry, op_io::AbstractOpticalPropsArry)
 
 """
-function increment!(op_in::ty_optical_props_arry, op_io::ty_optical_props_arry)
+function increment!(op_in::AbstractOpticalPropsArry, op_io::AbstractOpticalPropsArry)
   @assert bands_are_equal(op_in, op_io)
 
   if gpoints_are_equal(op_in, op_io)
@@ -245,133 +245,133 @@ end
 #####
 
 """
-  class(ty_optical_props_arry), intent(in   ) :: this
+  class(AbstractOpticalPropsArry), intent(in   ) :: this
   integer,                      intent(in   ) :: dim
   integer                                     :: get_arry_extent
 """
-get_arry_extent(this::ty_optical_props, dim) = size(this.tau, dim)
+get_arry_extent(this::AbstractOpticalProps, dim) = size(this.tau, dim)
 
 """
-  class(ty_optical_props_arry), intent(in   ) :: this
+  class(AbstractOpticalPropsArry), intent(in   ) :: this
   integer                                     :: get_ncol
 """
-get_ncol(this::ty_optical_props) = get_arry_extent(this, 1)
+get_ncol(this::AbstractOpticalProps) = get_arry_extent(this, 1)
 
 """
-  class(ty_optical_props_arry), intent(in   ) :: this
+  class(AbstractOpticalPropsArry), intent(in   ) :: this
   integer                                     :: get_nlay
 """
-get_nlay(this::ty_optical_props) = get_arry_extent(this, 2)
+get_nlay(this::AbstractOpticalProps) = get_arry_extent(this, 2)
 
 #####
 #####  Routines for base class: spectral discretization
 #####
 
 """
-    get_nband(this::ty_optical_props)
+    get_nband(this::AbstractOpticalProps)
 
 Number of bands
 """
-get_nband(this::ty_optical_props) = get_nband(this.base)
-get_nband(this::ty_optical_props_base) = size(this.band2gpt,2)
+get_nband(this::AbstractOpticalProps) = get_nband(this.base)
+get_nband(this::OpticalPropsBase) = size(this.band2gpt,2)
 
 """
-    get_ngpt(this::ty_optical_props)
+    get_ngpt(this::AbstractOpticalProps)
 
 Number of g-points
-  class(ty_optical_props), intent(in) :: this
+  class(AbstractOpticalProps), intent(in) :: this
   integer                             :: get_ngpt
 """
-get_ngpt(this::ty_optical_props) = get_ngpt(this.base)
-get_ngpt(this::ty_optical_props_base) = max(this.band2gpt...)
+get_ngpt(this::AbstractOpticalProps) = get_ngpt(this.base)
+get_ngpt(this::OpticalPropsBase) = max(this.band2gpt...)
 
 
 """
-    get_band_lims_gpoint(this::ty_optical_props)
+    get_band_lims_gpoint(this::AbstractOpticalProps)
 
 The first and last g-point of all bands at once
 dimension (2, nbands)
 
-  class(ty_optical_props), intent(in) :: this
+  class(AbstractOpticalProps), intent(in) :: this
   integer, dimension(size(this%band2gpt,dim=1), size(this%band2gpt,dim=2))
                                       :: get_band_lims_gpoint
 """
-get_band_lims_gpoint(this::ty_optical_props) = get_band_lims_gpoint(this.base)
-get_band_lims_gpoint(this::ty_optical_props_base) = this.band2gpt
+get_band_lims_gpoint(this::AbstractOpticalProps) = get_band_lims_gpoint(this.base)
+get_band_lims_gpoint(this::OpticalPropsBase) = this.band2gpt
 
 """
-    convert_band2gpt(this::ty_optical_props, band)
+    convert_band2gpt(this::AbstractOpticalProps, band)
 
 First and last g-point of a specific band
 
-  class(ty_optical_props), intent(in) :: this
+  class(AbstractOpticalProps), intent(in) :: this
   integer,                 intent(in) :: band
   integer, dimension(2)               :: convert_band2gpt
 """
-convert_band2gpt(this::ty_optical_props, band) = convert_band2gpt(this.base)
-convert_band2gpt(this::ty_optical_props_base, band) = this.band2gpt[:,band]
+convert_band2gpt(this::AbstractOpticalProps, band) = convert_band2gpt(this.base)
+convert_band2gpt(this::OpticalPropsBase, band) = this.band2gpt[:,band]
 
 """
-    get_band_lims_wavenumber(this::ty_optical_props)
+    get_band_lims_wavenumber(this::AbstractOpticalProps)
 
 Lower and upper wavenumber of all bands
 (upper and lower wavenumber by band) = band_lims_wvn(2,band)
 
-  class(ty_optical_props), intent(in) :: this
+  class(AbstractOpticalProps), intent(in) :: this
   real(FT), dimension(size(this%band_lims_wvn,1), size(this%band_lims_wvn,2))
                                       :: get_band_lims_wavenumber
 """
-get_band_lims_wavenumber(this::ty_optical_props) = get_band_lims_wavenumber(this.base)
-get_band_lims_wavenumber(this::ty_optical_props_base) = this.band_lims_wvn
+get_band_lims_wavenumber(this::AbstractOpticalProps) = get_band_lims_wavenumber(this.base)
+get_band_lims_wavenumber(this::OpticalPropsBase) = this.band_lims_wvn
 
 """
-    get_band_lims_wavelength(this::ty_optical_props)
+    get_band_lims_wavelength(this::AbstractOpticalProps)
 
 Lower and upper wavelength of all bands
 
-class(ty_optical_props), intent(in) :: this
+class(AbstractOpticalProps), intent(in) :: this
 real(FT), dimension(size(this%band_lims_wvn,1), size(this%band_lims_wvn,2))
                                     :: get_band_lims_wavelength
 """
-get_band_lims_wavelength(this::ty_optical_props) = get_band_lims_wavelength(this.base)
-get_band_lims_wavelength(this::ty_optical_props_base) = 1 ./ this.band_lims_wvn
+get_band_lims_wavelength(this::AbstractOpticalProps) = get_band_lims_wavelength(this.base)
+get_band_lims_wavelength(this::OpticalPropsBase) = 1 ./ this.band_lims_wvn
 
 """
-    get_gpoint_bands(this::ty_optical_props)
+    get_gpoint_bands(this::AbstractOpticalProps)
 
 Bands for all the g-points at once
 dimension (ngpt)
 
-  class(ty_optical_props), intent(in) :: this
+  class(AbstractOpticalProps), intent(in) :: this
   integer, dimension(size(this%gpt2band,dim=1)) :: get_gpoint_bands
 """
-get_gpoint_bands(this::ty_optical_props) = get_gpoint_bands(this.base)
-get_gpoint_bands(this::ty_optical_props_base) = this.gpt2band
+get_gpoint_bands(this::AbstractOpticalProps) = get_gpoint_bands(this.base)
+get_gpoint_bands(this::OpticalPropsBase) = this.gpt2band
 
 """
-    convert_gpt2band(this::ty_optical_props, gpt)
+    convert_gpt2band(this::AbstractOpticalProps, gpt)
 
 Band associated with a specific g-point
 
-    class(ty_optical_props), intent(in) :: this
+    class(AbstractOpticalProps), intent(in) :: this
     integer,                            intent(in) :: gpt
     integer                             :: convert_gpt2band
 """
-convert_gpt2band(this::ty_optical_props, gpt) = convert_gpt2band(this.base)
-convert_gpt2band(this::ty_optical_props_base, gpt) = this.gpt2band[gpt]
+convert_gpt2band(this::AbstractOpticalProps, gpt) = convert_gpt2band(this.base)
+convert_gpt2band(this::OpticalPropsBase, gpt) = this.gpt2band[gpt]
 
 """
-    expand(this::ty_optical_props{FT}, arr_in) where FT
+    expand(this::AbstractOpticalProps{FT}, arr_in) where FT
 
 Expand an array of dimension arr_in(nband) to dimension arr_out(ngpt)
 
-    class(ty_optical_props), intent(in) :: this
+    class(AbstractOpticalProps), intent(in) :: this
     real(FT), dimension(:),  intent(in) :: arr_in # (nband)
     real(FT), dimension(size(this%gpt2band)) :: arr_out
 
     integer :: iband
 """
-function expand(this::ty_optical_props{FT}, arr_in) where FT
+function expand(this::AbstractOpticalProps{FT}, arr_in) where FT
   arr_out = Vector{FT}(undef, size(this.gpt2band))
   for iband in 1:get_nband(this)
     arr_out[this.band2gpt[1,iband]:this.band2gpt[2,iband]] = arr_in[iband]
@@ -380,14 +380,14 @@ function expand(this::ty_optical_props{FT}, arr_in) where FT
 end
 
 """
-    bands_are_equal(this::ty_optical_props{FT}, that::ty_optical_props{FT}) where FT
+    bands_are_equal(this::AbstractOpticalProps{FT}, that::AbstractOpticalProps{FT}) where FT
 
 Are the bands of two objects the same? (same number, same wavelength limits)
 
-    class(ty_optical_props), intent(in) :: this, that
+    class(AbstractOpticalProps), intent(in) :: this, that
     logical                             :: bands_are_equal
 """
-function bands_are_equal(this::ty_optical_props{FT}, that::ty_optical_props{FT}) where FT
+function bands_are_equal(this::AbstractOpticalProps{FT}, that::AbstractOpticalProps{FT}) where FT
   if get_nband(this) == get_nband(that) && get_nband(this) > 0
     return all(abs.(get_band_lims_wavenumber(this) .-
                     get_band_lims_wavenumber(that)) .<
@@ -398,15 +398,15 @@ function bands_are_equal(this::ty_optical_props{FT}, that::ty_optical_props{FT})
 end
 
 """
-    gpoints_are_equal(this::ty_optical_props{FT}, that::ty_optical_props{FT}) where {FT}
+    gpoints_are_equal(this::AbstractOpticalProps{FT}, that::AbstractOpticalProps{FT}) where {FT}
 
 Is the g-point structure of two objects the same?
   (same bands, same number of g-points, same mapping between bands and g-points)
 
-    class(ty_optical_props), intent(in) :: this, that
+    class(AbstractOpticalProps), intent(in) :: this, that
     logical                             :: gpoints_are_equal
 """
-function gpoints_are_equal(this::ty_optical_props{FT}, that::ty_optical_props{FT}) where {FT}
+function gpoints_are_equal(this::AbstractOpticalProps{FT}, that::AbstractOpticalProps{FT}) where {FT}
   if bands_are_equal(this, that) && get_ngpt(this) == get_ngpt(that)
     return all(get_gpoint_bands(this) == get_gpoint_bands(that))
   else

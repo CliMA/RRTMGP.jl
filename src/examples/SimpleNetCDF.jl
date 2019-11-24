@@ -1,4 +1,4 @@
-module mo_simple_netcdf
+module SimpleNetCDF
 
 using NCDatasets
 

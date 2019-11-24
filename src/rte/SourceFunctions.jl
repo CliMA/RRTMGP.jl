@@ -1,22 +1,22 @@
 """
-    mo_source_functions
+    SourceFunctions
 
 Encapsulate source function arrays for longwave/lw/internal sources
     and shortwave/sw/external source.
 """
-module mo_source_functions
+module SourceFunctions
 
 using DocStringExtensions
-using ..mo_optical_props
-using ..fortran_intrinsics
-import ..mo_optical_props:get_ncol,get_nlay,get_ngpt
+using ..OpticalProps
+using ..FortranIntrinsics
+import ..OpticalProps:get_ncol,get_nlay,get_ngpt
 
-export ty_source_func_lw
-export ty_source_func_sw
+export SourceFuncLW
+export SourceFuncSW
 export get_ncol, get_nlay, get_ngpt
 
 """
-    ty_source_func_lw{FT, I} <: ty_optical_props{FT, I}
+    SourceFuncLW{FT, I} <: AbstractOpticalProps{FT, I}
 
 Longwave sources: computed at layer center, at layer edges using
    spectral mapping in each direction separately, and at the surface
@@ -25,13 +25,13 @@ Longwave sources: computed at layer center, at layer edges using
 
 $(DocStringExtensions.FIELDS)
 """
-struct ty_source_func_lw{FT, I} <: ty_optical_props{FT, I}
-  optical_props::ty_optical_props{FT,I}
+struct SourceFuncLW{FT, I} <: AbstractOpticalProps{FT, I}
+  optical_props::AbstractOpticalProps{FT,I}
   lay_source     # Planck source at layer average temperature [W/m2] (ncol, nlay, ngpt)
   lev_source_inc # Planck source at layer edge in increasing ilay direction [W/m2] (ncol, nlay+1, ngpt)
   lev_source_dec # Planck source at layer edge in decreasing ilay direction [W/m2] (ncol, nlay+1, ngpt)
   sfc_source
-  function ty_source_func_lw(ncol::I, nlay::I, optical_props::ty_optical_props{FT}) where {FT,I}
+  function SourceFuncLW(ncol::I, nlay::I, optical_props::AbstractOpticalProps{FT}) where {FT,I}
     ngpt = get_ngpt(optical_props)
     sfc_source = Array{FT}(undef, ncol,ngpt)
     lay_source = Array{FT}(undef, ncol,nlay,ngpt)
@@ -47,7 +47,7 @@ struct ty_source_func_lw{FT, I} <: ty_optical_props{FT, I}
 end
 
 """
-    ty_source_func_sw{FT, I} <: ty_optical_props{FT, I}
+    SourceFuncSW{FT, I} <: AbstractOpticalProps{FT, I}
 
 Shortwave sources
 
@@ -55,7 +55,7 @@ Shortwave sources
 
 $(DocStringExtensions.FIELDS)
 """
-struct ty_source_func_sw{FT, I} <: ty_optical_props{FT, I}
+struct SourceFuncSW{FT, I} <: AbstractOpticalProps{FT, I}
   band2gpt::Array{FT,2}        # (begin g-point, end g-point) = band2gpt(2,band)
   gpt2band::Array{I,1}         # band = gpt2band(g-point)
   band_lims_wvn::Array{FT,2}   # (upper and lower wavenumber by band) = band_lims_wvn(2,band)
@@ -66,10 +66,10 @@ struct ty_source_func_sw{FT, I} <: ty_optical_props{FT, I}
   lev_source_dec
 end
 
-get_ncol(this::ty_source_func_lw) = size(this.lay_source,1)
+get_ncol(this::SourceFuncLW) = size(this.lay_source,1)
 
-get_nlay(this::ty_source_func_lw) = size(this.lay_source,2)
+get_nlay(this::SourceFuncLW) = size(this.lay_source,2)
 
-get_ngpt(this::ty_source_func_lw) = size(this.lay_source,3)
+get_ngpt(this::SourceFuncLW) = size(this.lay_source,3)
 
 end # module

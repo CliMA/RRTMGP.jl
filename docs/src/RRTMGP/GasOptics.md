@@ -1,7 +1,7 @@
 # Gas Optics
 
 ```@meta
-CurrentModule = RRTMGP.mo_gas_optics_rrtmgp
+CurrentModule = RRTMGP.GasOptics
 ```
 
 ```@docs

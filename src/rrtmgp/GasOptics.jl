@@ -1,5 +1,5 @@
 """
-    mo_gas_optics_rrtmgp
+    GasOptics
 
 Computes spectrally-resolved gas optical properties and source functions
  given atmopsheric physical properties (profiles of temperature, pressure, and gas concentrations)
@@ -10,21 +10,21 @@ Two variants apply to internal Planck sources (longwave radiation in the Earth's
  The variant is chosen based on what information is supplied during initialization.
  (It might make more sense to define two sub-classes)
 """
-module mo_gas_optics_rrtmgp
+module GasOptics
 using OffsetArrays
 using TimerOutputs
 using DocStringExtensions
 
 const to_gor = TimerOutput()
-using ..fortran_intrinsics
-using ..mo_rrtmgp_constants
-using ..mo_util_array
-using ..mo_optical_props
-using ..mo_source_functions
+using ..FortranIntrinsics
+using ..PhysicalConstants
+using ..ArrayUtilities
+using ..OpticalProps
+using ..SourceFunctions
 
 using ..Utilities
-using ..mo_gas_concentrations
-using ..mo_optical_props
+using ..GasConcentrations
+using ..OpticalProps
 export gas_optics_int!, gas_optics_ext!, load_totplnk, load_solar_source
 export source_is_internal, source_is_external, get_press_min
 export get_col_dry
@@ -149,21 +149,21 @@ struct AtmosVars{FT}
   minor_gases
 end
 
-abstract type ty_gas_optics{T,I} <: ty_optical_props{T,I} end
+abstract type AbstractGasOptics{T,I} <: AbstractOpticalProps{T,I} end
 
 """
-    InternalSourceGasOptics{FT,I} <: ty_gas_optics{FT,I}
+    InternalSourceGasOptics{FT,I} <: AbstractGasOptics{FT,I}
 
 Gas optics with internal sources (for longwave radiation)
 
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct InternalSourceGasOptics{FT,I} <: ty_gas_optics{FT,I}
+struct InternalSourceGasOptics{FT,I} <: AbstractGasOptics{FT,I}
   "Reference data"
   ref::Reference{FT}
   "Base optical properties"
-  optical_props::ty_optical_props_base{FT,I}
+  optical_props::OpticalPropsBase{FT,I}
   "AtmosVars in the lower atmosphere"
   lower::AtmosVars
   "AtmosVars in the upper atmosphere"
@@ -193,18 +193,18 @@ struct InternalSourceGasOptics{FT,I} <: ty_gas_optics{FT,I}
 end
 
 """
-    ExternalSourceGasOptics{FT,I} <: ty_gas_optics{FT,I}
+    ExternalSourceGasOptics{FT,I} <: AbstractGasOptics{FT,I}
 
 Gas optics with external sources (for shortwave radiation)
 
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct ExternalSourceGasOptics{FT,I} <: ty_gas_optics{FT,I}
+struct ExternalSourceGasOptics{FT,I} <: AbstractGasOptics{FT,I}
   "Reference data"
   ref::Reference{FT}
   "Base optical properties"
-  optical_props::ty_optical_props_base{FT,I}
+  optical_props::OpticalPropsBase{FT,I}
   "AtmosVars in the lower atmosphere"
   lower::AtmosVars
   "AtmosVars in the upper atmosphere"
@@ -230,20 +230,20 @@ struct ExternalSourceGasOptics{FT,I} <: ty_gas_optics{FT,I}
 end
 
 """
-    get_ngas(this::ty_gas_optics)
+    get_ngas(this::AbstractGasOptics)
 
 Number of gases registered in the spectral configuration
 """
-get_ngas(this::ty_gas_optics) = length(this.gas_names)
+get_ngas(this::AbstractGasOptics) = length(this.gas_names)
 
 
 """
-    get_nflav(this::ty_gas_optics)
+    get_nflav(this::AbstractGasOptics)
 
 Number of distinct major gas pairs in the spectral bands (referred to as
 "flavors" - all bands have a flavor even if there is one or no major gas)
 """
-get_nflav(this::ty_gas_optics) = size(this.flavor, 2)
+get_nflav(this::AbstractGasOptics) = size(this.flavor, 2)
 
 
 """
@@ -252,9 +252,9 @@ get_nflav(this::ty_gas_optics) = size(this.flavor, 2)
                      plev,
                      tlay,
                      tsfc,
-                     gas_desc::ty_gas_concs,
-                     optical_props::ty_optical_props_arry,
-                     sources::ty_source_func_lw;
+                     gas_desc::GasConcs,
+                     optical_props::AbstractOpticalPropsArry,
+                     sources::SourceFuncLW;
                      col_dry=nothing,
                      tlev=nothing)
 
@@ -269,10 +269,10 @@ real(FT), dimension(:,:), intent(in   ) :: play,    # layer pressures [Pa, mb]; 
                                           plev,    # level pressures [Pa, mb]; (ncol,nlay+1)
                                           tlay      # layer temperatures [K]; (ncol,nlay)
 real(FT), dimension(:),   intent(in   ) :: tsfc      # surface skin temperatures [K]; (ncol)
-type(ty_gas_concs),       intent(in   ) :: gas_desc  # Gas volume mixing ratios
+type(GasConcs),       intent(in   ) :: gas_desc  # Gas volume mixing ratios
 # output
-class(ty_optical_props_arry), intent(inout) :: optical_props # Optical properties
-class(ty_source_func_lw    ), intent(inout) :: sources       # Planck sources
+class(AbstractOpticalPropsArry), intent(inout) :: optical_props # Optical properties
+class(SourceFuncLW    ), intent(inout) :: sources       # Planck sources
 # Optional inputs
 real(FT), dimension(:,:),   intent(in   ), optional, target :: col_dry,   # Column dry amount; dim(ncol,nlay)
                                                                 tlev        # level temperatures [K]; (ncol,nlay+1)
@@ -282,9 +282,9 @@ function gas_optics_int!(this::InternalSourceGasOptics,
                      plev,
                      tlay,
                      tsfc,
-                     gas_desc::ty_gas_concs,
-                     optical_props::ty_optical_props_arry,
-                     sources::ty_source_func_lw;
+                     gas_desc::GasConcs,
+                     optical_props::AbstractOpticalPropsArry,
+                     sources::SourceFuncLW;
                      col_dry=nothing,
                      tlev=nothing)
   FT = eltype(play)
@@ -336,8 +336,8 @@ end
                      play,
                      plev,
                      tlay,
-                     gas_desc::ty_gas_concs,    # mandatory inputs
-                     optical_props::ty_optical_props_arry,
+                     gas_desc::GasConcs,    # mandatory inputs
+                     optical_props::AbstractOpticalPropsArry,
                      toa_src,        # mandatory outputs
                      col_dry=nothing)
 
@@ -347,9 +347,9 @@ Compute gas optical depth, `toa_src`, given temperature, pressure, and compositi
 # real(FT), dimension(:,:), intent(in   ) :: play,    # layer pressures [Pa, mb]; (ncol,nlay)
 #                                            plev,    # level pressures [Pa, mb]; (ncol,nlay+1)
 #                                            tlay      # layer temperatures [K]; (ncol,nlay)
-# type(ty_gas_concs),       intent(in   ) :: gas_desc  # Gas volume mixing ratios
+# type(GasConcs),       intent(in   ) :: gas_desc  # Gas volume mixing ratios
 # # output
-# class(ty_optical_props_arry), intent(inout) :: optical_props
+# class(AbstractOpticalPropsArry), intent(inout) :: optical_props
 # real(FT), dimension(:,:), intent(  out) :: toa_src     # Incoming solar irradiance(ncol,ngpt)
 
 # Optional inputs
@@ -360,8 +360,8 @@ function gas_optics_ext!(this::ExternalSourceGasOptics,
                      play,
                      plev,
                      tlay,
-                     gas_desc::ty_gas_concs,    # mandatory inputs
-                     optical_props::ty_optical_props_arry,
+                     gas_desc::GasConcs,    # mandatory inputs
+                     optical_props::AbstractOpticalPropsArry,
                      toa_src,        # mandatory outputs
                      col_dry=nothing, last_call=false)
 
@@ -400,19 +400,19 @@ end
 
 # Returns optical properties and interpolation coefficients
 """
-    compute_gas_taus!(this::ty_gas_optics,
+    compute_gas_taus!(this::AbstractGasOptics,
                           ncol, nlay, ngpt, nband,
-                          play, plev, tlay, gas_desc::ty_gas_concs,
-                          optical_props::ty_optical_props_arry,
+                          play, plev, tlay, gas_desc::GasConcs,
+                          optical_props::AbstractOpticalPropsArry,
                           col_dry=nothing)
 
-class(ty_gas_optics), intent(in   ) :: this
+class(AbstractGasOptics), intent(in   ) :: this
 integer,                          intent(in   ) :: ncol, nlay, ngpt, nband
 real(FT), dimension(:,:),         intent(in   ) :: play,    # layer pressures [Pa, mb]; (ncol,nlay)
                                                    plev,    # level pressures [Pa, mb]; (ncol,nlay+1)
                                                    tlay      # layer temperatures [K]; (ncol,nlay)
-type(ty_gas_concs),               intent(in   ) :: gas_desc  # Gas volume mixing ratios
-class(ty_optical_props_arry),     intent(inout) :: optical_props #inout because components are allocated
+type(GasConcs),               intent(in   ) :: gas_desc  # Gas volume mixing ratios
+class(AbstractOpticalPropsArry),     intent(inout) :: optical_props #inout because components are allocated
 # Interpolation coefficients for use in internal source function
 integer,     dimension(                       ncol, nlay), intent(  out) :: jtemp, jpress
 integer,     dimension(2,    get_nflav(this),ncol, nlay), intent(  out) :: jeta
@@ -444,10 +444,10 @@ real(FT), dimension(2,2,  get_nflav(this),ncol,nlay) :: fminor # interpolation f
 integer :: ngas, nflav, neta, npres, ntemp
 ----------------------------------------------------------
 """
-function compute_gas_taus!(jtemp, jpress, jeta, tropo, fmajor, this::ty_gas_optics{FT},
+function compute_gas_taus!(jtemp, jpress, jeta, tropo, fmajor, this::AbstractGasOptics{FT},
                           ncol, nlay, ngpt, nband,
-                          play, plev, tlay, gas_desc::ty_gas_concs,
-                          optical_props::ty_optical_props_arry,
+                          play, plev, tlay, gas_desc::GasConcs,
+                          optical_props::AbstractOpticalPropsArry,
                           col_dry=nothing, last_call=false) where FT
 
   tau          = Array{FT}(undef, ngpt,nlay,ncol)          # absorption, Rayleigh scattering optical depths
@@ -460,7 +460,7 @@ function compute_gas_taus!(jtemp, jpress, jeta, tropo, fmajor, this::ty_gas_opti
   col_mix = Array{FT}(undef, 2,    get_nflav(this),ncol,nlay) # combination of major species's column amounts
   fminor  = Array{FT}(undef, 2,2,  get_nflav(this),ncol,nlay) # interpolation fractions for minor species
 
-  # Check for presence of key species in ty_gas_concs; return error if any key species are not present
+  # Check for presence of key species in GasConcs; return error if any key species are not present
   check_key_species_present(this, gas_desc)
 
   # Check input data sizes and values
@@ -483,7 +483,7 @@ function compute_gas_taus!(jtemp, jpress, jeta, tropo, fmajor, this::ty_gas_opti
 
   # Fill out the array of volume mixing ratios
   for igas in 1:ngas
-    # Get vmr if  gas is provided in ty_gas_concs
+    # Get vmr if  gas is provided in GasConcs
     if this.gas_names[igas] in gas_desc.gas_name
       get_vmr!(@view(vmr[:,:,igas]), gas_desc, this.gas_names[igas])
     end
@@ -562,7 +562,7 @@ end
                 ncol, nlay, nbnd, ngpt,
                 play, plev, tlay, tsfc,
                 jtemp, jpress, jeta, tropo, fmajor,
-                sources::ty_source_func_lw,          # Planck sources
+                sources::SourceFuncLW,          # Planck sources
                 tlev)
 
 Compute Planck source functions at layer centers and levels
@@ -579,7 +579,7 @@ integer,     dimension(ncol,nlay),     intent(in   ) :: jtemp, jpress
 logical(wl), dimension(ncol,nlay),     intent(in   ) :: tropo
 real(FT),    dimension(2,2,2,get_nflav(this),ncol,nlay), intent(in   ) :: fmajor
 integer,     dimension(2,    get_nflav(this),ncol,nlay), intent(in   ) :: jeta
-class(ty_source_func_lw    ),          intent(inout) :: sources
+class(SourceFuncLW    ),          intent(inout) :: sources
 real(FT), dimension(ncol,nlay+1),      intent(in   ), optional, target :: tlev          # level temperatures [K]
 ----------------------------------------------------------
 integer                                      :: icol, ilay, igpt
@@ -593,7 +593,7 @@ function source!(this::InternalSourceGasOptics{FT},
                  ncol, nlay, nbnd, ngpt,
                  play, plev, tlay, tsfc,
                  jtemp, jpress, jeta, tropo, fmajor,
-                 sources::ty_source_func_lw,
+                 sources::SourceFuncLW,
                  tlev=nothing) where {FT<:AbstractFloat}
 
   lay_source_t     = zeros(FT, ngpt,nlay,ncol)
@@ -728,7 +728,7 @@ Initialize absorption coefficient arrays
  - `lower_aux` lower atmospheric auxiliary variables
  - `upper_aux` upper atmospheric auxiliary variables
 
-class(ty_gas_concs),                intent(in   ) :: available_gases
+class(GasConcs),                intent(in   ) :: available_gases
 character(len=*), dimension(:),       intent(in) :: gas_names
 integer,  dimension(:,:,:),   intent(in) :: key_species
 integer,  dimension(:,:),     intent(in) :: band2gpt
@@ -740,7 +740,7 @@ logical,  dimension(:),     allocatable :: key_species_present_init
 integer,  dimension(:,:,:), allocatable :: key_species_red
 integer :: i, j, idx
 """
-function init_abs_coeffs(available_gases::ty_gas_concs,
+function init_abs_coeffs(available_gases::GasConcs,
                          gas_names,
                          key_species,
                          band2gpt,
@@ -768,7 +768,7 @@ function init_abs_coeffs(available_gases::ty_gas_concs,
   check_key_species_present_init(gas_names, key_species_present_init)
 
   flavor = create_flavor(key_species_red)
-  optical_props = ty_optical_props_base("ty_gas_optics optical props", band_lims_wavenum, band2gpt)
+  optical_props = OpticalPropsBase("AbstractGasOptics optical props", band_lims_wavenum, band2gpt)
 
   # create gpoint_flavor list
   gpoint_flavor = create_gpoint_flavor(key_species_red, get_gpoint_bands(optical_props), flavor)
@@ -801,9 +801,9 @@ check_key_species_present_init(gas_names, key_species_present_init) = @assert al
 
 # Ensure that every key gas required by the k-distribution is
 #    present in the gas concentration object
-function check_key_species_present(this::ty_gas_optics, gas_desc::ty_gas_concs)
-  # class(ty_gas_optics), intent(in) :: this
-  # class(ty_gas_concs),                intent(in) :: gas_desc
+function check_key_species_present(this::AbstractGasOptics, gas_desc::GasConcs)
+  # class(AbstractGasOptics), intent(in) :: this
+  # class(GasConcs),                intent(in) :: gas_desc
   key_gas_names = pack(this.gas_names, this.is_key)
   for igas = 1:length(key_gas_names)
     @assert key_gas_names[igas] in gas_desc.gas_name
@@ -812,11 +812,11 @@ end
 
 # Function to define names of key and minor gases to be used by gas_optics().
 # The final list gases includes those that are defined in gas_optics_specification
-# and are provided in ty_gas_concs.
+# and are provided in GasConcs.
 #
-function get_minor_list(this::ty_gas_optics, gas_desc::ty_gas_concs, ngas, names_spec)
-  # class(ty_gas_optics), intent(in)       :: this
-  # class(ty_gas_concs), intent(in)                      :: gas_desc
+function get_minor_list(this::AbstractGasOptics, gas_desc::GasConcs, ngas, names_spec)
+  # class(AbstractGasOptics), intent(in)       :: this
+  # class(GasConcs), intent(in)                      :: gas_desc
   # integer, intent(in)                                  :: ngas
   # character(32), dimension(ngas), intent(in)           :: names_spec
 
@@ -837,7 +837,7 @@ end
 #### Inquiry functions
 
 """
-    source_is_internal(this::ty_gas_optics)
+    source_is_internal(this::AbstractGasOptics)
 
 Bool indicating if initialized for internal sources
 """
@@ -845,7 +845,7 @@ source_is_internal(::ExternalSourceGasOptics) = false
 source_is_internal(::InternalSourceGasOptics) = true
 
 """
-    source_is_external(this::ty_gas_optics)
+    source_is_external(this::AbstractGasOptics)
 
 Bool indicating if initialized for external sources
 """
@@ -853,39 +853,39 @@ source_is_external(::ExternalSourceGasOptics) = true
 source_is_external(::InternalSourceGasOptics) = false
 
 """
-    get_gases(this::ty_gas_optics)
+    get_gases(this::AbstractGasOptics)
 
 Gas names
 """
-get_gases(this::ty_gas_optics) = this.gas_names
+get_gases(this::AbstractGasOptics) = this.gas_names
 
 """
-    get_press_min(this::ty_gas_optics)
+    get_press_min(this::AbstractGasOptics)
 
 Minimum pressure on the interpolation grids
 """
-get_press_min(this::ty_gas_optics) = this.ref.press_min
+get_press_min(this::AbstractGasOptics) = this.ref.press_min
 
 """
-    get_press_max(this::ty_gas_optics)
+    get_press_max(this::AbstractGasOptics)
 
 Maximum pressure on the interpolation grids
 """
-get_press_max(this::ty_gas_optics) = this.ref.press_max
+get_press_max(this::AbstractGasOptics) = this.ref.press_max
 
 """
-    get_temp_min(this::ty_gas_optics)
+    get_temp_min(this::AbstractGasOptics)
 
 Minimum temparature on the interpolation grids
 """
-get_temp_min(this::ty_gas_optics) = this.ref.temp_min
+get_temp_min(this::AbstractGasOptics) = this.ref.temp_min
 
 """
-    get_temp_max(this::ty_gas_optics)
+    get_temp_max(this::AbstractGasOptics)
 
 Maximum temparature on the interpolation grids
 """
-get_temp_max(this::ty_gas_optics) = this.ref.temp_max
+get_temp_max(this::AbstractGasOptics) = this.ref.temp_max
 
 """
     get_col_dry(vmr_h2o, plev, tlay, latitude=nothing)
@@ -1090,7 +1090,7 @@ function create_key_species_reduce(gas_names, gas_names_red, key_species)
 end
 
 """
-    reduce_minor_arrays!(available_gases::ty_gas_concs,
+    reduce_minor_arrays!(available_gases::GasConcs,
                               gas_minor,
                               identifier_minor,
                               atmos::AtmosVars{FT},
@@ -1098,7 +1098,7 @@ end
 
 Reduce minor arrays so variables only contain minor gases that are available
 
- - `available_gases` gas concentrations `ty_gas_concs`
+ - `available_gases` gas concentrations `GasConcs`
  - `gas_minor` array of minor gases
  - `identifier_minor`
  - `atmos` original minor `AtmosVars` (in)
@@ -1108,7 +1108,7 @@ integer :: i, j
 integer :: idx_mnr, nm, tot_g, red_nm
 integer :: icnt, n_elim, ng
 """
-function reduce_minor_arrays(available_gases::ty_gas_concs,
+function reduce_minor_arrays(available_gases::GasConcs,
                              gas_minor,
                              identifier_minor,
                              atmos::AtmosVars{FT}) where FT
@@ -1217,11 +1217,11 @@ end
 # Utility function to combine optical depths from gas absorption and Rayleigh scattering
 #   (and reorder them for convenience, while we're at it)
 #
-function combine_and_reorder!(tau, tau_rayleigh, has_rayleigh, optical_props::ty_optical_props_arry{FT}) where FT
+function combine_and_reorder!(tau, tau_rayleigh, has_rayleigh, optical_props::AbstractOpticalPropsArry{FT}) where FT
   # real(FT), dimension(:,:,:),   intent(in) :: tau
   # real(FT), dimension(:,:,:),   intent(in) :: tau_rayleigh
   # logical,                      intent(in) :: has_rayleigh
-  # class(ty_optical_props_arry), intent(inout) :: optical_props
+  # class(AbstractOpticalPropsArry), intent(inout) :: optical_props
 
   # integer :: ncol, nlay, ngpt, nmom
 
@@ -1231,17 +1231,17 @@ function combine_and_reorder!(tau, tau_rayleigh, has_rayleigh, optical_props::ty
   if !has_rayleigh
     # index reorder (ngpt, nlay, ncol) -> (ncol,nlay,gpt)
     permutedims!(optical_props.tau, tau, [3,2,1])
-      if optical_props isa ty_optical_props_2str
+      if optical_props isa TwoStream
         optical_props.ssa .= FT(0)
         optical_props.g   .= FT(0)
       end
   else
     # combine optical depth and rayleigh scattering
-      if optical_props isa ty_optical_props_1scl
+      if optical_props isa OneScalar
         # User is asking for absorption optical depth
         permutedims!(optical_props.tau, tau, [3,2,1])
 
-      elseif optical_props isa ty_optical_props_2str
+      elseif optical_props isa TwoStream
         combine_and_reorder_2str!(optical_props, ncol, nlay, ngpt,       tau, tau_rayleigh)
       end
   end
@@ -1255,14 +1255,14 @@ end
 #--------------------------------------------------------------------------------------------------------------------
 
 # return extent of eta dimension
-get_neta(this::ty_gas_optics) = size(this.kmajor,2)
+get_neta(this::AbstractGasOptics) = size(this.kmajor,2)
 
 # return the number of pressures in reference profile
 #   absorption coefficient table is one bigger since a pressure is repeated in upper/lower atmos
-get_npres(this::ty_gas_optics) = size(this.kmajor,3)-1
+get_npres(this::AbstractGasOptics) = size(this.kmajor,3)-1
 
 # return the number of temperatures
-get_ntemp(this::ty_gas_optics) = size(this.kmajor,4)
+get_ntemp(this::AbstractGasOptics) = size(this.kmajor,4)
 
 # return the number of temperatures for Planck function
 get_nPlanckTemp(this::InternalSourceGasOptics) = size(this.totplnk,1) # dimensions are Planck-temperature, band

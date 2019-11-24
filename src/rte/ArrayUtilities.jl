@@ -1,9 +1,9 @@
 """
-    mo_util_array
+    ArrayUtilities
 
 Utility array functions
 """
-module mo_util_array
+module ArrayUtilities
 
 export any_vals_less_than, any_vals_outside, reshape_for_comparison
 

@@ -9,11 +9,11 @@ include("DataSetFiles.jl")
 
   Δt_all = Dict()
 
-  rfmip_clear_sky_sw(ds, ty_optical_props_1scl; compile_first=true)
-  rfmip_clear_sky_sw(ds, ty_optical_props_2str; compile_first=true)
+  rfmip_clear_sky_sw(ds, OneScalar; compile_first=true)
+  rfmip_clear_sky_sw(ds, TwoStream; compile_first=true)
 
-  Δt_all["clear_sky_sw", "1scl"] = @elapsed rfmip_clear_sky_sw(ds, ty_optical_props_1scl)
-  Δt_all["clear_sky_sw", "2str"] = @elapsed rfmip_clear_sky_sw(ds, ty_optical_props_2str)
+  Δt_all["clear_sky_sw", "1scl"] = @elapsed rfmip_clear_sky_sw(ds, OneScalar)
+  Δt_all["clear_sky_sw", "2str"] = @elapsed rfmip_clear_sky_sw(ds, TwoStream)
 
   for (case,Δt) in Δt_all
     @show case, Δt

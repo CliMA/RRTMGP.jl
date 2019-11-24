@@ -1,20 +1,20 @@
 using RRTMGP
 using DocStringExtensions
-using RRTMGP.mo_optical_props
-using RRTMGP.mo_simple_netcdf
-using RRTMGP.fortran_intrinsics
-using RRTMGP.mo_util_array
-using RRTMGP.mo_gas_optics_rrtmgp
-using RRTMGP.mo_gas_concentrations
+using RRTMGP.OpticalProps
+using RRTMGP.SimpleNetCDF
+using RRTMGP.FortranIntrinsics
+using RRTMGP.ArrayUtilities
+using RRTMGP.GasOptics
+using RRTMGP.GasConcentrations
 using RRTMGP.RTESolver
-using RRTMGP.mo_fluxes
-using RRTMGP.mo_load_coefficients
-using RRTMGP.mo_rfmip_io
-using RRTMGP.mo_source_functions
-using RRTMGP.mo_cloud_optics
-using RRTMGP.mo_load_cloud_coefficients
+using RRTMGP.Fluxes
+using RRTMGP.LoadCoefficients
+using RRTMGP.RFMIPIO
+using RRTMGP.SourceFunctions
+using RRTMGP.CloudOptics
+using RRTMGP.LoadCloudCoefficients
 
-import RRTMGP.mo_optical_props: validate!, subset_range!, delta_scale!, get_nmom
+import RRTMGP.OpticalProps: validate!, subset_range!, delta_scale!, get_nmom
 
 include("OpticalPropsNStream.jl")
 include("OpticalPropsNStream_kernels.jl")

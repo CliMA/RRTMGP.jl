@@ -1,9 +1,9 @@
 """
-    mo_rrtmgp_constants
+    PhysicalConstants
 
 Physical and mathematical constants used in gas optics calculation
 """
-module mo_rrtmgp_constants
+module PhysicalConstants
 
 export k_boltz,
        m_h2o,

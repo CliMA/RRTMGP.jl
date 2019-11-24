@@ -13,8 +13,8 @@ Apply a T/F sampled cloud mask to cloud optical properties defined by band to pr
 """
 function draw_samples(cloud_mask,clouds,clouds_sampled)
   # logical, dimension(:,:,:),      intent(in   ) :: cloud_mask     # Dimensions ncol,nlay,ngpt
-  # class(ty_optical_props_arry),   intent(in   ) :: clouds         # Defined by band
-  # class(ty_optical_props_arry),   intent(inout) :: clouds_sampled # Defined by g-point
+  # class(AbstractOpticalPropsArry),   intent(in   ) :: clouds         # Defined by band
+  # class(AbstractOpticalPropsArry),   intent(inout) :: clouds_sampled # Defined by g-point
   # character(len=128)                            :: error_msg
   # # ------------------------
   # integer :: ncol,nlay,nbnd,ngpt
@@ -27,8 +27,8 @@ function draw_samples(cloud_mask,clouds,clouds_sampled)
   #   2str is checked at assignment
   #
 
-  if clouds isa ty_optical_props_1scl
-    if clouds_sampled isa ty_optical_props_2str
+  if clouds isa OneScalar
+    if clouds_sampled isa TwoStream
       error("draw_samples: by-band and sampled cloud properties need to be the same variable type")
     end
   end
@@ -60,8 +60,8 @@ function draw_samples(cloud_mask,clouds,clouds_sampled)
   #
   # For 2-stream
   #
-  if clouds isa ty_optical_props_2str
-    if clouds_sampled isa ty_optical_props_2str
+  if clouds isa TwoStream
+    if clouds_sampled isa TwoStream
       apply_cloud_mask!(ncol,nlay,nbnd,ngpt,get_band_lims_gpoint(clouds_sampled),cloud_mask,clouds.ssa,clouds_sampled.ssa)
       apply_cloud_mask!(ncol,nlay,nbnd,ngpt,get_band_lims_gpoint(clouds_sampled),cloud_mask,clouds.g,  clouds_sampled.g  )
     else

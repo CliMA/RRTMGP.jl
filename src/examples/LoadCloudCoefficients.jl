@@ -1,8 +1,8 @@
-module mo_load_cloud_coefficients
+module LoadCloudCoefficients
 
-using ..mo_optical_props
-using ..mo_cloud_optics
-using ..mo_simple_netcdf
+using ..OpticalProps
+using ..CloudOptics
+using ..SimpleNetCDF
 
 export load_cld_lutcoeff, load_cld_padecoeff
 
@@ -12,7 +12,6 @@ export load_cld_lutcoeff, load_cld_padecoeff
 read cloud optical property LUT coefficients from NetCDF file
 """
 function load_cld_lutcoeff(::Type{FT}, ds_cld_coeff, icergh) where FT
-  # class(ty_cloud_optics),     intent(inout) :: cloud_spec
   # Open cloud optical property coefficient file
   # Read LUT coefficient dimensions
   band_lims_wvn = Array{FT}(read_field(ds_cld_coeff, "bnd_limits_wavenumber"))
@@ -32,8 +31,8 @@ function load_cld_lutcoeff(::Type{FT}, ds_cld_coeff, icergh) where FT
                     Array{FT}(read_field(ds_cld_coeff, "lut_ssaice")),
                     Array{FT}(read_field(ds_cld_coeff, "lut_asyice")))
 
-  cloud_spec = ty_cloud_optics_lut{FT,Int}(
-    ty_optical_props_base("RRTMGP cloud optics LUT", band_lims_wvn),
+  cloud_spec = CloudOpticsLUT{FT,Int}(
+    OpticalPropsBase("RRTMGP cloud optics LUT", band_lims_wvn),
     icergh,
     liq,
     ice)
@@ -46,7 +45,6 @@ end
 read cloud optical property Pade coefficients from NetCDF file
 """
 function load_cld_padecoeff(::Type{FT}, ds_cld_coeff, icergh) where FT
-  # class(ty_cloud_optics),       intent(inout) :: cloud_spec
   # # Spectral discretization
   # Read Pade coefficient dimensions
   band_lims_wvn = Array{FT}(read_field(ds_cld_coeff, "bnd_limits_wavenumber"))
@@ -67,8 +65,8 @@ function load_cld_padecoeff(::Type{FT}, ds_cld_coeff, icergh) where FT
                    Array{FT}(read_field(ds_cld_coeff, "pade_sizreg_ssaice")),
                    Array{FT}(read_field(ds_cld_coeff, "pade_sizreg_asyice")))
 
-  cloud_spec = ty_cloud_optics_pade{FT,Int}(
-    ty_optical_props_base("RRTMGP cloud optics Pade", band_lims_wvn),
+  cloud_spec = CloudOpticsPade{FT,Int}(
+    OpticalPropsBase("RRTMGP cloud optics Pade", band_lims_wvn),
     icergh,
     liq,
     ice)

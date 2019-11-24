@@ -1,4 +1,4 @@
-module fortran_intrinsics
+module FortranIntrinsics
 using DelimitedFiles
 using OffsetArrays
 using Test
