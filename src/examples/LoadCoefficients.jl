@@ -18,7 +18,7 @@ end
 Initialize the gas optics class with data. The calls look slightly different depending
   on whether the radiation sources are internal to the atmosphere (longwave) or external (shortwave)
 """
-function load_and_init(ds, available_gases::GasConcs{FT}) where FT
+function load_and_init(ds, available_gases::Vector{String}, ::Type{FT}) where FT
 
   # Reading the properties from the NetCDF file
 
@@ -34,26 +34,26 @@ function load_and_init(ds, available_gases::GasConcs{FT}) where FT
   rayl_upper = haskey(ds,"rayl_upper") ? Array{FT}(ds["rayl_upper"][:]) : nothing
   @assert haskey(ds,"rayl_lower") == haskey(ds,"rayl_upper")
 
-  lower = AtmosVars{FT}(Array{Int}(ds["minor_limits_gpt_lower"][:]),
-                        Array{Bool}(ds["minor_scales_with_density_lower"][:]),
-                        Array{Bool}(ds["scale_by_complement_lower"][:]),
-                        Array{Int}(ds["kminor_start_lower"][:]),
-                        Array{FT}(ds["kminor_lower"][:]),
-                        read_char_vec(ds, "scaling_gas_lower"),
-                        read_char_vec(ds, "minor_gases_lower"))
-  upper = AtmosVars{FT}(Array{Int}(ds["minor_limits_gpt_upper"][:]),
-                        Array{Bool}(ds["minor_scales_with_density_upper"][:]),
-                        Array{Bool}(ds["scale_by_complement_upper"][:]),
-                        Array{Int}(ds["kminor_start_upper"][:]),
-                        Array{FT}(ds["kminor_upper"][:]),
-                        read_char_vec(ds, "scaling_gas_upper"),
-                        read_char_vec(ds, "minor_gases_upper"))
+  lower = GasOpticsVars{FT}(Array{Int}(ds["minor_limits_gpt_lower"][:]),
+                            Array{Bool}(ds["minor_scales_with_density_lower"][:]),
+                            Array{Bool}(ds["scale_by_complement_lower"][:]),
+                            Array{Int}(ds["kminor_start_lower"][:]),
+                            Array{FT}(ds["kminor_lower"][:]),
+                            read_char_vec(ds, "scaling_gas_lower"),
+                            read_char_vec(ds, "minor_gases_lower"))
+  upper = GasOpticsVars{FT}(Array{Int}(ds["minor_limits_gpt_upper"][:]),
+                            Array{Bool}(ds["minor_scales_with_density_upper"][:]),
+                            Array{Bool}(ds["scale_by_complement_upper"][:]),
+                            Array{Int}(ds["kminor_start_upper"][:]),
+                            Array{FT}(ds["kminor_upper"][:]),
+                            read_char_vec(ds, "scaling_gas_upper"),
+                            read_char_vec(ds, "minor_gases_upper"))
 
   ref = Reference(Array{FT}(ds["press_ref"][:]),
                   Array{FT}(ds["temp_ref"][:]),
                   FT(ds["press_ref_trop"][:]),
                   Array{FT}(ds["vmr_ref"][:]),
-                  available_gases.gas_name,
+                  available_gases,
                   gas_names
                   )
 

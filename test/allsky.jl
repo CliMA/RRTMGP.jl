@@ -6,6 +6,7 @@ const to = TimerOutput()
 using NCDatasets
 using RRTMGP.OpticalProps
 using RRTMGP.SimpleNetCDF
+using RRTMGP.AtmosphericStates
 using RRTMGP.FortranIntrinsics
 using RRTMGP.ArrayUtilities
 using RRTMGP.GasOptics
@@ -136,23 +137,18 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
     vmr_2d_to_1d!(gas_concs, gas_concs_garand, gas_names[igas], size(p_lay, 1), nlay)
   end
 
-  #  If we trusted in Fortran allocate-on-assign we could skip the temp_array here
-  temp_array = zeros(FT, ncol, nlay)
-  temp_array .= spread_new(p_lay[1,:], 1, ncol)
-  p_lay = deepcopy(temp_array)
-  temp_array = zeros(FT, ncol, nlay)
-  temp_array .= spread_new(t_lay[1,:], 1, ncol)
-  t_lay = deepcopy(temp_array)
-  temp_array = zeros(FT, ncol, nlay+1)
-  temp_array .= spread_new(p_lev[1,:], 1, ncol)
-  p_lev = deepcopy(temp_array)
-  temp_array = zeros(FT, ncol, nlay+1)
-  temp_array .= spread_new(t_lev[1,:], 1, ncol)
-  t_lev = deepcopy(temp_array)
+  p_lay = deepcopy(spread_new(p_lay[1,:], 1, ncol))
+  t_lay = deepcopy(spread_new(t_lay[1,:], 1, ncol))
+  p_lev = deepcopy(spread_new(p_lev[1,:], 1, ncol))
+  t_lev = deepcopy(spread_new(t_lev[1,:], 1, ncol))
+
+  atmos_state = AtmosphericState(p_lay,p_lev,t_lay,gas_concs,t_lev)
+  top_at_1 = atmos_state.top_at_1
+  p_lay, t_lay, p_lev, gas_concs, t_lev = ntuple(i->nothing,5)
 
   # This puts pressure and temperature arrays on the GPU
   # load data into classes
-  k_dist = load_and_init(ds[:k_dist], gas_concs)
+  k_dist = load_and_init(ds[:k_dist], atmos_state.gas_concs.gas_name, FT)
   is_sw = source_is_external(k_dist)
   is_lw = !is_sw
   #
@@ -168,7 +164,6 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
   #
   nbnd = get_nband(k_dist.optical_props)
   ngpt = get_ngpt(k_dist.optical_props)
-  top_at_1 = p_lay[1, 1] < p_lay[1, nlay]
 
   ps = ProblemSize(ncol, nlay, ngpt)
 
@@ -209,7 +204,7 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
     t_sfc = zeros(FT, ncol)
     emis_sfc = zeros(FT, nbnd, ncol)
     # Surface temperature
-    t_sfc .= t_lev[1, fmerge(nlay+1, 1, top_at_1)]
+    t_sfc .= atmos_state.t_lev[1, fmerge(nlay+1, 1, top_at_1)]
     emis_sfc .= FT(0.98)
   end
 
@@ -219,9 +214,6 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
   flux_up = zeros(FT, ncol,nlay+1)
   flux_dn = zeros(FT, ncol,nlay+1)
 
-  if is_sw
-    flux_dir = zeros(FT, ncol,nlay+1)
-  end
   #
   # Clouds
   #
@@ -237,12 +229,12 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
   rei_val = FT(0.5) * (get_min_radius(cloud_optics_.ice) + get_max_radius(cloud_optics_.ice))
   for ilay=1:nlay
     for icol=1:ncol
-      cloud_mask[icol,ilay] = p_lay[icol,ilay] < FT(100) * FT(100) && p_lay[icol,ilay] > FT(900)
+      cloud_mask[icol,ilay] = atmos_state.p_lay[icol,ilay] < FT(100) * FT(100) && atmos_state.p_lay[icol,ilay] > FT(900)
       #
       # Ice and liquid will overlap in a few layers
       #
-      lwp[icol,ilay] = fmerge(FT(10),  FT(0), cloud_mask[icol,ilay] && t_lay[icol,ilay] > FT(263))
-      iwp[icol,ilay] = fmerge(FT(10),  FT(0), cloud_mask[icol,ilay] && t_lay[icol,ilay] < FT(273))
+      lwp[icol,ilay] = fmerge(FT(10),  FT(0), cloud_mask[icol,ilay] && atmos_state.t_lay[icol,ilay] > FT(263))
+      iwp[icol,ilay] = fmerge(FT(10),  FT(0), cloud_mask[icol,ilay] && atmos_state.t_lay[icol,ilay] < FT(273))
       rel[icol,ilay] = fmerge(rel_val, FT(0), lwp[icol,ilay] > FT(0))
       rei[icol,ilay] = fmerge(rei_val, FT(0), iwp[icol,ilay] > FT(0))
     end
@@ -261,33 +253,37 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
     #
     fluxes.flux_up .= FT(0)
     fluxes.flux_dn .= FT(0)
+    # update_view!(atmos_state, b)
     if is_lw
-      gas_optics_int!(k_dist, p_lay, p_lev,
-                  t_lay, t_sfc,
-                  gas_concs,
-                  atmos,
-                  lw_sources;
-                  tlev = t_lev)
+      gas_optics_int!(k_dist,
+                      atmos_state,
+                      t_sfc,
+                      atmos,
+                      lw_sources)
 
 
       increment!(clouds, atmos)
-      rte_lw!(atmos, top_at_1,
+      rte_lw!(atmos,
+              top_at_1,
               lw_sources,
               emis_sfc,
               fluxes)
     else
-      fluxes.flux_dn_dir .= flux_dir
+      fluxes.flux_dn_dir .= 0
 
-      gas_optics_ext!(k_dist, p_lay, p_lev,
-                  t_lay,
-                  gas_concs,
-                  atmos,
-                  toa_flux)
+      gas_optics_ext!(k_dist,
+                      atmos_state,
+                      atmos,
+                      toa_flux)
+
       delta_scale!(clouds)
       increment!(clouds, atmos)
-      rte_sw!(atmos, top_at_1,
-              mu0,   toa_flux,
-              sfc_alb_dir, sfc_alb_dif,
+      rte_sw!(atmos,
+              top_at_1,
+              mu0,
+              toa_flux,
+              sfc_alb_dir,
+              sfc_alb_dif,
               fluxes)
     end
     flux_up .= fluxes.flux_up

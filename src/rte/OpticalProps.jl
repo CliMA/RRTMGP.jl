@@ -245,23 +245,18 @@ end
 #####
 
 """
-  class(AbstractOpticalPropsArry), intent(in   ) :: this
-  integer,                      intent(in   ) :: dim
-  integer                                     :: get_arry_extent
+  get_ncol(this::AbstractOpticalProps)
+
+Number of columns
 """
-get_arry_extent(this::AbstractOpticalProps, dim) = size(this.tau, dim)
+get_ncol(this::AbstractOpticalProps) = size(this.tau, 1)
 
 """
-  class(AbstractOpticalPropsArry), intent(in   ) :: this
-  integer                                     :: get_ncol
-"""
-get_ncol(this::AbstractOpticalProps) = get_arry_extent(this, 1)
+  get_nlay(this::AbstractOpticalProps)
 
+Number of layers
 """
-  class(AbstractOpticalPropsArry), intent(in   ) :: this
-  integer                                     :: get_nlay
-"""
-get_nlay(this::AbstractOpticalProps) = get_arry_extent(this, 2)
+get_nlay(this::AbstractOpticalProps) = size(this.tau, 2)
 
 #####
 #####  Routines for base class: spectral discretization

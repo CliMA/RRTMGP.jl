@@ -32,88 +32,45 @@ RRTMGP's gas optics class needs to be initialized with data read from a netCDF f
 """
 function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
 
-  # character(len=4)   :: block_size_char, forcing_index_char = '1'
-
-  # character(len=32 ), dimension(:),   allocatable :: kdist_gas_names, rfmip_gas_games
-  # real(FT), dimension(:,:,:),         allocatable :: p_lay, p_lev, t_lay, t_lev # block_size, nlay, nblocks
-  # real(FT), dimension(:,:,:), target, allocatable :: flux_up, flux_dn
-  # real(FT), dimension(:,:  ),         allocatable :: surface_albedo, total_solar_irradiance, solar_zenith_angle
-  #                                                    # block_size, nblocks
-  # real(FT), dimension(:,:  ),         allocatable :: sfc_alb_spec # nbnd, block_size; spectrally-resolved surface albedo
-  #
-  # Classes used by rte+rrtmgp
-  #
-  # type(AbstractGasOptics_rrtmgp)                     :: k_dist
-  # type(TwoStream)                    :: optical_props
-  # type(FluxesBroadBand)                      :: fluxes
-
-  # real(FT), dimension(:,:), allocatable          :: toa_flux # block_size, ngpt
-  # real(FT), dimension(:  ), allocatable          :: def_tsi, mu0    # block_size
-  # logical , dimension(:,:), allocatable          :: usecol # block_size, nblocks
-  #
   # GasConcs holds multiple columns; we make an array of these objects to
   #   leverage what we know about the input file
-  #
-  # type(GasConcs), dimension(:), allocatable  :: gas_conc_array
+
   FT = Float64
   deg_to_rad = acos(-FT(1))/FT(180)
-
-  # -------------------------------------------------------------------------------------------------
-  #
-  # Code starts
-  #   all arguments are optional
-  #
 
   ncol, nlay, nexp = read_size(ds[:rfmip])
 
   forcing_index = 1
   block_size = 8
 
-  #
   # How big is the problem? Does it fit into blocks of the size we've specified?
-  #
   @assert mod(ncol*nexp, block_size) == 0 # number of columns must fit evenly into blocks
   nblocks = Int((ncol*nexp)/block_size)
   # println("Doing $(nblocks) blocks of size $(block_size)")
 
   # TODO: Fix readme
-  # read(forcing_index_char, "(i4)") forcing_index
   @assert !(forcing_index < 1 || forcing_index > 3)
 
-  #
   # Identify the set of gases used in the calculation based on the forcing index
   #   A gas might have a different name in the k-distribution than in the files
   #   provided by RFMIP (e.g. 'co2' and 'carbon_dioxide')
-  #
   kdist_gas_names, rfmip_gas_games = @timeit to "determine_gas_names" determine_gas_names(ds[:k_dist], forcing_index)
-  # print("Calculation uses RFMIP gases: ")
-  # @show rfmip_gas_games
+  # print("Calculation uses RFMIP gases: $(rfmip_gas_games)")
 
-  # --------------------------------------------------
-  #
-  # Prepare data for use in rte+rrtmgp
-  #
-  #
-  # Allocation on assignment within reading routines
-  #
+  # Read atmospheric state from netCDF files
   p_lay, p_lev, t_lay, t_lev = @timeit to "read_and_block_pt" read_and_block_pt(ds[:rfmip], block_size)
-  #
-  # Are the arrays ordered in the vertical with 1 at the top or the bottom of the domain?
-  #
 
-  top_at_1 = p_lay[1, 1, 1] < p_lay[1, nlay, 1]
-
-  #
-  # Read the gas concentrations and surface properties
-  #
+  # Read the gas concentrations and surface properties from netCDF files
   gas_conc_array = @timeit to "read_and_block_gases_ty" read_and_block_gases_ty(ds[:rfmip], block_size, kdist_gas_names, rfmip_gas_games)
   surface_albedo, total_solar_irradiance, solar_zenith_angle = @timeit to "read_and_block_sw_bc" read_and_block_sw_bc(ds[:rfmip], block_size)
 
-  #
+  atmos_state = AtmosphericState(p_lay,p_lev,t_lay,gas_conc_array,t_lev)
+  top_at_1 = atmos_state.top_at_1
+  p_lay, t_lay, p_lev, gas_conc_array, t_lev = ntuple(i->nothing,5)
+
   # Read k-distribution information. load_and_init() reads data from netCDF and calls
   #   k_dist%init(); users might want to use their own reading methods
-  #
-  k_dist = @timeit to "load_and_init" load_and_init(ds[:k_dist], gas_conc_array[1])
+  k_dist = @timeit to "load_and_init" load_and_init(ds[:k_dist], atmos_state.gas_concs[1].gas_name, FT)
   @assert source_is_external(k_dist)
 
   nbnd = get_nband(k_dist.optical_props)
@@ -123,15 +80,14 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
   toa_flux = zeros(FT, block_size, get_ngpt(k_dist.optical_props))
   def_tsi = zeros(FT, block_size)
   usecol = Array{Bool}(undef, block_size, nblocks)
-  #
+
   # RRTMGP won't run with pressure less than its minimum. The top level in the RFMIP file
   #   is set to 10^-3 Pa. Here we pretend the layer is just a bit less deep.
   #   This introduces an error but shows input sanitizing.
-  #
   if top_at_1
-    p_lev[:,1,:] .= get_press_min(k_dist) + eps(FT)
+    atmos_state.p_lev[:,1,:] .= get_press_min(k_dist) + eps(FT)
   else
-    p_lev[:,nlay+1,:] .= get_press_min(k_dist) + eps(FT)
+    atmos_state.p_lev[:,nlay+1,:] .= get_press_min(k_dist) + eps(FT)
   end
 
   #
@@ -164,20 +120,20 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
   @showprogress 1 "Computing..." for b = 1:b_tot
     fluxes.flux_up .= FT(0)
     fluxes.flux_dn .= FT(0)
+
+    update_view!(atmos_state, b)
     #
     # Compute the optical properties of the atmosphere and the Planck source functions
     #    from pressures, temperatures, and gas concentrations...
     #
 
     @timeit to "gas_optics_ext!" gas_optics_ext!(k_dist,
-                p_lay[:,:,b],
-                p_lev[:,:,b],
-                t_lay[:,:,b],
-                gas_conc_array[b],
+                atmos_state,
                 optical_props,
                 toa_flux,
                 nothing,
-                b==b_tot)
+                b==b_tot;
+                b=b)
     # Boundary conditions
     #   (This is partly to show how to keep work on GPUs using OpenACC in a host application)
     # What's the total solar irradiance assumed by RRTMGP?
