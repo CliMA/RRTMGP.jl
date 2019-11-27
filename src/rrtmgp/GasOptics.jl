@@ -27,9 +27,8 @@ using ..GasConcentrations
 using ..OpticalProps
 export gas_optics_int!, gas_optics_ext!, load_totplnk, load_solar_source
 export source_is_internal, source_is_external, get_press_min
-export get_col_dry, get_nflav
+export get_col_dry
 export Reference
-export InterpolationVars
 export GasOpticsVars
 
 """
@@ -107,21 +106,23 @@ $(DocStringExtensions.FIELDS)
 """
 struct AuxVars{I}
   "indexes for determining `col_gas`"
-  idx_minor#::Vector{I}
+  idx_minor::Vector{I}
   "indexes that have special treatment in density scaling"
-  idx_minor_scaling#::Vector{I}
+  idx_minor_scaling::Vector{I}
   function AuxVars(gas_names_present, gas_minor, identifier_minor, reduced_atmos, ::Type{I}) where I
-    return new{I}(create_idx_minor(gas_names_present,
+    return new{I}(create_idx_minor(I,
+                                   gas_names_present,
                                    gas_minor,
                                    identifier_minor,
                                    reduced_atmos.minor_gases),
-                  create_idx_minor_scaling(gas_names_present,
-                    reduced_atmos.scaling_gas))
+                  create_idx_minor_scaling(I,
+                                           gas_names_present,
+                                           reduced_atmos.scaling_gas))
   end
 end
 
 """
-    GasOpticsVars{FT}
+    GasOpticsVars{FT,I}
 
 Variables defined at
 
@@ -133,21 +134,21 @@ levels of the atmosphere for both full and reduced sets of gases.
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct GasOpticsVars{FT}
+struct GasOpticsVars{FT,I}
   "minor g-point limits"
-  minor_limits_gpt#::Array{I,2}
+  minor_limits_gpt::Array{I,2}
   "minor scales with density"
-  minor_scales_with_density#::Vector{Bool}
+  minor_scales_with_density::Vector{Bool}
   "scale by complement"
-  scale_by_complement#::Vector{Bool}
+  scale_by_complement::Vector{Bool}
   "kminor start"
-  kminor_start#::Vector{I}
+  kminor_start::Vector{I}
   "kminor"
-  kminor#::Array{T,3}, (n_minor,eta,temperature)
+  kminor::Array{FT,3} #, (n_minor,eta,temperature)
   "scaling gas"
-  scaling_gas
+  scaling_gas::Array{String}
   "minor gases"
-  minor_gases
+  minor_gases::Array{String}
 end
 
 abstract type AbstractGasOptics{T,I} <: AbstractOpticalProps{T,I} end
@@ -231,39 +232,36 @@ struct ExternalSourceGasOptics{FT,I} <: AbstractGasOptics{FT,I}
 end
 
 """
-    InterpolationVars{FT,I}
+    InterpolationCoefficients{FT,I}
 
-Interpolation variables
+Interpolation coefficients
 
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct InterpolationVars{FT,I}
-  "interpolation index for temperature"
-  jtemp#::Array{I}
-  "interpolation index for pressure"
-  jpress#::Array{I}
-  "interpolation index for binary species parameter (eta)"
-  jeta#::Array{I}
-  "interpolation fractions for minor species"
-  fminor
-  "interpolation fractions for major species"
-  fmajor
+struct InterpolationCoefficients{FT,I}
+  "index for temperature"
+  jtemp::Array{I,2}
+  "index for pressure"
+  jpress::Array{I,2}
+  "index for binary species parameter (eta)"
+  jeta::Array{I,4}
   "troposphere mask: itropo = merge(1,2,tropo[icol,ilay]); itropo = 1 lower atmosphere; itropo = 2 upper atmosphere"
-  tropo
+  tropo::Array{Bool,2}
+  "fractions for major species"
+  fmajor::Array{FT,6}
+  "fractions for minor species"
+  fminor::Array{FT,5}
 end
-function InterpolationVars(::Type{FT}, ::Type{I}, s_play, nflav) where {I<:Int, FT<:AbstractFloat}
-  ncol = s_play[1]
-  nlay = s_play[2]
-  jtemp = Array{I}(undef, s_play)
-  jpress = Array{I}(undef, s_play)
-  jeta = Array{I}(undef, 2,    nflav, s_play...)
-  fmajor = zeros(FT, 2,2,2,nflav,s_play...)
-  tropo = Array{Bool}(undef, s_play)
+function InterpolationCoefficients(::Type{FT}, ::Type{I}, ncol, nlay, nflav) where {I<:Int, FT<:AbstractFloat}
+  jtemp = Array{I}(undef, ncol, nlay)
+  jpress = Array{I}(undef, ncol, nlay)
+  jeta = Array{I}(undef, 2, nflav, ncol, nlay)
+  tropo = Array{Bool}(undef, ncol, nlay)
+  fmajor = zeros(FT, 2,2,2, nflav,ncol, nlay)
   fminor  = Array{FT}(undef, 2,2, nflav,ncol,nlay)
-  return InterpolationVars{FT,I}(jtemp,jpress,jeta,fminor,fmajor,tropo)
+  return InterpolationCoefficients{FT,I}(jtemp,jpress,jeta,tropo,fmajor,fminor)
 end
-
 
 """
     get_ngas(this::AbstractGasOptics)
@@ -325,14 +323,14 @@ function gas_optics_int!(this::InternalSourceGasOptics,
                      tlev=nothing)
   FT = eltype(play)
 
-  ncol  = size(play, 1)
-  nlay  = size(play, 2)
+  ncol,nlay  = size(play)
+  ics = InterpolationCoefficients(FT, Int, ncol, nlay, get_nflav(this))
+
   ngpt  = get_ngpt(this.optical_props)
   nband = get_nband(this.optical_props)
-  interp_vars = InterpolationVars(FT, Int, size(play), get_nflav(this))
 
   # Gas optics
-  compute_gas_taus!(interp_vars, this,
+  compute_gas_taus!(ics, this,
                    ncol, nlay, ngpt, nband,
                    play, plev, tlay, gas_desc,
                    optical_props,
@@ -356,7 +354,7 @@ function gas_optics_int!(this::InternalSourceGasOptics,
   source!(this,
          ncol, nlay, nband, ngpt,
          play, plev, tlay, tsfc,
-         interp_vars,
+         ics,
          sources,
          tlev)
   nothing
@@ -384,8 +382,7 @@ Compute gas optical depth, `toa_src`, given temperature, pressure, and compositi
 # real(FT), dimension(:,:), intent(  out) :: toa_src     # Incoming solar irradiance(ncol,ngpt)
 
 # Optional inputs
-# real(FT), dimension(:,:), intent(in   ),
-#                        optional, target :: col_dry # Column dry amount; dim(ncol,nlay)
+# real(FT), dimension(:,:), intent(in   ), optional, target :: col_dry # Column dry amount; dim(ncol,nlay)
 """
 function gas_optics_ext!(this::ExternalSourceGasOptics,
                      play,
@@ -398,16 +395,15 @@ function gas_optics_ext!(this::ExternalSourceGasOptics,
 
   FT = eltype(play)
 
-  ncol  = size(play, 1)
-  nlay  = size(play, 2)
+  ncol,nlay  = size(play)
+  ics = InterpolationCoefficients(FT, Int, ncol,nlay, get_nflav(this))
   ngpt  = get_ngpt(this.optical_props)
   nband = get_nband(this.optical_props)
   ngas  = get_ngas(this)
   nflav = get_nflav(this)
-  interp_vars = InterpolationVars(FT, Int, size(play), get_nflav(this))
 
   # Gas optics
-  @timeit to_gor "compute_gas_taus!" compute_gas_taus!(interp_vars, this,
+  @timeit to_gor "compute_gas_taus!" compute_gas_taus!(ics, this,
                    ncol, nlay, ngpt, nband,
                    play, plev, tlay, gas_desc,
                    optical_props,
@@ -432,7 +428,7 @@ end
                           optical_props::AbstractOpticalPropsArry,
                           col_dry=nothing)
 
- - `iv` interpolation variables ([`InterpolationVars`](@ref))
+ - `ics` interpolation coefficients, see [`InterpolationCoefficients`](@ref)
 
 class(AbstractGasOptics), intent(in   ) :: this
 integer,                          intent(in   ) :: ncol, nlay, ngpt, nband
@@ -441,7 +437,6 @@ real(FT), dimension(:,:),         intent(in   ) :: play,    # layer pressures [P
                                                    tlay      # layer temperatures [K]; (ncol,nlay)
 type(GasConcs),               intent(in   ) :: gas_desc  # Gas volume mixing ratios
 class(AbstractOpticalPropsArry),     intent(inout) :: optical_props #inout because components are allocated
-# Interpolation coefficients for use in internal source function
 Optional inputs
 real(FT), dimension(:,:), intent(in   ), optional, target :: col_dry # Column dry amount; dim(ncol,nlay)
 ----------------------------------------------------------
@@ -468,11 +463,12 @@ real(FT), dimension(2,2,  get_nflav(this),ncol,nlay) :: fminor # interpolation f
 integer :: ngas, nflav, neta, npres, ntemp
 ----------------------------------------------------------
 """
-function compute_gas_taus!(interp_vars::InterpolationVars, this::AbstractGasOptics{FT},
-                          ncol, nlay, ngpt, nband,
-                          play, plev, tlay, gas_desc::GasConcs,
-                          optical_props::AbstractOpticalPropsArry,
-                          col_dry=nothing, last_call=false) where FT
+function compute_gas_taus!(ics::InterpolationCoefficients,
+                           this::AbstractGasOptics{FT},
+                           ncol, nlay, ngpt, nband,
+                           play, plev, tlay, gas_desc::GasConcs,
+                           optical_props::AbstractOpticalPropsArry,
+                           col_dry=nothing, last_call=false) where FT
 
   tau          = Array{FT}(undef, ngpt,nlay,ncol)          # absorption, Rayleigh scattering optical depths
   tau_rayleigh = Array{FT}(undef, ngpt,nlay,ncol) # absorption, Rayleigh scattering optical depths
@@ -529,7 +525,8 @@ function compute_gas_taus!(interp_vars::InterpolationVars, this::AbstractGasOpti
 
   # ---- calculate gas optical depths ----
   tau .= 0
-  @timeit to_gor "interpolation!" interpolation!(interp_vars,col_mix,
+  @timeit to_gor "interpolation!" interpolation!(ics,
+          col_mix,
           ncol,nlay,                        # problem dimensions
           nflav, neta, npres, ntemp,  # interpolation dimensions
           this.flavor,
@@ -547,7 +544,7 @@ function compute_gas_taus!(interp_vars::InterpolationVars, this::AbstractGasOpti
           this.upper,
           this.lower_aux,
           this.upper_aux,
-          interp_vars,
+          ics,
           col_mix,
           play,
           tlay,
@@ -562,7 +559,7 @@ function compute_gas_taus!(interp_vars::InterpolationVars, this::AbstractGasOpti
           idx_h2o,
           col_dry_wk,
           col_gas,
-          interp_vars,
+          ics,
           tau_rayleigh)
 
   end
@@ -576,13 +573,13 @@ end
     source!(this::InternalSourceGasOptics,
                 ncol, nlay, nbnd, ngpt,
                 play, plev, tlay, tsfc,
-                interp_vars::InterpolationVars,
+                ics,
                 sources::SourceFuncLW,          # Planck sources
                 tlev)
 
 Compute Planck source functions at layer centers and levels
 
- - `iv` interpolation variables ([`InterpolationVars`](@ref))
+ - `ics` interpolation coefficients, see [`InterpolationCoefficients`](@ref)
 
 # inputs
 class(InternalSourceGasOptics),    intent(in ) :: this
@@ -591,7 +588,6 @@ real(FT), dimension(ncol,nlay),        intent(in   ) :: play   # layer pressures
 real(FT), dimension(ncol,nlay+1),      intent(in   ) :: plev   # level pressures [Pa, mb]
 real(FT), dimension(ncol,nlay),        intent(in   ) :: tlay   # layer temperatures [K]
 real(FT), dimension(ncol),             intent(in   ) :: tsfc   # surface skin temperatures [K]
-# Interplation coefficients
 class(SourceFuncLW    ),          intent(inout) :: sources
 real(FT), dimension(ncol,nlay+1),      intent(in   ), optional, target :: tlev          # level temperatures [K]
 ----------------------------------------------------------
@@ -605,9 +601,9 @@ real(FT), dimension(:,:),            pointer :: tlev_wk
 function source!(this::InternalSourceGasOptics{FT},
                  ncol, nlay, nbnd, ngpt,
                  play, plev, tlay, tsfc,
-                 interp_vars::InterpolationVars{FT},
+                 ics::InterpolationCoefficients{FT,I},
                  sources::SourceFuncLW,
-                 tlev=nothing) where {FT<:AbstractFloat}
+                 tlev=nothing) where {FT<:AbstractFloat,I<:Int}
 
   lay_source_t     = zeros(FT, ngpt,nlay,ncol)
   lev_source_inc_t = zeros(FT, ngpt,nlay,ncol)
@@ -660,7 +656,7 @@ function source!(this::InternalSourceGasOptics{FT},
               get_ntemp(this),
               get_nPlanckTemp(this),
               tlay, tlev_wk, tsfc, fmerge(1,nlay,play[1,1] > play[1,nlay]),
-              interp_vars,
+              ics,
               get_gpoint_bands(this.optical_props),
               get_band_lims_gpoint(this.optical_props),
               this.planck_frac,
@@ -678,6 +674,7 @@ function source!(this::InternalSourceGasOptics{FT},
   permutedims!(sources.lay_source, lay_source_t, [3,2,1])
   permutedims!(sources.lev_source_inc, lev_source_inc_t, [3,2,1])
   permutedims!(sources.lev_source_dec, lev_source_dec_t, [3,2,1])
+  return nothing
 end
 
 #####
@@ -1032,7 +1029,7 @@ end
 #
 # create index list for extracting col_gas needed for minor gas optical depth calculations
 #
-function create_idx_minor(gas_names, gas_minor, identifier_minor, minor_gases_atm)
+function create_idx_minor(::Type{I}, gas_names, gas_minor, identifier_minor, minor_gases_atm) where {I<:Integer}
   # character(len=*), dimension(:), intent(in) :: gas_names
   # character(len=*), dimension(:), intent(in) :: gas_minor, identifier_minor
   # character(len=*), dimension(:), intent(in) :: minor_gases_atm
@@ -1041,7 +1038,7 @@ function create_idx_minor(gas_names, gas_minor, identifier_minor, minor_gases_at
   # # local
   # integer :: imnr
   # integer :: idx_mnr
-  idx_minor_atm = Vector{Int}(undef, size(minor_gases_atm,1))
+  idx_minor_atm = Vector{I}(undef, size(minor_gases_atm,1))
   for imnr = 1:size(minor_gases_atm,1) # loop over minor absorbers in each band
         # Find identifying string for minor species in list of possible identifiers (e.g. h2o_slf)
         idx_mnr     = loc_in_array(minor_gases_atm[imnr], identifier_minor)
@@ -1056,13 +1053,13 @@ end
 #
 # create index for special treatment in density scaling of minor gases
 #
-function create_idx_minor_scaling(gas_names, scaling_gas_atm)
+function create_idx_minor_scaling(::Type{I}, gas_names, scaling_gas_atm) where {I<:Integer}
   # character(len=*), dimension(:), intent(in) :: gas_names
   # character(len=*), dimension(:), intent(in) :: scaling_gas_atm
   # integer, dimension(:), allocatable, intent(out) :: idx_minor_scaling_atm
   # # local
   # integer :: imnr
-  idx_minor_scaling_atm = Vector{Int}(undef, size(scaling_gas_atm,1))
+  idx_minor_scaling_atm = Vector{I}(undef, size(scaling_gas_atm,1))
   for imnr = 1:size(scaling_gas_atm,1) # loop over minor absorbers in each band
         # This will be -1 if there's no interacting gas
         idx_minor_scaling_atm[imnr] = loc_in_array(scaling_gas_atm[imnr], gas_names)
@@ -1126,6 +1123,7 @@ function reduce_minor_arrays(available_gases::GasConcs,
                              identifier_minor,
                              atmos::GasOpticsVars{FT}) where FT
 
+  I = Int
   nm = length(atmos.minor_gases)
   tot_g=0
 
@@ -1158,7 +1156,7 @@ function reduce_minor_arrays(available_gases::GasConcs,
     atmos_red_kminor_start              = pack(atmos.kminor_start       , gas_is_present)
 
     atmos_red_kminor = zeros(FT, tot_g, size(atmos.kminor,2), size(atmos.kminor,3))
-    atmos_red_minor_limits_gpt = Array{Int}(undef, 2, red_nm)
+    atmos_red_minor_limits_gpt = Array{I}(undef, 2, red_nm)
 
     icnt = 0
     n_elim = 0
@@ -1176,7 +1174,7 @@ function reduce_minor_arrays(available_gases::GasConcs,
       end
     end
   end
-  return GasOpticsVars{FT}(atmos_red_minor_limits_gpt,
+  return GasOpticsVars{FT,I}(atmos_red_minor_limits_gpt,
                        atmos_red_minor_scales_with_density,
                        atmos_red_scale_by_complement,
                        atmos_red_kminor_start,
