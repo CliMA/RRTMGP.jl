@@ -1,6 +1,9 @@
 using Test
 using RRTMGP
 using NCDatasets
+using ProgressMeter
+using TimerOutputs
+const to = TimerOutput()
 using RRTMGP.OpticalProps
 using RRTMGP.FortranIntrinsics
 using RRTMGP.ArrayUtilities
@@ -19,24 +22,23 @@ Example program to demonstrate the calculation of longwave radiative fluxes in c
 Program is invoked as rrtmgp_rfmip_lw [block_size input_file  coefficient_file upflux_file downflux_file]
   All arguments are optional but need to be specified in order.
 
-Optical properties of the atmosphere as array of values
-   In the longwave we include only absorption optical depth (_1scl)
-   Shortwave calculations use optical depth, single-scattering albedo, asymmetry parameter (_2str)
+RTE shortwave driver
 
 RTE driver uses a derived type to reduce spectral fluxes to whatever the user wants
   Here we're just reporting broadband fluxes
 
 RRTMGP's gas optics class needs to be initialized with data read from a netCDF files
+
+Optical properties of the atmosphere as array of values
+   In the longwave we include only absorption optical depth (_1scl)
+   Shortwave calculations use optical depth, single-scattering albedo, asymmetry parameter (_2str)
 """
 function rfmip_clear_sky_lw(ds, optical_props_constructor; compile_first=false)
 
-  # GasConcs holds multiple columns; we make an array of these objects to
-  #   leverage what we know about the input file
-
   FT = Float64
-  I  = Integer
+  I  = Int
   deg_to_rad = acos(-FT(1))/FT(180)
-  n_quad_angles = Integer.(1)
+  n_quad_angles = I(1)
 
   ncol, nlay, nexp = read_size(ds[:rfmip])
 
@@ -71,7 +73,7 @@ function rfmip_clear_sky_lw(ds, optical_props_constructor; compile_first=false)
   p_lay, t_lay, p_lev, gas_conc_array, t_lev = ntuple(i->nothing,5)
 
   # Read k-distribution information from netCDF files.
-  k_dist = load_and_init(ds[:k_dist], atmos_state.gas_concs[1].gas_name, FT)
+  k_dist = load_and_init(ds[:k_dist], FT, gas_conc_array[1].gas_name)
 
   @assert source_is_internal(k_dist)
 

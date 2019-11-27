@@ -58,22 +58,22 @@ Encapsulates a collection of volume mixing ratios (concentrations) of gases.
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct GasConcs{FT}
+struct GasConcs{FT,I}
   "gas names"
   gas_name::Vector{String}
   "gas concentrations"
-  concs
+  concs::Vector{ConcField{FT}}
   "number of columns"
-  ncol#::Int
+  ncol::I
   "number of layers"
-  nlay#::Int
+  nlay::I
   "gas concentration problem size"
   gsc::GasConcSize
 end
 
-function GasConcs(::Type{FT}, gas_names, ncol, nlay, gsc::GasConcSize) where FT
-  concs = [ConcField(zeros(FT, gsc.s...)) for i in 1:gsc.nconcs]
-  return GasConcs{FT}(gas_names, concs, gsc.s..., gsc)
+function GasConcs(::Type{FT}, ::Type{I}, gas_names, ncol, nlay, gsc::GasConcSize) where {FT<:AbstractFloat,I<:Int}
+  concs = ConcField[ConcField(zeros(FT, gsc.s...)) for i in 1:gsc.nconcs]
+  return GasConcs{FT,I}(gas_names, concs, gsc.s..., gsc)
 end
 
 """

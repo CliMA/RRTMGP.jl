@@ -50,13 +50,13 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
   #
   FT = Float64
   I = Int64
-  p_lay, t_lay, p_lev, t_lev, gas_concs_garand, col_dry = @timeit to "read_atmos" read_atmos(ds[:input], FT, gas_names)
+  p_lay, t_lay, p_lev, t_lev, gas_concs_garand, col_dry = @timeit to "read_atmos" read_atmos(ds[:input], FT, I, gas_names)
 
   col_dry = nothing
   nlay = size(p_lay, 2)
   # For clouds we'll use the first column, repeated over and over
   gsc = GasConcSize(ncol, nlay, (ncol, nlay), ngas)
-  gas_concs = GasConcs(FT, gas_names, ncol, nlay, gsc)
+  gas_concs = GasConcs(FT, I, gas_names, ncol, nlay, gsc)
   for igas = 1:ngas
     vmr_2d_to_1d!(gas_concs, gas_concs_garand, gas_names[igas], size(p_lay, 1), nlay)
   end
@@ -72,7 +72,7 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
 
   # This puts pressure and temperature arrays on the GPU
   # load data into classes
-  k_dist = load_and_init(ds[:k_dist], atmos_state.gas_concs.gas_name, FT)
+  k_dist = load_and_init(ds[:k_dist], FT, gas_concs.gas_name)
   is_sw = source_is_external(k_dist)
   is_lw = !is_sw
   #

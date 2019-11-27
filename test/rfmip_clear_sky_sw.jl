@@ -4,6 +4,7 @@ using NCDatasets
 using ProgressMeter
 using TimerOutputs
 const to = TimerOutput()
+using RRTMGP.OpticalProps
 using RRTMGP.FortranIntrinsics
 using RRTMGP.ArrayUtilities
 using RRTMGP.GasOptics
@@ -15,27 +16,27 @@ using RRTMGP.RFMIPIO
 
 """
 Example program to demonstrate the calculation of shortwave radiative fluxes in clear, aerosol-free skies.
-   The example files come from the Radiative Forcing MIP (https://www.earthsystemcog.org/projects/rfmip/)
-   The large problem (1800 profiles) is divided into blocks
+  The example files come from the Radiative Forcing MIP (https://www.earthsystemcog.org/projects/rfmip/)
+  The large problem (1800 profiles) is divided into blocks
 
 Program is invoked as rrtmgp_rfmip_sw [block_size input_file  coefficient_file upflux_file downflux_file]
-   All arguments are optional but need to be specified in order.
+  All arguments are optional but need to be specified in order.
 
 RTE shortwave driver
 
 RTE driver uses a derived type to reduce spectral fluxes to whatever the user wants
- Here we're just reporting broadband fluxes
+  Here we're just reporting broadband fluxes
+
+RRTMGP's gas optics class needs to be initialized with data read from a netCDF files
 
 modules for reading and writing files
 
-RRTMGP's gas optics class needs to be initialized with data read from a netCDF files
+
 """
 function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
 
-  # GasConcs holds multiple columns; we make an array of these objects to
-  #   leverage what we know about the input file
-
   FT = Float64
+  I  = Int
   deg_to_rad = acos(-FT(1))/FT(180)
 
   ncol, nlay, nexp = read_size(ds[:rfmip])
@@ -48,7 +49,6 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
   nblocks = Int((ncol*nexp)/block_size)
   # println("Doing $(nblocks) blocks of size $(block_size)")
 
-  # TODO: Fix readme
   @assert !(forcing_index < 1 || forcing_index > 3)
 
   # Identify the set of gases used in the calculation based on the forcing index
@@ -70,7 +70,7 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
 
   # Read k-distribution information. load_and_init() reads data from netCDF and calls
   #   k_dist%init(); users might want to use their own reading methods
-  k_dist = @timeit to "load_and_init" load_and_init(ds[:k_dist], atmos_state.gas_concs[1].gas_name, FT)
+  k_dist = @timeit to "load_and_init" load_and_init(ds[:k_dist], FT, gas_conc_array[1].gas_name)
   @assert source_is_external(k_dist)
 
   nbnd = get_nband(k_dist.optical_props)

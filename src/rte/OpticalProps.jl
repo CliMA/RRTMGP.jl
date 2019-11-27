@@ -245,14 +245,14 @@ end
 #####
 
 """
-  get_ncol(this::AbstractOpticalProps)
+    get_ncol(this::AbstractOpticalProps)
 
 Number of columns
 """
 get_ncol(this::AbstractOpticalProps) = size(this.tau, 1)
 
 """
-  get_nlay(this::AbstractOpticalProps)
+    get_ncol(this::AbstractOpticalProps)
 
 Number of layers
 """
