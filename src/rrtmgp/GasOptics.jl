@@ -650,53 +650,10 @@ function source!(this::InternalSourceGasOptics{FT},
                  interp_vars::InterpolationVars,
                  sources::SourceFuncLW) where {I<:Int, FT<:AbstractFloat}
 
-  jtemp  = interp_vars.jtemp
-  jpress = interp_vars.jpress
-  jeta   = interp_vars.jeta
-  tropo  = interp_vars.tropo
-  fmajor = interp_vars.fmajor
-  play = atmos_state.p_lay
-  plev = atmos_state.p_lev
-  tlay = atmos_state.t_lay
-  tlev = atmos_state.t_lev
   lay_source_t     = zeros(FT, ngpt,nlay,ncol)
   lev_source_inc_t = zeros(FT, ngpt,nlay,ncol)
   lev_source_dec_t = zeros(FT, ngpt,nlay,ncol)
   sfc_source_t     = zeros(FT, ngpt,ncol)
-  tlev_arr         = zeros(FT, ncol,nlay+1)
-
-  # Source function needs temperature at interfaces/levels and at layer centers
-  if present(tlev)
-    #   Users might have provided these
-    tlev_wk = tlev
-  else
-    tlev_wk = tlev_arr
-    #
-    # Interpolate temperature to levels if not provided
-    #   Interpolation and extrapolation at boundaries is weighted by pressure
-    #
-    for icol = 1:ncol
-       tlev_arr[icol,1] = tlay[icol,1] +
-                         (plev[icol,1]-play[icol,1])*
-                         (tlay[icol,2]-tlay[icol,1])/
-                         (play[icol,2]-play[icol,1])
-    end
-    for ilay in 2:nlay
-      for icol in 1:ncol
-         tlev_arr[icol,ilay] = (play[icol,ilay-1]*tlay[icol,ilay-1]*
-                               (plev[icol,ilay]-play[icol,ilay]) +
-                                play[icol,ilay]*tlay[icol,ilay]*
-                               (play[icol,ilay-1]-plev[icol,ilay]))/
-                               (plev[icol,ilay]*(play[icol,ilay-1] - play[icol,ilay]))
-      end
-    end
-    for icol = 1:ncol
-       tlev_arr[icol,nlay+1] = tlay[icol,nlay] +
-                              (plev[icol,nlay+1]-play[icol,nlay])*
-                              (tlay[icol,nlay]-tlay[icol,nlay-1])/
-                              (play[icol,nlay]-play[icol,nlay-1])
-    end
-  end
 
   # Compute internal (Planck) source functions at layers and levels,
   #  which depend on mapping from spectral space that creates k-distribution.
@@ -709,15 +666,11 @@ function source!(this::InternalSourceGasOptics{FT},
               get_npres(this),
               get_ntemp(this),
               get_nPlanckTemp(this),
-              tlay,
-              tlev_wk,
+              atmos_state.t_lay,
+              atmos_state.t_lev,
               tsfc,
-              fmerge(1,nlay,play[1,1] > play[1,nlay]),
-              fmajor,
-              jeta,
-              tropo,
-              jtemp,
-              jpress,
+              fmerge(1,nlay,atmos_state.p_lay[1,1] > atmos_state.p_lay[1,nlay]),
+              interp_vars,
               get_gpoint_bands(this.optical_props),
               get_band_lims_gpoint(this.optical_props),
               this.planck_frac,

@@ -36,6 +36,25 @@ struct AtmosphericVars{FT}
   "level pressures [Pa, mb]; (ncol,nlay+1)"
   p_lev
   "layer temperatures [K]; (ncol,nlay)"
+  pressure
+  "level temperatures [K]; (ncol,nlay+1)"
+  temperature
+end
+
+"""
+    AtmosphericVars{FT}
+
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
+struct AtmosphericVars{FT}
+  "Gas concentrations, in the form of volume mixing ratios"
+  gas_concs
+  "layer pressures [Pa, mb]; (ncol,nlay)"
+  p_lay
+  "level pressures [Pa, mb]; (ncol,nlay+1)"
+  p_lev
+  "layer temperatures [K]; (ncol,nlay)"
   t_lay
   "level temperatures [K]; (ncol,nlay+1)"
   t_lev
@@ -90,27 +109,29 @@ mutable struct AtmosphericState{FT}
   ncol
   function AtmosphericState(gas_concs,p_lay,p_lev,t_lay,t_lev=nothing)
     _full = AtmosphericVars(gas_concs,p_lay,p_lev,t_lay,t_lev)
-    _view = _full.gas_concs
-    _view = _full.p_lay
-    _view = _full.p_lev
-    _view = _full.t_lay
-    _view = _full.t_lev
+    _view.gas_concs = _full.gas_concs
+    _view.p_lay = _full.p_lay
+    _view.p_lev = _full.p_lev
+    _view.t_lay = _full.t_lay
+    _view.t_lev = _full.t_lev
 
     FT = eltype(p_lay)
     nlay = size(p_lay, 2)
     ncol = size(p_lay, 1)
+
+    # Are the arrays ordered in the vertical with 1 at the top or the bottom of the domain?
     top_at_1 = p_lay[1, 1, 1] < p_lay[1, nlay, 1]
     grid = SimpleGrid{FT}(p_lay)
-    return new{FT}(grid,_full,_view,top_at_1,nlay,ncol)
+    return new{FT}(grid, _full, _view, top_at_1, nlay,ncol)
   end
 end
 
 function update_view!(atmos_state::AtmosphericState, b::Int)
-    atmos_state.p_lay     = @view(atmos_state.p_lay_full[:,:,b])
-    atmos_state.p_lev     = @view(atmos_state.p_lev_full[:,:,b])
-    atmos_state.t_lay     = @view(atmos_state.t_lay_full[:,:,b])
-    atmos_state.t_lev     = @view(atmos_state.t_lev_full[:,:,b])
-    atmos_state.gas_concs = @view(atmos_state.gas_concs_full[b])
+    atmos_state._view.p_lay     = @view(atmos_state._full.p_lay[:,:,b])
+    atmos_state._view.p_lev     = @view(atmos_state._full.p_lev[:,:,b])
+    atmos_state._view.t_lay     = @view(atmos_state._full.t_lay[:,:,b])
+    atmos_state._view.t_lev     = @view(atmos_state._full.t_lev[:,:,b])
+    atmos_state._view.gas_concs = @view(atmos_state._full.gas_concs[b])
 end
 
 

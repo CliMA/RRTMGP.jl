@@ -526,14 +526,24 @@ real(FT) :: pfrac          (ngpt,nlay,  ncol)
 real(FT) :: planck_function(nbnd,nlay+1,ncol)
 # -----------------
 """
-function compute_Planck_source!(
-                  ncol, nlay, nbnd, ngpt,
-                  nflav, neta, npres, ntemp, nPlanckTemp,
-                  tlay, tlev, tsfc, sfc_lay,
-                  fmajor, jeta, tropo, jtemp, jpress,
-                  gpoint_bands, band_lims_gpt,
-                  pfracin, temp_ref_min, totplnk_delta, totplnk, gpoint_flavor,
-                  sfc_src, lay_src, lev_src_inc, lev_src_dec)
+function compute_Planck_source!(ncol, nlay, nbnd, ngpt,
+                                nflav, neta, npres, ntemp, nPlanckTemp,
+                                tlay,
+                                tlev,
+                                tsfc,
+                                sfc_lay,
+                                interp_vars::InterpolationVars,
+                                gpoint_bands,
+                                band_lims_gpt,
+                                pfracin,
+                                temp_ref_min,
+                                totplnk_delta,
+                                totplnk,
+                                gpoint_flavor,
+                                sfc_src,
+                                lay_src,
+                                lev_src_inc,
+                                lev_src_dec)
   FT = eltype(fmajor) #Float64
 
 

@@ -66,7 +66,7 @@ function rfmip_clear_sky_lw(ds, optical_props_constructor; compile_first=false)
   sfc_emis, sfc_t = read_and_block_lw_bc(ds[:rfmip], block_size)
 
   # Initialize atmospheric state, deallocate locals
-  atmos_state = AtmosphericState(p_lay,p_lev,t_lay,gas_conc_array,t_lev)
+  atmos_state = AtmosphericState(gas_conc_array,p_lay,p_lev,t_lay,t_lev)
   top_at_1 = atmos_state.top_at_1
   p_lay, t_lay, p_lev, gas_conc_array, t_lev = ntuple(i->nothing,5)
 

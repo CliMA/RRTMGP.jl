@@ -64,7 +64,7 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
   gas_conc_array = @timeit to "read_and_block_gases_ty" read_and_block_gases_ty(ds[:rfmip], block_size, kdist_gas_names, rfmip_gas_games)
   surface_albedo, total_solar_irradiance, solar_zenith_angle = @timeit to "read_and_block_sw_bc" read_and_block_sw_bc(ds[:rfmip], block_size)
 
-  atmos_state = AtmosphericState(p_lay,p_lev,t_lay,gas_conc_array,t_lev)
+  atmos_state = AtmosphericState(gas_conc_array,p_lay,p_lev,t_lay,t_lev)
   top_at_1 = atmos_state.top_at_1
   p_lay, t_lay, p_lev, gas_conc_array, t_lev = ntuple(i->nothing,5)
 
