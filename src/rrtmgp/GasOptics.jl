@@ -29,7 +29,7 @@ export gas_optics_int!, gas_optics_ext!, load_totplnk, load_solar_source
 export source_is_internal, source_is_external, get_press_min
 export get_col_dry
 export Reference
-export AtmosVars
+export GasOpticsVars
 
 """
     Reference{FT}
@@ -120,7 +120,7 @@ struct AuxVars{I}
 end
 
 """
-    AtmosVars{FT}
+    GasOpticsVars{FT}
 
 Variables defined at
 
@@ -132,7 +132,7 @@ levels of the atmosphere for both full and reduced sets of gases.
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct AtmosVars{FT}
+struct GasOpticsVars{FT}
   "minor g-point limits"
   minor_limits_gpt#::Array{I,2}
   "minor scales with density"
@@ -164,10 +164,10 @@ struct InternalSourceGasOptics{FT,I} <: AbstractGasOptics{FT,I}
   ref::Reference{FT}
   "Base optical properties"
   optical_props::OpticalPropsBase{FT,I}
-  "AtmosVars in the lower atmosphere"
-  lower::AtmosVars
-  "AtmosVars in the upper atmosphere"
-  upper::AtmosVars
+  "GasOpticsVars in the lower atmosphere"
+  lower::GasOpticsVars
+  "GasOpticsVars in the upper atmosphere"
+  upper::GasOpticsVars
   "Auxiliary variables (index maps) in the lower atmosphere"
   lower_aux::AuxVars{I}
   "Auxiliary variables (index maps) in the upper atmosphere"
@@ -205,10 +205,10 @@ struct ExternalSourceGasOptics{FT,I} <: AbstractGasOptics{FT,I}
   ref::Reference{FT}
   "Base optical properties"
   optical_props::OpticalPropsBase{FT,I}
-  "AtmosVars in the lower atmosphere"
-  lower::AtmosVars
-  "AtmosVars in the upper atmosphere"
-  upper::AtmosVars
+  "GasOpticsVars in the lower atmosphere"
+  lower::GasOpticsVars
+  "GasOpticsVars in the upper atmosphere"
+  upper::GasOpticsVars
   "Auxiliary variables (index maps) in the lower atmosphere"
   lower_aux::AuxVars{I}
   "Auxiliary variables (index maps) in the upper atmosphere"
@@ -1093,15 +1093,15 @@ end
     reduce_minor_arrays!(available_gases::GasConcs,
                               gas_minor,
                               identifier_minor,
-                              atmos::AtmosVars{FT},
-                              atmos_red::AtmosVars{FT})
+                              atmos::GasOpticsVars{FT},
+                              atmos_red::GasOpticsVars{FT})
 
 Reduce minor arrays so variables only contain minor gases that are available
 
  - `available_gases` gas concentrations `GasConcs`
  - `gas_minor` array of minor gases
  - `identifier_minor`
- - `atmos` original minor `AtmosVars` (in)
+ - `atmos` original minor `GasOpticsVars` (in)
 
 # Local variables
 integer :: i, j
@@ -1111,7 +1111,7 @@ integer :: icnt, n_elim, ng
 function reduce_minor_arrays(available_gases::GasConcs,
                              gas_minor,
                              identifier_minor,
-                             atmos::AtmosVars{FT}) where FT
+                             atmos::GasOpticsVars{FT}) where FT
 
   nm = length(atmos.minor_gases)
   tot_g=0
@@ -1163,7 +1163,7 @@ function reduce_minor_arrays(available_gases::GasConcs,
       end
     end
   end
-  return AtmosVars{FT}(atmos_red_minor_limits_gpt,
+  return GasOpticsVars{FT}(atmos_red_minor_limits_gpt,
                        atmos_red_minor_scales_with_density,
                        atmos_red_scale_by_complement,
                        atmos_red_kminor_start,
