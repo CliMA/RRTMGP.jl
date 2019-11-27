@@ -4,7 +4,7 @@
 ####
 
 """
-    read_atmos(ds, FT, gas_names)
+    read_atmos(ds, FT, I, gas_names)
 
 Read profiles for all columns
  - `p_lay` pressure (layers)
@@ -13,7 +13,7 @@ Read profiles for all columns
  - `t_lev` temperature (levels)
  - `col_dry` gas concentrations
 """
-function read_atmos(ds, FT, gas_names)
+function read_atmos(ds, FT, I, gas_names)
 
   ncol = ds.dim["col"]
   nlay = ds.dim["lay"]
@@ -33,7 +33,7 @@ function read_atmos(ds, FT, gas_names)
   existing_gases = filter(ug->haskey(ds, "vmr_"*ug), available_gases)
 
   gsc = GasConcSize(ncol, nlay, (ncol, nlay), length(existing_gases))
-  gas_concs = GasConcs(FT, gas_names, ncol, nlay, gsc)
+  gas_concs = GasConcs(FT, I, gas_names, ncol, nlay, gsc)
 
   for eg in existing_gases
     set_vmr!(gas_concs, eg, Array{FT}(read_field(ds, "vmr_"*eg)))

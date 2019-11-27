@@ -37,82 +37,6 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
   k_dist_sym = Symbol(:k_dist,λ_string)
   cloud_optics_sym = Symbol(:cloud_optics,λ_string)
 
-  # ----------------------------------------------------------------------------------
-  # Variables
-  # ----------------------------------------------------------------------------------
-  # Arrays: dimensions (col, lay)
-  # real(wp), dimension(:,:),   allocatable :: p_lay, t_lay, p_lev
-  # real(wp), dimension(:,:),   allocatable :: col_dry
-  # real(wp), dimension(:,:),   allocatable :: temp_array
-
-  #
-  # Longwave only
-  #
-  # real(wp), dimension(:,:),   allocatable :: t_lev
-  # real(wp), dimension(:),     allocatable :: t_sfc
-  # real(wp), dimension(:,:),   allocatable :: emis_sfc # First dimension is band
-  #
-  # Shortwave only
-  #
-  # real(wp), dimension(:),     allocatable :: mu0
-  # real(wp), dimension(:,:),   allocatable :: sfc_alb_dir, sfc_alb_dif # First dimension is band
-  #
-  # Source functions
-  #
-  #   Longwave
-  # type(SourceFuncLW), save               :: lw_sources
-  #   Shortwave
-  # real(wp), dimension(:,:), allocatable, save :: toa_flux
-  #
-  # Clouds
-  #
-  # real(wp), allocatable, dimension(:,:) :: lwp, iwp, rel, rei
-  # logical,  allocatable, dimension(:,:) :: cloud_mask
-  #
-  # Output variables
-  #
-  # real(wp), dimension(:,:), target,
-  #                           allocatable :: flux_up, flux_dn, flux_dir
-  #
-  # Derived types from the RTE and RRTMGP libraries
-  #
-  # type(AbstractGasOptics_rrtmgp) :: k_dist
-  # type(AbstractCloudOptics)      :: cloud_optics_
-  # type(GasConcs)         :: gas_concs, gas_concs_garand, gas_concs_1col
-  # class(AbstractOpticalPropsArry),
-  #                allocatable :: atmos, clouds
-  # type(FluxesBroadBand)  :: fluxes
-
-  #
-  # Inputs to RRTMGP
-  #
-  # logical :: top_at_1, is_sw, is_lw
-
-  # integer  :: ncol, nlay, nbnd, ngpt
-  # integer  :: icol, ilay, ibnd, iloop, igas
-  # real(wp) :: rel_val, rei_val
-
-  # character(len=8) :: char_input
-  # integer  :: nUserArgs=0, nloops
-  # logical :: use_luts = .true., write_fluxes = .true.
-  # integer, parameter :: ngas = 8
-  # character(len=3), dimension(ngas)
-  #                    :: gas_names = ['h2o', 'co2', 'o3 ', 'n2o', 'co ', 'ch4', 'o2 ', 'n2 ']
-
-  # character(len=256) :: input_file, k_dist_file, cloud_optics_file
-  #
-  # Timing variables
-  #
-  # integer(kind=8)              :: start, finish, start_all, finish_all, clock_rate
-  # real(wp)                     :: avg
-  # integer(kind=8), allocatable :: elapsed(:)
-
-  #
-  # Parse command line for any file names, block size
-  #
-  # rrtmgp_clouds rrtmgp-clouds.nc $RRTMGP_ROOT/rrtmgp/data/rrtmgp-data-lw-g256-2018-12-04.nc $RRTMGP_ROOT/extensions/cloud_optics/rrtmgp-cloud-optics-coeffs-lw.nc  128 1
-  # rrtmgp_clouds rrtmgp-clouds.nc $RRTMGP_ROOT/rrtmgp/data/rrtmgp-data-sw-g224-2018-12-04.nc $RRTMGP_ROOT/extensions/cloud_optics/rrtmgp-cloud-optics-coeffs-sw.nc  128 1
-
   gas_names = lowercase.(strip.(["h2o", "co2", "o3", "n2o", "co", "ch4", "o2", "n2"]))
   ngas = length(gas_names)
   nloops = 1
@@ -125,34 +49,26 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
   #
   FT = Float64
   I = Int64
-  p_lay, t_lay, p_lev, t_lev, gas_concs_garand, col_dry = @timeit to "read_atmos" read_atmos(ds[:input], FT, gas_names)
+  p_lay, t_lay, p_lev, t_lev, gas_concs_garand, col_dry = @timeit to "read_atmos" read_atmos(ds[:input], FT, I, gas_names)
 
   col_dry = nothing
   nlay = size(p_lay, 2)
   # For clouds we'll use the first column, repeated over and over
   gsc = GasConcSize(ncol, nlay, (ncol, nlay), ngas)
-  gas_concs = GasConcs(FT, gas_names, ncol, nlay, gsc)
+  gas_concs = GasConcs(FT, I, gas_names, ncol, nlay, gsc)
   for igas = 1:ngas
     vmr_2d_to_1d!(gas_concs, gas_concs_garand, gas_names[igas], size(p_lay, 1), nlay)
   end
 
   #  If we trusted in Fortran allocate-on-assign we could skip the temp_array here
-  temp_array = zeros(FT, ncol, nlay)
-  temp_array .= spread_new(p_lay[1,:], 1, ncol)
-  p_lay = deepcopy(temp_array)
-  temp_array = zeros(FT, ncol, nlay)
-  temp_array .= spread_new(t_lay[1,:], 1, ncol)
-  t_lay = deepcopy(temp_array)
-  temp_array = zeros(FT, ncol, nlay+1)
-  temp_array .= spread_new(p_lev[1,:], 1, ncol)
-  p_lev = deepcopy(temp_array)
-  temp_array = zeros(FT, ncol, nlay+1)
-  temp_array .= spread_new(t_lev[1,:], 1, ncol)
-  t_lev = deepcopy(temp_array)
+  p_lay = deepcopy(spread_new(p_lay[1,:], 1, ncol))
+  t_lay = deepcopy(spread_new(t_lay[1,:], 1, ncol))
+  p_lev = deepcopy(spread_new(p_lev[1,:], 1, ncol))
+  t_lev = deepcopy(spread_new(t_lev[1,:], 1, ncol))
 
   # This puts pressure and temperature arrays on the GPU
   # load data into classes
-  k_dist = load_and_init(ds[:k_dist], gas_concs)
+  k_dist = load_and_init(ds[:k_dist], FT, gas_concs.gas_name)
   is_sw = source_is_external(k_dist)
   is_lw = !is_sw
   #

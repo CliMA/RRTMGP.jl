@@ -96,7 +96,7 @@ struct Reference{FT}
 end
 
 """
-    AuxVars{I}
+    GasOpticsAux{I}
 
 Auxiliary indexes for variables in the upper
 and lower levels of the atmosphere.
@@ -104,12 +104,12 @@ and lower levels of the atmosphere.
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct AuxVars{I}
+struct GasOpticsAux{I}
   "indexes for determining `col_gas`"
   idx_minor::Vector{I}
   "indexes that have special treatment in density scaling"
   idx_minor_scaling::Vector{I}
-  function AuxVars(gas_names_present, gas_minor, identifier_minor, reduced_atmos, ::Type{I}) where I
+  function GasOpticsAux(gas_names_present, gas_minor, identifier_minor, reduced_atmos, ::Type{I}) where I
     return new{I}(create_idx_minor(I,
                                    gas_names_present,
                                    gas_minor,
@@ -171,9 +171,9 @@ struct InternalSourceGasOptics{FT,I} <: AbstractGasOptics{FT,I}
   "GasOpticsVars in the upper atmosphere"
   upper::GasOpticsVars
   "Auxiliary variables (index maps) in the lower atmosphere"
-  lower_aux::AuxVars{I}
+  lower_aux::GasOpticsAux{I}
   "Auxiliary variables (index maps) in the upper atmosphere"
-  upper_aux::AuxVars{I}
+  upper_aux::GasOpticsAux{I}
   "Present gas names"
   gas_names::Vector{String}
   "Absorption coefficient for major species (g-point,eta,pressure,temperature)"
@@ -212,9 +212,9 @@ struct ExternalSourceGasOptics{FT,I} <: AbstractGasOptics{FT,I}
   "GasOpticsVars in the upper atmosphere"
   upper::GasOpticsVars
   "Auxiliary variables (index maps) in the lower atmosphere"
-  lower_aux::AuxVars{I}
+  lower_aux::GasOpticsAux{I}
   "Auxiliary variables (index maps) in the upper atmosphere"
-  upper_aux::AuxVars{I}
+  upper_aux::GasOpticsAux{I}
   "Present gas names"
   gas_names::Vector{String}
   "Absorption coefficient for major species (g-point,eta,pressure,temperature)"
@@ -733,12 +733,11 @@ end
 
 Initialize absorption coefficient arrays
 
- - `lower` lower atmospheric variables
- - `upper` upper atmospheric variables
- - `lower_aux` lower atmospheric auxiliary variables
- - `upper_aux` upper atmospheric auxiliary variables
+ - `lower` lower atmospheric gas optics variables, see [`GasOpticsVars`](@ref)
+ - `upper` upper atmospheric gas optics variables, see [`GasOpticsVars`](@ref)
+ - `lower_aux` lower atmospheric gas optics auxiliary variables, see [`GasOpticsAux`](@ref)
+ - `upper_aux` upper atmospheric gas optics auxiliary variables, see [`GasOpticsAux`](@ref)
 
-class(GasConcs),                intent(in   ) :: available_gases
 character(len=*), dimension(:),       intent(in) :: gas_names
 integer,  dimension(:,:,:),   intent(in) :: key_species
 integer,  dimension(:,:),     intent(in) :: band2gpt
@@ -750,7 +749,7 @@ logical,  dimension(:),     allocatable :: key_species_present_init
 integer,  dimension(:,:,:), allocatable :: key_species_red
 integer :: i, j, idx
 """
-function init_abs_coeffs(available_gases::GasConcs,
+function init_abs_coeffs(available_gases::Vector{String},
                          gas_names,
                          key_species,
                          band2gpt,
@@ -763,14 +762,14 @@ function init_abs_coeffs(available_gases::GasConcs,
   FT = eltype(kmajor)
 
   # Which gases known to the gas optics are present in the host model (available_gases)?
-  gas_is_present = map(x->x in available_gases.gas_name, gas_names)
+  gas_is_present = map(x->x in available_gases, gas_names)
   gas_names_present = pack(gas_names, gas_is_present)
 
   reduced_lower = reduce_minor_arrays(available_gases, gas_minor, identifier_minor, lower)
   reduced_upper = reduce_minor_arrays(available_gases, gas_minor, identifier_minor, upper)
 
-  lower_aux = AuxVars(gas_names_present, gas_minor, identifier_minor, reduced_lower, Int)
-  upper_aux = AuxVars(gas_names_present, gas_minor, identifier_minor, reduced_upper, Int)
+  lower_aux = GasOpticsAux(gas_names_present, gas_minor, identifier_minor, reduced_lower, Int)
+  upper_aux = GasOpticsAux(gas_names_present, gas_minor, identifier_minor, reduced_upper, Int)
 
   # create flavor list
   # Reduce (remap) key_species list; checks that all key gases are present in incoming
@@ -1100,15 +1099,15 @@ function create_key_species_reduce(gas_names, gas_names_red, key_species)
 end
 
 """
-    reduce_minor_arrays!(available_gases::GasConcs,
-                              gas_minor,
-                              identifier_minor,
-                              atmos::GasOpticsVars{FT},
-                              atmos_red::GasOpticsVars{FT})
+    reduce_minor_arrays(available_gases::Vector{String},
+                        gas_minor,
+                        identifier_minor,
+                        atmos::GasOpticsVars{FT},
+                        atmos_red::GasOpticsVars{FT})
 
 Reduce minor arrays so variables only contain minor gases that are available
 
- - `available_gases` gas concentrations `GasConcs`
+ - `available_gases` array of available gases
  - `gas_minor` array of minor gases
  - `identifier_minor`
  - `atmos` original minor `GasOpticsVars` (in)
@@ -1118,7 +1117,7 @@ integer :: i, j
 integer :: idx_mnr, nm, tot_g, red_nm
 integer :: icnt, n_elim, ng
 """
-function reduce_minor_arrays(available_gases::GasConcs,
+function reduce_minor_arrays(available_gases::Vector{String},
                              gas_minor,
                              identifier_minor,
                              atmos::GasOpticsVars{FT}) where FT
@@ -1128,7 +1127,7 @@ function reduce_minor_arrays(available_gases::GasConcs,
   tot_g=0
 
   mask = map(x->loc_in_array(x, identifier_minor), atmos.minor_gases)
-  gas_is_present = map(x->x in available_gases.gas_name, gas_minor[mask])
+  gas_is_present = map(x->x in available_gases, gas_minor[mask])
 
   for i = 1:length(atmos.minor_gases)
     if gas_is_present[i]
