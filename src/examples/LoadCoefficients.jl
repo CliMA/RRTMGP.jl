@@ -34,14 +34,14 @@ function load_and_init(ds, available_gases::GasConcs{FT}) where FT
   rayl_upper = haskey(ds,"rayl_upper") ? Array{FT}(ds["rayl_upper"][:]) : nothing
   @assert haskey(ds,"rayl_lower") == haskey(ds,"rayl_upper")
 
-  lower = AtmosVars{FT}(Array{Int}(ds["minor_limits_gpt_lower"][:]),
+  lower = GasOpticsVars{FT}(Array{Int}(ds["minor_limits_gpt_lower"][:]),
                         Array{Bool}(ds["minor_scales_with_density_lower"][:]),
                         Array{Bool}(ds["scale_by_complement_lower"][:]),
                         Array{Int}(ds["kminor_start_lower"][:]),
                         Array{FT}(ds["kminor_lower"][:]),
                         read_char_vec(ds, "scaling_gas_lower"),
                         read_char_vec(ds, "minor_gases_lower"))
-  upper = AtmosVars{FT}(Array{Int}(ds["minor_limits_gpt_upper"][:]),
+  upper = GasOpticsVars{FT}(Array{Int}(ds["minor_limits_gpt_upper"][:]),
                         Array{Bool}(ds["minor_scales_with_density_upper"][:]),
                         Array{Bool}(ds["scale_by_complement_upper"][:]),
                         Array{Int}(ds["kminor_start_upper"][:]),
