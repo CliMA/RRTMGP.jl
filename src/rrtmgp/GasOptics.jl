@@ -230,6 +230,41 @@ struct ExternalSourceGasOptics{FT,I} <: AbstractGasOptics{FT,I}
 end
 
 """
+    InterpolationVars{FT,I}
+
+Interpolation variables
+
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
+struct InterpolationVars{FT,I}
+  "interpolation index for temperature"
+  jtemp#::Array{I}
+  "interpolation index for pressure"
+  jpress#::Array{I}
+  "interpolation index for binary species parameter (eta)"
+  jeta#::Array{I}
+  "interpolation fractions for minor species"
+  fminor
+  "interpolation fractions for major species"
+  fmajor
+  "troposphere mask: itropo = merge(1,2,tropo[icol,ilay]); itropo = 1 lower atmosphere; itropo = 2 upper atmosphere"
+  tropo
+end
+function InterpolationVars(::Type{FT}, ::Type{I}, s_play, nflav) where {I<:Int, FT<:AbstractFloat}
+  ncol = s_play[1]
+  nlay = s_play[2]
+  jtemp = Array{I}(undef, s_play)
+  jpress = Array{I}(undef, s_play)
+  jeta = Array{I}(undef, 2,    nflav, s_play...)
+  fmajor = zeros(FT, 2,2,2,nflav,s_play...)
+  tropo = Array{Bool}(undef, s_play)
+  fminor  = Array{FT}(undef, 2,2, nflav,ncol,nlay)
+  return InterpolationVars{FT,I}(jtemp,jpress,jeta,fminor,fmajor,tropo)
+end
+
+
+"""
     get_ngas(this::AbstractGasOptics)
 
 Number of gases registered in the spectral configuration
@@ -289,11 +324,7 @@ function gas_optics_int!(this::InternalSourceGasOptics,
                      tlev=nothing)
   FT = eltype(play)
 
-  jpress = Array{Int}(undef, size(play))
-  jtemp = Array{Int}(undef, size(play))
-  tropo = Array{Bool}(undef, size(play))
-  fmajor = zeros(FT, 2,2,2,get_nflav(this),size(play)...)
-  jeta = Array{Int}(undef, 2,    get_nflav(this), size(play)...)
+  interp_vars = InterpolationVars(FT, Int, size(play), get_nflav(this))
 
   ncol  = size(play, 1)
   nlay  = size(play, 2)
@@ -301,7 +332,7 @@ function gas_optics_int!(this::InternalSourceGasOptics,
   nband = get_nband(this.optical_props)
 
   # Gas optics
-  compute_gas_taus!(jtemp, jpress, jeta, tropo, fmajor, this,
+  compute_gas_taus!(interp_vars, this,
                    ncol, nlay, ngpt, nband,
                    play, plev, tlay, gas_desc,
                    optical_props,
@@ -325,7 +356,7 @@ function gas_optics_int!(this::InternalSourceGasOptics,
   source!(this,
          ncol, nlay, nband, ngpt,
          play, plev, tlay, tsfc,
-         jtemp, jpress, jeta, tropo, fmajor,
+         interp_vars,
          sources,
          tlev)
   nothing
@@ -367,11 +398,7 @@ function gas_optics_ext!(this::ExternalSourceGasOptics,
 
   FT = eltype(play)
 
-  jpress = Array{Int}( undef, size(play))
-  jtemp  = Array{Int}( undef, size(play))
-  tropo  = Array{Bool}(undef, size(play))
-  fmajor = zeros(FT, 2,2,2, get_nflav(this), size(play)...)
-  jeta   = Array{Int}( undef, 2,     get_nflav(this), size(play)...)
+  interp_vars = InterpolationVars(FT, Int, size(play), get_nflav(this))
 
   ncol  = size(play, 1)
   nlay  = size(play, 2)
@@ -381,7 +408,7 @@ function gas_optics_ext!(this::ExternalSourceGasOptics,
   nflav = get_nflav(this)
 
   # Gas optics
-  @timeit to_gor "compute_gas_taus!" compute_gas_taus!(jtemp, jpress, jeta, tropo, fmajor, this,
+  @timeit to_gor "compute_gas_taus!" compute_gas_taus!(interp_vars, this,
                    ncol, nlay, ngpt, nband,
                    play, plev, tlay, gas_desc,
                    optical_props,
@@ -444,7 +471,7 @@ real(FT), dimension(2,2,  get_nflav(this),ncol,nlay) :: fminor # interpolation f
 integer :: ngas, nflav, neta, npres, ntemp
 ----------------------------------------------------------
 """
-function compute_gas_taus!(jtemp, jpress, jeta, tropo, fmajor, this::AbstractGasOptics{FT},
+function compute_gas_taus!(interp_vars::InterpolationVars, this::AbstractGasOptics{FT},
                           ncol, nlay, ngpt, nband,
                           play, plev, tlay, gas_desc::GasConcs,
                           optical_props::AbstractOpticalPropsArry,
@@ -506,7 +533,7 @@ function compute_gas_taus!(jtemp, jpress, jeta, tropo, fmajor, this::AbstractGas
 
   # ---- calculate gas optical depths ----
   tau .= 0
-  @timeit to_gor "interpolation!" interpolation!(jtemp,fmajor,fminor,col_mix,tropo,jeta,jpress,
+  @timeit to_gor "interpolation!" interpolation!(interp_vars,col_mix,
           ncol,nlay,                        # problem dimensions
           nflav, neta, npres, ntemp,  # interpolation dimensions
           this.flavor,
@@ -524,16 +551,11 @@ function compute_gas_taus!(jtemp, jpress, jeta, tropo, fmajor, this::AbstractGas
           this.upper,
           this.lower_aux,
           this.upper_aux,
-          tropo,
+          interp_vars,
           col_mix,
-          fmajor,
-          fminor,
           play,
           tlay,
-          col_gas,
-          jeta,
-          jtemp,
-          jpress)
+          col_gas)
   if allocated(this.krayl)
 
     @timeit to_gor "compute_tau_rayleigh!" compute_tau_rayleigh!(          #Rayleigh scattering optical depths
@@ -544,10 +566,7 @@ function compute_gas_taus!(jtemp, jpress, jeta, tropo, fmajor, this::AbstractGas
           idx_h2o,
           col_dry_wk,
           col_gas,
-          fminor,
-          jeta,
-          tropo,
-          jtemp,      # local input
+          interp_vars,
           tau_rayleigh)
 
   end
@@ -592,7 +611,7 @@ real(FT), dimension(:,:),            pointer :: tlev_wk
 function source!(this::InternalSourceGasOptics{FT},
                  ncol, nlay, nbnd, ngpt,
                  play, plev, tlay, tsfc,
-                 jtemp, jpress, jeta, tropo, fmajor,
+                 interp_vars::InterpolationVars{FT},
                  sources::SourceFuncLW,
                  tlev=nothing) where {FT<:AbstractFloat}
 
@@ -647,7 +666,7 @@ function source!(this::InternalSourceGasOptics{FT},
               get_ntemp(this),
               get_nPlanckTemp(this),
               tlay, tlev_wk, tsfc, fmerge(1,nlay,play[1,1] > play[1,nlay]),
-              fmajor, jeta, tropo, jtemp, jpress,
+              interp_vars,
               get_gpoint_bands(this.optical_props),
               get_band_lims_gpoint(this.optical_props),
               this.planck_frac,
