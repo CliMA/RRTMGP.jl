@@ -72,7 +72,7 @@ struct GasConcs{FT}
 end
 
 function GasConcs(::Type{FT}, gas_names, ncol, nlay, gsc::GasConcSize) where FT
-  concs = [ConcField(zeros(FT, gsc.s...)) for i in 1:gsc.nconcs]
+  concs = ConcField[ConcField(zeros(FT, gsc.s...)) for i in 1:gsc.nconcs]
   return GasConcs{FT}(gas_names, concs, gsc.s..., gsc)
 end
 
