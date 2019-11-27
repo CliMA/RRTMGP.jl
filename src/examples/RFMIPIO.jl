@@ -2,15 +2,15 @@
     RFMIPIO
 
 This module reads an example file containing atomspheric conditions (temperature, pressure, gas concentrations)
- and surface properties (emissivity, temperature), defined on nlay layers across a set of ncol columns subject to
- nexp perturbations, and returns them in data structures suitable for use in rte and rrtmpg. The input data
+ and surface properties (emissivity, temperature), defined on `nlay` layers across a set of `ncol` columns subject to
+ `nexp` perturbations, and returns them in data structures suitable for use in rte and rrtmpg. The input data
  are partitioned into a user-specified number of blocks.
 For the moment only quantities relevant to longwave calculations are provided.
 
 The example files comes from the Radiative Forcing MIP (https://www.earthsystemcog.org/projects/rfmip/)
  The protocol for this experiment allows for different specifications of which gases to consider:
 all gases, (CO2, CH4, N2O) + {CFC11eq; CFC12eq + HFC-134eq}. Ozone is always included
-The protocol does not specify the treatmet of gases like CO
+The protocol does not specify the treatment of gases like CO
 """
 module RFMIPIO
 
@@ -101,8 +101,7 @@ end
 Read and reshape shortwave boundary conditions
     character(len=*),           intent(in   ) :: fileName
     integer,                    intent(in   ) :: blocksize
-    real(FT), dimension(:,:), allocatable, &
-                                intent(  out) :: surface_albedo, total_solar_irradiance, solar_zenith_angle
+    real(FT), dimension(:,:), allocatable,  intent(  out) :: surface_albedo, total_solar_irradiance, solar_zenith_angle
 """
 function read_and_block_sw_bc(ds, blocksize)
   FT = Float64
@@ -137,8 +136,7 @@ Read and reshape longwave boundary conditions
 
 character(len=*),           intent(in   ) :: fileName
 integer,                    intent(in   ) :: blocksize
-real(FT), dimension(:,:), allocatable, &
-                            intent(  out) :: surface_emissivity, surface_temperature
+real(FT), dimension(:,:), allocatable,  intent(  out) :: surface_emissivity, surface_temperature
 """
 function read_and_block_lw_bc(ds, blocksize)
   FT = Float64
@@ -226,8 +224,8 @@ read_kdist_gas_names(ds) =
 Read and reshape gas concentrations. RRTMGP requires gas concentrations to be supplied via a class
  (GasConcs). Gas concentrations are set via a call to gas_concs%set_vmr(name, values)
  where `name` is nominally the chemical formula for the gas in question and `values` may be
- a scalar, a 1-d profile assumed to apply to all columns, or an array of dimension (ncol, nlay).
-This routine outputs a vector nblocks long of these types so each element of the array can be passed to
+ a scalar, a 1-d profile assumed to apply to all columns, or an array of dimension (`ncol`, `nlay`).
+This routine outputs a vector `nblocks` long of these types so each element of the array can be passed to
  the rrtmgp gas optics calculation in turn.
 
 This routine exploits RFMIP conventions: only water vapor and ozone vary by column within
@@ -235,14 +233,10 @@ This routine exploits RFMIP conventions: only water vapor and ozone vary by colu
 Fields in the RFMIP file have a trailing _GM (global mean); some fields use a chemical formula and other
  a descriptive name, so a map is provided between these.
 
-  character(len=*),           intent(in   ) :: fileName
   integer,                    intent(in   ) :: blocksize
-  character(len=*),  dimension(:), &
-                              intent(in   ) :: gas_names ! Names used by the k-distribution/gas concentration type
-  character(len=*),  dimension(:), &
-                              intent(in   ) :: names_in_file ! Corresponding names in the RFMIP file
-  type(GasConcs), dimension(:), allocatable, &
-                              intent(  out) :: gas_conc_array
+  character(len=*),  dimension(:), intent(in   ) :: gas_names ! Names used by the k-distribution/gas concentration type
+  character(len=*),  dimension(:), intent(in   ) :: names_in_file ! Corresponding names in the RFMIP file
+  type(GasConcs), dimension(:), allocatable,  intent(  out) :: gas_conc_array
 """
 function read_and_block_gases_ty(ds, blocksize, gas_names, names_in_file)
   ncol_l, nlay_l, nexp_l = read_size(ds)
@@ -250,8 +244,9 @@ function read_and_block_gases_ty(ds, blocksize, gas_names, names_in_file)
   @assert (ncol_l*nexp_l)%blocksize == 0
   nblocks = Int((ncol_l*nexp_l)/blocksize)
   FT = Float64
+  I = Int
   gsc = GasConcSize(ncol_l, nlay_l, (blocksize, nlay_l), length(gas_names))
-  gas_concs = GasConcs(FT, gas_names, ncol_l, nlay_l, gsc)
+  gas_concs = GasConcs(FT, I, gas_names, ncol_l, nlay_l, gsc)
   gas_conc_array = Vector([deepcopy(gas_concs) for i in 1:nblocks])
 
   # Experiment index for each column

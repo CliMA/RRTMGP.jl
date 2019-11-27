@@ -6,7 +6,7 @@ CurrentModule = RRTMGP.GasOptics
 
 ```@docs
 Reference
-AuxVars
+GasOpticsAux
 GasOpticsVars
 InternalSourceGasOptics
 ExternalSourceGasOptics

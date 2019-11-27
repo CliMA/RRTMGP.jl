@@ -1,6 +1,9 @@
 using Test
 using RRTMGP
 using NCDatasets
+using ProgressMeter
+using TimerOutputs
+const to = TimerOutput()
 using RRTMGP.OpticalProps
 using RRTMGP.FortranIntrinsics
 using RRTMGP.ArrayUtilities
@@ -12,60 +15,30 @@ using RRTMGP.LoadCoefficients
 using RRTMGP.RFMIPIO
 using RRTMGP.SourceFunctions
 """
-Example program to demonstrate the calculation of shortwave radiative fluxes in clear, aerosol-free skies.
+Example program to demonstrate the calculation of longwave radiative fluxes in clear, aerosol-free skies.
   The example files come from the Radiative Forcing MIP (https://www.earthsystemcog.org/projects/rfmip/)
   The large problem (1800 profiles) is divided into blocks
 
-Program is invoked as rrtmgp_rfmip_sw [block_size input_file  coefficient_file upflux_file downflux_file]
+Program is invoked as rrtmgp_rfmip_lw [block_size input_file  coefficient_file upflux_file downflux_file]
   All arguments are optional but need to be specified in order.
 
-Optical properties of the atmosphere as array of values
-   In the longwave we include only absorption optical depth (_1scl)
-   Shortwave calculations use optical depth, single-scattering albedo, asymmetry parameter (_2str)
+RTE shortwave driver
 
 RTE driver uses a derived type to reduce spectral fluxes to whatever the user wants
   Here we're just reporting broadband fluxes
 
 RRTMGP's gas optics class needs to be initialized with data read from a netCDF files
+
+Optical properties of the atmosphere as array of values
+   In the longwave we include only absorption optical depth (_1scl)
+   Shortwave calculations use optical depth, single-scattering albedo, asymmetry parameter (_2str)
 """
 function rfmip_clear_sky_lw(ds, optical_props_constructor; compile_first=false)
-  # character(len=132) :: flxdn_file, flxup_file
-  # integer            :: nargs, ncol, nlay, nbnd, ngpt, nexp, nblocks, block_size, forcing_index
-  # logical            :: top_at_1
-  # integer            :: b, icol, ibnd, igpt
-  # character(len=4)   :: block_size_char, forcing_index_char = '1'
 
-  # character(len=32 ), dimension(:),   allocatable :: kdist_gas_names, rfmip_gas_games
-  # real(FT), dimension(:,:,:),         allocatable :: p_lay, p_lev, t_lay, t_lev # block_size, nlay, nblocks
-  # real(FT), dimension(:,:,:), target, allocatable :: flux_up, flux_dn
-  # real(FT), dimension(:,:  ),         allocatable :: surface_albedo, total_solar_irradiance, solar_zenith_angle
-  #                                                    # block_size, nblocks
-  # real(FT), dimension(:,:  ),         allocatable :: sfc_alb_spec # nbnd, block_size; spectrally-resolved surface albedo
-  #
-  # Classes used by rte+rrtmgp
-  #
-  # type(AbstractGasOptics_rrtmgp)                     :: k_dist
-  # type(TwoStream)                    :: optical_props
-  # type(FluxesBroadBand)                      :: fluxes
-
-  # real(FT), dimension(:,:), allocatable          :: toa_flux # block_size, ngpt
-  # real(FT), dimension(:  ), allocatable          :: def_tsi, mu0    # block_size
-  # logical , dimension(:,:), allocatable          :: usecol # block_size, nblocks
-  #
-  # GasConcs holds multiple columns; we make an array of these objects to
-  #   leverage what we know about the input file
-  #
-  # type(GasConcs), dimension(:), allocatable  :: gas_conc_array
   FT = Float64
-  I  = Integer
+  I  = Int
   deg_to_rad = acos(-FT(1))/FT(180)
-  n_quad_angles = Integer.(1)
-
-  #
-  # Code starts
-  #   all arguments are optional
-  #
-
+  n_quad_angles = I(1)
 
   ncol, nlay, nexp = read_size(ds[:rfmip])
 
@@ -116,7 +89,7 @@ function rfmip_clear_sky_lw(ds, optical_props_constructor; compile_first=false)
   # Read k-distribution information. load_and_init() reads data from netCDF and calls
   #   k_dist%init(); users might want to use their own reading methods
   #
-  k_dist = load_and_init(ds[:k_dist], gas_conc_array[1])
+  k_dist = load_and_init(ds[:k_dist], FT, gas_conc_array[1].gas_name)
 
   @assert source_is_internal(k_dist)
 

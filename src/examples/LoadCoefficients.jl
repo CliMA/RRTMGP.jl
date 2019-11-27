@@ -18,7 +18,7 @@ end
 Initialize the gas optics class with data. The calls look slightly different depending
   on whether the radiation sources are internal to the atmosphere (longwave) or external (shortwave)
 """
-function load_and_init(ds, available_gases::GasConcs{FT}) where FT
+function load_and_init(ds, ::Type{FT}, available_gases::Vector{String}) where {FT<:AbstractFloat}
 
   # Reading the properties from the NetCDF file
 
@@ -54,7 +54,7 @@ function load_and_init(ds, available_gases::GasConcs{FT}) where FT
                   Array{FT}(ds["temp_ref"][:]),
                   FT(ds["press_ref_trop"][:]),
                   Array{FT}(ds["vmr_ref"][:]),
-                  available_gases.gas_name,
+                  available_gases,
                   gas_names
                   )
 
