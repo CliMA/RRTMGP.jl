@@ -27,8 +27,9 @@ using ..GasConcentrations
 using ..OpticalProps
 export gas_optics_int!, gas_optics_ext!, load_totplnk, load_solar_source
 export source_is_internal, source_is_external, get_press_min
-export get_col_dry
+export get_col_dry, get_nflav
 export Reference
+export InterpolationVars
 export GasOpticsVars
 
 """
@@ -324,12 +325,11 @@ function gas_optics_int!(this::InternalSourceGasOptics,
                      tlev=nothing)
   FT = eltype(play)
 
-  interp_vars = InterpolationVars(FT, Int, size(play), get_nflav(this))
-
   ncol  = size(play, 1)
   nlay  = size(play, 2)
   ngpt  = get_ngpt(this.optical_props)
   nband = get_nband(this.optical_props)
+  interp_vars = InterpolationVars(FT, Int, size(play), get_nflav(this))
 
   # Gas optics
   compute_gas_taus!(interp_vars, this,
@@ -398,14 +398,13 @@ function gas_optics_ext!(this::ExternalSourceGasOptics,
 
   FT = eltype(play)
 
-  interp_vars = InterpolationVars(FT, Int, size(play), get_nflav(this))
-
   ncol  = size(play, 1)
   nlay  = size(play, 2)
   ngpt  = get_ngpt(this.optical_props)
   nband = get_nband(this.optical_props)
   ngas  = get_ngas(this)
   nflav = get_nflav(this)
+  interp_vars = InterpolationVars(FT, Int, size(play), get_nflav(this))
 
   # Gas optics
   @timeit to_gor "compute_gas_taus!" compute_gas_taus!(interp_vars, this,
@@ -433,6 +432,8 @@ end
                           optical_props::AbstractOpticalPropsArry,
                           col_dry=nothing)
 
+ - `iv` interpolation variables ([`InterpolationVars`](@ref))
+
 class(AbstractGasOptics), intent(in   ) :: this
 integer,                          intent(in   ) :: ncol, nlay, ngpt, nband
 real(FT), dimension(:,:),         intent(in   ) :: play,    # layer pressures [Pa, mb]; (ncol,nlay)
@@ -441,10 +442,6 @@ real(FT), dimension(:,:),         intent(in   ) :: play,    # layer pressures [P
 type(GasConcs),               intent(in   ) :: gas_desc  # Gas volume mixing ratios
 class(AbstractOpticalPropsArry),     intent(inout) :: optical_props #inout because components are allocated
 # Interpolation coefficients for use in internal source function
-integer,     dimension(                       ncol, nlay), intent(  out) :: jtemp, jpress
-integer,     dimension(2,    get_nflav(this),ncol, nlay), intent(  out) :: jeta
-logical(wl), dimension(                       ncol, nlay), intent(  out) :: tropo
-real(FT),    dimension(2,2,2,get_nflav(this),ncol, nlay), intent(  out) :: fmajor
 Optional inputs
 real(FT), dimension(:,:), intent(in   ), optional, target :: col_dry # Column dry amount; dim(ncol,nlay)
 ----------------------------------------------------------
@@ -485,7 +482,6 @@ function compute_gas_taus!(interp_vars::InterpolationVars, this::AbstractGasOpti
   vmr     = Array{FT}(undef, ncol,nlay,  get_ngas(this)) # volume mixing ratios
   col_gas = OffsetArray{FT}(undef, 1:ncol,1:nlay,0:get_ngas(this)) # column amounts for each gas, plus col_dry
   col_mix = Array{FT}(undef, 2,    get_nflav(this),ncol,nlay) # combination of major species's column amounts
-  fminor  = Array{FT}(undef, 2,2,  get_nflav(this),ncol,nlay) # interpolation fractions for minor species
 
   # Check for presence of key species in GasConcs; return error if any key species are not present
   check_key_species_present(this, gas_desc)
@@ -580,11 +576,13 @@ end
     source!(this::InternalSourceGasOptics,
                 ncol, nlay, nbnd, ngpt,
                 play, plev, tlay, tsfc,
-                jtemp, jpress, jeta, tropo, fmajor,
+                interp_vars::InterpolationVars,
                 sources::SourceFuncLW,          # Planck sources
                 tlev)
 
 Compute Planck source functions at layer centers and levels
+
+ - `iv` interpolation variables ([`InterpolationVars`](@ref))
 
 # inputs
 class(InternalSourceGasOptics),    intent(in ) :: this
@@ -594,10 +592,6 @@ real(FT), dimension(ncol,nlay+1),      intent(in   ) :: plev   # level pressures
 real(FT), dimension(ncol,nlay),        intent(in   ) :: tlay   # layer temperatures [K]
 real(FT), dimension(ncol),             intent(in   ) :: tsfc   # surface skin temperatures [K]
 # Interplation coefficients
-integer,     dimension(ncol,nlay),     intent(in   ) :: jtemp, jpress
-logical(wl), dimension(ncol,nlay),     intent(in   ) :: tropo
-real(FT),    dimension(2,2,2,get_nflav(this),ncol,nlay), intent(in   ) :: fmajor
-integer,     dimension(2,    get_nflav(this),ncol,nlay), intent(in   ) :: jeta
 class(SourceFuncLW    ),          intent(inout) :: sources
 real(FT), dimension(ncol,nlay+1),      intent(in   ), optional, target :: tlev          # level temperatures [K]
 ----------------------------------------------------------
