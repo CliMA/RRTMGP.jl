@@ -296,9 +296,9 @@ Compute gas optical depth and Planck source functions,
 #  given temperature, pressure, and composition
 
  - `col_dry` Number of molecules per cm-2 of dry air
+ - `this` gas optics, see [`InternalSourceGasOptics`](@ref)
 
 inputs
-class(InternalSourceGasOptics), intent(in) :: this
 real(FT), dimension(:,:), intent(in   ) :: play,    # layer pressures [Pa, mb]; (ncol,nlay)
                                           plev,    # level pressures [Pa, mb]; (ncol,nlay+1)
                                           tlay      # layer temperatures [K]; (ncol,nlay)

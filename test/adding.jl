@@ -2,7 +2,6 @@ using RRTMGP
 using NCDatasets
 using RRTMGP.OpticalProps
 using RRTMGP.RTESolver
-using RRTMGP.SimpleNetCDF
 using RRTMGP.FortranIntrinsics
 using Test
 

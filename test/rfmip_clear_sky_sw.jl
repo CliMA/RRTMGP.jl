@@ -11,8 +11,10 @@ using RRTMGP.GasOptics
 using RRTMGP.GasConcentrations
 using RRTMGP.RTESolver
 using RRTMGP.Fluxes
-using RRTMGP.LoadCoefficients
-using RRTMGP.RFMIPIO
+
+
+include(joinpath("..","ReadInputData","ReadInputs.jl"))
+include(joinpath("..","ReadInputData","LoadCoefficients.jl"))
 
 """
 Example program to demonstrate the calculation of shortwave radiative fluxes in clear, aerosol-free skies.

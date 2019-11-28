@@ -14,9 +14,5 @@ include(joinpath("rte","RTESolver.jl"))
 include(joinpath("rrtmgp","PhysicalConstants.jl"))
 include(joinpath("rrtmgp","GasConcentrations.jl"))
 include(joinpath("rrtmgp","GasOptics.jl"))
-include(joinpath("examples","LoadCoefficients.jl"))
-include(joinpath("examples","SimpleNetCDF.jl"))
-include(joinpath("examples","RFMIPIO.jl"))
-include(joinpath("examples","LoadCloudCoefficients.jl"))
 
 end # module

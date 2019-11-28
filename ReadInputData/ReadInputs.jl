@@ -1,7 +1,11 @@
-"""
-    RFMIPIO
+#=
 
-This module reads an example file containing atomspheric conditions (temperature, pressure, gas concentrations)
+####
+#### Reads profiles needed for RRTMGP and related
+#### calculations assuming a certain netCDF file layout
+####
+
+This file reads an example file containing atmospheric conditions (temperature, pressure, gas concentrations)
  and surface properties (emissivity, temperature), defined on `nlay` layers across a set of `ncol` columns subject to
  `nexp` perturbations, and returns them in data structures suitable for use in rte and rrtmpg. The input data
  are partitioned into a user-specified number of blocks.
@@ -11,17 +15,195 @@ The example files comes from the Radiative Forcing MIP (https://www.earthsystemc
  The protocol for this experiment allows for different specifications of which gases to consider:
 all gases, (CO2, CH4, N2O) + {CFC11eq; CFC12eq + HFC-134eq}. Ozone is always included
 The protocol does not specify the treatment of gases like CO
-"""
-module RFMIPIO
 
-using ..GasConcentrations
-using ..Utilities
-using ..FortranIntrinsics
+# Convention
+
+Note that `ds` is used to denote an NC dataset.
+=#
+
+using RRTMGP.GasConcentrations
+using RRTMGP.Utilities
+using RRTMGP.FortranIntrinsics
 using NCDatasets
 
-export read_kdist_gas_names, determine_gas_names, read_size, read_and_block_pt,
-          read_and_block_sw_bc, read_and_block_lw_bc, read_and_block_gases_ty,
-          unblock_and_write
+"""
+    read_atmos(ds, FT, I, gas_names)
+
+Read profiles for all columns
+ - `p_lay` pressure (layers)
+ - `t_lay` temperature (layers)
+ - `p_lev` pressure (levels)
+ - `t_lev` temperature (levels)
+ - `col_dry` gas concentrations
+"""
+function read_atmos(ds, FT, I, gas_names)
+
+  ncol = ds.dim["col"]
+  nlay = ds.dim["lay"]
+  nlev = ds.dim["lev"]
+  @assert nlev == nlay+1
+
+  p_lay = Array{FT}(ds["p_lay"][:])
+  t_lay = Array{FT}(ds["t_lay"][:])
+  p_lev = Array{FT}(ds["p_lev"][:])
+  t_lev = Array{FT}(ds["t_lev"][:])
+
+  available_gases = ["h2o", "co2", "o3", "n2o", "co",
+                     "ch4", "o2", "n2", "ccl4", "cfc11",
+                     "cfc12", "cfc22", "hfc143a", "hfc125", "hfc23",
+                     "hfc32", "hfc134a", "cf4", "no2"]
+
+  existing_gases = filter(ug->haskey(ds, "vmr_"*ug), available_gases)
+
+  gsc = GasConcSize(ncol, nlay, (ncol, nlay), length(existing_gases))
+  gas_concs = GasConcs(FT, I, gas_names, ncol, nlay, gsc)
+
+  for eg in existing_gases
+    set_vmr!(gas_concs, eg, Array{FT}(ds["vmr_"*eg][:]))
+  end
+
+  # col_dry has unchanged allocation status on return if the variable isn't present in the netCDF file
+  col_dry = haskey(ds, "col_dry") ? Array{FT}(ds["col_dry"][:]) : nothing
+
+  return p_lay, t_lay, p_lev, t_lev, gas_concs, col_dry
+end
+
+
+"""
+    is_sw(ds)
+
+Does this file contain variables needed to do SW calculations?
+"""
+is_sw(ds) = haskey(ds,"solar_zenith_angle")
+
+"""
+    is_lw(ds)
+
+Does this file contain variables needed to do LW calculations?
+"""
+is_lw(ds) = !is_sw(ds)
+
+"""
+    read_lw_bc(ds)
+
+Read LW boundary conditions for all columns
+"""
+read_lw_bc(ds) = ds["t_sfc"][:], ds["emis_sfc"][:]
+
+"""
+    read_lw_rt(ds)
+
+Read LW radiative transfer parameters
+"""
+read_lw_rt(ds) = length( size( ds["angle"] ) )
+
+"""
+    read_sw_bc(ds)
+
+Read SW boundary conditions for all columns
+"""
+read_sw_bc(ds) = (ds["solar_zenith_angle"][:],
+                  ds["total_solar_irradiance"][:],
+                  ds["sfc_alb_direct"],
+                  ds["sfc_alb_diffuse"],
+                  haskey(ds,"tsi_scaling") ? ds["tsi_scaling"][:] : nothing)
+
+
+"""
+    read_spectral_disc!(ds, spectral_disc::AbstractOpticalProps)
+
+Read spectral discretization
+"""
+function read_spectral_disc!(ds, spectral_disc::AbstractOpticalProps)
+  @assert ds.dim["pair"] == 2
+  band_lims_wvn = ds["band_lims_wvn"][:]
+  band_lims_gpt = ds["band_lims_gpt"][:]
+  spectral_disc.base = OpticalPropsBase("read_spectral_disc!", band_lims_wvn, band_lims_gpt)
+end
+
+"""
+    read_sfc_test_file(ds)
+
+Read surface SW albedo and LW emissivity spectra from the surface test file
+"""
+read_sfc_test_file(ds) = (ds["SW_albedo"][:], ds["LW_emissivity"][:])
+
+"""
+    read_direction(ds)
+
+Which direction is up? Stored as a global attribute.
+"""
+read_direction(ds) = (ds.attrib["top_at_1"] == 1)
+
+"""
+    read_sources(ds)
+
+Sources of upward and downward diffuse radiation, for each layer and at the surface
+"""
+read_sources(ds) = ds["source_up"][:],
+                   ds["source_dn"][:],
+                   ds["source_sfc"][:]
+
+"""
+    read_lw_Planck_sources!(ds, sources::SourceFuncLW{FT}) where FT
+
+Longwave sources at layer centers; edges in two directions; surface
+   Also directionality since this will be needed for solution
+"""
+function read_lw_Planck_sources!(ds, sources::SourceFuncLW{FT}) where FT
+  ncol  = ds.dim["col"]
+  nlay  = ds.dim["lay"]
+  ngpt  = ds.dim["gpt"]
+  nband = ds.dim["band"]
+  # Error checking
+  @assert ds.dim["pair"] == 2
+  @assert haskey(ds,"lay_src")
+
+  # Spectral discretization
+  band_lims_wvn = ds["band_lims_wvn"][:]
+  band_lims_gpt = ds["band_lims_gpt"][:]
+
+  sources.optical_props = OpticalPropsBase("SourceFuncLW", band_lims_wvn, band_lims_gpt)
+  sources.tau .= Array{FT}(undef, ncol, nlay)
+
+  sources.lay_source     .= ds["lay_src"][:]
+  sources.lev_source_inc .= ds["lev_src_inc"][:]
+  sources.lev_source_dec .= ds["lev_src_dec"][:]
+  sources.sfc_source     .= ds["sfc_src"][:]
+  return nothing
+
+end
+
+"""
+    read_sw_solar_sources(ds)
+
+Shortwave source at TOA
+   Also directionality since this will be needed for solution
+"""
+read_sw_solar_sources(ds) = ds["toa_src"][:]
+
+"""
+    read_two_stream(ds)
+
+Two-stream results: reflection and transmission for diffuse and direct radiation; also extinction
+"""
+function read_two_stream(ds)
+  Rdif    = ds["Rdif"][:]
+  Tdif    = ds["Tdif"][:]
+  Rdir = haskey(ds,"Rdir") ? ds["Rdir"][:] : nothing
+  Tdir = haskey(ds,"Tdir") ? ds["Tdir"][:] : nothing
+  Tnoscat = haskey(ds,"Tnoscat") ? ds["Tnoscat"][:] : nothing
+  return Rdif, Tdif, Rdir, Tdir, Tnoscat
+end
+
+"""
+    read_gpt_fluxes(ds)
+
+g-point fluxes
+"""
+read_gpt_fluxes(ds) = (ds["gpt_flux_up"][:],
+                       ds["gpt_flux_dn"][:],
+                       haskey(ds,"gpt_flux_dn_dir") ? ds["gpt_flux_dn_dir"][:] : nothing)
 
 """
     read_size(ds)
@@ -32,7 +214,6 @@ function read_size(ds)
   ncol = Int(ds.dim["site"])
   nlay = Int(ds.dim["layer"])
   nexp = Int(ds.dim["expt"])
-
   @assert ds.dim["level"] == nlay+1
   return ncol, nlay, nexp
 end
@@ -40,13 +221,12 @@ end
 """
     read_and_block_pt(ds, blocksize)
 
-Return layer and level pressures and temperatures as arrays dimensioned (ncol, nlay/+1, nblocks)
-   Input arrays are dimensioned (nlay/+1, ncol, nexp)
-   Output arrays are allocated within this routine
-    character(len=*),           intent(in   ) :: fileName
-    integer,                    intent(in   ) :: blocksize
-    real(FT), dimension(:,:,:), allocatable, & ! [blocksize, nlay/+1, nblocks]
-                                intent(  out) :: p_lay, p_lev, t_lay, t_lev
+Return layer and level
+
+ - `p_lay` layer pressure dimensions (ncol, nlay, nblocks)
+ - `p_lev` level pressure dimensions (ncol, nlay+1, nblocks)
+ - `t_lay` layer temperature dimensions (ncol, nlay, nblocks)
+ - `t_lev` level temperature dimensions (ncol, nlay+1, nblocks)
 """
 function read_and_block_pt(ds, blocksize)
 
@@ -99,9 +279,10 @@ end
     read_and_block_sw_bc(ds, blocksize)
 
 Read and reshape shortwave boundary conditions
-    character(len=*),           intent(in   ) :: fileName
-    integer,                    intent(in   ) :: blocksize
-    real(FT), dimension(:,:), allocatable,  intent(  out) :: surface_albedo, total_solar_irradiance, solar_zenith_angle
+
+ - `surface_albedo` surface albedo
+ - `total_solar_irradiance` total solar irradiance
+ - `solar_zenith_angle` solar zenith angle
 """
 function read_and_block_sw_bc(ds, blocksize)
   FT = Float64
@@ -110,12 +291,10 @@ function read_and_block_sw_bc(ds, blocksize)
   @assert !any([ncol_l, nlay_l, nexp_l] .== 0)
   @assert (ncol_l*nexp_l)%blocksize == 0
   nblocks = Int((ncol_l*nexp_l)/blocksize)
-  #
+
   # Check that output arrays are sized correctly : blocksize, nlay, (ncol * nexp)/blocksize
-  #
   surface_albedo = Array{FT}(ds["surface_albedo"][:])
   temp2D = repeat(surface_albedo,1,nexp_l)
-
   surface_albedo = reshape(temp2D,blocksize,nblocks)
 
   total_solar_irradiance = Array{FT}(ds["total_solar_irradiance"][:])
@@ -133,22 +312,17 @@ end
 
 Read and reshape longwave boundary conditions
 
-
-character(len=*),           intent(in   ) :: fileName
-integer,                    intent(in   ) :: blocksize
-real(FT), dimension(:,:), allocatable,  intent(  out) :: surface_emissivity, surface_temperature
+ - `surface_emissivity` surface emissivity
+ - `surface_temperature` surface temperature
 """
 function read_and_block_lw_bc(ds, blocksize)
   FT = Float64
 
   ncol_l, nlay_l, nexp_l = read_size(ds)
   @assert !any([ncol_l, nlay_l, nexp_l]  .== 0)
-
   @assert (ncol_l*nexp_l)%blocksize == 0
-
   nblocks = convert(Int,(ncol_l*nexp_l)/blocksize)
 
-  # Allocate on assignment
   temp2D = repeat( ds["surface_emissivity"][:] ,1,nexp_l)
   surface_emissivity  = Array{FT}(reshape(temp2D,blocksize,nblocks))
 
@@ -161,15 +335,12 @@ end
     determine_gas_names(ds, forcing_index)
 
 Create a pair of string arrays - one containing the chemical name of each gas, used by the k-distribution, and
- one containing the name as contained in the RFMIP input files - depending on the forcing scenario
-Forcing index (1 = all available greenhouse gases;
-              2 = CO2, CH4, N2O, CFC11eq
-              3 = CO2, CH4, N2O, CFC12eq, HFC-134eq
-              All scenarios use 3D values of ozone, water vapor so those aren't listed here
+one containing the name as contained in the RFMIP input files - depending on the forcing scenario:
 
-  character(len=*),                             intent(in   ) :: concentrationFile, kdistFile
-  integer,                                      intent(in   ) :: forcing_index
-  character(len=32), dimension(:), allocatable, intent(inout) :: names_in_kdist, names_in_file
+ - `forcing_index` (1 = all available greenhouse gases;
+                    2 = CO2, CH4, N2O, CFC11eq
+                    3 = CO2, CH4, N2O, CFC12eq, HFC-134eq
+                    All scenarios use 3D values of ozone, water vapor so those aren't listed here
 """
 function determine_gas_names(ds, forcing_index)
 
@@ -214,7 +385,11 @@ function determine_gas_names(ds, forcing_index)
 
 end
 
-# Read the names of the gases known to the k-distribution
+"""
+    read_kdist_gas_names(ds)
+
+Read the names of the gases known to the k-distribution
+"""
 read_kdist_gas_names(ds) =
   lowercase.(strip.( String[join(ds["gas_names"][:][:,i]) for i = 1:ds.dim["absorber"]] ))
 
@@ -222,21 +397,23 @@ read_kdist_gas_names(ds) =
     read_and_block_gases_ty(ds, blocksize, gas_names, names_in_file)
 
 Read and reshape gas concentrations. RRTMGP requires gas concentrations to be supplied via a class
- (GasConcs). Gas concentrations are set via a call to gas_concs%set_vmr(name, values)
- where `name` is nominally the chemical formula for the gas in question and `values` may be
- a scalar, a 1-d profile assumed to apply to all columns, or an array of dimension (`ncol`, `nlay`).
+(GasConcs). Gas concentrations are set via a call to set_vmr!(gas_concs, name, values)
+where `name` is nominally the chemical formula for the gas in question and `values` may be
+a scalar, a 1-d profile assumed to apply to all columns, or an array of dimension (`ncol`, `nlay`).
+
 This routine outputs a vector `nblocks` long of these types so each element of the array can be passed to
- the rrtmgp gas optics calculation in turn.
+the rrtmgp gas optics calculation in turn.
 
 This routine exploits RFMIP conventions: only water vapor and ozone vary by column within
- each experiment.
-Fields in the RFMIP file have a trailing _GM (global mean); some fields use a chemical formula and other
- a descriptive name, so a map is provided between these.
+each experiment.
 
-  integer,                    intent(in   ) :: blocksize
-  character(len=*),  dimension(:), intent(in   ) :: gas_names ! Names used by the k-distribution/gas concentration type
-  character(len=*),  dimension(:), intent(in   ) :: names_in_file ! Corresponding names in the RFMIP file
-  type(GasConcs), dimension(:), allocatable,  intent(  out) :: gas_conc_array
+Fields in the RFMIP file have a trailing _GM (global mean); some fields use a chemical formula and other
+a descriptive name, so a map is provided between these.
+
+ - `names_in_file` Corresponding names in the RFMIP file
+ - `gas_names` Names used by the k-distribution/gas concentration type
+ - `blocksize`
+ - `gas_conc_array` vector of [`GasConcs`](@ref)
 """
 function read_and_block_gases_ty(ds, blocksize, gas_names, names_in_file)
   ncol_l, nlay_l, nexp_l = read_size(ds)
@@ -247,14 +424,15 @@ function read_and_block_gases_ty(ds, blocksize, gas_names, names_in_file)
   I = Int
   gsc = GasConcSize(ncol_l, nlay_l, (blocksize, nlay_l), length(gas_names))
   gas_concs = GasConcs(FT, I, gas_names, ncol_l, nlay_l, gsc)
-  gas_conc_array = Vector([deepcopy(gas_concs) for i in 1:nblocks])
+  gas_conc_array = GasConcs[deepcopy(gas_concs) for i in 1:nblocks]
 
   # Experiment index for each column
   exp_num = freshape(spread(convert(Array,collect(1:nexp_l)'), 1, ncol_l), [blocksize, nblocks], order=[1,2])
 
   # Water vapor and ozone depend on col, lay, exp: look just like other fields
   water_vapor = Array{FT}(ds["water_vapor"][:])
-  gas_conc_temp_3d = reshape(water_vapor, nlay_l, blocksize, nblocks ) .* read_scaling(ds, FT,"water_vapor")
+  water_vapor_scaling = read_scaling(ds, FT,"water_vapor")
+  gas_conc_temp_3d = reshape(water_vapor, nlay_l, blocksize, nblocks ) .* water_vapor_scaling
 
   for b = 1:nblocks
     gas_conc_temp_3d_t = transpose(gas_conc_temp_3d[:,:,b])
@@ -264,7 +442,8 @@ function read_and_block_gases_ty(ds, blocksize, gas_names, names_in_file)
   end
 
   ozone = Array{FT}(ds["ozone"][:])
-  gas_conc_temp_3d = reshape(ozone, nlay_l, blocksize, nblocks ) * read_scaling(ds, FT,"ozone")
+  ozone_scaling = read_scaling(ds, FT,"ozone")
+  gas_conc_temp_3d = reshape(ozone, nlay_l, blocksize, nblocks ) * ozone_scaling
 
   for b = 1:nblocks
     set_vmr!(gas_conc_array[b],"o3", convert(Array, transpose(gas_conc_temp_3d[:,:,b])))
@@ -279,7 +458,8 @@ function read_and_block_gases_ty(ds, blocksize, gas_names, names_in_file)
     end
 
     # Read the values as a function of experiment
-    gas_conc_temp_1d = ds[trim(names_in_file[g]) * "_GM"][:] * read_scaling(ds, FT,trim(names_in_file[g]) * "_GM")
+    gas_conc_scaling = read_scaling(ds, FT,names_in_file[g] * "_GM")
+    gas_conc_temp_1d = ds[names_in_file[g] * "_GM"][:] * gas_conc_scaling
 
     for b = 1:nblocks
       # Does every value in this block belong to the same experiment?
@@ -299,4 +479,3 @@ end
 
 read_scaling(ds, FT, varName) = parse(FT, ds[varName].attrib["units"])
 
-end #module

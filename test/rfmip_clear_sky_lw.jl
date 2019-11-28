@@ -11,9 +11,11 @@ using RRTMGP.GasOptics
 using RRTMGP.GasConcentrations
 using RRTMGP.RTESolver
 using RRTMGP.Fluxes
-using RRTMGP.LoadCoefficients
-using RRTMGP.RFMIPIO
 using RRTMGP.SourceFunctions
+
+include(joinpath("..","ReadInputData","ReadInputs.jl"))
+include(joinpath("..","ReadInputData","LoadCoefficients.jl"))
+
 """
 Example program to demonstrate the calculation of longwave radiative fluxes in clear, aerosol-free skies.
   The example files come from the Radiative Forcing MIP (https://www.earthsystemcog.org/projects/rfmip/)

@@ -143,19 +143,19 @@ get_num_roughness_types(this::PadeMethod) = size(this.ext, 4)
 get_num_roughness_types(this::LookUpTable) = size(this.ext,  3)
 
 struct CloudOpticsLUT{FT, I} <: AbstractOpticalProps{FT, I}
-  base
+  base::OpticalPropsBase
   # Ice surface roughness category - needed for Yang (2013) ice optics parameterization
-  icergh#::I
-  liq#AbstractInterpolationMethod
-  ice#AbstractInterpolationMethod
+  icergh::I
+  liq::AbstractInterpolationMethod
+  ice::AbstractInterpolationMethod
 end
 
 struct CloudOpticsPade{FT, I} <: AbstractOpticalProps{FT, I}
-  base
+  base::OpticalPropsBase
   # Ice surface roughness category - needed for Yang (2013) ice optics parameterization
-  icergh#::I
-  liq#AbstractInterpolationMethod
-  ice#AbstractInterpolationMethod
+  icergh::I
+  liq::AbstractInterpolationMethod
+  ice::AbstractInterpolationMethod
 end
 
 

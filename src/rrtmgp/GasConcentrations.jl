@@ -26,8 +26,6 @@ export GasConcs
 export set_vmr!, get_vmr!
 export GasConcSize
 
-const GAS_NOT_IN_LIST = -1
-
 """
     GasConcSize
 
@@ -91,7 +89,7 @@ function set_vmr!(this::GasConcs{FT}, gas::String, w::Vector{FT}) where FT
   @assert !any(w .< FT(0)) || any(w .> FT(1))
   @assert !(this.nlay ≠ nothing && length(w) ≠ this.nlay)
   igas = loc_in_array(gas, this.gas_name)
-  @assert igas ≠ GAS_NOT_IN_LIST
+  @assert igas ≠ -1 # assert gas is found
   this.concs[igas].conc .= reshape(w, 1, this.nlay)
   this.gas_name[igas] = gas
 end
@@ -100,7 +98,7 @@ function set_vmr!(this::GasConcs, gas::String, w::Array{FT, 2}) where FT
   @assert !(this.ncol ≠ nothing && size(w, 1) ≠ this.ncol)
   @assert !(this.nlay ≠ nothing && size(w, 2) ≠ this.nlay)
   igas = loc_in_array(gas, this.gas_name)
-  @assert igas ≠ GAS_NOT_IN_LIST
+  @assert igas ≠ -1 # assert gas is found
   this.concs[igas].conc .= w
   this.gas_name[igas] = gas
 end
@@ -108,22 +106,15 @@ end
 """
     get_vmr!(array::AbstractArray{FT,2}, this::GasConcs{FT}, gas::String) where FT
 
-Volume mixing ratio ( nlay dependence only)
+Volume mixing ratio (nlay dependence only)
 """
 function get_vmr!(array::AbstractArray{FT,2}, this::GasConcs{FT}, gas::String) where FT
   igas = loc_in_array(gas, this.gas_name)
-  @assert igas ≠ GAS_NOT_IN_LIST
+  @assert igas ≠ -1 # assert gas is found
   @assert !(this.ncol ≠ nothing && this.ncol ≠ size(array,1))
   @assert !(this.nlay ≠ nothing && this.nlay ≠ size(array,2))
   conc = this.concs[igas].conc
-
-  if size(conc, 1) > 1     # Concentration stored as 2D
-    array .= conc
-  elseif size(conc, 2) > 1 # Concentration stored as 1D
-    array .= reshape(conc[1,:], this.ncol, this.nlay)
-  else                     # Concentration stored as scalar
-    array .= conc[1,1]
-  end
+  array .= conc
   return nothing
 end
 

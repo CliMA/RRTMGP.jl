@@ -1,15 +1,10 @@
-module LoadCoefficients
-
-using ..GasConcentrations
-using ..GasOptics
-using ..FortranIntrinsics
+using RRTMGP.GasConcentrations
+using RRTMGP.GasOptics
 using NCDatasets
-
-export load_and_init
 
 function read_char_vec(ds, var_name)
   tmp = ds[var_name][:]
-  return Array{String}([trim(join(tmp[:,i])) for i = 1:size(tmp, 2)])
+  return Array{String}([strip(join(tmp[:,i])) for i = 1:size(tmp, 2)])
 end
 
 """
@@ -80,6 +75,3 @@ function load_and_init(ds, ::Type{FT}, available_gases::Vector{String}) where {F
   return kdist
 
 end
-
-
-end #module
