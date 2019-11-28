@@ -9,6 +9,14 @@ Two variants apply to internal Planck sources (longwave radiation in the Earth's
  external stellar radiation (shortwave radiation in the Earth's atmosphere).
  The variant is chosen based on what information is supplied during initialization.
  (It might make more sense to define two sub-classes)
+
+RRTMGP computes absorption in each band arising from
+two major species in each band, which are combined to make
+a relative mixing ratio eta and a total column amount (col_mix)
+contributions from zero or more minor species whose concentrations
+may be scaled by other components of the atmosphere
+
+Absorption coefficients are interpolated from tables on a pressure/temperature/(eta) grid
 """
 module GasOptics
 using OffsetArrays
@@ -144,7 +152,7 @@ struct GasOpticsVars{FT,I}
   scale_by_complement::Vector{Bool}
   "kminor start"
   kminor_start::Vector{I}
-  "kminor"
+  "absorption coefficient for minor species"
   kminor::Array{FT,3} #, (n_minor,eta,temperature)
   "scaling gas"
   scaling_gas::Array{String}

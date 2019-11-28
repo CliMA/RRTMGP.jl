@@ -32,10 +32,6 @@ real(FT) :: ratio_eta_half # ratio of vmrs of major species that defines eta=0.5
                            # for given flavor and reference temperature level
 real(FT) :: eta, feta      # binary_species_parameter, interpolation variable for eta
 real(FT) :: loceta         # needed to find location in eta grid
-real(FT) :: ftemp_term
-# -----------------
-# local indexes
-integer :: icol, ilay, iflav, igases(2), itropo, itemp
 """
 function interpolation!(ics::InterpolationCoefficients{FT,I},
                         col_mix::Array{FT},
@@ -115,10 +111,10 @@ end
 Compute minor and major species optical depth
 from pre-computed interpolation coefficients (`ics`)
 
- - `lower` lower atmospheric variables
- - `upper` upper atmospheric variables
- - `lower_aux` lower atmospheric auxiliary variables
- - `upper_aux` upper atmospheric auxiliary variables
+ - `lower` lower atmospheric gas optics, see [`GasOpticsVars`](@ref)
+ - `upper` upper atmospheric gas optics, see [`GasOpticsVars`](@ref)
+ - `lower_aux` lower atmospheric auxiliary variables, see [`GasOpticsAux`](@ref)
+ - `upper_aux` upper atmospheric auxiliary variables, see [`GasOpticsAux`](@ref)
  - `ics` interpolation coefficients, see [`InterpolationCoefficients`](@ref)
 
 # ---------------------
@@ -139,11 +135,6 @@ real(FT), dimension(            ncol,nlay,0:ngas), intent(in) :: col_gas
 # ---------------------
 # output - optical depth
 real(FT), dimension(ngpt,nlay,ncol), intent(inout) :: tau
-# ---------------------
-# Local variables
-#
-logical                    :: top_at_1
-integer, dimension(ncol,2) :: itropo_lower, itropo_upper
 """
 function compute_tau_absorption!(tau,
               ncol,nlay,nbnd,ngpt,                  # dimensions
@@ -301,18 +292,11 @@ end
 
 compute minor species optical depths
 
+ - `atmos` gas optics variables, see [`GasOpticsVars`](@ref)
 
-integer,                                     intent(in   ) :: ncol,nlay,ngpt
-integer,                                     intent(in   ) :: ngas,nflav
-integer,                                     intent(in   ) :: ntemp,neta,nminor,nminork
+integer,                                     intent(in   ) :: ncol,ngpt
 integer,                                     intent(in   ) :: idx_h2o
 integer,     dimension(ngpt),                intent(in   ) :: gpt_flv
-real(FT),    dimension(nminork,neta,ntemp),  intent(in   ) :: kminor
-integer,     dimension(2,nminor),            intent(in   ) :: minor_limits_gpt
-logical(wl), dimension(  nminor),            intent(in   ) :: minor_scales_with_density
-logical(wl), dimension(  nminor),            intent(in   ) :: scale_by_complement
-integer,     dimension(  nminor),            intent(in   ) :: kminor_start
-integer,     dimension(  nminor),            intent(in   ) :: idx_minor, idx_minor_scaling
 real(FT),    dimension(ncol,nlay),           intent(in   ) :: play, tlay
 real(FT),    dimension(ncol,nlay,0:ngas),    intent(in   ) :: col_gas
 real(FT),    dimension(2,2,nflav,ncol,nlay), intent(in   ) :: fminor
@@ -322,13 +306,8 @@ integer,     dimension(ncol,nlay),           intent(in   ) :: jtemp
 real(FT),    dimension(ngpt,nlay,ncol),      intent(inout) :: tau
 # -----------------
 # local variables
-real(FT), parameter :: PaTohPa = 0.01
 real(FT) :: vmr_fact, dry_fact             # conversion from column abundance to dry vol. mixing ratio;
 real(FT) :: scaling, kminor_loc            # minor species absorption coefficient, optical depth
-integer  :: icol, ilay, iflav, igpt, imnr
-integer  :: gptS, gptE
-real(FT), dimension(ngpt) :: tau_minor
-
 """
 function gas_optical_depths_minor!(ncol,
                                    ngpt,
@@ -423,21 +402,13 @@ compute Rayleigh scattering optical depths
  - `ics` interpolation coefficients, see [`InterpolationCoefficients`](@ref)
 
 integer,                                     intent(in ) :: ncol,nlay,nbnd,ngpt
-integer,                                     intent(in ) :: ngas,nflav,neta,npres,ntemp
 integer,     dimension(2,ngpt),              intent(in ) :: gpoint_flavor
 integer,     dimension(2,nbnd),              intent(in ) :: band_lims_gpt # start and end g-point for each band
 real(FT),    dimension(ngpt,neta,ntemp,2),   intent(in ) :: krayl
 integer,                                     intent(in ) :: idx_h2o
 real(FT),    dimension(ncol,nlay),           intent(in ) :: col_dry
 real(FT),    dimension(ncol,nlay,0:ngas),    intent(in ) :: col_gas
-# outputs
 real(FT),    dimension(ngpt,nlay,ncol),      intent(out) :: tau_rayleigh
-# -----------------
-# local variables
-real(FT) :: k(ngpt) # rayleigh scattering coefficient
-integer  :: icol, ilay, iflav, ibnd, igpt, gptS, gptE
-integer  :: itropo
-# -----------------
 """
 function compute_tau_rayleigh!(ncol::I,nlay::I,nbnd::I,ngpt::I,
                                gpoint_flavor::Array{I,2},
@@ -448,7 +419,7 @@ function compute_tau_rayleigh!(ncol::I,nlay::I,nbnd::I,ngpt::I,
                                col_gas::AbstractArray{FT,3},
                                ics::InterpolationCoefficients{FT},
                                tau_rayleigh::Array{FT}) where {FT<:AbstractFloat, I<:Integer, B<:Bool}
-  k = Array{FT}(undef, ngpt)
+  k = Array{FT}(undef, ngpt) # Rayleigh scattering coefficient
   @inbounds for ilay in 1:nlay
     @inbounds for icol in 1:ncol
       itropo = fmerge(1,2,ics.tropo[icol,ilay]) # itropo = 1 lower atmosphere; itropo = 2 upper atmosphere
@@ -498,18 +469,9 @@ real(FT),                                     intent(in) :: temp_ref_min, totpln
 real(FT), dimension(ngpt,neta,npres+1,ntemp), intent(in) :: pfracin
 real(FT), dimension(nPlanckTemp,nbnd),        intent(in) :: totplnk
 integer,  dimension(2,ngpt),                  intent(in) :: gpoint_flavor
-
 real(FT), dimension(ngpt,     ncol), intent(out) :: sfc_src
 real(FT), dimension(ngpt,nlay,ncol), intent(out) :: lay_src
 real(FT), dimension(ngpt,nlay,ncol), intent(out) :: lev_src_inc, lev_src_dec
-# -----------------
-# local
-integer  :: ilay, icol, igpt, ibnd, itropo, iflav
-integer  :: gptS, gptE
-real(FT), dimension(2), parameter :: one = [1._wp, 1._wp]
-real(FT) :: pfrac          (ngpt,nlay,  ncol)
-real(FT) :: planck_function(nbnd,nlay+1,ncol)
-# -----------------
 """
 function compute_Planck_source!(
                   ncol, nlay, nbnd, ngpt,
@@ -615,24 +577,17 @@ One dimensional interpolation -- return all values along second table dimension
 # input
 real(FT), intent(in) :: val,     # axis value at which to evaluate table
                         offset,  # minimum of table axis
-                        delta     # step size of table axis
-real(FT), dimension(:,:),
-          intent(in) :: table # dimensions (axis, values)
+                        delta    # step size of table axis
+real(FT), dimension(:,:), intent(in) :: table # dimensions (axis, values)
 # output
 real(FT), dimension(size(table,dim=2)) :: res
-
-# local
-real(FT) :: val0 # fraction index adjusted by offset and delta
-integer :: index # index term
-real(FT) :: frac # fractional term
-# -------------------------------------
 """
 function interpolate1D(val, offset, delta, table)
   FT = eltype(delta)
   res = Vector{FT}(undef, size(table, 2))
-  val0 = (val - offset) / delta
-  frac = val0 - fint(val0) # get fractional part
-  index = Integer(min(size(table,1)-1, max(1, fint(val0)+1))) # limit the index range
+  val0 = (val - offset) / delta # fraction index adjusted by offset and delta
+  frac = val0 - fint(val0) # fractional term
+  index = Integer(min(size(table,1)-1, max(1, fint(val0)+1))) # index term, limit the index range
   res .= table[index,:] + frac * (table[index+1,:] - table[index,:])
   return res
 end

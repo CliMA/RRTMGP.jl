@@ -11,6 +11,8 @@ using ..GasConcentrations
 
 export AtmosphericState, update_view!
 
+abstract type AbstractAtmosphericState{AbstractFloat} end
+
 """
     SimpleGrid{FT}
 
@@ -28,7 +30,7 @@ end
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct AtmosphericVars{FT}
+struct AtmosphericVars{FT} <: AbstractAtmosphericState{FT}
   "Gas concentrations, in the form of volume mixing ratios"
   gas_concs
   "layer pressures [Pa, mb]; (ncol,nlay)"
