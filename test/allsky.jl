@@ -5,21 +5,19 @@ using TimerOutputs
 const to = TimerOutput()
 using NCDatasets
 using RRTMGP.OpticalProps
-using RRTMGP.SimpleNetCDF
 using RRTMGP.FortranIntrinsics
 using RRTMGP.ArrayUtilities
 using RRTMGP.GasOptics
 using RRTMGP.GasConcentrations
 using RRTMGP.RTESolver
 using RRTMGP.Fluxes
-using RRTMGP.LoadCoefficients
-using RRTMGP.RFMIPIO
 using RRTMGP.SourceFunctions
 using RRTMGP.CloudOptics
-using RRTMGP.LoadCloudCoefficients
 
+include(joinpath("..","ReadInputData","ReadInputs.jl"))
+include(joinpath("..","ReadInputData","LoadCoefficients.jl"))
+include(joinpath("..","ReadInputData","LoadCloudCoefficients.jl"))
 include("CloudSampling.jl")
-include("TestFilesIO.jl")
 
 function vmr_2d_to_1d!(gas_concs::GasConcs{FT},
                        gas_concs_garand::GasConcs{FT},
