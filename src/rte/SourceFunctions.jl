@@ -60,7 +60,7 @@ struct SourceFuncSW{FT, I} <: AbstractOpticalProps{FT, I}
   gpt2band::Array{I,1}         # band = gpt2band(g-point)
   band_lims_wvn::Array{FT,2}   # (upper and lower wavenumber by band) = band_lims_wvn(2,band)
   name::String
-  tau::Array{FT,3}
+  τ::Array{FT,3}
   toa_source
   lev_source_inc
   lev_source_dec

@@ -20,7 +20,6 @@ Subsets can be extracted in the column dimension
 module GasConcentrations
 
 using DocStringExtensions
-using ..FortranIntrinsics
 using ..Utilities
 export GasConcs
 export set_vmr!, get_vmr!
@@ -58,7 +57,7 @@ $(DocStringExtensions.FIELDS)
 """
 struct GasConcs{FT,I}
   "gas names"
-  gas_name::Vector{String}
+  gas_names::Vector{String}
   "gas concentrations"
   concs::Vector{ConcField{FT}}
   "number of columns"
@@ -81,26 +80,26 @@ Set volume mixing ratio (vmr)
 """
 function set_vmr!(this::GasConcs{FT}, gas::String, w::FT) where FT
   @assert !(w < FT(0) || w > FT(1))
-  igas = loc_in_array(gas, this.gas_name)
+  igas = loc_in_array(gas, this.gas_names)
   this.concs[igas].conc .= w
-  this.gas_name[igas] = gas
+  this.gas_names[igas] = gas
 end
 function set_vmr!(this::GasConcs{FT}, gas::String, w::Vector{FT}) where FT
   @assert !any(w .< FT(0)) || any(w .> FT(1))
   @assert !(this.nlay ≠ nothing && length(w) ≠ this.nlay)
-  igas = loc_in_array(gas, this.gas_name)
+  igas = loc_in_array(gas, this.gas_names)
   @assert igas ≠ -1 # assert gas is found
   this.concs[igas].conc .= reshape(w, 1, this.nlay)
-  this.gas_name[igas] = gas
+  this.gas_names[igas] = gas
 end
 function set_vmr!(this::GasConcs, gas::String, w::Array{FT, 2}) where FT
   @assert !any(w .< FT(0)) || any(w .> FT(1))
   @assert !(this.ncol ≠ nothing && size(w, 1) ≠ this.ncol)
   @assert !(this.nlay ≠ nothing && size(w, 2) ≠ this.nlay)
-  igas = loc_in_array(gas, this.gas_name)
+  igas = loc_in_array(gas, this.gas_names)
   @assert igas ≠ -1 # assert gas is found
   this.concs[igas].conc .= w
-  this.gas_name[igas] = gas
+  this.gas_names[igas] = gas
 end
 
 """
@@ -109,7 +108,7 @@ end
 Volume mixing ratio (nlay dependence only)
 """
 function get_vmr!(array::AbstractArray{FT,2}, this::GasConcs{FT}, gas::String) where FT
-  igas = loc_in_array(gas, this.gas_name)
+  igas = loc_in_array(gas, this.gas_names)
   @assert igas ≠ -1 # assert gas is found
   @assert !(this.ncol ≠ nothing && this.ncol ≠ size(array,1))
   @assert !(this.nlay ≠ nothing && this.nlay ≠ size(array,2))

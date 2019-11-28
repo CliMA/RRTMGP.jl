@@ -164,7 +164,7 @@ function read_lw_Planck_sources!(ds, sources::SourceFuncLW{FT}) where FT
   band_lims_gpt = ds["band_lims_gpt"][:]
 
   sources.optical_props = OpticalPropsBase("SourceFuncLW", band_lims_wvn, band_lims_gpt)
-  sources.tau .= Array{FT}(undef, ncol, nlay)
+  sources.τ .= Array{FT}(undef, ncol, nlay)
 
   sources.lay_source     .= ds["lay_src"][:]
   sources.lev_source_inc .= ds["lev_src_inc"][:]

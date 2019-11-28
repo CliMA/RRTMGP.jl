@@ -56,7 +56,7 @@ function draw_samples(cloud_mask,clouds,clouds_sampled)
   # Finally - sample fields according to the cloud mask
   #
   # Optical depth assignment works for 1scl, 2str (also nstr)
-  apply_cloud_mask!(ncol,nlay,nbnd,ngpt,get_band_lims_gpoint(clouds_sampled),cloud_mask,clouds.tau,clouds_sampled.tau)
+  apply_cloud_mask!(ncol,nlay,nbnd,ngpt,get_band_lims_gpoint(clouds_sampled),cloud_mask,clouds.τ,clouds_sampled.τ)
   #
   # For 2-stream
   #
@@ -149,9 +149,9 @@ end
     sampled_mask_exp_ran
 
  Generate a McICA-sampled cloud mask for exponential-random overlap
-   The overlap parameter alpha is defined between pairs of layers
-   for layer i, alpha(i) describes the overlap betwen cloud_frac(i) and cloud_frac(i+1)
-   By skipping layers with 0 cloud fraction the code forces alpha(i) = 0 for cloud_frac(i) = 0.
+   The overlap parameter α is defined between pairs of layers
+   for layer i, α(i) describes the overlap betwen cloud_frac(i) and cloud_frac(i+1)
+   By skipping layers with 0 cloud fraction the code forces α(i) = 0 for cloud_frac(i) = 0.
 """
 function sampled_mask_exp_ran(randoms,cloud_frac,overlap_param,cloud_mask)
   # real(FT), dimension(:,:,:), intent(in ) :: randoms       # ngpt,nlay,ncol

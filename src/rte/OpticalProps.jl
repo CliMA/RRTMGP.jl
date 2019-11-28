@@ -12,10 +12,10 @@ Encapsulate optical properties defined on a spectral grid of N bands.
  (abstract class AbstractOpticalPropsArry).
  The type holds arrays depending on how much information is needed
  There are three possibilities
-    `OneScalar` holds absorption optical depth `tau`, used in calculations accounting for extinction and emission
-    `TwoStream` holds extinction optical depth `tau`, single-scattering albedo (`ssa`), and asymmetry parameter `g`.
+    `OneScalar` holds absorption optical depth `τ`, used in calculations accounting for extinction and emission
+    `TwoStream` holds extinction optical depth `τ`, single-scattering albedo (`ssa`), and asymmetry parameter `g`.
  These classes must be allocated before use. Initialization and allocation can be combined.
- The classes have a validate() function that checks all arrays for valid values (e.g. `tau` > 0.)
+ The classes have a validate() function that checks all arrays for valid values (e.g. `τ` > 0.)
 
 Optical properties can be delta-scaled (though this is currently implemented only for two-stream arrays)
 
@@ -118,14 +118,14 @@ end
 """
     OneScalar{FT,I} <: AbstractOpticalPropsArry{FT,I}
 
-Holds absorption optical depth `tau`, used in calculations accounting for extinction and emission
+Holds absorption optical depth `τ`, used in calculations accounting for extinction and emission
 
 # Fields
 $(DocStringExtensions.FIELDS)
 """
 struct OneScalar{FT,I} <: AbstractOpticalPropsArry{FT,I}
   base
-  tau#::Array{FT,3}
+  τ#::Array{FT,3}
 end
 
 OneScalar(base::OpticalPropsBase{FT}, ps::ProblemSize{I}) where {FT<:AbstractFloat,I<:Int} =
@@ -134,14 +134,14 @@ OneScalar(base::OpticalPropsBase{FT}, ps::ProblemSize{I}) where {FT<:AbstractFlo
 """
     TwoStream{FT,I} <: AbstractOpticalPropsArry{FT,I}
 
-Holds extinction optical depth `tau`, single-scattering albedo (`ssa`), and asymmetry parameter `g`.
+Holds extinction optical depth `τ`, single-scattering albedo (`ssa`), and asymmetry parameter `g`.
 
 # Fields
 $(DocStringExtensions.FIELDS)
 """
 struct TwoStream{FT,I} <: AbstractOpticalPropsArry{FT,I}
   base
-  tau#::Array{FT,3}
+  τ#::Array{FT,3}
   ssa#::Array{FT,3}
   g#::Array{FT,3}
 end
@@ -194,7 +194,7 @@ end
 """
 function validate!(this::OneScalar{FT}) where FT
   # Validate sizes
-  @assert !any_vals_less_than(this.tau, FT(0))
+  @assert !any_vals_less_than(this.τ, FT(0))
 end
 
 """
@@ -203,10 +203,10 @@ end
 """
 function validate!(this::TwoStream{FT}) where FT
   # Validate sizes
-  @assert all(size(this.ssa) == size(this.tau))
-  @assert all(size(this.g) == size(this.tau))
+  @assert all(size(this.ssa) == size(this.τ))
+  @assert all(size(this.g) == size(this.τ))
   # Valid values
-  @assert !any_vals_less_than(this.tau,  FT(0))
+  @assert !any_vals_less_than(this.τ,  FT(0))
   @assert !any_vals_outside(this.ssa,  FT(0), FT(1))
   @assert !any_vals_outside(this.g  , FT(-1), FT(1))
 end
@@ -249,14 +249,14 @@ end
 
 Number of columns
 """
-get_ncol(this::AbstractOpticalProps) = size(this.tau, 1)
+get_ncol(this::AbstractOpticalProps) = size(this.τ, 1)
 
 """
     get_ncol(this::AbstractOpticalProps)
 
 Number of layers
 """
-get_nlay(this::AbstractOpticalProps) = size(this.tau, 2)
+get_nlay(this::AbstractOpticalProps) = size(this.τ, 2)
 
 #####
 #####  Routines for base class: spectral discretization
