@@ -16,13 +16,13 @@ end
 function read_sw_bc(ds, FT)
   ncol  = ds.dim["col"]
   nband = ds.dim["band"]
-  mu0         =  get_array(ds, "mu0", FT, (ncol))
+  μ_0         =  get_array(ds, "μ_0", FT, (ncol))
   tsi         =  get_array(ds, "tsi", FT, (ncol))
   sfc_alb_dir =  get_array(ds, "sfc_alb_dir", FT, (nband,ncol))
   sfc_alb_dif =  get_array(ds, "sfc_alb_dif", FT, (nband,ncol))
 
   tsi_scaling =  get_array(ds, "tsi_scaling", FT)
-  return mu0, tsi, tsi_scaling, sfc_alb_dir, sfc_alb_dif
+  return μ_0, tsi, tsi_scaling, sfc_alb_dir, sfc_alb_dif
 end
 
 function read_sources(ds, FT)
@@ -90,7 +90,7 @@ end
   # real(FT), dimension(:,:,:), allocatable :: Rdif, Tdif, source_up, source_dn
   # real(FT), dimension(:,  :), allocatable :: source_sfc
   # real(FT), dimension(:,:,:), allocatable :: Rdir, Tdir, Tnoscat
-  # real(FT), dimension(:    ), allocatable :: mu0, tsi, t_sfc
+  # real(FT), dimension(:    ), allocatable :: μ_0, tsi, t_sfc
   # real(FT), dimension(:,  :), allocatable :: toa_src
   # real(FT), dimension(:,  :), allocatable :: sfc_alb_dir, sfc_alb_dif,
   #                                            sfc_alb_gpt
@@ -110,8 +110,8 @@ end
   source_up, source_dn, source_sfc = read_sources(ds, FT)
   if do_sw
     Rdif, Tdif, Rdir, Tdir, Tnoscat = read_two_stream(ds, FT)
-    mu0, tsi, tsi_scaling, sfc_alb_dir, sfc_alb_dif = read_sw_bc(ds, FT)
-    mu0[:] .= cos.(mu0[:] * acos(-FT(1))/FT(180))
+    μ_0, tsi, tsi_scaling, sfc_alb_dir, sfc_alb_dif = read_sw_bc(ds, FT)
+    μ_0[:] .= cos.(μ_0[:] * acos(-FT(1))/FT(180))
   else
     # Rdif, Tdif = read_two_stream(fileName)
   #   t_sfc, sfc_alb_dif = read_lw_bc(fileName)
@@ -155,12 +155,12 @@ end
     flux_dn_dir = Array{FT}(undef, ncol, nlay+1, ngpt)
 
     if top_at_1
-      flux_dn_dir[:,    1,:]  .= toa_src .* spread(mu0, 2, ngpt)
+      flux_dn_dir[:,    1,:]  .= toa_src .* spread(μ_0, 2, ngpt)
       for j = 1:nlay
         flux_dn_dir[:,j+1,:] .= Tnoscat[:,j,:] .* flux_dn_dir[:,j,:]
       end
     else
-      flux_dn_dir[:,nlay+1,:] .= toa_src .* spread(mu0, 2, ngpt)
+      flux_dn_dir[:,nlay+1,:] .= toa_src .* spread(μ_0, 2, ngpt)
       for j = nlay:-1:1
         flux_dn_dir[:,j,:] .= Tnoscat[:,j,:] .* flux_dn_dir[:,j+1,:]
       end

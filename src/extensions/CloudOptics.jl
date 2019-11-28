@@ -162,32 +162,32 @@ end
 # Derive cloud optical properties from provided cloud physical properties
 
 """
-    combine_optical_props!(optical_props::AbstractOpticalProps, ltau, ltaussa, ltaussag, itau, itaussa, itaussag, nbnd, nlay, ncol)
+    combine_optical_props!(optical_props::AbstractOpticalProps, lτ, lτssa, lτssag, iτ, iτssa, iτssag, nbnd, nlay, ncol)
 
 Combine liquid and ice contributions into total cloud optical properties
    See also the `increment!` routines in `OpticalProps_kernels`
 """
-function combine_optical_props!(optical_props::OneScalar, ltau, ltaussa, ltaussag, itau, itaussa, itaussag, nbnd, nlay, ncol)
-  # Absorption optical depth  = (1-ssa) * tau = tau - taussa
+function combine_optical_props!(optical_props::OneScalar, lτ, lτssa, lτssag, iτ, iτssa, iτssag, nbnd, nlay, ncol)
+  # Absorption optical depth  = (1-ssa) * τ = τ - τssa
   for ibnd = 1:nbnd
     for ilay = 1:nlay
       for icol = 1:ncol
-        # Absorption optical depth  = (1-ssa) * tau = tau - taussa
-        optical_props.tau[icol,ilay,ibnd] = (ltau[icol,ilay,ibnd] - ltaussa[icol,ilay,ibnd]) +
-                                            (itau[icol,ilay,ibnd] - itaussa[icol,ilay,ibnd])
+        # Absorption optical depth  = (1-ssa) * τ = τ - τssa
+        optical_props.τ[icol,ilay,ibnd] = (lτ[icol,ilay,ibnd] - lτssa[icol,ilay,ibnd]) +
+                                            (iτ[icol,ilay,ibnd] - iτssa[icol,ilay,ibnd])
       end
     end
   end
 end
-function combine_optical_props!(optical_props::TwoStream{FT}, ltau, ltaussa, ltaussag, itau, itaussa, itaussag, nbnd, nlay, ncol) where FT
+function combine_optical_props!(optical_props::TwoStream{FT}, lτ, lτssa, lτssag, iτ, iτssa, iτssag, nbnd, nlay, ncol) where FT
   for ibnd = 1:nbnd
     for ilay = 1:nlay
       for icol = 1:ncol
-        tau    = ltau[icol,ilay,ibnd]    + itau[icol,ilay,ibnd]
-        taussa = ltaussa[icol,ilay,ibnd] + itaussa[icol,ilay,ibnd]
-        optical_props.g[icol,ilay,ibnd]  = (ltaussag[icol,ilay,ibnd] + itaussag[icol,ilay,ibnd]) / max(eps(FT), taussa...)
-        optical_props.ssa[icol,ilay,ibnd] = taussa/max(eps(FT), tau...)
-        optical_props.tau[icol,ilay,ibnd] = tau
+        τ    = lτ[icol,ilay,ibnd]    + iτ[icol,ilay,ibnd]
+        τssa = lτssa[icol,ilay,ibnd] + iτssa[icol,ilay,ibnd]
+        optical_props.g[icol,ilay,ibnd]  = (lτssag[icol,ilay,ibnd] + iτssag[icol,ilay,ibnd]) / max(eps(FT), τssa...)
+        optical_props.ssa[icol,ilay,ibnd] = τssa/max(eps(FT), τ...)
+        optical_props.τ[icol,ilay,ibnd] = τ
       end
     end
   end
@@ -225,7 +225,7 @@ class(AbstractOpticalPropsArry), intent(inout) :: optical_props Dimensions: (nco
 ! ------- Local -------
 logical(wl), dimension(size(clwp,1), size(clwp,2)) :: liqmsk, icemsk
 real(wp),    dimension(size(clwp,1), size(clwp,2), this%get_nband()) ::
-            ltau, ltaussa, ltaussag, itau, itaussa, itaussag
+            lτ, lτssa, lτssag, iτ, iτssa, iτssag
 # ------- Local -------
 type(TwoStream) :: clouds_liq, clouds_ice
 integer  :: nsizereg, ibnd, imom
@@ -239,7 +239,7 @@ function cloud_optics!(this::CloudOpticsPade{FT},
   icemsk = BitArray(ciwp .> FT(0))
   validate_cloud_optics!(this, clwp, ciwp, reliq, reice, optical_props)
 
-  ltau, ltaussa, ltaussag, itau, itaussa, itaussag =
+  lτ, lτssa, lτssag, iτ, iτssa, iτssag =
     ntuple(i-> Array{FT}(undef, size(clwp,1), size(clwp,2), get_nband(this)), 6)
   #### Compute cloud optical properties.
 
@@ -251,16 +251,16 @@ function cloud_optics!(this::CloudOpticsPade{FT},
                             2, 3, this.liq.sizreg_ext, this.liq.ext,
                             2, 2, this.liq.sizreg_ssa, this.liq.ssa,
                             2, 2, this.liq.sizreg_asy, this.liq.asy,
-                            ltau, ltaussa, ltaussag)
+                            lτ, lτssa, lτssag)
   compute_all_from_pade!(ncol, nlay, nbnd, nsizereg,
                             icemsk, ciwp, reice,
                             2, 3, this.ice.sizreg_ext, this.ice.ext[:,:,:,this.icergh],
                             2, 2, this.ice.sizreg_ssa, this.ice.ssa[:,:,:,this.icergh],
                             2, 2, this.ice.sizreg_asy, this.ice.asy[:,:,:,this.icergh],
-                            itau, itaussa, itaussag)
+                            iτ, iτssa, iτssag)
 
   # Copy total cloud properties onto outputs
-  combine_optical_props!(optical_props, ltau, ltaussa, ltaussag, itau, itaussa, itaussag, nbnd, nlay, ncol)
+  combine_optical_props!(optical_props, lτ, lτssa, lτssag, iτ, iτssa, iτssag, nbnd, nlay, ncol)
 
 end
 function cloud_optics!(this::CloudOpticsLUT{FT},
@@ -273,7 +273,7 @@ function cloud_optics!(this::CloudOpticsLUT{FT},
   icemsk = BitArray(ciwp .> FT(0))
   validate_cloud_optics!(this, clwp, ciwp, reliq, reice, optical_props)
 
-  ltau, ltaussa, ltaussag, itau, itaussa, itaussag =
+  lτ, lτssa, lτssag, iτ, iτssa, iτssag =
     ntuple(i-> Array{FT}(undef, size(clwp,1), size(clwp,2), get_nband(this)), 6)
 
   #### Compute cloud optical properties.
@@ -286,7 +286,7 @@ function cloud_optics!(this::CloudOpticsLUT{FT},
                               this.liq.ext,
                               this.liq.ssa,
                               this.liq.asy,
-                              ltau, ltaussa, ltaussag)
+                              lτ, lτssa, lτssag)
   # Ice
   compute_all_from_table!(ncol, nlay, nbnd, icemsk, ciwp, reice,
                               this.ice.nsteps,
@@ -295,10 +295,10 @@ function cloud_optics!(this::CloudOpticsLUT{FT},
                               this.ice.ext[:,:,this.icergh],
                               this.ice.ssa[:,:,this.icergh],
                               this.ice.asy[:,:,this.icergh],
-                              itau, itaussa, itaussag)
+                              iτ, iτssa, iτssag)
 
   # Copy total cloud properties onto outputs
-  combine_optical_props!(optical_props, ltau, ltaussa, ltaussag, itau, itaussa, itaussag, nbnd, nlay, ncol)
+  combine_optical_props!(optical_props, lτ, lτssa, lτssag, iτ, iτssa, iτssag, nbnd, nlay, ncol)
 
 end
 
@@ -310,19 +310,19 @@ end
 #
 function compute_all_from_table!(ncol, nlay, nbnd, mask, lwp, re,
                                   nsteps, step_size, offset,
-                                  tau_table, ssa_table, asy_table,
-                                  tau::Array{FT}, taussa, taussag) where FT
+                                  τ_table, ssa_table, asy_table,
+                                  τ::Array{FT}, τssa, τssag) where FT
   # integer,                                intent(in) :: ncol, nlay, nbnd, nsteps
   # logical(wl), dimension(ncol,nlay),      intent(in) :: mask
   # real(wp),    dimension(ncol,nlay),      intent(in) :: lwp, re
   # real(wp),                               intent(in) :: step_size, offset
-  # real(wp),    dimension(nsteps,   nbnd), intent(in) :: tau_table, ssa_table, asy_table
-  # real(wp),    dimension(ncol,nlay,nbnd)             :: tau, taussa, taussag
+  # real(wp),    dimension(nsteps,   nbnd), intent(in) :: τ_table, ssa_table, asy_table
+  # real(wp),    dimension(ncol,nlay,nbnd)             :: τ, τssa, τssag
   # # ---------------------------
   # integer  :: icol, ilay, ibnd
   # integer  :: index
   # real(wp) :: fint
-  # real(wp) :: t, ts, tsg  # tau, tau*ssa, tau*ssa*g
+  # real(wp) :: t, ts, tsg  # τ, τ*ssa, τ*ssa*g
   # # ---------------------------
   #$acc parallel loop gang vector default(present) collapse(3)
   for ibnd = 1:nbnd
@@ -331,15 +331,15 @@ function compute_all_from_table!(ncol, nlay, nbnd, mask, lwp, re,
         if mask[icol,ilay]
           index = convert(Int, min(floor((re[icol,ilay] - offset)/step_size)+1, nsteps-1))
           fint = (re[icol,ilay] - offset)/step_size - (index-1)
-          t   = lwp[icol,ilay] *                  (tau_table[index,  ibnd] + fint * (tau_table[index+1,ibnd] - tau_table[index,ibnd]))
+          t   = lwp[icol,ilay] *                  (τ_table[index,  ibnd] + fint * (τ_table[index+1,ibnd] - τ_table[index,ibnd]))
           ts  = t              *                  (ssa_table[index,  ibnd] + fint * (ssa_table[index+1,ibnd] - ssa_table[index,ibnd]))
-          taussag[icol,ilay,ibnd] = ts          * (asy_table[index,  ibnd] + fint * (asy_table[index+1,ibnd] - asy_table[index,ibnd]))
-          taussa[icol,ilay,ibnd] = ts
-          tau[icol,ilay,ibnd] = t
+          τssag[icol,ilay,ibnd] = ts          * (asy_table[index,  ibnd] + fint * (asy_table[index+1,ibnd] - asy_table[index,ibnd]))
+          τssa[icol,ilay,ibnd] = ts
+          τ[icol,ilay,ibnd] = t
         else
-          tau[icol,ilay,ibnd] = FT(0)
-          taussa[icol,ilay,ibnd] = FT(0)
-          taussag[icol,ilay,ibnd] = FT(0)
+          τ[icol,ilay,ibnd] = FT(0)
+          τssa[icol,ilay,ibnd] = FT(0)
+          τssag[icol,ilay,ibnd] = FT(0)
         end
       end
     end
@@ -355,7 +355,7 @@ function compute_all_from_pade!(ncol, nlay, nbnd, nsizes,
                                  m_ext, n_ext, re_bounds_ext, coeffs_ext,
                                  m_ssa, n_ssa, re_bounds_ssa, coeffs_ssa,
                                  m_asy, n_asy, re_bounds_asy, coeffs_asy,
-                                 tau::Array{FT}, taussa, taussag) where FT
+                                 τ::Array{FT}, τssa, τssag) where FT
   # integer,                        intent(in) :: ncol, nlay, nbnd, nsizes
   # logical(wl),
   #           dimension(ncol,nlay), intent(in) :: mask
@@ -370,7 +370,7 @@ function compute_all_from_pade!(ncol, nlay, nbnd, nsizes,
   # integer,                        intent(in) :: m_asy, n_asy
   # real(wp), dimension(nbnd,nsizes,0:m_asy+n_asy),
   #                                 intent(in) :: coeffs_asy
-  # real(wp), dimension(ncol,nlay,nbnd)        :: tau, taussa, taussag
+  # real(wp), dimension(ncol,nlay,nbnd)        :: τ, τssa, τssag
   # # ---------------------------
   # integer  :: icol, ilay, ibnd, irad, count
   # real(wp) :: t, ts
@@ -392,14 +392,14 @@ function compute_all_from_pade!(ncol, nlay, nbnd, nsizes,
           # Pade approximants for co-albedo can sometimes be negative
           ts   = t               * (FT(1) - max(FT(0), pade_eval(ibnd, nbnd, nsizes, m_ssa, n_ssa, irad, re[icol,ilay], coeffs_ssa)))
           irad = convert(Int, min(floor((re[icol,ilay] - re_bounds_asy[2])/re_bounds_asy[3])+2, 3))
-          taussag[icol,ilay,ibnd] = ts             * pade_eval(ibnd, nbnd, nsizes, m_asy, n_asy, irad, re[icol,ilay], coeffs_asy)
+          τssag[icol,ilay,ibnd] = ts             * pade_eval(ibnd, nbnd, nsizes, m_asy, n_asy, irad, re[icol,ilay], coeffs_asy)
 
-          taussa[icol,ilay,ibnd] = ts
-          tau[icol,ilay,ibnd] = t
+          τssa[icol,ilay,ibnd] = ts
+          τ[icol,ilay,ibnd] = t
         else
-          tau[icol,ilay,ibnd] = FT(0)
-          taussa[icol,ilay,ibnd] = FT(0)
-          taussag[icol,ilay,ibnd] = FT(0)
+          τ[icol,ilay,ibnd] = FT(0)
+          τssa[icol,ilay,ibnd] = FT(0)
+          τssag[icol,ilay,ibnd] = FT(0)
         end
       end
     end

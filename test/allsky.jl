@@ -66,7 +66,7 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
 
   # This puts pressure and temperature arrays on the GPU
   # load data into classes
-  k_dist = load_and_init(ds[:k_dist], FT, gas_concs.gas_name)
+  k_dist = load_and_init(ds[:k_dist], FT, gas_concs.gas_names)
   is_sw = source_is_external(k_dist)
   is_lw = !is_sw
   #
@@ -83,6 +83,9 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
   nbnd = get_nband(k_dist.optical_props)
   ngpt = get_ngpt(k_dist.optical_props)
   top_at_1 = p_lay[1, 1] < p_lay[1, nlay]
+
+  println("--------- Problem size:")
+  @show ncol,nlay,nbnd,ngpt
 
   ps = ProblemSize(ncol, nlay, ngpt)
 
@@ -111,11 +114,11 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
     #
     sfc_alb_dir = zeros(FT, nbnd, ncol)
     sfc_alb_dif = zeros(FT, nbnd, ncol)
-    mu0 = zeros(FT, ncol)
+    μ_0 = zeros(FT, ncol)
     # Ocean-ish values for no particular reason
     sfc_alb_dir .= FT(0.06)
     sfc_alb_dif .= FT(0.06)
-    mu0 .= FT(.86)
+    μ_0 .= FT(.86)
   else
     # lw_sorces is thread private
     lw_sources = SourceFuncLW(ncol, nlay, k_dist.optical_props)
@@ -200,7 +203,7 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
       delta_scale!(clouds)
       increment!(clouds, atmos)
       rte_sw!(atmos, top_at_1,
-              mu0,   toa_flux,
+              μ_0,   toa_flux,
               sfc_alb_dir, sfc_alb_dif,
               fluxes)
     end

@@ -53,7 +53,6 @@ function rfmip_clear_sky_lw(ds, optical_props_constructor; compile_first=false)
   @assert mod(ncol*nexp, block_size) == 0
 
   nblocks = Int((ncol*nexp)/block_size)
-  # println("Doing $(nblocks) blocks of size $(block_size)")
 
   @assert 1 <= forcing_index <= 3
 
@@ -91,14 +90,15 @@ function rfmip_clear_sky_lw(ds, optical_props_constructor; compile_first=false)
   # Read k-distribution information. load_and_init() reads data from netCDF and calls
   #   k_dist%init(); users might want to use their own reading methods
   #
-  k_dist = load_and_init(ds[:k_dist], FT, gas_conc_array[1].gas_name)
+  k_dist = load_and_init(ds[:k_dist], FT, gas_conc_array[1].gas_names)
 
   @assert source_is_internal(k_dist)
 
   nbnd = get_nband(k_dist.optical_props)
   ngpt = get_ngpt(k_dist.optical_props)
-  # @show nbnd
-  # @show ngpt
+  println("--------- Problem size:")
+  @show ncol,nlay,nbnd,ngpt
+  @show nblocks,nexp,block_size
 
   #
   # RRTMGP won't run with pressure less than its minimum. The top level in the RFMIP file

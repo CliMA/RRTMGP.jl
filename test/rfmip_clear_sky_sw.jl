@@ -49,7 +49,6 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
   # How big is the problem? Does it fit into blocks of the size we've specified?
   @assert mod(ncol*nexp, block_size) == 0 # number of columns must fit evenly into blocks
   nblocks = Int((ncol*nexp)/block_size)
-  # println("Doing $(nblocks) blocks of size $(block_size)")
 
   @assert !(forcing_index < 1 || forcing_index > 3)
 
@@ -86,11 +85,16 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
   # Read k-distribution information. load_and_init() reads data from netCDF and calls
   #   k_dist%init(); users might want to use their own reading methods
   #
-  k_dist = @timeit to "load_and_init" load_and_init(ds[:k_dist], FT, gas_conc_array[1].gas_name)
+  k_dist = @timeit to "load_and_init" load_and_init(ds[:k_dist], FT, gas_conc_array[1].gas_names)
   @assert source_is_external(k_dist)
 
   nbnd = get_nband(k_dist.optical_props)
   ngpt = get_ngpt(k_dist.optical_props)
+
+  println("--------- Problem size:")
+  @show ncol,nlay,nbnd,ngpt
+  @show nblocks,nexp,block_size
+
   ps = ProblemSize(block_size, nlay, ngpt)
 
   toa_flux = zeros(FT, block_size, get_ngpt(k_dist.optical_props))
@@ -124,7 +128,7 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
   flux_up = zeros(FT, block_size, nlay+1, nblocks)
   flux_dn = zeros(FT, block_size, nlay+1, nblocks)
 
-  mu0 = zeros(FT, block_size)
+  μ_0 = zeros(FT, block_size)
   sfc_alb_spec = zeros(FT, nbnd,block_size)
   optical_props = optical_props_constructor(k_dist.optical_props, ps)
 
@@ -176,7 +180,7 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
     # Cosine of the solar zenith angle
     #
     for icol = 1:block_size
-      mu0[icol] = fmerge(cos(solar_zenith_angle[icol,b]*deg_to_rad), FT(1), usecol[icol,b])
+      μ_0[icol] = fmerge(cos(solar_zenith_angle[icol,b]*deg_to_rad), FT(1), usecol[icol,b])
     end
 
     #
@@ -186,7 +190,7 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
 
     @timeit to "rte_sw!" rte_sw!(optical_props,
             top_at_1,
-            mu0,
+            μ_0,
             toa_flux,
             sfc_alb_spec,
             sfc_alb_spec,

@@ -62,7 +62,7 @@ export rte_lw!, rte_sw!, expand_and_transpose
 """
     rte_sw!(atmos::AbstractOpticalPropsArry,
                  top_at_1,
-                 mu0::Array{FT},
+                 μ_0::Array{FT},
                  inc_flux,
                  sfc_alb_dir,
                  sfc_alb_dif,
@@ -74,7 +74,7 @@ Compute fluxes `fluxes` (`AbstractFluxes`), given
  - `atmos` Optical properties provided as arrays (`AbstractOpticalPropsArry`)
  - `top_at_1` bool indicating if the top of the domain is at index 1
              (if not, ordering is bottom-to-top)
- - `mu0` cosine of solar zenith angle (ncol)
+ - `μ_0` cosine of solar zenith angle (ncol)
  - `inc_flux` incident flux at top of domain [W/m2] (ncol, ngpt)
  - `sfc_alb_dir` surface albedo for direct and
  - `sfc_alb_dif` diffuse radiation (nband, ncol)
@@ -83,7 +83,7 @@ and, optionally,
 """
 function rte_sw!(atmos::AbstractOpticalPropsArry,
                  top_at_1,
-                 mu0::Array{FT},
+                 μ_0::Array{FT},
                  inc_flux,
                  sfc_alb_dir,
                  sfc_alb_dif,
@@ -97,8 +97,8 @@ function rte_sw!(atmos::AbstractOpticalPropsArry,
 
   # Error checking -- consistency / sizes / validity of values
   @assert are_desired(fluxes)
-  @assert size(mu0, 1) ==  ncol
-  @assert !any_vals_outside(mu0, FT(0), FT(1))
+  @assert size(μ_0, 1) ==  ncol
+  @assert !any_vals_outside(μ_0, FT(0), FT(1))
   @assert all(size(inc_flux) .== (ncol, ngpt))
   @assert !any_vals_less_than(inc_flux, FT(0))
   if present(inc_flux_dif)
@@ -125,7 +125,7 @@ function rte_sw!(atmos::AbstractOpticalPropsArry,
   #   On input flux_dn is the diffuse component; the last action in each solver is to add
   #   direct and diffuse to represent the total, consistent with the LW
   #
-  apply_BC!(gpt_flux_dir, ncol, nlay, ngpt, top_at_1,   inc_flux, mu0)
+  apply_BC!(gpt_flux_dir, ncol, nlay, ngpt, top_at_1,   inc_flux, μ_0)
 
   if present(inc_flux_dif)
     apply_BC!(gpt_flux_dn, ncol, nlay, ngpt, top_at_1, inc_flux_dif)
@@ -137,7 +137,7 @@ function rte_sw!(atmos::AbstractOpticalPropsArry,
     # Direct beam only
     validate!(atmos)
     sw_solver_noscat!(ncol, nlay, ngpt, top_at_1,
-                          atmos.tau, mu0,
+                          atmos.τ, μ_0,
                           gpt_flux_dir)
     # No diffuse flux
     # gpt_flux_up .= FT(0)
@@ -147,7 +147,7 @@ function rte_sw!(atmos::AbstractOpticalPropsArry,
     validate!(atmos)
 
     sw_solver_2stream!(ncol, nlay, ngpt, top_at_1,
-                           atmos.tau, atmos.ssa, atmos.g, mu0,
+                           atmos.τ, atmos.ssa, atmos.g, μ_0,
                            sfc_alb_dir_gpt, sfc_alb_dif_gpt,
                            gpt_flux_up, gpt_flux_dn, gpt_flux_dir)
   end
@@ -226,7 +226,7 @@ function rte_lw!(optical_props::AbstractOpticalPropsArry{FT}, top_at_1,
     n_quad_angs = n_gauss_angles
   end
 
-  # Ensure values of tau, ssa, and g are reasonable
+  # Ensure values of τ, ssa, and g are reasonable
   validate!(optical_props)
 
   #
@@ -253,7 +253,7 @@ function rte_lw!(optical_props::AbstractOpticalPropsArry{FT}, top_at_1,
     # No scattering two-stream calculation
     lw_solver_noscat_GaussQuad!(ncol, nlay, ngpt, top_at_1,
                             n_quad_angs, gauss_Ds[1:n_quad_angs,n_quad_angs], gauss_wts[1:n_quad_angs,n_quad_angs],
-                            optical_props.tau,
+                            optical_props.τ,
                             sources.lay_source, sources.lev_source_inc, sources.lev_source_dec,
                             sfc_emis_gpt, sources.sfc_source,
                             gpt_flux_up, gpt_flux_dn)
@@ -261,7 +261,7 @@ function rte_lw!(optical_props::AbstractOpticalPropsArry{FT}, top_at_1,
   elseif optical_props isa TwoStream
     # two-stream calculation with scattering
     lw_solver_2stream!(ncol, nlay, ngpt, top_at_1,
-                               optical_props.tau, optical_props.ssa, optical_props.g,
+                               optical_props.τ, optical_props.ssa, optical_props.g,
                                sources.lay_source, sources.lev_source_inc, sources.lev_source_dec, sfc_emis_gpt, sources.sfc_source,
                                gpt_flux_up, gpt_flux_dn)
   end

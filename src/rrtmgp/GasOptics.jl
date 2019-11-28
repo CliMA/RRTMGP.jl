@@ -11,20 +11,22 @@ Two variants apply to internal Planck sources (longwave radiation in the Earth's
  (It might make more sense to define two sub-classes)
 """
 module GasOptics
+
 using OffsetArrays
 using TimerOutputs
 using DocStringExtensions
 
 const to_gor = TimerOutput()
+
 using ..FortranIntrinsics
 using ..PhysicalConstants
 using ..ArrayUtilities
 using ..OpticalProps
 using ..SourceFunctions
-
 using ..Utilities
 using ..GasConcentrations
 using ..OpticalProps
+
 export gas_optics_int!, gas_optics_ext!, load_totplnk, load_solar_source
 export source_is_internal, source_is_external, get_press_min
 export get_col_dry
@@ -144,7 +146,7 @@ struct GasOpticsVars{FT,I}
   "kminor start"
   kminor_start::Vector{I}
   "kminor"
-  kminor::Array{FT,3} #, (n_minor,eta,temperature)
+  kminor::Array{FT,3} #, (n_minor,η,temperature)
   "scaling gas"
   scaling_gas::Array{String}
   "minor gases"
@@ -176,7 +178,7 @@ struct InternalSourceGasOptics{FT,I} <: AbstractGasOptics{FT,I}
   upper_aux::GasOpticsAux{I}
   "Present gas names"
   gas_names::Vector{String}
-  "Absorption coefficient for major species (g-point,eta,pressure,temperature)"
+  "Absorption coefficient for major species (g-point,η,pressure,temperature)"
   kmajor::Array{FT,4}
   "major species pair; [2, nflav]"
   flavor::Array{I,2}
@@ -190,7 +192,7 @@ struct InternalSourceGasOptics{FT,I} <: AbstractGasOptics{FT,I}
   totplnk::Array{FT,2}
   "temperature steps in totplnk"
   totplnk_delta::FT
-  "Absorption coefficient for Rayleigh scattering [g-point,eta,temperature,upper/lower atmosphere]"
+  "Absorption coefficient for Rayleigh scattering [g-point,η,temperature,upper/lower atmosphere]"
   krayl::Union{Array{FT,4},Nothing}
 end
 
@@ -217,7 +219,7 @@ struct ExternalSourceGasOptics{FT,I} <: AbstractGasOptics{FT,I}
   upper_aux::GasOpticsAux{I}
   "Present gas names"
   gas_names::Vector{String}
-  "Absorption coefficient for major species (g-point,eta,pressure,temperature)"
+  "Absorption coefficient for major species (g-point,η,pressure,temperature)"
   kmajor::Array{FT,4}
   "major species pair; [2, nflav]"
   flavor::Array{I,2}
@@ -227,7 +229,7 @@ struct ExternalSourceGasOptics{FT,I} <: AbstractGasOptics{FT,I}
   is_key::Vector{Bool}
   "incoming solar irradiance (g-point)"
   solar_src::Vector{FT} # incoming solar irradiance(g-point)
-  "absorption coefficient for Rayleigh scattering (g-point,eta,temperature,upper/lower atmosphere)"
+  "absorption coefficient for Rayleigh scattering (g-point,η,temperature,upper/lower atmosphere)"
   krayl::Union{Array{FT,4},Nothing}
 end
 
@@ -244,8 +246,8 @@ struct InterpolationCoefficients{FT,I}
   jtemp::Array{I,2}
   "index for pressure"
   jpress::Array{I,2}
-  "index for binary species parameter (eta)"
-  jeta::Array{I,4}
+  "index for binary species parameter (η)"
+  j_η::Array{I,4}
   "troposphere mask: itropo = merge(1,2,tropo[icol,ilay]); itropo = 1 lower atmosphere; itropo = 2 upper atmosphere"
   tropo::Array{Bool,2}
   "fractions for major species"
@@ -256,11 +258,11 @@ end
 function InterpolationCoefficients(::Type{FT}, ::Type{I}, ncol, nlay, nflav) where {I<:Int, FT<:AbstractFloat}
   jtemp = Array{I}(undef, ncol, nlay)
   jpress = Array{I}(undef, ncol, nlay)
-  jeta = Array{I}(undef, 2, nflav, ncol, nlay)
+  j_η = Array{I}(undef, 2, nflav, ncol, nlay)
   tropo = Array{Bool}(undef, ncol, nlay)
   fmajor = zeros(FT, 2,2,2, nflav,ncol, nlay)
   fminor  = Array{FT}(undef, 2,2, nflav,ncol,nlay)
-  return InterpolationCoefficients{FT,I}(jtemp,jpress,jeta,tropo,fmajor,fminor)
+  return InterpolationCoefficients{FT,I}(jtemp,jpress,j_η,tropo,fmajor,fminor)
 end
 
 """
@@ -330,7 +332,7 @@ function gas_optics_int!(this::InternalSourceGasOptics,
   nband = get_nband(this.optical_props)
 
   # Gas optics
-  compute_gas_taus!(ics, this,
+  compute_gas_τs!(ics, this,
                    ncol, nlay, ngpt, nband,
                    play, plev, tlay, gas_desc,
                    optical_props,
@@ -403,7 +405,7 @@ function gas_optics_ext!(this::ExternalSourceGasOptics,
   nflav = get_nflav(this)
 
   # Gas optics
-  @timeit to_gor "compute_gas_taus!" compute_gas_taus!(ics, this,
+  @timeit to_gor "compute_gas_τs!" compute_gas_τs!(ics, this,
                    ncol, nlay, ngpt, nband,
                    play, plev, tlay, gas_desc,
                    optical_props,
@@ -422,7 +424,7 @@ end
 
 # Returns optical properties and interpolation coefficients
 """
-    compute_gas_taus!(this::AbstractGasOptics,
+    compute_gas_τs!(this::AbstractGasOptics,
                           ncol, nlay, ngpt, nband,
                           play, plev, tlay, gas_desc::GasConcs,
                           optical_props::AbstractOpticalPropsArry,
@@ -441,7 +443,7 @@ Optional inputs
 real(FT), dimension(:,:), intent(in   ), optional, target :: col_dry # Column dry amount; dim(ncol,nlay)
 ----------------------------------------------------------
 Local variables
-real(FT), dimension(ngpt,nlay,ncol) :: tau, tau_rayleigh  # absorption, Rayleigh scattering optical depths
+real(FT), dimension(ngpt,nlay,ncol) :: τ, τ_rayleigh  # absorption, Rayleigh scattering optical depths
 # integer :: igas, idx_h2o # index of some gases
 # Number of molecules per cm^2
 real(FT), dimension(ncol,nlay), target  :: col_dry_arr
@@ -456,22 +458,22 @@ real(FT), dimension(2,    get_nflav(this),ncol,nlay) :: col_mix # combination of
                                                     # index(2) : flavor
                                                     # index(3) : layer
 real(FT), dimension(2,2,  get_nflav(this),ncol,nlay) :: fminor # interpolation fractions for minor species
-                                                     # index(1) : reference eta level (temperature dependent)
+                                                     # index(1) : reference η level (temperature dependent)
                                                      # index(2) : reference temperature level
                                                      # index(3) : flavor
                                                      # index(4) : layer
 integer :: ngas, nflav, neta, npres, ntemp
 ----------------------------------------------------------
 """
-function compute_gas_taus!(ics::InterpolationCoefficients,
+function compute_gas_τs!(ics::InterpolationCoefficients,
                            this::AbstractGasOptics{FT},
                            ncol, nlay, ngpt, nband,
                            play, plev, tlay, gas_desc::GasConcs,
                            optical_props::AbstractOpticalPropsArry,
                            col_dry=nothing, last_call=false) where FT
 
-  tau          = Array{FT}(undef, ngpt,nlay,ncol)          # absorption, Rayleigh scattering optical depths
-  tau_rayleigh = Array{FT}(undef, ngpt,nlay,ncol) # absorption, Rayleigh scattering optical depths
+  τ          = Array{FT}(undef, ngpt,nlay,ncol)          # absorption, Rayleigh scattering optical depths
+  τ_rayleigh = Array{FT}(undef, ngpt,nlay,ncol) # absorption, Rayleigh scattering optical depths
   col_dry_arr  = Array{FT}(undef, ncol, nlay)
   col_dry_wk   = Array{FT}(undef, ncol, nlay)
 
@@ -503,7 +505,7 @@ function compute_gas_taus!(ics::InterpolationCoefficients,
   # Fill out the array of volume mixing ratios
   for igas in 1:ngas
     # Get vmr if  gas is provided in GasConcs
-    if this.gas_names[igas] in gas_desc.gas_name
+    if this.gas_names[igas] in gas_desc.gas_names
       get_vmr!(@view(vmr[:,:,igas]), gas_desc, this.gas_names[igas])
     end
   end
@@ -524,7 +526,7 @@ function compute_gas_taus!(ics::InterpolationCoefficients,
   end
 
   # ---- calculate gas optical depths ----
-  tau .= 0
+  τ .= 0
   @timeit to_gor "interpolation!" interpolation!(ics,
           col_mix,
           ncol,nlay,                        # problem dimensions
@@ -534,7 +536,7 @@ function compute_gas_taus!(ics::InterpolationCoefficients,
           play,
           tlay,
           col_gas)
-  @timeit to_gor "compute_tau_absorption!" compute_tau_absorption!(tau,
+  @timeit to_gor "compute_τ_absorption!" compute_τ_absorption!(τ,
           ncol,nlay,nband,ngpt,                      # dimensions
           idx_h2o,
           this.gpoint_flavor,
@@ -551,7 +553,7 @@ function compute_gas_taus!(ics::InterpolationCoefficients,
           col_gas)
   if allocated(this.krayl)
 
-    @timeit to_gor "compute_tau_rayleigh!" compute_tau_rayleigh!(          #Rayleigh scattering optical depths
+    @timeit to_gor "compute_τ_rayleigh!" compute_τ_rayleigh!(          #Rayleigh scattering optical depths
           ncol,nlay,nband,ngpt,# dimensions
           this.gpoint_flavor,
           get_band_lims_gpoint(this.optical_props),
@@ -560,12 +562,12 @@ function compute_gas_taus!(ics::InterpolationCoefficients,
           col_dry_wk,
           col_gas,
           ics,
-          tau_rayleigh)
+          τ_rayleigh)
 
   end
 
   # Combine optical depths and reorder for radiative transfer solver.
-  @timeit to_gor "combine_and_reorder!" combine_and_reorder!(tau, tau_rayleigh, allocated(this.krayl), optical_props)
+  @timeit to_gor "combine_and_reorder!" combine_and_reorder!(τ, τ_rayleigh, allocated(this.krayl), optical_props)
 
 end
 
@@ -650,12 +652,10 @@ function source!(this::InternalSourceGasOptics{FT},
               nlay,
               nbnd,
               ngpt,
-              get_nflav(this),
-              get_neta(this),
-              get_npres(this),
-              get_ntemp(this),
-              get_nPlanckTemp(this),
-              tlay, tlev_wk, tsfc, fmerge(1,nlay,play[1,1] > play[1,nlay]),
+              tlay,
+              tlev_wk,
+              tsfc,
+              fmerge(1,nlay,play[1,1] > play[1,nlay]),
               ics,
               get_gpoint_bands(this.optical_props),
               get_band_lims_gpoint(this.optical_props),
@@ -762,8 +762,7 @@ function init_abs_coeffs(available_gases::Vector{String},
   FT = eltype(kmajor)
 
   # Which gases known to the gas optics are present in the host model (available_gases)?
-  gas_is_present = map(x->x in available_gases, gas_names)
-  gas_names_present = pack(gas_names, gas_is_present)
+  gas_names_present = intersect(gas_names, available_gases)
 
   reduced_lower = reduce_minor_arrays(available_gases, gas_minor, identifier_minor, lower)
   reduced_upper = reduce_minor_arrays(available_gases, gas_minor, identifier_minor, upper)
@@ -773,8 +772,7 @@ function init_abs_coeffs(available_gases::Vector{String},
 
   # create flavor list
   # Reduce (remap) key_species list; checks that all key gases are present in incoming
-  key_species_red,key_species_present_init = create_key_species_reduce(gas_names, gas_names_present, key_species)
-  check_key_species_present_init(gas_names, key_species_present_init)
+  key_species_red = create_key_species_reduce(gas_names, gas_names_present, key_species)
 
   flavor = create_flavor(key_species_red)
   optical_props = OpticalPropsBase("AbstractGasOptics optical props", band_lims_wavenum, band2gpt)
@@ -806,8 +804,6 @@ function init_abs_coeffs(available_gases::Vector{String},
 
 end
 
-check_key_species_present_init(gas_names, key_species_present_init) = @assert all(key_species_present_init)
-
 # Ensure that every key gas required by the k-distribution is
 #    present in the gas concentration object
 function check_key_species_present(this::AbstractGasOptics, gas_desc::GasConcs)
@@ -815,29 +811,22 @@ function check_key_species_present(this::AbstractGasOptics, gas_desc::GasConcs)
   # class(GasConcs),                intent(in) :: gas_desc
   key_gas_names = pack(this.gas_names, this.is_key)
   for igas = 1:length(key_gas_names)
-    @assert key_gas_names[igas] in gas_desc.gas_name
+    @assert key_gas_names[igas] in gas_desc.gas_names
   end
 end
 
-# Function to define names of key and minor gases to be used by gas_optics().
-# The final list gases includes those that are defined in gas_optics_specification
-# and are provided in GasConcs.
-#
-function get_minor_list(this::AbstractGasOptics, gas_desc::GasConcs, ngas, names_spec)
-  # class(AbstractGasOptics), intent(in)       :: this
-  # class(GasConcs), intent(in)                      :: gas_desc
-  # integer, intent(in)                                  :: ngas
-  # character(32), dimension(ngas), intent(in)           :: names_spec
+"""
+    get_minor_list(this::AbstractGasOptics, gas_desc::GasConcs, ngas, names_spec)
 
-  # # List of minor gases to be used in gas_optics()
-  # character(len=32), dimension(:), allocatable         :: get_minor_list
-  # # Logical flag for minor species in specification (T = minor; F = not minor)
-  # logical, dimension(size(names_spec))                 :: gas_is_present
-  # integer                                              :: igas, icnt
-
-  # gas_is_present = map(x->x in gas_desc.gas_name, names_spec)
+List of minor gases to be used in gas_optics()
+Function to define names of key and minor gases to be used by gas_optics().
+The final list gases includes those that are defined in gas_optics_specification
+and are provided in GasConcs.
+"""
+function get_minor_list(this::AbstractGasOptics, gas_desc::GasConcs, ngas, names_spec::Vector{String})
+  gas_is_present = map(x->x in gas_desc.gas_names, names_spec)
   for igas = 1:get_ngas(this)
-    gas_is_present[igas] = names_spec[igas] in gas_desc.gas_name
+    gas_is_present[igas] = names_spec[igas] in gas_desc.gas_names
   end
   minor_list = pack(this.gas_names, gas_is_present)
   return minor_list
@@ -1066,19 +1055,14 @@ function create_idx_minor_scaling(::Type{I}, gas_names, scaling_gas_atm) where {
   return idx_minor_scaling_atm
 
 end
-# ---------------------------------------------------------------------------------------
-function create_key_species_reduce(gas_names, gas_names_red, key_species)
-  # character(len=*), dimension(:),       intent(in) :: gas_names
-  # character(len=*), dimension(:),       intent(in) :: gas_names_red
-  # integer,  dimension(:,:,:),   intent(in) :: key_species
-  # integer,  dimension(:,:,:), allocatable, intent(out) :: key_species_red
-  # logical, dimension(:), allocatable, intent(out) :: key_species_present_init
-  # integer :: ip, ia, it, np, na, nt
 
+function create_key_species_reduce(gas_names::Vector{S},
+                                   gas_names_red::Vector{S},
+                                   key_species::Array{I,3}) where {I<:Int, S<:String}
   np,na,nt = size(key_species)
   key_species_red = Array{Int}(undef, size(key_species)...)
   key_species_present_init = Vector{Bool}(undef, size(gas_names))
-  key_species_present_init = true
+  key_species_present_init .= true
 
   for ip = 1:np
     for ia = 1:na
@@ -1094,8 +1078,8 @@ function create_key_species_reduce(gas_names, gas_names_red, key_species)
       end
     end
   end
-  return key_species_red,key_species_present_init
-
+  @assert all(key_species_present_init)
+  return key_species_red
 end
 
 """
@@ -1222,49 +1206,46 @@ function create_gpoint_flavor(key_species, gpt2band, flavor)
   return gpoint_flavor
 end
 
-#--------------------------------------------------------------------------------------------------------------------
-#
-# Utility function to combine optical depths from gas absorption and Rayleigh scattering
-#   (and reorder them for convenience, while we're at it)
-#
-function combine_and_reorder!(tau, tau_rayleigh, has_rayleigh, optical_props::AbstractOpticalPropsArry{FT}) where FT
-  # real(FT), dimension(:,:,:),   intent(in) :: tau
-  # real(FT), dimension(:,:,:),   intent(in) :: tau_rayleigh
-  # logical,                      intent(in) :: has_rayleigh
-  # class(AbstractOpticalPropsArry), intent(inout) :: optical_props
+"""
+    combine_and_reorder!(τ::Array{FT,3},
+                              τ_rayleigh::Array{FT,3},
+                              has_rayleigh::Bool,
+                              optical_props::AbstractOpticalPropsArry{FT}) where FT
 
-  # integer :: ncol, nlay, ngpt, nmom
-
-  ncol = size(tau, 3)
-  nlay = size(tau, 2)
-  ngpt = size(tau, 1)
+Utility function to combine optical depths from gas absorption and Rayleigh scattering
+(and reorder them for convenience, while we're at it)
+"""
+function combine_and_reorder!(τ::Array{FT,3},
+                              τ_rayleigh::Array{FT,3},
+                              has_rayleigh::Bool,
+                              optical_props::AbstractOpticalPropsArry{FT}) where FT
   if !has_rayleigh
     # index reorder (ngpt, nlay, ncol) -> (ncol,nlay,gpt)
-    permutedims!(optical_props.tau, tau, [3,2,1])
-      if optical_props isa TwoStream
-        optical_props.ssa .= FT(0)
-        optical_props.g   .= FT(0)
-      end
+    permutedims!(optical_props.τ, τ, [3,2,1])
+    if optical_props isa TwoStream
+      optical_props.ssa .= FT(0)
+      optical_props.g   .= FT(0)
+    end
   else
-    # combine optical depth and rayleigh scattering
-      if optical_props isa OneScalar
-        # User is asking for absorption optical depth
-        permutedims!(optical_props.tau, tau, [3,2,1])
+    # combine optical depth and Rayleigh scattering
+    if optical_props isa OneScalar
+      # User is asking for absorption optical depth
+      permutedims!(optical_props.τ, τ, [3,2,1])
 
-      elseif optical_props isa TwoStream
-        combine_and_reorder_2str!(optical_props, ncol, nlay, ngpt,       tau, tau_rayleigh)
-      end
+    elseif optical_props isa TwoStream
+      combine_and_reorder_2str!(optical_props, τ, τ_rayleigh)
+    end
   end
 end
 
 #--------------------------------------------------------------------------------------------------------------------
-# Sizes of tables: pressure, temperate, eta (mixing fraction)
+# Sizes of tables: pressure, temperate, η (mixing fraction)
 #   Equivalent routines for the number of gases and flavors (get_ngas(), get_nflav()) are defined above because they're
 #   used in function defintions
 # Table kmajor has dimensions (ngpt, neta, npres, ntemp)
 #--------------------------------------------------------------------------------------------------------------------
 
-# return extent of eta dimension
+# return extent of η dimension
 get_neta(this::AbstractGasOptics) = size(this.kmajor,2)
 
 # return the number of pressures in reference profile
