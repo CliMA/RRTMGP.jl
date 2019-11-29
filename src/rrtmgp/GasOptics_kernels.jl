@@ -399,7 +399,7 @@ function gas_optical_depths_minor!(ncol,
 end
 
 """
-    compute_τ_rayleigh!()
+    compute_τ_Rayleigh!()
 
 compute Rayleigh scattering optical depths
 
@@ -413,15 +413,15 @@ integer,                                     intent(in ) :: idx_h2o
 real(FT),    dimension(ncol,nlay),           intent(in ) :: col_dry
 real(FT),    dimension(ncol,nlay,0:ngas),    intent(in ) :: col_gas
 # outputs
-real(FT),    dimension(ngpt,nlay,ncol),      intent(out) :: τ_rayleigh
+real(FT),    dimension(ngpt,nlay,ncol),      intent(out) :: τ_Rayleigh
 # -----------------
 # local variables
-real(FT) :: k(ngpt) # rayleigh scattering coefficient
+real(FT) :: k(ngpt) # Rayleigh scattering coefficient
 integer  :: icol, ilay, iflav, ibnd, igpt, gptS, gptE
 integer  :: itropo
 # -----------------
 """
-function compute_τ_rayleigh!(ncol::I,nlay::I,nbnd::I,ngpt::I,
+function compute_τ_Rayleigh!(ncol::I,nlay::I,nbnd::I,ngpt::I,
                                gpoint_flavor::Array{I,2},
                                band_lims_gpt::Array{I,2},
                                krayl::Array{FT,4},
@@ -429,7 +429,7 @@ function compute_τ_rayleigh!(ncol::I,nlay::I,nbnd::I,ngpt::I,
                                col_dry::Array{FT,2},
                                col_gas::AbstractArray{FT,3},
                                ics::InterpolationCoefficients{FT},
-                               τ_rayleigh::Array{FT}) where {FT<:AbstractFloat, I<:Integer, B<:Bool}
+                               τ_Rayleigh::Array{FT}) where {FT<:AbstractFloat, I<:Integer, B<:Bool}
   k = Array{FT}(undef, ngpt)
   @inbounds for ilay in 1:nlay
     @inbounds for icol in 1:ncol
@@ -454,7 +454,7 @@ function compute_τ_rayleigh!(ncol::I,nlay::I,nbnd::I,ngpt::I,
                               jeta_tup,
                               ics.jtemp[icol,ilay])
 
-        τ_rayleigh[gptS:gptE,ilay,icol] .= k[gptS:gptE] .*
+        τ_Rayleigh[gptS:gptE,ilay,icol] .= k[gptS:gptE] .*
                                             (col_gas[icol,ilay,idx_h2o]+col_dry[icol,ilay])
       end
     end
@@ -757,13 +757,13 @@ function interpolate3D_byflav!(res::AbstractArray{FT},
 end
 
 """
-    combine_and_reorder_2str!(op::AbstractOpticalProps{FT}, τ_abs::Array{FT}, τ_rayleigh::Array{FT}) where FT
+    combine_and_reorder_2str!(op::AbstractOpticalProps{FT}, τ_abs::Array{FT}, τ_Rayleigh::Array{FT}) where FT
 
 Combine absorption and Rayleigh optical depths for total `τ`, `ssa`, `g`
 
 """
-function combine_and_reorder_2str!(op::AbstractOpticalProps{FT}, τ_abs::Array{FT}, τ_rayleigh::Array{FT}) where FT
-  τ_Rayleigh′ = permutedims(τ_rayleigh, [3,2,1])
+function combine_and_reorder_2str!(op::AbstractOpticalProps{FT}, τ_abs::Array{FT}, τ_Rayleigh::Array{FT}) where FT
+  τ_Rayleigh′ = permutedims(τ_Rayleigh, [3,2,1])
   τ_abs′ = permutedims(τ_abs, [3,2,1])
   t = τ_abs′+τ_Rayleigh′
   op.τ .= t

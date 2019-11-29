@@ -356,25 +356,6 @@ convert_gpt2band(this::AbstractOpticalProps, gpt) = convert_gpt2band(this.base)
 convert_gpt2band(this::OpticalPropsBase, gpt) = this.gpt2band[gpt]
 
 """
-    expand(this::AbstractOpticalProps{FT}, arr_in) where FT
-
-Expand an array of dimension arr_in(nband) to dimension arr_out(ngpt)
-
-    class(AbstractOpticalProps), intent(in) :: this
-    real(FT), dimension(:),  intent(in) :: arr_in # (nband)
-    real(FT), dimension(size(this%gpt2band)) :: arr_out
-
-    integer :: iband
-"""
-function expand(this::AbstractOpticalProps{FT}, arr_in) where FT
-  arr_out = Vector{FT}(undef, size(this.gpt2band))
-  for iband in 1:get_nband(this)
-    arr_out[this.band2gpt[1,iband]:this.band2gpt[2,iband]] = arr_in[iband]
-  end
-  return arr_out
-end
-
-"""
     bands_are_equal(this::AbstractOpticalProps{FT}, that::AbstractOpticalProps{FT}) where FT
 
 Are the bands of two objects the same? (same number, same wavelength limits)
