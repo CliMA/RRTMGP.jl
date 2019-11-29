@@ -998,41 +998,32 @@ end
 
 create index list for extracting col_gas needed for minor gas optical depth calculations
 
-character(len=*), dimension(:), intent(in) :: gas_names
-character(len=*), dimension(:), intent(in) :: gas_minor, identifier_minor
-character(len=*), dimension(:), intent(in) :: minor_gases_atm
-integer, dimension(:), allocatable, intent(out) :: idx_minor_atm
+ - `gas_names`
+ - `gas_minor`
+ - `identifier_minor`
+ - `minor_gases_atm`
 """
-function create_idx_minor(::Type{I}, gas_names, gas_minor, identifier_minor, minor_gases_atm) where {I<:Integer}
-
-  idx_minor_atm = Vector{I}(undef, size(minor_gases_atm,1))
-  for imnr = 1:size(minor_gases_atm,1) # loop over minor absorbers in each band
-        # Find identifying string for minor species in list of possible identifiers (e.g. h2o_slf)
-        idx_mnr     = loc_in_array(minor_gases_atm[imnr], identifier_minor)
-        # Find name of gas associated with minor species identifier (e.g. h2o)
-        idx_minor_atm[imnr] = loc_in_array(gas_minor[idx_mnr],    gas_names)
-  end
-  return idx_minor_atm
-
+function create_idx_minor(::Type{I},
+                          gas_names::VS,
+                          gas_minor::VS,
+                          identifier_minor::VS,
+                          minor_gases_atm::VS) where {I<:Integer,VS<:Vector{String}}
+  # Find identifying string for minor species in list of possible identifiers (e.g. h2o_slf)
+  idx_mnr = map(x->loc_in_array(x, identifier_minor), minor_gases_atm)
+  # Find name of gas associated with minor species identifier (e.g. h2o)
+  return map(x->loc_in_array(gas_minor[x], gas_names), idx_mnr)
 end
 
 """
-    create_idx_minor_scaling(::Type{I}, gas_names, scaling_gas_atm) where {I<:Integer}
+    create_idx_minor_scaling(::Type{I}, gas_names::Vector{S}, scaling_gas_atm::Vector{S}) where {I<:Integer, S<:String}
 
 Create index for special treatment in density scaling of minor gases
 
-character(len=*), dimension(:), intent(in) :: gas_names
-character(len=*), dimension(:), intent(in) :: scaling_gas_atm
-integer, dimension(:), allocatable, intent(out) :: idx_minor_scaling_atm
+ - `gas_names` gas names
+ - `scaling_gas_atm`
 """
-function create_idx_minor_scaling(::Type{I}, gas_names, scaling_gas_atm) where {I<:Integer}
-  idx_minor_scaling_atm = Vector{I}(undef, size(scaling_gas_atm,1))
-  for imnr = 1:size(scaling_gas_atm,1) # loop over minor absorbers in each band
-    idx_minor_scaling_atm[imnr] = loc_in_array(scaling_gas_atm[imnr], gas_names)
-  end
-  return idx_minor_scaling_atm
-
-end
+create_idx_minor_scaling(::Type{I}, gas_names::VS, scaling_gas_atm::VS) where {I<:Integer, VS<:Vector{String}} =
+  map(x->loc_in_array(x, gas_names), scaling_gas_atm)
 
 """
     create_key_species_reduce(gas_names::VS,
@@ -1136,15 +1127,10 @@ end
 
 Flavor index; -1 if not found
 """
-function key_species_pair2flavor(flavor, key_species_pair)
-  # integer, dimension(:,:), intent(in) :: flavor
-  # integer, dimension(2), intent(in) :: key_species_pair
-  for iflav=1:size(flavor,2)
-    if all(key_species_pair .== flavor[:,iflav])
-      return iflav
-    end
-  end
-  return -1
+function key_species_pair2flavor(flavor::Array{I,2},
+                                 key_species_pair::Vector{I}) where {I<:Int}
+  iflav = findfirst(mapslices(x->all(key_species_pair .== x), flavor; dims=1)[:])
+  return iflav==nothing ? -1 : iflav
 end
 
 """
