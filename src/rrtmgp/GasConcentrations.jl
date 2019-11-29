@@ -38,15 +38,6 @@ struct GasConcSize{N,I}
 end
 
 """
-    ConcField
-
-Gas concentration arrays
-"""
-struct ConcField{FT}
-  conc::Array{FT,2}
-end
-
-"""
     GasConcs{FT}
 
 Encapsulates a collection of volume mixing ratios (concentrations) of gases.
@@ -58,8 +49,8 @@ $(DocStringExtensions.FIELDS)
 struct GasConcs{FT,I}
   "gas names"
   gas_names::Vector{String}
-  "gas concentrations"
-  concs::Vector{ConcField{FT}}
+  "gas concentrations arrays"
+  concs::Array{FT}
   "number of columns"
   ncol::I
   "number of layers"
@@ -69,7 +60,7 @@ struct GasConcs{FT,I}
 end
 
 function GasConcs(::Type{FT}, ::Type{I}, gas_names, ncol, nlay, gsc::GasConcSize) where {FT<:AbstractFloat,I<:Int}
-  concs = ConcField[ConcField(zeros(FT, gsc.s...)) for i in 1:gsc.nconcs]
+  concs = zeros(FT, gsc.nconcs, gsc.s...)
   return GasConcs{FT,I}(gas_names, concs, gsc.s..., gsc)
 end
 
@@ -81,7 +72,7 @@ Set volume mixing ratio (vmr)
 function set_vmr!(this::GasConcs{FT}, gas::String, w::FT) where FT
   @assert !(w < FT(0) || w > FT(1))
   igas = loc_in_array(gas, this.gas_names)
-  this.concs[igas].conc .= w
+  this.concs[igas,:,:] .= w
   this.gas_names[igas] = gas
 end
 function set_vmr!(this::GasConcs{FT}, gas::String, w::Vector{FT}) where FT
@@ -89,7 +80,7 @@ function set_vmr!(this::GasConcs{FT}, gas::String, w::Vector{FT}) where FT
   @assert !(this.nlay ≠ nothing && length(w) ≠ this.nlay)
   igas = loc_in_array(gas, this.gas_names)
   @assert igas ≠ -1 # assert gas is found
-  this.concs[igas].conc .= reshape(w, 1, this.nlay)
+  this.concs[igas,:,:] .= reshape(w, 1, this.nlay)
   this.gas_names[igas] = gas
 end
 function set_vmr!(this::GasConcs, gas::String, w::Array{FT, 2}) where FT
@@ -98,7 +89,7 @@ function set_vmr!(this::GasConcs, gas::String, w::Array{FT, 2}) where FT
   @assert !(this.nlay ≠ nothing && size(w, 2) ≠ this.nlay)
   igas = loc_in_array(gas, this.gas_names)
   @assert igas ≠ -1 # assert gas is found
-  this.concs[igas].conc .= w
+  this.concs[igas,:,:] .= w
   this.gas_names[igas] = gas
 end
 
@@ -112,7 +103,7 @@ function get_vmr!(array::AbstractArray{FT,2}, this::GasConcs{FT}, gas::String) w
   @assert igas ≠ -1 # assert gas is found
   @assert !(this.ncol ≠ nothing && this.ncol ≠ size(array,1))
   @assert !(this.nlay ≠ nothing && this.nlay ≠ size(array,2))
-  conc = this.concs[igas].conc
+  conc = this.concs[igas,:,:]
   array .= conc
   return nothing
 end
