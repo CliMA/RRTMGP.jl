@@ -35,7 +35,7 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
   k_dist_sym = Symbol(:k_dist,λ_string)
   cloud_optics_sym = Symbol(:cloud_optics,λ_string)
 
-  gas_names = lowercase.(strip.(["h2o", "co2", "o3", "n2o", "co", "ch4", "o2", "n2"]))
+  gas_names = lowercase.(strip.(["h2o", "co2", "o3", "n2o", "co", "ch4", "o2", "n2"])) # populates gas_concs.gas_names
   ngas = length(gas_names)
   nloops = 1
   ncol = 128
