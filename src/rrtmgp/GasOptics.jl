@@ -443,7 +443,7 @@ Optional inputs
 real(FT), dimension(:,:), intent(in   ), optional, target :: col_dry # Column dry amount; dim(ncol,nlay)
 ----------------------------------------------------------
 Local variables
-real(FT), dimension(ngpt,nlay,ncol) :: τ, τ_rayleigh  # absorption, Rayleigh scattering optical depths
+real(FT), dimension(ngpt,nlay,ncol) :: τ, τ_Rayleigh  # absorption, Rayleigh scattering optical depths
 # integer :: igas, idx_h2o # index of some gases
 # Number of molecules per cm^2
 real(FT), dimension(ncol,nlay), target  :: col_dry_arr
@@ -473,7 +473,7 @@ function compute_gas_τs!(ics::InterpolationCoefficients,
                            col_dry=nothing, last_call=false) where FT
 
   τ          = Array{FT}(undef, ngpt,nlay,ncol)          # absorption, Rayleigh scattering optical depths
-  τ_rayleigh = Array{FT}(undef, ngpt,nlay,ncol) # absorption, Rayleigh scattering optical depths
+  τ_Rayleigh = Array{FT}(undef, ngpt,nlay,ncol) # absorption, Rayleigh scattering optical depths
   col_dry_arr  = Array{FT}(undef, ncol, nlay)
   col_dry_wk   = Array{FT}(undef, ncol, nlay)
 
@@ -482,7 +482,7 @@ function compute_gas_τs!(ics::InterpolationCoefficients,
   col_mix = Array{FT}(undef, 2,    get_nflav(this),ncol,nlay) # combination of major species's column amounts
 
   # Check for presence of key species in GasConcs; return error if any key species are not present
-  check_key_species_present(this, gas_desc)
+  check_key_species_present(this, gas_desc.gas_names)
 
   # Check input data sizes and values
   check_extent(play, (ncol, nlay  ), "play")
@@ -553,7 +553,7 @@ function compute_gas_τs!(ics::InterpolationCoefficients,
           col_gas)
   if allocated(this.krayl)
 
-    @timeit to_gor "compute_τ_rayleigh!" compute_τ_rayleigh!(          #Rayleigh scattering optical depths
+    @timeit to_gor "compute_τ_Rayleigh!" compute_τ_Rayleigh!(          #Rayleigh scattering optical depths
           ncol,nlay,nband,ngpt,# dimensions
           this.gpoint_flavor,
           get_band_lims_gpoint(this.optical_props),
@@ -562,12 +562,12 @@ function compute_gas_τs!(ics::InterpolationCoefficients,
           col_dry_wk,
           col_gas,
           ics,
-          τ_rayleigh)
+          τ_Rayleigh)
 
   end
 
   # Combine optical depths and reorder for radiative transfer solver.
-  @timeit to_gor "combine_and_reorder!" combine_and_reorder!(τ, τ_rayleigh, allocated(this.krayl), optical_props)
+  @timeit to_gor "combine_and_reorder!" combine_and_reorder!(τ, τ_Rayleigh, allocated(this.krayl), optical_props)
 
 end
 
@@ -681,9 +681,13 @@ end
 ##### Initialization
 #####
 
-# Initialize object based on data read from netCDF file however the user desires.
-#  Rayleigh scattering tables may or may not be present; this is indicated with allocation status
-# This interface is for the internal-sources object -- includes Plank functions and fractions
+"""
+    load_totplnk(totplnk, planck_frac, rayl_lower, rayl_upper, ref, args...)
+
+Initialize object based on data read from netCDF file however the user desires.
+Rayleigh scattering tables may or may not be present; this is indicated with allocation status
+This interface is for the internal-sources object -- includes Plank functions and fractions
+"""
 function load_totplnk(totplnk, planck_frac, rayl_lower, rayl_upper, ref, args...)
   abs_coeffs = init_abs_coeffs(args...)
 
@@ -706,9 +710,13 @@ function load_totplnk(totplnk, planck_frac, rayl_lower, rayl_upper, ref, args...
 
 end
 
-# Initialize object based on data read from netCDF file however the user desires.
-#  Rayleigh scattering tables may or may not be present; this is indicated with allocation status
-# This interface is for the external-sources object -- includes TOA source function table
+"""
+    load_solar_source(solar_src, rayl_lower, rayl_upper, ref, args...)
+
+Initialize object based on data read from netCDF file however the user desires.
+Rayleigh scattering tables may or may not be present; this is indicated with allocation status
+This interface is for the external-sources object -- includes TOA source function table
+"""
 function load_solar_source(solar_src, rayl_lower, rayl_upper, ref, args...)
   abs_coeffs = init_abs_coeffs(args...)
   FT = Float64
@@ -743,11 +751,6 @@ integer,  dimension(:,:,:),   intent(in) :: key_species
 integer,  dimension(:,:),     intent(in) :: band2gpt
 real(FT), dimension(:,:),     intent(in) :: band_lims_wavenum
 real(FT), dimension(:,:,:,:), intent(in) :: kmajor
---------------------------------------------------------------------------
-logical,  dimension(:),     allocatable :: gas_is_present
-logical,  dimension(:),     allocatable :: key_species_present_init
-integer,  dimension(:,:,:), allocatable :: key_species_red
-integer :: i, j, idx
 """
 function init_abs_coeffs(available_gases::Vector{String},
                          gas_names,
@@ -804,14 +807,16 @@ function init_abs_coeffs(available_gases::Vector{String},
 
 end
 
-# Ensure that every key gas required by the k-distribution is
-#    present in the gas concentration object
-function check_key_species_present(this::AbstractGasOptics, gas_desc::GasConcs)
-  # class(AbstractGasOptics), intent(in) :: this
-  # class(GasConcs),                intent(in) :: gas_desc
+"""
+    check_key_species_present(this::AbstractGasOptics, gas_names::Vector{String})
+
+Ensure that every key gas required by the k-distribution is
+present in the gas concentration object
+"""
+function check_key_species_present(this::AbstractGasOptics, gas_names::Vector{String})
   key_gas_names = pack(this.gas_names, this.is_key)
   for igas = 1:length(key_gas_names)
-    @assert key_gas_names[igas] in gas_desc.gas_names
+    @assert key_gas_names[igas] in gas_names
   end
 end
 
@@ -823,16 +828,17 @@ Function to define names of key and minor gases to be used by gas_optics().
 The final list gases includes those that are defined in gas_optics_specification
 and are provided in GasConcs.
 """
-function get_minor_list(this::AbstractGasOptics, gas_desc::GasConcs, ngas, names_spec::Vector{String})
-  gas_is_present = map(x->x in gas_desc.gas_names, names_spec)
+function get_minor_list(this::AbstractGasOptics, gas_names::Vector{String}, ngas, names_spec::Vector{String})
+  gas_is_present = map(x->x in gas_names, names_spec)
   for igas = 1:get_ngas(this)
-    gas_is_present[igas] = names_spec[igas] in gas_desc.gas_names
+    gas_is_present[igas] = names_spec[igas] in gas_names
   end
-  minor_list = pack(this.gas_names, gas_is_present)
-  return minor_list
+  return pack(this.gas_names, gas_is_present)
 end
 
-#### Inquiry functions
+#####
+##### Inquiry functions
+#####
 
 """
     source_is_internal(this::AbstractGasOptics)
@@ -881,7 +887,7 @@ get_temp_min(this::AbstractGasOptics) = this.ref.temp_min
 """
     get_temp_max(this::AbstractGasOptics)
 
-Maximum temparature on the interpolation grids
+Maximum temperature on the interpolation grids
 """
 get_temp_max(this::AbstractGasOptics) = this.ref.temp_max
 
@@ -896,18 +902,6 @@ real(FT), dimension(:,:), intent(in) :: vmr_h2o  # volume mixing ratio of water 
 real(FT), dimension(:,:), intent(in) :: plev     # Layer boundary pressures [Pa] (ncol,nlay+1)
 real(FT), dimension(:,:), intent(in) :: tlay     # Layer temperatures [K] (ncol,nlay)
 real(FT), dimension(:),   optional, intent(in) :: latitude # Latitude [degrees] (ncol)
-# output
-real(FT), dimension(size(tlay,dim=1),size(tlay,dim=2)) :: col_dry # Column dry amount (ncol,nlay)
-------------------------------------------------
-# first and second term of Helmert formula
-real(FT), parameter :: helmert1 = 9.80665_wp
-real(FT), parameter :: helmert2 = 0.02586_wp
-# local variables
-real(FT), dimension(size(tlay,dim=1)                 ) :: g0 # (ncol)
-real(FT), dimension(size(tlay,dim=1),size(tlay,dim=2)) :: delta_plev # (ncol,nlay)
-real(FT), dimension(size(tlay,dim=1),size(tlay,dim=2)) :: m_air # average mass of air; (ncol,nlay)
-integer :: nlev, nlay
-# ------------------------------------------------
 """
 function get_col_dry(vmr_h2o, plev, tlay, latitude=nothing)
   FT = eltype(plev)
@@ -940,46 +934,34 @@ function get_col_dry(vmr_h2o, plev, tlay, latitude=nothing)
   return col_dry
 end
 
-#
-# Internal procedures
-#
-function rewrite_key_species_pair(key_species_pair)
-  # (0,0) becomes (2,2) -- because absorption coefficients for these g-points will be 0.
-  # integer, dimension(2) :: rewrite_key_species_pair
-  # integer, dimension(2), intent(in) :: key_species_pair
-  result = key_species_pair
-  if all(key_species_pair .== [0,0])
-    result .= [2,2]
-  end
-  return result
-end
+"""
+    rewrite_key_species_pair(key_species_pair)
 
-# ---------------------------------------------------------------------------------------
-# true is key_species_pair exists in key_species_list
-function key_species_pair_exists(key_species_list, key_species_pair)
-  # logical                             :: key_species_pair_exists
-  # integer, dimension(:,:), intent(in) :: key_species_list
-  # integer, dimension(2),   intent(in) :: key_species_pair
-  # integer :: i
-  for i=1:size(key_species_list,2)
-    if all(key_species_list[:,i] .== key_species_pair)
-      result = true
-      return result
-    end
-  end
-  result = false
-  return result
-end
-# ---------------------------------------------------------------------------------------
-# create flavor list --
-#   an unordered array of extent (2,:) containing all possible pairs of key species
-#   used in either upper or lower atmos
-#
-function create_flavor(key_species)
-  # integer, dimension(:,:,:), intent(in) :: key_species
-  # integer, dimension(:,:), allocatable, intent(out) :: flavor
-  # integer, dimension(2,size(key_species,3)*2) :: key_species_list
-  # integer :: ibnd, iatm, i, iflavor
+(0,0) becomes (2,2) -- because absorption coefficients for these g-points will be 0.
+"""
+rewrite_key_species_pair(key_species_pair) =
+  all(key_species_pair .== [0,0]) ? [2,2] : key_species_pair
+
+"""
+    key_species_pair_exists(key_species_list, key_species_pair)
+
+True is key_species_pair exists in key_species_list
+
+integer, dimension(:,:), intent(in) :: key_species_list
+integer, dimension(2),   intent(in) :: key_species_pair
+"""
+key_species_pair_exists(key_species_list, key_species_pair) =
+  any([all(key_species_list[:,i] .== key_species_pair) for i=1:size(key_species_list,2)])
+
+
+"""
+    create_flavor(key_species)
+
+Flavor list -- an unordered array of extent (2,:)
+containing all possible pairs of key species
+used in either upper or lower atmosphere
+"""
+function create_flavor(key_species::Array{I,3}) where {I<:Int}
 
   key_species_list = Array{Int}(undef, 2,size(key_species,3)*2)
 
@@ -988,44 +970,41 @@ function create_flavor(key_species)
   for ibnd=1:size(key_species,3)
     for iatm=1:size(key_species,1)
       key_species_list[:,i] .= key_species[:,iatm,ibnd]
-      i = i + 1
+      i += 1
     end
   end
   # rewrite single key_species pairs
   for i=1:size(key_species_list,2)
-      key_species_list[:,i] = rewrite_key_species_pair(key_species_list[:,i])
+    key_species_list[:,i] .= rewrite_key_species_pair(key_species_list[:,i])
   end
   # count unique key species pairs
-  iflavor = 0
-  for i=1:size(key_species_list,2)
-    if !key_species_pair_exists(key_species_list[:,1:i-1],key_species_list[:,i])
-      iflavor = iflavor + 1
-    end
-  end
+  x = key_species_list
+  key_species_pair_absent = [!key_species_pair_exists(x[:,1:i-1],x[:,i]) for i=1:size(x,2)]
+  iflavor = count(key_species_pair_absent)
   # fill flavors
-  flavor = Array{Int}(undef, 2,iflavor)
+  flavor = Array{Int}(undef, 2, iflavor)
   iflavor = 0
   for i=1:size(key_species_list,2)
-    if !key_species_pair_exists(key_species_list[:,1:i-1],key_species_list[:,i])
-      iflavor = iflavor + 1
+    if key_species_pair_absent[i]
+      iflavor += 1
       flavor[:,iflavor] = key_species_list[:,i]
     end
   end
   return flavor
 end
-# ---------------------------------------------------------------------------------------
-#
-# create index list for extracting col_gas needed for minor gas optical depth calculations
-#
-function create_idx_minor(::Type{I}, gas_names, gas_minor, identifier_minor, minor_gases_atm) where {I<:Integer}
-  # character(len=*), dimension(:), intent(in) :: gas_names
-  # character(len=*), dimension(:), intent(in) :: gas_minor, identifier_minor
-  # character(len=*), dimension(:), intent(in) :: minor_gases_atm
-  # integer, dimension(:), allocatable, intent(out) :: idx_minor_atm
 
-  # # local
-  # integer :: imnr
-  # integer :: idx_mnr
+"""
+    create_idx_minor(::Type{I}, gas_names, gas_minor, identifier_minor, minor_gases_atm) where {I<:Integer}
+
+create index list for extracting col_gas needed for minor gas optical depth calculations
+
+character(len=*), dimension(:), intent(in) :: gas_names
+character(len=*), dimension(:), intent(in) :: gas_minor, identifier_minor
+character(len=*), dimension(:), intent(in) :: minor_gases_atm
+integer, dimension(:), allocatable, intent(out) :: idx_minor_atm
+"""
+function create_idx_minor(::Type{I}, gas_names, gas_minor, identifier_minor, minor_gases_atm) where {I<:Integer}
+
   idx_minor_atm = Vector{I}(undef, size(minor_gases_atm,1))
   for imnr = 1:size(minor_gases_atm,1) # loop over minor absorbers in each band
         # Find identifying string for minor species in list of possible identifiers (e.g. h2o_slf)
@@ -1037,48 +1016,37 @@ function create_idx_minor(::Type{I}, gas_names, gas_minor, identifier_minor, min
 
 end
 
-# ---------------------------------------------------------------------------------------
-#
-# create index for special treatment in density scaling of minor gases
-#
+"""
+    create_idx_minor_scaling(::Type{I}, gas_names, scaling_gas_atm) where {I<:Integer}
+
+Create index for special treatment in density scaling of minor gases
+
+character(len=*), dimension(:), intent(in) :: gas_names
+character(len=*), dimension(:), intent(in) :: scaling_gas_atm
+integer, dimension(:), allocatable, intent(out) :: idx_minor_scaling_atm
+"""
 function create_idx_minor_scaling(::Type{I}, gas_names, scaling_gas_atm) where {I<:Integer}
-  # character(len=*), dimension(:), intent(in) :: gas_names
-  # character(len=*), dimension(:), intent(in) :: scaling_gas_atm
-  # integer, dimension(:), allocatable, intent(out) :: idx_minor_scaling_atm
-  # # local
-  # integer :: imnr
   idx_minor_scaling_atm = Vector{I}(undef, size(scaling_gas_atm,1))
   for imnr = 1:size(scaling_gas_atm,1) # loop over minor absorbers in each band
-        # This will be -1 if there's no interacting gas
-        idx_minor_scaling_atm[imnr] = loc_in_array(scaling_gas_atm[imnr], gas_names)
+    idx_minor_scaling_atm[imnr] = loc_in_array(scaling_gas_atm[imnr], gas_names)
   end
   return idx_minor_scaling_atm
 
 end
 
-function create_key_species_reduce(gas_names::Vector{S},
-                                   gas_names_red::Vector{S},
-                                   key_species::Array{I,3}) where {I<:Int, S<:String}
-  np,na,nt = size(key_species)
-  key_species_red = Array{Int}(undef, size(key_species)...)
-  key_species_present_init = Vector{Bool}(undef, size(gas_names))
-  key_species_present_init .= true
+"""
+    create_key_species_reduce(gas_names::VS,
+                              gas_names_red::VS,
+                              key_species::Array{I,3}) where {VS<:Vector{String},I<:Int}
 
-  for ip = 1:np
-    for ia = 1:na
-      for it = 1:nt
-        if key_species[ip,ia,it] ≠ 0
-          key_species_red[ip,ia,it] = loc_in_array(gas_names[key_species[ip,ia,it]],gas_names_red)
-          if key_species_red[ip,ia,it] == -1
-            key_species_present_init[key_species[ip,ia,it]] = false
-          end
-        else
-          key_species_red[ip,ia,it] = key_species[ip,ia,it]
-        end
-      end
-    end
-  end
-  @assert all(key_species_present_init)
+create flavor list
+Reduce (remap) key_species list; checks that all key gases are present in incoming
+"""
+function create_key_species_reduce(gas_names::VS,
+                                   gas_names_red::VS,
+                                   key_species::Array{I,3}) where {VS<:Vector{String},I<:Int}
+  key_species_red = map(x-> x≠0 ? loc_in_array(gas_names[x],gas_names_red) : x, key_species)
+  @assert !any(key_species_red .== -1)
   return key_species_red
 end
 
@@ -1095,11 +1063,6 @@ Reduce minor arrays so variables only contain minor gases that are available
  - `gas_minor` array of minor gases
  - `identifier_minor`
  - `atmos` original minor `GasOpticsVars` (in)
-
-# Local variables
-integer :: i, j
-integer :: idx_mnr, nm, tot_g, red_nm
-integer :: icnt, n_elim, ng
 """
 function reduce_minor_arrays(available_gases::Vector{String},
                              gas_minor,
@@ -1167,13 +1130,15 @@ function reduce_minor_arrays(available_gases::Vector{String},
 
 end
 
-# ---------------------------------------------------------------------------------------
-# returns flavor index; -1 if not found
+
+"""
+    key_species_pair2flavor(flavor, key_species_pair)
+
+Flavor index; -1 if not found
+"""
 function key_species_pair2flavor(flavor, key_species_pair)
-  # integer :: key_species_pair2flavor
   # integer, dimension(:,:), intent(in) :: flavor
   # integer, dimension(2), intent(in) :: key_species_pair
-  # integer :: iflav
   for iflav=1:size(flavor,2)
     if all(key_species_pair .== flavor[:,iflav])
       return iflav
@@ -1182,25 +1147,26 @@ function key_species_pair2flavor(flavor, key_species_pair)
   return -1
 end
 
-# ---------------------------------------------------------------------------------------
-#
-# create gpoint_flavor list
-#   a map pointing from each g-point to the corresponding entry in the "flavor list"
-#
+"""
+    create_gpoint_flavor(key_species, gpt2band, flavor)
+
+create gpoint_flavor list a map pointing from each
+g-point to the corresponding entry in the "flavor list"
+
+integer, dimension(:,:,:), intent(in) :: key_species
+integer, dimension(:), intent(in) :: gpt2band
+integer, dimension(:,:), intent(in) :: flavor
+integer, dimension(:,:), intent(out), allocatable :: gpoint_flavor
+integer :: ngpt, igpt, iatm
+"""
 function create_gpoint_flavor(key_species, gpt2band, flavor)
-  # integer, dimension(:,:,:), intent(in) :: key_species
-  # integer, dimension(:), intent(in) :: gpt2band
-  # integer, dimension(:,:), intent(in) :: flavor
-  # integer, dimension(:,:), intent(out), allocatable :: gpoint_flavor
-  # integer :: ngpt, igpt, iatm
   ngpt = length(gpt2band)
   gpoint_flavor = Array{Int}(undef, 2,ngpt)
   for igpt=1:ngpt
     for iatm=1:2
-      gpoint_flavor[iatm,igpt] = key_species_pair2flavor(
-        flavor,
-        rewrite_key_species_pair(key_species[:,iatm,gpt2band[igpt]])
-      )
+      gpoint_flavor[iatm,igpt] = key_species_pair2flavor(flavor,
+                                                         rewrite_key_species_pair(key_species[:,iatm,gpt2band[igpt]])
+                                                         )
     end
   end
   return gpoint_flavor
@@ -1208,18 +1174,18 @@ end
 
 """
     combine_and_reorder!(τ::Array{FT,3},
-                              τ_rayleigh::Array{FT,3},
-                              has_rayleigh::Bool,
+                              τ_Rayleigh::Array{FT,3},
+                              has_Rayleigh::Bool,
                               optical_props::AbstractOpticalPropsArry{FT}) where FT
 
 Utility function to combine optical depths from gas absorption and Rayleigh scattering
 (and reorder them for convenience, while we're at it)
 """
 function combine_and_reorder!(τ::Array{FT,3},
-                              τ_rayleigh::Array{FT,3},
-                              has_rayleigh::Bool,
+                              τ_Rayleigh::Array{FT,3},
+                              has_Rayleigh::Bool,
                               optical_props::AbstractOpticalPropsArry{FT}) where FT
-  if !has_rayleigh
+  if !has_Rayleigh
     # index reorder (ngpt, nlay, ncol) -> (ncol,nlay,gpt)
     permutedims!(optical_props.τ, τ, [3,2,1])
     if optical_props isa TwoStream
@@ -1233,38 +1199,61 @@ function combine_and_reorder!(τ::Array{FT,3},
       permutedims!(optical_props.τ, τ, [3,2,1])
 
     elseif optical_props isa TwoStream
-      combine_and_reorder_2str!(optical_props, τ, τ_rayleigh)
+      combine_and_reorder_2str!(optical_props, τ, τ_Rayleigh)
     end
   end
 end
 
-#--------------------------------------------------------------------------------------------------------------------
-# Sizes of tables: pressure, temperate, η (mixing fraction)
-#   Equivalent routines for the number of gases and flavors (get_ngas(), get_nflav()) are defined above because they're
-#   used in function defintions
-# Table kmajor has dimensions (ngpt, neta, npres, ntemp)
-#--------------------------------------------------------------------------------------------------------------------
+#####
+##### Sizes of tables: pressure, temperate, η (mixing fraction)
+#####   Equivalent routines for the number of gases and flavors
+#####   (get_ngas(), get_nflav()) are defined above because they're
+#####   used in function definitions
+#####
 
-# return extent of η dimension
+"""
+    get_neta(this::AbstractGasOptics)
+
+size of η dimension
+"""
 get_neta(this::AbstractGasOptics) = size(this.kmajor,2)
 
-# return the number of pressures in reference profile
-#   absorption coefficient table is one bigger since a pressure is repeated in upper/lower atmos
+"""
+    get_npres(this::AbstractGasOptics)
+
+Number of pressures in reference profile absorption
+coefficient table is one bigger since a pressure is
+repeated in upper/lower atmosphere.
+"""
 get_npres(this::AbstractGasOptics) = size(this.kmajor,3)-1
 
-# return the number of temperatures
+"""
+    get_ntemp(this::AbstractGasOptics)
+
+Number of temperatures
+"""
 get_ntemp(this::AbstractGasOptics) = size(this.kmajor,4)
 
-# return the number of temperatures for Planck function
+"""
+    get_nPlanckTemp(this::InternalSourceGasOptics)
+
+Number of temperatures for Planck function
+"""
 get_nPlanckTemp(this::InternalSourceGasOptics) = size(this.totplnk,1) # dimensions are Planck-temperature, band
 
-#### Generic procedures for checking sizes, limits
+"""
+    check_extent(array, s, label)
 
-# Extents
+Assert array has correct size
+"""
 check_extent(array, s, label) = @assert all(size(array).==s)
 
-# Values
-check_range(val, minV, maxV, label) = any(val .< minV) || any(val .> maxV) ? trim(label) * " values out of range." : ""
+"""
+    check_range(val, minV, maxV, label)
+
+Assert range of values is valid
+"""
+check_range(val, minV, maxV, label) = any(val .< minV) || any(val .> maxV) ? error(strip(label) * " values out of range.") : nothing
 
 include("GasOptics_kernels.jl")
 

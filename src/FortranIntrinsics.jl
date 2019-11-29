@@ -10,7 +10,6 @@ export fmerge,
        spread_new,
        associated,
        allocated,
-       trim,
        pack,
        spacing,
        fint,
@@ -143,7 +142,5 @@ associated(a::AbstractArray) = length(a)>0
 allocated(a::Array) = a ≠ nothing
 allocated(a::Nothing) = false
 present(arg) = arg ≠ nothing
-trim(s::AbstractString) = strip(s)
-trim(s::Char) = s
 
 end
