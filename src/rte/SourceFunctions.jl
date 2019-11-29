@@ -27,11 +27,11 @@ $(DocStringExtensions.FIELDS)
 """
 struct SourceFuncLW{FT, I} <: AbstractOpticalProps{FT, I}
   optical_props::AbstractOpticalProps{FT,I}
-  lay_source     # Planck source at layer average temperature [W/m2] (ncol, nlay, ngpt)
-  lev_source_inc # Planck source at layer edge in increasing ilay direction [W/m2] (ncol, nlay+1, ngpt)
-  lev_source_dec # Planck source at layer edge in decreasing ilay direction [W/m2] (ncol, nlay+1, ngpt)
-  sfc_source
-  function SourceFuncLW(ncol::I, nlay::I, optical_props::AbstractOpticalProps{FT}) where {FT,I}
+  lay_source::Array{FT,3}     # Planck source at layer average temperature [W/m2] (ncol, nlay, ngpt)
+  lev_source_inc::Array{FT,3} # Planck source at layer edge in increasing ilay direction [W/m2] (ncol, nlay+1, ngpt)
+  lev_source_dec::Array{FT,3} # Planck source at layer edge in decreasing ilay direction [W/m2] (ncol, nlay+1, ngpt)
+  sfc_source::Array{FT,2}
+  function SourceFuncLW(ncol::I, nlay::I, optical_props::AbstractOpticalProps{FT}) where {FT<:AbstractFloat,I<:Int}
     ngpt = get_ngpt(optical_props)
     sfc_source = Array{FT}(undef, ncol,ngpt)
     lay_source = Array{FT}(undef, ncol,nlay,ngpt)
