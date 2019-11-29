@@ -124,8 +124,8 @@ Holds absorption optical depth `τ`, used in calculations accounting for extinct
 $(DocStringExtensions.FIELDS)
 """
 struct OneScalar{FT,I} <: AbstractOpticalPropsArry{FT,I}
-  base
-  τ#::Array{FT,3}
+  base::OpticalPropsBase{FT}
+  τ::Array{FT,3}
 end
 
 OneScalar(base::OpticalPropsBase{FT}, ps::ProblemSize{I}) where {FT<:AbstractFloat,I<:Int} =
@@ -140,10 +140,10 @@ Holds extinction optical depth `τ`, single-scattering albedo (`ssa`), and asymm
 $(DocStringExtensions.FIELDS)
 """
 struct TwoStream{FT,I} <: AbstractOpticalPropsArry{FT,I}
-  base
-  τ#::Array{FT,3}
-  ssa#::Array{FT,3}
-  g#::Array{FT,3}
+  base::OpticalPropsBase{FT}
+  τ::Array{FT,3}
+  ssa::Array{FT,3}
+  g::Array{FT,3}
 end
 
 TwoStream(base::OpticalPropsBase{FT}, ps::ProblemSize{I}) where {FT<:AbstractFloat,I<:Int} =

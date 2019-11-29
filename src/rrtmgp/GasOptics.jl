@@ -270,7 +270,6 @@ function gas_optics_int!(this::InternalSourceGasOptics,
 
   # Gas optics
   compute_gas_τs!(ics, this,
-                   ncol, nlay, ngpt, nband,
                    play, plev, tlay, gas_desc,
                    optical_props,
                    col_dry)
@@ -291,7 +290,6 @@ function gas_optics_int!(this::InternalSourceGasOptics,
 
   # Interpolate source function
   source!(this,
-         ncol, nlay, nband, ngpt,
          play, plev, tlay, tsfc,
          ics,
          sources,
@@ -323,38 +321,27 @@ Compute gas optical depth, `toa_src`, given temperature, pressure, and compositi
 # Optional inputs
 # real(FT), dimension(:,:), intent(in   ), optional, target :: col_dry # Column dry amount; dim(ncol,nlay)
 """
-function gas_optics_ext!(this::ExternalSourceGasOptics,
+function gas_optics_ext!(this::ExternalSourceGasOptics{FT},
                      play,
                      plev,
                      tlay,
-                     gas_desc::GasConcs,    # mandatory inputs
+                     gas_desc::GasConcs{FT},    # mandatory inputs
                      optical_props::AbstractOpticalPropsArry,
                      toa_src,        # mandatory outputs
-                     col_dry=nothing, last_call=false)
-
-  FT = eltype(play)
+                     col_dry=nothing, last_call=false) where {FT<:AbstractFloat}
 
   ncol,nlay  = size(play)
   ics = InterpolationCoefficients(FT, Int, ncol,nlay, get_nflav(this))
-  ngpt  = get_ngpt(this.optical_props)
-  nband = get_nband(this.optical_props)
-  ngas  = get_ngas(this)
-  nflav = get_nflav(this)
 
   # Gas optics
   @timeit to_gor "compute_gas_τs!" compute_gas_τs!(ics, this,
-                   ncol, nlay, ngpt, nband,
                    play, plev, tlay, gas_desc,
                    optical_props,
                    col_dry, last_call)
 
   # External source function is constant
-  check_extent(toa_src,     (ncol,         ngpt), "toa_src")
-  for igpt in 1:ngpt
-     for icol in 1:ncol
-        toa_src[icol,igpt] = this.solar_src[igpt]
-     end
-  end
+  # check_extent(toa_src,     (ncol,         ngpt), "toa_src")
+  toa_src .= repeat(this.solar_src', ncol)
   last_call && @show to_gor
 end
 
@@ -362,7 +349,6 @@ end
 # Returns optical properties and interpolation coefficients
 """
     compute_gas_τs!(this::AbstractGasOptics,
-                          ncol, nlay, ngpt, nband,
                           play, plev, tlay, gas_desc::GasConcs,
                           optical_props::AbstractOpticalPropsArry,
                           col_dry=nothing)
@@ -370,7 +356,6 @@ end
  - `ics` interpolation coefficients, see [`InterpolationCoefficients`](@ref)
 
 class(AbstractGasOptics), intent(in   ) :: this
-integer,                          intent(in   ) :: ncol, nlay, ngpt, nband
 real(FT), dimension(:,:),         intent(in   ) :: play,    # layer pressures [Pa, mb]; (ncol,nlay)
                                                    plev,    # level pressures [Pa, mb]; (ncol,nlay+1)
                                                    tlay      # layer temperatures [K]; (ncol,nlay)
@@ -399,15 +384,17 @@ real(FT), dimension(2,2,  get_nflav(this),ncol,nlay) :: fminor # interpolation f
                                                      # index(2) : reference temperature level
                                                      # index(3) : flavor
                                                      # index(4) : layer
-integer :: ngas, nflav, neta, npres, ntemp
-----------------------------------------------------------
 """
 function compute_gas_τs!(ics::InterpolationCoefficients,
                            this::AbstractGasOptics{FT},
-                           ncol, nlay, ngpt, nband,
                            play, plev, tlay, gas_desc::GasConcs,
                            optical_props::AbstractOpticalPropsArry,
                            col_dry=nothing, last_call=false) where FT
+
+  ncol  = get_ncol(optical_props)
+  nlay  = get_nlay(optical_props)
+  ngpt  = get_ngpt(optical_props)
+  nband = get_nband(optical_props)
 
   τ          = Array{FT}(undef, ngpt,nlay,ncol)          # absorption, Rayleigh scattering optical depths
   τ_Rayleigh = Array{FT}(undef, ngpt,nlay,ncol) # absorption, Rayleigh scattering optical depths
@@ -510,7 +497,6 @@ end
 
 """
     source!(this::InternalSourceGasOptics,
-                ncol, nlay, nbnd, ngpt,
                 play, plev, tlay, tsfc,
                 ics,
                 sources::SourceFuncLW,          # Planck sources
@@ -522,7 +508,6 @@ Compute Planck source functions at layer centers and levels
 
 # inputs
 class(InternalSourceGasOptics),    intent(in ) :: this
-integer,                               intent(in   ) :: ncol, nlay, nbnd, ngpt
 real(FT), dimension(ncol,nlay),        intent(in   ) :: play   # layer pressures [Pa, mb]
 real(FT), dimension(ncol,nlay+1),      intent(in   ) :: plev   # level pressures [Pa, mb]
 real(FT), dimension(ncol,nlay),        intent(in   ) :: tlay   # layer temperatures [K]
@@ -530,45 +515,45 @@ real(FT), dimension(ncol),             intent(in   ) :: tsfc   # surface skin te
 class(SourceFuncLW    ),          intent(inout) :: sources
 real(FT), dimension(ncol,nlay+1),      intent(in   ), optional, target :: tlev          # level temperatures [K]
 ----------------------------------------------------------
-integer                                      :: icol, ilay, igpt
 real(FT), dimension(ngpt,nlay,ncol)          :: lay_source_t, lev_source_inc_t, lev_source_dec_t
 real(FT), dimension(ngpt,     ncol)          :: sfc_source_t
-# Variables for temperature at layer edges [K] (ncol, nlay+1)
-real(FT), dimension(   ncol,nlay+1), target  :: tlev_arr
 real(FT), dimension(:,:),            pointer :: tlev_wk
 """
 function source!(this::InternalSourceGasOptics{FT},
-                 ncol, nlay, nbnd, ngpt,
                  play, plev, tlay, tsfc,
                  ics::InterpolationCoefficients{FT,I},
                  sources::SourceFuncLW,
                  tlev=nothing) where {FT<:AbstractFloat,I<:Int}
 
+  ncol  = get_ncol(sources)
+  nlay  = get_nlay(sources)
+  ngpt  = get_ngpt(sources)
+  nbnd = get_nband(sources.optical_props)
+
   lay_source_t     = zeros(FT, ngpt,nlay,ncol)
   lev_source_inc_t = zeros(FT, ngpt,nlay,ncol)
   lev_source_dec_t = zeros(FT, ngpt,nlay,ncol)
   sfc_source_t     = zeros(FT, ngpt,ncol)
-  tlev_arr         = zeros(FT, ncol,nlay+1)
 
   # Source function needs temperature at interfaces/levels and at layer centers
   if present(tlev)
     #   Users might have provided these
     tlev_wk = tlev
   else
-    tlev_wk = tlev_arr
+    tlev_wk = zeros(FT, ncol,nlay+1)
     #
     # Interpolate temperature to levels if not provided
     #   Interpolation and extrapolation at boundaries is weighted by pressure
     #
     for icol = 1:ncol
-       tlev_arr[icol,1] = tlay[icol,1] +
+       tlev_wk[icol,1] = tlay[icol,1] +
                          (plev[icol,1]-play[icol,1])*
                          (tlay[icol,2]-tlay[icol,1])/
                          (play[icol,2]-play[icol,1])
     end
     for ilay in 2:nlay
       for icol in 1:ncol
-         tlev_arr[icol,ilay] = (play[icol,ilay-1]*tlay[icol,ilay-1]*
+         tlev_wk[icol,ilay] = (play[icol,ilay-1]*tlay[icol,ilay-1]*
                                (plev[icol,ilay]-play[icol,ilay]) +
                                 play[icol,ilay]*tlay[icol,ilay]*
                                (play[icol,ilay-1]-plev[icol,ilay]))/
@@ -576,7 +561,7 @@ function source!(this::InternalSourceGasOptics{FT},
       end
     end
     for icol = 1:ncol
-       tlev_arr[icol,nlay+1] = tlay[icol,nlay] +
+       tlev_wk[icol,nlay+1] = tlay[icol,nlay] +
                               (plev[icol,nlay+1]-play[icol,nlay])*
                               (tlay[icol,nlay]-tlay[icol,nlay-1])/
                               (play[icol,nlay]-play[icol,nlay-1])
@@ -817,7 +802,7 @@ get_press_max(this::AbstractGasOptics) = this.ref.press_max
 """
     get_temp_min(this::AbstractGasOptics)
 
-Minimum temparature on the interpolation grids
+Minimum temperature on the interpolation grids
 """
 get_temp_min(this::AbstractGasOptics) = this.ref.temp_min
 

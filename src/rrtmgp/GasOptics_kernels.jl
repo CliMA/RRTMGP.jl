@@ -465,6 +465,9 @@ end
 """
     compute_Planck_source!(...)
 
+Compute internal (Planck) source functions at layers and levels,
+which depend on mapping from spectral space that creates k-distribution.
+
  - `ics` interpolation coefficients, see [`InterpolationCoefficients`](@ref)
 
 integer,                                    intent(in) :: ncol, nlay, nbnd, ngpt
@@ -543,7 +546,7 @@ function compute_Planck_source!(ncol, nlay, nbnd, ngpt,
   # Compute surface source irradiance for g-point, equals band irradiance x fraction for g-point
   #
   @inbounds for icol in 1:ncol
-    planck_function[1:nbnd,1,icol] = interpolate1D(tsfc[icol], temp_ref_min, totplnk_delta, totplnk)
+    planck_function[1:nbnd,1,icol] .= interpolate1D(tsfc[icol], temp_ref_min, totplnk_delta, totplnk)
     #
     # Map to g-points
     #
@@ -559,7 +562,7 @@ function compute_Planck_source!(ncol, nlay, nbnd, ngpt,
   @inbounds for icol in 1:ncol
     @inbounds for ilay in 1:nlay
       # Compute layer source irradiance for g-point, equals band irradiance x fraction for g-point
-      planck_function[1:nbnd,ilay,icol] = interpolate1D(tlay[icol,ilay], temp_ref_min, totplnk_delta, totplnk)
+      planck_function[1:nbnd,ilay,icol] .= interpolate1D(tlay[icol,ilay], temp_ref_min, totplnk_delta, totplnk)
       #
       # Map to g-points
       #
@@ -575,9 +578,9 @@ function compute_Planck_source!(ncol, nlay, nbnd, ngpt,
 
   # compute level source irradiances for each g-point, one each for upward and downward paths
   @inbounds for icol in 1:ncol
-    planck_function[1:nbnd,       1,icol] = interpolate1D(tlev[icol,     1], temp_ref_min, totplnk_delta, totplnk)
+    planck_function[1:nbnd,       1,icol] .= interpolate1D(tlev[icol,     1], temp_ref_min, totplnk_delta, totplnk)
     @inbounds for ilay in 1:nlay
-      planck_function[1:nbnd,ilay+1,icol] = interpolate1D(tlev[icol,ilay+1], temp_ref_min, totplnk_delta, totplnk)
+      planck_function[1:nbnd,ilay+1,icol] .= interpolate1D(tlev[icol,ilay+1], temp_ref_min, totplnk_delta, totplnk)
       #
       # Map to g-points
       #
