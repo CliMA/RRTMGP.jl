@@ -368,7 +368,6 @@ Local variables
 real(FT), dimension(ngpt,nlay,ncol) :: τ, τ_Rayleigh  # absorption, Rayleigh scattering optical depths
 # integer :: igas, idx_h2o # index of some gases
 # Number of molecules per cm^2
-real(FT), dimension(ncol,nlay), target  :: col_dry_arr
 real(FT), dimension(:,:),       pointer :: col_dry_wk
 #
 # Interpolation variables used in major gas but not elsewhere, so don't need exporting
@@ -398,7 +397,6 @@ function compute_gas_τs!(ics::InterpolationCoefficients,
 
   τ          = Array{FT}(undef, ngpt,nlay,ncol)          # absorption, Rayleigh scattering optical depths
   τ_Rayleigh = Array{FT}(undef, ngpt,nlay,ncol) # absorption, Rayleigh scattering optical depths
-  col_dry_arr  = Array{FT}(undef, ncol, nlay)
   col_dry_wk   = Array{FT}(undef, ncol, nlay)
 
   vmr     = Array{FT}(undef, ncol,nlay,  get_ngas(this)) # volume mixing ratios
@@ -437,16 +435,15 @@ function compute_gas_τs!(ics::InterpolationCoefficients,
   # Compute dry air column amounts (number of molecule per cm^2) if user hasn't provided them
   idx_h2o = loc_in_array("h2o", this.gas_names)
   if present(col_dry)
-    col_dry_wk = col_dry
+    col_dry_wk .= col_dry
   else
-    col_dry_arr = get_col_dry(vmr[:,:,idx_h2o], plev, tlay) # dry air column amounts computation
-    col_dry_wk = col_dry_arr
+    col_dry_wk .= get_col_dry(vmr[:,:,idx_h2o], plev, tlay) # dry air column amounts computation
   end
 
   # compute column gas amounts [molec/cm^2]
-  col_gas[1:ncol,1:nlay,0] .= col_dry_wk[1:ncol,1:nlay]
+  col_gas[:,:,0] .= col_dry_wk
   for igas = 1:ngas
-    col_gas[1:ncol,1:nlay,igas] .= vmr[1:ncol,1:nlay,igas] .* col_dry_wk[1:ncol,1:nlay]
+    col_gas[:,:,igas] .= vmr[:,:,igas] .* col_dry_wk
   end
 
   # ---- calculate gas optical depths ----
