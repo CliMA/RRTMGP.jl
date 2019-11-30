@@ -95,7 +95,7 @@ function interpolation!(ics::InterpolationCoefficients{FT,I},
           # ftemp_term = (FT(1)-ftemp(icol,ilay)) for itemp = 1, ftemp(icol,ilay) for itemp=2
           ftemp_term = (FT(2-itemp) + FT(2*itemp-3) * ftemp[icol,ilay])
           ics.fminor[1,itemp,iflav,icol,ilay] = (1-f_η) * ftemp_term
-          ics.fminor[2,itemp,iflav,icol,ilay] =        f_η  * ftemp_term
+          ics.fminor[2,itemp,iflav,icol,ilay] =    f_η  * ftemp_term
           # compute interpolation fractions needed for major species
           ics.fmajor[1,1,itemp,iflav,icol,ilay] = (FT(1)-fpress[icol,ilay]) * ics.fminor[1,itemp,iflav,icol,ilay]
           ics.fmajor[2,1,itemp,iflav,icol,ilay] = (FT(1)-fpress[icol,ilay]) * ics.fminor[2,itemp,iflav,icol,ilay]
