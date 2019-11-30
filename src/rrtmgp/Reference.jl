@@ -73,3 +73,10 @@ struct Reference{FT}
                    vmr_ref_red)
   end
 end
+
+"""
+    get_press_min(ref::Reference)
+
+Minimum pressure on the interpolation grids
+"""
+get_press_min(ref::Reference) = ref.press_min

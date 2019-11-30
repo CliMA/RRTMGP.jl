@@ -106,9 +106,9 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
   #   This introduces an error but shows input sanitizing.
   #
   if top_at_1
-    p_lev[:,1,:] .= get_press_min(k_dist) + eps(FT)
+    p_lev[:,1,:] .= get_press_min(k_dist.ref) + eps(FT)
   else
-    p_lev[:,nlay+1,:] .= get_press_min(k_dist) + eps(FT)
+    p_lev[:,nlay+1,:] .= get_press_min(k_dist.ref) + eps(FT)
   end
 
   #

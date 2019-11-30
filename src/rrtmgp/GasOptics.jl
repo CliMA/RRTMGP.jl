@@ -664,47 +664,40 @@ Initialize absorption coefficient arrays
  - `upper` upper atmospheric gas optics variables, see [`GasOpticsVars`](@ref)
  - `lower_aux` lower atmospheric gas optics auxiliary variables, see [`GasOpticsAux`](@ref)
  - `upper_aux` upper atmospheric gas optics auxiliary variables, see [`GasOpticsAux`](@ref)
-
-character(len=*), dimension(:),       intent(in) :: gas_names
-integer,  dimension(:,:,:),   intent(in) :: key_species
-integer,  dimension(:,:),     intent(in) :: band2gpt
-real(FT), dimension(:,:),     intent(in) :: band_lims_wavenum
-real(FT), dimension(:,:,:,:), intent(in) :: kmajor
+ - `gases_in_database` gases available in database
+ - `optical_props` optical properties, see [`OpticalProps`](@ref)
 """
-function init_abs_coeffs(available_gases::Vector{String},
-                         gas_names,
-                         key_species,
-                         band2gpt,
-                         band_lims_wavenum,
-                         kmajor,
-                         gas_minor,
-                         identifier_minor,
-                         lower,
-                         upper)
-  FT = eltype(kmajor)
+function init_abs_coeffs(gases_prescribed::Vector{String},
+                         gases_in_database::Vector{String},
+                         key_species::Array{I,3},
+                         optical_props::OpticalPropsBase{FT,I},
+                         kmajor::Array{FT,4},
+                         gas_minor::Vector{String},
+                         identifier_minor::Vector{String},
+                         lower::GasOpticsVars{FT},
+                         upper::GasOpticsVars{FT}) where {FT<:AbstractFloat,I<:Int}
 
-  # Which gases known to the gas optics are present in the host model (available_gases)?
-  gas_names_present = intersect(gas_names, available_gases)
+  # Which gases known to the gas optics are present in the host model (gases_prescribed)?
+  gas_names_present = intersect(gases_in_database, gases_prescribed)
 
-  reduced_lower = reduce_minor_arrays(available_gases, gas_minor, identifier_minor, lower)
-  reduced_upper = reduce_minor_arrays(available_gases, gas_minor, identifier_minor, upper)
+  reduced_lower = reduce_minor_arrays(gases_prescribed, gas_minor, identifier_minor, lower)
+  reduced_upper = reduce_minor_arrays(gases_prescribed, gas_minor, identifier_minor, upper)
 
-  lower_aux = GasOpticsAux(gas_names_present, gas_minor, identifier_minor, reduced_lower, Int)
-  upper_aux = GasOpticsAux(gas_names_present, gas_minor, identifier_minor, reduced_upper, Int)
+  lower_aux = GasOpticsAux(gas_names_present, gas_minor, identifier_minor, reduced_lower, I)
+  upper_aux = GasOpticsAux(gas_names_present, gas_minor, identifier_minor, reduced_upper, I)
 
   # create flavor list
   # Reduce (remap) key_species list; checks that all key gases are present in incoming
-  key_species_red = create_key_species_reduce(gas_names, gas_names_present, key_species)
+  key_species_red = create_key_species_reduce(gases_in_database, gas_names_present, key_species)
 
   flavor = create_flavor(key_species_red)
-  optical_props = OpticalPropsBase("AbstractGasOptics optical props", band_lims_wavenum, band2gpt)
 
   # create gpoint_flavor list
   gpoint_flavor = create_gpoint_flavor(key_species_red, get_gpoint_bands(optical_props), flavor)
 
   # Which species are key in one or more bands?
   #   flavor is an index into gas_names_present
-  is_key = [false for i in 1:length(gas_names_present)]
+  is_key = Bool[false for i in 1:length(gas_names_present)]
   for j in 1:size(flavor, 2)
     for i in 1:size(flavor, 1) # should be 2
       if flavor[i,j] ≠ 0
@@ -740,20 +733,17 @@ function check_key_species_present(this::AbstractGasOptics, gas_names::Vector{St
 end
 
 """
-    get_minor_list(this::AbstractGasOptics, gas_desc::GasConcs, ngas, names_spec)
+    get_minor_list(this::AbstractGasOptics, gas_names::Vector{String}, names_spec::Vector{String})
 
 List of minor gases to be used in gas_optics()
 Function to define names of key and minor gases to be used by gas_optics().
 The final list gases includes those that are defined in gas_optics_specification
 and are provided in GasConcs.
+
+!!! Not yet tested
 """
-function get_minor_list(this::AbstractGasOptics, gas_names::Vector{String}, ngas, names_spec::Vector{String})
-  gas_is_present = map(x->x in gas_names, names_spec)
-  for igas = 1:get_ngas(this)
-    gas_is_present[igas] = names_spec[igas] in gas_names
-  end
-  return pack(this.gas_names, gas_is_present)
-end
+get_minor_list(this::AbstractGasOptics, gas_names::Vector{String}, names_spec::Vector{String}) =
+  pack(this.gas_names, map(x->x in gas_names, names_spec))
 
 #####
 ##### Inquiry functions
@@ -774,41 +764,6 @@ Bool indicating if initialized for external sources
 """
 source_is_external(::ExternalSourceGasOptics) = true
 source_is_external(::InternalSourceGasOptics) = false
-
-"""
-    get_gases(this::AbstractGasOptics)
-
-Gas names
-"""
-get_gases(this::AbstractGasOptics) = this.gas_names
-
-"""
-    get_press_min(this::AbstractGasOptics)
-
-Minimum pressure on the interpolation grids
-"""
-get_press_min(this::AbstractGasOptics) = this.ref.press_min
-
-"""
-    get_press_max(this::AbstractGasOptics)
-
-Maximum pressure on the interpolation grids
-"""
-get_press_max(this::AbstractGasOptics) = this.ref.press_max
-
-"""
-    get_temp_min(this::AbstractGasOptics)
-
-Minimum temperature on the interpolation grids
-"""
-get_temp_min(this::AbstractGasOptics) = this.ref.temp_min
-
-"""
-    get_temp_max(this::AbstractGasOptics)
-
-Maximum temperature on the interpolation grids
-"""
-get_temp_max(this::AbstractGasOptics) = this.ref.temp_max
 
 """
     get_col_dry(vmr_h2o, plev, tlay, latitude=nothing)
@@ -961,22 +916,22 @@ function create_key_species_reduce(gas_names::VS,
 end
 
 """
-    reduce_minor_arrays(available_gases::Vector{String},
-                        gas_minor,
-                        identifier_minor,
-                        atmos::GasOpticsVars{FT},
-                        atmos_red::GasOpticsVars{FT})
+    reduce_minor_arrays(gases_prescribed::Vector{String},
+                        gas_minor::Vector{String},
+                        identifier_minor::Vector{String},
+                        atmos::GasOpticsVars{FT}) where FT
 
-Reduce minor arrays so variables only contain minor gases that are available
+A reduced `GasOpticsVars` for minor species arrays.
+Variables only contain minor gases that are available.
 
- - `available_gases` array of available gases
+ - `gases_prescribed` array of available gases
  - `gas_minor` array of minor gases
  - `identifier_minor`
- - `atmos` original minor `GasOpticsVars` (in)
+ - `atmos` original gas optics for minor species, see [`GasOpticsVars`](@ref)
 """
-function reduce_minor_arrays(available_gases::Vector{String},
-                             gas_minor,
-                             identifier_minor,
+function reduce_minor_arrays(gases_prescribed::Vector{String},
+                             gas_minor::Vector{String},
+                             identifier_minor::Vector{String},
                              atmos::GasOpticsVars{FT}) where FT
 
   I = Int
@@ -984,7 +939,7 @@ function reduce_minor_arrays(available_gases::Vector{String},
   tot_g=0
 
   mask = map(x->loc_in_array(x, identifier_minor), atmos.minor_gases)
-  gas_is_present = map(x->x in available_gases, gas_minor[mask])
+  gas_is_present = map(x->x in gases_prescribed, gas_minor[mask])
 
   for i = 1:length(atmos.minor_gases)
     if gas_is_present[i]
@@ -1138,13 +1093,6 @@ get_npres(this::AbstractGasOptics) = size(this.kmajor,3)-1
 Number of temperatures
 """
 get_ntemp(this::AbstractGasOptics) = size(this.kmajor,4)
-
-"""
-    get_nPlanckTemp(this::InternalSourceGasOptics)
-
-Number of temperatures for Planck function
-"""
-get_nPlanckTemp(this::InternalSourceGasOptics) = size(this.totplnk,1) # dimensions are Planck-temperature, band
 
 """
     check_extent(array, s, label)
