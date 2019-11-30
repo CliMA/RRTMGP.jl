@@ -27,7 +27,7 @@ using RRTMGP.FortranIntrinsics
 using NCDatasets
 
 """
-    read_atmos(ds, FT, I, gas_names)
+    read_atmos(ds, FT, I, gases_prescribed)
 
 Read profiles for all columns
  - `p_lay` pressure (layers)
@@ -36,7 +36,7 @@ Read profiles for all columns
  - `t_lev` temperature (levels)
  - `col_dry` gas concentrations
 """
-function read_atmos(ds, FT, I, gas_names)
+function read_atmos(ds, FT, I, gases_prescribed)
 
   ncol = ds.dim["col"]
   nlay = ds.dim["lay"]
@@ -48,17 +48,17 @@ function read_atmos(ds, FT, I, gas_names)
   p_lev = Array{FT}(ds["p_lev"][:])
   t_lev = Array{FT}(ds["t_lev"][:])
 
-  available_gases = ["h2o", "co2", "o3", "n2o", "co",
-                     "ch4", "o2", "n2", "ccl4", "cfc11",
-                     "cfc12", "cfc22", "hfc143a", "hfc125", "hfc23",
-                     "hfc32", "hfc134a", "cf4", "no2"]
+  gases_to_look_for = ["h2o", "co2", "o3", "n2o", "co",
+                       "ch4", "o2", "n2", "ccl4", "cfc11",
+                       "cfc12", "cfc22", "hfc143a", "hfc125", "hfc23",
+                       "hfc32", "hfc134a", "cf4", "no2"]
 
-  existing_gases = filter(ug->haskey(ds, "vmr_"*ug), available_gases)
+  gases_in_database = filter(ug->haskey(ds, "vmr_"*ug), gases_to_look_for)
 
-  gsc = GasConcSize(ncol, nlay, (ncol, nlay), length(existing_gases))
-  gas_concs = GasConcs(FT, I, gas_names, ncol, nlay, gsc)
+  gsc = GasConcSize(ncol, nlay, (ncol, nlay), length(gases_in_database))
+  gas_concs = GasConcs(FT, I, gases_prescribed, ncol, nlay, gsc)
 
-  for eg in existing_gases
+  for eg in gases_in_database
     set_vmr!(gas_concs, eg, Array{FT}(ds["vmr_"*eg][:]))
   end
 
@@ -366,20 +366,20 @@ function determine_gas_names(ds, forcing_index)
     names_in_file = map(x->x in chem_name ?
       conc_name[loc_in_array(x,chem_name)] : x, names_in_kdist)
 
-  elseif forcing_index == 2
+  # elseif forcing_index == 2
 
-    # Not part of the RFMIP specification, but oxygen is included because it's a major
-    #    gas in some bands in the SW
-    names_in_kdist = ["co2", "ch4", "n2o", "o2", "cfc12", "cfc11"]
-    names_in_file =  ["carbon_dioxide", "methane", "nitrous_oxide",
-                      "oxygen", "cfc12", "cfc11eq"]
-  elseif forcing_index == 3
+  #   # Not part of the RFMIP specification, but oxygen is included because it's a major
+  #   #    gas in some bands in the SW
+  #   names_in_kdist = ["co2", "ch4", "n2o", "o2", "cfc12", "cfc11"]
+  #   names_in_file =  ["carbon_dioxide", "methane", "nitrous_oxide",
+  #                     "oxygen", "cfc12", "cfc11eq"]
+  # elseif forcing_index == 3
 
-    # Not part of the RFMIP specification, but oxygen is included because it's a major
-    #    gas in some bands in the SW
-    names_in_kdist = ["co2", "ch4", "n2o", "o2", "cfc12", "hfc134a"]
-    names_in_file =  ["carbon_dioxide", "methane", "nitrous_oxide",
-                      "oxygen", "cfc12eq", "hfc134aeq"]
+  #   # Not part of the RFMIP specification, but oxygen is included because it's a major
+  #   #    gas in some bands in the SW
+  #   names_in_kdist = ["co2", "ch4", "n2o", "o2", "cfc12", "hfc134a"]
+  #   names_in_file =  ["carbon_dioxide", "methane", "nitrous_oxide",
+  #                     "oxygen", "cfc12eq", "hfc134aeq"]
   end
   return names_in_kdist, names_in_file
 

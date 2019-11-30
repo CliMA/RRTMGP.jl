@@ -35,8 +35,8 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
   k_dist_sym = Symbol(:k_dist,λ_string)
   cloud_optics_sym = Symbol(:cloud_optics,λ_string)
 
-  gas_names = lowercase.(strip.(["h2o", "co2", "o3", "n2o", "co", "ch4", "o2", "n2"]))
-  ngas = length(gas_names)
+  gases_prescribed = lowercase.(strip.(["h2o", "co2", "o3", "n2o", "co", "ch4", "o2", "n2"]))
+  ngas = length(gases_prescribed)
   nloops = 1
   ncol = 128
   write_fluxes = true
@@ -47,15 +47,15 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
   #
   FT = Float64
   I = Int64
-  p_lay, t_lay, p_lev, t_lev, gas_concs_garand, col_dry = @timeit to "read_atmos" read_atmos(ds[:input], FT, I, gas_names)
+  p_lay, t_lay, p_lev, t_lev, gas_concs_garand, col_dry = @timeit to "read_atmos" read_atmos(ds[:input], FT, I, gases_prescribed)
 
   col_dry = nothing
   nlay = size(p_lay, 2)
   # For clouds we'll use the first column, repeated over and over
   gsc = GasConcSize(ncol, nlay, (ncol, nlay), ngas)
-  gas_concs = GasConcs(FT, I, gas_names, ncol, nlay, gsc)
+  gas_concs = GasConcs(FT, I, gases_prescribed, ncol, nlay, gsc)
   for igas = 1:ngas
-    vmr_2d_to_1d!(gas_concs, gas_concs_garand, gas_names[igas], size(p_lay, 1), nlay)
+    vmr_2d_to_1d!(gas_concs, gas_concs_garand, gases_prescribed[igas], size(p_lay, 1), nlay)
   end
 
   #  If we trusted in Fortran allocate-on-assign we could skip the temp_array here

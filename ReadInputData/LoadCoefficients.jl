@@ -8,12 +8,12 @@ function read_char_vec(ds, var_name)
 end
 
 """
-    load_and_init(ds, available_gases::GasConcs{FT}) where FT
+    load_and_init(ds, ::Type{FT}, gases_prescribed::Vector{String}) where {FT<:AbstractFloat}
 
 Initialize the gas optics class with data. The calls look slightly different depending
   on whether the radiation sources are internal to the atmosphere (longwave) or external (shortwave)
 """
-function load_and_init(ds, ::Type{FT}, available_gases::Vector{String}) where {FT<:AbstractFloat}
+function load_and_init(ds, ::Type{FT}, gases_prescribed::Vector{String}) where {FT<:AbstractFloat}
 
   # Reading the properties from the NetCDF file
 
@@ -21,8 +21,8 @@ function load_and_init(ds, ::Type{FT}, available_gases::Vector{String}) where {F
   kmajor                          = Array{FT}(ds["kmajor"][:])
   key_species                     = Array{I}(ds["key_species"][:])
   band2gpt                        = Array{I}(ds["bnd_limits_gpt"][:])
-  band_lims                       = Array{FT}(ds["bnd_limits_wavenumber"][:])
-  gas_names                       = read_char_vec(ds, "gas_names")
+  band_lims_wavenum               = Array{FT}(ds["bnd_limits_wavenumber"][:])
+  gases_in_database               = read_char_vec(ds, "gas_names")
   gas_minor                       = read_char_vec(ds, "gas_minor")
   identifier_minor                = read_char_vec(ds, "identifier_minor")
 
@@ -49,15 +49,16 @@ function load_and_init(ds, ::Type{FT}, available_gases::Vector{String}) where {F
                   Array{FT}(ds["temp_ref"][:]),
                   FT(ds["press_ref_trop"][:]),
                   Array{FT}(ds["vmr_ref"][:]),
-                  available_gases,
-                  gas_names
+                  gases_prescribed,
+                  gases_in_database
                   )
 
-  args = (available_gases,
-          gas_names,
+  optical_props = OpticalPropsBase("GasOptics optical props", band_lims_wavenum, band2gpt)
+
+  args = (gases_prescribed,
+          gases_in_database,
           key_species,
-          band2gpt,
-          band_lims,
+          optical_props,
           kmajor,
           gas_minor,
           identifier_minor,
