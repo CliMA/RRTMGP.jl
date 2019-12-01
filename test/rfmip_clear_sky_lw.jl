@@ -47,11 +47,8 @@ function rfmip_clear_sky_lw(ds, optical_props_constructor; compile_first=false)
   forcing_index = 1
   block_size = 8
 
-  #
   # How big is the problem? Does it fit into blocks of the size we've specified?
-  #
   @assert mod(ncol*nexp, block_size) == 0
-
   nblocks = Int((ncol*nexp)/block_size)
 
   @assert 1 <= forcing_index <= 3
@@ -61,7 +58,6 @@ function rfmip_clear_sky_lw(ds, optical_props_constructor; compile_first=false)
   #   A gas might have a different name in the k-distribution than in the files
   #   provided by RFMIP (e.g. 'co2' and 'carbon_dioxide')
   #
-
   kdist_gas_names, rfmip_gas_games = determine_gas_names(ds[:k_dist], forcing_index)
   # print("Calculation uses RFMIP gases: ")
   # @show rfmip_gas_games
@@ -91,14 +87,15 @@ function rfmip_clear_sky_lw(ds, optical_props_constructor; compile_first=false)
   #   k_dist%init(); users might want to use their own reading methods
   #
   k_dist = load_and_init(ds[:k_dist], FT, gas_conc_array[1].gas_names)
-
   @assert source_is_internal(k_dist)
 
   nbnd = get_nband(k_dist.optical_props)
   ngpt = get_ngpt(k_dist.optical_props)
+
   println("--------- Problem size:")
   @show ncol,nlay,nbnd,ngpt
   @show nblocks,nexp,block_size
+  ps = ProblemSize(block_size, nlay, ngpt)
 
   #
   # RRTMGP won't run with pressure less than its minimum. The top level in the RFMIP file
@@ -127,7 +124,6 @@ function rfmip_clear_sky_lw(ds, optical_props_constructor; compile_first=false)
 
   sfc_emis_spec = Array{FT}(undef, nbnd,block_size)
 
-  ps = ProblemSize(block_size, nlay, ngpt)
   optical_props = optical_props_constructor(k_dist.optical_props, ps)
   source = SourceFuncLW(block_size,nlay,k_dist.optical_props)
 

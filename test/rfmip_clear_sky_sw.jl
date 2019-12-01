@@ -41,6 +41,7 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
   I  = Int
   deg_to_rad = acos(-FT(1))/FT(180)
 
+
   ncol, nlay, nexp = read_size(ds[:rfmip])
 
   forcing_index = 1
@@ -94,12 +95,8 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
   println("--------- Problem size:")
   @show ncol,nlay,nbnd,ngpt
   @show nblocks,nexp,block_size
-
   ps = ProblemSize(block_size, nlay, ngpt)
 
-  toa_flux = zeros(FT, block_size, get_ngpt(k_dist.optical_props))
-  def_tsi = zeros(FT, block_size)
-  usecol = Array{Bool}(undef, block_size, nblocks)
   #
   # RRTMGP won't run with pressure less than its minimum. The top level in the RFMIP file
   #   is set to 10^-3 Pa. Here we pretend the layer is just a bit less deep.
@@ -111,6 +108,9 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
     p_lev[:,nlay+1,:] .= get_press_min(k_dist.ref) + eps(FT)
   end
 
+  toa_flux = zeros(FT, block_size, get_ngpt(k_dist.optical_props))
+  def_tsi = zeros(FT, block_size)
+  usecol = Array{Bool}(undef, block_size, nblocks)
   #
   # RTE will fail if passed solar zenith angles greater than 90 degree. We replace any with
   #   nighttime columns with a default solar zenith angle. We'll mask these out later, of

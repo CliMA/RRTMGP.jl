@@ -115,6 +115,8 @@ struct InternalSourceGasOptics{FT,I} <: AbstractGasOptics{FT,I}
   upper_aux::GasOpticsAux{I}
   "Present gas names"
   gas_names::Vector{String}
+  "Indexes corresponding to present gas names"
+  i_gases::Vector{I}
   "Absorption coefficient for major species (g-point,η,pressure,temperature)"
   kmajor::Array{FT,4}
   "major species pair; [2, nflav]"
@@ -156,6 +158,8 @@ struct ExternalSourceGasOptics{FT,I} <: AbstractGasOptics{FT,I}
   upper_aux::GasOpticsAux{I}
   "Present gas names"
   gas_names::Vector{String}
+  "Indexes corresponding to present gas names"
+  i_gases::Vector{I}
   "Absorption coefficient for major species (g-point,η,pressure,temperature)"
   kmajor::Array{FT,4}
   "major species pair; [2, nflav]"
@@ -425,11 +429,8 @@ function compute_gas_τs!(ics::InterpolationCoefficients,
   ntemp = get_ntemp(this)
 
   # Fill out the array of volume mixing ratios
-  for igas in 1:ngas
-    # Get vmr if  gas is provided in GasConcs
-    if this.gas_names[igas] in gas_desc.gas_names
-      get_vmr!(@view(vmr[:,:,igas]), gas_desc, this.gas_names[igas])
-    end
+  for igas in this.i_gases
+    vmr[:,:,igas] .= gas_desc.concs[igas,:,:]
   end
 
   # Compute dry air column amounts (number of molecule per cm^2) if user hasn't provided them
@@ -679,6 +680,7 @@ function init_abs_coeffs(gases_prescribed::Vector{String},
 
   # Which gases known to the gas optics are present in the host model (gases_prescribed)?
   gas_names_present = intersect(gases_in_database, gases_prescribed)
+  i_gases = I[i for i in 1:length(gases_prescribed) if gas_names_present[i] in gases_in_database]
 
   reduced_lower = reduce_minor_arrays(gases_prescribed, gas_minor, identifier_minor, lower)
   reduced_upper = reduce_minor_arrays(gases_prescribed, gas_minor, identifier_minor, upper)
@@ -712,6 +714,7 @@ function init_abs_coeffs(gases_prescribed::Vector{String},
           lower_aux,
           upper_aux,
           gas_names_present,
+          i_gases,
           kmajor,
           flavor,
           gpoint_flavor,

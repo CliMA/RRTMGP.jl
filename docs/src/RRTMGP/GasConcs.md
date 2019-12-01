@@ -6,7 +6,6 @@ CurrentModule = RRTMGP.GasConcentrations
 
 ```@docs
 GasConcSize
-ConcField
 GasConcs
 ```
 
