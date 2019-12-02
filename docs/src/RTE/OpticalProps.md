@@ -14,7 +14,6 @@ TwoStream
 delta_scale!
 validate!
 increment!
-expand
 bands_are_equal
 gpoints_are_equal
 ```

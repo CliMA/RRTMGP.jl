@@ -22,13 +22,12 @@ include("CloudSampling.jl")
 
 function vmr_2d_to_1d!(gas_concs::GasConcs{FT},
                        gas_concs_garand::GasConcs{FT},
-                       name::AbstractGas,
-                       sz1::I,
-                       sz2::I) where {FT<:AbstractFloat,I<:Int}
-  tmp = Array{FT}(undef, sz1, sz2)
-  get_vmr!(tmp, gas_concs_garand, name)
+                       gas::AbstractGas,
+                       gases_prescribed::Vector{AbstractGas}) where {FT<:AbstractFloat, I<:Int}
+  i_gas = loc_in_array(gas, gases_prescribed)
+  tmp = gas_concs_garand.concs[i_gas,:,:]
   tmp_col = tmp[1, :]
-  set_vmr!(gas_concs, name, tmp_col)
+  set_vmr!(gas_concs, gas, tmp_col)
 end
 
 function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
@@ -55,8 +54,8 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
   # For clouds we'll use the first column, repeated over and over
   gsc = GasConcSize(ncol, nlay, (ncol, nlay), ngas)
   gas_concs = GasConcs(FT, I, gases_prescribed, ncol, nlay, gsc)
-  for igas = 1:ngas
-    vmr_2d_to_1d!(gas_concs, gas_concs_garand, gases_prescribed[igas], size(p_lay, 1), nlay)
+  for gas in gases_prescribed
+    vmr_2d_to_1d!(gas_concs, gas_concs_garand, gas, gases_prescribed)
   end
 
   #  If we trusted in Fortran allocate-on-assign we could skip the temp_array here
