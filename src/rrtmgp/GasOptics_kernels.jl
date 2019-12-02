@@ -46,7 +46,7 @@ function interpolation!(ics::InterpolationCoefficients{FT,I},
                         npres::I,
                         ntemp::I,
                         flavor::Array{I},
-                        ref::Reference{FT},
+                        ref::ReferenceState{FT},
                         play::Array{FT},
                         tlay::Array{FT},
                         col_gas::AbstractArray{FT}) where {I<:Int,B<:Bool,FT<:AbstractFloat}

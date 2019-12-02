@@ -1,16 +1,26 @@
-##### Reference
+"""
+    ReferenceStates
 
-export Reference
+Reference state variables for look-up tables / interpolation
+"""
+module ReferenceStates
+
+using DocStringExtensions
+using OffsetArrays
+using ..Gases
+using ..Utilities
+export ReferenceState
+export get_press_min
 
 """
-    Reference{FT}
+    ReferenceState{FT}
 
-Reference variables for look-up tables / interpolation
+Reference state variables for look-up tables / interpolation
 
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct Reference{FT}
+struct ReferenceState{FT}
   "Pressure"
   press::Vector{FT}
   "Log of pressure"
@@ -30,12 +40,12 @@ struct Reference{FT}
   temp_delta::FT
   press_trop_log::FT
   vmr::AbstractArray{FT,3}   # vmr(lower or upper atmosphere, gas, temp)
-  function Reference(press::Array{FT},
-                     temp::Array{FT},
-                     press_ref_trop::FT,
-                     vmr_ref::Array{FT},
-                     available_gases::Vector{AbstractGas},
-                     gas_names::Vector{AbstractGas}) where {FT<:AbstractFloat}
+  function ReferenceState(press::Array{FT},
+                          temp::Array{FT},
+                          press_ref_trop::FT,
+                          vmr_ref::Array{FT},
+                          available_gases::Vector{AbstractGas},
+                          gas_names::Vector{AbstractGas}) where {FT<:AbstractFloat}
 
     gas_is_present = map(x->x in available_gases, gas_names)
     ngas = count(gas_is_present)
@@ -75,8 +85,10 @@ struct Reference{FT}
 end
 
 """
-    get_press_min(ref::Reference)
+    get_press_min(ref::ReferenceState)
 
 Minimum pressure on the interpolation grids
 """
-get_press_min(ref::Reference) = ref.press_min
+get_press_min(ref::ReferenceState) = ref.press_min
+
+end

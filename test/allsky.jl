@@ -65,15 +65,15 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
   p_lev = deepcopy(spread_new(p_lev[1,:], 1, ncol))
   t_lev = deepcopy(spread_new(t_lev[1,:], 1, ncol))
 
-  as = AtmosphericState(gas_conc, p_lay, p_lev, t_lay, t_lev)
-  gas_conc, p_lay, p_lev, t_lay, t_lev = ntuple(i->nothing,5)
-
   # This puts pressure and temperature arrays on the GPU
   # load data into classes
-  k_dist = load_and_init(ds[:k_dist], FT, as.gas_conc.gas_names)
+  k_dist = load_and_init(ds[:k_dist], FT, gas_conc.gas_names)
   is_sw = source_is_external(k_dist)
   is_lw = !is_sw
-  #
+
+  as = AtmosphericState(gas_conc, p_lay, p_lev, t_lay, t_lev, k_dist.ref)
+  gas_conc, p_lay, p_lev, t_lay, t_lev = ntuple(i->nothing,5)
+
   # Should also try with Pade calculations
   if use_luts
     cloud_optics_ = load_cld_lutcoeff(FT,ds[:cloud_optics], 2)
