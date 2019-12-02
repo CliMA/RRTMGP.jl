@@ -8,7 +8,7 @@ Contains a single routine to compute direct and diffuse fluxes of solar radiatio
  - information about vertical ordering
  - boundary conditions
  - solar zenith angle
- - spectrally-resolved incident colimated flux
+ - spectrally-resolved incident collimated flux
  - surface albedos for direct and diffuse radiation
  - (optionally) a boundary condition for incident diffuse radiation
 
@@ -61,13 +61,13 @@ export rte_lw!, rte_sw!, expand_and_transpose
 
 """
     rte_sw!(atmos::AbstractOpticalPropsArry,
-                 top_at_1,
-                 μ_0::Array{FT},
-                 inc_flux,
-                 sfc_alb_dir,
-                 sfc_alb_dif,
-                 fluxes,
-                 inc_flux_dif=nothing)
+            top_at_1::Bool,
+            μ_0::Array{FT},
+            inc_flux,
+            sfc_alb_dir,
+            sfc_alb_dif,
+            fluxes,
+            inc_flux_dif=nothing) where {FT<:AbstractFloat}
 
 Compute fluxes `fluxes` (`AbstractFluxes`), given
 
@@ -82,7 +82,7 @@ and, optionally,
  - `inc_flux_dif` incident diffuse flux at top of domain [W/m2] (ncol, ngpt)
 """
 function rte_sw!(atmos::AbstractOpticalPropsArry,
-                 top_at_1,
+                 top_at_1::Bool,
                  μ_0::Array{FT},
                  inc_flux,
                  sfc_alb_dir,
@@ -157,10 +157,13 @@ function rte_sw!(atmos::AbstractOpticalPropsArry,
 end
 
 """
-    rte_lw!(optical_props, top_at_1,
-                sources, sfc_emis,
-                fluxes,
-                inc_flux=nothing, n_gauss_angles=nothing)
+    rte_lw!(optical_props::AbstractOpticalPropsArry{FT},
+            top_at_1,
+            sources,
+            sfc_emis,
+            fluxes,
+            inc_flux=nothing,
+            n_gauss_angles=nothing) where FT
 
 Interface using only optical properties and source functions as inputs; fluxes as outputs.
 
@@ -173,10 +176,13 @@ Interface using only optical properties and source functions as inputs; fluxes a
  - [`inc_flux`] incident flux at domain top [W/m2] (ncol, ngpts)
  - [`n_gauss_angles`] Number of angles used in Gaussian quadrature (no-scattering solution)
 """
-function rte_lw!(optical_props::AbstractOpticalPropsArry{FT}, top_at_1,
-                sources, sfc_emis,
-                fluxes,
-                inc_flux=nothing, n_gauss_angles=nothing) where FT
+function rte_lw!(optical_props::AbstractOpticalPropsArry{FT},
+                 top_at_1,
+                 sources,
+                 sfc_emis,
+                 fluxes,
+                 inc_flux=nothing,
+                 n_gauss_angles=nothing) where FT
 
   #
   # Weights and angle secants for first order (k=1) Gaussian quadrature.
@@ -278,7 +284,7 @@ dimensions (nband, ncol) -> (ncol,ngpt), of `arr_out`, given
  - `ops` - a `AbstractOpticalProps`
  - `arr_in` - input array
 """
-function expand_and_transpose(ops::AbstractOpticalProps,arr_in::Array{FT}) where FT
+function expand_and_transpose(ops::AbstractOpticalProps, arr_in::Array{FT}) where FT
   ncol  = size(arr_in,2)
   nband = get_nband(ops)
   ngpt  = get_ngpt(ops)

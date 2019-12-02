@@ -140,7 +140,7 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
     p_lev = p_lev_all[:,:,b]
     t_lay = t_lay_all[:,:,b]
     gas_conc = gas_conc_array[b]
-    as = AtmosphericState(gas_conc, p_lay, p_lev, t_lay)
+    as = AtmosphericState(gas_conc, p_lay, p_lev, t_lay, nothing, k_dist.ref)
 
     # Compute the optical properties of the atmosphere and the Planck source functions
     #    from pressures, temperatures, and gas concentrations...

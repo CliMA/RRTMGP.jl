@@ -7,7 +7,9 @@ module AtmosphericStates
 
 using DocStringExtensions
 
+using ..Utilities
 using ..GasConcentrations
+using ..ReferenceStates
 
 export AtmosphericState
 
@@ -85,12 +87,23 @@ struct AtmosphericState{FT,I} <: AbstractAtmosphericState{FT,I}
                             p_lay::Array{FT,2},
                             p_lev::Array{FT,2},
                             t_lay::Array{FT,2},
-                            t_lev::Union{Array{FT,2},Nothing}=nothing) where {I<:Int,FT<:AbstractFloat}
+                            t_lev::Union{Array{FT,2},Nothing},
+                            ref::ReferenceState) where {I<:Int,FT<:AbstractFloat}
     nlay = size(p_lay, 2)
     ncol = size(p_lay, 1)
     if t_lev==nothing
       t_lev = interpolate_temperature(p_lay, p_lev, t_lay, ncol, nlay)
     end
+
+    check_extent(p_lay, (ncol, nlay  ), "p_lay")
+    check_extent(p_lev, (ncol, nlay+1), "p_lev")
+    check_extent(t_lay, (ncol, nlay  ), "t_lay")
+    check_extent(t_lev, (ncol, nlay+1), "t_lev")
+    check_range(p_lay, ref.press_min, ref.press_max, "p_lay")
+    check_range(p_lev, ref.press_min, ref.press_max, "p_lev")
+    check_range(t_lay, ref.temp_min,  ref.temp_max,  "t_lay")
+    check_range(t_lev, ref.temp_min,  ref.temp_max,  "t_lev")
+
     # Are the arrays ordered in the vertical with 1 at the top or the bottom of the domain?
     top_at_1 = p_lay[1, 1] < p_lay[1, nlay]
     grid = SimpleGrid{FT}(p_lay)

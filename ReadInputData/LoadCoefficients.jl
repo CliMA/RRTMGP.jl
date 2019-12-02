@@ -1,6 +1,7 @@
 using RRTMGP.Gases
 using RRTMGP.GasConcentrations
 using RRTMGP.GasOptics
+using RRTMGP.ReferenceStates
 using NCDatasets
 
 function read_char_vec(ds, var_name)
@@ -48,13 +49,12 @@ function load_and_init(ds, ::Type{FT}, gases_prescribed::Vector{AbstractGas}) wh
                               read_gases(ds, "scaling_gas_upper"),
                               read_gases(ds, "minor_gases_upper"))
 
-  ref = Reference(Array{FT}(ds["press_ref"][:]),
-                  Array{FT}(ds["temp_ref"][:]),
-                  FT(ds["press_ref_trop"][:]),
-                  Array{FT}(ds["vmr_ref"][:]),
-                  gases_prescribed,
-                  gases_in_database
-                  )
+  ref = ReferenceState(Array{FT}(ds["press_ref"][:]),
+                       Array{FT}(ds["temp_ref"][:]),
+                       FT(ds["press_ref_trop"][:]),
+                       Array{FT}(ds["vmr_ref"][:]),
+                       gases_prescribed,
+                       gases_in_database)
 
   optical_props = OpticalPropsBase("GasOptics optical props", band_lims_wavenum, band2gpt)
 

@@ -142,7 +142,7 @@ function rfmip_clear_sky_lw(ds, optical_props_constructor; compile_first=false)
     t_lay = t_lay_all[:,:,b]
     t_lev = t_lev_all[:,:,b]
     sfc_t = sfc_t_all[:,  b]
-    as = AtmosphericState(gas_conc, p_lay, p_lev, t_lay, t_lev)
+    as = AtmosphericState(gas_conc, p_lay, p_lev, t_lay, t_lev, k_dist.ref)
 
     fluxes.flux_up .= FT(0)
     fluxes.flux_dn .= FT(0)

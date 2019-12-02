@@ -13,6 +13,7 @@ include(joinpath("rte","RTESolver.jl"))
 
 include(joinpath("rrtmgp","PhysicalConstants.jl"))
 include(joinpath("rrtmgp","Gases.jl"))
+include(joinpath("rrtmgp","ReferenceStates.jl"))
 include(joinpath("rrtmgp","GasConcentrations.jl"))
 include(joinpath("rrtmgp","AtmosphericStates.jl"))
 include(joinpath("rrtmgp","GasOptics.jl"))

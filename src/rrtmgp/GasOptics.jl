@@ -19,6 +19,7 @@ using DocStringExtensions
 const to_gor = TimerOutput()
 
 using ..Gases
+using ..ReferenceStates
 using ..FortranIntrinsics
 using ..PhysicalConstants
 using ..ArrayUtilities
@@ -30,11 +31,9 @@ using ..OpticalProps
 using ..AtmosphericStates
 
 export gas_optics_int!, gas_optics_ext!, load_totplnk, load_solar_source
-export source_is_internal, source_is_external, get_press_min
+export source_is_internal, source_is_external
 export get_col_dry
 export GasOpticsVars
-
-include("Reference.jl")
 
 """
     GasOpticsAux{I}
@@ -51,13 +50,11 @@ struct GasOpticsAux{I}
   "indexes that have special treatment in density scaling"
   idx_minor_scaling::Vector{I}
   function GasOpticsAux(gas_names_present, gas_minor, identifier_minor, reduced_atmos, ::Type{I}) where I
-    return new{I}(create_idx_minor(I,
-                                   gas_names_present,
+    return new{I}(create_idx_minor(gas_names_present,
                                    gas_minor,
                                    identifier_minor,
                                    reduced_atmos.minor_gases),
-                  create_idx_minor_scaling(I,
-                                           gas_names_present,
+                  create_idx_minor_scaling(gas_names_present,
                                            reduced_atmos.scaling_gas))
   end
 end
@@ -103,8 +100,8 @@ Gas optics with internal sources (for longwave radiation)
 $(DocStringExtensions.FIELDS)
 """
 struct InternalSourceGasOptics{FT,I} <: AbstractGasOptics{FT,I}
-  "Reference data"
-  ref::Reference{FT}
+  "Reference state data"
+  ref::ReferenceState{FT}
   "Base optical properties"
   optical_props::OpticalPropsBase{FT,I}
   "GasOpticsVars in the lower atmosphere"
@@ -146,8 +143,8 @@ Gas optics with external sources (for shortwave radiation)
 $(DocStringExtensions.FIELDS)
 """
 struct ExternalSourceGasOptics{FT,I} <: AbstractGasOptics{FT,I}
-  "Reference data"
-  ref::Reference{FT}
+  "Reference state data"
+  ref::ReferenceState{FT}
   "Base optical properties"
   optical_props::OpticalPropsBase{FT,I}
   "GasOpticsVars in the lower atmosphere"
@@ -237,9 +234,9 @@ Compute gas optical depth and Planck source functions given:
 
  - `this` gas optics, see [`InternalSourceGasOptics`](@ref)
  - `as` atmospheric state, see [`AtmosphericState`](@ref)
- - `col_dry` Number of molecules per cm-2 of dry air
  - `optical_props` optical properties, see [`AbstractOpticalPropsArry`](@ref)
  - `sources` longwave sources, see [`SourceFuncLW`](@ref)
+ - `col_dry` Number of molecules per cm-2 of dry air
 
 real(FT), dimension(:),   intent(in   ) :: tsfc      # surface skin temperatures [K]; (ncol)
 real(FT), dimension(:,:),   intent(in   ), optional, target :: col_dry,   # Column dry amount; dim(ncol,nlay)
@@ -263,10 +260,6 @@ function gas_optics_int!(this::InternalSourceGasOptics,
   # input data sizes and values
   check_extent(tsfc, as.ncol, "tsfc")
   check_range(tsfc, this.ref.temp_min,  this.ref.temp_max,  "tsfc")
-  if present(as.t_lev)
-    check_extent(as.t_lev, (as.ncol, as.nlay+1), "tlev")
-    check_range(as.t_lev, this.ref.temp_min, this.ref.temp_max, "tlev")
-  end
 
   #   output extents
   @assert get_ncol(sources) == as.ncol
@@ -316,13 +309,14 @@ end
 
 # Returns optical properties and interpolation coefficients
 """
-    compute_gas_τs!(this::AbstractGasOptics,
-                          play, plev, tlay, gas_conc::GasConcs,
-                          optical_props::AbstractOpticalPropsArry,
-                          col_dry=nothing)
+    compute_gas_τs!(ics::InterpolationCoefficients,
+                    this::AbstractGasOptics{FT},
+                    as::AtmosphericState{FT,I},
+                    optical_props::AbstractOpticalPropsArry,
+                    col_dry=nothing, last_call=false) where {FT<:AbstractFloat,I<:Int}
 
- - `this` gas optics, see [`InternalSourceGasOptics`](@ref) or [`ExternalSourceGasOptics`](@ref)
  - `ics` interpolation coefficients, see [`InterpolationCoefficients`](@ref)
+ - `this` gas optics, see [`InternalSourceGasOptics`](@ref) or [`ExternalSourceGasOptics`](@ref)
  - `as` atmospheric state, see [`AtmosphericState`](@ref)
  - `optical_props` optical properties, see [`AbstractOpticalPropsArry`](@ref)
 
@@ -371,12 +365,6 @@ function compute_gas_τs!(ics::InterpolationCoefficients,
   check_key_species_present(this, as.gas_conc.gas_names)
 
   # Check input data sizes and values
-  check_extent(as.p_lay, (ncol, nlay  ), "p_lay")
-  check_extent(as.p_lev, (ncol, nlay+1), "p_lev")
-  check_extent(as.t_lay, (ncol, nlay  ), "t_lay")
-  check_range(as.p_lay, this.ref.press_min, this.ref.press_max, "p_lay")
-  check_range(as.p_lev, this.ref.press_min, this.ref.press_max, "p_lev")
-  check_range(as.t_lay, this.ref.temp_min,  this.ref.temp_max,  "t_lay")
   if present(col_dry)
     check_extent(col_dry, (ncol, nlay), "col_dry")
     check_range(col_dry, FT(0), floatmax(FT), "col_dry")
@@ -580,7 +568,15 @@ function load_solar_source(solar_src, rayl_lower, rayl_upper, ref, args...)
 end
 
 """
-    init_abs_coeffs(...)
+    init_abs_coeffs(gases_prescribed::Vector{AbstractGas},
+                    gases_in_database::Vector{AbstractGas},
+                    key_species::Array{I,3},
+                    optical_props::OpticalPropsBase{FT,I},
+                    kmajor::Array{FT,4},
+                    gas_minor::Vector{AbstractGas},
+                    identifier_minor::Vector{AbstractGas},
+                    lower::GasOpticsVars{FT},
+                    upper::GasOpticsVars{FT}) where {FT<:AbstractFloat,I<:Int}
 
 Initialize absorption coefficient arrays
 
@@ -794,7 +790,10 @@ function create_flavor(key_species::Array{I,3}) where {I<:Int}
 end
 
 """
-    create_idx_minor(::Type{I}, gas_names, gas_minor, identifier_minor, minor_gases_atm) where {I<:Integer}
+    create_idx_minor(gas_names::VG,
+                     gas_minor::VG,
+                     identifier_minor::VG,
+                     minor_gases_atm::VG) where {VG<:Vector{AbstractGas}}
 
 create index list for extracting col_gas needed for minor gas optical depth calculations
 
@@ -803,11 +802,10 @@ create index list for extracting col_gas needed for minor gas optical depth calc
  - `identifier_minor`
  - `minor_gases_atm`
 """
-function create_idx_minor(::Type{I},
-                          gas_names::VG,
+function create_idx_minor(gas_names::VG,
                           gas_minor::VG,
                           identifier_minor::VG,
-                          minor_gases_atm::VG) where {I<:Integer,VG<:Vector{AbstractGas}}
+                          minor_gases_atm::VG) where {VG<:Vector{AbstractGas}}
   # Find identifying gas for minor species in list of possible identifiers (e.g. h2o_slf)
   idx_mnr = map(x->loc_in_array(x, identifier_minor), minor_gases_atm)
   # Find name of gas associated with minor species identifier (e.g. h2o)
@@ -815,14 +813,14 @@ function create_idx_minor(::Type{I},
 end
 
 """
-    create_idx_minor_scaling(::Type{I}, gas_names::VG, scaling_gas_atm::VG) where {I<:Integer, VG<:Vector{AbstractGas}}
+    create_idx_minor_scaling(gas_names::VG, scaling_gas_atm::VG) where {VG<:Vector{AbstractGas}}
 
 Create index for special treatment in density scaling of minor gases
 
  - `gas_names` gas names
  - `scaling_gas_atm`
 """
-create_idx_minor_scaling(::Type{I}, gas_names::VG, scaling_gas_atm::VG) where {I<:Integer, VG<:Vector{AbstractGas}} =
+create_idx_minor_scaling(gas_names::VG, scaling_gas_atm::VG) where {VG<:Vector{AbstractGas}} =
   map(x->loc_in_array(x, gas_names), scaling_gas_atm)
 
 """
@@ -960,9 +958,9 @@ end
 
 """
     combine_and_reorder!(τ::Array{FT,3},
-                              τ_Rayleigh::Array{FT,3},
-                              has_Rayleigh::Bool,
-                              optical_props::AbstractOpticalPropsArry{FT}) where FT
+                         τ_Rayleigh::Array{FT,3},
+                         has_Rayleigh::Bool,
+                         optical_props::AbstractOpticalPropsArry{FT}) where FT
 
 Utility function to combine optical depths from gas absorption and Rayleigh scattering
 (and reorder them for convenience, while we're at it)
@@ -1019,20 +1017,6 @@ get_npres(this::AbstractGasOptics) = size(this.kmajor,3)-1
 Number of temperatures
 """
 get_ntemp(this::AbstractGasOptics) = size(this.kmajor,4)
-
-"""
-    check_extent(array, s, label)
-
-Assert array has correct size
-"""
-check_extent(array, s, label) = @assert all(size(array).==s)
-
-"""
-    check_range(val, minV, maxV, label)
-
-Assert range of values is valid
-"""
-check_range(val, minV, maxV, label) = any(val .< minV) || any(val .> maxV) ? error(strip(label) * " values out of range.") : nothing
 
 include("GasOptics_kernels.jl")
 

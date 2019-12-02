@@ -16,6 +16,7 @@ makedocs(
     "RRTMGP" => Any[
     "Gas Concentrations" => "RRTMGP/GasConcs.md"
     "Gas Optics" => "RRTMGP/GasOptics.md"
+    "References States" => "RRTMGP/ReferenceStates.md"
     ],
     "RTE" => Any[
     "Optical Properties" => "RTE/OpticalProps.md"
