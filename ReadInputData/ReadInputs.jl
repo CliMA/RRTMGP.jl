@@ -360,18 +360,6 @@ one containing the name as contained in the RFMIP input files - depending on the
 """
 function determine_gas_names(ds, forcing_index)
 
-  chem_name = AbstractGas[co(),
-                          ch4(),
-                          o2(),
-                          n2o(),
-                          n2(),
-                          co2(),
-                          ccl4(),
-                          ch4(),
-                          ch3br(),
-                          ch3cl(),
-                          cfc22()]
-
   @assert any(forcing_index .== [1,2,3])
   if forcing_index == 1
     names_in_kdist = convert.(AbstractGas, read_kdist_gas_names(ds))

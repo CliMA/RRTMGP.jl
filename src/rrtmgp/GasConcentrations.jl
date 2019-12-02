@@ -23,7 +23,7 @@ using DocStringExtensions
 using ..Utilities
 using ..Gases
 export GasConcs
-export set_vmr!, get_vmr!
+export set_vmr!
 export GasConcSize
 
 """
@@ -51,7 +51,7 @@ struct GasConcs{FT,I}
   "gas names"
   gas_names::Vector{AbstractGas}
   "gas concentrations arrays"
-  concs::Array{FT}
+  concs::Array{FT,3}
   "number of columns"
   ncol::I
   "number of layers"
@@ -92,21 +92,6 @@ function set_vmr!(this::GasConcs, gas::AbstractGas, w::Array{FT, 2}) where FT
   @assert igas ≠ -1 # assert gas is found
   this.concs[igas,:,:] .= w
   this.gas_names[igas] = gas
-end
-
-"""
-    get_vmr!(array::AbstractArray{FT,2}, this::GasConcs{FT}, gas::AbstractGas) where FT
-
-Volume mixing ratio (nlay dependence only)
-"""
-function get_vmr!(array::AbstractArray{FT,2}, this::GasConcs{FT}, gas::AbstractGas) where FT
-  igas = loc_in_array(gas, this.gas_names)
-  @assert igas ≠ -1 # assert gas is found
-  @assert !(this.ncol ≠ nothing && this.ncol ≠ size(array,1))
-  @assert !(this.nlay ≠ nothing && this.nlay ≠ size(array,2))
-  conc = this.concs[igas,:,:]
-  array .= conc
-  return nothing
 end
 
 end # module
