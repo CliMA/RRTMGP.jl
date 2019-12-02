@@ -13,6 +13,7 @@ using RRTMGP.GasConcentrations
 using RRTMGP.RTESolver
 using RRTMGP.Fluxes
 using RRTMGP.SourceFunctions
+using RRTMGP.AtmosphericStates
 using RRTMGP.CloudOptics
 
 include(joinpath("..","ReadInputData","ReadInputs.jl"))
@@ -20,14 +21,14 @@ include(joinpath("..","ReadInputData","LoadCoefficients.jl"))
 include(joinpath("..","ReadInputData","LoadCloudCoefficients.jl"))
 include("CloudSampling.jl")
 
-function vmr_2d_to_1d!(gas_concs::GasConcs{FT},
-                       gas_concs_garand::GasConcs{FT},
+function vmr_2d_to_1d!(gas_conc::GasConcs{FT},
+                       gas_conc_garand::GasConcs{FT},
                        gas::AbstractGas,
                        gases_prescribed::Vector{AbstractGas}) where {FT<:AbstractFloat, I<:Int}
   i_gas = loc_in_array(gas, gases_prescribed)
-  tmp = gas_concs_garand.concs[i_gas,:,:]
+  tmp = gas_conc_garand.concs[i_gas,:,:]
   tmp_col = tmp[1, :]
-  set_vmr!(gas_concs, gas, tmp_col)
+  set_vmr!(gas_conc, gas, tmp_col)
 end
 
 function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
@@ -47,15 +48,15 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
   #
   FT = Float64
   I = Int64
-  p_lay, t_lay, p_lev, t_lev, gas_concs_garand, col_dry = @timeit to "read_atmos" read_atmos(ds[:input], FT, I, gases_prescribed)
+  p_lay, t_lay, p_lev, t_lev, gas_conc_garand, col_dry = @timeit to "read_atmos" read_atmos(ds[:input], FT, I, gases_prescribed)
 
   col_dry = nothing
   nlay = size(p_lay, 2)
   # For clouds we'll use the first column, repeated over and over
   gsc = GasConcSize(ncol, nlay, (ncol, nlay), ngas)
-  gas_concs = GasConcs(FT, I, gases_prescribed, ncol, nlay, gsc)
+  gas_conc = GasConcs(FT, I, gases_prescribed, ncol, nlay, gsc)
   for gas in gases_prescribed
-    vmr_2d_to_1d!(gas_concs, gas_concs_garand, gas, gases_prescribed)
+    vmr_2d_to_1d!(gas_conc, gas_conc_garand, gas, gases_prescribed)
   end
 
   #  If we trusted in Fortran allocate-on-assign we could skip the temp_array here
@@ -64,9 +65,12 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
   p_lev = deepcopy(spread_new(p_lev[1,:], 1, ncol))
   t_lev = deepcopy(spread_new(t_lev[1,:], 1, ncol))
 
+  as = AtmosphericState(gas_conc, p_lay, p_lev, t_lay, t_lev)
+  gas_conc, p_lay, p_lev, t_lay, t_lev = ntuple(i->nothing,5)
+
   # This puts pressure and temperature arrays on the GPU
   # load data into classes
-  k_dist = load_and_init(ds[:k_dist], FT, gas_concs.gas_names)
+  k_dist = load_and_init(ds[:k_dist], FT, as.gas_conc.gas_names)
   is_sw = source_is_external(k_dist)
   is_lw = !is_sw
   #
@@ -82,7 +86,6 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
   #
   nbnd = get_nband(k_dist.optical_props)
   ngpt = get_ngpt(k_dist.optical_props)
-  top_at_1 = p_lay[1, 1] < p_lay[1, nlay]
 
   println("--------- Problem size:")
   @show ncol,nlay,nbnd,ngpt
@@ -126,7 +129,7 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
     t_sfc = zeros(FT, ncol)
     emis_sfc = zeros(FT, nbnd, ncol)
     # Surface temperature
-    t_sfc .= t_lev[1, fmerge(nlay+1, 1, top_at_1)]
+    t_sfc .= as.t_lev[1, fmerge(nlay+1, 1, as.top_at_1)]
     emis_sfc .= FT(0.98)
   end
 
@@ -154,12 +157,12 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
   rei_val = FT(0.5) * (get_min_radius(cloud_optics_.ice) + get_max_radius(cloud_optics_.ice))
   for ilay=1:nlay
     for icol=1:ncol
-      cloud_mask[icol,ilay] = p_lay[icol,ilay] < FT(100) * FT(100) && p_lay[icol,ilay] > FT(900)
+      cloud_mask[icol,ilay] = as.p_lay[icol,ilay] < FT(100) * FT(100) && as.p_lay[icol,ilay] > FT(900)
       #
       # Ice and liquid will overlap in a few layers
       #
-      lwp[icol,ilay] = fmerge(FT(10),  FT(0), cloud_mask[icol,ilay] && t_lay[icol,ilay] > FT(263))
-      iwp[icol,ilay] = fmerge(FT(10),  FT(0), cloud_mask[icol,ilay] && t_lay[icol,ilay] < FT(273))
+      lwp[icol,ilay] = fmerge(FT(10),  FT(0), cloud_mask[icol,ilay] && as.t_lay[icol,ilay] > FT(263))
+      iwp[icol,ilay] = fmerge(FT(10),  FT(0), cloud_mask[icol,ilay] && as.t_lay[icol,ilay] < FT(273))
       rel[icol,ilay] = fmerge(rel_val, FT(0), lwp[icol,ilay] > FT(0))
       rei[icol,ilay] = fmerge(rei_val, FT(0), iwp[icol,ilay] > FT(0))
     end
@@ -178,33 +181,37 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
     #
     fluxes.flux_up .= FT(0)
     fluxes.flux_dn .= FT(0)
+
+
     if is_lw
-      gas_optics_int!(k_dist, p_lay, p_lev,
-                  t_lay, t_sfc,
-                  gas_concs,
-                  atmos,
-                  lw_sources;
-                  tlev = t_lev)
+      gas_optics_int!(k_dist,
+                      as,
+                      t_sfc,
+                      atmos,
+                      lw_sources)
 
 
       increment!(clouds, atmos)
-      rte_lw!(atmos, top_at_1,
+      rte_lw!(atmos,
+              as.top_at_1,
               lw_sources,
               emis_sfc,
               fluxes)
     else
       fluxes.flux_dn_dir .= flux_dir
 
-      gas_optics_ext!(k_dist, p_lay, p_lev,
-                  t_lay,
-                  gas_concs,
-                  atmos,
-                  toa_flux)
+      gas_optics_ext!(k_dist,
+                      as,
+                      atmos,
+                      toa_flux)
       delta_scale!(clouds)
       increment!(clouds, atmos)
-      rte_sw!(atmos, top_at_1,
-              μ_0,   toa_flux,
-              sfc_alb_dir, sfc_alb_dif,
+      rte_sw!(atmos,
+              as.top_at_1,
+              μ_0,
+              toa_flux,
+              sfc_alb_dir,
+              sfc_alb_dif,
               fluxes)
     end
     flux_up .= fluxes.flux_up

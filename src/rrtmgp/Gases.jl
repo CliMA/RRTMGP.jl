@@ -8,7 +8,7 @@ export AbstractGas
 export chem_name, rfmip_name
 export h2o, o3, no2, co2, CCl4, CH3Br, CH3Cl, n2o, co, ch4, o2, n2, cfc22
 export ccl4, cfc11, cfc12, hfc143a, hfc125, hfc23, hfc32, hfc134a, cf4, ch3br, ch3cl # not tested
-export h2o_frgn, h2o_self
+export h2o_frgn, h2o_self # TODO: figure out what these gases are
 export UncaughtGas
 
 abstract type AbstractGas end
@@ -37,8 +37,8 @@ struct hfc134a     <: AbstractGas end # Not tested
 struct cf4         <: AbstractGas end # Not tested
 struct ch3br       <: AbstractGas end # Not tested
 struct ch3cl       <: AbstractGas end # Not tested
-struct h2o_frgn    <: AbstractGas end # Not tested
-struct h2o_self    <: AbstractGas end # Not tested
+struct h2o_frgn    <: AbstractGas end # TODO: figure out what these gases are
+struct h2o_self    <: AbstractGas end # TODO: figure out what these gases are
 struct UncaughtGas <: AbstractGas end
 
 chem_name(g::AbstractGas) = first(split(string(g), "("))
@@ -82,12 +82,5 @@ rfmip_name(::ch3cl)       = "methyl_chloride"
 rfmip_name(::h2o_frgn)    = "h2o_frgn"
 rfmip_name(::h2o_self)    = "h2o_self"
 rfmip_name(::UncaughtGas) = "UncaughtGas"
-
-# struct GasSet{N,T<:NTuple{N,AbstractGas}}
-#   gases::T
-# end
-
-# GasSet(g::NTuple{N,AbstractGas}) where {N} = GasSet{N,typeof(g)}(g)
-# GasSet(g::AbstractGas...) = GasSet(g)
 
 end # module

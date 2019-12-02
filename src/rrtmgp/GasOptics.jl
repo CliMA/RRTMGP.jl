@@ -27,6 +27,7 @@ using ..SourceFunctions
 using ..Utilities
 using ..GasConcentrations
 using ..OpticalProps
+using ..AtmosphericStates
 
 export gas_optics_int!, gas_optics_ext!, load_totplnk, load_solar_source
 export source_is_internal, source_is_external, get_press_min
@@ -226,127 +227,89 @@ get_nflav(this::AbstractGasOptics) = size(this.flavor, 2)
 
 """
     gas_optics_int!(this::InternalSourceGasOptics,
-                     play,
-                     plev,
-                     tlay,
-                     tsfc,
-                     gas_desc::GasConcs,
-                     optical_props::AbstractOpticalPropsArry,
-                     sources::SourceFuncLW;
-                     col_dry=nothing,
-                     tlev=nothing)
+                    as::AtmosphericState{FT,I},
+                    tsfc,
+                    optical_props::AbstractOpticalPropsArry,
+                    sources::SourceFuncLW;
+                    col_dry=nothing) where {FT<:AbstractFloat,I<:Int}
 
-Compute gas optical depth and Planck source functions,
-#  given temperature, pressure, and composition
+Compute gas optical depth and Planck source functions given:
 
- - `col_dry` Number of molecules per cm-2 of dry air
  - `this` gas optics, see [`InternalSourceGasOptics`](@ref)
+ - `as` atmospheric state, see [`AtmosphericState`](@ref)
+ - `col_dry` Number of molecules per cm-2 of dry air
+ - `optical_props` optical properties, see [`AbstractOpticalPropsArry`](@ref)
+ - `sources` longwave sources, see [`SourceFuncLW`](@ref)
 
-inputs
-real(FT), dimension(:,:), intent(in   ) :: play,    # layer pressures [Pa, mb]; (ncol,nlay)
-                                          plev,    # level pressures [Pa, mb]; (ncol,nlay+1)
-                                          tlay      # layer temperatures [K]; (ncol,nlay)
 real(FT), dimension(:),   intent(in   ) :: tsfc      # surface skin temperatures [K]; (ncol)
-type(GasConcs),       intent(in   ) :: gas_desc  # Gas volume mixing ratios
-# output
-class(AbstractOpticalPropsArry), intent(inout) :: optical_props # Optical properties
-class(SourceFuncLW    ), intent(inout) :: sources       # Planck sources
-# Optional inputs
 real(FT), dimension(:,:),   intent(in   ), optional, target :: col_dry,   # Column dry amount; dim(ncol,nlay)
-                                                                tlev        # level temperatures [K]; (ncol,nlay+1)
 """
 function gas_optics_int!(this::InternalSourceGasOptics,
-                     play,
-                     plev,
-                     tlay,
-                     tsfc,
-                     gas_desc::GasConcs,
-                     optical_props::AbstractOpticalPropsArry,
-                     sources::SourceFuncLW;
-                     col_dry=nothing,
-                     tlev=nothing)
-  FT = eltype(play)
+                         as::AtmosphericState{FT,I},
+                         tsfc::Vector{FT},
+                         optical_props::AbstractOpticalPropsArry,
+                         sources::SourceFuncLW;
+                         col_dry=nothing) where {FT<:AbstractFloat,I<:Int}
 
-  ncol,nlay  = size(play)
-  ics = InterpolationCoefficients(FT, Int, ncol, nlay, get_nflav(this))
+  ics = InterpolationCoefficients(FT, Int, as.ncol, as.nlay, get_nflav(this))
 
   ngpt  = get_ngpt(this.optical_props)
   nband = get_nband(this.optical_props)
 
   # Gas optics
-  compute_gas_τs!(ics, this,
-                   play, plev, tlay, gas_desc,
-                   optical_props,
-                   col_dry)
+  compute_gas_τs!(ics, this, as, optical_props, col_dry)
 
   # External source -- check arrays sizes and values
   # input data sizes and values
-  check_extent(tsfc, ncol, "tsfc")
+  check_extent(tsfc, as.ncol, "tsfc")
   check_range(tsfc, this.ref.temp_min,  this.ref.temp_max,  "tsfc")
-  if present(tlev)
-    check_extent(tlev, (ncol, nlay+1), "tlev")
-    check_range(tlev, this.ref.temp_min, this.ref.temp_max, "tlev")
+  if present(as.t_lev)
+    check_extent(as.t_lev, (as.ncol, as.nlay+1), "tlev")
+    check_range(as.t_lev, this.ref.temp_min, this.ref.temp_max, "tlev")
   end
 
   #   output extents
-  @assert get_ncol(sources) == ncol
-  @assert get_nlay(sources) == nlay
+  @assert get_ncol(sources) == as.ncol
+  @assert get_nlay(sources) == as.nlay
   @assert get_ngpt(sources) == ngpt
 
   # Interpolate source function
-  source!(this,
-         play, plev, tlay, tsfc,
-         ics,
-         sources,
-         tlev)
+  source!(this, as, tsfc, ics, sources)
   nothing
 end
 
 """
-    gas_optics_ext!(this::ExternalSourceGasOptics,
-                     play,
-                     plev,
-                     tlay,
-                     gas_desc::GasConcs,    # mandatory inputs
-                     optical_props::AbstractOpticalPropsArry,
-                     toa_src,        # mandatory outputs
-                     col_dry=nothing)
+    gas_optics_ext!(this::ExternalSourceGasOptics{FT},
+                    as::AtmosphericState{FT,I},
+                    optical_props::AbstractOpticalPropsArry,
+                    toa_src,        # mandatory outputs
+                    col_dry=nothing,
+                    last_call=false) where {FT<:AbstractFloat,I<:Int}
 
-Compute gas optical depth, `toa_src`, given temperature, pressure, and composition
+Compute gas optical depth, and top-of-atmosphere (toa) source `toa_src`, given:
 
-# class(ExternalSourceGasOptics), intent(in) :: this
-# real(FT), dimension(:,:), intent(in   ) :: play,    # layer pressures [Pa, mb]; (ncol,nlay)
-#                                            plev,    # level pressures [Pa, mb]; (ncol,nlay+1)
-#                                            tlay      # layer temperatures [K]; (ncol,nlay)
-# type(GasConcs),       intent(in   ) :: gas_desc  # Gas volume mixing ratios
-# # output
-# class(AbstractOpticalPropsArry), intent(inout) :: optical_props
+ - `this` gas optics, see [`ExternalSourceGasOptics`](@ref)
+ - `as` atmospheric state, see [`AtmosphericState`](@ref)
+ - `optical_props` optical properties, see [`AbstractOpticalPropsArry`](@ref)
+
 # real(FT), dimension(:,:), intent(  out) :: toa_src     # Incoming solar irradiance(ncol,ngpt)
-
-# Optional inputs
 # real(FT), dimension(:,:), intent(in   ), optional, target :: col_dry # Column dry amount; dim(ncol,nlay)
 """
 function gas_optics_ext!(this::ExternalSourceGasOptics{FT},
-                     play,
-                     plev,
-                     tlay,
-                     gas_desc::GasConcs{FT},    # mandatory inputs
-                     optical_props::AbstractOpticalPropsArry,
-                     toa_src,        # mandatory outputs
-                     col_dry=nothing, last_call=false) where {FT<:AbstractFloat}
+                         as::AtmosphericState{FT,I},
+                         optical_props::AbstractOpticalPropsArry,
+                         toa_src,        # mandatory outputs
+                         col_dry=nothing,
+                         last_call=false) where {FT<:AbstractFloat,I<:Int}
 
-  ncol,nlay  = size(play)
-  ics = InterpolationCoefficients(FT, Int, ncol,nlay, get_nflav(this))
+  ics = InterpolationCoefficients(FT, Int, as.ncol,as.nlay, get_nflav(this))
 
   # Gas optics
-  @timeit to_gor "compute_gas_τs!" compute_gas_τs!(ics, this,
-                   play, plev, tlay, gas_desc,
-                   optical_props,
-                   col_dry, last_call)
+  @timeit to_gor "compute_gas_τs!" compute_gas_τs!(ics, this, as, optical_props, col_dry, last_call)
 
   # External source function is constant
-  # check_extent(toa_src,     (ncol,         ngpt), "toa_src")
-  toa_src .= repeat(this.solar_src', ncol)
+  # check_extent(toa_src,     (as.ncol,         ngpt), "toa_src")
+  toa_src .= repeat(this.solar_src', as.ncol)
   last_call && @show to_gor
 end
 
@@ -354,19 +317,15 @@ end
 # Returns optical properties and interpolation coefficients
 """
     compute_gas_τs!(this::AbstractGasOptics,
-                          play, plev, tlay, gas_desc::GasConcs,
+                          play, plev, tlay, gas_conc::GasConcs,
                           optical_props::AbstractOpticalPropsArry,
                           col_dry=nothing)
 
+ - `this` gas optics, see [`InternalSourceGasOptics`](@ref) or [`ExternalSourceGasOptics`](@ref)
  - `ics` interpolation coefficients, see [`InterpolationCoefficients`](@ref)
+ - `as` atmospheric state, see [`AtmosphericState`](@ref)
+ - `optical_props` optical properties, see [`AbstractOpticalPropsArry`](@ref)
 
-class(AbstractGasOptics), intent(in   ) :: this
-real(FT), dimension(:,:),         intent(in   ) :: play,    # layer pressures [Pa, mb]; (ncol,nlay)
-                                                   plev,    # level pressures [Pa, mb]; (ncol,nlay+1)
-                                                   tlay      # layer temperatures [K]; (ncol,nlay)
-type(GasConcs),               intent(in   ) :: gas_desc  # Gas volume mixing ratios
-class(AbstractOpticalPropsArry),     intent(inout) :: optical_props #inout because components are allocated
-Optional inputs
 real(FT), dimension(:,:), intent(in   ), optional, target :: col_dry # Column dry amount; dim(ncol,nlay)
 ----------------------------------------------------------
 Local variables
@@ -390,10 +349,10 @@ real(FT), dimension(2,2,  get_nflav(this),ncol,nlay) :: fminor # interpolation f
                                                      # index(4) : layer
 """
 function compute_gas_τs!(ics::InterpolationCoefficients,
-                           this::AbstractGasOptics{FT},
-                           play, plev, tlay, gas_desc::GasConcs,
-                           optical_props::AbstractOpticalPropsArry,
-                           col_dry=nothing, last_call=false) where FT
+                         this::AbstractGasOptics{FT},
+                         as::AtmosphericState{FT,I},
+                         optical_props::AbstractOpticalPropsArry,
+                         col_dry=nothing, last_call=false) where {FT<:AbstractFloat,I<:Int}
 
   ncol  = get_ncol(optical_props)
   nlay  = get_nlay(optical_props)
@@ -409,15 +368,15 @@ function compute_gas_τs!(ics::InterpolationCoefficients,
   col_mix = Array{FT}(undef, 2,    get_nflav(this),ncol,nlay) # combination of major species's column amounts
 
   # Check for presence of key species in GasConcs; return error if any key species are not present
-  check_key_species_present(this, gas_desc.gas_names)
+  check_key_species_present(this, as.gas_conc.gas_names)
 
   # Check input data sizes and values
-  check_extent(play, (ncol, nlay  ), "play")
-  check_extent(plev, (ncol, nlay+1), "plev")
-  check_extent(tlay, (ncol, nlay  ), "tlay")
-  check_range(play, this.ref.press_min, this.ref.press_max, "play")
-  check_range(plev, this.ref.press_min, this.ref.press_max, "plev")
-  check_range(tlay, this.ref.temp_min,  this.ref.temp_max,  "tlay")
+  check_extent(as.p_lay, (ncol, nlay  ), "p_lay")
+  check_extent(as.p_lev, (ncol, nlay+1), "p_lev")
+  check_extent(as.t_lay, (ncol, nlay  ), "t_lay")
+  check_range(as.p_lay, this.ref.press_min, this.ref.press_max, "p_lay")
+  check_range(as.p_lev, this.ref.press_min, this.ref.press_max, "p_lev")
+  check_range(as.t_lay, this.ref.temp_min,  this.ref.temp_max,  "t_lay")
   if present(col_dry)
     check_extent(col_dry, (ncol, nlay), "col_dry")
     check_range(col_dry, FT(0), floatmax(FT), "col_dry")
@@ -431,7 +390,7 @@ function compute_gas_τs!(ics::InterpolationCoefficients,
 
   # Fill out the array of volume mixing ratios
   for i_gas in this.i_gases
-    vmr[:,:,i_gas] .= gas_desc.concs[i_gas,:,:]
+    vmr[:,:,i_gas] .= as.gas_conc.concs[i_gas,:,:]
   end
 
   # Compute dry air column amounts (number of molecule per cm^2) if user hasn't provided them
@@ -439,7 +398,7 @@ function compute_gas_τs!(ics::InterpolationCoefficients,
   if present(col_dry)
     col_dry_wk .= col_dry
   else
-    col_dry_wk .= get_col_dry(vmr[:,:,idx_h2o], plev, tlay) # dry air column amounts computation
+    col_dry_wk .= get_col_dry(vmr[:,:,idx_h2o], as.p_lev, as.t_lay) # dry air column amounts computation
   end
 
   # compute column gas amounts [molec/cm^2]
@@ -456,8 +415,8 @@ function compute_gas_τs!(ics::InterpolationCoefficients,
           nflav, neta, npres, ntemp,  # interpolation dimensions
           this.flavor,
           this.ref,
-          play,
-          tlay,
+          as.p_lay,
+          as.t_lay,
           col_gas)
   @timeit to_gor "compute_τ_absorption!" compute_τ_absorption!(τ,
           ncol,nlay,nband,ngpt,                      # dimensions
@@ -471,8 +430,8 @@ function compute_gas_τs!(ics::InterpolationCoefficients,
           this.upper_aux,
           ics,
           col_mix,
-          play,
-          tlay,
+          as.p_lay,
+          as.t_lay,
           col_gas)
   if allocated(this.krayl)
 
@@ -495,34 +454,30 @@ function compute_gas_τs!(ics::InterpolationCoefficients,
 end
 
 """
-    source!(this::InternalSourceGasOptics,
-                play, plev, tlay, tsfc,
-                ics,
-                sources::SourceFuncLW,          # Planck sources
-                tlev)
+    source!(this::InternalSourceGasOptics{FT},
+            as::AtmosphericState{FT,I},
+            tsfc::Vector{FT},
+            ics::InterpolationCoefficients{FT,I},
+            sources::SourceFuncLW) where {FT<:AbstractFloat,I<:Int}
 
 Compute Planck source functions at layer centers and levels
 
+ - `this` gas optics, see [`InternalSourceGasOptics`](@ref)
+ - `as` atmospheric state, see [`AtmosphericState`](@ref)
  - `ics` interpolation coefficients, see [`InterpolationCoefficients`](@ref)
+ - `sources` longwave sources, see [`SourceFuncLW`](@ref)
 
 # inputs
-class(InternalSourceGasOptics),    intent(in ) :: this
-real(FT), dimension(ncol,nlay),        intent(in   ) :: play   # layer pressures [Pa, mb]
-real(FT), dimension(ncol,nlay+1),      intent(in   ) :: plev   # level pressures [Pa, mb]
-real(FT), dimension(ncol,nlay),        intent(in   ) :: tlay   # layer temperatures [K]
 real(FT), dimension(ncol),             intent(in   ) :: tsfc   # surface skin temperatures [K]
-class(SourceFuncLW    ),          intent(inout) :: sources
-real(FT), dimension(ncol,nlay+1),      intent(in   ), optional, target :: tlev          # level temperatures [K]
 ----------------------------------------------------------
 real(FT), dimension(ngpt,nlay,ncol)          :: lay_source_t, lev_source_inc_t, lev_source_dec_t
 real(FT), dimension(ngpt,     ncol)          :: sfc_source_t
-real(FT), dimension(:,:),            pointer :: tlev_wk
 """
 function source!(this::InternalSourceGasOptics{FT},
-                 play, plev, tlay, tsfc,
+                 as::AtmosphericState{FT,I},
+                 tsfc::Vector{FT},
                  ics::InterpolationCoefficients{FT,I},
-                 sources::SourceFuncLW,
-                 tlev=nothing) where {FT<:AbstractFloat,I<:Int}
+                 sources::SourceFuncLW) where {FT<:AbstractFloat,I<:Int}
 
   ncol  = get_ncol(sources)
   nlay  = get_nlay(sources)
@@ -534,49 +489,16 @@ function source!(this::InternalSourceGasOptics{FT},
   lev_source_dec_t = zeros(FT, ngpt,nlay,ncol)
   sfc_source_t     = zeros(FT, ngpt,ncol)
 
-  # Source function needs temperature at interfaces/levels and at layer centers
-  if present(tlev)
-    #   Users might have provided these
-    tlev_wk = tlev
-  else
-    tlev_wk = zeros(FT, ncol,nlay+1)
-    #
-    # Interpolate temperature to levels if not provided
-    #   Interpolation and extrapolation at boundaries is weighted by pressure
-    #
-    for icol = 1:ncol
-       tlev_wk[icol,1] = tlay[icol,1] +
-                         (plev[icol,1]-play[icol,1])*
-                         (tlay[icol,2]-tlay[icol,1])/
-                         (play[icol,2]-play[icol,1])
-    end
-    for ilay in 2:nlay
-      for icol in 1:ncol
-         tlev_wk[icol,ilay] = (play[icol,ilay-1]*tlay[icol,ilay-1]*
-                               (plev[icol,ilay]-play[icol,ilay]) +
-                                play[icol,ilay]*tlay[icol,ilay]*
-                               (play[icol,ilay-1]-plev[icol,ilay]))/
-                               (plev[icol,ilay]*(play[icol,ilay-1] - play[icol,ilay]))
-      end
-    end
-    for icol = 1:ncol
-       tlev_wk[icol,nlay+1] = tlay[icol,nlay] +
-                              (plev[icol,nlay+1]-play[icol,nlay])*
-                              (tlay[icol,nlay]-tlay[icol,nlay-1])/
-                              (play[icol,nlay]-play[icol,nlay-1])
-    end
-  end
-
   # Compute internal (Planck) source functions at layers and levels,
   #  which depend on mapping from spectral space that creates k-distribution.
   compute_Planck_source!(ncol,
               nlay,
               nbnd,
               ngpt,
-              tlay,
-              tlev_wk,
+              as.t_lay,
+              as.t_lev,
               tsfc,
-              fmerge(1,nlay,play[1,1] > play[1,nlay]),
+              fmerge(1,nlay,as.p_lay[1,1] > as.p_lay[1,nlay]),
               ics,
               get_gpoint_bands(this.optical_props),
               get_band_lims_gpoint(this.optical_props),

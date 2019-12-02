@@ -10,6 +10,7 @@ using RRTMGP.ArrayUtilities
 using RRTMGP.GasOptics
 using RRTMGP.GasConcentrations
 using RRTMGP.RTESolver
+using RRTMGP.AtmosphericStates
 using RRTMGP.Fluxes
 
 
@@ -66,12 +67,12 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
   #
   # Allocation on assignment within reading routines
   #
-  p_lay, p_lev, t_lay, t_lev = @timeit to "read_and_block_pt" read_and_block_pt(ds[:rfmip], block_size)
+  p_lay_all, p_lev_all, t_lay_all, t_lev_all = @timeit to "read_and_block_pt" read_and_block_pt(ds[:rfmip], block_size)
   #
   # Are the arrays ordered in the vertical with 1 at the top or the bottom of the domain?
   #
 
-  top_at_1 = p_lay[1, 1, 1] < p_lay[1, nlay, 1]
+  top_at_1 = p_lay_all[1, 1, 1] < p_lay_all[1, nlay, 1]
 
   #
   # Read the gas concentrations and surface properties
@@ -88,27 +89,25 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
 
   nbnd = get_nband(k_dist.optical_props)
   ngpt = get_ngpt(k_dist.optical_props)
-
   println("--------- Problem size:")
   @show ncol,nlay,nbnd,ngpt
   @show nblocks,nexp,block_size
-
   ps = ProblemSize(block_size, nlay, ngpt)
 
-  toa_flux = zeros(FT, block_size, get_ngpt(k_dist.optical_props))
-  def_tsi = zeros(FT, block_size)
-  usecol = Array{Bool}(undef, block_size, nblocks)
   #
   # RRTMGP won't run with pressure less than its minimum. The top level in the RFMIP file
   #   is set to 10^-3 Pa. Here we pretend the layer is just a bit less deep.
   #   This introduces an error but shows input sanitizing.
   #
   if top_at_1
-    p_lev[:,1,:] .= get_press_min(k_dist.ref) + eps(FT)
+    p_lev_all[:,1,:] .= get_press_min(k_dist.ref) + eps(FT)
   else
-    p_lev[:,nlay+1,:] .= get_press_min(k_dist.ref) + eps(FT)
+    p_lev_all[:,nlay+1,:] .= get_press_min(k_dist.ref) + eps(FT)
   end
 
+  toa_flux = zeros(FT, block_size, get_ngpt(k_dist.optical_props))
+  def_tsi = zeros(FT, block_size)
+  usecol = Array{Bool}(undef, block_size, nblocks)
   #
   # RTE will fail if passed solar zenith angles greater than 90 degree. We replace any with
   #   nighttime columns with a default solar zenith angle. We'll mask these out later, of
@@ -137,22 +136,23 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
 
   b_tot = (compile_first ? 1 : nblocks)
   @showprogress 1 "Computing..." for b = 1:b_tot
-    fluxes.flux_up .= FT(0)
-    fluxes.flux_dn .= FT(0)
-    #
+    p_lay = p_lay_all[:,:,b]
+    p_lev = p_lev_all[:,:,b]
+    t_lay = t_lay_all[:,:,b]
+    gas_conc = gas_conc_array[b]
+    as = AtmosphericState(gas_conc, p_lay, p_lev, t_lay)
+
     # Compute the optical properties of the atmosphere and the Planck source functions
     #    from pressures, temperatures, and gas concentrations...
-    #
+    fluxes.flux_up .= FT(0)
+    fluxes.flux_dn .= FT(0)
 
     @timeit to "gas_optics_ext!" gas_optics_ext!(k_dist,
-                p_lay[:,:,b],
-                p_lev[:,:,b],
-                t_lay[:,:,b],
-                gas_conc_array[b],
-                optical_props,
-                toa_flux,
-                nothing,
-                b==b_tot)
+                                                 as,
+                                                 optical_props,
+                                                 toa_flux,
+                                                 nothing,
+                                                 b==b_tot)
     # Boundary conditions
     #   (This is partly to show how to keep work on GPUs using OpenACC in a host application)
     # What's the total solar irradiance assumed by RRTMGP?
@@ -187,12 +187,12 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
     #
 
     @timeit to "rte_sw!" rte_sw!(optical_props,
-            top_at_1,
-            μ_0,
-            toa_flux,
-            sfc_alb_spec,
-            sfc_alb_spec,
-            fluxes)
+                                 as.top_at_1,
+                                 μ_0,
+                                 toa_flux,
+                                 sfc_alb_spec,
+                                 sfc_alb_spec,
+                                 fluxes)
 
 
     flux_up[:,:,b] .= fluxes.flux_up
