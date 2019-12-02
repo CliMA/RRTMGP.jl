@@ -23,6 +23,7 @@ Note that `ds` is used to denote an NC dataset.
 
 using RRTMGP.GasConcentrations
 using RRTMGP.Utilities
+using RRTMGP.Gases
 using RRTMGP.FortranIntrinsics
 using NCDatasets
 
@@ -48,18 +49,33 @@ function read_atmos(ds, FT, I, gases_prescribed)
   p_lev = Array{FT}(ds["p_lev"][:])
   t_lev = Array{FT}(ds["t_lev"][:])
 
-  gases_to_look_for = ["h2o", "co2", "o3", "n2o", "co",
-                       "ch4", "o2", "n2", "ccl4", "cfc11",
-                       "cfc12", "cfc22", "hfc143a", "hfc125", "hfc23",
-                       "hfc32", "hfc134a", "cf4", "no2"]
+  gases_to_look_for = [h2o(),
+                       co2(),
+                       o3(),
+                       n2o(),
+                       co(),
+                       ch4(),
+                       o2(),
+                       n2(),
+                       ccl4(),
+                       cfc11(),
+                       cfc12(),
+                       cfc22(),
+                       hfc143a(),
+                       hfc125(),
+                       hfc23(),
+                       hfc32(),
+                       hfc134a(),
+                       cf4(),
+                       no2()]
 
-  gases_in_database = filter(ug->haskey(ds, "vmr_"*ug), gases_to_look_for)
+  gases_in_database = filter(ug->haskey(ds, "vmr_"*chem_name(ug)), gases_to_look_for)
 
   gsc = GasConcSize(ncol, nlay, (ncol, nlay), length(gases_in_database))
   gas_concs = GasConcs(FT, I, gases_prescribed, ncol, nlay, gsc)
 
   for eg in gases_in_database
-    set_vmr!(gas_concs, eg, Array{FT}(ds["vmr_"*eg][:]))
+    set_vmr!(gas_concs, eg, Array{FT}(ds["vmr_"*chem_name(eg)][:]))
   end
 
   # col_dry has unchanged allocation status on return if the variable isn't present in the netCDF file
@@ -344,44 +360,34 @@ one containing the name as contained in the RFMIP input files - depending on the
 """
 function determine_gas_names(ds, forcing_index)
 
-  chem_name = ["co", "ch4", "o2", "n2o", "n2", "co2", "ccl4", "ch4", "ch3br", "ch3cl", "cfc22"]
-
-  conc_name = ["carbon_monoxide",
-               "methane",
-               "oxygen",
-               "nitrous_oxide",
-               "nitrogen",
-               "carbon_dioxide",
-               "carbon_tetrachloride",
-               "methane",
-               "methyl_bromide",
-               "methyl_chloride",
-               "hcfc22"]
+  chem_name = AbstractGas[co(),
+                          ch4(),
+                          o2(),
+                          n2o(),
+                          n2(),
+                          co2(),
+                          ccl4(),
+                          ch4(),
+                          ch3br(),
+                          ch3cl(),
+                          cfc22()]
 
   @assert any(forcing_index .== [1,2,3])
   if forcing_index == 1
-    names_in_kdist = read_kdist_gas_names(ds)
-
-    # Use a mapping between chemical formula and name if it exists
-    names_in_file = map(x->x in chem_name ?
-      conc_name[loc_in_array(x,chem_name)] : x, names_in_kdist)
+    names_in_kdist = convert.(AbstractGas, read_kdist_gas_names(ds))
 
   # elseif forcing_index == 2
 
   #   # Not part of the RFMIP specification, but oxygen is included because it's a major
   #   #    gas in some bands in the SW
-  #   names_in_kdist = ["co2", "ch4", "n2o", "o2", "cfc12", "cfc11"]
-  #   names_in_file =  ["carbon_dioxide", "methane", "nitrous_oxide",
-  #                     "oxygen", "cfc12", "cfc11eq"]
+  #   names_in_kdist = [co2(), ch4(), n2o(), o2(), cfc12(), cfc11()]
   # elseif forcing_index == 3
 
   #   # Not part of the RFMIP specification, but oxygen is included because it's a major
   #   #    gas in some bands in the SW
-  #   names_in_kdist = ["co2", "ch4", "n2o", "o2", "cfc12", "hfc134a"]
-  #   names_in_file =  ["carbon_dioxide", "methane", "nitrous_oxide",
-  #                     "oxygen", "cfc12eq", "hfc134aeq"]
+  #   names_in_kdist = [co2(), ch4(), n2o(), o2(), cfc12(), hfc134a()]
   end
-  return names_in_kdist, names_in_file
+  return names_in_kdist
 
 end
 
@@ -394,7 +400,7 @@ read_kdist_gas_names(ds) =
   lowercase.(strip.( String[join(ds["gas_names"][:][:,i]) for i = 1:ds.dim["absorber"]] ))
 
 """
-    read_and_block_gases_ty(ds, blocksize, gas_names, names_in_file)
+    read_and_block_gases_ty(ds, blocksize, gas_names)
 
 Read and reshape gas concentrations. RRTMGP requires gas concentrations to be supplied via a class
 (GasConcs). Gas concentrations are set via a call to set_vmr!(gas_concs, name, values)
@@ -410,12 +416,13 @@ each experiment.
 Fields in the RFMIP file have a trailing _GM (global mean); some fields use a chemical formula and other
 a descriptive name, so a map is provided between these.
 
- - `names_in_file` Corresponding names in the RFMIP file
  - `gas_names` Names used by the k-distribution/gas concentration type
  - `blocksize`
  - `gas_conc_array` vector of [`GasConcs`](@ref)
 """
-function read_and_block_gases_ty(ds, blocksize, gas_names, names_in_file)
+function read_and_block_gases_ty(ds,
+                                 blocksize,
+                                 gas_names::Vector{AbstractGas})
   ncol_l, nlay_l, nexp_l = read_size(ds)
   @assert !any([ncol_l, nlay_l, nexp_l] .== 0)
   @assert (ncol_l*nexp_l)%blocksize == 0
@@ -430,45 +437,37 @@ function read_and_block_gases_ty(ds, blocksize, gas_names, names_in_file)
   exp_num = freshape(spread(convert(Array,collect(1:nexp_l)'), 1, ncol_l), [blocksize, nblocks], order=[1,2])
 
   # Water vapor and ozone depend on col, lay, exp: look just like other fields
-  water_vapor = Array{FT}(ds["water_vapor"][:])
-  water_vapor_scaling = read_scaling(ds, FT,"water_vapor")
-  gas_conc_temp_3d = reshape(water_vapor, nlay_l, blocksize, nblocks ) .* water_vapor_scaling
+  for gas in (h2o(), o3())
+    gas_conc = Array{FT}(ds[rfmip_name(gas)][:])
+    gas_conc_scaling = read_scaling(ds, FT, rfmip_name(gas))
+    gas_conc_temp_3d = reshape(gas_conc, nlay_l, blocksize, nblocks ) .* gas_conc_scaling
 
-  for b = 1:nblocks
-    gas_conc_temp_3d_t = transpose(gas_conc_temp_3d[:,:,b])
-    gas_conc_temp_3d_a = convert(Array, gas_conc_temp_3d_t)
-
-    set_vmr!(gas_conc_array[b], "h2o", gas_conc_temp_3d_a)
-  end
-
-  ozone = Array{FT}(ds["ozone"][:])
-  ozone_scaling = read_scaling(ds, FT,"ozone")
-  gas_conc_temp_3d = reshape(ozone, nlay_l, blocksize, nblocks ) * ozone_scaling
-
-  for b = 1:nblocks
-    set_vmr!(gas_conc_array[b],"o3", convert(Array, transpose(gas_conc_temp_3d[:,:,b])))
+    for b = 1:nblocks
+      gas_conc_temp_3d_t = convert(Array, transpose(gas_conc_temp_3d[:,:,b]))
+      set_vmr!(gas_conc_array[b], gas, gas_conc_temp_3d_t)
+    end
   end
 
   # All other gases are a function of experiment only
-  for g = 1:length(gas_names)
+  for gas in gas_names
 
     # Skip 3D fields above, also NO2 since RFMIP doesn't have this
-    if gas_names[g] in ["h2o", "o3", "no2"]
+    if gas in [h2o(), o3(), no2()]
       continue
     end
 
     # Read the values as a function of experiment
-    gas_conc_scaling = read_scaling(ds, FT,names_in_file[g] * "_GM")
-    gas_conc_temp_1d = ds[names_in_file[g] * "_GM"][:] * gas_conc_scaling
+    gas_conc_scaling = read_scaling(ds, FT, rfmip_name(gas) * "_GM")
+    gas_conc_temp_1d = ds[rfmip_name(gas) * "_GM"][:] * gas_conc_scaling
 
     for b = 1:nblocks
       # Does every value in this block belong to the same experiment?
       if all( exp_num[2:end,b] .- exp_num[1,b] .== 0 )
         # Provide a scalar value
-        set_vmr!(gas_conc_array[b],gas_names[g], gas_conc_temp_1d[exp_num[1,b]])
+        set_vmr!(gas_conc_array[b], gas, gas_conc_temp_1d[exp_num[1,b]])
       else
         # Create 2D field, blocksize x nlay, with scalar values from each experiment
-        set_vmr!(gas_conc_array[b], gas_names[g], spread(gas_conc_temp_1d[exp_num[:,b]], 2, nlay_l))
+        set_vmr!(gas_conc_array[b], gas, spread(gas_conc_temp_1d[exp_num[:,b]], 2, nlay_l))
       end
     end
 

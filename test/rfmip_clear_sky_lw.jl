@@ -62,9 +62,7 @@ function rfmip_clear_sky_lw(ds, optical_props_constructor; compile_first=false)
   #   provided by RFMIP (e.g. 'co2' and 'carbon_dioxide')
   #
 
-  kdist_gas_names, rfmip_gas_games = determine_gas_names(ds[:k_dist], forcing_index)
-  # print("Calculation uses RFMIP gases: ")
-  # @show rfmip_gas_games
+  kdist_gas_names = determine_gas_names(ds[:k_dist], forcing_index)
 
   # --------------------------------------------------
   #
@@ -83,7 +81,7 @@ function rfmip_clear_sky_lw(ds, optical_props_constructor; compile_first=false)
   #
   # Read the gas concentrations and surface properties
   #
-  gas_conc_array = read_and_block_gases_ty(ds[:rfmip], block_size, kdist_gas_names, rfmip_gas_games)
+  gas_conc_array = read_and_block_gases_ty(ds[:rfmip], block_size, kdist_gas_names)
   sfc_emis, sfc_t = read_and_block_lw_bc(ds[:rfmip], block_size)
 
   #

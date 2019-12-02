@@ -34,8 +34,8 @@ struct Reference{FT}
                      temp::Array{FT},
                      press_ref_trop::FT,
                      vmr_ref::Array{FT},
-                     available_gases::Array{S},
-                     gas_names::Array{S}) where {FT<:AbstractFloat,S<:AbstractString}
+                     available_gases::Vector{AbstractGas},
+                     gas_names::Vector{AbstractGas}) where {FT<:AbstractFloat}
 
     gas_is_present = map(x->x in available_gases, gas_names)
     ngas = count(gas_is_present)

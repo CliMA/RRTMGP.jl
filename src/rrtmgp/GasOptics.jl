@@ -18,6 +18,7 @@ using DocStringExtensions
 
 const to_gor = TimerOutput()
 
+using ..Gases
 using ..FortranIntrinsics
 using ..PhysicalConstants
 using ..ArrayUtilities
@@ -85,9 +86,9 @@ struct GasOpticsVars{FT,I}
   "absorption coefficient of minor species"
   kminor::Array{FT,3} #, (n_minor,η,temperature)
   "scaling gas"
-  scaling_gas::Array{String}
+  scaling_gas::Array{AbstractGas}
   "minor gases"
-  minor_gases::Array{String}
+  minor_gases::Array{AbstractGas}
 end
 
 abstract type AbstractGasOptics{T,I} <: AbstractOpticalProps{T,I} end
@@ -114,7 +115,7 @@ struct InternalSourceGasOptics{FT,I} <: AbstractGasOptics{FT,I}
   "Auxiliary variables (index maps) in the upper atmosphere"
   upper_aux::GasOpticsAux{I}
   "Present gas names"
-  gas_names::Vector{String}
+  gas_names::Vector{AbstractGas}
   "Absorption coefficient for major species (g-point,η,pressure,temperature)"
   kmajor::Array{FT,4}
   "major species pair; [2, nflav]"
@@ -155,7 +156,7 @@ struct ExternalSourceGasOptics{FT,I} <: AbstractGasOptics{FT,I}
   "Auxiliary variables (index maps) in the upper atmosphere"
   upper_aux::GasOpticsAux{I}
   "Present gas names"
-  gas_names::Vector{String}
+  gas_names::Vector{AbstractGas}
   "Absorption coefficient for major species (g-point,η,pressure,temperature)"
   kmajor::Array{FT,4}
   "major species pair; [2, nflav]"
@@ -433,7 +434,7 @@ function compute_gas_τs!(ics::InterpolationCoefficients,
   end
 
   # Compute dry air column amounts (number of molecule per cm^2) if user hasn't provided them
-  idx_h2o = loc_in_array("h2o", this.gas_names)
+  idx_h2o = loc_in_array(h2o(), this.gas_names)
   if present(col_dry)
     col_dry_wk .= col_dry
   else
@@ -667,13 +668,13 @@ Initialize absorption coefficient arrays
  - `gases_in_database` gases available in database
  - `optical_props` optical properties, see [`OpticalProps`](@ref)
 """
-function init_abs_coeffs(gases_prescribed::Vector{String},
-                         gases_in_database::Vector{String},
+function init_abs_coeffs(gases_prescribed::Vector{AbstractGas},
+                         gases_in_database::Vector{AbstractGas},
                          key_species::Array{I,3},
                          optical_props::OpticalPropsBase{FT,I},
                          kmajor::Array{FT,4},
-                         gas_minor::Vector{String},
-                         identifier_minor::Vector{String},
+                         gas_minor::Vector{AbstractGas},
+                         identifier_minor::Vector{AbstractGas},
                          lower::GasOpticsVars{FT},
                          upper::GasOpticsVars{FT}) where {FT<:AbstractFloat,I<:Int}
 
@@ -720,12 +721,12 @@ function init_abs_coeffs(gases_prescribed::Vector{String},
 end
 
 """
-    check_key_species_present(this::AbstractGasOptics, gas_names::Vector{String})
+    check_key_species_present(this::AbstractGasOptics, gas_names::Vector{AbstractGas})
 
 Ensure that every key gas required by the k-distribution is
 present in the gas concentration object
 """
-function check_key_species_present(this::AbstractGasOptics, gas_names::Vector{String})
+function check_key_species_present(this::AbstractGasOptics, gas_names::Vector{AbstractGas})
   key_gas_names = pack(this.gas_names, this.is_key)
   for igas = 1:length(key_gas_names)
     @assert key_gas_names[igas] in gas_names
@@ -733,7 +734,7 @@ function check_key_species_present(this::AbstractGasOptics, gas_names::Vector{St
 end
 
 """
-    get_minor_list(this::AbstractGasOptics, gas_names::Vector{String}, names_spec::Vector{String})
+    get_minor_list(this::AbstractGasOptics, gas_names::Vector{AbstractGas}, names_spec::Vector{AbstractGas})
 
 List of minor gases to be used in gas_optics()
 Function to define names of key and minor gases to be used by gas_optics().
@@ -742,7 +743,7 @@ and are provided in GasConcs.
 
 !!! Not yet tested
 """
-get_minor_list(this::AbstractGasOptics, gas_names::Vector{String}, names_spec::Vector{String}) =
+get_minor_list(this::AbstractGasOptics, gas_names::Vector{AbstractGas}, names_spec::Vector{AbstractGas}) =
   pack(this.gas_names, map(x->x in gas_names, names_spec))
 
 #####
@@ -878,47 +879,47 @@ create index list for extracting col_gas needed for minor gas optical depth calc
  - `minor_gases_atm`
 """
 function create_idx_minor(::Type{I},
-                          gas_names::VS,
-                          gas_minor::VS,
-                          identifier_minor::VS,
-                          minor_gases_atm::VS) where {I<:Integer,VS<:Vector{String}}
-  # Find identifying string for minor species in list of possible identifiers (e.g. h2o_slf)
+                          gas_names::VG,
+                          gas_minor::VG,
+                          identifier_minor::VG,
+                          minor_gases_atm::VG) where {I<:Integer,VG<:Vector{AbstractGas}}
+  # Find identifying gas for minor species in list of possible identifiers (e.g. h2o_slf)
   idx_mnr = map(x->loc_in_array(x, identifier_minor), minor_gases_atm)
   # Find name of gas associated with minor species identifier (e.g. h2o)
   return map(x->loc_in_array(gas_minor[x], gas_names), idx_mnr)
 end
 
 """
-    create_idx_minor_scaling(::Type{I}, gas_names::Vector{S}, scaling_gas_atm::Vector{S}) where {I<:Integer, S<:String}
+    create_idx_minor_scaling(::Type{I}, gas_names::VG, scaling_gas_atm::VG) where {I<:Integer, VG<:Vector{AbstractGas}}
 
 Create index for special treatment in density scaling of minor gases
 
  - `gas_names` gas names
  - `scaling_gas_atm`
 """
-create_idx_minor_scaling(::Type{I}, gas_names::VS, scaling_gas_atm::VS) where {I<:Integer, VS<:Vector{String}} =
+create_idx_minor_scaling(::Type{I}, gas_names::VG, scaling_gas_atm::VG) where {I<:Integer, VG<:Vector{AbstractGas}} =
   map(x->loc_in_array(x, gas_names), scaling_gas_atm)
 
 """
-    create_key_species_reduce(gas_names::VS,
-                              gas_names_red::VS,
-                              key_species::Array{I,3}) where {VS<:Vector{String},I<:Int}
+    create_key_species_reduce(gas_names::VG,
+                              gas_names_red::VG,
+                              key_species::Array{I,3}) where {VS<:Vector{AbstractGas},I<:Int}
 
 create flavor list
 Reduce (remap) key_species list; checks that all key gases are present in incoming
 """
-function create_key_species_reduce(gas_names::VS,
-                                   gas_names_red::VS,
-                                   key_species::Array{I,3}) where {VS<:Vector{String},I<:Int}
+function create_key_species_reduce(gas_names::VG,
+                                   gas_names_red::VG,
+                                   key_species::Array{I,3}) where {VG<:Vector{AbstractGas},I<:Int}
   key_species_red = map(x-> x≠0 ? loc_in_array(gas_names[x],gas_names_red) : x, key_species)
   @assert !any(key_species_red .== -1)
   return key_species_red
 end
 
 """
-    reduce_minor_arrays(gases_prescribed::Vector{String},
-                        gas_minor::Vector{String},
-                        identifier_minor::Vector{String},
+    reduce_minor_arrays(gases_prescribed::Vector{AbstractGas},
+                        gas_minor::Vector{AbstractGas},
+                        identifier_minor::Vector{AbstractGas},
                         atmos::GasOpticsVars{FT}) where FT
 
 A reduced `GasOpticsVars` for minor species arrays.
@@ -929,9 +930,9 @@ Variables only contain minor gases that are available.
  - `identifier_minor`
  - `atmos` original gas optics for minor species, see [`GasOpticsVars`](@ref)
 """
-function reduce_minor_arrays(gases_prescribed::Vector{String},
-                             gas_minor::Vector{String},
-                             identifier_minor::Vector{String},
+function reduce_minor_arrays(gases_prescribed::Vector{AbstractGas},
+                             gas_minor::Vector{AbstractGas},
+                             identifier_minor::Vector{AbstractGas},
                              atmos::GasOpticsVars{FT}) where FT
 
   I = Int

@@ -3,6 +3,7 @@ using DocStringExtensions
 using RRTMGP.OpticalProps
 using RRTMGP.FortranIntrinsics
 using RRTMGP.ArrayUtilities
+using RRTMGP.Gases
 using RRTMGP.GasOptics
 using RRTMGP.GasConcentrations
 using RRTMGP.RTESolver
