@@ -11,6 +11,7 @@ using RRTMGP.GasOptics
 using RRTMGP.GasConcentrations
 using RRTMGP.RTESolver
 using RRTMGP.Fluxes
+using RRTMGP.AtmosphericStates
 using RRTMGP.SourceFunctions
 
 include(joinpath("..","ReadInputData","ReadInputs.jl"))
@@ -47,11 +48,8 @@ function rfmip_clear_sky_lw(ds, optical_props_constructor; compile_first=false)
   forcing_index = 1
   block_size = 8
 
-  #
   # How big is the problem? Does it fit into blocks of the size we've specified?
-  #
   @assert mod(ncol*nexp, block_size) == 0
-
   nblocks = Int((ncol*nexp)/block_size)
 
   @assert 1 <= forcing_index <= 3
@@ -61,7 +59,6 @@ function rfmip_clear_sky_lw(ds, optical_props_constructor; compile_first=false)
   #   A gas might have a different name in the k-distribution than in the files
   #   provided by RFMIP (e.g. 'co2' and 'carbon_dioxide')
   #
-
   kdist_gas_names = determine_gas_names(ds[:k_dist], forcing_index)
 
   # --------------------------------------------------
@@ -71,25 +68,24 @@ function rfmip_clear_sky_lw(ds, optical_props_constructor; compile_first=false)
   #
   # Allocation on assignment within reading routines
   #
-  p_lay, p_lev, t_lay, t_lev = read_and_block_pt(ds[:rfmip], block_size)
+  p_lay_all, p_lev_all, t_lay_all, t_lev_all = read_and_block_pt(ds[:rfmip], block_size)
   #
   # Are the arrays ordered in the vertical with 1 at the top or the bottom of the domain?
   #
 
-  top_at_1 = p_lay[1, 1, 1] < p_lay[1, nlay, 1]
+  top_at_1 = p_lay_all[1, 1, 1] < p_lay_all[1, nlay, 1]
 
   #
   # Read the gas concentrations and surface properties
   #
   gas_conc_array = read_and_block_gases_ty(ds[:rfmip], block_size, kdist_gas_names)
-  sfc_emis, sfc_t = read_and_block_lw_bc(ds[:rfmip], block_size)
+  sfc_emis_all, sfc_t_all = read_and_block_lw_bc(ds[:rfmip], block_size)
 
   #
   # Read k-distribution information. load_and_init() reads data from netCDF and calls
   #   k_dist%init(); users might want to use their own reading methods
   #
   k_dist = load_and_init(ds[:k_dist], FT, gas_conc_array[1].gas_names)
-
   @assert source_is_internal(k_dist)
 
   nbnd = get_nband(k_dist.optical_props)
@@ -97,6 +93,7 @@ function rfmip_clear_sky_lw(ds, optical_props_constructor; compile_first=false)
   println("--------- Problem size:")
   @show ncol,nlay,nbnd,ngpt
   @show nblocks,nexp,block_size
+  ps = ProblemSize(block_size, nlay, ngpt)
 
   #
   # RRTMGP won't run with pressure less than its minimum. The top level in the RFMIP file
@@ -104,9 +101,9 @@ function rfmip_clear_sky_lw(ds, optical_props_constructor; compile_first=false)
   #   This introduces an error but shows input sanitizing.
   #
   if top_at_1
-    p_lev[:,1,:] .= get_press_min(k_dist.ref) + eps(FT)
+    p_lev_all[:,1,:] .= get_press_min(k_dist.ref) + eps(FT)
   else
-    p_lev[:,nlay+1,:] .= get_press_min(k_dist.ref) + eps(FT)
+    p_lev_all[:,nlay+1,:] .= get_press_min(k_dist.ref) + eps(FT)
   end
 
   #
@@ -125,7 +122,6 @@ function rfmip_clear_sky_lw(ds, optical_props_constructor; compile_first=false)
 
   sfc_emis_spec = Array{FT}(undef, nbnd,block_size)
 
-  ps = ProblemSize(block_size, nlay, ngpt)
   optical_props = optical_props_constructor(k_dist.optical_props, ps)
   source = SourceFuncLW(block_size,nlay,k_dist.optical_props)
 
@@ -135,26 +131,35 @@ function rfmip_clear_sky_lw(ds, optical_props_constructor; compile_first=false)
   fluxes = FluxesBroadBand(FT, (size(flux_up,1),size(flux_up,2)))
 
   for b = 1:(compile_first ? 1 : nblocks)
+    gas_conc = gas_conc_array[b]
+    for icol = 1:block_size
+      for ibnd = 1:nbnd
+        sfc_emis_spec[ibnd,icol] = sfc_emis_all[icol,b]
+      end
+    end
+    p_lay = p_lay_all[:,:,b]
+    p_lev = p_lev_all[:,:,b]
+    t_lay = t_lay_all[:,:,b]
+    t_lev = t_lev_all[:,:,b]
+    sfc_t = sfc_t_all[:,  b]
+    as = AtmosphericState(gas_conc, p_lay, p_lev, t_lay, t_lev)
+
     fluxes.flux_up .= FT(0)
     fluxes.flux_dn .= FT(0)
 
-    for icol = 1:block_size
-      for ibnd = 1:nbnd
-        sfc_emis_spec[ibnd,icol] = sfc_emis[icol,b]
-      end
-    end
-
     gas_optics_int!(k_dist,
-                p_lay[:,:,b],
-                p_lev[:,:,b],
-                t_lay[:,:,b],
-                sfc_t[:,  b],
-                gas_conc_array[b],
-                optical_props,
-                source;
-                tlev = t_lev[:,:,b])
+                    as,
+                    sfc_t,
+                    optical_props,
+                    source)
 
-    rte_lw!(optical_props,top_at_1,source,sfc_emis_spec,fluxes,nothing,n_quad_angles)
+    rte_lw!(optical_props,
+            as.top_at_1,
+            source,
+            sfc_emis_spec,
+            fluxes,
+            nothing,
+            n_quad_angles)
 
     flux_up[:,:,b] .= fluxes.flux_up
     flux_dn[:,:,b] .= fluxes.flux_dn
