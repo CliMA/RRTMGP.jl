@@ -57,9 +57,7 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
   #   A gas might have a different name in the k-distribution than in the files
   #   provided by RFMIP (e.g. 'co2' and 'carbon_dioxide')
   #
-  kdist_gas_names, rfmip_gas_games = @timeit to "determine_gas_names" determine_gas_names(ds[:k_dist], forcing_index)
-  # print("Calculation uses RFMIP gases: ")
-  # @show rfmip_gas_games
+  kdist_gas_names = @timeit to "determine_gas_names" determine_gas_names(ds[:k_dist], forcing_index)
 
   # --------------------------------------------------
   #
@@ -78,7 +76,7 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
   #
   # Read the gas concentrations and surface properties
   #
-  gas_conc_array = @timeit to "read_and_block_gases_ty" read_and_block_gases_ty(ds[:rfmip], block_size, kdist_gas_names, rfmip_gas_games)
+  gas_conc_array = @timeit to "read_and_block_gases_ty" read_and_block_gases_ty(ds[:rfmip], block_size, kdist_gas_names)
   surface_albedo, total_solar_irradiance, solar_zenith_angle = @timeit to "read_and_block_sw_bc" read_and_block_sw_bc(ds[:rfmip], block_size)
 
   #

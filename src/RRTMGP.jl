@@ -12,6 +12,7 @@ include(joinpath("extensions","CloudOptics.jl"))
 include(joinpath("rte","RTESolver.jl"))
 
 include(joinpath("rrtmgp","PhysicalConstants.jl"))
+include(joinpath("rrtmgp","Gases.jl"))
 include(joinpath("rrtmgp","GasConcentrations.jl"))
 include(joinpath("rrtmgp","GasOptics.jl"))
 

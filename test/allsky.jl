@@ -5,6 +5,7 @@ using TimerOutputs
 const to = TimerOutput()
 using NCDatasets
 using RRTMGP.OpticalProps
+using RRTMGP.Gases
 using RRTMGP.FortranIntrinsics
 using RRTMGP.ArrayUtilities
 using RRTMGP.GasOptics
@@ -21,7 +22,7 @@ include("CloudSampling.jl")
 
 function vmr_2d_to_1d!(gas_concs::GasConcs{FT},
                        gas_concs_garand::GasConcs{FT},
-                       name::String,
+                       name::AbstractGas,
                        sz1::I,
                        sz2::I) where {FT<:AbstractFloat,I<:Int}
   tmp = Array{FT}(undef, sz1, sz2)
@@ -35,7 +36,7 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
   k_dist_sym = Symbol(:k_dist,λ_string)
   cloud_optics_sym = Symbol(:cloud_optics,λ_string)
 
-  gases_prescribed = lowercase.(strip.(["h2o", "co2", "o3", "n2o", "co", "ch4", "o2", "n2"]))
+  gases_prescribed = [h2o(), co2(), o3(), n2o(), co(), ch4(), o2(), n2()]
   ngas = length(gases_prescribed)
   nloops = 1
   ncol = 128
