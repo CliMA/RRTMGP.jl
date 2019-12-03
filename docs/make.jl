@@ -22,6 +22,7 @@ makedocs(
     "Optical Properties" => "RTE/OpticalProps.md"
     "Fluxes" => "RTE/Fluxes.md"
     "RTE Solver" => "RTE/RTESolver.md"
+    "Solar Zenith Angle" => "RTE/SolarZenithAngle.md"
     ],
     "References" => "References.md",
   ],
