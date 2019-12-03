@@ -30,7 +30,7 @@ using ..GasConcentrations
 using ..OpticalProps
 using ..AtmosphericStates
 
-export gas_optics_int!, gas_optics_ext!, load_totplnk, load_solar_source
+export gas_optics!, load_totplnk, load_solar_source
 export source_is_internal, source_is_external
 export get_col_dry
 export GasOpticsVars
@@ -223,11 +223,10 @@ get_nflav(this::AbstractGasOptics) = size(this.flavor, 2)
 
 
 """
-    gas_optics_int!(this::InternalSourceGasOptics,
-                    as::AtmosphericState{FT,I},
-                    tsfc,
-                    optical_props::AbstractOpticalPropsArry,
-                    sources::SourceFuncLW) where {FT<:AbstractFloat,I<:Int}
+    gas_optics!(this::InternalSourceGasOptics,
+                as::AtmosphericState{FT,I},
+                optical_props::AbstractOpticalPropsArry,
+                sources::SourceFuncLW) where {FT<:AbstractFloat,I<:Int}
 
 Compute gas optical depth and Planck source functions given:
 
@@ -235,58 +234,43 @@ Compute gas optical depth and Planck source functions given:
  - `as` atmospheric state, see [`AtmosphericState`](@ref)
  - `optical_props` optical properties, see [`AbstractOpticalPropsArry`](@ref)
  - `sources` longwave sources, see [`SourceFuncLW`](@ref)
-
-real(FT), dimension(:),   intent(in   ) :: tsfc      # surface skin temperatures [K]; (ncol)
 """
-function gas_optics_int!(this::InternalSourceGasOptics,
-                         as::AtmosphericState{FT,I},
-                         tsfc::Vector{FT},
-                         optical_props::AbstractOpticalPropsArry,
-                         sources::SourceFuncLW) where {FT<:AbstractFloat,I<:Int}
+function gas_optics!(this::InternalSourceGasOptics,
+                     as::AtmosphericState{FT,I},
+                     optical_props::AbstractOpticalPropsArry,
+                     sources::SourceFuncLW) where {FT<:AbstractFloat,I<:Int}
 
   ics = InterpolationCoefficients(FT, Int, as.ncol, as.nlay, get_nflav(this))
-
-  ngpt  = get_ngpt(this.optical_props)
-  nband = get_nband(this.optical_props)
 
   # Gas optics
   compute_gas_τs!(ics, this, as, optical_props)
 
-  # External source -- check arrays sizes and values
-  # input data sizes and values
-  check_extent(tsfc, as.ncol, "tsfc")
-  check_range(tsfc, this.ref.temp_min,  this.ref.temp_max,  "tsfc")
-
   #   output extents
   @assert get_ncol(sources) == as.ncol
   @assert get_nlay(sources) == as.nlay
-  @assert get_ngpt(sources) == ngpt
+  @assert get_ngpt(sources) == get_ngpt(this.optical_props)
 
   # Interpolate source function
-  source!(this, as, tsfc, ics, sources)
+  source!(this, as, ics, sources)
   nothing
 end
 
 """
-    gas_optics_ext!(this::ExternalSourceGasOptics{FT},
-                    as::AtmosphericState{FT,I},
-                    optical_props::AbstractOpticalPropsArry,
-                    toa_src,        # mandatory outputs
-                    last_call=false) where {FT<:AbstractFloat,I<:Int}
+    gas_optics!(this::ExternalSourceGasOptics{FT},
+                as::AtmosphericState{FT,I},
+                optical_props::AbstractOpticalPropsArry,
+                last_call=false) where {FT<:AbstractFloat,I<:Int}
 
-Compute gas optical depth, and top-of-atmosphere (toa) source `toa_src`, given:
+Compute gas optical depth given:
 
  - `this` gas optics, see [`ExternalSourceGasOptics`](@ref)
  - `as` atmospheric state, see [`AtmosphericState`](@ref)
  - `optical_props` optical properties, see [`AbstractOpticalPropsArry`](@ref)
-
-# real(FT), dimension(:,:), intent(  out) :: toa_src     # Incoming solar irradiance(ncol,ngpt)
 """
-function gas_optics_ext!(this::ExternalSourceGasOptics{FT},
-                         as::AtmosphericState{FT,I},
-                         optical_props::AbstractOpticalPropsArry,
-                         toa_src,        # mandatory outputs
-                         last_call=false) where {FT<:AbstractFloat,I<:Int}
+function gas_optics!(this::ExternalSourceGasOptics{FT},
+                     as::AtmosphericState{FT,I},
+                     optical_props::AbstractOpticalPropsArry,
+                     last_call=false) where {FT<:AbstractFloat,I<:Int}
 
   ics = InterpolationCoefficients(FT, Int, as.ncol,as.nlay, get_nflav(this))
 
@@ -294,8 +278,6 @@ function gas_optics_ext!(this::ExternalSourceGasOptics{FT},
   @timeit to_gor "compute_gas_τs!" compute_gas_τs!(ics, this, as, optical_props, last_call)
 
   # External source function is constant
-  # check_extent(toa_src,     (as.ncol,         ngpt), "toa_src")
-  toa_src .= repeat(this.solar_src', as.ncol)
   last_call && @show to_gor
 end
 
@@ -313,16 +295,10 @@ end
  - `as` atmospheric state, see [`AtmosphericState`](@ref)
  - `optical_props` optical properties, see [`AbstractOpticalPropsArry`](@ref)
 
-real(FT), dimension(:,:), intent(in   ), optional, target :: col_dry # Column dry amount; dim(ncol,nlay)
-----------------------------------------------------------
 Local variables
 real(FT), dimension(ngpt,nlay,ncol) :: τ, τ_Rayleigh  # absorption, Rayleigh scattering optical depths
-# integer :: igas, idx_h2o # index of some gases
-# Number of molecules per cm^2
-real(FT), dimension(:,:),       pointer :: col_dry_wk
-#
+
 # Interpolation variables used in major gas but not elsewhere, so don't need exporting
-#
 real(FT), dimension(ncol,nlay,  this%get_ngas()) :: vmr     # volume mixing ratios
 real(FT), dimension(2,    get_nflav(this),ncol,nlay) :: col_mix # combination of major species's column amounts
                                                     # index(1) : reference temperature level
@@ -410,7 +386,6 @@ end
 """
     source!(this::InternalSourceGasOptics{FT},
             as::AtmosphericState{FT,I},
-            tsfc::Vector{FT},
             ics::InterpolationCoefficients{FT,I},
             sources::SourceFuncLW) where {FT<:AbstractFloat,I<:Int}
 
@@ -421,15 +396,11 @@ Compute Planck source functions at layer centers and levels
  - `ics` interpolation coefficients, see [`InterpolationCoefficients`](@ref)
  - `sources` longwave sources, see [`SourceFuncLW`](@ref)
 
-# inputs
-real(FT), dimension(ncol),             intent(in   ) :: tsfc   # surface skin temperatures [K]
-----------------------------------------------------------
 real(FT), dimension(ngpt,nlay,ncol)          :: lay_source_t, lev_source_inc_t, lev_source_dec_t
 real(FT), dimension(ngpt,     ncol)          :: sfc_source_t
 """
 function source!(this::InternalSourceGasOptics{FT},
                  as::AtmosphericState{FT,I},
-                 tsfc::Vector{FT},
                  ics::InterpolationCoefficients{FT,I},
                  sources::SourceFuncLW) where {FT<:AbstractFloat,I<:Int}
 
@@ -451,7 +422,7 @@ function source!(this::InternalSourceGasOptics{FT},
               ngpt,
               as.t_lay,
               as.t_lev,
-              tsfc,
+              as.t_sfc,
               fmerge(1,nlay,as.p_lay[1,1] > as.p_lay[1,nlay]),
               ics,
               get_gpoint_bands(this.optical_props),

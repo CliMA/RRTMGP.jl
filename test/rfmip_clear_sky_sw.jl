@@ -158,11 +158,10 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
     fluxes.flux_up .= FT(0)
     fluxes.flux_dn .= FT(0)
 
-    @timeit to "gas_optics_ext!" gas_optics_ext!(k_dist,
-                                                 as,
-                                                 optical_props,
-                                                 toa_flux,
-                                                 b==b_tot)
+    @timeit to "gas_optics!" gas_optics!(k_dist, as, optical_props, b==b_tot)
+
+    check_extent(toa_flux, (as.ncol, ngpt), "toa_flux")
+    toa_flux .= repeat(k_dist.solar_src', as.ncol)
     # Boundary conditions
     #   (This is partly to show how to keep work on GPUs using OpenACC in a host application)
     # What's the total solar irradiance assumed by RRTMGP?
