@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Solar Zenith Angle · RRTMGP</title><link href="https://cdnjs.cloudflare.com/ajax/libs/normalize/4.2.0/normalize.min.css" rel="stylesheet" type="text/css"/><link href="https://fonts.googleapis.com/css?family=Lato|Roboto+Mono" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.2.0/require.min.js" data-main="../assets/documenter.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><link href="../assets/documenter.css" rel="stylesheet" type="text/css"/></head><body><nav class="toc"><h1>RRTMGP</h1><select id="version-selector" onChange="window.location.href=this.value" style="visibility: hidden"></select><form class="search" id="search-form" action="../search.html"><input id="search-query" name="q" type="text" placeholder="Search docs"/></form><ul><li><a class="toctext" href="../index.html">Home</a></li><li><span class="toctext">RRTMGP</span><ul><li><a class="toctext" href="../RRTMGP/GasConcs.html">Gas Concentrations</a></li><li><a class="toctext" href="../RRTMGP/GasOptics.html">Gas Optics</a></li><li><a class="toctext" href="../RRTMGP/ReferenceStates.html">References States</a></li></ul></li><li><span class="toctext">RTE</span><ul><li><a class="toctext" href="OpticalProps.html">Optical Properties</a></li><li><a class="toctext" href="Fluxes.html">Fluxes</a></li><li><a class="toctext" href="RTESolver.html">RTE Solver</a></li><li class="current"><a class="toctext" href="SolarZenithAngle.html">Solar Zenith Angle</a><ul class="internal"><li class="toplevel"><a class="toctext" href="#Examples-1">Examples</a></li><li><a class="toctext" href="#Example-2-1">Example 2</a></li><li><a class="toctext" href="#Example-3-1">Example 3</a></li><li><a class="toctext" href="#Example-4-1">Example 4</a></li><li><a class="toctext" href="#Example-6-1">Example 6</a></li></ul></li></ul></li><li><a class="toctext" href="../References.html">References</a></li></ul></nav><article id="docs"><header><nav><ul><li>RTE</li><li><a href="SolarZenithAngle.html">Solar Zenith Angle</a></li></ul><a class="edit-page" href="https://github.com/climate-machine/RRTMGP.jl/blob/master/docs/src/RTE/SolarZenithAngle.md"><span class="fa"></span> Edit on GitHub</a></nav><hr/><div id="topbar"><span>Solar Zenith Angle</span><a class="fa fa-bars" href="#"></a></div></header><h1><a class="nav-anchor" id="Solar-Zenith-Angle-1" href="#Solar-Zenith-Angle-1">Solar Zenith Angle</a></h1><h1><a class="nav-anchor" id="Examples-1" href="#Examples-1">Examples</a></h1><pre><code class="language-julia">include(&quot;plot_zenith_angle.jl&quot;)
+
+#####
+##### Example 2
+#####
+
+# 2018 constants
+γ_0 = 23.44
+π_0 = 282.95
+e_0 = 0.017
+
+# ndays, nlats
+ndays = 365
+nlats = 180
+
+F0 = calc_day_lat_insolation(ndays, nlats, γ_0, π_0, e_0)
+plot_day_lat_insolation(ndays, nlats, F0, &quot;YlOrRd&quot;, &quot;gamma_0 = $(γ_0), pi_0 = $(π_0), e = $(e_0)&quot;, &quot;example2.png&quot;)
+
+#####
+##### Example 3
+#####
+
+# turn longitude of perihelion by 180°
+γ_0 = 23.44
+π_1 = 282.95 + 180.0
+e_0 = 0.017
+
+ndays = 365
+nlats = 180
+
+F1 = calc_day_lat_insolation(ndays,nlats,γ_0,π_1,e_0)
+plot_day_lat_insolation(ndays,nlats,F1,&quot;YlOrRd&quot;,  &quot;γ_0 = $(γ_0)^∘, π_0 = $(π_0)^∘, e = $(e_0)&quot;, &quot;example3a.png&quot;)
+plot_day_lat_insolation(ndays,nlats,F1-F0,&quot;PRGn&quot;, &quot;ToA Insolation Difference: π_0_1 = 102.95^∘ - π_0_0 = 282.95^∘&quot;, &quot;example3b.png&quot;)
+
+#####
+##### Example 4
+#####
+
+# perihelion back to normal. decrease γ to 22.0°
+γ_1 = 22.0
+π_0 = 282.95
+e_0 = 0.017
+
+# ndays, nlats
+ndays = 365
+nlats = 180
+
+F2 = calc_day_lat_insolation(ndays,nlats,γ_1,π_0,e_0)
+plot_day_lat_insolation(ndays,nlats,F2,&quot;YlOrRd&quot;,  &quot;γ_0 = $(γ_0)^∘, π_0 = $(π_0)^∘, e = $(e_0)&quot;, &quot;example4a.png&quot;)
+plot_day_lat_insolation(ndays,nlats,F2-F0,&quot;PRGn&quot;, &quot;ToA Insolation Difference: γ_1 = $(γ_1)^∘ - γ_0 = $(γ_0)^∘&quot;, &quot;example4b.png&quot;)
+
+# decrease γ to 18.0°
+γ_2 = 18.0
+π_0 = 282.95
+e_0 = 0.017
+
+# ndays, nlats
+ndays = 365
+nlats = 180
+
+F3 = calc_day_lat_insolation(ndays,nlats,γ_2,π_0,e_0)
+plot_day_lat_insolation(ndays,nlats,F3,&quot;YlOrRd&quot;, &quot;γ_0 = $(γ_0)^∘, π_0 = $(π_0)^∘, e = $(e_0)&quot;, &quot;example4c.png&quot;)
+plot_day_lat_insolation(ndays,nlats,F3-F0,&quot;PRGn&quot;, &quot;ToA Insolation Difference: γ_1 = $(γ_1)^∘ - γ_0 = $(γ_0)^∘&quot;, &quot;example4d.png&quot;)
+
+#####
+##### Example 6
+#####
+
+# now change obliquity to 60.0°
+γ_3 = 60.0
+π_0 = 282.95
+e_0 = 0.017
+
+# ndays, nlats
+ndays = 365
+nlats = 180
+
+F4 = calc_day_lat_insolation(ndays,nlats,γ_3,π_0,e_0)
+plot_day_lat_insolation(ndays,nlats,F4,&quot;YlOrRd&quot;, &quot;γ_0 = $(γ_0)^∘, π_0 = $(π_0)^∘, e = $(e_0)&quot;, &quot;example6a.png&quot;)
+plot_day_lat_insolation(ndays,nlats,F4-F0,&quot;PRGn&quot;, &quot;ToA Insolation Difference: γ_1 = 60.0^∘ - γ_0 = 23.44^∘&quot;, &quot;example6b.png&quot;)
+
+# now change obliquity to 97.86°
+γ = 97.86
+π_0 = 282.95
+e_0 = 0.017
+
+# ndays, nlats
+ndays = 365
+nlats = 180
+
+F5 = calc_day_lat_insolation(ndays,nlats,γ,π_0,e_0)
+plot_day_lat_insolation(ndays,nlats,F5,&quot;YlOrRd&quot;, &quot;γ_0 = $(γ_0)^∘, π_0 = $(π_0)^∘, e = $(e_0)&quot;, &quot;example6c.png&quot;)
+plot_day_lat_insolation(ndays,nlats,F5-F0,&quot;PRGn&quot;, &quot;ToA Insolation Difference: γ_1 = 97.86^∘ - γ_0 = 23.44^∘&quot;, &quot;example6d.png&quot;)</code></pre><pre><code class="language-none">/home/vsts/.julia/packages/GR/oiZD3/src/../deps/gr/bin/gksqt: error while loading shared libraries: libQt5Widgets.so.5: cannot open shared object file: No such file or directory
+connect: Connection refused
+GKS: can&#39;t connect to GKS socket application
+Did you start &#39;gksqt&#39;?
+
+GKS: Open failed in routine OPEN_WS
+GKS: GKS not in proper state. GKS must be either in the state WSOP or WSAC in routine ACTIVATE_WS
+/home/vsts/.julia/packages/GR/oiZD3/src/../deps/gr/bin/gksqt: error while loading shared libraries: libQt5Widgets.so.5: cannot open shared object file: No such file or directory
+connect: Connection refused
+GKS: can&#39;t connect to GKS socket application
+Did you start &#39;gksqt&#39;?
+
+GKS: Open failed in routine OPEN_WS
+GKS: GKS not in proper state. GKS must be either in the state WSOP or WSAC in routine ACTIVATE_WS
+/home/vsts/.julia/packages/GR/oiZD3/src/../deps/gr/bin/gksqt: error while loading shared libraries: libQt5Widgets.so.5: cannot open shared object file: No such file or directory
+connect: Connection refused
+GKS: can&#39;t connect to GKS socket application
+Did you start &#39;gksqt&#39;?
+
+GKS: Open failed in routine OPEN_WS
+GKS: GKS not in proper state. GKS must be either in the state WSOP or WSAC in routine ACTIVATE_WS
+/home/vsts/.julia/packages/GR/oiZD3/src/../deps/gr/bin/gksqt: error while loading shared libraries: libQt5Widgets.so.5: cannot open shared object file: No such file or directory
+connect: Connection refused
+GKS: can&#39;t connect to GKS socket application
+Did you start &#39;gksqt&#39;?
+
+GKS: Open failed in routine OPEN_WS
+GKS: GKS not in proper state. GKS must be either in the state WSOP or WSAC in routine ACTIVATE_WS
+/home/vsts/.julia/packages/GR/oiZD3/src/../deps/gr/bin/gksqt: error while loading shared libraries: libQt5Widgets.so.5: cannot open shared object file: No such file or directory
+connect: Connection refused
+GKS: can&#39;t connect to GKS socket application
+Did you start &#39;gksqt&#39;?
+
+GKS: Open failed in routine OPEN_WS
+GKS: GKS not in proper state. GKS must be either in the state WSOP or WSAC in routine ACTIVATE_WS
+/home/vsts/.julia/packages/GR/oiZD3/src/../deps/gr/bin/gksqt: error while loading shared libraries: libQt5Widgets.so.5: cannot open shared object file: No such file or directory
+connect: Connection refused
+GKS: can&#39;t connect to GKS socket application
+Did you start &#39;gksqt&#39;?
+
+GKS: Open failed in routine OPEN_WS
+GKS: GKS not in proper state. GKS must be either in the state WSOP or WSAC in routine ACTIVATE_WS
+/home/vsts/.julia/packages/GR/oiZD3/src/../deps/gr/bin/gksqt: error while loading shared libraries: libQt5Widgets.so.5: cannot open shared object file: No such file or directory
+connect: Connection refused
+GKS: can&#39;t connect to GKS socket application
+Did you start &#39;gksqt&#39;?
+
+GKS: Open failed in routine OPEN_WS
+GKS: GKS not in proper state. GKS must be either in the state WSOP or WSAC in routine ACTIVATE_WS
+/home/vsts/.julia/packages/GR/oiZD3/src/../deps/gr/bin/gksqt: error while loading shared libraries: libQt5Widgets.so.5: cannot open shared object file: No such file or directory
+connect: Connection refused
+GKS: can&#39;t connect to GKS socket application
+Did you start &#39;gksqt&#39;?
+
+GKS: Open failed in routine OPEN_WS
+GKS: GKS not in proper state. GKS must be either in the state WSOP or WSAC in routine ACTIVATE_WS
+/home/vsts/.julia/packages/GR/oiZD3/src/../deps/gr/bin/gksqt: error while loading shared libraries: libQt5Widgets.so.5: cannot open shared object file: No such file or directory
+connect: Connection refused
+GKS: can&#39;t connect to GKS socket application
+Did you start &#39;gksqt&#39;?
+
+GKS: Open failed in routine OPEN_WS
+GKS: GKS not in proper state. GKS must be either in the state WSOP or WSAC in routine ACTIVATE_WS
+/home/vsts/.julia/packages/GR/oiZD3/src/../deps/gr/bin/gksqt: error while loading shared libraries: libQt5Widgets.so.5: cannot open shared object file: No such file or directory
+connect: Connection refused
+GKS: can&#39;t connect to GKS socket application
+Did you start &#39;gksqt&#39;?
+
+GKS: Open failed in routine OPEN_WS
+GKS: GKS not in proper state. GKS must be either in the state WSOP or WSAC in routine ACTIVATE_WS
+/home/vsts/.julia/packages/GR/oiZD3/src/../deps/gr/bin/gksqt: error while loading shared libraries: libQt5Widgets.so.5: cannot open shared object file: No such file or directory
+connect: Connection refused
+GKS: can&#39;t connect to GKS socket application
+Did you start &#39;gksqt&#39;?
+
+GKS: Open failed in routine OPEN_WS
+GKS: GKS not in proper state. GKS must be either in the state WSOP or WSAC in routine ACTIVATE_WS</code></pre><h2><a class="nav-anchor" id="Example-2-1" href="#Example-2-1">Example 2</a></h2><p><img src="example2.png" alt/></p><h2><a class="nav-anchor" id="Example-3-1" href="#Example-3-1">Example 3</a></h2><p><img src="example3a.png" alt/> <img src="example3b.png" alt/></p><h2><a class="nav-anchor" id="Example-4-1" href="#Example-4-1">Example 4</a></h2><p><img src="example4a.png" alt/> <img src="example4b.png" alt/> <img src="example4c.png" alt/> <img src="example4d.png" alt/></p><h2><a class="nav-anchor" id="Example-6-1" href="#Example-6-1">Example 6</a></h2><p><img src="example6a.png" alt/> <img src="example6b.png" alt/> <img src="example6c.png" alt/> <img src="example6d.png" alt/></p><footer><hr/><a class="previous" href="RTESolver.html"><span class="direction">Previous</span><span class="title">RTE Solver</span></a><a class="next" href="../References.html"><span class="direction">Next</span><span class="title">References</span></a></footer></article></body></html>
