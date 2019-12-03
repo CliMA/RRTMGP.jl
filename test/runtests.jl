@@ -8,6 +8,7 @@ for submodule in [
                   "test_allsky",
                   "test_rfmip_clear_sky_lw",
                   "test_rfmip_clear_sky_sw",
+                  "solar_zenith_angle",
                   # "Benchmarks",
                   ]
 
