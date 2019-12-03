@@ -15,6 +15,14 @@ using RRTMGP.Fluxes
 using RRTMGP.SourceFunctions
 using RRTMGP.AtmosphericStates
 using RRTMGP.CloudOptics
+@static if haspkg("Plots")
+  using Plots
+  const export_plots = true
+else
+  const export_plots = false
+end
+
+include(joinpath("PostProcessing.jl"))
 
 include(joinpath("..","ReadInputData","ReadInputs.jl"))
 include(joinpath("..","ReadInputData","LoadCoefficients.jl"))
@@ -218,6 +226,16 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
     flux_dn .= fluxes.flux_dn
   end
 
+  if export_plots
+    case = "AllSky_use_luts_"*string(use_luts)*"_$(λ_string)"
+    heating_rate, z = compute_heating_rate(fluxes.flux_up, fluxes.flux_dn, as)
+    plot(heating_rate, z, title="All sky $(λ_string) heating rates",
+                          xlabel="heating rate",
+                          ylabel="pressure")
+    out_dir = "output"
+    mkpath(out_dir)
+    savefig(joinpath(out_dir,case*".png"))
+  end
 
   # Compare with reference:
   ref_flux_up = Array{FT}(ds[:ref][λ_string*"_flux_up"][:])
