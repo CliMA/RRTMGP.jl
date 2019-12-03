@@ -6,8 +6,12 @@ Atmospheric conditions used as inputs to RRTMGP.
 module AtmosphericStates
 
 using DocStringExtensions
+using OffsetArrays
 
 using ..Utilities
+using ..FortranIntrinsics
+using ..PhysicalConstants
+using ..Gases
 using ..GasConcentrations
 using ..ReferenceStates
 
@@ -23,6 +27,49 @@ $(DocStringExtensions.FIELDS)
 """
 struct SimpleGrid{FT}
   z
+end
+
+"""
+    get_col_dry(vmr_h2o, plev, tlay, latitude=nothing)
+
+Utility function, provided for user convenience
+computes column amounts of dry air using hydrostatic equation
+
+# input
+real(FT), dimension(:,:), intent(in) :: vmr_h2o  # volume mixing ratio of water vapor to dry air; (ncol,nlay)
+real(FT), dimension(:,:), intent(in) :: plev     # Layer boundary pressures [Pa] (ncol,nlay+1)
+real(FT), dimension(:,:), intent(in) :: tlay     # Layer temperatures [K] (ncol,nlay)
+real(FT), dimension(:),   optional, intent(in) :: latitude # Latitude [degrees] (ncol)
+"""
+function get_col_dry(vmr_h2o, plev, tlay, latitude=nothing)
+  FT = eltype(plev)
+
+  # first and second term of Helmert formula
+  helmert1 = FT(9.80665)
+  helmert2 = FT(0.02586)
+  # local variables
+  g0         = zeros(FT, size(tlay,1)             ) # (ncol)
+  delta_plev = zeros(FT, size(tlay,1),size(tlay,2)) # (ncol,nlay)
+  m_air      = zeros(FT, size(tlay,1),size(tlay,2)) # average mass of air; (ncol,nlay)
+
+  nlay = size(tlay, 2)
+  nlev = size(plev, 2)
+
+  if latitude ≠ nothing
+    g0 .= helmert1 - helmert2 * cos(FT(2) * π * latitude / FT(180)) # acceleration due to gravity [m/s^2]
+  else
+    g0 .= grav(FT)
+  end
+  delta_plev .= abs.(plev[:,1:nlev-1] .- plev[:,2:nlev])
+
+  # Get average mass of moist air per mole of moist air
+  m_air .= (m_dry(FT) .+ m_h2o(FT) .* vmr_h2o) ./ (1 .+ vmr_h2o)
+
+  # Hydrostatic equation
+  col_dry = zeros(FT, size(tlay,1),size(tlay,2))
+  col_dry .= FT(10) .* delta_plev .* avogad(FT) ./ (FT(1000)*m_air .* FT(100) .* spread(g0, 2, nlay))
+  col_dry .= col_dry ./ (FT(1) .+ vmr_h2o)
+  return col_dry
 end
 
 function interpolate_temperature(p_lay::Array{FT},
@@ -79,6 +126,10 @@ struct AtmosphericState{FT,I} <: AbstractAtmosphericState{FT,I}
   t_lay::Array{FT,2}
   "level temperatures [K]; (ncol,nlay+1)"
   t_lev::Array{FT,2}
+  "column amounts for each gas, plus col_dry. gas amounts [molec/cm^2]"
+  col_gas::AbstractArray{FT,3}
+  "Number of molecules per cm-2 of dry air"
+  col_dry::Array{FT,2}
   "Indicates whether arrays are ordered in the vertical with 1 at the top or the bottom of the domain."
   top_at_1::Bool
   nlay::I
@@ -88,7 +139,8 @@ struct AtmosphericState{FT,I} <: AbstractAtmosphericState{FT,I}
                             p_lev::Array{FT,2},
                             t_lay::Array{FT,2},
                             t_lev::Union{Array{FT,2},Nothing},
-                            ref::ReferenceState) where {I<:Int,FT<:AbstractFloat}
+                            ref::ReferenceState,
+                            col_dry::Union{Array{FT,2},Nothing}=nothing) where {I<:Int,FT<:AbstractFloat}
     nlay = size(p_lay, 2)
     ncol = size(p_lay, 1)
     if t_lev==nothing
@@ -104,10 +156,45 @@ struct AtmosphericState{FT,I} <: AbstractAtmosphericState{FT,I}
     check_range(t_lay, ref.temp_min,  ref.temp_max,  "t_lay")
     check_range(t_lev, ref.temp_min,  ref.temp_max,  "t_lev")
 
+    ngas    = length(gas_conc.gas_names)
+    vmr     = Array{FT}(undef, ncol,nlay,ngas) # volume mixing ratios
+    col_gas = OffsetArray{FT}(undef, 1:ncol,1:nlay,0:ngas) # column amounts for each gas, plus col_dry
+
+    # Fill out the array of volume mixing ratios
+    for gas in gas_conc.gas_names
+      i_gas = loc_in_array(gas, gas_conc.gas_names)
+      vmr[:,:,i_gas] .= gas_conc.concs[i_gas,:,:]
+    end
+
+    # Compute dry air column amounts (number of molecule per cm^2) if user hasn't provided them
+    idx_h2o = loc_in_array(h2o(), gas_conc.gas_names)
+    if col_dry == nothing
+      col_dry = get_col_dry(vmr[:,:,idx_h2o], p_lev, t_lay) # dry air column amounts computation
+    end
+
+    check_extent(col_dry, (ncol, nlay), "col_dry")
+    check_range(col_dry, FT(0), floatmax(FT), "col_dry")
+
+    # compute column gas amounts [molec/cm^2]
+    col_gas[:,:,0] .= col_dry
+    for igas = 1:ngas
+      col_gas[:,:,igas] .= vmr[:,:,igas] .* col_dry
+    end
+
     # Are the arrays ordered in the vertical with 1 at the top or the bottom of the domain?
     top_at_1 = p_lay[1, 1] < p_lay[1, nlay]
     grid = SimpleGrid{FT}(p_lay)
-    return new{FT,I}(grid,gas_conc,p_lay,p_lev,t_lay,t_lev,top_at_1,nlay,ncol)
+    return new{FT,I}(grid,
+                     gas_conc,
+                     p_lay,
+                     p_lev,
+                     t_lay,
+                     t_lev,
+                     col_gas,
+                     col_dry,
+                     top_at_1,
+                     nlay,
+                     ncol)
   end
 end
 
