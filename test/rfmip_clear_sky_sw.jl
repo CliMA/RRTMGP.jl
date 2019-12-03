@@ -10,10 +10,18 @@ using RRTMGP.ArrayUtilities
 using RRTMGP.GasOptics
 using RRTMGP.GasConcentrations
 using RRTMGP.RTESolver
-using RRTMGP.AtmosphericStates
 using RRTMGP.Fluxes
+using RRTMGP.AtmosphericStates
 
 
+@static if haspkg("Plots")
+  using Plots
+  const export_plots = true
+else
+  const export_plots = false
+end
+
+include(joinpath("PostProcessing.jl"))
 include(joinpath("..","ReadInputData","ReadInputs.jl"))
 include(joinpath("..","ReadInputData","LoadCoefficients.jl"))
 
@@ -41,6 +49,7 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
   FT = Float64
   I  = Int
   deg_to_rad = acos(-FT(1))/FT(180)
+
 
   ncol, nlay, nexp = read_size(ds[:rfmip])
 
@@ -134,6 +143,8 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
   #
   fluxes = FluxesBroadBand(FT, (size(flux_up,1),size(flux_up,2)), true)
 
+  local as
+
   b_tot = (compile_first ? 1 : nblocks)
   @showprogress 1 "Computing..." for b = 1:b_tot
     p_lay = p_lay_all[:,:,b]
@@ -207,6 +218,17 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
       end
     end
 
+  end
+
+  if export_plots
+    case = "clearsky_sw_"*string(optical_props_constructor)
+    heating_rate, z = compute_heating_rate(fluxes.flux_up, fluxes.flux_dn, as)
+    plot(heating_rate, z, title="Clear sky shortwave heating rates",
+                          xlabel="heating rate",
+                          ylabel="pressure")
+    out_dir = "output"
+    mkpath(out_dir)
+    savefig(joinpath(out_dir,case*".png"))
   end
 
   # reshaping the flux_up and flux_dn arrays for comparison with Fortran code.
