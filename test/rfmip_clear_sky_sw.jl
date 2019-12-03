@@ -162,7 +162,6 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
                                                  as,
                                                  optical_props,
                                                  toa_flux,
-                                                 nothing,
                                                  b==b_tot)
     # Boundary conditions
     #   (This is partly to show how to keep work on GPUs using OpenACC in a host application)
