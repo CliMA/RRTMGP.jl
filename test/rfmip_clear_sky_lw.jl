@@ -87,7 +87,7 @@ function rfmip_clear_sky_lw(ds, optical_props_constructor; compile_first=false)
   # Read the gas concentrations and surface properties
   #
   gas_conc_array = read_and_block_gases_ty(ds[:rfmip], block_size, kdist_gas_names)
-  sfc_emis_all, sfc_t_all = read_and_block_lw_bc(ds[:rfmip], block_size)
+  sfc_emis_all, t_sfc_all = read_and_block_lw_bc(ds[:rfmip], block_size)
 
   #
   # Read k-distribution information. load_and_init() reads data from netCDF and calls
@@ -151,17 +151,13 @@ function rfmip_clear_sky_lw(ds, optical_props_constructor; compile_first=false)
     p_lev = p_lev_all[:,:,b]
     t_lay = t_lay_all[:,:,b]
     t_lev = t_lev_all[:,:,b]
-    sfc_t = sfc_t_all[:,  b]
-    as = AtmosphericState(gas_conc, p_lay, p_lev, t_lay, t_lev, k_dist.ref)
+    t_sfc = t_sfc_all[:,  b]
+    as = AtmosphericState(gas_conc, p_lay, p_lev, t_lay, t_lev, k_dist.ref, nothing, t_sfc)
 
     fluxes.flux_up .= FT(0)
     fluxes.flux_dn .= FT(0)
 
-    gas_optics_int!(k_dist,
-                    as,
-                    sfc_t,
-                    optical_props,
-                    source)
+    gas_optics!(k_dist, as, optical_props, source)
 
     rte_lw!(optical_props,
             as.top_at_1,

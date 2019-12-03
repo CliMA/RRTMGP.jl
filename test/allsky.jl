@@ -79,9 +79,6 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
   is_sw = source_is_external(k_dist)
   is_lw = !is_sw
 
-  as = AtmosphericState(gas_conc, p_lay, p_lev, t_lay, t_lev, k_dist.ref)
-  gas_conc, p_lay, p_lev, t_lay, t_lev = ntuple(i->nothing,5)
-
   # Should also try with Pade calculations
   if use_luts
     cloud_optics_ = load_cld_lutcoeff(FT,ds[:cloud_optics], 2)
@@ -113,9 +110,7 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
     atmos = OneScalar(k_dist.optical_props, ps)
   end
 
-  #
-  # Allocate arrays for the optical properties themselves.
-  #
+  top_at_1 = p_lay[1, 1] < p_lay[1, nlay]
 
   #  Boundary conditions depending on whether the k-distribution being supplied
   #   is LW or SW
@@ -134,12 +129,13 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
     # lw_sorces is thread private
     lw_sources = SourceFuncLW(ncol, nlay, k_dist.optical_props)
 
-    t_sfc = zeros(FT, ncol)
     emis_sfc = zeros(FT, nbnd, ncol)
     # Surface temperature
-    t_sfc .= as.t_lev[1, fmerge(nlay+1, 1, as.top_at_1)]
     emis_sfc .= FT(0.98)
   end
+
+  as = AtmosphericState(gas_conc, p_lay, p_lev, t_lay, t_lev, k_dist.ref, nothing, nothing)
+  gas_conc, p_lay, p_lev, t_lay, t_lev = ntuple(i->nothing,5)
 
   #
   # Fluxes
@@ -192,12 +188,7 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
 
 
     if is_lw
-      gas_optics_int!(k_dist,
-                      as,
-                      t_sfc,
-                      atmos,
-                      lw_sources)
-
+      gas_optics!(k_dist, as, atmos, lw_sources)
 
       increment!(clouds, atmos)
       rte_lw!(atmos,
@@ -208,10 +199,11 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
     else
       fluxes.flux_dn_dir .= flux_dir
 
-      gas_optics_ext!(k_dist,
-                      as,
-                      atmos,
-                      toa_flux)
+      gas_optics!(k_dist, as, atmos)
+
+      check_extent(toa_flux, (as.ncol, ngpt), "toa_flux")
+      toa_flux .= repeat(k_dist.solar_src', as.ncol)
+
       delta_scale!(clouds)
       increment!(clouds, atmos)
       rte_sw!(atmos,

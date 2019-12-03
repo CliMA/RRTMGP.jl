@@ -126,6 +126,8 @@ struct AtmosphericState{FT,I} <: AbstractAtmosphericState{FT,I}
   t_lay::Array{FT,2}
   "level temperatures [K]; (ncol,nlay+1)"
   t_lev::Array{FT,2}
+  "surface temperatures [K]; (ncol)"
+  t_sfc::Vector{FT}
   "column amounts for each gas, plus col_dry. gas amounts [molec/cm^2]"
   col_gas::AbstractArray{FT,3}
   "Number of molecules per cm-2 of dry air"
@@ -140,7 +142,8 @@ struct AtmosphericState{FT,I} <: AbstractAtmosphericState{FT,I}
                             t_lay::Array{FT,2},
                             t_lev::Union{Array{FT,2},Nothing},
                             ref::ReferenceState,
-                            col_dry::Union{Array{FT,2},Nothing}=nothing) where {I<:Int,FT<:AbstractFloat}
+                            col_dry::Union{Array{FT,2},Nothing}=nothing,
+                            t_sfc::Union{Vector{FT},Nothing}=nothing) where {I<:Int,FT<:AbstractFloat}
     nlay = size(p_lay, 2)
     ncol = size(p_lay, 1)
     if t_lev==nothing
@@ -180,9 +183,16 @@ struct AtmosphericState{FT,I} <: AbstractAtmosphericState{FT,I}
     for igas = 1:ngas
       col_gas[:,:,igas] .= vmr[:,:,igas] .* col_dry
     end
-
     # Are the arrays ordered in the vertical with 1 at the top or the bottom of the domain?
     top_at_1 = p_lay[1, 1] < p_lay[1, nlay]
+
+    if t_sfc == nothing
+      t_sfc = Array{FT}(undef, ncol)
+      t_sfc .= t_lev[1, fmerge(nlay+1, 1, top_at_1)]
+    end
+    check_extent(t_sfc, ncol, "t_sfc")
+    check_range(t_sfc, ref.temp_min,  ref.temp_max,  "t_sfc")
+
     grid = SimpleGrid{FT}(p_lay)
     return new{FT,I}(grid,
                      gas_conc,
@@ -190,6 +200,7 @@ struct AtmosphericState{FT,I} <: AbstractAtmosphericState{FT,I}
                      p_lev,
                      t_lay,
                      t_lev,
+                     t_sfc,
                      col_gas,
                      col_dry,
                      top_at_1,
