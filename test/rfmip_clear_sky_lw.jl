@@ -14,7 +14,7 @@ using RRTMGP.RTESolver
 using RRTMGP.Fluxes
 using RRTMGP.AtmosphericStates
 using RRTMGP.SourceFunctions
-
+using RRTMGP.AngularDiscretizations
 @static if haspkg("Plots")
   using Plots
   const export_plots = true
@@ -50,7 +50,7 @@ function rfmip_clear_sky_lw(ds, optical_props_constructor; compile_first=false)
   FT = Float64
   I  = Int
   deg_to_rad = acos(-FT(1))/FT(180)
-  n_quad_angles = I(1)
+  angle_disc = GaussQuadrature(FT, 1)
 
   ncol, nlay, nexp = read_size(ds[:rfmip])
 
@@ -167,7 +167,7 @@ function rfmip_clear_sky_lw(ds, optical_props_constructor; compile_first=false)
             source,
             bcs,
             fluxes,
-            n_quad_angles)
+            angle_disc)
 
     flux_up[:,:,b] .= fluxes.flux_up
     flux_dn[:,:,b] .= fluxes.flux_dn

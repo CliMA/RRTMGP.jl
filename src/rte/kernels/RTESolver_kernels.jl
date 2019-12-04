@@ -159,28 +159,29 @@ given
  - `top_at_1` indicates whether arrays are ordered in the vertical with 1 at the top or the bottom of the domain.
  - `optical_props` 2-stream optical properties, see [`TwoStream`](@ref)
  - `sfc_emis` - surface emissivity
+ - `angle_disc` - angular discretization, see [`GaussQuadrature`](@ref)
+ - `flux_up` upward radiance [W/m2-str]
+ - `flux_dn` downward radiance, Top level must contain incident flux boundary condition
+ - `τ` Absorption optical thickness [ncol,nlay,  ngpt]
 
-integer,                               intent(in   ) :: nmus         # number of quadrature angles
-real(FT), dimension(nmus),             intent(in   ) :: Ds, weights  # quadrature secants, weights
-real(FT), dimension(ncol,nlay,  ngpt), intent(in   ) :: τ          # Absorption optical thickness []
-real(FT), dimension(ncol,nlay+1,ngpt), intent(  out) :: flux_up      # Radiances [W/m2-str]
-real(FT), dimension(ncol,nlay+1,ngpt), intent(inout) :: flux_dn      # Top level must contain incident flux boundary condition
+ - `radn_dn` Fluxes per quad angle [ncol,nlay+1,ngpt]
+ - `radn_up` Fluxes per quad angle [ncol,nlay+1,ngpt]
+
 # Local variables
-real(FT), dimension(ncol,nlay+1,ngpt) :: radn_dn, radn_up # Fluxes per quad angle
 real(FT), dimension(ncol,       ngpt) :: Ds_ncol
-integer :: imu, top_level
 """
 function lw_solver_noscat_GaussQuad!(ncol::I, nlay::I, ngpt::I,
-                                     top_at_1::B, nmus::I,
-                                     Ds::Array{FT},
-                                     weights::Array{FT},
+                                     top_at_1::B,
+                                     angle_disc::GaussQuadrature{FT,I},
                                      τ::Array{FT},
                                      source::SourceFuncLW{FT, I},
                                      sfc_emis::Array{FT},
                                      flux_up::Array{FT},
                                      flux_dn::Array{FT}) where {I<:Int,B<:Bool,FT<:AbstractFloat}
 
-
+  n_μ = angle_disc.n_gauss_angles
+  Ds = angle_disc.gauss_Ds[1:n_μ,n_μ]
+  weights = angle_disc.gauss_wts[1:n_μ,n_μ]
   #
   # For the first angle output arrays store total flux
   #
@@ -203,12 +204,12 @@ function lw_solver_noscat_GaussQuad!(ncol::I, nlay::I, ngpt::I,
   top_level = fmerge(1, nlay+1, top_at_1)
   apply_BC!(radn_dn, ncol, nlay, ngpt, top_at_1, flux_dn[:,top_level,:])
 
-  for imu in 2:nmus
-    Ds_ncol .= Ds[imu]
+  for i_μ in 2:n_μ
+    Ds_ncol .= Ds[i_μ]
     lw_solver_noscat!(ncol, nlay, ngpt,
                       top_at_1,
                       Ds_ncol,
-                      weights[imu],
+                      weights[i_μ],
                       τ,
                       source,
                       sfc_emis,
