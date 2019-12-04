@@ -29,44 +29,44 @@ LW_diff_sec(::Type{FT}) where FT = FT(1.66)  # 1./cos(diffusivity angle)
 #
 
 """
-    lw_solver_noscat!(...)
+    lw_solver_noscat!(ncol::I, nlay::I, ngpt::I,
+                      top_at_1::B,
+                      D::Array{FT},
+                      weight::FT,
+                      τ::Array{FT},
+                      source::SourceFuncLW{FT,I},
+                      sfc_emis::Array{FT},
+                      radn_up::Array{FT},
+                      radn_dn::Array{FT}) where {FT<:AbstractFloat,I<:Int,B<:Bool}
 
-integer,                               intent(in   ) :: ncol, nlay, ngpt # Number of columns, layers, g-points
-logical(wl),                           intent(in   ) :: top_at_1
+ - `source` longwave source function, see [`SourceFuncLW`](@ref)
+ - `top_at_1` indicates whether arrays are ordered in the vertical with 1 at the top or the bottom of the domain.
+ - `optical_props` 2-stream optical properties, see [`TwoStream`](@ref)
+ - `sfc_emis` - surface emissivity
+ - `radn_up` - upward radiance [W/m2-str]
+ - `radn_dn` - downward radiance [W/m2-str] Top level (= merge(1, nlay+1, top_at_1) must contain incident flux boundary condition
+
 real(FT), dimension(ncol,       ngpt), intent(in   ) :: D            # secant of propagation angle  []
 real(FT),                              intent(in   ) :: weight       # quadrature weight
 real(FT), dimension(ncol,nlay,  ngpt), intent(in   ) :: τ          # Absorption optical thickness []
-real(FT), dimension(ncol,nlay,  ngpt), intent(in   ) :: lay_source   # Planck source at layer average temperature [W/m2]
-# Planck source at layer edge for radiation in increasing/decreasing ilay direction
-# lev_source_dec applies the mapping in layer i to the Planck function at layer i
-# lev_source_inc applies the mapping in layer i to the Planck function at layer i+1
-real(FT), dimension(ncol,nlay,  ngpt), target,
-                                       intent(in   ) :: lev_source_inc, lev_source_dec
-real(FT), dimension(ncol,       ngpt), intent(in   ) :: sfc_emis     # Surface emissivity      []
-real(FT), dimension(ncol,       ngpt), intent(in   ) :: sfc_src      # Surface source function [W/m2]
-real(FT), dimension(ncol,nlay+1,ngpt), intent(  out) :: radn_up      # Radiances [W/m2-str]
-real(FT), dimension(ncol,nlay+1,ngpt), intent(inout) :: radn_dn      # Top level must contain incident flux boundary condition
 
 # Local variables, no g-point dependency
 real(FT), dimension(ncol,nlay) :: τ_loc,   # path length (τ/μ)
-                                    trans       # transmissivity  = exp(-τ)
+                                  trans    # transmissivity  = exp(-τ)
 real(FT), dimension(ncol,nlay) :: source_dn, source_up
 real(FT), dimension(ncol     ) :: source_sfc, sfc_albedo
 
 real(FT), dimension(:,:,:), pointer :: lev_source_up, lev_source_dn # Mapping increasing/decreasing indicies to up/down
-
-real(FT), parameter :: π = acos(-1._wp)
-integer             :: ilev, igpt, top_level
 """
 function lw_solver_noscat!(ncol::I, nlay::I, ngpt::I,
-                           top_at_1::B, D::Array{FT}, weight::FT,
+                           top_at_1::B,
+                           D::Array{FT},
+                           weight::FT,
                            τ::Array{FT},
-                           lay_source::Array{FT},
-                           lev_source_inc::Array{FT},
-                           lev_source_dec::Array{FT},
+                           source::SourceFuncLW{FT,I},
                            sfc_emis::Array{FT},
-                           sfc_src::Array{FT},
-                           radn_up::Array{FT}, radn_dn::Array{FT}) where {FT<:AbstractFloat,I<:Int,B<:Bool}
+                           radn_up::Array{FT},
+                           radn_dn::Array{FT}) where {FT<:AbstractFloat,I<:Int,B<:Bool}
   τ_loc    = Array{FT}(undef,ncol,nlay)
   trans      = Array{FT}(undef,ncol,nlay)
   source_up  = Array{FT}(undef,ncol,nlay)
@@ -79,12 +79,12 @@ function lw_solver_noscat!(ncol::I, nlay::I, ngpt::I,
   #                lev_source_dn => lev_source_inc, and vice-versa
   if top_at_1
     top_level = 1
-    lev_source_up = lev_source_dec
-    lev_source_dn = lev_source_inc
+    lev_source_up = source.lev_source_dec
+    lev_source_dn = source.lev_source_inc
   else
     top_level = nlay+1
-    lev_source_up = lev_source_inc
-    lev_source_dn = lev_source_dec
+    lev_source_up = source.lev_source_inc
+    lev_source_dn = source.lev_source_dec
   end
 
   @inbounds for igpt in 1:ngpt
@@ -99,25 +99,36 @@ function lw_solver_noscat!(ncol::I, nlay::I, ngpt::I,
     #
     @inbounds for ilev in 1:nlay
       τ_loc[:,ilev] .= τ[:,ilev,igpt] .* D[:,igpt]
-      trans[:,ilev]   .= exp.(-τ_loc[:,ilev])
+      trans[:,ilev] .= exp.(-τ_loc[:,ilev])
     end
     #
     # Source function for diffuse radiation
     #
     lw_source_noscat!(ncol, nlay,
-                          lay_source[:,:,igpt], lev_source_up[:,:,igpt], lev_source_dn[:,:,igpt],
-                          τ_loc, trans, source_dn, source_up)
+                      source.lay_source[:,:,igpt],
+                      lev_source_up[:,:,igpt],
+                      lev_source_dn[:,:,igpt],
+                      τ_loc,
+                      trans,
+                      source_dn,
+                      source_up)
     #
     # Surface albedo, surface source function
     #
     sfc_albedo .= FT(1) .- sfc_emis[:,igpt]
-    source_sfc .= sfc_emis[:,igpt] .* sfc_src[:,igpt]
+    source_sfc .= sfc_emis[:,igpt] .* source.sfc_source[:,igpt]
     #
     # Transport
     #
     lw_transport_noscat!(ncol, nlay, top_at_1,
-                             τ_loc, trans, sfc_albedo, source_dn, source_up, source_sfc,
-                             @view(radn_up[:,:,igpt]), @view(radn_dn[:,:,igpt]))
+                         τ_loc,
+                         trans,
+                         sfc_albedo,
+                         source_dn,
+                         source_up,
+                         source_sfc,
+                         @view(radn_up[:,:,igpt]),
+                         @view(radn_dn[:,:,igpt]))
     #
     # Convert intensity to flux assuming azimuthal isotropy and quadrature weight
     #
@@ -128,31 +139,35 @@ function lw_solver_noscat!(ncol::I, nlay::I, ngpt::I,
 end
 
 """
-    lw_solver_noscat_GaussQuad!(...)
+    lw_solver_noscat_GaussQuad!(ncol::I, nlay::I, ngpt::I,
+                                top_at_1::B, nmus::I,
+                                Ds::Array{FT},
+                                weights::Array{FT},
+                                τ::Array{FT},
+                                source::SourceFuncLW{FT, I},
+                                sfc_emis::Array{FT},
+                                flux_up::Array{FT},
+                                flux_dn::Array{FT}) where {I<:Int,B<:Bool,FT<:AbstractFloat}
 
 LW transport, no scattering, multi-angle quadrature
 Users provide a set of weights and quadrature angles
 Routine sums over single-angle solutions for each sets of angles/weights
 
-integer,                               intent(in   ) :: ncol, nlay, ngpt # Number of columns, layers, g-points
-logical(wl),                           intent(in   ) :: top_at_1
+given
+
+ - `source` longwave source function, see [`SourceFuncLW`](@ref)
+ - `top_at_1` indicates whether arrays are ordered in the vertical with 1 at the top or the bottom of the domain.
+ - `optical_props` 2-stream optical properties, see [`TwoStream`](@ref)
+ - `sfc_emis` - surface emissivity
+
 integer,                               intent(in   ) :: nmus         # number of quadrature angles
 real(FT), dimension(nmus),             intent(in   ) :: Ds, weights  # quadrature secants, weights
 real(FT), dimension(ncol,nlay,  ngpt), intent(in   ) :: τ          # Absorption optical thickness []
-real(FT), dimension(ncol,nlay,  ngpt), intent(in   ) :: lay_source   # Planck source at layer average temperature [W/m2]
-real(FT), dimension(ncol,nlay,  ngpt), intent(in   ) :: lev_source_inc
-                                    # Planck source at layer edge for radiation in increasing ilay direction [W/m2]
-                                    # Includes spectral weighting that accounts for state-dependent frequency to g-space mapping
-real(FT), dimension(ncol,nlay,  ngpt), intent(in   ) :: lev_source_dec
-                                           # Planck source at layer edge for radiation in decreasing ilay direction [W/m2]
-real(FT), dimension(ncol,       ngpt), intent(in   ) :: sfc_emis     # Surface emissivity      []
-real(FT), dimension(ncol,       ngpt), intent(in   ) :: sfc_src      # Surface source function [W/m2]
 real(FT), dimension(ncol,nlay+1,ngpt), intent(  out) :: flux_up      # Radiances [W/m2-str]
 real(FT), dimension(ncol,nlay+1,ngpt), intent(inout) :: flux_dn      # Top level must contain incident flux boundary condition
 # Local variables
 real(FT), dimension(ncol,nlay+1,ngpt) :: radn_dn, radn_up # Fluxes per quad angle
 real(FT), dimension(ncol,       ngpt) :: Ds_ncol
-
 integer :: imu, top_level
 """
 function lw_solver_noscat_GaussQuad!(ncol::I, nlay::I, ngpt::I,
@@ -160,12 +175,10 @@ function lw_solver_noscat_GaussQuad!(ncol::I, nlay::I, ngpt::I,
                                      Ds::Array{FT},
                                      weights::Array{FT},
                                      τ::Array{FT},
-                                     lay_source::Array{FT},
-                                     lev_source_inc::Array{FT},
-                                     lev_source_dec::Array{FT},
+                                     source::SourceFuncLW{FT, I},
                                      sfc_emis::Array{FT},
-                                     sfc_src::Array{FT},
-                                     flux_up::Array{FT}, flux_dn::Array{FT}) where {I<:Int,B<:Bool,FT<:AbstractFloat}
+                                     flux_up::Array{FT},
+                                     flux_dn::Array{FT}) where {I<:Int,B<:Bool,FT<:AbstractFloat}
 
 
   #
@@ -176,9 +189,14 @@ function lw_solver_noscat_GaussQuad!(ncol::I, nlay::I, ngpt::I,
 
   Ds_ncol .= Ds[1]
   lw_solver_noscat!(ncol, nlay, ngpt,
-                    top_at_1, Ds_ncol, weights[1], τ,
-                    lay_source, lev_source_inc, lev_source_dec, sfc_emis, sfc_src,
-                    flux_up, flux_dn)
+                    top_at_1,
+                    Ds_ncol,
+                    weights[1],
+                    τ,
+                    source,
+                    sfc_emis,
+                    flux_up,
+                    flux_dn)
   #
   # For more than one angle use local arrays
   #
@@ -188,54 +206,56 @@ function lw_solver_noscat_GaussQuad!(ncol::I, nlay::I, ngpt::I,
   for imu in 2:nmus
     Ds_ncol .= Ds[imu]
     lw_solver_noscat!(ncol, nlay, ngpt,
-                      top_at_1, Ds_ncol, weights[imu], τ,
-                      lay_source, lev_source_inc, lev_source_dec, sfc_emis, sfc_src,
-                      radn_up, radn_dn)
+                      top_at_1,
+                      Ds_ncol,
+                      weights[imu],
+                      τ,
+                      source,
+                      sfc_emis,
+                      radn_up,
+                      radn_dn)
     flux_up .+= radn_up
     flux_dn .+= radn_dn
   end
 end
 
 """
-    lw_solver_2stream!(...)
+    lw_solver!(ncol::I, nlay::I, ngpt::I,
+               top_at_1::B,
+               optical_props::TwoStream{FT},
+               source::SourceFuncLW{FT},
+               sfc_emis::Array{FT},
+               flux_up::Array{FT},
+               flux_dn::Array{FT}) where {I<:Int,B<:Bool,FT<:AbstractFloat}
 
-Longwave two-stream calculation:
- combine RRTMGP-specific sources at levels
- compute layer reflectance, transmittance
- compute total source function at levels using linear-in-τ
- transport
+Longwave calculation:
+ - combine RRTMGP-specific sources at levels
+ - compute layer reflectance, transmittance
+ - compute total source function at levels using linear-in-τ
+ - transport
 
-integer,                               intent(in   ) :: ncol, nlay, ngpt # Number of columns, layers, g-points
-logical(wl),                           intent(in   ) :: top_at_1
-real(FT), dimension(ncol,nlay,  ngpt), intent(in   ) :: τ,   # Optical thickness,
-                                                        ssa,   # single-scattering albedo,
-                                                        g       # asymmetry parameter []
-real(FT), dimension(ncol,nlay,ngpt),   intent(in   ) :: lay_source   # Planck source at layer average temperature [W/m2]
-real(FT), dimension(ncol,nlay,ngpt), target,
-                                       intent(in   ) :: lev_source_inc, lev_source_dec
-                                    # Planck source at layer edge for radiation in increasing/decreasing ilay direction [W/m2]
-                                    # Includes spectral weighting that accounts for state-dependent frequency to g-space mapping
-real(FT), dimension(ncol,       ngpt), intent(in   ) :: sfc_emis         # Surface emissivity      []
-real(FT), dimension(ncol,       ngpt), intent(in   ) :: sfc_src          # Surface source function [W/m2]
-real(FT), dimension(ncol,nlay+1,ngpt),
-                                       intent(  out) :: flux_up   # Fluxes [W/m2]
-real(FT), dimension(ncol,nlay+1,ngpt),
-                                       intent(inout) :: flux_dn   # Top level (= merge(1, nlay+1, top_at_1)
-                                                                  # must contain incident flux boundary condition
-# ----------------------------------------------------------------------
-integer :: igpt
+given
+
+ - `source` longwave source function, see [`SourceFuncLW`](@ref)
+ - `top_at_1` indicates whether arrays are ordered in the vertical with 1 at the top or the bottom of the domain.
+ - `optical_props` 2-stream optical properties, see [`TwoStream`](@ref)
+ - `sfc_emis` - surface emissivity
+ - `flux_up` - upward flux [W/m2]
+ - `flux_dn` - downward flux [W/m2] Top level (= merge(1, nlay+1, top_at_1) must contain incident flux boundary condition
+
 real(FT), dimension(ncol,nlay  ) :: Rdif, Tdif, γ_1, γ_2
 real(FT), dimension(ncol       ) :: sfc_albedo
 real(FT), dimension(ncol,nlay+1) :: lev_source
 real(FT), dimension(ncol,nlay  ) :: source_dn, source_up
 real(FT), dimension(ncol       ) :: source_sfc
-# ------------------------------------
 """
-function lw_solver_2stream!(ncol::I, nlay::I, ngpt::I, top_at_1::B,
-                               τ::Array{FT}, ssa::Array{FT}, g::Array{FT},
-                               lay_source::Array{FT}, lev_source_inc::Array{FT},
-                               lev_source_dec::Array{FT}, sfc_emis::Array{FT}, sfc_src::Array{FT},
-                               flux_up::Array{FT}, flux_dn::Array{FT}) where {I<:Int,B<:Bool,FT<:AbstractFloat}
+function lw_solver!(ncol::I, nlay::I, ngpt::I,
+                    top_at_1::B,
+                    optical_props::TwoStream{FT},
+                    source::SourceFuncLW{FT},
+                    sfc_emis::Array{FT},
+                    flux_up::Array{FT},
+                    flux_dn::Array{FT}) where {I<:Int,B<:Bool,FT<:AbstractFloat}
 
   lev_source = Array{FT}(undef, ncol,nlay+1)
   source_sfc = Array{FT}(undef, ncol)
@@ -249,32 +269,50 @@ function lw_solver_2stream!(ncol::I, nlay::I, ngpt::I, top_at_1::B,
     #   of each adjacent layer. Combine these for two-stream calculations
     #
     lw_combine_sources!(ncol, nlay, top_at_1,
-                        lev_source_inc[:,:,igpt], lev_source_dec[:,:,igpt],
+                        source.lev_source_inc[:,:,igpt],
+                        source.lev_source_dec[:,:,igpt],
                         lev_source)
     #
     # Cell properties: reflection, transmission for diffuse radiation
     #   Coupling coefficients needed for source function
     #
     lw_two_stream!(ncol, nlay,
-                   τ[:,:,igpt], ssa[:,:,igpt], g[:,:,igpt],
-                   γ_1, γ_2, Rdif, Tdif)
+                   optical_props.τ[:,:,igpt],
+                   optical_props.ssa[:,:,igpt],
+                   optical_props.g[:,:,igpt],
+                   γ_1,
+                   γ_2,
+                   Rdif,
+                   Tdif)
     #
     # Source function for diffuse radiation
     #
     lw_source_2str!(ncol, nlay, top_at_1,
-                    sfc_emis[:,igpt], sfc_src[:,igpt],
-                    lay_source[:,:,igpt], lev_source,
-                    γ_1, γ_2, Rdif, Tdif, τ[:,:,igpt],
-                    source_dn, source_up, source_sfc)
+                    sfc_emis[:,igpt],
+                    source.sfc_source[:,igpt],
+                    source.lay_source[:,:,igpt],
+                    lev_source,
+                    γ_1,
+                    γ_2,
+                    Rdif,
+                    Tdif,
+                    optical_props.τ[:,:,igpt],
+                    source_dn,
+                    source_up,
+                    source_sfc)
     #
     # Transport
     #
     sfc_albedo .= FT(1) .- sfc_emis[:,igpt]
     adding!(ncol, nlay, top_at_1,
             sfc_albedo,
-            Rdif, Tdif,
-            source_dn, source_up, source_sfc,
-            @view(flux_up[:,:,igpt]), @view(flux_dn[:,:,igpt]))
+            Rdif,
+            Tdif,
+            source_dn,
+            source_up,
+            source_sfc,
+            @view(flux_up[:,:,igpt]),
+            @view(flux_dn[:,:,igpt]))
   end
 
 end
@@ -288,7 +326,11 @@ end
 #####
 
 """
-    sw_solver_noscat!(...)
+    sw_solver_noscat!(ncol, nlay, ngpt,
+                      top_at_1,
+                      τ::Array{FT},
+                      μ_0,
+                      flux_dir) where FT
 
 
 integer,                    intent( in) :: ncol, nlay, ngpt # Number of columns, layers, g-points
@@ -301,7 +343,10 @@ integer :: icol, ilev, igpt
 real(FT) :: μ_0_inv(ncol)
 """
 function sw_solver_noscat!(ncol, nlay, ngpt,
-                              top_at_1, τ::Array{FT}, μ_0, flux_dir) where FT
+                           top_at_1,
+                           τ::Array{FT},
+                           μ_0,
+                           flux_dir) where FT
 
   μ_0_inv = FT(1) ./ μ_0
   # Indexing into arrays for upward and downward propagation depends on the vertical
@@ -336,29 +381,36 @@ end
 #   transport
 
 """
-    sw_solver_2stream!(...)
+    sw_solver!(ncol, nlay, ngpt, top_at_1,
+               optical_props::TwoStream{FT},
+               μ_0::Array{FT},
+               sfc_alb_dir,
+               sfc_alb_dif,
+               flux_up,
+               flux_dn,
+               flux_dir) where FT
 
-integer,                               intent(in   ) :: ncol, nlay, ngpt # Number of columns, layers, g-points
-logical(wl),                           intent(in   ) :: top_at_1
-real(FT), dimension(ncol,nlay,  ngpt), intent(in   ) :: τ,   # Optical thickness,
-                                                        ssa,   # single-scattering albedo,
-                                                        g       # asymmetry parameter []
+ - `top_at_1` indicates whether arrays are ordered in the vertical with 1 at the top or the bottom of the domain.
+ - `optical_props` 2-stream optical properties, see [`TwoStream`](@ref)
+ - `flux_up` - upward flux [W/m2]
+ - `flux_dn` - downward flux [W/m2] Top level (= merge(1, nlay+1, top_at_1) must contain incident flux boundary condition
+
 real(FT), dimension(ncol            ), intent(in   ) :: μ_0     # cosine of solar zenith angle
 real(FT), dimension(ncol,       ngpt), intent(in   ) :: sfc_alb_dir, sfc_alb_dif # Spectral albedo of surface to direct and diffuse radiation
-real(FT), dimension(ncol,nlay+1,ngpt), intent(  out) :: flux_up # Fluxes [W/m2]
-real(FT), dimension(ncol,nlay+1,ngpt),                         # Downward fluxes contain boundary conditions
-                                       intent(inout) :: flux_dn, flux_dir
 # -------------------------------------------
-integer :: igpt
 real(FT), dimension(ncol,nlay) :: Rdif, Tdif, Rdir, Tdir, Tnoscat
 real(FT), dimension(ncol,nlay) :: source_up, source_dn
 real(FT), dimension(ncol     ) :: source_srf
 # ------------------------------------
 """
-function sw_solver_2stream!(ncol, nlay, ngpt, top_at_1,
-                                 τ, ssa, g, μ_0::Array{FT},
-                                 sfc_alb_dir, sfc_alb_dif,
-                                 flux_up, flux_dn, flux_dir) where FT
+function sw_solver!(ncol, nlay, ngpt, top_at_1,
+                    optical_props::TwoStream{FT},
+                    μ_0::Array{FT},
+                    sfc_alb_dir,
+                    sfc_alb_dif,
+                    flux_up,
+                    flux_dn,
+                    flux_dir) where FT
 
   Rdif, Tdif, Rdir, Tdir, Tnoscat, source_up, source_dn = ntuple(i->zeros(FT, ncol,nlay), 7)
   source_srf = zeros(FT, ncol)
@@ -370,9 +422,9 @@ function sw_solver_2stream!(ncol, nlay, ngpt, top_at_1,
 
     sw_two_stream!(Rdif, Tdif, Rdir, Tdir, Tnoscat,
                    ncol, nlay, μ_0,
-                   τ[:,:,igpt],
-                   ssa[:,:,igpt],
-                   g[:,:,igpt])
+                   optical_props.τ[:,:,igpt],
+                   optical_props.ssa[:,:,igpt],
+                   optical_props.g[:,:,igpt])
     #
     # Direct-beam and source for diffuse radiation
     #
@@ -405,8 +457,14 @@ end
 #
 
 """
-    lw_source_noscat!(...)
-
+    lw_source_noscat!(ncol::I, nlay::I,
+                      lay_source::Array{FT},
+                      lev_source_up::Array{FT},
+                      lev_source_dn::Array{FT},
+                      τ::Array{FT},
+                      trans::Array{FT},
+                      source_dn::Array{FT},
+                      source_up::Array{FT}) where {I<:Int,FT<:AbstractFloat}
 
 integer,                         intent(in) :: ncol, nlay
 real(FT), dimension(ncol, nlay), intent(in) :: lay_source,  # Planck source at layer center
@@ -426,7 +484,8 @@ function lw_source_noscat!(ncol::I, nlay::I,
                            lev_source_dn::Array{FT},
                            τ::Array{FT},
                            trans::Array{FT},
-                           source_dn::Array{FT}, source_up::Array{FT}) where {I<:Int,FT<:AbstractFloat}
+                           source_dn::Array{FT},
+                           source_up::Array{FT}) where {I<:Int,FT<:AbstractFloat}
 
   τ_thresh = sqrt(eps(eltype(τ)))
 #    τ_thresh = abs(eps(eltype(τ)))
@@ -456,18 +515,26 @@ end
 #####
 
 """
-    lw_transport_noscat!(...)
+    lw_transport_noscat!(ncol::I, nlay::I, top_at_1::B,
+                         τ::Array{FT},
+                         trans::Array{FT},
+                         sfc_albedo::Array{FT},
+                         source_dn::Array{FT},
+                         source_up::Array{FT},
+                         source_sfc::Array{FT},
+                         radn_up::AbstractArray{FT},
+                         radn_dn::AbstractArray{FT}) where {I<:Int, B<:Bool, FT<:AbstractFloat}
 
 integer,                          intent(in   ) :: ncol, nlay # Number of columns, layers, g-points
 logical(wl),                      intent(in   ) :: top_at_1   #
-real(FT), dimension(ncol,nlay  ), intent(in   ) :: τ,      # Absorption optical thickness, pre-divided by μ []
+real(FT), dimension(ncol,nlay  ), intent(in   ) :: τ,         # Absorption optical thickness, pre-divided by μ []
                                                    trans      # transmissivity = exp(-τ)
 real(FT), dimension(ncol       ), intent(in   ) :: sfc_albedo # Surface albedo
 real(FT), dimension(ncol,nlay  ), intent(in   ) :: source_dn,
                                                    source_up  # Diffuse radiation emitted by the layer
 real(FT), dimension(ncol       ), intent(in   ) :: source_sfc # Surface source function [W/m2]
 real(FT), dimension(ncol,nlay+1), intent(  out) :: radn_up    # Radiances [W/m2-str]
-real(FT), dimension(ncol,nlay+1), intent(inout) :: radn_dn    #Top level must contain incident flux boundary condition
+real(FT), dimension(ncol,nlay+1), intent(inout) :: radn_dn    # Top level must contain incident flux boundary condition
 # Local variables
 integer :: ilev
 """
@@ -478,7 +545,8 @@ function lw_transport_noscat!(ncol::I, nlay::I, top_at_1::B,
                               source_dn::Array{FT},
                               source_up::Array{FT},
                               source_sfc::Array{FT},
-                              radn_up::AbstractArray{FT}, radn_dn::AbstractArray{FT}) where {I<:Int, B<:Bool, FT<:AbstractFloat}
+                              radn_up::AbstractArray{FT},
+                              radn_dn::AbstractArray{FT}) where {I<:Int, B<:Bool, FT<:AbstractFloat}
   if top_at_1
     #
     # Top of domain is index 1
@@ -525,7 +593,14 @@ end
 # -------------------------------------------------------------------------------------------------
 
 """
-    lw_two_stream!(...)
+    lw_two_stream!(ncol::I, nlay::I,
+                   τ::Array{FT},
+                   w0::Array{FT},
+                   g::Array{FT},
+                   γ_1::Array{FT},
+                   γ_2::Array{FT},
+                   Rdif::Array{FT},
+                   Tdif::Array{FT}) where {I<:Int, FT<:AbstractFloat}
 
 integer,                        intent(in)  :: ncol, nlay
 real(FT), dimension(ncol,nlay), intent(in)  :: τ, w0, g
@@ -542,7 +617,6 @@ real(FT) :: RT_term(ncol)
 real(FT) :: exp_minuskτ(ncol), exp_minus2kτ(ncol)
 
 real(FT), parameter :: LW_diff_sec = 1.66  # 1./cos(diffusivity angle)
-# ---------------------------------
 """
 function lw_two_stream!(ncol::I, nlay::I,
                         τ::Array{FT},
@@ -608,15 +682,15 @@ end
 # -------------------------------------------------------------------------------------------------
 
 """
-    lw_combine_sources!(...)
+    lw_combine_sources!(ncol::I, nlay::I, top_at_1::B,
+                        lev_src_inc::Array{FT},
+                        lev_src_dec::Array{FT},
+                        lev_source::Array{FT}) where {I<:Int,B<:Bool,FT<:AbstractFloat}
 
-    integer,                           intent(in ) :: ncol, nlay
-    logical(wl),                       intent(in ) :: top_at_1
-    real(FT), dimension(ncol, nlay  ), intent(in ) :: lev_src_inc, lev_src_dec
-    real(FT), dimension(ncol, nlay+1), intent(out) :: lev_source
-
-    integer :: icol, ilay
-    # ---------------------------------------------------------------
+integer,                           intent(in ) :: ncol, nlay
+logical(wl),                       intent(in ) :: top_at_1
+real(FT), dimension(ncol, nlay  ), intent(in ) :: lev_src_inc, lev_src_dec
+real(FT), dimension(ncol, nlay+1), intent(out) :: lev_source
 """
 function lw_combine_sources!(ncol::I, nlay::I, top_at_1::B,
                              lev_src_inc::Array{FT},
@@ -647,24 +721,35 @@ end
 # ---------------------------------------------------------------
 
 """
-    lw_source_2str!(...)
+    lw_source_2str!(ncol::I, nlay::I, top_at_1::B,
+                    sfc_emis::Array{FT},
+                    sfc_src::Array{FT},
+                    lay_source::Array{FT},
+                    lev_source::Array{FT},
+                    γ_1::Array{FT},
+                    γ_2::Array{FT},
+                    rdif::Array{FT},
+                    tdif::Array{FT},
+                    τ::Array{FT},
+                    source_dn::Array{FT},
+                    source_up::Array{FT},
+                    source_sfc::Array{FT}) where {I<:Int, B<:Bool,FT<:AbstractFloat}
 
-    integer,                         intent(in) :: ncol, nlay
-    logical(wl),                     intent(in) :: top_at_1
-    real(FT), dimension(ncol      ), intent(in) :: sfc_emis, sfc_src
-    real(FT), dimension(ncol, nlay), intent(in) :: lay_source,     # Planck source at layer center
-                                                   τ,            # Optical depth (τ)
-                                                   γ_1, γ_2, # Coupling coefficients
-                                                   rdif, tdif       # Layer reflectance and transmittance
-    real(FT), dimension(ncol, nlay+1), target,
-                                     intent(in)  :: lev_source       # Planck source at layer edges
-    real(FT), dimension(ncol, nlay), intent(out) :: source_dn, source_up
-    real(FT), dimension(ncol      ), intent(out) :: source_sfc      # Source function for upward radation at surface
+integer,                         intent(in) :: ncol, nlay
+logical(wl),                     intent(in) :: top_at_1
+real(FT), dimension(ncol      ), intent(in) :: sfc_emis, sfc_src
+real(FT), dimension(ncol, nlay), intent(in) :: lay_source,     # Planck source at layer center
+                                             τ,            # Optical depth (τ)
+                                             γ_1, γ_2, # Coupling coefficients
+                                             rdif, tdif       # Layer reflectance and transmittance
+real(FT), dimension(ncol, nlay+1), target,
+                               intent(in)  :: lev_source       # Planck source at layer edges
+real(FT), dimension(ncol, nlay), intent(out) :: source_dn, source_up
+real(FT), dimension(ncol      ), intent(out) :: source_sfc      # Source function for upward radation at surface
 
-    integer             :: icol, ilay
-    real(FT)            :: Z, Zup_top, Zup_bottom, Zdn_top, Zdn_bottom
-    real(FT), dimension(:), pointer :: lev_source_bot, lev_source_top
-    # ---------------------------------------------------------------
+integer             :: icol, ilay
+real(FT)            :: Z, Zup_top, Zup_bottom, Zdn_top, Zdn_bottom
+real(FT), dimension(:), pointer :: lev_source_bot, lev_source_top
 """
 function lw_source_2str!(ncol::I, nlay::I, top_at_1::B,
                          sfc_emis::Array{FT},
@@ -676,7 +761,9 @@ function lw_source_2str!(ncol::I, nlay::I, top_at_1::B,
                          rdif::Array{FT},
                          tdif::Array{FT},
                          τ::Array{FT},
-                         source_dn::Array{FT}, source_up::Array{FT}, source_sfc::Array{FT}) where {I<:Int, B<:Bool,FT<:AbstractFloat}
+                         source_dn::Array{FT},
+                         source_up::Array{FT},
+                         source_sfc::Array{FT}) where {I<:Int, B<:Bool,FT<:AbstractFloat}
 
   for ilay in 1:nlay
     if top_at_1
@@ -724,29 +811,46 @@ end
 # -------------------------------------------------------------------------------------------------
 
 """
-    sw_two_stream!(...)
+    sw_two_stream!(Rdif::Array{FT},
+                   Tdif::Array{FT},
+                   Rdir::Array{FT},
+                   Tdir::Array{FT},
+                   Tnoscat::Array{FT},
+                   ncol::I, nlay::I,
+                   μ_0::Array{FT},
+                   τ::Array{FT},
+                   w0::Array{FT},
+                   g::Array{FT}) where {I<:Int,FT<:AbstractFloat}
 
-    integer,                        intent(in)  :: ncol, nlay
-    real(FT), dimension(ncol),      intent(in)  :: μ_0
-    real(FT), dimension(ncol,nlay), intent(in)  :: τ, w0, g
-    real(FT), dimension(ncol,nlay), intent(out) :: Rdif, Tdif, Rdir, Tdir, Tnoscat
+integer,                        intent(in)  :: ncol, nlay
+real(FT), dimension(ncol),      intent(in)  :: μ_0
+real(FT), dimension(ncol,nlay), intent(in)  :: τ, w0, g
+real(FT), dimension(ncol,nlay), intent(out) :: Rdif, Tdif, Rdir, Tdir, Tnoscat
 
-    # -----------------------
-    integer  :: i, j
+# -----------------------
+integer  :: i, j
 
-    # Variables used in Meador and Weaver
-    real(FT) :: γ_1(ncol), γ_2(ncol), γ_3(ncol), γ_4(ncol)
-    real(FT) :: α_1(ncol), α_2(ncol), k(ncol)
+# Variables used in Meador and Weaver
+real(FT) :: γ_1(ncol), γ_2(ncol), γ_3(ncol), γ_4(ncol)
+real(FT) :: α_1(ncol), α_2(ncol), k(ncol)
 
-    # Ancillary variables
-    real(FT) :: RT_term(ncol)
-    real(FT) :: exp_minuskτ(ncol), exp_minus2kτ(ncol)
-    real(FT) :: k_μ, k_γ_3, k_γ_4
-    real(FT) :: μ_0_inv(ncol)
-    # ---------------------------------
+# Ancillary variables
+real(FT) :: RT_term(ncol)
+real(FT) :: exp_minuskτ(ncol), exp_minus2kτ(ncol)
+real(FT) :: k_μ, k_γ_3, k_γ_4
+real(FT) :: μ_0_inv(ncol)
+# ---------------------------------
 """
-function sw_two_stream!(Rdif::Array{FT}, Tdif::Array{FT}, Rdir::Array{FT}, Tdir::Array{FT}, Tnoscat::Array{FT},
-                       ncol::I, nlay::I, μ_0::Array{FT}, τ::Array{FT}, w0::Array{FT}, g::Array{FT}) where {I<:Int,FT<:AbstractFloat}
+function sw_two_stream!(Rdif::Array{FT},
+                        Tdif::Array{FT},
+                        Rdir::Array{FT},
+                        Tdir::Array{FT},
+                        Tnoscat::Array{FT},
+                        ncol::I, nlay::I,
+                        μ_0::Array{FT},
+                        τ::Array{FT},
+                        w0::Array{FT},
+                        g::Array{FT}) where {I<:Int,FT<:AbstractFloat}
 
   μ_0_inv = 1 ./ μ_0
   exp_minuskτ  = Array{FT}(undef, ncol)
@@ -834,33 +938,43 @@ function sw_two_stream!(Rdif::Array{FT}, Tdif::Array{FT}, Rdir::Array{FT}, Tdir:
 
     end
   end
-  nothing
+  return nothing
 end
-# ---------------------------------------------------------------
-#
-# Direct beam source for diffuse radiation in layers and at surface;
-#   report direct beam as a byproduct
-#
-# -------------------------------------------------------------------------------------------------
-"""
-    sw_source_2str!(...)
 
-    integer,                           intent(in   ) :: ncol, nlay
-    logical(wl),                       intent(in   ) :: top_at_1
-    real(FT), dimension(ncol, nlay  ), intent(in   ) :: Rdir, Tdir, Tnoscat # Layer reflectance, transmittance for diffuse radiation
-    real(FT), dimension(ncol        ), intent(in   ) :: sfc_albedo          # surface albedo for direct radiation
-    real(FT), dimension(ncol, nlay  ), intent(  out) :: source_dn, source_up
-    real(FT), dimension(ncol        ), intent(  out) :: source_sfc          # Source function for upward radation at surface
-    real(FT), dimension(ncol, nlay+1), intent(inout) :: flux_dn_dir # Direct beam flux
-                                                                    # intent(inout) because top layer includes incident flux
+#####
+##### Direct beam source for diffuse radiation in layers and at surface;
+#####   report direct beam as a byproduct
+#####
+
+"""
+    sw_source_2str!(ncol::I, nlay::I, top_at_1::B,
+                    Rdir::Array{FT},
+                    Tdir::Array{FT},
+                    Tnoscat::Array{FT},
+                    sfc_albedo::Array{FT},
+                    source_up::Array{FT},
+                    source_dn::Array{FT},
+                    source_sfc::Array{FT},
+                    flux_dn_dir::AbstractArray{FT}) where {I<:Int,B<:Bool,FT<:AbstractFloat}
+
+integer,                           intent(in   ) :: ncol, nlay
+logical(wl),                       intent(in   ) :: top_at_1
+real(FT), dimension(ncol, nlay  ), intent(in   ) :: Rdir, Tdir, Tnoscat # Layer reflectance, transmittance for diffuse radiation
+real(FT), dimension(ncol        ), intent(in   ) :: sfc_albedo          # surface albedo for direct radiation
+real(FT), dimension(ncol, nlay  ), intent(  out) :: source_dn, source_up
+real(FT), dimension(ncol        ), intent(  out) :: source_sfc          # Source function for upward radation at surface
+real(FT), dimension(ncol, nlay+1), intent(inout) :: flux_dn_dir # Direct beam flux
+                                                                # intent(inout) because top layer includes incident flux
 """
 function sw_source_2str!(ncol::I, nlay::I, top_at_1::B,
                          Rdir::Array{FT},
                          Tdir::Array{FT},
                          Tnoscat::Array{FT},
                          sfc_albedo::Array{FT},
-                         source_up::Array{FT}, source_dn::Array{FT},
-                         source_sfc::Array{FT}, flux_dn_dir::AbstractArray{FT}) where {I<:Int,B<:Bool,FT<:AbstractFloat}
+                         source_up::Array{FT},
+                         source_dn::Array{FT},
+                         source_sfc::Array{FT},
+                         flux_dn_dir::AbstractArray{FT}) where {I<:Int,B<:Bool,FT<:AbstractFloat}
 
   if top_at_1
     @inbounds for ilev in 1:nlay
@@ -879,43 +993,55 @@ function sw_source_2str!(ncol::I, nlay::I, top_at_1::B,
     end
     source_sfc .= flux_dn_dir[:,     1] .* sfc_albedo
   end
+  return nothing
 end
 
-# ---------------------------------------------------------------
-#
-# Transport of diffuse radiation through a vertically layered atmosphere.
-#   Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
-#   This routine is shared by longwave and shortwave
-#
-# -------------------------------------------------------------------------------------------------
+#####
+##### Transport of diffuse radiation through a vertically layered atmosphere.
+#####   Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
+#####   This routine is shared by longwave and shortwave
+#####
+
 """
-    adding!(...)
+    adding!(ncol::I, nlay::I, top_at_1::B,
+            albedo_sfc::Array{FT},
+            rdif::Array{FT},
+            tdif::Array{FT},
+            src_dn::Array{FT},
+            src_up::Array{FT},
+            src_sfc::Array{FT},
+            flux_up::AbstractArray{FT},
+            flux_dn::AbstractArray{FT}) where {I<:Int,B<:Bool,FT<:AbstractFloat}
 
 
-  integer,                          intent(in   ) :: ncol, nlay
-  logical(wl),                      intent(in   ) :: top_at_1
-  real(FT), dimension(ncol       ), intent(in   ) :: albedo_sfc
-  real(FT), dimension(ncol,nlay  ), intent(in   ) :: rdif, tdif
-  real(FT), dimension(ncol,nlay  ), intent(in   ) :: src_dn, src_up
-  real(FT), dimension(ncol       ), intent(in   ) :: src_sfc
-  real(FT), dimension(ncol,nlay+1), intent(  out) :: flux_up
-  # intent(inout) because top layer includes incident flux
-  real(FT), dimension(ncol,nlay+1), intent(inout) :: flux_dn
-  # ------------------
-  integer :: ilev
-  real(FT), dimension(ncol,nlay+1)  :: albedo,   # reflectivity to diffuse radiation below this level
-                                                  # α in SH08
-                                       src        # source of diffuse upwelling radiation from emission or
-                                                  # scattering of direct beam
-                                                  # G in SH08
-  real(FT), dimension(ncol,nlay  )  :: denom      # β in SH08
-  # ------------------
+integer,                          intent(in   ) :: ncol, nlay
+logical(wl),                      intent(in   ) :: top_at_1
+real(FT), dimension(ncol       ), intent(in   ) :: albedo_sfc
+real(FT), dimension(ncol,nlay  ), intent(in   ) :: rdif, tdif
+real(FT), dimension(ncol,nlay  ), intent(in   ) :: src_dn, src_up
+real(FT), dimension(ncol       ), intent(in   ) :: src_sfc
+real(FT), dimension(ncol,nlay+1), intent(  out) :: flux_up
+# intent(inout) because top layer includes incident flux
+real(FT), dimension(ncol,nlay+1), intent(inout) :: flux_dn
+# ------------------
+integer :: ilev
+real(FT), dimension(ncol,nlay+1)  :: albedo,   # reflectivity to diffuse radiation below this level
+                                                # α in SH08
+                                     src        # source of diffuse upwelling radiation from emission or
+                                                # scattering of direct beam
+                                                # G in SH08
+real(FT), dimension(ncol,nlay  )  :: denom      # β in SH08
+# ------------------
 """
 function adding!(ncol::I, nlay::I, top_at_1::B,
                   albedo_sfc::Array{FT},
-                  rdif::Array{FT}, tdif::Array{FT},
-                  src_dn::Array{FT}, src_up::Array{FT}, src_sfc::Array{FT},
-                  flux_up::AbstractArray{FT}, flux_dn::AbstractArray{FT}) where {I<:Int,B<:Bool,FT<:AbstractFloat}
+                  rdif::Array{FT},
+                  tdif::Array{FT},
+                  src_dn::Array{FT},
+                  src_up::Array{FT},
+                  src_sfc::Array{FT},
+                  flux_up::AbstractArray{FT},
+                  flux_dn::AbstractArray{FT}) where {I<:Int,B<:Bool,FT<:AbstractFloat}
   albedo = Array{FT}(undef, ncol,nlay+1)
   src    = Array{FT}(undef, ncol,nlay+1)
   denom  = Array{FT}(undef, ncol,nlay)
@@ -1005,20 +1131,22 @@ function adding!(ncol::I, nlay::I, top_at_1::B,
 
     end
   end
+  return nothing
 end
-# -------------------------------------------------------------------------------------------------
-#
-# Upper boundary condition
-#
-# -------------------------------------------------------------------------------------------------
+
+#####
+##### Upper boundary condition
+#####
 
 """
-    apply_BC_gpt!(...)
+    apply_BC!(flux_dn::Array{FT}, ncol::I, nlay::I, ngpt::I,
+              top_at_1::B,
+              inc_flux::Array{FT,2}) where {I<:Integer,B<:Bool,FT<:AbstractFloat}
 
-  integer,                               intent( in) :: ncol, nlay, ngpt # Number of columns, layers, g-points
-  logical(wl),                           intent( in) :: top_at_1
-  real(FT), dimension(ncol,       ngpt), intent( in) :: inc_flux         # Flux at top of domain
-  real(FT), dimension(ncol,nlay+1,ngpt), intent(out) :: flux_dn          # Flux to be used as input to solvers below
+integer,                               intent( in) :: ncol, nlay, ngpt # Number of columns, layers, g-points
+logical(wl),                           intent( in) :: top_at_1
+real(FT), dimension(ncol,       ngpt), intent( in) :: inc_flux         # Flux at top of domain
+real(FT), dimension(ncol,nlay+1,ngpt), intent(out) :: flux_dn          # Flux to be used as input to solvers below
 """
 function apply_BC!(flux_dn::Array{FT}, ncol::I, nlay::I, ngpt::I,
                    top_at_1::B,
@@ -1030,17 +1158,20 @@ function apply_BC!(flux_dn::Array{FT}, ncol::I, nlay::I, ngpt::I,
   else
     flux_dn[1:ncol, nlay+1, 1:ngpt]  .= inc_flux[1:ncol,1:ngpt]
   end
-  nothing
+  return nothing
 end
 
 """
-    apply_BC_factor!(...)
+    apply_BC!(flux_dn::Array{FT}, ncol::I, nlay::I, ngpt::I,
+              top_at_1::B,
+              inc_flux::Array{FT,2},
+              factor::Array{FT,1}) where {I<:Integer,B<:Bool,FT<:AbstractFloat}
 
-  integer,                               intent( in) :: ncol, nlay, ngpt # Number of columns, layers, g-points
-  logical(wl),                           intent( in) :: top_at_1
-  real(FT), dimension(ncol,       ngpt), intent( in) :: inc_flux         # Flux at top of domain
-  real(FT), dimension(ncol            ), intent( in) :: factor           # Factor to multiply incoming flux
-  real(FT), dimension(ncol,nlay+1,ngpt), intent(out) :: flux_dn          # Flux to be used as input to solvers below
+integer,                               intent( in) :: ncol, nlay, ngpt # Number of columns, layers, g-points
+logical(wl),                           intent( in) :: top_at_1
+real(FT), dimension(ncol,       ngpt), intent( in) :: inc_flux         # Flux at top of domain
+real(FT), dimension(ncol            ), intent( in) :: factor           # Factor to multiply incoming flux
+real(FT), dimension(ncol,nlay+1,ngpt), intent(out) :: flux_dn          # Flux to be used as input to solvers below
 """
 function apply_BC!(flux_dn::Array{FT}, ncol::I, nlay::I, ngpt::I,
                    top_at_1::B,
@@ -1055,15 +1186,16 @@ function apply_BC!(flux_dn::Array{FT}, ncol::I, nlay::I, ngpt::I,
     # flux_dn[1:ncol, :, 1:ngpt]  .= inc_flux[1:ncol,1:ngpt] .* spread(factor, 2, ngpt)
     flux_dn[1:ncol, nlay+1, 1:ngpt]  .= inc_flux[1:ncol,1:ngpt] .* spread(factor, 2, ngpt)
   end
-  nothing
+  return nothing
 end
 
 """
-    apply_BC_0!(...)
+    apply_BC!(flux_dn::Array{FT}, ncol::I, nlay::I, ngpt::I,
+              top_at_1::B) where {I<:Integer,B<:Bool,FT<:AbstractFloat}
 
-  integer,                               intent( in) :: ncol, nlay, ngpt # Number of columns, layers, g-points
-  logical(wl),                           intent( in) :: top_at_1
-  real(FT), dimension(ncol,nlay+1,ngpt), intent(out) :: flux_dn          # Flux to be used as input to solvers below
+integer,                               intent( in) :: ncol, nlay, ngpt # Number of columns, layers, g-points
+logical(wl),                           intent( in) :: top_at_1
+real(FT), dimension(ncol,nlay+1,ngpt), intent(out) :: flux_dn          # Flux to be used as input to solvers below
 """
 function apply_BC!(flux_dn::Array{FT}, ncol::I, nlay::I, ngpt::I,
                    top_at_1::B) where {I<:Integer,B<:Bool,FT<:AbstractFloat}
@@ -1075,6 +1207,6 @@ function apply_BC!(flux_dn::Array{FT}, ncol::I, nlay::I, ngpt::I,
     # flux_dn[1:ncol, nlay+1, 1:ngpt]  .= FT(0)
     flux_dn .= FT(0)
   end
-  nothing
+  return nothing
 end
 

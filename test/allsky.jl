@@ -7,9 +7,10 @@ using NCDatasets
 using RRTMGP.OpticalProps
 using RRTMGP.Gases
 using RRTMGP.FortranIntrinsics
-using RRTMGP.ArrayUtilities
+using RRTMGP.Utilities
 using RRTMGP.GasOptics
 using RRTMGP.GasConcentrations
+using RRTMGP.RadiativeBoundaryConditions
 using RRTMGP.RTESolver
 using RRTMGP.Fluxes
 using RRTMGP.SourceFunctions
@@ -129,9 +130,9 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
     # lw_sorces is thread private
     lw_sources = SourceFuncLW(ncol, nlay, k_dist.optical_props)
 
-    emis_sfc = zeros(FT, nbnd, ncol)
-    # Surface temperature
-    emis_sfc .= FT(0.98)
+    # Surface emissivity
+    sfc_emis = zeros(FT, nbnd, ncol)
+    sfc_emis .= FT(0.98)
   end
 
   as = AtmosphericState(gas_conc, p_lay, p_lev, t_lay, t_lev, k_dist.ref, nothing, nothing)
@@ -191,10 +192,11 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
       gas_optics!(k_dist, as, atmos, lw_sources)
 
       increment!(clouds, atmos)
+      bcs = LongwaveBCs(sfc_emis)
       rte_lw!(atmos,
               as.top_at_1,
               lw_sources,
-              emis_sfc,
+              bcs,
               fluxes)
     else
       fluxes.flux_dn_dir .= flux_dir
@@ -206,12 +208,11 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
 
       delta_scale!(clouds)
       increment!(clouds, atmos)
+      bcs = ShortwaveBCs(toa_flux, sfc_alb_dir, sfc_alb_dif)
       rte_sw!(atmos,
               as.top_at_1,
               μ_0,
-              toa_flux,
-              sfc_alb_dir,
-              sfc_alb_dif,
+              bcs,
               fluxes)
     end
     flux_up .= fluxes.flux_up

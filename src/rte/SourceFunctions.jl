@@ -26,10 +26,15 @@ Longwave sources: computed at layer center, at layer edges using
 $(DocStringExtensions.FIELDS)
 """
 struct SourceFuncLW{FT, I} <: AbstractOpticalProps{FT, I}
+  "optical properties, see [`AbstractOpticalProps`](@ref)"
   optical_props::AbstractOpticalProps{FT,I}
-  lay_source::Array{FT,3}     # Planck source at layer average temperature [W/m2] (ncol, nlay, ngpt)
-  lev_source_inc::Array{FT,3} # Planck source at layer edge in increasing ilay direction [W/m2] (ncol, nlay+1, ngpt)
-  lev_source_dec::Array{FT,3} # Planck source at layer edge in decreasing ilay direction [W/m2] (ncol, nlay+1, ngpt)
+  "Planck source at layer average temperature [W/m2] (ncol, nlay, ngpt)"
+  lay_source::Array{FT,3}
+  "Planck source at layer edge in increasing ilay direction [W/m2] (ncol, nlay+1, ngpt), includes spectral weighting that accounts for state-dependent frequency to g-space mapping"
+  lev_source_inc::Array{FT,3}
+  "Planck source at layer edge in decreasing ilay direction [W/m2] (ncol, nlay+1, ngpt), includes spectral weighting that accounts for state-dependent frequency to g-space mapping"
+  lev_source_dec::Array{FT,3}
+  "Surface source"
   sfc_source::Array{FT,2}
   function SourceFuncLW(ncol::I, nlay::I, optical_props::AbstractOpticalProps{FT}) where {FT<:AbstractFloat,I<:Int}
     ngpt = get_ngpt(optical_props)
@@ -38,11 +43,11 @@ struct SourceFuncLW{FT, I} <: AbstractOpticalProps{FT, I}
     lev_source_inc = Array{FT}(undef, ncol,nlay,ngpt)
     lev_source_dec = Array{FT}(undef, ncol,nlay,ngpt)
     opt_props = deepcopy(optical_props)
-    new{FT,I}(opt_props,
-              lay_source,
-              lev_source_inc,
-              lev_source_dec,
-              sfc_source)
+    return new{FT,I}(opt_props,
+                     lay_source,
+                     lev_source_inc,
+                     lev_source_dec,
+                     sfc_source)
   end
 end
 

@@ -96,19 +96,6 @@ function reduce!(this::FluxesByBand,
   end
 end
 
-"""
-    are_desired(this::FluxesByBand)
-
-Boolean indicating if any fluxes desired from this
-set of g-point fluxes.
-"""
-are_desired(this::FluxesByBand) =
-  any([associated(this.bnd_flux_up),
-       associated(this.bnd_flux_dn),
-       associated(this.bnd_flux_dn_dir),
-       associated(this.bnd_flux_net),
-       are_desired(this.fluxes_broadband)])
-
 #####
 ##### Kernels for computing by-band fluxes by summing
 ##### over all elements in the spectral dimension.

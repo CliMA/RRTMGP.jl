@@ -86,19 +86,6 @@ function reduce!(this::FluxesBroadBand,
   end
 end
 
-"""
-    are_desired(this::FluxesBroadBand)
-
-Bool indicating if any fluxes desired from this set of
-g-point fluxes. We can tell because memory will be
-allocated for output
-"""
-are_desired(this::FluxesBroadBand) =
-  any( [associated(this.flux_up),
-        associated(this.flux_dn),
-        associated(this.flux_dn_dir),
-        associated(this.flux_net)] )
-
 #####
 ##### Kernels for computing broadband fluxes by summing
 ##### over all elements in the spectral dimension.

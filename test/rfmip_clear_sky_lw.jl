@@ -6,9 +6,10 @@ using TimerOutputs
 const to = TimerOutput()
 using RRTMGP.OpticalProps
 using RRTMGP.FortranIntrinsics
-using RRTMGP.ArrayUtilities
+using RRTMGP.Utilities
 using RRTMGP.GasOptics
 using RRTMGP.GasConcentrations
+using RRTMGP.RadiativeBoundaryConditions
 using RRTMGP.RTESolver
 using RRTMGP.Fluxes
 using RRTMGP.AtmosphericStates
@@ -159,12 +160,13 @@ function rfmip_clear_sky_lw(ds, optical_props_constructor; compile_first=false)
 
     gas_optics!(k_dist, as, optical_props, source)
 
+    bcs = LongwaveBCs(sfc_emis_spec)
+
     rte_lw!(optical_props,
             as.top_at_1,
             source,
-            sfc_emis_spec,
+            bcs,
             fluxes,
-            nothing,
             n_quad_angles)
 
     flux_up[:,:,b] .= fluxes.flux_up

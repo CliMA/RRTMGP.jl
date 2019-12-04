@@ -2,7 +2,7 @@ using RRTMGP
 using DocStringExtensions
 using RRTMGP.OpticalProps
 using RRTMGP.FortranIntrinsics
-using RRTMGP.ArrayUtilities
+using RRTMGP.Utilities
 using RRTMGP.Gases
 using RRTMGP.GasOptics
 using RRTMGP.GasConcentrations

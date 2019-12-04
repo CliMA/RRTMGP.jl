@@ -6,9 +6,10 @@ using TimerOutputs
 const to = TimerOutput()
 using RRTMGP.OpticalProps
 using RRTMGP.FortranIntrinsics
-using RRTMGP.ArrayUtilities
+using RRTMGP.Utilities
 using RRTMGP.GasOptics
 using RRTMGP.GasConcentrations
+using RRTMGP.RadiativeBoundaryConditions
 using RRTMGP.RTESolver
 using RRTMGP.Fluxes
 using RRTMGP.AtmosphericStates
@@ -195,12 +196,12 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
     #    via FluxesBroadBand
     #
 
+    bcs = ShortwaveBCs(toa_flux, sfc_alb_spec, sfc_alb_spec)
+
     @timeit to "rte_sw!" rte_sw!(optical_props,
                                  as.top_at_1,
                                  μ_0,
-                                 toa_flux,
-                                 sfc_alb_spec,
-                                 sfc_alb_spec,
+                                 bcs,
                                  fluxes)
 
 
