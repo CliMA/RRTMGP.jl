@@ -30,7 +30,7 @@ module OpticalProps
 
 using DocStringExtensions
 using ..FortranIntrinsics
-using ..ArrayUtilities
+using ..Utilities
 
 export delta_scale!,
        validate!,

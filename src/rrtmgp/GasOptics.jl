@@ -22,10 +22,9 @@ using ..Gases
 using ..ReferenceStates
 using ..FortranIntrinsics
 using ..PhysicalConstants
-using ..ArrayUtilities
+using ..Utilities
 using ..OpticalProps
 using ..SourceFunctions
-using ..Utilities
 using ..GasConcentrations
 using ..OpticalProps
 using ..AtmosphericStates

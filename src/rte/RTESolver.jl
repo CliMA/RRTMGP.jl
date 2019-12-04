@@ -52,63 +52,46 @@ The routine does error checking and choses which lower-level kernel to invoke ba
 """
 module RTESolver
 
-using ..ArrayUtilities
+using ..RadiativeBoundaryConditions
+using ..Utilities
 using ..OpticalProps
 using ..Fluxes
+using ..SourceFunctions
 using ..FortranIntrinsics
 
 export rte_lw!, rte_sw!, expand_and_transpose
 
 """
-    rte_sw!(atmos::AbstractOpticalPropsArry,
+    rte_sw!(atmos::AbstractOpticalPropsArry{FT},
             top_at_1::Bool,
             μ_0::Array{FT},
-            inc_flux,
-            sfc_alb_dir,
-            sfc_alb_dif,
-            fluxes,
-            inc_flux_dif=nothing) where {FT<:AbstractFloat}
+            bcs::ShortwaveBCs{FT},
+            fluxes::FluxesBroadBand{FT}) where {FT<:AbstractFloat}
 
-Compute fluxes `fluxes` (`AbstractFluxes`), given
+Computes
+
+ - `fluxes` broadband fluxes, see [`AbstractFluxes`](@ref)
+
+given
 
  - `atmos` Optical properties provided as arrays (`AbstractOpticalPropsArry`)
- - `top_at_1` bool indicating if the top of the domain is at index 1
-             (if not, ordering is bottom-to-top)
+ - `top_at_1` indicates that the top of the domain is at index 1
  - `μ_0` cosine of solar zenith angle (ncol)
- - `inc_flux` incident flux at top of domain [W/m2] (ncol, ngpt)
- - `sfc_alb_dir` surface albedo for direct and
- - `sfc_alb_dif` diffuse radiation (nband, ncol)
-and, optionally,
- - `inc_flux_dif` incident diffuse flux at top of domain [W/m2] (ncol, ngpt)
+ - `bcs` boundary conditions, see [`ShortwaveBCs`](@ref)
 """
-function rte_sw!(atmos::AbstractOpticalPropsArry,
+function rte_sw!(atmos::AbstractOpticalPropsArry{FT},
                  top_at_1::Bool,
                  μ_0::Array{FT},
-                 inc_flux,
-                 sfc_alb_dir,
-                 sfc_alb_dif,
-                 fluxes,
-                 inc_flux_dif=nothing) where {FT<:AbstractFloat}
+                 bcs::ShortwaveBCs{FT},
+                 fluxes::FluxesBroadBand{FT}) where {FT<:AbstractFloat}
 
   ncol  = get_ncol(atmos)
   nlay  = get_nlay(atmos)
   ngpt  = get_ngpt(atmos)
-  nband = get_nband(atmos)
 
   # Error checking -- consistency / sizes / validity of values
-  @assert are_desired(fluxes)
   @assert size(μ_0, 1) ==  ncol
   @assert !any_vals_outside(μ_0, FT(0), FT(1))
-  @assert all(size(inc_flux) .== (ncol, ngpt))
-  @assert !any_vals_less_than(inc_flux, FT(0))
-  if present(inc_flux_dif)
-    @assert all(size(inc_flux_dif) .== (ncol, ngpt))
-    @assert !any_vals_less_than(inc_flux_dif, FT(0))
-  end
-  @assert all(size(sfc_alb_dir) .== (nband, ncol))
-  @assert !any_vals_outside(sfc_alb_dir,  FT(0), FT(1))
-  @assert all(size(sfc_alb_dif) .== (nband, ncol))
-  @assert !any_vals_outside(sfc_alb_dif, FT(0), FT(1))
 
   gpt_flux_up  = zeros(FT, ncol, nlay+1, ngpt)
   gpt_flux_dn  = zeros(FT, ncol, nlay+1, ngpt)
@@ -116,8 +99,8 @@ function rte_sw!(atmos::AbstractOpticalPropsArry,
 
   # Lower boundary condition -- expand surface albedos by band to gpoints
   #   and switch dimension ordering
-  sfc_alb_dir_gpt = expand_and_transpose(atmos, sfc_alb_dir)
-  sfc_alb_dif_gpt = expand_and_transpose(atmos, sfc_alb_dif)
+  sfc_alb_dir_gpt = expand_and_transpose(atmos, bcs.sfc_alb_direct)
+  sfc_alb_dif_gpt = expand_and_transpose(atmos, bcs.sfc_alb_diffuse)
 
   # Compute the radiative transfer...
   #
@@ -125,72 +108,73 @@ function rte_sw!(atmos::AbstractOpticalPropsArry,
   #   On input flux_dn is the diffuse component; the last action in each solver is to add
   #   direct and diffuse to represent the total, consistent with the LW
   #
-  apply_BC!(gpt_flux_dir, ncol, nlay, ngpt, top_at_1,   inc_flux, μ_0)
+  apply_BC!(gpt_flux_dir, ncol, nlay, ngpt, top_at_1,   bcs.toa_flux, μ_0)
 
-  if present(inc_flux_dif)
-    apply_BC!(gpt_flux_dn, ncol, nlay, ngpt, top_at_1, inc_flux_dif)
+  if present(bcs.inc_flux_diffuse)
+    apply_BC!(gpt_flux_dn, ncol, nlay, ngpt, top_at_1, bcs.inc_flux_diffuse)
   else
     apply_BC!(gpt_flux_dn, ncol, nlay, ngpt, top_at_1)
   end
 
+  validate!(atmos)
   if atmos isa OneScalar
     # Direct beam only
-    validate!(atmos)
     sw_solver_noscat!(ncol, nlay, ngpt, top_at_1,
-                          atmos.τ, μ_0,
-                          gpt_flux_dir)
+                      atmos.τ, μ_0,
+                      gpt_flux_dir)
     # No diffuse flux
     # gpt_flux_up .= FT(0)
     # gpt_flux_dn .= FT(0)
   elseif atmos isa TwoStream
     # two-stream calculation with scattering
-    validate!(atmos)
-
-    sw_solver_2stream!(ncol, nlay, ngpt, top_at_1,
-                           atmos.τ, atmos.ssa, atmos.g, μ_0,
-                           sfc_alb_dir_gpt, sfc_alb_dif_gpt,
-                           gpt_flux_up, gpt_flux_dn, gpt_flux_dir)
+    sw_solver!(ncol, nlay, ngpt, top_at_1,
+               atmos,
+               μ_0,
+               sfc_alb_dir_gpt,
+               sfc_alb_dif_gpt,
+               gpt_flux_up,
+               gpt_flux_dn,
+               gpt_flux_dir)
   end
 
   # ...and reduce spectral fluxes to desired output quantities
-  reduce!(fluxes,gpt_flux_up, gpt_flux_dn, atmos, top_at_1, gpt_flux_dir)
+  reduce!(fluxes,
+          gpt_flux_up,
+          gpt_flux_dn,
+          atmos,
+          top_at_1,
+          gpt_flux_dir)
 end
 
 """
     rte_lw!(optical_props::AbstractOpticalPropsArry{FT},
-            top_at_1,
-            sources,
-            sfc_emis,
-            fluxes,
-            inc_flux=nothing,
-            n_gauss_angles=nothing) where FT
+            top_at_1::Bool,
+            sources::SourceFuncLW{FT, I},
+            bcs::LongwaveBCs{FT},
+            fluxes::FluxesBroadBand{FT},
+            n_gauss_angles=nothing) where {FT<:AbstractFloat,I<:Int}
 
 Interface using only optical properties and source functions as inputs; fluxes as outputs.
 
  - `optical_props` optical properties
  - `top_at_1` indicates that the top of the domain is at index 1
  - `sources` radiation sources
- - `sfc_emis` emissivity at surface (nband, ncol)
- - `fluxes` Array of AbstractFluxes. Default computes broadband fluxes at all levels
-            if output arrays are defined. Can be extended per user desires.
- - [`inc_flux`] incident flux at domain top [W/m2] (ncol, ngpts)
- - [`n_gauss_angles`] Number of angles used in Gaussian quadrature (no-scattering solution)
+ - `bcs` boundary conditions, see [`LongwaveBCs`](@ref)
+ - `fluxes` broadband fluxes, see [`AbstractFluxes`](@ref)
+ - `n_gauss_angles` Number of angles used in Gaussian quadrature (no-scattering solution)
 """
 function rte_lw!(optical_props::AbstractOpticalPropsArry{FT},
-                 top_at_1,
-                 sources,
-                 sfc_emis,
-                 fluxes,
-                 inc_flux=nothing,
-                 n_gauss_angles=nothing) where FT
+                 top_at_1::Bool,
+                 sources::SourceFuncLW{FT, I},
+                 bcs::LongwaveBCs{FT},
+                 fluxes::FluxesBroadBand{FT},
+                 n_gauss_angles=nothing) where {FT<:AbstractFloat,I<:Int}
 
-  #
   # Weights and angle secants for first order (k=1) Gaussian quadrature.
   #   Values from Table 2, Clough et al, 1992, doi:10.1029/92JD01419
   #   after Abramowitz & Stegun 1972, page 921
-  #
 
-  max_gauss_pts = Integer.(4)
+  max_gauss_pts = I(4)
   # Diffusivity angle, not Gaussian angle
   gauss_Ds  = reshape([1.66000000, 0.00000000, 0.00000000, 0.00000000,
                        1.18350343, 2.81649655, 0.00000000, 0.00000000,
@@ -206,23 +190,14 @@ function rte_lw!(optical_props::AbstractOpticalPropsArry{FT},
 
 
   # Error checking
-  #   if inc_flux is present it has the right dimensions, is positive definite
   ncol  = get_ncol(optical_props)
   nlay  = get_nlay(optical_props)
   ngpt  = get_ngpt(optical_props)
-  nband = get_nband(optical_props)
 
   # Error checking -- consistency of sizes and validity of values
-  @assert are_desired(fluxes)
   @assert get_ncol(sources) == ncol
   @assert get_nlay(sources) == nlay
   @assert get_ngpt(sources) == ngpt
-  @assert all(size(sfc_emis) .== (nband, ncol))
-  @assert !any_vals_outside(sfc_emis, FT.(0.), FT.(1.0))
-  if inc_flux ≠ nothing
-    @assert all(size(inc_flux) .== (ncol, ngpt))
-    @assert !any_vals_less_than(inc_flux, FT(0.0))
-  end
 
   # Number of quadrature points for no-scattering calculation
   n_quad_angs = 1
@@ -235,19 +210,15 @@ function rte_lw!(optical_props::AbstractOpticalPropsArry{FT},
   # Ensure values of τ, ssa, and g are reasonable
   validate!(optical_props)
 
-  #
-  #    Lower boundary condition -- expand surface emissivity by band to gpoints
-  #
-
+  # Lower boundary condition -- expand surface emissivity by band to gpoints
   gpt_flux_up  = Array{FT}(undef,ncol,nlay+1,ngpt)
   gpt_flux_dn  = Array{FT}(undef,ncol,nlay+1,ngpt)
-  sfc_emis_gpt = Array{FT}(undef,ncol,       ngpt)
 
-  sfc_emis_gpt = expand_and_transpose(optical_props, sfc_emis)
+  sfc_emis_gpt = expand_and_transpose(optical_props, bcs.sfc_emis)
 
   #   Upper boundary condition
-  if inc_flux ≠ nothing
-    apply_BC!(gpt_flux_dn, ncol, nlay, ngpt, top_at_1, inc_flux)
+  if bcs.inc_flux ≠ nothing
+    apply_BC!(gpt_flux_dn, ncol, nlay, ngpt, top_at_1, bcs.inc_flux)
   else
     # Default is zero incident diffuse flux
     apply_BC!(gpt_flux_dn, ncol, nlay, ngpt, top_at_1)
@@ -258,21 +229,26 @@ function rte_lw!(optical_props::AbstractOpticalPropsArry{FT},
 
     # No scattering two-stream calculation
     lw_solver_noscat_GaussQuad!(ncol, nlay, ngpt, top_at_1,
-                            n_quad_angs, gauss_Ds[1:n_quad_angs,n_quad_angs], gauss_wts[1:n_quad_angs,n_quad_angs],
-                            optical_props.τ,
-                            sources.lay_source, sources.lev_source_inc, sources.lev_source_dec,
-                            sfc_emis_gpt, sources.sfc_source,
-                            gpt_flux_up, gpt_flux_dn)
+                                n_quad_angs,
+                                gauss_Ds[1:n_quad_angs,n_quad_angs],
+                                gauss_wts[1:n_quad_angs,n_quad_angs],
+                                optical_props.τ,
+                                sources,
+                                sfc_emis_gpt,
+                                gpt_flux_up,
+                                gpt_flux_dn)
 
   elseif optical_props isa TwoStream
     # two-stream calculation with scattering
-    lw_solver_2stream!(ncol, nlay, ngpt, top_at_1,
-                               optical_props.τ, optical_props.ssa, optical_props.g,
-                               sources.lay_source, sources.lev_source_inc, sources.lev_source_dec, sfc_emis_gpt, sources.sfc_source,
-                               gpt_flux_up, gpt_flux_dn)
+    lw_solver!(ncol, nlay, ngpt, top_at_1,
+               optical_props,
+               sources,
+               sfc_emis_gpt,
+               gpt_flux_up,
+               gpt_flux_dn)
   end
 
-  reduce!(fluxes,gpt_flux_up, gpt_flux_dn, optical_props, top_at_1)
+  reduce!(fluxes, gpt_flux_up, gpt_flux_dn, optical_props, top_at_1)
 end
 
 """

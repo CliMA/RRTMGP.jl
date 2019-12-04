@@ -12,7 +12,7 @@ module CloudOptics
 
 using OffsetArrays
 using ..OpticalProps
-using ..ArrayUtilities
+using ..Utilities
 using ..FortranIntrinsics
 
 export cloud_optics!

@@ -11,6 +11,5 @@ FluxesByBand
 
 ```@docs
 reduce!
-are_desired
 ```
 
