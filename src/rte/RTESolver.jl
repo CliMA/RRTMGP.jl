@@ -53,6 +53,7 @@ The routine does error checking and choses which lower-level kernel to invoke ba
 module RTESolver
 
 using ..RadiativeBoundaryConditions
+using ..AngularDiscretizations
 using ..Utilities
 using ..OpticalProps
 using ..Fluxes
@@ -168,26 +169,7 @@ function rte_lw!(optical_props::AbstractOpticalPropsArry{FT},
                  sources::SourceFuncLW{FT, I},
                  bcs::LongwaveBCs{FT},
                  fluxes::FluxesBroadBand{FT},
-                 n_gauss_angles=nothing) where {FT<:AbstractFloat,I<:Int}
-
-  # Weights and angle secants for first order (k=1) Gaussian quadrature.
-  #   Values from Table 2, Clough et al, 1992, doi:10.1029/92JD01419
-  #   after Abramowitz & Stegun 1972, page 921
-
-  max_gauss_pts = I(4)
-  # Diffusivity angle, not Gaussian angle
-  gauss_Ds  = reshape([1.66000000, 0.00000000, 0.00000000, 0.00000000,
-                       1.18350343, 2.81649655, 0.00000000, 0.00000000,
-                       1.09719858, 1.69338507, 4.70941630, 0.00000000,
-                       1.06056257, 1.38282560, 2.40148179, 7.15513024],
-                       max_gauss_pts, max_gauss_pts)
-
-  gauss_wts = reshape([0.5000000000, 0.0000000000, 0.0000000000, 0.0000000000,
-                       0.3180413817, 0.1819586183, 0.0000000000, 0.0000000000,
-                       0.2009319137, 0.2292411064, 0.0698269799, 0.0000000000,
-                       0.1355069134, 0.2034645680, 0.1298475476, 0.0311809710],
-                       max_gauss_pts, max_gauss_pts)
-
+                 angle_disc::Union{GaussQuadrature{FT,I},Nothing}=nothing) where {FT<:AbstractFloat,I<:Int}
 
   # Error checking
   ncol  = get_ncol(optical_props)
@@ -199,12 +181,8 @@ function rte_lw!(optical_props::AbstractOpticalPropsArry{FT},
   @assert get_nlay(sources) == nlay
   @assert get_ngpt(sources) == ngpt
 
-  # Number of quadrature points for no-scattering calculation
-  n_quad_angs = 1
-  if n_gauss_angles ≠ nothing
-    @assert !(n_gauss_angles > max_gauss_pts)
-    @assert !(n_gauss_angles < 1)
-    n_quad_angs = n_gauss_angles
+  if angle_disc == nothing
+    angle_disc = GaussQuadrature(FT, 1)
   end
 
   # Ensure values of τ, ssa, and g are reasonable
@@ -229,9 +207,7 @@ function rte_lw!(optical_props::AbstractOpticalPropsArry{FT},
 
     # No scattering two-stream calculation
     lw_solver_noscat_GaussQuad!(ncol, nlay, ngpt, top_at_1,
-                                n_quad_angs,
-                                gauss_Ds[1:n_quad_angs,n_quad_angs],
-                                gauss_wts[1:n_quad_angs,n_quad_angs],
+                                angle_disc,
                                 optical_props.τ,
                                 sources,
                                 sfc_emis_gpt,

@@ -4,6 +4,7 @@ include("Misc.jl")
 include("FortranIntrinsics.jl")
 include("Utilities.jl")
 
+include(joinpath("rte","AngularDiscretizations.jl"))
 include(joinpath("rte","SolarZenithAngle.jl"))
 include(joinpath("rte","OpticalProps.jl"))
 include(joinpath("rte","Fluxes.jl"))
