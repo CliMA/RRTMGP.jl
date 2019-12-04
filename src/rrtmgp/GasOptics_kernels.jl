@@ -46,7 +46,8 @@ function interpolation!(ics::InterpolationCoefficients{FT,I},
                         npres::I,
                         ntemp::I,
                         flavor::Array{I},
-                        ref::ReferenceState{FT},
+                        vmr::AbstractArray{FT},
+                        ref::ReferenceStateProfile{FT},
                         play::Array{FT},
                         tlay::Array{FT},
                         col_gas::AbstractArray{FT}) where {I<:Int,B<:Bool,FT<:AbstractFloat}
@@ -83,8 +84,8 @@ function interpolation!(ics::InterpolationCoefficients{FT,I},
           # compute interpolation fractions needed for lower, then upper reference temperature level
           # compute binary species parameter (η) for flavor and temperature and
           #  associated interpolation index and factors
-          ratio_η_half = ref.vmr[itropo,igases[1],(ics.jtemp[icol,ilay]+itemp-1)] /
-                         ref.vmr[itropo,igases[2],(ics.jtemp[icol,ilay]+itemp-1)]
+          ratio_η_half = vmr[itropo,igases[1],(ics.jtemp[icol,ilay]+itemp-1)] /
+                         vmr[itropo,igases[2],(ics.jtemp[icol,ilay]+itemp-1)]
           col_mix[itemp,iflav,icol,ilay] = col_gas[icol,ilay,igases[1]] + ratio_η_half * col_gas[icol,ilay,igases[2]]
           η = fmerge(col_gas[icol,ilay,igases[1]] / col_mix[itemp,iflav,icol,ilay], FT(0.5),
                       col_mix[itemp,iflav,icol,ilay] > FT(2) * floatmin(FT))

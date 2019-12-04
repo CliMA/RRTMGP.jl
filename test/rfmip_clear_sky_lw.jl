@@ -94,7 +94,7 @@ function rfmip_clear_sky_lw(ds, optical_props_constructor; compile_first=false)
   # Read k-distribution information. load_and_init() reads data from netCDF and calls
   #   k_dist%init(); users might want to use their own reading methods
   #
-  k_dist = load_and_init(ds[:k_dist], FT, gas_conc_array[1].gas_names)
+  k_dist, ref_prof = load_and_init(ds[:k_dist], FT, gas_conc_array[1].gas_names)
   @assert source_is_internal(k_dist)
 
   nbnd = get_nband(k_dist.optical_props)
@@ -110,9 +110,9 @@ function rfmip_clear_sky_lw(ds, optical_props_constructor; compile_first=false)
   #   This introduces an error but shows input sanitizing.
   #
   if top_at_1
-    p_lev_all[:,1,:] .= get_press_min(k_dist.ref) + eps(FT)
+    p_lev_all[:,1,:] .= get_press_min(ref_prof) + eps(FT)
   else
-    p_lev_all[:,nlay+1,:] .= get_press_min(k_dist.ref) + eps(FT)
+    p_lev_all[:,nlay+1,:] .= get_press_min(ref_prof) + eps(FT)
   end
 
   #
@@ -153,12 +153,12 @@ function rfmip_clear_sky_lw(ds, optical_props_constructor; compile_first=false)
     t_lay = t_lay_all[:,:,b]
     t_lev = t_lev_all[:,:,b]
     t_sfc = t_sfc_all[:,  b]
-    as = AtmosphericState(gas_conc, p_lay, p_lev, t_lay, t_lev, k_dist.ref, nothing, t_sfc)
+    as = AtmosphericState(gas_conc, p_lay, p_lev, t_lay, t_lev, ref_prof, nothing, t_sfc)
 
     fluxes.flux_up .= FT(0)
     fluxes.flux_dn .= FT(0)
 
-    gas_optics!(k_dist, as, optical_props, source)
+    gas_optics!(k_dist, as, ref_prof, optical_props, source)
 
     bcs = LongwaveBCs(sfc_emis_spec)
 

@@ -76,7 +76,7 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
 
   # This puts pressure and temperature arrays on the GPU
   # load data into classes
-  k_dist = load_and_init(ds[:k_dist], FT, gas_conc.gas_names)
+  k_dist, ref_prof = load_and_init(ds[:k_dist], FT, gas_conc.gas_names)
   is_sw = source_is_external(k_dist)
   is_lw = !is_sw
 
@@ -135,7 +135,7 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
     sfc_emis .= FT(0.98)
   end
 
-  as = AtmosphericState(gas_conc, p_lay, p_lev, t_lay, t_lev, k_dist.ref, nothing, nothing)
+  as = AtmosphericState(gas_conc, p_lay, p_lev, t_lay, t_lev, ref_prof, nothing, nothing)
   gas_conc, p_lay, p_lev, t_lay, t_lev = ntuple(i->nothing,5)
 
   #
@@ -174,6 +174,7 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
   end
 
   fluxes = FluxesBroadBand(FT, size(flux_up), is_sw)
+  ics = InterpolationCoefficients(FT, Int, as.ncol, as.nlay, get_nflav(k_dist))
   #
   # Multiple iterations for big problem sizes, and to help identify data movement
   #   For CPUs we can introduce OpenMP threading over loop iterations
@@ -189,7 +190,7 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
 
 
     if is_lw
-      gas_optics!(k_dist, as, atmos, lw_sources)
+      gas_optics!(k_dist, as, ref_prof, atmos, lw_sources)
 
       increment!(clouds, atmos)
       bcs = LongwaveBCs(sfc_emis)
@@ -201,7 +202,7 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
     else
       fluxes.flux_dn_dir .= flux_dir
 
-      gas_optics!(k_dist, as, atmos)
+      gas_optics!(k_dist, as, ref_prof, atmos)
 
       check_extent(toa_flux, (as.ncol, ngpt), "toa_flux")
       toa_flux .= repeat(k_dist.solar_src', as.ncol)

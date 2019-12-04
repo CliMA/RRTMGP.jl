@@ -49,12 +49,13 @@ function load_and_init(ds, ::Type{FT}, gases_prescribed::Vector{AbstractGas}) wh
                               read_gases(ds, "scaling_gas_upper"),
                               read_gases(ds, "minor_gases_upper"))
 
-  ref = ReferenceState(Array{FT}(ds["press_ref"][:]),
-                       Array{FT}(ds["temp_ref"][:]),
-                       FT(ds["press_ref_trop"][:]),
-                       Array{FT}(ds["vmr_ref"][:]),
+  ref = ReferenceState(Array{FT}(ds["vmr_ref"][:]),
                        gases_prescribed,
                        gases_in_database)
+
+  ref_prof = ReferenceStateProfile(Array{FT}(ds["press_ref"][:]),
+                                   Array{FT}(ds["temp_ref"][:]),
+                                   FT(ds["press_ref_trop"][:]))
 
   optical_props = OpticalPropsBase("GasOptics optical props", band_lims_wavenum, band2gpt)
 
@@ -71,11 +72,11 @@ function load_and_init(ds, ::Type{FT}, gases_prescribed::Vector{AbstractGas}) wh
   if haskey(ds,"totplnk")
     totplnk     = Array{FT}(ds["totplnk"][:])
     planck_frac = Array{FT}(ds["plank_fraction"][:])
-    kdist = load_totplnk(totplnk, planck_frac, rayl_lower, rayl_upper, ref, args...)
+    kdist = get_k_dist_longwave(totplnk, planck_frac, rayl_lower, rayl_upper, ref, ref_prof, args...)
   else
     solar_src = ds["solar_source"][:]
-    kdist = load_solar_source(solar_src, rayl_lower, rayl_upper, ref, args...)
+    kdist = get_k_dist_shortwave(solar_src, rayl_lower, rayl_upper, ref, args...)
   end
-  return kdist
+  return kdist, ref_prof
 
 end

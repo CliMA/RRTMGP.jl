@@ -94,7 +94,7 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
   # Read k-distribution information. load_and_init() reads data from netCDF and calls
   #   k_dist%init(); users might want to use their own reading methods
   #
-  k_dist = @timeit to "load_and_init" load_and_init(ds[:k_dist], FT, gas_conc_array[1].gas_names)
+  k_dist, ref_prof = @timeit to "load_and_init" load_and_init(ds[:k_dist], FT, gas_conc_array[1].gas_names)
   @assert source_is_external(k_dist)
 
   nbnd = get_nband(k_dist.optical_props)
@@ -110,9 +110,9 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
   #   This introduces an error but shows input sanitizing.
   #
   if top_at_1
-    p_lev_all[:,1,:] .= get_press_min(k_dist.ref) + eps(FT)
+    p_lev_all[:,1,:] .= get_press_min(ref_prof) + eps(FT)
   else
-    p_lev_all[:,nlay+1,:] .= get_press_min(k_dist.ref) + eps(FT)
+    p_lev_all[:,nlay+1,:] .= get_press_min(ref_prof) + eps(FT)
   end
 
   toa_flux = zeros(FT, block_size, get_ngpt(k_dist.optical_props))
@@ -152,14 +152,14 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
     p_lev = p_lev_all[:,:,b]
     t_lay = t_lay_all[:,:,b]
     gas_conc = gas_conc_array[b]
-    as = AtmosphericState(gas_conc, p_lay, p_lev, t_lay, nothing, k_dist.ref)
+    as = AtmosphericState(gas_conc, p_lay, p_lev, t_lay, nothing, ref_prof)
 
     # Compute the optical properties of the atmosphere and the Planck source functions
     #    from pressures, temperatures, and gas concentrations...
     fluxes.flux_up .= FT(0)
     fluxes.flux_dn .= FT(0)
 
-    @timeit to "gas_optics!" gas_optics!(k_dist, as, optical_props, b==b_tot)
+    @timeit to "gas_optics!" gas_optics!(k_dist, as, ref_prof, optical_props, b==b_tot)
 
     check_extent(toa_flux, (as.ncol, ngpt), "toa_flux")
     toa_flux .= repeat(k_dist.solar_src', as.ncol)

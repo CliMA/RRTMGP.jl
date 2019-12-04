@@ -141,7 +141,7 @@ struct AtmosphericState{FT,I} <: AbstractAtmosphericState{FT,I}
                             p_lev::Array{FT,2},
                             t_lay::Array{FT,2},
                             t_lev::Union{Array{FT,2},Nothing},
-                            ref::ReferenceState,
+                            ref::ReferenceStateProfile,
                             col_dry::Union{Array{FT,2},Nothing}=nothing,
                             t_sfc::Union{Vector{FT},Nothing}=nothing) where {I<:Int,FT<:AbstractFloat}
     nlay = size(p_lay, 2)

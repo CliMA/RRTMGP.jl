@@ -76,19 +76,19 @@ Base class for optical properties. Describes the spectral
 discretization including the wavenumber limits of each band
 (spectral region) and the mapping between g-points and bands.
 
- - (begin g-point, end g-point) = band2gpt(2,band)
- - band = gpt2band(g-point)
- - (upper and lower wavenumber by band) = band_lims_wvn(2,band)
-
 # Fields
 $(DocStringExtensions.FIELDS)
 """
 struct OpticalPropsBase{FT,I} <: AbstractOpticalProps{FT,I}
+  "begin g-point, end g-point"
   band2gpt::Array{I,2}
+  "band = gpt2band[g-point]"
   gpt2band::Array{I,1}
+  "(upper and lower wavenumber by band) = band_lims_wvn[2,band]"
   band_lims_wvn::Array{FT,2}
+  "name of particular optical properties"
   name::AbstractString
-  function OpticalPropsBase(name, band_lims_wvn::Array{FT}, band_lims_gpt=nothing) where FT
+  function OpticalPropsBase(name::AbstractString, band_lims_wvn::Array{FT}, band_lims_gpt=nothing) where FT
     @assert size(band_lims_wvn,1) == 2
     @assert !any(band_lims_wvn.<FT(0))
     band_lims_gpt_lcl = Array{Int}(undef, 2, size(band_lims_wvn, 2))
