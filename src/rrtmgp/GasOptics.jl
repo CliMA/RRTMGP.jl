@@ -91,14 +91,14 @@ end
 abstract type AbstractGasOptics{T,I} <: AbstractOpticalProps{T,I} end
 
 """
-    InternalSourceGasOptics{FT,I} <: AbstractGasOptics{FT,I}
+    KDistributionLongwave{FT,I} <: AbstractGasOptics{FT,I}
 
 Gas optics with internal sources (for longwave radiation)
 
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct InternalSourceGasOptics{FT,I} <: AbstractGasOptics{FT,I}
+struct KDistributionLongwave{FT,I} <: AbstractGasOptics{FT,I}
   "Reference state data"
   ref::ReferenceState{FT}
   "Base optical properties"
@@ -134,14 +134,14 @@ struct InternalSourceGasOptics{FT,I} <: AbstractGasOptics{FT,I}
 end
 
 """
-    ExternalSourceGasOptics{FT,I} <: AbstractGasOptics{FT,I}
+    KDistributionShortwave{FT,I} <: AbstractGasOptics{FT,I}
 
 Gas optics with external sources (for shortwave radiation)
 
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct ExternalSourceGasOptics{FT,I} <: AbstractGasOptics{FT,I}
+struct KDistributionShortwave{FT,I} <: AbstractGasOptics{FT,I}
   "Reference state data"
   ref::ReferenceState{FT}
   "Base optical properties"
@@ -222,19 +222,19 @@ get_nflav(this::AbstractGasOptics) = size(this.flavor, 2)
 
 
 """
-    gas_optics!(this::InternalSourceGasOptics,
+    gas_optics!(this::KDistributionLongwave,
                 as::AtmosphericState{FT,I},
                 optical_props::AbstractOpticalPropsArry,
                 sources::SourceFuncLW) where {FT<:AbstractFloat,I<:Int}
 
 Compute gas optical depth and Planck source functions given:
 
- - `this` gas optics, see [`InternalSourceGasOptics`](@ref)
+ - `this` gas optics, see [`KDistributionLongwave`](@ref)
  - `as` atmospheric state, see [`AtmosphericState`](@ref)
  - `optical_props` optical properties, see [`AbstractOpticalPropsArry`](@ref)
  - `sources` longwave sources, see [`SourceFuncLW`](@ref)
 """
-function gas_optics!(this::InternalSourceGasOptics,
+function gas_optics!(this::KDistributionLongwave,
                      as::AtmosphericState{FT,I},
                      optical_props::AbstractOpticalPropsArry,
                      sources::SourceFuncLW) where {FT<:AbstractFloat,I<:Int}
@@ -255,18 +255,18 @@ function gas_optics!(this::InternalSourceGasOptics,
 end
 
 """
-    gas_optics!(this::ExternalSourceGasOptics{FT},
+    gas_optics!(this::KDistributionShortwave{FT},
                 as::AtmosphericState{FT,I},
                 optical_props::AbstractOpticalPropsArry,
                 last_call=false) where {FT<:AbstractFloat,I<:Int}
 
 Compute gas optical depth given:
 
- - `this` gas optics, see [`ExternalSourceGasOptics`](@ref)
+ - `this` gas optics, see [`KDistributionShortwave`](@ref)
  - `as` atmospheric state, see [`AtmosphericState`](@ref)
  - `optical_props` optical properties, see [`AbstractOpticalPropsArry`](@ref)
 """
-function gas_optics!(this::ExternalSourceGasOptics{FT},
+function gas_optics!(this::KDistributionShortwave{FT},
                      as::AtmosphericState{FT,I},
                      optical_props::AbstractOpticalPropsArry,
                      last_call=false) where {FT<:AbstractFloat,I<:Int}
@@ -290,7 +290,7 @@ end
                     last_call=false) where {FT<:AbstractFloat,I<:Int}
 
  - `ics` interpolation coefficients, see [`InterpolationCoefficients`](@ref)
- - `this` gas optics, see [`InternalSourceGasOptics`](@ref) or [`ExternalSourceGasOptics`](@ref)
+ - `this` gas optics, see [`KDistributionLongwave`](@ref) or [`KDistributionShortwave`](@ref)
  - `as` atmospheric state, see [`AtmosphericState`](@ref)
  - `optical_props` optical properties, see [`AbstractOpticalPropsArry`](@ref)
 
@@ -383,14 +383,14 @@ function compute_gas_τs!(ics::InterpolationCoefficients,
 end
 
 """
-    source!(this::InternalSourceGasOptics{FT},
+    source!(this::KDistributionLongwave{FT},
             as::AtmosphericState{FT,I},
             ics::InterpolationCoefficients{FT,I},
             sources::SourceFuncLW) where {FT<:AbstractFloat,I<:Int}
 
 Compute Planck source functions at layer centers and levels
 
- - `this` gas optics, see [`InternalSourceGasOptics`](@ref)
+ - `this` gas optics, see [`KDistributionLongwave`](@ref)
  - `as` atmospheric state, see [`AtmosphericState`](@ref)
  - `ics` interpolation coefficients, see [`InterpolationCoefficients`](@ref)
  - `sources` longwave sources, see [`SourceFuncLW`](@ref)
@@ -398,7 +398,7 @@ Compute Planck source functions at layer centers and levels
 real(FT), dimension(ngpt,nlay,ncol)          :: lay_source_t, lev_source_inc_t, lev_source_dec_t
 real(FT), dimension(ngpt,     ncol)          :: sfc_source_t
 """
-function source!(this::InternalSourceGasOptics{FT},
+function source!(this::KDistributionLongwave{FT},
                  as::AtmosphericState{FT,I},
                  ics::InterpolationCoefficients{FT,I},
                  sources::SourceFuncLW) where {FT<:AbstractFloat,I<:Int}
@@ -468,7 +468,7 @@ function load_totplnk(totplnk, planck_frac, rayl_lower, rayl_upper, ref, args...
   end
   totplnk_delta =  (ref.temp_max-ref.temp_min) / (size(totplnk, 1)-1)
 
-  return InternalSourceGasOptics{FT,Int}(ref,
+  return KDistributionLongwave{FT,Int}(ref,
                                          abs_coeffs...,
                                          planck_frac,
                                          totplnk,
@@ -496,7 +496,7 @@ function load_solar_source(solar_src, rayl_lower, rayl_upper, ref, args...)
     krayl = nothing
   end
 
-  return ExternalSourceGasOptics{FT,Int}(ref,
+  return KDistributionShortwave{FT,Int}(ref,
                                          abs_coeffs...,
                                          solar_src,
                                          krayl)
@@ -612,16 +612,16 @@ get_minor_list(this::AbstractGasOptics, gas_names::Vector{AbstractGas}, names_sp
 
 Bool indicating if initialized for internal sources
 """
-source_is_internal(::ExternalSourceGasOptics) = false
-source_is_internal(::InternalSourceGasOptics) = true
+source_is_internal(::KDistributionShortwave) = false
+source_is_internal(::KDistributionLongwave) = true
 
 """
     source_is_external(this::AbstractGasOptics)
 
 Bool indicating if initialized for external sources
 """
-source_is_external(::ExternalSourceGasOptics) = true
-source_is_external(::InternalSourceGasOptics) = false
+source_is_external(::KDistributionShortwave) = true
+source_is_external(::KDistributionLongwave) = false
 
 """
     rewrite_key_species_pair(key_species_pair)
