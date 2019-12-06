@@ -194,14 +194,71 @@ struct InterpolationCoefficients{FT,I}
   "fractions for minor species"
   fminor::Array{FT,5}
 end
-function InterpolationCoefficients(::Type{FT}, ::Type{I}, ncol, nlay, nflav) where {I<:Int, FT<:AbstractFloat}
+function InterpolationCoefficients(::Type{FT}, ncol::I, nlay::I, nflav::I) where {I<:Int, FT<:AbstractFloat}
   jtemp = Array{I}(undef, ncol, nlay)
   jpress = Array{I}(undef, ncol, nlay)
   j_η = Array{I}(undef, 2, nflav, ncol, nlay)
   tropo = Array{Bool}(undef, ncol, nlay)
   fmajor = zeros(FT, 2,2,2, nflav,ncol, nlay)
-  fminor  = Array{FT}(undef, 2,2, nflav,ncol,nlay)
+  fminor = Array{FT}(undef, 2,2, nflav,ncol,nlay)
   return InterpolationCoefficients{FT,I}(jtemp,jpress,j_η,tropo,fmajor,fminor)
+end
+
+"""
+    InterpolationCoefficientsNode{FT,I}
+
+Interpolation coefficients per nodal value
+
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
+mutable struct InterpolationCoefficientsNode{FT,I}
+  "index for temperature"
+  jtemp::I
+  "index for pressure"
+  jpress::I
+  "index for binary species parameter (η)"
+  j_η::Array{I,2}
+  "troposphere mask: itropo = merge(1,2,tropo[icol,ilay]); itropo = 1 lower atmosphere; itropo = 2 upper atmosphere"
+  tropo::Bool
+  "fractions for major species"
+  fmajor::Array{FT,4}
+  "fractions for minor species"
+  fminor::Array{FT,3}
+end
+function InterpolationCoefficientsNode(::Type{FT}, nflav::I) where {I<:Int, FT<:AbstractFloat}
+  jtemp = 0
+  jpress = 0
+  j_η = Array{I}(undef, 2, nflav)
+  tropo = false
+  fmajor = zeros(FT, 2,2,2, nflav)
+  fminor = Array{FT}(undef, 2,2, nflav)
+  return InterpolationCoefficientsNode{FT,I}(jtemp,jpress,j_η,tropo,fmajor,fminor)
+end
+function InterpolationCoefficientsNode(ics::InterpolationCoefficients)
+  ncol, nlay = size(ics.jpress)
+  ics_pgp = [InterpolationCoefficientsNode(
+    ics.jtemp[icol,ilay],
+    ics.jpress[icol,ilay],
+    ics.j_η[:,:,icol,ilay],
+    ics.tropo[icol,ilay],
+    ics.fmajor[:,:,:,:,icol,ilay],
+    ics.fminor[:,:,:,icol,ilay]) for icol in 1:ncol, ilay in 1:nlay]
+  return ics_pgp
+end
+function InterpolationCoefficientsNode!(ics, ics_pgp)
+  _, nflav, ncol, nlay= size(ics.j_η)
+  @inbounds for icol in 1:ncol
+    @inbounds for ilay in 1:nlay
+      ics.jtemp[icol,ilay]           = ics_pgp[icol,ilay].jtemp
+      ics.jpress[icol,ilay]          = ics_pgp[icol,ilay].jpress
+      ics.j_η[:,:,icol,ilay]        .= ics_pgp[icol,ilay].j_η
+      ics.tropo[icol,ilay]           = ics_pgp[icol,ilay].tropo
+      ics.fmajor[:,:,:,:,icol,ilay] .= ics_pgp[icol,ilay].fmajor
+      ics.fminor[:,:,:,icol,ilay]   .= ics_pgp[icol,ilay].fminor
+    end
+  end
+  return ics
 end
 
 """
@@ -239,7 +296,7 @@ function gas_optics!(this::KDistributionLongwave,
                      optical_props::AbstractOpticalPropsArry,
                      sources::SourceFuncLW) where {FT<:AbstractFloat,I<:Int}
 
-  ics = InterpolationCoefficients(FT, Int, as.ncol, as.nlay, get_nflav(this))
+  ics = InterpolationCoefficients(FT, as.ncol, as.nlay, get_nflav(this))
 
   # Gas optics
   compute_gas_τs!(ics, this, as, optical_props)
@@ -271,7 +328,7 @@ function gas_optics!(this::KDistributionShortwave{FT},
                      optical_props::AbstractOpticalPropsArry,
                      last_call=false) where {FT<:AbstractFloat,I<:Int}
 
-  ics = InterpolationCoefficients(FT, Int, as.ncol,as.nlay, get_nflav(this))
+  ics = InterpolationCoefficients(FT, as.ncol,as.nlay, get_nflav(this))
 
   # Gas optics
   @timeit to_gor "compute_gas_τs!" compute_gas_τs!(ics, this, as, optical_props, last_call)
@@ -340,7 +397,6 @@ function compute_gas_τs!(ics::InterpolationCoefficients,
   τ .= 0
   @timeit to_gor "interpolation!" interpolation!(ics,
           col_mix,
-          ncol,nlay,                        # problem dimensions
           nflav, neta, npres, ntemp,  # interpolation dimensions
           this.flavor,
           this.ref,
@@ -348,7 +404,7 @@ function compute_gas_τs!(ics::InterpolationCoefficients,
           as.t_lay,
           as.col_gas)
   @timeit to_gor "compute_τ_absorption!" compute_τ_absorption!(τ,
-          ncol,nlay,nband,ngpt,                      # dimensions
+          nband,ngpt,                      # dimensions
           idx_h2o,
           this.gpoint_flavor,
           get_band_lims_gpoint(this.optical_props),
@@ -385,7 +441,7 @@ end
 """
     source!(this::KDistributionLongwave{FT},
             as::AtmosphericState{FT,I},
-            ics::InterpolationCoefficients{FT,I},
+            ics::InterpolationCoefficients{FT},
             sources::SourceFuncLW) where {FT<:AbstractFloat,I<:Int}
 
 Compute Planck source functions at layer centers and levels
@@ -400,7 +456,7 @@ real(FT), dimension(ngpt,     ncol)          :: sfc_source_t
 """
 function source!(this::KDistributionLongwave{FT},
                  as::AtmosphericState{FT,I},
-                 ics::InterpolationCoefficients{FT,I},
+                 ics::InterpolationCoefficients{FT},
                  sources::SourceFuncLW) where {FT<:AbstractFloat,I<:Int}
 
   ncol  = get_ncol(sources)
