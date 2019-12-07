@@ -29,7 +29,7 @@ squeeze(A) = dropdims(A, dims=tuple([i for i in 1:length(size(A)) if size(A)[i]=
 
 Based on https://gcc.gnu.org/onlinedocs/gfortran/INT.html
 """
-fint(x::Real) = abs(x) < 1 ? 0 : floor(x)
+fint(x::Real) = abs(x) < 1 ? 0 : convert(Int,floor(x))
 
 """
     fmerge(t_source, f_source, mask)

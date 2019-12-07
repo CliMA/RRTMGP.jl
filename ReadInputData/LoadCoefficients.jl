@@ -71,10 +71,10 @@ function load_and_init(ds, ::Type{FT}, gases_prescribed::Vector{AbstractGas}) wh
   if haskey(ds,"totplnk")
     totplnk     = Array{FT}(ds["totplnk"][:])
     planck_frac = Array{FT}(ds["plank_fraction"][:])
-    kdist = load_totplnk(totplnk, planck_frac, rayl_lower, rayl_upper, ref, args...)
+    kdist = get_kdist_longwave(totplnk, planck_frac, rayl_lower, rayl_upper, ref, args...)
   else
     solar_src = ds["solar_source"][:]
-    kdist = load_solar_source(solar_src, rayl_lower, rayl_upper, ref, args...)
+    kdist = get_kdist_shortwave(solar_src, rayl_lower, rayl_upper, ref, args...)
   end
   return kdist
 
