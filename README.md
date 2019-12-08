@@ -2,9 +2,9 @@
 
 Julia implementation of Rapid and accurate Radiative Transfer Model for General Circulation Models.
 
-| **Documentation**                             | **Build Status**                                                        |
-|:--------------------------------------------- |:------------------------------------------------------------------------|
-| [![latest][docs-latest-img]][docs-latest-url] | [![azure][azure-img]][azure-url] [![codecov][codecov-img]][codecov-url] |
+| **Documentation**                             | **Build Status**                                                        | Bors                                  |
+|:--------------------------------------------- |:------------------------------------------------------------------------|---------------------------------------|
+| [![latest][docs-latest-img]][docs-latest-url] | [![azure][azure-img]][azure-url] [![codecov][codecov-img]][codecov-url] | [![Bors enabled][bors-img]][bors-url] |
 
 [docs-latest-img]: https://img.shields.io/badge/docs-latest-blue.svg
 [docs-latest-url]: https://climate-machine.github.io/RRTMGP.jl/latest/
@@ -14,6 +14,9 @@ Julia implementation of Rapid and accurate Radiative Transfer Model for General 
 
 [codecov-img]: https://codecov.io/gh/climate-machine/RRTMGP.jl/branch/master/graph/badge.svg
 [codecov-url]: https://codecov.io/gh/climate-machine/RRTMGP.jl
+
+[bors-img]: https://bors.tech/images/badge_small.svg
+[bors-url]: https://app.bors.tech/repositories/20449
 
 
 | **Backup Build Status**                                                       |
