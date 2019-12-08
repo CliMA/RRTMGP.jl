@@ -1,5 +1,5 @@
 status = [
-  "RRTMGP.jl",
+  "climate-machine.RRTMGP.jl"
 ]
 delete_merged_branches = true
 timeout_sec = 86400
