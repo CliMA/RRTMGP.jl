@@ -216,7 +216,7 @@ Interpolation coefficients per nodal value
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct InterpolationCoefficientsNode{FT,I}
+mutable struct InterpolationCoefficientsNode{FT,I}
   "index for temperature"
   jtemp::I
   "index for pressure"
@@ -346,25 +346,26 @@ function compute_gas_τs!(this::AbstractGasOptics{FT},
   nlay  = get_nlay(optical_props)
   ngpt  = get_ngpt(optical_props)
   nband = get_nband(optical_props)
-
-  τ          = Array{FT}(undef, ngpt,nlay,ncol) # absorption, Rayleigh scattering optical depths
-  τ_Rayleigh = Array{FT}(undef, ngpt,nlay,ncol) # absorption, Rayleigh scattering optical depths
-
-  # Check for presence of key species in GasConcs; return error if any key species are not present
-  check_key_species_present(this, as.gas_conc.gas_names)
-
   ngas  = get_ngas(this)
   nflav = get_nflav(this)
   neta  = get_neta(this)
   npres = get_npres(this)
   ntemp = get_ntemp(this)
 
+  τ          = Array{FT}(undef, ngpt,nlay,ncol) # absorption optical depths
+  τ_Rayleigh = Array{FT}(undef, ngpt,nlay,ncol) # Rayleigh scattering optical depths
+  ics = [InterpolationCoefficientsNode(FT,nflav) for icol in 1:ncol, ilay in 1:nlay]
+
+  # Check for presence of key species in GasConcs; return error if any key species are not present
+  check_key_species_present(this, as.gas_conc.gas_names)
+
+
   # Compute dry air column amounts (number of molecule per cm^2) if user hasn't provided them
   idx_h2o = loc_in_array(h2o(), this.gas_names)
 
   # ---- calculate gas optical depths ----
   τ .= 0
-  @timeit to_gor "interpolation" ics = interpolation(nflav, neta, npres, ntemp,  # interpolation dimensions
+  @timeit to_gor "interpolation" interpolation!(ics, nflav, neta, npres, ntemp,  # interpolation dimensions
           this.flavor,
           this.ref,
           as.p_lay,

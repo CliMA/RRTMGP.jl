@@ -178,9 +178,9 @@ function delta_scale!(this::TwoStream{FT}, for_ = nothing) where FT
   if for_ ≠ nothing
     @assert all(size(for_) .== (ncol, nlay, ngpt))
     @assert !any(for_ < FT(0) || for_ > FT(1))
-    delta_scale_2str_kernel!(this, for_)
+    delta_scale_kernel!(this, for_)
   else
-    delta_scale_2str_kernel!(this)
+    delta_scale_kernel!(this)
   end
 end
 

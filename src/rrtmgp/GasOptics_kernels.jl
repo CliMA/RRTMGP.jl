@@ -25,58 +25,61 @@ integer,     dimension(2,nflav),    intent(in) :: flavor
 real(FT),    dimension(ncol,nlay),        intent(in) :: play, tlay
 real(FT),    dimension(ncol,nlay,0:ngas), intent(in) :: col_gas
 """
-function interpolation(nflav::I,
-                       neta::I,
-                       npres::I,
-                       ntemp::I,
-                       flavor::Array{I},
-                       ref::ReferenceState{FT},
-                       play::Array{FT},
-                       tlay::Array{FT},
-                       col_gas::AbstractArray{FT}) where {I<:Int,B<:Bool,FT<:AbstractFloat}
+function interpolation!(ics::Array,
+                        nflav::I,
+                        neta::I,
+                        npres::I,
+                        ntemp::I,
+                        flavor::Array{I},
+                        ref::ReferenceState{FT},
+                        play::Array{FT},
+                        tlay::Array{FT},
+                        col_gas::AbstractArray{FT}) where {I<:Int,B<:Bool,FT<:AbstractFloat}
 
   ncol, nlay = size(play)
-  return [interpolation(nflav,
-                    neta,
-                    npres,
-                    ntemp,
-                    flavor,
-                    ref,
-                    play[icol,ilay],
-                    tlay[icol,ilay],
-                    col_gas[icol,ilay,:]) for icol in 1:ncol, ilay in 1:nlay]
+  @inbounds for icol in 1:ncol
+    @inbounds for ilay in 1:nlay
+      interpolation!(ics[icol,ilay],
+                     nflav,
+                     neta,
+                     npres,
+                     ntemp,
+                     flavor,
+                     ref,
+                     play[icol,ilay],
+                     tlay[icol,ilay],
+                     col_gas[icol,ilay,:])
+    end
+  end
 end
-function interpolation(nflav::I,
-                       neta::I,
-                       npres::I,
-                       ntemp::I,
-                       flavor::Array{I},
-                       ref::ReferenceState{FT},
-                       play::FT,
-                       tlay::FT,
-                       col_gas::AbstractArray{FT}) where {I<:Int,FT<:AbstractFloat}
+function interpolation!(ics::InterpolationCoefficientsNode{FT},
+                        nflav::I,
+                        neta::I,
+                        npres::I,
+                        ntemp::I,
+                        flavor::Array{I},
+                        ref::ReferenceState{FT},
+                        play::FT,
+                        tlay::FT,
+                        col_gas::AbstractArray{FT}) where {I<:Int,FT<:AbstractFloat}
 
-  igases = Vector{Int}(undef,2)
-  fmajor = Array{FT}(undef,2,2,2,nflav)
-  fminor = Array{FT}(undef,2,2,nflav)
-  j_η = Array{I}(undef,2,nflav)
-  col_mix = Array{FT}(undef,2,nflav)
+  igases = Vector{Int}(undef, 2)
 
   # index and factor for temperature interpolation
-  jtemp = fint((tlay - (ref.temp_min - ref.temp_delta)) / ref.temp_delta)
-  jtemp = min(ntemp - 1, max(1, jtemp)) # limit the index range
-  ftemp = (tlay - ref.temp[jtemp]) / ref.temp_delta  # interpolation fraction for temperature
+  ics.jtemp = fint((tlay - (ref.temp_min - ref.temp_delta)) / ref.temp_delta)
+  ics.jtemp = min(ntemp - 1, max(1, ics.jtemp)) # limit the index range
+  ftemp = (tlay - ref.temp[ics.jtemp]) / ref.temp_delta  # interpolation fraction for temperature
 
   # index and factor for pressure interpolation
   locpress = FT(1) + (log(play) - ref.press_log[1]) / ref.press_log_delta # needed to find location in pressure grid
-  jpress = min(npres-1, max(1, fint(locpress)))
-  fpress = locpress - FT(jpress) # interpolation fraction for pressure
+  ics.jpress = min(npres-1, max(1, fint(locpress)))
+  fpress = locpress - FT(ics.jpress) # interpolation fraction for pressure
 
   # determine if in lower or upper part of atmosphere
-  tropo = log(play) > ref.press_trop_log
+  ics.tropo = log(play) > ref.press_trop_log
 
   # itropo = 1 lower atmosphere; itropo = 2 upper atmosphere
-  itropo = fmerge(1,2,tropo)
+  itropo = fmerge(1,2,ics.tropo)
   # loop over implemented combinations of major species
   @inbounds for iflav in 1:nflav
     igases .= flavor[:,iflav]
@@ -84,28 +87,28 @@ function interpolation(nflav::I,
       # compute interpolation fractions needed for lower, then upper reference temperature level
       # compute binary species parameter (η) for flavor and temperature and
       #  associated interpolation index and factors
-      ratio_η_half = ref.vmr[itropo,igases[1],(jtemp+itemp-1)] /
-                     ref.vmr[itropo,igases[2],(jtemp+itemp-1)] # ratio of vmrs of major species that defines η=0.5
+      ratio_η_half = ref.vmr[itropo,igases[1],(ics.jtemp+itemp-1)] /
+                     ref.vmr[itropo,igases[2],(ics.jtemp+itemp-1)] # ratio of vmrs of major species that defines η=0.5
                                                                # for given flavor and reference temperature level
-      col_mix[itemp,iflav] = col_gas[igases[1]] + ratio_η_half * col_gas[igases[2]]
-      η = fmerge(col_gas[igases[1]] / col_mix[itemp,iflav], FT(0.5),
-                  col_mix[itemp,iflav] > FT(2) * floatmin(FT)) # binary species parameter
+      ics.col_mix[itemp,iflav] = col_gas[igases[1]] + ratio_η_half * col_gas[igases[2]]
+      η = fmerge(col_gas[igases[1]] / ics.col_mix[itemp,iflav], FT(0.5),
+                  ics.col_mix[itemp,iflav] > FT(2) * floatmin(FT)) # binary species parameter
       loc_η = η * FT(neta-1) # needed to find location in η grid
-      j_η[itemp,iflav] = min(fint(loc_η)+1, neta-1)
+      ics.j_η[itemp,iflav] = min(fint(loc_η)+1, neta-1)
       f_η = mod(loc_η, 1) # interpolation variable for η
       # compute interpolation fractions needed for minor species
       # ftemp_term = (FT(1)-ftemp) for itemp = 1, ftemp for itemp=2
       ftemp_term = (FT(2-itemp) + FT(2*itemp-3) * ftemp)
-      fminor[1,itemp,iflav] = (1-f_η) * ftemp_term
-      fminor[2,itemp,iflav] =    f_η  * ftemp_term
+      ics.fminor[1,itemp,iflav] = (1-f_η) * ftemp_term
+      ics.fminor[2,itemp,iflav] =    f_η  * ftemp_term
       # compute interpolation fractions needed for major species
-      fmajor[1,1,itemp,iflav] = (FT(1)-fpress) * fminor[1,itemp,iflav]
-      fmajor[2,1,itemp,iflav] = (FT(1)-fpress) * fminor[2,itemp,iflav]
-      fmajor[1,2,itemp,iflav] =        fpress  * fminor[1,itemp,iflav]
-      fmajor[2,2,itemp,iflav] =        fpress  * fminor[2,itemp,iflav]
+      ics.fmajor[1,1,itemp,iflav] = (FT(1)-fpress) * ics.fminor[1,itemp,iflav]
+      ics.fmajor[2,1,itemp,iflav] = (FT(1)-fpress) * ics.fminor[2,itemp,iflav]
+      ics.fmajor[1,2,itemp,iflav] =        fpress  * ics.fminor[1,itemp,iflav]
+      ics.fmajor[2,2,itemp,iflav] =        fpress  * ics.fminor[2,itemp,iflav]
     end # reference temperatures
   end # iflav
-  return InterpolationCoefficientsNode(jtemp,jpress,j_η,tropo,fmajor,fminor,col_mix)
+  return nothing
 end
 
 """
