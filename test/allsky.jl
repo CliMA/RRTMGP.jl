@@ -150,10 +150,8 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
   #
   # Clouds
   #
-  lwp = zeros(FT, ncol,nlay)
-  iwp = zeros(FT, ncol,nlay)
-  rel = zeros(FT, ncol,nlay)
-  rei = zeros(FT, ncol,nlay)
+  clouds_ice = CloudOpticalProps(FT, ncol,nlay)
+  clouds_liq = CloudOpticalProps(FT, ncol,nlay)
   cloud_mask = Array{Bool}(undef, ncol,nlay)
 
   # Restrict clouds to troposphere (< 100 hPa = 100*100 Pa)
@@ -166,10 +164,10 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
       #
       # Ice and liquid will overlap in a few layers
       #
-      lwp[icol,ilay] = fmerge(FT(10),  FT(0), cloud_mask[icol,ilay] && as.t_lay[icol,ilay] > FT(263))
-      iwp[icol,ilay] = fmerge(FT(10),  FT(0), cloud_mask[icol,ilay] && as.t_lay[icol,ilay] < FT(273))
-      rel[icol,ilay] = fmerge(rel_val, FT(0), lwp[icol,ilay] > FT(0))
-      rei[icol,ilay] = fmerge(rei_val, FT(0), iwp[icol,ilay] > FT(0))
+      clouds_liq.wp[icol,ilay] = fmerge(FT(10),  FT(0), cloud_mask[icol,ilay] && as.t_lay[icol,ilay] > FT(263))
+      clouds_ice.wp[icol,ilay] = fmerge(FT(10),  FT(0), cloud_mask[icol,ilay] && as.t_lay[icol,ilay] < FT(273))
+      clouds_liq.re[icol,ilay] = fmerge(rel_val, FT(0), clouds_liq.wp[icol,ilay] > FT(0))
+      clouds_ice.re[icol,ilay] = fmerge(rei_val, FT(0), clouds_ice.wp[icol,ilay] > FT(0))
     end
   end
 
@@ -180,7 +178,8 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
   #
 
   for iloop = 1:(compile_first ? 1 : nloops)
-    cloud_optics!(cloud_optics_, lwp, iwp, rel, rei, clouds)
+    # cloud_optics!(cloud_optics_, clouds_liq.wp, clouds_ice.wp, clouds_liq.re, clouds_ice.re, clouds)
+    cloud_optics!(cloud_optics_, clouds_liq, clouds_ice, clouds)
     #
     # Solvers
     #
