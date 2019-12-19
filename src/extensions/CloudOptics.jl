@@ -11,10 +11,12 @@ The class can be used as-is but is also intended as an example of how to extend 
 module CloudOptics
 
 using OffsetArrays
+using DocStringExtensions
 using ..OpticalProps
 using ..Utilities
 using ..FortranIntrinsics
 
+export CloudOpticalProps
 export cloud_optics!
 export get_min_radius, get_max_radius
 
@@ -27,26 +29,27 @@ abstract type AbstractInterpolationMethod end
 """
     PadeMethod <: AbstractInterpolationMethod
 
-# Pade coefficients
- - `ext` extinction
- - `ssa` single scattering albedo
- - `asy` asymmetry parameter
+Pade approximation coefficients
 
-Pade particle size regime boundaries
- - `sizreg_ext`
- - `sizreg_ssa`
- - `sizreg_asy`
+# Fields
+$(DocStringExtensions.FIELDS)
 """
 struct PadeMethod{FT} <: AbstractInterpolationMethod
-  # Pade approximation coefficients
+  "Extinction coefficients"
   ext::Array{FT}
+  "Single scattering albedo"
   ssa::Array{FT}
+  "Asymmetry parameter"
   asy::Array{FT}
-  # Particle size regimes for Pade formulations
+  "Extinction coefficient particle size regime boundaries"
   sizreg_ext::Array{FT}
+  "Single scattering albedo particle size regime boundaries"
   sizreg_ssa::Array{FT}
+  "Asymmetry parameter particle size regime boundaries"
   sizreg_asy::Array{FT}
+  "particle size lower bound for interpolation"
   rad_lwr::FT
+  "particle size upper bound for interpolation"
   rad_upr::FT
   function PadeMethod(ext::Array{FT},
                       ssa::Array{FT},
@@ -55,29 +58,29 @@ struct PadeMethod{FT} <: AbstractInterpolationMethod
                       sizreg_ssa::Array{FT},
                       sizreg_asy::Array{FT}) where FT
 
-    # # Error checking
-    # nbnd         = size(ext, 1)
-    # nsizereg     = size(ext, 2)
-    # ncoeff_ssa_g = size(ssa, 3)
-    # nbound       = length(sizreg_ext)
-    # # Error checking
-    # @assert nbnd == get_nband(this)
-    # @assert all(size(ssa) .== (nbnd, nsizereg, ncoeff_ssa_g))
-    # @assert all(size(asy) .== (nbnd, nsizereg, ncoeff_ssa_g))
-    # @assert length(liq.sizreg_ssa) == nbound
-    # @assert length(liq.sizreg_asy) == nbound
-    # @assert nsizereg == 3
+    # Error checking
+    nbnd         = size(ext, 1)
+    nsizereg     = size(ext, 2)
+    ncoeff_ssa_g = size(ssa, 3)
+    nbound       = length(sizreg_ext)
+    nrghice      = size(ext,4)
 
-    # this.liq = liq
-    # this.ice = ice
-    # # Consistency among size regimes
-    # @assert !any([liq.sizreg_ssa[1], liq.sizreg_asy[1]] .< this.liq.rad_lwr)
-    # @assert !any([ice.sizreg_ssa[1], ice.sizreg_asy[1]] .< this.ice.rad_lwr)
-    # @assert !any([liq.sizreg_ssa[nbound], liq.sizreg_asy[nbound]] .> this.liq.rad_upr)
-    # @assert !any([ice.sizreg_ssa[nbound], ice.sizreg_asy[nbound]] .> this.ice.rad_upr)
-
+    @assert nsizereg == 3
+    if length(size(ext))==4
+      @assert all(size(ssa) .== (nbnd, nsizereg, ncoeff_ssa_g, nrghice))
+      @assert all(size(asy) .== (nbnd, nsizereg, ncoeff_ssa_g, nrghice))
+    else
+      @assert all(size(ssa) .== (nbnd, nsizereg, ncoeff_ssa_g))
+      @assert all(size(asy) .== (nbnd, nsizereg, ncoeff_ssa_g))
+    end
+    @assert length(sizreg_ssa) == nbound
+    @assert length(sizreg_asy) == nbound
+    # Consistency among size regimes
     rad_lwr = sizreg_ext[1]
     rad_upr = sizreg_ext[end]
+    @assert !any([sizreg_ssa[1], sizreg_asy[1]] .< rad_lwr)
+    @assert !any([sizreg_ssa[nbound], sizreg_asy[nbound]] .> rad_upr)
+
     return new{FT}(ext,ssa,asy,sizreg_ext,sizreg_ssa,sizreg_asy,rad_lwr,rad_upr)
   end
 end
@@ -85,25 +88,27 @@ end
 """
     LookUpTable{FT,I} <: AbstractInterpolationMethod
 
-Lookup table interpolation constants
+Lookup table interpolation constants and coefficients
 
-  - `rad_lwr` particle size lower bound for interpolation
-  - `rad_upr` particle size upper bound for interpolation
-  - `rad_fac` constant for calculating interpolation indices
-
-Lookup table coefficients
-   `ext` extinction
-   `ssa` single scattering albedo
-   `asy` asymmetry parameter
+# Fields
+$(DocStringExtensions.FIELDS)
 """
 struct LookUpTable{FT,I} <: AbstractInterpolationMethod
+  "particle size lower bound for interpolation"
   rad_lwr::FT
+  "particle size upper bound for interpolation"
   rad_upr::FT
+  "constant for calculating interpolation indexes"
   rad_fac::FT
+  "Number of evenly-spaced elements for linear interpolation"
   nsteps::I
+  "Size of step for linear interpolation"
   step_size::FT
+  "Extinction coefficients"
   ext::Array{FT}
+  "Single scattering albedo"
   ssa::Array{FT}
+  "Asymmetry parameter"
   asy::Array{FT}
   function LookUpTable(rad_lwr::FT,
                        rad_upr::FT,
@@ -112,27 +117,25 @@ struct LookUpTable{FT,I} <: AbstractInterpolationMethod
                        ssa::Array{FT},
                        asy::Array{FT}) where {FT<:AbstractFloat}
 
-  # # Error checking
-  # #
-  # # LUT coefficient dimensions
-  # #
-  # nsize_liq = size(liq.ext,1)
-  # nsize_ice = size(ice.ext,1)
-  # nbnd      = size(liq.ext,2)
-  # nrghice   = size(ice.ext,3)
-  # #
-  # # Error checking
-  # #   Can we check for consistency between table bounds and _fac?
-  # #
-  # @assert nbnd == get_nband(this)
-  # @assert size(ice.ext, 2) == nbnd
-  # @assert all(size(liq.ssa) .== (nsize_liq, nbnd))
-  # @assert all(size(liq.asy) .== (nsize_liq, nbnd))
-  # @assert all(size(ice.ssa) .== (nsize_ice, nbnd, nrghice))
-  # @assert all(size(ice.asy) .== (nsize_ice, nbnd, nrghice))
+    # Error checking
+    # LUT coefficient dimensions
+    nsize = size(ext,1)
+    nbnd  = size(ext,2)
+
+    # Error checking
+    #   Can we check for consistency between table bounds and _fac?
+    if length(size(ext))==3
+      nrghice = size(ext,3)
+      @assert all(size(ssa) .== (nsize, nbnd, nrghice))
+      @assert all(size(asy) .== (nsize, nbnd, nrghice))
+    else
+      @assert all(size(ssa) .== (nsize, nbnd))
+      @assert all(size(asy) .== (nsize, nbnd))
+    end
 
     nsteps = size(ext, 1)
     step_size = (rad_upr - rad_lwr)/FT(nsteps-1)
+
     return new{FT,Int}(rad_lwr,rad_upr,rad_fac,nsteps,step_size,ext,ssa,asy)
   end
 end
@@ -142,24 +145,59 @@ get_max_radius(aim::AbstractInterpolationMethod) = aim.rad_upr
 get_num_roughness_types(this::PadeMethod) = size(this.ext, 4)
 get_num_roughness_types(this::LookUpTable) = size(this.ext,  3)
 
+"""
+    CloudOpticsLUT{FT, I} <: AbstractOpticalProps{FT, I}
+
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
 struct CloudOpticsLUT{FT, I} <: AbstractOpticalProps{FT, I}
   base::OpticalPropsBase
-  # Ice surface roughness category - needed for Yang (2013) ice optics parameterization
+  "Ice surface roughness category - needed for Yang (2013) ice optics parameterization"
   icergh::I
-  liq::AbstractInterpolationMethod
-  ice::AbstractInterpolationMethod
+  "Interpolation method for liquid properties"
+  liq::LookUpTable
+  "Interpolation method for ice properties"
+  ice::LookUpTable
 end
 
+"""
+    CloudOpticsPade{FT, I} <: AbstractOpticalProps{FT, I}
+
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
 struct CloudOpticsPade{FT, I} <: AbstractOpticalProps{FT, I}
+  "Base optical properties"
   base::OpticalPropsBase
-  # Ice surface roughness category - needed for Yang (2013) ice optics parameterization
+  "Ice surface roughness category - needed for Yang (2013) ice optics parameterization"
   icergh::I
+  "Interpolation method for liquid properties"
   liq::AbstractInterpolationMethod
+  "Interpolation method for ice properties"
   ice::AbstractInterpolationMethod
 end
 
+"""
+    CloudOpticalProps{FT<:AbstractFloat}
 
-# Derive cloud optical properties from provided cloud physical properties
+Cloud properties (liquid or ice) used to combine with
+averaged optical properties
+
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
+struct CloudOpticalProps{FT<:AbstractFloat}
+  "Water path"
+  wp::Array{FT}
+  "Effective radius"
+  re::Array{FT}
+end
+CloudOpticalProps(FT, ncol,nlay) = CloudOpticalProps{FT}(zeros(FT,ncol,nlay),zeros(FT,ncol,nlay))
+
+#####
+##### Derive cloud optical properties from provided cloud physical properties
+#####
 
 """
     combine_optical_props!(op::AbstractOpticalPropsArry, liq::TwoStream{FT}, ice::TwoStream{FT}) where {FT<:AbstractFloat}
@@ -182,105 +220,75 @@ function combine_optical_props!(op::TwoStream{FT}, liq::TwoStream{FT}, ice::TwoS
 end
 
 function validate_cloud_optics!(this::AbstractOpticalProps{FT},
-                      clwp, ciwp, reliq, reice,
-                      optical_props) where FT
-  liqmsk = BitArray(clwp .> FT(0))
-  icemsk = BitArray(ciwp .> FT(0))
+                                liq::CloudOpticalProps{FT},
+                                ice::CloudOpticalProps{FT},
+                                optical_props::AbstractOpticalPropsArry{FT}) where FT
+  liqmsk = BitArray(liq.wp .> FT(0))
+  icemsk = BitArray(ice.wp .> FT(0))
   # Error checking
   @assert bands_are_equal(this, optical_props)
   @assert get_nband(optical_props) == get_ngpt(optical_props)
   @assert !(this.icergh < 1 || this.icergh > get_num_roughness_types(this.ice))
-  @assert !any_vals_outside(reliq, liqmsk, this.liq.rad_lwr, this.liq.rad_upr)
-  @assert !any_vals_outside(reice, icemsk, this.ice.rad_lwr, this.ice.rad_upr)
-  any(liqmsk) && @assert !any_vals_less_than(clwp, liqmsk, FT(0))
-  any(icemsk) && @assert !any_vals_less_than(ciwp, icemsk, FT(0))
+  @assert !any_vals_outside(liq.re, liqmsk, this.liq.rad_lwr, this.liq.rad_upr)
+  @assert !any_vals_outside(ice.re, icemsk, this.ice.rad_lwr, this.ice.rad_upr)
+  any(liqmsk) && @assert !any_vals_less_than(liq.wp, liqmsk, FT(0))
+  any(icemsk) && @assert !any_vals_less_than(ice.wp, icemsk, FT(0))
   return nothing
 end
 
 """
-    cloud_optics!(this::CloudOpticsPade{FT},
-                      clwp, ciwp, reliq, reice,
-                      optical_props)
+    cloud_optics!(this::AbstractOpticalProps{FT},
+                  clouds_liq::CloudOpticalProps{FT},
+                  clouds_ice::CloudOpticalProps{FT},
+                  optical_props::AbstractOpticalPropsArry{FT}) where {FT<:AbstractFloat}
 
-Compute single-scattering properties
+Compute single-scattering properties in
 
-class(CloudOpticsPade), intent(in   ) :: this
-real(wp), intent(in   ) :: clwp  (:,:),    ! cloud ice water path    (units?)
-                           ciwp  (:,:),    ! cloud liquid water path (units?)
-                           reliq (:,:),    ! cloud ice particle effective size (microns)
-                           reice (:,:)      ! cloud liquid particle effective radius (microns)
-class(AbstractOpticalPropsArry), intent(inout) :: optical_props Dimensions: (ncol,nlay,nbnd)
-! ------- Local -------
-logical(wl), dimension(size(clwp,1), size(clwp,2)) :: liqmsk, icemsk
-real(wp),    dimension(size(clwp,1), size(clwp,2), this%get_nband()) :: lτ, lτssa, lτssag, iτ, iτssa, iτssag
+ - `optical_props` optical properties, see [`AbstractOpticalPropsArry`](@ref)
+
+given
+
+ - `this` cloud optics, see [`AbstractOpticalProps`](@ref)
+ - `clouds_liq` cloud properties for liquid, see [`CloudOpticalProps`](@ref)
+ - `clouds_ice` cloud properties for ice   , see [`CloudOpticalProps`](@ref)
 """
 function cloud_optics!(this::CloudOpticsPade{FT},
-                       clwp, ciwp, reliq, reice,
-                       optical_props) where FT
-  ncol,nlay = size(clwp)
-  nbnd = get_nband(this)
-  liqmsk = BitArray(clwp .> FT(0))
-  icemsk = BitArray(ciwp .> FT(0))
-  validate_cloud_optics!(this, clwp, ciwp, reliq, reice, optical_props)
+                       clouds_liq::CloudOpticalProps{FT},
+                       clouds_ice::CloudOpticalProps{FT},
+                       optical_props::AbstractOpticalPropsArry{FT}) where {FT<:AbstractFloat}
 
-  liq = TwoStream(FT, size(clwp)...,get_nband(this))
-  ice = TwoStream(FT, size(clwp)...,get_nband(this))
+  nbnd = get_nband(this)
+
+  validate_cloud_optics!(this, clouds_liq, clouds_ice, optical_props)
+
+  liq = TwoStream(FT, size(clouds_liq.wp)..., nbnd)
+  ice = TwoStream(FT, size(clouds_ice.wp)..., nbnd)
 
   #### Compute cloud optical properties.
 
-  # Cloud optical properties from Pade coefficient method
-  #   Hard coded assumptions: order of approximants, three size regimes
-  nsizereg = size(this.liq.ext,2)
-  compute_all_from_pade!(ncol, nlay, nbnd, nsizereg,
-                            liqmsk, clwp, reliq,
-                            2, 3, this.liq.sizreg_ext, this.liq.ext,
-                            2, 2, this.liq.sizreg_ssa, this.liq.ssa,
-                            2, 2, this.liq.sizreg_asy, this.liq.asy,
-                            liq)
-  compute_all_from_pade!(ncol, nlay, nbnd, nsizereg,
-                            icemsk, ciwp, reice,
-                            2, 3, this.ice.sizreg_ext, this.ice.ext[:,:,:,this.icergh],
-                            2, 2, this.ice.sizreg_ssa, this.ice.ssa[:,:,:,this.icergh],
-                            2, 2, this.ice.sizreg_asy, this.ice.asy[:,:,:,this.icergh],
-                            ice)
+  compute_all_from_pade!(nbnd, clouds_liq, this.liq, liq)              # Liquid
+  compute_all_from_pade!(nbnd, clouds_ice, this.ice, ice, this.icergh) # Ice
 
   # Copy total cloud properties onto outputs
   combine_optical_props!(optical_props, liq, ice)
 
 end
 function cloud_optics!(this::CloudOpticsLUT{FT},
-                       clwp, ciwp, reliq, reice,
-                       optical_props) where FT
-  ncol = size(clwp,1)
-  nlay = size(clwp,2)
-  nbnd = get_nband(this)
-  liqmsk = BitArray(clwp .> FT(0))
-  icemsk = BitArray(ciwp .> FT(0))
-  validate_cloud_optics!(this, clwp, ciwp, reliq, reice, optical_props)
+                       clouds_liq::CloudOpticalProps{FT},
+                       clouds_ice::CloudOpticalProps{FT},
+                       optical_props::AbstractOpticalPropsArry{FT}) where FT
 
-  liq = TwoStream(FT, size(clwp)...,get_nband(this))
-  ice = TwoStream(FT, size(clwp)...,get_nband(this))
+  nbnd = get_nband(this)
+
+  validate_cloud_optics!(this, clouds_liq, clouds_ice, optical_props)
+
+  liq = TwoStream(FT, size(clouds_liq.wp)..., nbnd)
+  ice = TwoStream(FT, size(clouds_ice.wp)..., nbnd)
 
   #### Compute cloud optical properties.
 
-  # Liquid
-  compute_all_from_table!(ncol, nlay, nbnd, liqmsk, clwp, reliq,
-                              this.liq.nsteps,
-                              this.liq.step_size,
-                              this.liq.rad_lwr,
-                              this.liq.ext,
-                              this.liq.ssa,
-                              this.liq.asy,
-                              liq)
-  # Ice
-  compute_all_from_table!(ncol, nlay, nbnd, icemsk, ciwp, reice,
-                              this.ice.nsteps,
-                              this.ice.step_size,
-                              this.ice.rad_lwr,
-                              this.ice.ext[:,:,this.icergh],
-                              this.ice.ssa[:,:,this.icergh],
-                              this.ice.asy[:,:,this.icergh],
-                              ice)
+  compute_all_from_table!(nbnd, clouds_liq, this.liq, liq)              # Liquid
+  compute_all_from_table!(nbnd, clouds_ice, this.ice, ice, this.icergh) # Ice
 
   # Copy total cloud properties onto outputs
   combine_optical_props!(optical_props, liq, ice)
@@ -288,44 +296,50 @@ function cloud_optics!(this::CloudOpticsLUT{FT},
 end
 
 """
-    compute_all_from_table!(ncol, nlay, nbnd, mask, lwp, re,
-                            nsteps, step_size, offset,
-                            τ_table, ssa_table, asy_table,
-                            op::TwoStream{FT}) where FT
+    compute_all_from_table!(nbnd::I,
+                            clouds::CloudOpticalProps{FT},
+                            op::TwoStream{FT},
+                            icergh::Union{Nothing,I}=nothing) where {FT<:AbstractFloat,I<:Int}
 
 Linearly interpolate values from a lookup table with "nsteps" evenly-spaced
-  elements starting at "offset." The table's second dimension is band.
-Returns 0 where the mask is false.
-We could also try gather/scatter for efficiency
+elements starting at "offset." in
 
-integer,                                intent(in) :: ncol, nlay, nbnd, nsteps
-logical(wl), dimension(ncol,nlay),      intent(in) :: mask
-real(wp),    dimension(ncol,nlay),      intent(in) :: lwp, re
-real(wp),                               intent(in) :: step_size, offset
-real(wp),    dimension(nsteps,   nbnd), intent(in) :: τ_table, ssa_table, asy_table
-real(wp),    dimension(ncol,nlay,nbnd)             :: τ, τssa, τssag
-# ---------------------------
-integer  :: icol, ilay, ibnd
-integer  :: index
-real(wp) :: fint
-real(wp) :: t, ts, tsg  # τ, τ*ssa, τ*ssa*g
+ - `op` optical properties, see [`TwoStream`](@ref)
+
+given
+
+ - `nbnd` number of bands
+ - `clouds` cloud optical properties, see [`CloudOpticalProps`](@ref)
+ - `aim` interpolation method, see [`AbstractInterpolationMethod`](@ref)
+ - `icergh` ice surface roughness category - needed for Yang (2013) ice optics parameterization
+
+The table's second dimension is band. Returns 0 where `clouds.wp ≤ 0`.
 """
-function compute_all_from_table!(ncol, nlay, nbnd, mask, lwp, re,
-                                  nsteps, step_size, offset,
-                                  τ_table, ssa_table, asy_table,
-                                  op::TwoStream{FT}) where FT
+function compute_all_from_table!(nbnd::I,
+                                 clouds::CloudOpticalProps{FT},
+                                 aim::AbstractInterpolationMethod,
+                                 op::TwoStream{FT},
+                                 icergh::Union{Nothing,I}=nothing) where {FT<:AbstractFloat,I<:Int}
+
+  ncol,nlay = size(clouds.re)
+
+  offset = aim.rad_lwr
+
+  τ_table   = icergh ≠ nothing ? aim.ext[:,:,icergh] : aim.ext
+  ssa_table = icergh ≠ nothing ? aim.ssa[:,:,icergh] : aim.ssa
+  asy_table = icergh ≠ nothing ? aim.asy[:,:,icergh] : aim.asy
 
   @inbounds for ibnd = 1:nbnd
     @inbounds for ilay = 1:nlay
       @inbounds for icol = 1:ncol
-        if mask[icol,ilay]
-          index = convert(Int, min(floor((re[icol,ilay] - offset)/step_size)+1, nsteps-1))
-          fint = (re[icol,ilay] - offset)/step_size - (index-1)
-          t   = lwp[icol,ilay] *                 (τ_table[index,  ibnd] + fint * (τ_table[index+1,ibnd]   - τ_table[index,ibnd]))
-          ts  = t              *               (ssa_table[index,  ibnd] + fint * (ssa_table[index+1,ibnd] - ssa_table[index,ibnd]))
-          op.g[icol,ilay,ibnd] = ts          * (asy_table[index,  ibnd] + fint * (asy_table[index+1,ibnd] - asy_table[index,ibnd]))
-          op.ssa[icol,ilay,ibnd] = ts
-          op.τ[icol,ilay,ibnd] = t
+        if clouds.wp[icol,ilay] > FT(0)
+          index = convert(Int, min(floor((clouds.re[icol,ilay] - offset)/aim.step_size)+1, aim.nsteps-1))
+          fint = (clouds.re[icol,ilay] - offset)/aim.step_size - (index-1)
+          τ   = clouds.wp[icol,ilay] *           (τ_table[index,  ibnd] + fint * (τ_table[index+1,ibnd]   - τ_table[index,ibnd]))
+          τs  = τ              *               (ssa_table[index,  ibnd] + fint * (ssa_table[index+1,ibnd] - ssa_table[index,ibnd]))
+          op.g[icol,ilay,ibnd] = τs          * (asy_table[index,  ibnd] + fint * (asy_table[index+1,ibnd] - asy_table[index,ibnd]))
+          op.ssa[icol,ilay,ibnd] = τs
+          op.τ[icol,ilay,ibnd] = τ
         else
           op.τ[icol,ilay,ibnd] = FT(0)
           op.ssa[icol,ilay,ibnd] = FT(0)
@@ -336,53 +350,62 @@ function compute_all_from_table!(ncol, nlay, nbnd, mask, lwp, re,
   end
 end
 
+#####
+##### Pade functions
+#####
+
 """
+    compute_all_from_pade!(nbnd,
+                           clouds::CloudOpticalProps{FT},
+                           aim::AbstractInterpolationMethod,
+                           op::TwoStream{FT},
+                           icergh::Union{Nothing,I}=nothing) where {FT<:AbstractFloat,I<:Int}
 
-# Pade functions
-
-integer,                        intent(in) :: ncol, nlay, nbnd, nsizes
-logical(wl),
-         dimension(ncol,nlay), intent(in) :: mask
-real(wp), dimension(ncol,nlay), intent(in) :: lwp, re
-real(wp), dimension(nsizes+1),  intent(in) :: re_bounds_ext, re_bounds_ssa, re_bounds_asy
-integer,                        intent(in) :: m_ext, n_ext
-real(wp), dimension(nbnd,nsizes,0:m_ext+n_ext), intent(in) :: coeffs_ext
-integer,                        intent(in) :: m_ssa, n_ssa
-real(wp), dimension(nbnd,nsizes,0:m_ssa+n_ssa), intent(in) :: coeffs_ssa
-integer,                        intent(in) :: m_asy, n_asy
-real(wp), dimension(nbnd,nsizes,0:m_asy+n_asy), intent(in) :: coeffs_asy
-real(wp), dimension(ncol,nlay,nbnd)        :: τ, τssa, τssag
-# ---------------------------
-integer  :: icol, ilay, ibnd, irad, count
-real(wp) :: t, ts
+ - `nbnd` number of bands
+ - `clouds` cloud optical properties, see [`CloudOpticalProps`](@ref)
+ - `aim` interpolation method, see [`AbstractInterpolationMethod`](@ref)
+ - `op` optical properties, see [`TwoStream`](@ref)
+ - `icergh` ice surface roughness category - needed for Yang (2013) ice optics parameterization
 """
-function compute_all_from_pade!(ncol, nlay, nbnd, nsizes,
-                                 mask, lwp, re,
-                                 m_ext, n_ext, re_bounds_ext, coeffs_ext,
-                                 m_ssa, n_ssa, re_bounds_ssa, coeffs_ssa,
-                                 m_asy, n_asy, re_bounds_asy, coeffs_asy,
-                                 op::TwoStream{FT}) where FT
+function compute_all_from_pade!(nbnd::I,
+                                clouds::CloudOpticalProps{FT},
+                                aim::AbstractInterpolationMethod,
+                                op::TwoStream{FT},
+                                icergh::Union{Nothing,I}=nothing) where {FT<:AbstractFloat,I<:Int}
 
+  nsizes = size(aim.ext,2)
+  # Cloud optical properties from Pade coefficient method
+  #   Hard coded assumptions: order of approximants, three size regimes
+  m_ext, n_ext = 2, 3
+  m_ssa, n_ssa = 2, 2
+  m_asy, n_asy = 2, 2
+
+  coeffs_ext = icergh≠nothing ? aim.ext[:,:,:,icergh] : aim.ext
+  coeffs_ssa = icergh≠nothing ? aim.ssa[:,:,:,icergh] : aim.ssa
+  coeffs_asy = icergh≠nothing ? aim.asy[:,:,:,icergh] : aim.asy
+
+  ncol,nlay = size(clouds.re)
   @inbounds for ibnd = 1:nbnd
     @inbounds for ilay = 1:nlay
       @inbounds for icol = 1:ncol
-        if mask[icol,ilay]
+        if clouds.wp[icol,ilay]>FT(0)
+          re = clouds.re[icol,ilay]
           #
           # Finds index into size regime table
           # This works only if there are precisely three size regimes (four bounds) and it's
           #   previously guaranteed that size_bounds(1) <= size <= size_bounds(4)
           #
-          irad = convert(Int, min(floor((re[icol,ilay] - re_bounds_ext[2])/re_bounds_ext[3])+2, 3))
-          t   = lwp[icol,ilay] * pade_eval(ibnd, nbnd, nsizes, m_ext, n_ext, irad, re[icol,ilay], coeffs_ext)
+          irad = convert(Int, min(floor((re - aim.sizreg_ext[2])/aim.sizreg_ext[3])+2, 3))
+          τ   = clouds.wp[icol,ilay] * pade_eval(ibnd, nbnd, nsizes, m_ext, n_ext, irad, re, coeffs_ext)
 
-          irad = convert(Int,min(floor((re[icol,ilay] - re_bounds_ssa[2])/re_bounds_ssa[3])+2, 3))
+          irad = convert(Int,min(floor((re - aim.sizreg_ssa[2])/aim.sizreg_ssa[3])+2, 3))
           # Pade approximants for co-albedo can sometimes be negative
-          ts   = t               * (FT(1) - max(FT(0), pade_eval(ibnd, nbnd, nsizes, m_ssa, n_ssa, irad, re[icol,ilay], coeffs_ssa)))
-          irad = convert(Int, min(floor((re[icol,ilay] - re_bounds_asy[2])/re_bounds_asy[3])+2, 3))
-          op.g[icol,ilay,ibnd] = ts             * pade_eval(ibnd, nbnd, nsizes, m_asy, n_asy, irad, re[icol,ilay], coeffs_asy)
+          τs   = τ               * (FT(1) - max(FT(0), pade_eval(ibnd, nbnd, nsizes, m_ssa, n_ssa, irad, re, coeffs_ssa)))
+          irad = convert(Int, min(floor((re - aim.sizreg_asy[2])/aim.sizreg_asy[3])+2, 3))
+          op.g[icol,ilay,ibnd] = τs  * pade_eval(ibnd, nbnd, nsizes, m_asy, n_asy, irad, re, coeffs_asy)
 
-          op.ssa[icol,ilay,ibnd] = ts
-          op.τ[icol,ilay,ibnd] = t
+          op.ssa[icol,ilay,ibnd] = τs
+          op.τ[icol,ilay,ibnd] = τ
         else
           op.τ[icol,ilay,ibnd] = FT(0)
           op.ssa[icol,ilay,ibnd] = FT(0)
