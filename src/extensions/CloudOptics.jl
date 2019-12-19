@@ -162,35 +162,23 @@ end
 # Derive cloud optical properties from provided cloud physical properties
 
 """
-    combine_optical_props!(optical_props::AbstractOpticalProps, lτ, lτssa, lτssag, iτ, iτssa, iτssag, nbnd, nlay, ncol)
+    combine_optical_props!(op::AbstractOpticalPropsArry, liq::TwoStream{FT}, ice::TwoStream{FT}) where {FT<:AbstractFloat}
 
 Combine liquid and ice contributions into total cloud optical properties
    See also the `increment!` routines in `OpticalProps_kernels`
 """
-function combine_optical_props!(optical_props::OneScalar, lτ, lτssa, lτssag, iτ, iτssa, iτssag, nbnd, nlay, ncol)
+function combine_optical_props!(op::OneScalar, liq::TwoStream{FT}, ice::TwoStream{FT}) where {FT<:AbstractFloat}
   # Absorption optical depth  = (1-ssa) * τ = τ - τssa
-  for ibnd = 1:nbnd
-    for ilay = 1:nlay
-      for icol = 1:ncol
-        # Absorption optical depth  = (1-ssa) * τ = τ - τssa
-        optical_props.τ[icol,ilay,ibnd] = (lτ[icol,ilay,ibnd] - lτssa[icol,ilay,ibnd]) +
-                                            (iτ[icol,ilay,ibnd] - iτssa[icol,ilay,ibnd])
-      end
-    end
-  end
+  nbnd = size(liq.τ,3)
+  op.τ[:,:,1:nbnd] .= (liq.τ .- liq.ssa) + (ice.τ .- ice.ssa)
 end
-function combine_optical_props!(optical_props::TwoStream{FT}, lτ, lτssa, lτssag, iτ, iτssa, iτssag, nbnd, nlay, ncol) where FT
-  for ibnd = 1:nbnd
-    for ilay = 1:nlay
-      for icol = 1:ncol
-        τ    = lτ[icol,ilay,ibnd]    + iτ[icol,ilay,ibnd]
-        τssa = lτssa[icol,ilay,ibnd] + iτssa[icol,ilay,ibnd]
-        optical_props.g[icol,ilay,ibnd]  = (lτssag[icol,ilay,ibnd] + iτssag[icol,ilay,ibnd]) / max(eps(FT), τssa...)
-        optical_props.ssa[icol,ilay,ibnd] = τssa/max(eps(FT), τ...)
-        optical_props.τ[icol,ilay,ibnd] = τ
-      end
-    end
-  end
+function combine_optical_props!(op::TwoStream{FT}, liq::TwoStream{FT}, ice::TwoStream{FT}) where {FT<:AbstractFloat}
+  nbnd = size(liq.τ,3)
+  τ    = liq.τ    + ice.τ
+  ssa = liq.ssa + ice.ssa
+  op.g[:,:,1:nbnd] .= (liq.g + ice.g) ./ max.(eps(FT), ssa)
+  op.ssa[:,:,1:nbnd] .= ssa ./ max.(eps(FT), τ)
+  op.τ[:,:,1:nbnd] .= τ
 end
 
 function validate_cloud_optics!(this::AbstractOpticalProps{FT},
@@ -224,23 +212,20 @@ real(wp), intent(in   ) :: clwp  (:,:),    ! cloud ice water path    (units?)
 class(AbstractOpticalPropsArry), intent(inout) :: optical_props Dimensions: (ncol,nlay,nbnd)
 ! ------- Local -------
 logical(wl), dimension(size(clwp,1), size(clwp,2)) :: liqmsk, icemsk
-real(wp),    dimension(size(clwp,1), size(clwp,2), this%get_nband()) ::
-            lτ, lτssa, lτssag, iτ, iτssa, iτssag
-# ------- Local -------
-type(TwoStream) :: clouds_liq, clouds_ice
-integer  :: nsizereg, ibnd, imom
+real(wp),    dimension(size(clwp,1), size(clwp,2), this%get_nband()) :: lτ, lτssa, lτssag, iτ, iτssa, iτssag
 """
 function cloud_optics!(this::CloudOpticsPade{FT},
-                      clwp, ciwp, reliq, reice,
-                      optical_props) where FT
+                       clwp, ciwp, reliq, reice,
+                       optical_props) where FT
   ncol,nlay = size(clwp)
   nbnd = get_nband(this)
   liqmsk = BitArray(clwp .> FT(0))
   icemsk = BitArray(ciwp .> FT(0))
   validate_cloud_optics!(this, clwp, ciwp, reliq, reice, optical_props)
 
-  lτ, lτssa, lτssag, iτ, iτssa, iτssag =
-    ntuple(i-> Array{FT}(undef, size(clwp,1), size(clwp,2), get_nband(this)), 6)
+  liq = TwoStream(FT, size(clwp)...,get_nband(this))
+  ice = TwoStream(FT, size(clwp)...,get_nband(this))
+
   #### Compute cloud optical properties.
 
   # Cloud optical properties from Pade coefficient method
@@ -251,21 +236,21 @@ function cloud_optics!(this::CloudOpticsPade{FT},
                             2, 3, this.liq.sizreg_ext, this.liq.ext,
                             2, 2, this.liq.sizreg_ssa, this.liq.ssa,
                             2, 2, this.liq.sizreg_asy, this.liq.asy,
-                            lτ, lτssa, lτssag)
+                            liq)
   compute_all_from_pade!(ncol, nlay, nbnd, nsizereg,
                             icemsk, ciwp, reice,
                             2, 3, this.ice.sizreg_ext, this.ice.ext[:,:,:,this.icergh],
                             2, 2, this.ice.sizreg_ssa, this.ice.ssa[:,:,:,this.icergh],
                             2, 2, this.ice.sizreg_asy, this.ice.asy[:,:,:,this.icergh],
-                            iτ, iτssa, iτssag)
+                            ice)
 
   # Copy total cloud properties onto outputs
-  combine_optical_props!(optical_props, lτ, lτssa, lτssag, iτ, iτssa, iτssag, nbnd, nlay, ncol)
+  combine_optical_props!(optical_props, liq, ice)
 
 end
 function cloud_optics!(this::CloudOpticsLUT{FT},
-                      clwp, ciwp, reliq, reice,
-                      optical_props) where FT
+                       clwp, ciwp, reliq, reice,
+                       optical_props) where FT
   ncol = size(clwp,1)
   nlay = size(clwp,2)
   nbnd = get_nband(this)
@@ -273,8 +258,8 @@ function cloud_optics!(this::CloudOpticsLUT{FT},
   icemsk = BitArray(ciwp .> FT(0))
   validate_cloud_optics!(this, clwp, ciwp, reliq, reice, optical_props)
 
-  lτ, lτssa, lτssag, iτ, iτssa, iτssag =
-    ntuple(i-> Array{FT}(undef, size(clwp,1), size(clwp,2), get_nband(this)), 6)
+  liq = TwoStream(FT, size(clwp)...,get_nband(this))
+  ice = TwoStream(FT, size(clwp)...,get_nband(this))
 
   #### Compute cloud optical properties.
 
@@ -286,7 +271,7 @@ function cloud_optics!(this::CloudOpticsLUT{FT},
                               this.liq.ext,
                               this.liq.ssa,
                               this.liq.asy,
-                              lτ, lτssa, lτssag)
+                              liq)
   # Ice
   compute_all_from_table!(ncol, nlay, nbnd, icemsk, ciwp, reice,
                               this.ice.nsteps,
@@ -295,90 +280,92 @@ function cloud_optics!(this::CloudOpticsLUT{FT},
                               this.ice.ext[:,:,this.icergh],
                               this.ice.ssa[:,:,this.icergh],
                               this.ice.asy[:,:,this.icergh],
-                              iτ, iτssa, iτssag)
+                              ice)
 
   # Copy total cloud properties onto outputs
-  combine_optical_props!(optical_props, lτ, lτssa, lτssag, iτ, iτssa, iτssag, nbnd, nlay, ncol)
+  combine_optical_props!(optical_props, liq, ice)
 
 end
 
-#
-# Linearly interpolate values from a lookup table with "nsteps" evenly-spaced
-#   elements starting at "offset." The table's second dimension is band.
-# Returns 0 where the mask is false.
-# We could also try gather/scatter for efficiency
-#
+"""
+    compute_all_from_table!(ncol, nlay, nbnd, mask, lwp, re,
+                            nsteps, step_size, offset,
+                            τ_table, ssa_table, asy_table,
+                            op::TwoStream{FT}) where FT
+
+Linearly interpolate values from a lookup table with "nsteps" evenly-spaced
+  elements starting at "offset." The table's second dimension is band.
+Returns 0 where the mask is false.
+We could also try gather/scatter for efficiency
+
+integer,                                intent(in) :: ncol, nlay, nbnd, nsteps
+logical(wl), dimension(ncol,nlay),      intent(in) :: mask
+real(wp),    dimension(ncol,nlay),      intent(in) :: lwp, re
+real(wp),                               intent(in) :: step_size, offset
+real(wp),    dimension(nsteps,   nbnd), intent(in) :: τ_table, ssa_table, asy_table
+real(wp),    dimension(ncol,nlay,nbnd)             :: τ, τssa, τssag
+# ---------------------------
+integer  :: icol, ilay, ibnd
+integer  :: index
+real(wp) :: fint
+real(wp) :: t, ts, tsg  # τ, τ*ssa, τ*ssa*g
+"""
 function compute_all_from_table!(ncol, nlay, nbnd, mask, lwp, re,
                                   nsteps, step_size, offset,
                                   τ_table, ssa_table, asy_table,
-                                  τ::Array{FT}, τssa, τssag) where FT
-  # integer,                                intent(in) :: ncol, nlay, nbnd, nsteps
-  # logical(wl), dimension(ncol,nlay),      intent(in) :: mask
-  # real(wp),    dimension(ncol,nlay),      intent(in) :: lwp, re
-  # real(wp),                               intent(in) :: step_size, offset
-  # real(wp),    dimension(nsteps,   nbnd), intent(in) :: τ_table, ssa_table, asy_table
-  # real(wp),    dimension(ncol,nlay,nbnd)             :: τ, τssa, τssag
-  # # ---------------------------
-  # integer  :: icol, ilay, ibnd
-  # integer  :: index
-  # real(wp) :: fint
-  # real(wp) :: t, ts, tsg  # τ, τ*ssa, τ*ssa*g
-  # # ---------------------------
-  #$acc parallel loop gang vector default(present) collapse(3)
-  for ibnd = 1:nbnd
-    for ilay = 1:nlay
-      for icol = 1:ncol
+                                  op::TwoStream{FT}) where FT
+
+  @inbounds for ibnd = 1:nbnd
+    @inbounds for ilay = 1:nlay
+      @inbounds for icol = 1:ncol
         if mask[icol,ilay]
           index = convert(Int, min(floor((re[icol,ilay] - offset)/step_size)+1, nsteps-1))
           fint = (re[icol,ilay] - offset)/step_size - (index-1)
-          t   = lwp[icol,ilay] *                  (τ_table[index,  ibnd] + fint * (τ_table[index+1,ibnd] - τ_table[index,ibnd]))
-          ts  = t              *                  (ssa_table[index,  ibnd] + fint * (ssa_table[index+1,ibnd] - ssa_table[index,ibnd]))
-          τssag[icol,ilay,ibnd] = ts          * (asy_table[index,  ibnd] + fint * (asy_table[index+1,ibnd] - asy_table[index,ibnd]))
-          τssa[icol,ilay,ibnd] = ts
-          τ[icol,ilay,ibnd] = t
+          t   = lwp[icol,ilay] *                 (τ_table[index,  ibnd] + fint * (τ_table[index+1,ibnd]   - τ_table[index,ibnd]))
+          ts  = t              *               (ssa_table[index,  ibnd] + fint * (ssa_table[index+1,ibnd] - ssa_table[index,ibnd]))
+          op.g[icol,ilay,ibnd] = ts          * (asy_table[index,  ibnd] + fint * (asy_table[index+1,ibnd] - asy_table[index,ibnd]))
+          op.ssa[icol,ilay,ibnd] = ts
+          op.τ[icol,ilay,ibnd] = t
         else
-          τ[icol,ilay,ibnd] = FT(0)
-          τssa[icol,ilay,ibnd] = FT(0)
-          τssag[icol,ilay,ibnd] = FT(0)
+          op.τ[icol,ilay,ibnd] = FT(0)
+          op.ssa[icol,ilay,ibnd] = FT(0)
+          op.g[icol,ilay,ibnd] = FT(0)
         end
       end
     end
   end
 end
 
-#
-# Pade functions
-#
+"""
 
+# Pade functions
+
+integer,                        intent(in) :: ncol, nlay, nbnd, nsizes
+logical(wl),
+         dimension(ncol,nlay), intent(in) :: mask
+real(wp), dimension(ncol,nlay), intent(in) :: lwp, re
+real(wp), dimension(nsizes+1),  intent(in) :: re_bounds_ext, re_bounds_ssa, re_bounds_asy
+integer,                        intent(in) :: m_ext, n_ext
+real(wp), dimension(nbnd,nsizes,0:m_ext+n_ext), intent(in) :: coeffs_ext
+integer,                        intent(in) :: m_ssa, n_ssa
+real(wp), dimension(nbnd,nsizes,0:m_ssa+n_ssa), intent(in) :: coeffs_ssa
+integer,                        intent(in) :: m_asy, n_asy
+real(wp), dimension(nbnd,nsizes,0:m_asy+n_asy), intent(in) :: coeffs_asy
+real(wp), dimension(ncol,nlay,nbnd)        :: τ, τssa, τssag
+# ---------------------------
+integer  :: icol, ilay, ibnd, irad, count
+real(wp) :: t, ts
+"""
 function compute_all_from_pade!(ncol, nlay, nbnd, nsizes,
                                  mask, lwp, re,
                                  m_ext, n_ext, re_bounds_ext, coeffs_ext,
                                  m_ssa, n_ssa, re_bounds_ssa, coeffs_ssa,
                                  m_asy, n_asy, re_bounds_asy, coeffs_asy,
-                                 τ::Array{FT}, τssa, τssag) where FT
-  # integer,                        intent(in) :: ncol, nlay, nbnd, nsizes
-  # logical(wl),
-  #           dimension(ncol,nlay), intent(in) :: mask
-  # real(wp), dimension(ncol,nlay), intent(in) :: lwp, re
-  # real(wp), dimension(nsizes+1),  intent(in) :: re_bounds_ext, re_bounds_ssa, re_bounds_asy
-  # integer,                        intent(in) :: m_ext, n_ext
-  # real(wp), dimension(nbnd,nsizes,0:m_ext+n_ext),
-  #                                 intent(in) :: coeffs_ext
-  # integer,                        intent(in) :: m_ssa, n_ssa
-  # real(wp), dimension(nbnd,nsizes,0:m_ssa+n_ssa),
-  #                                 intent(in) :: coeffs_ssa
-  # integer,                        intent(in) :: m_asy, n_asy
-  # real(wp), dimension(nbnd,nsizes,0:m_asy+n_asy),
-  #                                 intent(in) :: coeffs_asy
-  # real(wp), dimension(ncol,nlay,nbnd)        :: τ, τssa, τssag
-  # # ---------------------------
-  # integer  :: icol, ilay, ibnd, irad, count
-  # real(wp) :: t, ts
+                                 op::TwoStream{FT}) where FT
 
-  #$acc parallel loop gang vector default(present) collapse(3)
-  for ibnd = 1:nbnd
-    for ilay = 1:nlay
-      for icol = 1:ncol
+  @inbounds for ibnd = 1:nbnd
+    @inbounds for ilay = 1:nlay
+      @inbounds for icol = 1:ncol
         if mask[icol,ilay]
           #
           # Finds index into size regime table
@@ -392,14 +379,14 @@ function compute_all_from_pade!(ncol, nlay, nbnd, nsizes,
           # Pade approximants for co-albedo can sometimes be negative
           ts   = t               * (FT(1) - max(FT(0), pade_eval(ibnd, nbnd, nsizes, m_ssa, n_ssa, irad, re[icol,ilay], coeffs_ssa)))
           irad = convert(Int, min(floor((re[icol,ilay] - re_bounds_asy[2])/re_bounds_asy[3])+2, 3))
-          τssag[icol,ilay,ibnd] = ts             * pade_eval(ibnd, nbnd, nsizes, m_asy, n_asy, irad, re[icol,ilay], coeffs_asy)
+          op.g[icol,ilay,ibnd] = ts             * pade_eval(ibnd, nbnd, nsizes, m_asy, n_asy, irad, re[icol,ilay], coeffs_asy)
 
-          τssa[icol,ilay,ibnd] = ts
-          τ[icol,ilay,ibnd] = t
+          op.ssa[icol,ilay,ibnd] = ts
+          op.τ[icol,ilay,ibnd] = t
         else
-          τ[icol,ilay,ibnd] = FT(0)
-          τssa[icol,ilay,ibnd] = FT(0)
-          τssag[icol,ilay,ibnd] = FT(0)
+          op.τ[icol,ilay,ibnd] = FT(0)
+          op.ssa[icol,ilay,ibnd] = FT(0)
+          op.g[icol,ilay,ibnd] = FT(0)
         end
       end
     end
@@ -407,78 +394,37 @@ function compute_all_from_pade!(ncol, nlay, nbnd, nsizes,
 
 end
 
-#
-# Ancillary functions
-#
-#
+#####
+##### Ancillary functions
+#####
 
-#
-# Pade functions
-#
+"""
+    pade_eval(iband, nbnd, nrads, m, n, irad, re, pade_coeffs_array)
 
-#
-# Evaluate Pade approximant of order [m/n]
-#
-function pade_eval(nbnd, nrads, m, n, irad, re, pade_coeffs)
-  # integer,                intent(in) :: nbnd, nrads, m, n, irad
-  # real(wp), dimension(nbnd, nrads, 0:m+n), &
-  #                         intent(in) :: pade_coeffs
-  # real(wp),               intent(in) :: re
-  # real(wp), dimension(nbnd)          :: pade_eval_nbnd
+Evaluate Pade approximant of order [m/n], given
 
-  # integer :: iband
-  # real(wp) :: numer, denom
-  # integer  :: i
-  FT = eltype(pade_coeffs)
-  res = Vector{FT}(undef, nbnd)
+ - `pade_coeffs` pade coefficients [nbnd, nrads, 1:m+n+1]
+"""
+function pade_eval(iband::I,
+                   nbnd::I,
+                   nrads::I,
+                   m::I,
+                   n::I,
+                   irad::I,
+                   re::FT,
+                   pade_coeffs::AbstractArray{FT}) where {FT<:AbstractFloat, I<:Int}
 
-  for iband = 1:nbnd
-    denom = pade_coeffs[iband,irad,n+m]
-    for i = n-1+m:-1:1+m
-      denom = pade_coeffs[iband,irad,i]+re*denom
-    end
-    denom =  FT(1)                     +re*denom
-
-    numer = pade_coeffs[iband,irad,m]
-    for i = m-1:-1:1
-      numer = pade_coeffs[iband,irad,i]+re*numer
-    end
-    numer = pade_coeffs[iband,irad,0]  +re*numer
-
-    res[iband] = numer/denom
+  denom = pade_coeffs[iband,irad,n+m+1]
+  @inbounds for i = n-1+m:-1:1+m
+    denom = pade_coeffs[iband,irad,i+1]+re*denom
   end
-  return res
-end
+  denom = 1 +re*denom
 
-#
-# Evaluate Pade approximant of order [m/n]
-#
-function pade_eval(iband, nbnd, nrads, m, n, irad, re, pade_coeffs_array)
-  # !$acc routine seq
-  # !
-  # integer,                intent(in) :: iband, nbnd, nrads, m, n, irad
-  # real(wp), dimension(nbnd, nrads, 0:m+n), &
-  #                         intent(in) :: pade_coeffs
-  # real(wp),               intent(in) :: re
-  # real(wp)                           :: pade_eval_1
-
-  # real(wp) :: numer, denom
-  # integer  :: i
-  FT = eltype(re)
-  pade_coeffs = OffsetArray{FT}(undef, 1:nbnd, 1:nrads, 0:m+n)
-  pade_coeffs[:,:,:] = pade_coeffs_array[:,:,:]
-
-  denom = pade_coeffs[iband,irad,n+m]
-  for i = n-1+m:-1:1+m
-    denom = pade_coeffs[iband,irad,i]+re*denom
+  numer = pade_coeffs[iband,irad,m+1]
+  @inbounds for i = m-1:-1:1
+    numer = pade_coeffs[iband,irad,i+1]+re*numer
   end
-  denom =  FT(1)                     +re*denom
-
-  numer = pade_coeffs[iband,irad,m]
-  for i = m-1:-1:1
-    numer = pade_coeffs[iband,irad,i]+re*numer
-  end
-  numer = pade_coeffs[iband,irad,0]  +re*numer
+  numer = pade_coeffs[iband,irad,1]  +re*numer
 
   pade_eval_1 = numer/denom
   return pade_eval_1
