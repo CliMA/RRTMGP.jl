@@ -124,12 +124,19 @@ Holds absorption optical depth `τ`, used in calculations accounting for extinct
 $(DocStringExtensions.FIELDS)
 """
 struct OneScalar{FT,I} <: AbstractOpticalPropsArry{FT,I}
-  base::OpticalPropsBase{FT}
+  base::Union{OpticalPropsBase{FT}, Nothing}
   τ::Array{FT,3}
 end
 
 OneScalar(base::OpticalPropsBase{FT}, ps::ProblemSize{I}) where {FT<:AbstractFloat,I<:Int} =
   OneScalar{FT,I}(base, Array{FT}(undef, ps.s...))
+OneScalar(::Type{FT}, ps::ProblemSize{I}) where {FT<:AbstractFloat,I<:Int} =
+  OneScalar{FT,I}(nothing, Array{FT}(undef, ps.s...))
+
+OneScalar(base::OpticalPropsBase{FT}, ncol::I, nlay::I, ngpt::I) where {FT<:AbstractFloat,I<:Int} =
+  OneScalar{FT,I}(base, Array{FT}(undef, ncol, nlay, ngpt))
+OneScalar(::Type{FT}, ncol::I, nlay::I, ngpt::I) where {FT<:AbstractFloat,I<:Int} =
+  OneScalar{FT,I}(nothing, Array{FT}(undef, ncol, nlay, ngpt))
 
 """
     TwoStream{FT,I} <: AbstractOpticalPropsArry{FT,I}
@@ -140,7 +147,7 @@ Holds extinction optical depth `τ`, single-scattering albedo (`ssa`), and asymm
 $(DocStringExtensions.FIELDS)
 """
 struct TwoStream{FT,I} <: AbstractOpticalPropsArry{FT,I}
-  base::OpticalPropsBase{FT}
+  base::Union{OpticalPropsBase{FT}, Nothing}
   τ::Array{FT,3}
   ssa::Array{FT,3}
   g::Array{FT,3}
@@ -148,6 +155,12 @@ end
 
 TwoStream(base::OpticalPropsBase{FT}, ps::ProblemSize{I}) where {FT<:AbstractFloat,I<:Int} =
   TwoStream{FT,I}(base, ntuple(i->Array{FT}(undef, ps.s...),3)... )
+TwoStream(::Type{FT}, ps::ProblemSize{I}) where {FT<:AbstractFloat,I<:Int} =
+  TwoStream{FT,I}(nothing, ntuple(i->Array{FT}(undef, ps.s...),3)... )
+TwoStream(base::OpticalPropsBase{FT}, ncol::I, nlay::I, ngpt::I) where {FT<:AbstractFloat,I<:Int} =
+  TwoStream{FT,I}(base, ntuple(i->Array{FT}(undef, ncol, nlay, ngpt),3)... )
+TwoStream(::Type{FT}, ncol::I, nlay::I, ngpt::I) where {FT<:AbstractFloat,I<:Int} =
+  TwoStream{FT,I}(nothing, ntuple(i->Array{FT}(undef, ncol, nlay, ngpt),3)... )
 
 #####
 #####  Delta-scaling
@@ -178,9 +191,9 @@ function delta_scale!(this::TwoStream{FT}, for_ = nothing) where FT
   if for_ ≠ nothing
     @assert all(size(for_) .== (ncol, nlay, ngpt))
     @assert !any(for_ < FT(0) || for_ > FT(1))
-    delta_scale_2str_kernel!(this, for_)
+    delta_scale_kernel!(this, for_)
   else
-    delta_scale_2str_kernel!(this)
+    delta_scale_kernel!(this)
   end
 end
 
