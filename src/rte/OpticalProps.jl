@@ -35,58 +35,42 @@ using ..Utilities
 export delta_scale!,
        validate!,
        increment!,
-       convert_band2gpt,
        get_band_lims_wavenumber,
-       get_band_lims_wavelength,
        get_gpoint_bands,
-       expand,
-       ProblemSize,
        bands_are_equal,
-       convert_gpt2band,
-       get_band_lims_gpoint,
-       get_ncol,
-       get_nlay,
-       gpoints_are_equal
+       get_band_lims_gpoint
 
 export AbstractOpticalProps,
        OneScalar,
        TwoStream,
        OpticalPropsBase
 
-export get_nband, get_ngpt
+export get_nband,
+       get_ngpt,
+       get_ncol,
+       get_nlay
 
 export AbstractOpticalProps
 abstract type AbstractOpticalProps{FT,I} end
 export AbstractOpticalPropsArry
 abstract type AbstractOpticalPropsArry{FT,I} <: AbstractOpticalProps{FT,I} end
 
-struct ProblemSize{I}
-  ncol::I
-  nlay::I
-  ngpt::I
-  s::NTuple{3,I}
-  ProblemSize(ncol::I,nlay::I,ngpt::I) where {I<:Int} =
-    new{I}(ncol,nlay,ngpt, (ncol,nlay,ngpt))
-end
-
 """
     OpticalPropsBase{FT,I} <: AbstractOpticalProps{FT,I}
 
-Base class for optical properties. Describes the spectral
-discretization including the wavenumber limits of each band
-(spectral region) and the mapping between g-points and bands.
-
- - (begin g-point, end g-point) = band2gpt(2,band)
- - band = gpt2band(g-point)
- - (upper and lower wavenumber by band) = band_lims_wvn(2,band)
+Base class for optical properties.
 
 # Fields
 $(DocStringExtensions.FIELDS)
 """
 struct OpticalPropsBase{FT,I} <: AbstractOpticalProps{FT,I}
+  "Map from band to g-point. (begin g-point, end g-point) = band2gpt(2,band)"
   band2gpt::Array{I,2}
+  "Map from g-point to band. band = gpt2band(g-point)"
   gpt2band::Array{I,1}
+  "wavenumber band limits. (upper and lower wavenumber by band) = band_lims_wvn(2,band)"
   band_lims_wvn::Array{FT,2}
+  "Name of optical properties"
   name::AbstractString
   function OpticalPropsBase(name, band_lims_wvn::Array{FT}, band_lims_gpt=nothing) where FT
     @assert size(band_lims_wvn,1) == 2
@@ -102,9 +86,7 @@ struct OpticalPropsBase{FT,I} <: AbstractOpticalProps{FT,I}
         band_lims_gpt_lcl[1:2,iband] .= iband
       end
     end
-
     band2gpt = band_lims_gpt_lcl
-
     # Make a map between g-points and bands
     gpt2band = Array{Int}(undef, max(band_lims_gpt_lcl...))
     for iband in 1:size(band_lims_gpt_lcl, 2)
@@ -118,20 +100,18 @@ end
 """
     OneScalar{FT,I} <: AbstractOpticalPropsArry{FT,I}
 
-Holds absorption optical depth `τ`, used in calculations accounting for extinction and emission
+Single scalar approximation for optical depth, used in
+calculations accounting for extinction and emission
 
 # Fields
 $(DocStringExtensions.FIELDS)
 """
 struct OneScalar{FT,I} <: AbstractOpticalPropsArry{FT,I}
+  "Base optical properties, see "
   base::Union{OpticalPropsBase{FT}, Nothing}
+  "optical depth"
   τ::Array{FT,3}
 end
-
-OneScalar(base::OpticalPropsBase{FT}, ps::ProblemSize{I}) where {FT<:AbstractFloat,I<:Int} =
-  OneScalar{FT,I}(base, Array{FT}(undef, ps.s...))
-OneScalar(::Type{FT}, ps::ProblemSize{I}) where {FT<:AbstractFloat,I<:Int} =
-  OneScalar{FT,I}(nothing, Array{FT}(undef, ps.s...))
 
 OneScalar(base::OpticalPropsBase{FT}, ncol::I, nlay::I, ngpt::I) where {FT<:AbstractFloat,I<:Int} =
   OneScalar{FT,I}(base, Array{FT}(undef, ncol, nlay, ngpt))
@@ -141,22 +121,23 @@ OneScalar(::Type{FT}, ncol::I, nlay::I, ngpt::I) where {FT<:AbstractFloat,I<:Int
 """
     TwoStream{FT,I} <: AbstractOpticalPropsArry{FT,I}
 
-Holds extinction optical depth `τ`, single-scattering albedo (`ssa`), and asymmetry parameter `g`.
+Two stream approximation for optical depth, used in
+calculations accounting for extinction and emission
 
 # Fields
 $(DocStringExtensions.FIELDS)
 """
 struct TwoStream{FT,I} <: AbstractOpticalPropsArry{FT,I}
+  "optical properties discretization and mapping"
   base::Union{OpticalPropsBase{FT}, Nothing}
+  "optical depth"
   τ::Array{FT,3}
+  "single-scattering albedo"
   ssa::Array{FT,3}
+  "asymmetry parameter"
   g::Array{FT,3}
 end
 
-TwoStream(base::OpticalPropsBase{FT}, ps::ProblemSize{I}) where {FT<:AbstractFloat,I<:Int} =
-  TwoStream{FT,I}(base, ntuple(i->Array{FT}(undef, ps.s...),3)... )
-TwoStream(::Type{FT}, ps::ProblemSize{I}) where {FT<:AbstractFloat,I<:Int} =
-  TwoStream{FT,I}(nothing, ntuple(i->Array{FT}(undef, ps.s...),3)... )
 TwoStream(base::OpticalPropsBase{FT}, ncol::I, nlay::I, ngpt::I) where {FT<:AbstractFloat,I<:Int} =
   TwoStream{FT,I}(base, ntuple(i->Array{FT}(undef, ncol, nlay, ngpt),3)... )
 TwoStream(::Type{FT}, ncol::I, nlay::I, ngpt::I) where {FT<:AbstractFloat,I<:Int} =
@@ -167,31 +148,28 @@ TwoStream(::Type{FT}, ncol::I, nlay::I, ngpt::I) where {FT<:AbstractFloat,I<:Int
 #####
 
 """
-    delta_scale!(...)
+    delta_scale!(this::OneScalar, fwd_scat_frac)
 
-    class(OneScalar), intent(inout) :: this
-    real(FT), dimension(:,:,:), optional, intent(in   ) :: for_
+ - `this` optical properties, see [`OneScalar`](@ref)
+ - `fwd_scat_frac` forward scattering fraction
 """
-delta_scale!(this::OneScalar, for_) = ""
+delta_scale!(this::OneScalar, fwd_scat_frac) = ""
 
 """
-    delta_scale!()
+    delta_scale!(this::TwoStream{FT}, for_ = nothing) where {FT<:AbstractFloat}
 
-    class(TwoStream), intent(inout) :: this
-    real(FT), dimension(:,:,:), optional, intent(in   ) :: for_
-    # Forward scattering fraction; g**2 if not provided
-
-    integer :: ncol, nlay, ngpt
+ - `this` optical properties, see [`TwoStream`](@ref)
+ - `fwd_scat_frac` forward scattering fraction
 """
-function delta_scale!(this::TwoStream{FT}, for_ = nothing) where FT
+function delta_scale!(this::TwoStream{FT}, fwd_scat_frac = nothing) where {FT<:AbstractFloat}
   ncol = get_ncol(this)
   nlay = get_nlay(this)
   ngpt = get_ngpt(this)
 
-  if for_ ≠ nothing
-    @assert all(size(for_) .== (ncol, nlay, ngpt))
-    @assert !any(for_ < FT(0) || for_ > FT(1))
-    delta_scale_kernel!(this, for_)
+  if fwd_scat_frac ≠ nothing
+    @assert all(size(fwd_scat_frac) .== (ncol, nlay, ngpt))
+    @assert !any(fwd_scat_frac < FT(0) || fwd_scat_frac > FT(1))
+    delta_scale_kernel!(this, fwd_scat_frac)
   else
     delta_scale_kernel!(this)
   end
@@ -205,7 +183,7 @@ end
   validate!(this::OneScalar{FT}) where FT
 
 """
-function validate!(this::OneScalar{FT}) where FT
+function validate!(this::OneScalar{FT}) where {FT<:AbstractFloat}
   # Validate sizes
   @assert !any_vals_less_than(this.τ, FT(0))
 end
@@ -214,7 +192,7 @@ end
     validate!(this::TwoStream{FT}) where FT
 
 """
-function validate!(this::TwoStream{FT}) where FT
+function validate!(this::TwoStream{FT}) where {FT<:AbstractFloat}
   # Validate sizes
   @assert all(size(this.ssa) == size(this.τ))
   @assert all(size(this.g) == size(this.τ))
@@ -260,14 +238,18 @@ end
 """
     get_ncol(this::AbstractOpticalProps)
 
-Number of columns
+Number of columns, given
+
+ - `this` optical properties, see [`AbstractOpticalProps`](@ref)
 """
 get_ncol(this::AbstractOpticalProps) = size(this.τ, 1)
 
 """
     get_ncol(this::AbstractOpticalProps)
 
-Number of layers
+Number of layers, given
+
+ - `this` optical properties, see [`AbstractOpticalProps`](@ref)
 """
 get_nlay(this::AbstractOpticalProps) = size(this.τ, 2)
 
@@ -278,7 +260,9 @@ get_nlay(this::AbstractOpticalProps) = size(this.τ, 2)
 """
     get_nband(this::AbstractOpticalProps)
 
-Number of bands
+Number of bands, given
+
+ - `this` optical properties, see [`AbstractOpticalProps`](@ref)
 """
 get_nband(this::AbstractOpticalProps) = get_nband(this.base)
 get_nband(this::OpticalPropsBase) = size(this.band2gpt,2)
@@ -286,9 +270,9 @@ get_nband(this::OpticalPropsBase) = size(this.band2gpt,2)
 """
     get_ngpt(this::AbstractOpticalProps)
 
-Number of g-points
-  class(AbstractOpticalProps), intent(in) :: this
-  integer                             :: get_ngpt
+Number of g-points, given
+
+ - `this` optical properties, see [`AbstractOpticalProps`](@ref)
 """
 get_ngpt(this::AbstractOpticalProps) = get_ngpt(this.base)
 get_ngpt(this::OpticalPropsBase) = max(this.band2gpt...)
@@ -297,12 +281,9 @@ get_ngpt(this::OpticalPropsBase) = max(this.band2gpt...)
 """
     get_band_lims_gpoint(this::AbstractOpticalProps)
 
-The first and last g-point of all bands at once
-dimension (2, nbands)
+The first and last g-point of all bands at once, given
 
-  class(AbstractOpticalProps), intent(in) :: this
-  integer, dimension(size(this%band2gpt,dim=1), size(this%band2gpt,dim=2))
-                                      :: get_band_lims_gpoint
+ - `this` optical properties, see [`AbstractOpticalProps`](@ref)
 """
 get_band_lims_gpoint(this::AbstractOpticalProps) = get_band_lims_gpoint(this.base)
 get_band_lims_gpoint(this::OpticalPropsBase) = this.band2gpt
@@ -310,24 +291,20 @@ get_band_lims_gpoint(this::OpticalPropsBase) = this.band2gpt
 """
     convert_band2gpt(this::AbstractOpticalProps, band)
 
-First and last g-point of a specific band
+First and last g-point of a specific band, given
 
-  class(AbstractOpticalProps), intent(in) :: this
-  integer,                 intent(in) :: band
-  integer, dimension(2)               :: convert_band2gpt
+ - `this` optical properties, see [`AbstractOpticalProps`](@ref)
+ - `band` index of i-th band
 """
-convert_band2gpt(this::AbstractOpticalProps, band) = convert_band2gpt(this.base)
-convert_band2gpt(this::OpticalPropsBase, band) = this.band2gpt[:,band]
+convert_band2gpt(this::AbstractOpticalProps, band::I) where {I<:Int} = convert_band2gpt(this.base)
+convert_band2gpt(this::OpticalPropsBase, band::I) where {I<:Int} = this.band2gpt[:,band]
 
 """
     get_band_lims_wavenumber(this::AbstractOpticalProps)
 
-Lower and upper wavenumber of all bands
-(upper and lower wavenumber by band) = band_lims_wvn(2,band)
+Lower and upper wavenumber of all bands, given
 
-  class(AbstractOpticalProps), intent(in) :: this
-  real(FT), dimension(size(this%band_lims_wvn,1), size(this%band_lims_wvn,2))
-                                      :: get_band_lims_wavenumber
+ - `this` optical properties, see [`AbstractOpticalProps`](@ref)
 """
 get_band_lims_wavenumber(this::AbstractOpticalProps) = get_band_lims_wavenumber(this.base)
 get_band_lims_wavenumber(this::OpticalPropsBase) = this.band_lims_wvn
@@ -335,11 +312,9 @@ get_band_lims_wavenumber(this::OpticalPropsBase) = this.band_lims_wvn
 """
     get_band_lims_wavelength(this::AbstractOpticalProps)
 
-Lower and upper wavelength of all bands
+Lower and upper wavelength of all bands, given
 
-class(AbstractOpticalProps), intent(in) :: this
-real(FT), dimension(size(this%band_lims_wvn,1), size(this%band_lims_wvn,2))
-                                    :: get_band_lims_wavelength
+ - `this` optical properties, see [`AbstractOpticalProps`](@ref)
 """
 get_band_lims_wavelength(this::AbstractOpticalProps) = get_band_lims_wavelength(this.base)
 get_band_lims_wavelength(this::OpticalPropsBase) = 1 ./ this.band_lims_wvn
@@ -347,11 +322,9 @@ get_band_lims_wavelength(this::OpticalPropsBase) = 1 ./ this.band_lims_wvn
 """
     get_gpoint_bands(this::AbstractOpticalProps)
 
-Bands for all the g-points at once
-dimension (ngpt)
+Bands for all the g-points at once, given
 
-  class(AbstractOpticalProps), intent(in) :: this
-  integer, dimension(size(this%gpt2band,dim=1)) :: get_gpoint_bands
+ - `this` optical properties, see [`AbstractOpticalProps`](@ref)
 """
 get_gpoint_bands(this::AbstractOpticalProps) = get_gpoint_bands(this.base)
 get_gpoint_bands(this::OpticalPropsBase) = this.gpt2band
@@ -361,20 +334,20 @@ get_gpoint_bands(this::OpticalPropsBase) = this.gpt2band
 
 Band associated with a specific g-point
 
-    class(AbstractOpticalProps), intent(in) :: this
-    integer,                            intent(in) :: gpt
-    integer                             :: convert_gpt2band
+ - `this` optical properties, see [`AbstractOpticalProps`](@ref)
+ - `gpt` index of i-th g-point
 """
-convert_gpt2band(this::AbstractOpticalProps, gpt) = convert_gpt2band(this.base)
-convert_gpt2band(this::OpticalPropsBase, gpt) = this.gpt2band[gpt]
+convert_gpt2band(this::AbstractOpticalProps, gpt::I) where {I<:Int} = convert_gpt2band(this.base)
+convert_gpt2band(this::OpticalPropsBase, gpt::I) where {I<:Int} = this.gpt2band[gpt]
 
 """
     bands_are_equal(this::AbstractOpticalProps{FT}, that::AbstractOpticalProps{FT}) where FT
 
-Are the bands of two objects the same? (same number, same wavelength limits)
+Boolean that indicates if the bands of two objects
+the same, (same number, same wavelength limits), given
 
-    class(AbstractOpticalProps), intent(in) :: this, that
-    logical                             :: bands_are_equal
+ - `this` optical properties, see [`AbstractOpticalProps`](@ref)
+ - `that` optical properties, see [`AbstractOpticalProps`](@ref)
 """
 function bands_are_equal(this::AbstractOpticalProps{FT}, that::AbstractOpticalProps{FT}) where FT
   if get_nband(this) == get_nband(that) && get_nband(this) > 0
@@ -389,11 +362,12 @@ end
 """
     gpoints_are_equal(this::AbstractOpticalProps{FT}, that::AbstractOpticalProps{FT}) where {FT}
 
-Is the g-point structure of two objects the same?
-  (same bands, same number of g-points, same mapping between bands and g-points)
+Boolean that indicates if the g-point structure of two
+objects the same, (same bands, same number of g-points,
+same mapping between bands and g-points), given
 
-    class(AbstractOpticalProps), intent(in) :: this, that
-    logical                             :: gpoints_are_equal
+ - `this` optical properties, see [`AbstractOpticalProps`](@ref)
+ - `that` optical properties, see [`AbstractOpticalProps`](@ref)
 """
 function gpoints_are_equal(this::AbstractOpticalProps{FT}, that::AbstractOpticalProps{FT}) where {FT}
   if bands_are_equal(this, that) && get_ngpt(this) == get_ngpt(that)

@@ -96,19 +96,17 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
   println("--------- Problem size:")
   @show ncol,nlay,nbnd,ngpt
 
-  ps = ProblemSize(ncol, nlay, ngpt)
-
   # Clouds optical props are defined by band
   clouds_base = OpticalPropsBase("Clouds", get_band_lims_wavenumber(k_dist.optical_props))
 
   # LW calculations neglect scattering; SW calculations use the 2-stream approximation
   #   Here we choose the right variant of optical_props.
   if is_sw
-    clouds = TwoStream(clouds_base, ps)
-    atmos = TwoStream(k_dist.optical_props,ps)
+    clouds = TwoStream(clouds_base, ncol, nlay, ngpt)
+    atmos = TwoStream(k_dist.optical_props,ncol, nlay, ngpt)
   else
-    clouds = OneScalar(clouds_base, ps)
-    atmos = OneScalar(k_dist.optical_props, ps)
+    clouds = OneScalar(clouds_base, ncol, nlay, ngpt)
+    atmos = OneScalar(k_dist.optical_props, ncol, nlay, ngpt)
   end
 
   top_at_1 = p_lay[1, 1] < p_lay[1, nlay]

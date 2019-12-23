@@ -102,7 +102,6 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
   println("--------- Problem size:")
   @show ncol,nlay,nbnd,ngpt
   @show nblocks,nexp,block_size
-  ps = ProblemSize(block_size, nlay, ngpt)
 
   #
   # RRTMGP won't run with pressure less than its minimum. The top level in the RFMIP file
@@ -137,7 +136,7 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
 
   μ_0 = zeros(FT, block_size)
   sfc_alb_spec = zeros(FT, nbnd,block_size)
-  optical_props = optical_props_constructor(k_dist.optical_props, ps)
+  optical_props = optical_props_constructor(k_dist.optical_props, block_size, nlay, ngpt)
 
   #
   # Loop over blocks
