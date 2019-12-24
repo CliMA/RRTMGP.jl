@@ -2,6 +2,16 @@ module Utilities
 
 export any_vals_less_than, any_vals_outside, reshape_for_comparison
 export loc_in_array, check_range, check_extent
+export @unpack_fields
+
+macro unpack_fields(stuff, syms...)
+  thunk = Expr(:block)
+  for sym in syms
+    push!(thunk.args, :($(esc(sym)) = getproperty($(esc(stuff)),$(QuoteNode(sym)))))
+  end
+  push!(thunk.args, nothing)
+  return thunk
+end
 
 """
   loc_in_array

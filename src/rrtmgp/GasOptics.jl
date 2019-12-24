@@ -195,6 +195,8 @@ struct InterpolationCoefficients{FT,I}
   fminor::Array{FT,5}
   "combination of major specie's column amounts"
   col_mix::Array{FT,4}
+  "Layer limits of upper, lower atmospheres"
+  tropo_lims::Array{I,3}
 end
 function InterpolationCoefficients(::Type{FT}, ::Type{I}, ncol, nlay, nflav) where {I<:Int, FT<:AbstractFloat}
   jtemp = Array{I}(undef,                ncol, nlay)
@@ -204,7 +206,8 @@ function InterpolationCoefficients(::Type{FT}, ::Type{I}, ncol, nlay, nflav) whe
   fmajor = zeros(FT, 2,2,2, nflav,       ncol, nlay)
   fminor  = Array{FT}(undef, 2,2, nflav, ncol, nlay)
   col_mix  = Array{FT}(undef, 2, nflav,  ncol, nlay)
-  return InterpolationCoefficients{FT,I}(jtemp,jpress,j_η,tropo,fmajor,fminor,col_mix)
+  tropo_lims = Array{I}(undef,           ncol, 2, 2)
+  return InterpolationCoefficients{FT,I}(jtemp,jpress,j_η,tropo,fmajor,fminor,col_mix,tropo_lims)
 end
 
 """
@@ -230,11 +233,14 @@ mutable struct InterpolationCoefficientsPGP{FT,I}
   fminor::Array{FT,3}
   "combination of major specie's column amounts"
   col_mix::Array{FT,2}
+  "Layer limits of upper, lower atmospheres"
+  tropo_lims::Array{I,2}
 end
 
 function Base.convert(::Type{InterpolationCoefficients}, data::Array{InterpolationCoefficientsPGP{FT,I}}) where {FT,I}
   s = size(data)
   s_j_η = size(first(data).j_η)
+  s_tropo_lims = size(first(data).tropo_lims)
   s_fmajor = size(first(data).fmajor)
   s_fminor = size(first(data).fminor)
   s_col_mix = size(first(data).col_mix)
@@ -261,7 +267,10 @@ function Base.convert(::Type{InterpolationCoefficients}, data::Array{Interpolati
                                                   p in 1:s_col_mix[2],
                                                   i in 1:s[1],
                                                   j in 1:s[2]])
-  return InterpolationCoefficients{FT,I}(jtemp,jpress,j_η,tropo,fmajor,fminor,col_mix)
+  tropo_lims = Array{I}([data[i,1].tropo_lims[k,p] for i in 1:s[1],
+                                                     k in 1:s_tropo_lims[1],
+                                                     p in 1:s_tropo_lims[2]])
+  return InterpolationCoefficients{FT,I}(jtemp,jpress,j_η,tropo,fmajor,fminor,col_mix,tropo_lims)
 end
 
 Base.convert(::Type{Array{InterpolationCoefficientsPGP}}, data::InterpolationCoefficients{FT,I}) where {FT,I} =
@@ -271,8 +280,8 @@ Base.convert(::Type{Array{InterpolationCoefficientsPGP}}, data::InterpolationCoe
                                       data.tropo[i,j],
                                       data.fmajor[:,:,:,:,i,j],
                                       data.fminor[:,:,:,i,j],
-                                      data.col_mix[:,:,i,j]) for i in 1:size(data.jtemp,1), j in 1:size(data.jtemp,2)]
-
+                                      data.col_mix[:,:,i,j],
+                                      data.tropo_lims[i,:,:]) for i in 1:size(data.jtemp,1), j in 1:size(data.jtemp,2)]
 
 """
     get_ngas(this::AbstractGasOptics)
@@ -313,15 +322,12 @@ function gas_optics!(this::KDistributionLongwave,
   ics = convert(Array{InterpolationCoefficientsPGP}, ics)
   ics = convert(InterpolationCoefficients, ics)
 
-  # Gas optics
   compute_gas_τs!(ics, this, as, optical_props)
 
-  #   output extents
   @assert get_ncol(sources) == as.ncol
   @assert get_nlay(sources) == as.nlay
   @assert get_ngpt(sources) == get_ngpt(this.optical_props)
 
-  # Interpolate source function
   source!(this, as, ics, sources)
   nothing
 end
@@ -347,10 +353,8 @@ function gas_optics!(this::KDistributionShortwave{FT},
   ics = convert(Array{InterpolationCoefficientsPGP}, ics)
   ics = convert(InterpolationCoefficients, ics)
 
-  # Gas optics
   @timeit to_gor "compute_gas_τs!" compute_gas_τs!(ics, this, as, optical_props, last_call)
 
-  # External source function is constant
   last_call && @show to_gor
 end
 
@@ -382,7 +386,6 @@ function compute_gas_τs!(ics::InterpolationCoefficients,
   ncol  = get_ncol(optical_props)
   nlay  = get_nlay(optical_props)
   ngpt  = get_ngpt(optical_props)
-  nband = get_nband(optical_props)
 
   τ          = Array{FT}(undef, ngpt,nlay,ncol) # absorption, Rayleigh scattering optical depths
   τ_Rayleigh = Array{FT}(undef, ngpt,nlay,ncol) # absorption, Rayleigh scattering optical depths
@@ -390,52 +393,13 @@ function compute_gas_τs!(ics::InterpolationCoefficients,
   # Check for presence of key species in GasConcs; return error if any key species are not present
   check_key_species_present(this, as.gas_conc.gas_names)
 
-  ngas  = get_ngas(this)
-  nflav = get_nflav(this)
-  neta  = get_neta(this)
-  npres = get_npres(this)
-  ntemp = get_ntemp(this)
-
-  # Compute dry air column amounts (number of molecule per cm^2) if user hasn't provided them
-  idx_h2o = loc_in_array(h2o(), this.gas_names)
-
-  # ---- calculate gas optical depths ----
   τ .= 0
-  @timeit to_gor "interpolation!" interpolation!(ics,
-          ncol,nlay,                        # problem dimensions
-          nflav, neta, npres, ntemp,  # interpolation dimensions
-          this.flavor,
-          this.ref,
-          as.p_lay,
-          as.t_lay,
-          as.col_gas)
-  @timeit to_gor "compute_τ_absorption!" compute_τ_absorption!(τ,
-          ncol,nlay,nband,ngpt,                      # dimensions
-          idx_h2o,
-          this.gpoint_flavor,
-          get_band_lims_gpoint(this.optical_props),
-          this.kmajor,
-          this.lower,
-          this.upper,
-          this.lower_aux,
-          this.upper_aux,
-          ics,
-          as.p_lay,
-          as.t_lay,
-          as.col_gas)
+  @timeit to_gor "interpolation!" interpolation!(ics, this, as)
+  @timeit to_gor "compute_τ_absorption!" compute_τ_absorption!(τ, this, ics, as)
+
   if allocated(this.krayl)
 
-    @timeit to_gor "compute_τ_Rayleigh!" compute_τ_Rayleigh!(          #Rayleigh scattering optical depths
-          ncol,nlay,nband,ngpt,# dimensions
-          this.gpoint_flavor,
-          get_band_lims_gpoint(this.optical_props),
-          this.krayl,                   # inputs from object
-          idx_h2o,
-          as.col_dry,
-          as.col_gas,
-          ics,
-          τ_Rayleigh)
-
+    @timeit to_gor "compute_τ_Rayleigh!" compute_τ_Rayleigh!(τ_Rayleigh, this, ics, as)
   end
 
   # Combine optical depths and reorder for radiative transfer solver.
