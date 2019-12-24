@@ -34,12 +34,12 @@ LW_diff_sec(::Type{FT}) where FT = FT(1.66)  # 1./cos(diffusivity angle)
                       D::Array{FT},
                       weight::FT,
                       τ::Array{FT},
-                      source::SourceFuncLW{FT,I},
+                      source::SourceFuncLongWave{FT,I},
                       sfc_emis::Array{FT},
                       radn_up::Array{FT},
                       radn_dn::Array{FT}) where {FT<:AbstractFloat,I<:Int,B<:Bool}
 
- - `source` longwave source function, see [`SourceFuncLW`](@ref)
+ - `source` longwave source function, see [`SourceFuncLongWave`](@ref)
  - `top_at_1` indicates whether arrays are ordered in the vertical with 1 at the top or the bottom of the domain.
  - `optical_props` 2-stream optical properties, see [`TwoStream`](@ref)
  - `sfc_emis` - surface emissivity
@@ -63,7 +63,7 @@ function lw_solver_noscat!(ncol::I, nlay::I, ngpt::I,
                            D::Array{FT},
                            weight::FT,
                            τ::Array{FT},
-                           source::SourceFuncLW{FT,I},
+                           source::SourceFuncLongWave{FT,I},
                            sfc_emis::Array{FT},
                            radn_up::Array{FT},
                            radn_dn::Array{FT}) where {FT<:AbstractFloat,I<:Int,B<:Bool}
@@ -144,7 +144,7 @@ end
                                 Ds::Array{FT},
                                 weights::Array{FT},
                                 τ::Array{FT},
-                                source::SourceFuncLW{FT, I},
+                                source::SourceFuncLongWave{FT, I},
                                 sfc_emis::Array{FT},
                                 flux_up::Array{FT},
                                 flux_dn::Array{FT}) where {I<:Int,B<:Bool,FT<:AbstractFloat}
@@ -155,7 +155,7 @@ Routine sums over single-angle solutions for each sets of angles/weights
 
 given
 
- - `source` longwave source function, see [`SourceFuncLW`](@ref)
+ - `source` longwave source function, see [`SourceFuncLongWave`](@ref)
  - `top_at_1` indicates whether arrays are ordered in the vertical with 1 at the top or the bottom of the domain.
  - `optical_props` 2-stream optical properties, see [`TwoStream`](@ref)
  - `sfc_emis` - surface emissivity
@@ -174,7 +174,7 @@ function lw_solver_noscat_GaussQuad!(ncol::I, nlay::I, ngpt::I,
                                      top_at_1::B,
                                      angle_disc::GaussQuadrature{FT,I},
                                      τ::Array{FT},
-                                     source::SourceFuncLW{FT, I},
+                                     source::SourceFuncLongWave{FT, I},
                                      sfc_emis::Array{FT},
                                      flux_up::Array{FT},
                                      flux_dn::Array{FT}) where {I<:Int,B<:Bool,FT<:AbstractFloat}
@@ -224,7 +224,7 @@ end
     lw_solver!(ncol::I, nlay::I, ngpt::I,
                top_at_1::B,
                optical_props::TwoStream{FT},
-               source::SourceFuncLW{FT},
+               source::SourceFuncLongWave{FT},
                sfc_emis::Array{FT},
                flux_up::Array{FT},
                flux_dn::Array{FT}) where {I<:Int,B<:Bool,FT<:AbstractFloat}
@@ -237,7 +237,7 @@ Longwave calculation:
 
 given
 
- - `source` longwave source function, see [`SourceFuncLW`](@ref)
+ - `source` longwave source function, see [`SourceFuncLongWave`](@ref)
  - `top_at_1` indicates whether arrays are ordered in the vertical with 1 at the top or the bottom of the domain.
  - `optical_props` 2-stream optical properties, see [`TwoStream`](@ref)
  - `sfc_emis` - surface emissivity
@@ -253,7 +253,7 @@ real(FT), dimension(ncol       ) :: source_sfc
 function lw_solver!(ncol::I, nlay::I, ngpt::I,
                     top_at_1::B,
                     optical_props::TwoStream{FT},
-                    source::SourceFuncLW{FT},
+                    source::SourceFuncLongWave{FT},
                     sfc_emis::Array{FT},
                     flux_up::Array{FT},
                     flux_dn::Array{FT}) where {I<:Int,B<:Bool,FT<:AbstractFloat}

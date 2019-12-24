@@ -150,7 +150,7 @@ end
 """
     rte_lw!(optical_props::AbstractOpticalPropsArry{FT},
             top_at_1::Bool,
-            sources::SourceFuncLW{FT, I},
+            sources::SourceFuncLongWave{FT, I},
             bcs::LongwaveBCs{FT},
             fluxes::FluxesBroadBand{FT},
             n_gauss_angles=nothing) where {FT<:AbstractFloat,I<:Int}
@@ -166,7 +166,7 @@ Interface using only optical properties and source functions as inputs; fluxes a
 """
 function rte_lw!(optical_props::AbstractOpticalPropsArry{FT},
                  top_at_1::Bool,
-                 sources::SourceFuncLW{FT, I},
+                 sources::SourceFuncLongWave{FT, I},
                  bcs::LongwaveBCs{FT},
                  fluxes::FluxesBroadBand{FT},
                  angle_disc::Union{GaussQuadrature{FT,I},Nothing}=nothing) where {FT<:AbstractFloat,I<:Int}

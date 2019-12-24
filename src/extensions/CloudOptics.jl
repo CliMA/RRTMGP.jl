@@ -16,7 +16,7 @@ using ..OpticalProps
 using ..Utilities
 using ..FortranIntrinsics
 
-export CloudOpticalProps
+export CloudOpticalProps, CloudOpticalPropsPGP
 export cloud_optics!
 export get_min_radius, get_max_radius
 
@@ -195,6 +195,33 @@ struct CloudOpticalProps{FT<:AbstractFloat}
 end
 CloudOpticalProps(FT, ncol,nlay) = CloudOpticalProps{FT}(zeros(FT,ncol,nlay),zeros(FT,ncol,nlay))
 
+"""
+    CloudOpticalPropsPGP{FT<:AbstractFloat}
+
+Cloud properties (liquid or ice) used to combine with
+averaged optical properties per grid point
+
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
+mutable struct CloudOpticalPropsPGP{FT<:AbstractFloat}
+  "Water path"
+  wp::FT
+  "Effective radius"
+  re::FT
+end
+CloudOpticalPropsPGP(FT) = CloudOpticalPropsPGP{FT}(FT(0),FT(0))
+
+function Base.convert(::Type{CloudOpticalProps}, data::Array{CloudOpticalPropsPGP{FT}}) where {FT}
+  s = size(data)
+  return CloudOpticalProps{FT}(Array{FT}([data[i,j].wp for i in 1:s[1], j in 1:s[2]]),
+                               Array{FT}([data[i,j].re for i in 1:s[1], j in 1:s[2]]))
+end
+
+Base.convert(::Type{Array{CloudOpticalPropsPGP}}, data::CloudOpticalProps{FT}) where {FT} =
+  [CloudOpticalPropsPGP{FT}(data.wp[i,j],data.re[i,j]) for i in 1:size(data.wp,1), j in 1:size(data.wp,2)]
+
+
 #####
 ##### Derive cloud optical properties from provided cloud physical properties
 #####
@@ -218,6 +245,19 @@ function combine_optical_props!(op::TwoStream{FT}, liq::TwoStream{FT}, ice::TwoS
   op.ssa[:,:,1:nbnd] .= ssa ./ max.(eps(FT), τ)
   op.τ[:,:,1:nbnd] .= τ
 end
+function combine_optical_props!(op::OneScalarPGP, liq::TwoStreamPGP{FT}, ice::TwoStreamPGP{FT}) where {FT<:AbstractFloat}
+  # Absorption optical depth  = (1-ssa) * τ = τ - τssa
+  nbnd = size(liq.τ,1)
+  op.τ[1:nbnd] .= (liq.τ .- liq.ssa) + (ice.τ .- ice.ssa)
+end
+function combine_optical_props!(op::TwoStreamPGP{FT}, liq::TwoStreamPGP{FT}, ice::TwoStreamPGP{FT}) where {FT<:AbstractFloat}
+  nbnd = size(liq.τ,1)
+  τ    = liq.τ    + ice.τ
+  ssa = liq.ssa + ice.ssa
+  op.g[1:nbnd] .= (liq.g + ice.g) ./ max.(eps(FT), ssa)
+  op.ssa[1:nbnd] .= ssa ./ max.(eps(FT), τ)
+  op.τ[1:nbnd] .= τ
+end
 
 function validate_cloud_optics!(this::AbstractOpticalProps{FT},
                                 liq::CloudOpticalProps{FT},
@@ -233,6 +273,22 @@ function validate_cloud_optics!(this::AbstractOpticalProps{FT},
   @assert !any_vals_outside(ice.re, icemsk, this.ice.rad_lwr, this.ice.rad_upr)
   any(liqmsk) && @assert !any_vals_less_than(liq.wp, liqmsk, FT(0))
   any(icemsk) && @assert !any_vals_less_than(ice.wp, icemsk, FT(0))
+  return nothing
+end
+function validate_cloud_optics!(this::AbstractOpticalProps{FT},
+                                liq::CloudOpticalPropsPGP{FT},
+                                ice::CloudOpticalPropsPGP{FT},
+                                optical_props::AbstractOpticalPropsPGP{FT}) where FT
+  liqmsk = liq.wp > FT(0)
+  icemsk = ice.wp > FT(0)
+  # Error checking
+  @assert bands_are_equal(this, optical_props)
+  @assert get_nband(optical_props) == get_ngpt(optical_props)
+  @assert !(this.icergh < 1 || this.icergh > get_num_roughness_types(this.ice))
+  @assert !any_vals_outside(liq.re, liqmsk, this.liq.rad_lwr, this.liq.rad_upr)
+  @assert !any_vals_outside(ice.re, icemsk, this.ice.rad_lwr, this.ice.rad_upr)
+  liqmsk && @assert !any_vals_less_than(liq.wp, liqmsk, FT(0))
+  icemsk && @assert !any_vals_less_than(ice.wp, icemsk, FT(0))
   return nothing
 end
 
@@ -284,6 +340,48 @@ function cloud_optics!(this::CloudOpticsLUT{FT},
 
   liq = TwoStream(FT, size(clouds_liq.wp)..., nbnd)
   ice = TwoStream(FT, size(clouds_ice.wp)..., nbnd)
+
+  #### Compute cloud optical properties.
+
+  compute_all_from_table!(nbnd, clouds_liq, this.liq, liq)              # Liquid
+  compute_all_from_table!(nbnd, clouds_ice, this.ice, ice, this.icergh) # Ice
+
+  # Copy total cloud properties onto outputs
+  combine_optical_props!(optical_props, liq, ice)
+
+end
+function cloud_optics!(this::CloudOpticsPade{FT},
+                       clouds_liq::CloudOpticalPropsPGP{FT},
+                       clouds_ice::CloudOpticalPropsPGP{FT},
+                       optical_props::AbstractOpticalPropsPGP{FT}) where {FT<:AbstractFloat}
+
+  nbnd = get_nband(this)
+
+  validate_cloud_optics!(this, clouds_liq, clouds_ice, optical_props)
+
+  liq = TwoStreamPGP(FT, nbnd)
+  ice = TwoStreamPGP(FT, nbnd)
+
+  #### Compute cloud optical properties.
+
+  compute_all_from_pade!(nbnd, clouds_liq, this.liq, liq)              # Liquid
+  compute_all_from_pade!(nbnd, clouds_ice, this.ice, ice, this.icergh) # Ice
+
+  # Copy total cloud properties onto outputs
+  combine_optical_props!(optical_props, liq, ice)
+
+end
+function cloud_optics!(this::CloudOpticsLUT{FT},
+                       clouds_liq::CloudOpticalPropsPGP{FT},
+                       clouds_ice::CloudOpticalPropsPGP{FT},
+                       optical_props::AbstractOpticalPropsPGP{FT}) where FT
+
+  nbnd = get_nband(this)
+
+  validate_cloud_optics!(this, clouds_liq, clouds_ice, optical_props)
+
+  liq = TwoStreamPGP(FT, nbnd)
+  ice = TwoStreamPGP(FT, nbnd)
 
   #### Compute cloud optical properties.
 
@@ -349,6 +447,34 @@ function compute_all_from_table!(nbnd::I,
     end
   end
 end
+function compute_all_from_table!(nbnd::I,
+                                 clouds::CloudOpticalPropsPGP{FT},
+                                 aim::AbstractInterpolationMethod,
+                                 op::TwoStreamPGP{FT},
+                                 icergh::Union{Nothing,I}=nothing) where {FT<:AbstractFloat,I<:Int}
+
+  offset = aim.rad_lwr
+
+  τ_table   = icergh ≠ nothing ? aim.ext[:,:,icergh] : aim.ext
+  ssa_table = icergh ≠ nothing ? aim.ssa[:,:,icergh] : aim.ssa
+  asy_table = icergh ≠ nothing ? aim.asy[:,:,icergh] : aim.asy
+
+  @inbounds for ibnd = 1:nbnd
+    if clouds.wp > FT(0)
+      index = convert(Int, min(floor((clouds.re - offset)/aim.step_size)+1, aim.nsteps-1))
+      fint = (clouds.re - offset)/aim.step_size - (index-1)
+      τ   = clouds.wp *           (τ_table[index,  ibnd] + fint * (  τ_table[index+1,ibnd] - τ_table[index,ibnd]))
+      τs  = τ         *         (ssa_table[index,  ibnd] + fint * (ssa_table[index+1,ibnd] - ssa_table[index,ibnd]))
+      op.g[ibnd] = τs         * (asy_table[index,  ibnd] + fint * (asy_table[index+1,ibnd] - asy_table[index,ibnd]))
+      op.ssa[ibnd] = τs
+      op.τ[ibnd] = τ
+    else
+      op.τ[ibnd] = FT(0)
+      op.ssa[ibnd] = FT(0)
+      op.g[ibnd] = FT(0)
+    end
+  end
+end
 
 #####
 ##### Pade functions
@@ -403,7 +529,6 @@ function compute_all_from_pade!(nbnd::I,
           τs   = τ               * (FT(1) - max(FT(0), pade_eval(ibnd, nbnd, nsizes, m_ssa, n_ssa, irad, re, coeffs_ssa)))
           irad = convert(Int, min(floor((re - aim.sizreg_asy[2])/aim.sizreg_asy[3])+2, 3))
           op.g[icol,ilay,ibnd] = τs  * pade_eval(ibnd, nbnd, nsizes, m_asy, n_asy, irad, re, coeffs_asy)
-
           op.ssa[icol,ilay,ibnd] = τs
           op.τ[icol,ilay,ibnd] = τ
         else
@@ -412,6 +537,48 @@ function compute_all_from_pade!(nbnd::I,
           op.g[icol,ilay,ibnd] = FT(0)
         end
       end
+    end
+  end
+end
+function compute_all_from_pade!(nbnd::I,
+                                clouds::CloudOpticalPropsPGP{FT},
+                                aim::AbstractInterpolationMethod,
+                                op::TwoStreamPGP{FT},
+                                icergh::Union{Nothing,I}=nothing) where {FT<:AbstractFloat,I<:Int}
+
+  nsizes = size(aim.ext,2)
+  # Cloud optical properties from Pade coefficient method
+  #   Hard coded assumptions: order of approximants, three size regimes
+  m_ext, n_ext = 2, 3
+  m_ssa, n_ssa = 2, 2
+  m_asy, n_asy = 2, 2
+
+  coeffs_ext = icergh≠nothing ? aim.ext[:,:,:,icergh] : aim.ext
+  coeffs_ssa = icergh≠nothing ? aim.ssa[:,:,:,icergh] : aim.ssa
+  coeffs_asy = icergh≠nothing ? aim.asy[:,:,:,icergh] : aim.asy
+
+  @inbounds for ibnd = 1:nbnd
+    if clouds.wp>FT(0)
+      re = clouds.re
+      #
+      # Finds index into size regime table
+      # This works only if there are precisely three size regimes (four bounds) and it's
+      #   previously guaranteed that size_bounds(1) <= size <= size_bounds(4)
+      #
+      irad = convert(Int, min(floor((re - aim.sizreg_ext[2])/aim.sizreg_ext[3])+2, 3))
+      τ   = clouds.wp * pade_eval(ibnd, nbnd, nsizes, m_ext, n_ext, irad, re, coeffs_ext)
+
+      irad = convert(Int,min(floor((re - aim.sizreg_ssa[2])/aim.sizreg_ssa[3])+2, 3))
+      # Pade approximants for co-albedo can sometimes be negative
+      τs   = τ               * (FT(1) - max(FT(0), pade_eval(ibnd, nbnd, nsizes, m_ssa, n_ssa, irad, re, coeffs_ssa)))
+      irad = convert(Int, min(floor((re - aim.sizreg_asy[2])/aim.sizreg_asy[3])+2, 3))
+      op.g[ibnd] = τs  * pade_eval(ibnd, nbnd, nsizes, m_asy, n_asy, irad, re, coeffs_asy)
+      op.ssa[ibnd] = τs
+      op.τ[ibnd] = τ
+    else
+      op.τ[ibnd] = FT(0)
+      op.ssa[ibnd] = FT(0)
+      op.g[ibnd] = FT(0)
     end
   end
 

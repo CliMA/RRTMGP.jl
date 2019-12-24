@@ -40,20 +40,23 @@ export delta_scale!,
        bands_are_equal,
        get_band_lims_gpoint
 
-export AbstractOpticalProps,
-       OneScalar,
-       TwoStream,
-       OpticalPropsBase
-
 export get_nband,
        get_ngpt,
        get_ncol,
        get_nlay
 
-export AbstractOpticalProps
+export AbstractOpticalProps,
+       AbstractOpticalPropsArry,
+       AbstractOpticalPropsPGP,
+       OneScalar,
+       TwoStream,
+       OneScalarPGP,
+       TwoStreamPGP,
+       OpticalPropsBase
+
 abstract type AbstractOpticalProps{FT,I} end
-export AbstractOpticalPropsArry
 abstract type AbstractOpticalPropsArry{FT,I} <: AbstractOpticalProps{FT,I} end
+abstract type AbstractOpticalPropsPGP{FT,I} <: AbstractOpticalProps{FT,I} end
 
 """
     OpticalPropsBase{FT,I} <: AbstractOpticalProps{FT,I}
@@ -96,7 +99,6 @@ struct OpticalPropsBase{FT,I} <: AbstractOpticalProps{FT,I}
   end
 end
 
-
 """
     OneScalar{FT,I} <: AbstractOpticalPropsArry{FT,I}
 
@@ -117,6 +119,37 @@ OneScalar(base::OpticalPropsBase{FT}, ncol::I, nlay::I, ngpt::I) where {FT<:Abst
   OneScalar{FT,I}(base, Array{FT}(undef, ncol, nlay, ngpt))
 OneScalar(::Type{FT}, ncol::I, nlay::I, ngpt::I) where {FT<:AbstractFloat,I<:Int} =
   OneScalar{FT,I}(nothing, Array{FT}(undef, ncol, nlay, ngpt))
+
+"""
+    OneScalarPGP{FT,I} <: AbstractOpticalPropsArry{FT,I}
+
+Single scalar approximation for optical depth, used in
+calculations accounting for extinction and emission
+per-grid-point
+
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
+struct OneScalarPGP{FT,I} <: AbstractOpticalPropsPGP{FT,I}
+  "optical properties discretization and mapping"
+  base::Union{OpticalPropsBase{FT}, Nothing}
+  "optical depth"
+  τ::Array{FT,1}
+end
+
+OneScalarPGP(base::OpticalPropsBase{FT}, ngpt::I) where {FT<:AbstractFloat,I<:Int} =
+  OneScalarPGP{FT,I}(base, Array{FT}(undef, ngpt))
+OneScalarPGP(::Type{FT}, ngpt::I) where {FT<:AbstractFloat,I<:Int} =
+  OneScalarPGP{FT,I}(nothing, Array{FT}(undef, ngpt))
+
+function Base.convert(::Type{OneScalar}, data::Array{OneScalarPGP{FT,I}}) where {FT,I}
+  s = size(data)
+  ngpt = length(first(data).τ)
+  return OneScalar{FT,I}(first(data).base, Array{FT}([data[i,j].τ[k] for i in 1:s[1], j in 1:s[2], k in 1:ngpt]))
+end
+
+Base.convert(::Type{Array{OneScalarPGP}}, data::OneScalar{FT,I}) where {FT,I} =
+  [OneScalarPGP{FT,I}(data.base, data.τ[i,j,:]) for i in 1:size(data.τ,1), j in 1:size(data.τ,2)]
 
 """
     TwoStream{FT,I} <: AbstractOpticalPropsArry{FT,I}
@@ -142,6 +175,43 @@ TwoStream(base::OpticalPropsBase{FT}, ncol::I, nlay::I, ngpt::I) where {FT<:Abst
   TwoStream{FT,I}(base, ntuple(i->Array{FT}(undef, ncol, nlay, ngpt),3)... )
 TwoStream(::Type{FT}, ncol::I, nlay::I, ngpt::I) where {FT<:AbstractFloat,I<:Int} =
   TwoStream{FT,I}(nothing, ntuple(i->Array{FT}(undef, ncol, nlay, ngpt),3)... )
+
+"""
+    TwoStreamPGP{FT,I} <: AbstractOpticalPropsArry{FT,I}
+
+Two stream approximation for optical depth, used in
+calculations accounting for extinction and emission
+per-grid-point
+
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
+struct TwoStreamPGP{FT,I} <: AbstractOpticalPropsPGP{FT,I}
+  "optical properties discretization and mapping"
+  base::Union{OpticalPropsBase{FT}, Nothing}
+  "optical depth"
+  τ::Array{FT,1}
+  "single-scattering albedo"
+  ssa::Array{FT,1}
+  "asymmetry parameter"
+  g::Array{FT,1}
+end
+
+TwoStreamPGP(base::OpticalPropsBase{FT}, ngpt::I) where {FT<:AbstractFloat,I<:Int} =
+  TwoStreamPGP{FT,I}(base, ntuple(i->Array{FT}(undef, ngpt),3)... )
+TwoStreamPGP(::Type{FT}, ngpt::I) where {FT<:AbstractFloat,I<:Int} =
+  TwoStreamPGP{FT,I}(nothing, ntuple(i->Array{FT}(undef, ngpt),3)... )
+
+function Base.convert(::Type{TwoStream}, data::Array{TwoStreamPGP{FT,I}}) where {FT,I}
+  s = size(data)
+  ngpt = length(first(data).τ)
+  return TwoStream{FT,I}(first(data).base, Array{FT}([data[i,j].τ[k]   for i in 1:s[1], j in 1:s[2], k in 1:ngpt]),
+                                           Array{FT}([data[i,j].ssa[k] for i in 1:s[1], j in 1:s[2], k in 1:ngpt]),
+                                           Array{FT}([data[i,j].g[k]   for i in 1:s[1], j in 1:s[2], k in 1:ngpt]))
+end
+
+Base.convert(::Type{Array{TwoStreamPGP}}, data::TwoStream{FT,I}) where {FT,I} =
+  [TwoStreamPGP{FT,I}(data.base, data.τ[i,j,:], data.ssa[i,j,:],data.g[i,j,:]) for i in 1:size(data.τ,1), j in 1:size(data.τ,2)]
 
 #####
 #####  Delta-scaling

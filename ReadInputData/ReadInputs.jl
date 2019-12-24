@@ -71,8 +71,7 @@ function read_atmos(ds, FT, I, gases_prescribed)
 
   gases_in_database = filter(ug->haskey(ds, "vmr_"*chem_name(ug)), gases_to_look_for)
 
-  gsc = GasConcSize(ncol, nlay, (ncol, nlay), length(gases_in_database))
-  gas_concs = GasConcs(FT, I, gases_prescribed, ncol, nlay, gsc)
+  gas_concs = GasConcs(FT, I, gases_prescribed, ncol, nlay, length(gases_in_database))
 
   for eg in gases_in_database
     set_vmr!(gas_concs, eg, Array{FT}(ds["vmr_"*chem_name(eg)][:]))
@@ -161,12 +160,12 @@ read_sources(ds) = ds["source_up"][:],
                    ds["source_sfc"][:]
 
 """
-    read_lw_Planck_sources!(ds, sources::SourceFuncLW{FT}) where FT
+    read_lw_Planck_sources!(ds, sources::SourceFuncLongWave{FT}) where FT
 
 Longwave sources at layer centers; edges in two directions; surface
    Also directionality since this will be needed for solution
 """
-function read_lw_Planck_sources!(ds, sources::SourceFuncLW{FT}) where FT
+function read_lw_Planck_sources!(ds, sources::SourceFuncLongWave{FT}) where FT
   ncol  = ds.dim["col"]
   nlay  = ds.dim["lay"]
   ngpt  = ds.dim["gpt"]
@@ -179,7 +178,7 @@ function read_lw_Planck_sources!(ds, sources::SourceFuncLW{FT}) where FT
   band_lims_wvn = ds["band_lims_wvn"][:]
   band_lims_gpt = ds["band_lims_gpt"][:]
 
-  sources.optical_props = OpticalPropsBase("SourceFuncLW", band_lims_wvn, band_lims_gpt)
+  sources.optical_props = OpticalPropsBase("SourceFuncLongWave", band_lims_wvn, band_lims_gpt)
   sources.τ .= Array{FT}(undef, ncol, nlay)
 
   sources.lay_source     .= ds["lay_src"][:]
@@ -417,8 +416,7 @@ function read_and_block_gases_ty(ds,
   nblocks = Int((ncol_l*nexp_l)/blocksize)
   FT = Float64
   I = Int
-  gsc = GasConcSize(ncol_l, nlay_l, (blocksize, nlay_l), length(gas_names))
-  gas_concs = GasConcs(FT, I, gas_names, ncol_l, nlay_l, gsc)
+  gas_concs = GasConcs(FT, I, gas_names, blocksize, nlay_l)
   gas_conc_array = GasConcs[deepcopy(gas_concs) for i in 1:nblocks]
 
   # Experiment index for each column

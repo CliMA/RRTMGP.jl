@@ -3,7 +3,8 @@
 
 Computes spectrally-resolved gas optical properties and source functions
  given atmospheric physical properties (profiles of temperature, pressure, and gas concentrations)
- The struct must be initialized with data (provided as a netCDF file) before being used.
+ The `KDistributionLongwave` and `KDistributionShortwave` must be initialized with data (provided
+ as a netCDF file) before being used.
 
 Two variants apply to internal Planck sources (longwave radiation in the Earth's atmosphere) and to
  external stellar radiation (shortwave radiation in the Earth's atmosphere).
@@ -192,16 +193,86 @@ struct InterpolationCoefficients{FT,I}
   fmajor::Array{FT,6}
   "fractions for minor species. [reference η level (temperature dependent), reference temperature level, flavor, layer]"
   fminor::Array{FT,5}
+  "combination of major specie's column amounts"
+  col_mix::Array{FT,4}
 end
 function InterpolationCoefficients(::Type{FT}, ::Type{I}, ncol, nlay, nflav) where {I<:Int, FT<:AbstractFloat}
-  jtemp = Array{I}(undef, ncol, nlay)
-  jpress = Array{I}(undef, ncol, nlay)
-  j_η = Array{I}(undef, 2, nflav, ncol, nlay)
-  tropo = Array{Bool}(undef, ncol, nlay)
-  fmajor = zeros(FT, 2,2,2, nflav,ncol, nlay)
-  fminor  = Array{FT}(undef, 2,2, nflav,ncol,nlay)
-  return InterpolationCoefficients{FT,I}(jtemp,jpress,j_η,tropo,fmajor,fminor)
+  jtemp = Array{I}(undef,                ncol, nlay)
+  jpress = Array{I}(undef,               ncol, nlay)
+  j_η = Array{I}(undef, 2, nflav,        ncol, nlay)
+  tropo = Array{Bool}(undef,             ncol, nlay)
+  fmajor = zeros(FT, 2,2,2, nflav,       ncol, nlay)
+  fminor  = Array{FT}(undef, 2,2, nflav, ncol, nlay)
+  col_mix  = Array{FT}(undef, 2, nflav,  ncol, nlay)
+  return InterpolationCoefficients{FT,I}(jtemp,jpress,j_η,tropo,fmajor,fminor,col_mix)
 end
+
+"""
+    InterpolationCoefficientsPGP{FT,I}
+
+Interpolation coefficients per grid point
+
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
+mutable struct InterpolationCoefficientsPGP{FT,I}
+  "index for temperature"
+  jtemp::I
+  "index for pressure"
+  jpress::I
+  "index for binary species parameter (η)"
+  j_η::Array{I,2}
+  "troposphere mask: itropo = merge(1,2,tropo[icol,ilay]); itropo = 1 lower atmosphere; itropo = 2 upper atmosphere"
+  tropo::Bool
+  "fractions for major species"
+  fmajor::Array{FT,4}
+  "fractions for minor species. [reference η level (temperature dependent), reference temperature level, flavor, layer]"
+  fminor::Array{FT,3}
+  "combination of major specie's column amounts"
+  col_mix::Array{FT,2}
+end
+
+function Base.convert(::Type{InterpolationCoefficients}, data::Array{InterpolationCoefficientsPGP{FT,I}}) where {FT,I}
+  s = size(data)
+  s_j_η = size(first(data).j_η)
+  s_fmajor = size(first(data).fmajor)
+  s_fminor = size(first(data).fminor)
+  s_col_mix = size(first(data).col_mix)
+  jtemp  = Array{I}([data[i,j].jtemp  for i in 1:s[1], j in 1:s[2]])
+  jpress = Array{I}([data[i,j].jpress for i in 1:s[1], j in 1:s[2]])
+  tropo  = Array{Bool}([data[i,j].tropo  for i in 1:s[1], j in 1:s[2]])
+
+  j_η    = Array{I}([data[i,j].j_η[k,p] for k in 1:s_j_η[1],
+                                             p in 1:s_j_η[2],
+                                             i in 1:s[1],
+                                             j in 1:s[2]])
+  fmajor = Array{FT}([data[i,j].fmajor[k,p,q,r] for k in 1:s_fmajor[1],
+                                                    p in 1:s_fmajor[2],
+                                                    q in 1:s_fmajor[3],
+                                                    r in 1:s_fmajor[4],
+                                                    i in 1:s[1],
+                                                    j in 1:s[2]])
+  fminor = Array{FT}([data[i,j].fminor[k,p,q] for k in 1:s_fminor[1],
+                                                  p in 1:s_fminor[2],
+                                                  q in 1:s_fminor[3],
+                                                  i in 1:s[1],
+                                                  j in 1:s[2]])
+  col_mix = Array{FT}([data[i,j].col_mix[k,p] for k in 1:s_col_mix[1],
+                                                  p in 1:s_col_mix[2],
+                                                  i in 1:s[1],
+                                                  j in 1:s[2]])
+  return InterpolationCoefficients{FT,I}(jtemp,jpress,j_η,tropo,fmajor,fminor,col_mix)
+end
+
+Base.convert(::Type{Array{InterpolationCoefficientsPGP}}, data::InterpolationCoefficients{FT,I}) where {FT,I} =
+  [InterpolationCoefficientsPGP{FT,I}(data.jtemp[i,j],
+                                      data.jpress[i,j],
+                                      data.j_η[:,:,i,j],
+                                      data.tropo[i,j],
+                                      data.fmajor[:,:,:,:,i,j],
+                                      data.fminor[:,:,:,i,j],
+                                      data.col_mix[:,:,i,j]) for i in 1:size(data.jtemp,1), j in 1:size(data.jtemp,2)]
+
 
 """
     get_ngas(this::AbstractGasOptics)
@@ -224,21 +295,23 @@ get_nflav(this::AbstractGasOptics) = size(this.flavor, 2)
     gas_optics!(this::KDistributionLongwave,
                 as::AtmosphericState{FT,I},
                 optical_props::AbstractOpticalPropsArry,
-                sources::SourceFuncLW) where {FT<:AbstractFloat,I<:Int}
+                sources::SourceFuncLongWave) where {FT<:AbstractFloat,I<:Int}
 
 Compute gas optical depth and Planck source functions given:
 
  - `this` gas optics, see [`KDistributionLongwave`](@ref)
  - `as` atmospheric state, see [`AtmosphericState`](@ref)
  - `optical_props` optical properties, see [`AbstractOpticalPropsArry`](@ref)
- - `sources` longwave sources, see [`SourceFuncLW`](@ref)
+ - `sources` longwave sources, see [`SourceFuncLongWave`](@ref)
 """
 function gas_optics!(this::KDistributionLongwave,
                      as::AtmosphericState{FT,I},
                      optical_props::AbstractOpticalPropsArry,
-                     sources::SourceFuncLW) where {FT<:AbstractFloat,I<:Int}
+                     sources::SourceFuncLongWave) where {FT<:AbstractFloat,I<:Int}
 
-  ics = InterpolationCoefficients(FT, Int, as.ncol, as.nlay, get_nflav(this))
+  ics = InterpolationCoefficients(FT, I, as.ncol, as.nlay, get_nflav(this))
+  ics = convert(Array{InterpolationCoefficientsPGP}, ics)
+  ics = convert(InterpolationCoefficients, ics)
 
   # Gas optics
   compute_gas_τs!(ics, this, as, optical_props)
@@ -270,7 +343,9 @@ function gas_optics!(this::KDistributionShortwave{FT},
                      optical_props::AbstractOpticalPropsArry,
                      last_call=false) where {FT<:AbstractFloat,I<:Int}
 
-  ics = InterpolationCoefficients(FT, Int, as.ncol,as.nlay, get_nflav(this))
+  ics = InterpolationCoefficients(FT, I, as.ncol,as.nlay, get_nflav(this))
+  ics = convert(Array{InterpolationCoefficientsPGP}, ics)
+  ics = convert(InterpolationCoefficients, ics)
 
   # Gas optics
   @timeit to_gor "compute_gas_τs!" compute_gas_τs!(ics, this, as, optical_props, last_call)
@@ -311,7 +386,6 @@ function compute_gas_τs!(ics::InterpolationCoefficients,
 
   τ          = Array{FT}(undef, ngpt,nlay,ncol) # absorption, Rayleigh scattering optical depths
   τ_Rayleigh = Array{FT}(undef, ngpt,nlay,ncol) # absorption, Rayleigh scattering optical depths
-  col_mix = Array{FT}(undef, 2,    get_nflav(this),ncol,nlay) # combination of major specie's column amounts
 
   # Check for presence of key species in GasConcs; return error if any key species are not present
   check_key_species_present(this, as.gas_conc.gas_names)
@@ -328,7 +402,6 @@ function compute_gas_τs!(ics::InterpolationCoefficients,
   # ---- calculate gas optical depths ----
   τ .= 0
   @timeit to_gor "interpolation!" interpolation!(ics,
-          col_mix,
           ncol,nlay,                        # problem dimensions
           nflav, neta, npres, ntemp,  # interpolation dimensions
           this.flavor,
@@ -347,7 +420,6 @@ function compute_gas_τs!(ics::InterpolationCoefficients,
           this.lower_aux,
           this.upper_aux,
           ics,
-          col_mix,
           as.p_lay,
           as.t_lay,
           as.col_gas)
@@ -375,14 +447,14 @@ end
     source!(this::KDistributionLongwave{FT},
             as::AtmosphericState{FT,I},
             ics::InterpolationCoefficients{FT,I},
-            sources::SourceFuncLW) where {FT<:AbstractFloat,I<:Int}
+            sources::SourceFuncLongWave) where {FT<:AbstractFloat,I<:Int}
 
 Compute Planck source functions at layer centers and levels
 
  - `this` gas optics, see [`KDistributionLongwave`](@ref)
  - `as` atmospheric state, see [`AtmosphericState`](@ref)
  - `ics` interpolation coefficients, see [`InterpolationCoefficients`](@ref)
- - `sources` longwave sources, see [`SourceFuncLW`](@ref)
+ - `sources` longwave sources, see [`SourceFuncLongWave`](@ref)
 
  - `lay_source_t`, `lev_source_inc_t`, `lev_source_dec_t` [ngpt,nlay,ncol]
  - `sfc_source_t`                                         [ngpt,     ncol]
@@ -390,7 +462,7 @@ Compute Planck source functions at layer centers and levels
 function source!(this::KDistributionLongwave{FT},
                  as::AtmosphericState{FT,I},
                  ics::InterpolationCoefficients{FT,I},
-                 sources::SourceFuncLW) where {FT<:AbstractFloat,I<:Int}
+                 sources::SourceFuncLongWave) where {FT<:AbstractFloat,I<:Int}
 
   ncol  = get_ncol(sources)
   nlay  = get_nlay(sources)
@@ -438,16 +510,25 @@ end
 #####
 
 """
-    get_k_dist_lw(totplnk, planck_frac, rayl_lower, rayl_upper, ref, args...)
+    get_k_dist_lw(totplnk,
+                  planck_frac,
+                  rayl_lower,
+                  rayl_upper,
+                  ref::ReferenceState{FT},
+                  args...) where {FT<:AbstractFloat}
 
 Initialize object based on data read from netCDF file however the user desires.
 Rayleigh scattering tables may or may not be present; this is indicated with allocation status
 This interface is for the internal-sources object -- includes Plank functions and fractions
 """
-function get_k_dist_lw(totplnk, planck_frac, rayl_lower, rayl_upper, ref, args...)
+function get_k_dist_lw(totplnk,
+                       planck_frac,
+                       rayl_lower,
+                       rayl_upper,
+                       ref::ReferenceState{FT},
+                       args...) where {FT<:AbstractFloat}
   abs_coeffs = init_abs_coeffs(args...)
 
-  FT = Float64
   if rayl_lower ≠ nothing && rayl_upper ≠ nothing
     krayl = zeros(FT, size(rayl_lower)...,2)
     krayl[:,:,:,1] = rayl_lower
@@ -467,15 +548,22 @@ function get_k_dist_lw(totplnk, planck_frac, rayl_lower, rayl_upper, ref, args..
 end
 
 """
-    get_k_dist_sw(solar_src, rayl_lower, rayl_upper, ref, args...)
+    get_k_dist_sw(solar_src,
+                  rayl_lower,
+                  rayl_upper,
+                  ref::ReferenceState{FT},
+                  args...) where {FT<:AbstractFloat}
 
 Initialize object based on data read from netCDF file however the user desires.
 Rayleigh scattering tables may or may not be present; this is indicated with allocation status
 This interface is for the external-sources object -- includes TOA source function table
 """
-function get_k_dist_sw(solar_src, rayl_lower, rayl_upper, ref, args...)
+function get_k_dist_sw(solar_src,
+                       rayl_lower,
+                       rayl_upper,
+                       ref::ReferenceState{FT},
+                       args...) where {FT<:AbstractFloat}
   abs_coeffs = init_abs_coeffs(args...)
-  FT = Float64
 
   if rayl_lower ≠ nothing && rayl_upper ≠ nothing
     krayl = zeros(FT, size(rayl_lower)...,2)
