@@ -26,27 +26,27 @@ end
 
 """
     reduce!(this::FluxesByBand,
-                       gpt_flux_up::Array{FT,3},
-                       gpt_flux_dn::Array{FT,3},
-                       spectral_disc::AbstractOpticalProps,
-                       top_at_1::Bool,
-                       gpt_flux_dn_dir::Union{Nothing,Array{FT,3}}=nothing)
+            gpt_flux_up::Array{FT,3},
+            gpt_flux_dn::Array{FT,3},
+            spectral_disc::AbstractOpticalProps,
+            top_at_1::Bool,
+            gpt_flux_dn_dir::Union{Nothing,Array{FT,3}}=nothing)
 
 Reduces fluxes by-band to broadband in `FluxesByBand` `this`, given
 
  - `gpt_flux_up` fluxes by gpoint [W/m2]
  - `gpt_flux_dn` fluxes by gpoint [W/m2]
- - `spectral_disc` a `AbstractOpticalProps` struct containing spectral information
+ - `spectral_disc` spectral discretization, see [`AbstractOpticalProps`](@ref)
  - `top_at_1` bool indicating at top
 and, optionally,
  - `gpt_flux_dn_dir` direct flux downward
 """
 function reduce!(this::FluxesByBand,
-                       gpt_flux_up::Array{FT,3},
-                       gpt_flux_dn::Array{FT,3},
-                       spectral_disc::AbstractOpticalProps,
-                       top_at_1::Bool,
-                       gpt_flux_dn_dir::Union{Nothing,Array{FT,3}}=nothing) where {FT<:AbstractFloat}
+                 gpt_flux_up::Array{FT,3},
+                 gpt_flux_dn::Array{FT,3},
+                 spectral_disc::AbstractOpticalProps,
+                 top_at_1::Bool,
+                 gpt_flux_dn_dir::Union{Nothing,Array{FT,3}}=nothing) where {FT<:AbstractFloat}
   ncol, nlev = size(gpt_flux_up)
   ngpt = get_ngpt(spectral_disc)
   nbnd = get_nband(spectral_disc)

@@ -26,6 +26,13 @@ include(joinpath("PostProcessing.jl"))
 include(joinpath("..","ReadInputData","ReadInputs.jl"))
 include(joinpath("..","ReadInputData","LoadCoefficients.jl"))
 
+convert_optical_props_pgp(op::AbstractOpticalPropsArry) =
+  op isa TwoStream ? convert(Array{TwoStreamPGP},op) :
+                     convert(Array{OneScalarPGP},op)
+convert_optical_props(op) =
+  eltype(op) <: TwoStreamPGP ? convert(TwoStream,op) :
+                                convert(OneScalar,op)
+
 """
 Example program to demonstrate the calculation of longwave radiative fluxes in clear, aerosol-free skies.
   The example files come from the Radiative Forcing MIP (https://www.earthsystemcog.org/projects/rfmip/)
@@ -45,7 +52,7 @@ Optical properties of the atmosphere as array of values
    In the longwave we include only absorption optical depth (_1scl)
    Shortwave calculations use optical depth, single-scattering albedo, asymmetry parameter (_2str)
 """
-function rfmip_clear_sky_lw(ds, optical_props_constructor; compile_first=false)
+function rfmip_clear_sky_lw_pgp(ds, optical_props_constructor; compile_first=false)
 
   FT = Float64
   I  = Int
@@ -128,6 +135,9 @@ function rfmip_clear_sky_lw(ds, optical_props_constructor; compile_first=false)
   sfc_emis_spec = Array{FT}(undef, nbnd,block_size)
 
   optical_props = optical_props_constructor(k_dist.optical_props, block_size, nlay, ngpt)
+  optical_props = convert_optical_props_pgp(optical_props)
+  optical_props = convert_optical_props(optical_props)
+
   source = SourceFuncLongWave(block_size,nlay,k_dist.optical_props)
 
   #
@@ -150,9 +160,14 @@ function rfmip_clear_sky_lw(ds, optical_props_constructor; compile_first=false)
     t_lev = t_lev_all[:,:,b]
     t_sfc = t_sfc_all[:,  b]
     as = AtmosphericState(gas_conc, p_lay, p_lev, t_lay, t_lev, k_dist.ref, nothing, t_sfc)
+    as = convert(Array{AtmosphericStatePGP}, as)
+    as = convert(AtmosphericState, as)
 
     fluxes.flux_up .= FT(0)
     fluxes.flux_dn .= FT(0)
+
+    source = convert(Array{SourceFuncLongWavePGP}, source)
+    source = convert(SourceFuncLongWave, source)
 
     gas_optics!(k_dist, as, optical_props, source)
 

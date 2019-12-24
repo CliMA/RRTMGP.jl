@@ -8,11 +8,13 @@ PaTohPa(::Type{FT}) where FT = FT(0.01)
     interpolation!(...)
 
 Compute interpolation coefficients
+
+ - `ics` interpolation coefficients, see [`InterpolationCoefficients`](@ref)
+
 for calculations of major optical depths, minor optical depths, Rayleigh,
-and Planck fractions
+and Planck fractions given
 
  - `ref` reference variables, see [`Reference`](@ref)
- - `ics` interpolation coefficients, see [`InterpolationCoefficients`](@ref)
 
 integer,                            intent(in) :: ncol,nlay
 integer,                            intent(in) :: ngas,nflav,neta,npres,ntemp
@@ -21,10 +23,6 @@ integer,     dimension(2,nflav),    intent(in) :: flavor
 real(FT),    dimension(ncol,nlay),        intent(in) :: play, tlay
 real(FT),    dimension(ncol,nlay,0:ngas), intent(in) :: col_gas
 
-# outputs
-real(FT),    dimension(2,    nflav,ncol,nlay), intent(out) :: col_mix
-real(FT),    dimension(2,2,  nflav,ncol,nlay), intent(out) :: fminor
-# -----------------
 # local
 real(FT), dimension(ncol,nlay) :: ftemp, fpress # interpolation fraction for temperature, pressure
 real(FT) :: locpress # needed to find location in pressure grid
@@ -38,7 +36,6 @@ real(FT) :: ftemp_term
 integer :: icol, ilay, iflav, igases(2), itropo, itemp
 """
 function interpolation!(ics::InterpolationCoefficients{FT,I},
-                        col_mix::Array{FT},
                         ncol::I,
                         nlay::I,
                         nflav::I,
@@ -85,9 +82,9 @@ function interpolation!(ics::InterpolationCoefficients{FT,I},
           #  associated interpolation index and factors
           ratio_η_half = ref.vmr[itropo,igases[1],(ics.jtemp[icol,ilay]+itemp-1)] /
                          ref.vmr[itropo,igases[2],(ics.jtemp[icol,ilay]+itemp-1)]
-          col_mix[itemp,iflav,icol,ilay] = col_gas[icol,ilay,igases[1]] + ratio_η_half * col_gas[icol,ilay,igases[2]]
-          η = fmerge(col_gas[icol,ilay,igases[1]] / col_mix[itemp,iflav,icol,ilay], FT(0.5),
-                      col_mix[itemp,iflav,icol,ilay] > FT(2) * floatmin(FT))
+          ics.col_mix[itemp,iflav,icol,ilay] = col_gas[icol,ilay,igases[1]] + ratio_η_half * col_gas[icol,ilay,igases[2]]
+          η = fmerge(col_gas[icol,ilay,igases[1]] / ics.col_mix[itemp,iflav,icol,ilay], FT(0.5),
+                      ics.col_mix[itemp,iflav,icol,ilay] > FT(2) * floatmin(FT))
           loc_η = η * FT(neta-1)
           ics.j_η[itemp,iflav,icol,ilay] = min(fint(loc_η)+1, neta-1)
           f_η = mod(loc_η, 1)
@@ -133,7 +130,6 @@ integer,     dimension(2,nbnd),                  intent(in) :: band_lims_gpt
 real(FT),    dimension(ngpt,neta,npres+1,ntemp), intent(in) :: kmajor
 # ---------------------
 # inputs from profile or parent function
-real(FT), dimension(2,    nflav,ncol,nlay       ), intent(in) :: col_mix
 real(FT), dimension(            ncol,nlay       ), intent(in) :: play, tlay      # pressure and temperature
 real(FT), dimension(            ncol,nlay,0:ngas), intent(in) :: col_gas
 # ---------------------
@@ -156,7 +152,6 @@ function compute_τ_absorption!(τ,
               lower_aux,
               upper_aux,
               ics::InterpolationCoefficients{FT},
-              col_mix,
               play,
               tlay,
               col_gas) where {FT<:AbstractFloat}
@@ -189,7 +184,6 @@ function compute_τ_absorption!(τ,
         gpoint_flavor,
         band_lims_gpt,
         kmajor,
-        col_mix,
         ics,
         τ)
   # ---------------------
@@ -244,9 +238,6 @@ integer,  dimension(2,ngpt),  intent(in) :: gpoint_flavor
 integer,  dimension(2,nbnd),  intent(in) :: band_lims_gpt # start and end g-point for each band
 real(FT), dimension(ngpt,neta,npres+1,ntemp), intent(in) :: kmajor
 
-# inputs from profile or parent function
-real(FT),    dimension(2,    nflav,ncol,nlay), intent(in) :: col_mix
-
 # outputs
 real(FT), dimension(ngpt,nlay,ncol), intent(inout) :: τ
 # -----------------
@@ -260,7 +251,6 @@ function gas_optical_depths_major!(ncol,nlay,nbnd,ngpt,
                                     gpoint_flavor,
                                     band_lims_gpt,    # inputs from object
                                     kmajor,
-                                    col_mix,
                                     ics::InterpolationCoefficients{FT},
                                     τ::Array{FT}) where {FT<:AbstractFloat}
 
@@ -276,7 +266,7 @@ function gas_optical_depths_major!(ncol,nlay,nbnd,ngpt,
         iflav = gpoint_flavor[itropo, gptS] #η interpolation depends on band's flavor
         # interpolation in temperature, pressure, and η
         interpolate3D_byflav!(@view(τ_major[gptS:gptE]),
-                              col_mix[:,iflav,icol,ilay],
+                              ics.col_mix[:,iflav,icol,ilay],
                               ics.fmajor[:,:,:,iflav,icol,ilay],
                               kmajor,
                               band_lims_gpt[1, ibnd],

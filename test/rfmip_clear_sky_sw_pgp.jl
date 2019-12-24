@@ -26,6 +26,13 @@ include(joinpath("PostProcessing.jl"))
 include(joinpath("..","ReadInputData","ReadInputs.jl"))
 include(joinpath("..","ReadInputData","LoadCoefficients.jl"))
 
+convert_optical_props_pgp(op) =
+  op isa TwoStream ? convert(Array{TwoStreamPGP},op) :
+                     convert(Array{OneScalarPGP},op)
+convert_optical_props(op) =
+  eltype(op) <: TwoStreamPGP ? convert(TwoStream,op) :
+                                convert(OneScalar,op)
+
 """
 Example program to demonstrate the calculation of shortwave radiative fluxes in clear, aerosol-free skies.
   The example files come from the Radiative Forcing MIP (https://www.earthsystemcog.org/projects/rfmip/)
@@ -45,7 +52,7 @@ modules for reading and writing files
 
 
 """
-function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
+function rfmip_clear_sky_sw_pgp(ds, optical_props_constructor; compile_first=false)
 
   FT = Float64
   I  = Int
@@ -134,6 +141,8 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
   μ_0 = zeros(FT, block_size)
   sfc_alb_spec = zeros(FT, nbnd,block_size)
   optical_props = optical_props_constructor(k_dist.optical_props, block_size, nlay, ngpt)
+  optical_props = convert_optical_props_pgp(optical_props)
+  optical_props = convert_optical_props(optical_props)
 
   #
   # Loop over blocks
@@ -149,6 +158,8 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
     t_lay = t_lay_all[:,:,b]
     gas_conc = gas_conc_array[b]
     as = AtmosphericState(gas_conc, p_lay, p_lev, t_lay, nothing, k_dist.ref)
+    as = convert(Array{AtmosphericStatePGP}, as)
+    as = convert(AtmosphericState, as)
 
     # Compute the optical properties of the atmosphere and the Planck source functions
     #    from pressures, temperatures, and gas concentrations...

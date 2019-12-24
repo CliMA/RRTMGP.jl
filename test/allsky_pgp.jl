@@ -40,7 +40,18 @@ function vmr_2d_to_1d!(gas_conc::GasConcs{FT},
   set_vmr!(gas_conc, gas, tmp_col)
 end
 
-function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
+get_optical_props(op_base, is_sw, ncol, nlay, ngpt) =
+  is_sw ? TwoStream(op_base, ncol, nlay, ngpt) :
+          OneScalar(op_base, ncol, nlay, ngpt)
+
+convert_optical_props_pgp(op, is_sw) =
+  is_sw ? convert(Array{TwoStreamPGP},op) :
+          convert(Array{OneScalarPGP},op)
+convert_optical_props(op, is_sw) =
+  is_sw ? convert(TwoStream,op) :
+          convert(OneScalar,op)
+
+function all_sky_pgp(ds; use_luts=false, λ_string="", compile_first=false)
   @assert λ_string == "sw" || λ_string == "lw"
   k_dist_sym = Symbol(:k_dist,λ_string)
   cloud_optics_sym = Symbol(:cloud_optics,λ_string)
@@ -97,13 +108,8 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
 
   # LW calculations neglect scattering; SW calculations use the 2-stream approximation
   #   Here we choose the right variant of optical_props.
-  if is_sw
-    clouds = TwoStream(clouds_base, ncol, nlay, ngpt)
-    atmos = TwoStream(k_dist.optical_props,ncol, nlay, ngpt)
-  else
-    clouds = OneScalar(clouds_base, ncol, nlay, ngpt)
-    atmos = OneScalar(k_dist.optical_props, ncol, nlay, ngpt)
-  end
+  clouds = get_optical_props(clouds_base, is_sw, ncol, nlay, ngpt)
+  atmos  = get_optical_props(k_dist.optical_props, is_sw, ncol, nlay, ngpt)
 
   top_at_1 = p_lay[1, 1] < p_lay[1, nlay]
 
@@ -130,6 +136,8 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
   end
 
   as = AtmosphericState(gas_conc, p_lay, p_lev, t_lay, t_lev, k_dist.ref, nothing, nothing)
+  as = convert(Array{AtmosphericStatePGP}, as)
+  as = convert(AtmosphericState, as)
   gas_conc, p_lay, p_lev, t_lay, t_lev = ntuple(i->nothing,5)
 
   #
@@ -173,7 +181,20 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
 
   for iloop = 1:(compile_first ? 1 : nloops)
 
-    cloud_optics!(cloud_optics_, clouds_liq, clouds_ice, clouds)
+    clouds = convert_optical_props_pgp(clouds, is_sw)
+    atmos  = convert_optical_props_pgp(atmos , is_sw)
+    clouds_ice = convert(Array{CloudOpticalPropsPGP}, clouds_ice)
+    clouds_liq = convert(Array{CloudOpticalPropsPGP}, clouds_liq)
+
+    for i in eachindex(clouds)
+      cloud_optics!(cloud_optics_, clouds_liq[i], clouds_ice[i], clouds[i])
+    end
+
+    clouds = convert_optical_props(clouds, is_sw)
+    atmos  = convert_optical_props(atmos , is_sw)
+    clouds_ice = convert(CloudOpticalProps, clouds_ice)
+    clouds_liq = convert(CloudOpticalProps, clouds_liq)
+
     #
     # Solvers
     #
@@ -182,6 +203,10 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
 
 
     if is_lw
+
+      lw_sources = convert(Array{SourceFuncLongWavePGP}, lw_sources)
+      lw_sources = convert(SourceFuncLongWave, lw_sources)
+
       gas_optics!(k_dist, as, atmos, lw_sources)
 
       increment!(clouds, atmos)

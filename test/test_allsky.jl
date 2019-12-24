@@ -1,5 +1,6 @@
 using Profile
 include("allsky.jl")
+include("allsky_pgp.jl")
 include("DataSetFiles.jl")
 
 @testset "All sky" begin
@@ -10,15 +11,29 @@ include("DataSetFiles.jl")
 
   Δt_all = Dict()
 
-  all_sky(ds_lw; use_luts=false, λ_string = "lw", compile_first=true)
-  all_sky(ds_sw; use_luts=false, λ_string = "sw", compile_first=true)
-  all_sky(ds_lw; use_luts=true, λ_string = "lw", compile_first=true)
-  all_sky(ds_sw; use_luts=true, λ_string = "sw", compile_first=true)
+  if !pgp_only
+    all_sky(ds_lw; use_luts=false, λ_string = "lw", compile_first=true)
+    all_sky(ds_sw; use_luts=false, λ_string = "sw", compile_first=true)
+    all_sky(ds_lw; use_luts=true, λ_string = "lw", compile_first=true)
+    all_sky(ds_sw; use_luts=true, λ_string = "sw", compile_first=true)
+  end
 
-  Δt_all["all_sky_lw","use_luts_false"] = @elapsed all_sky(ds_lw; use_luts=false, λ_string = "lw")
-  Δt_all["all_sky_sw","use_luts_false"] = @elapsed all_sky(ds_sw; use_luts=false, λ_string = "sw")
-  Δt_all["all_sky_lw","use_luts_true"] = @elapsed all_sky(ds_lw; use_luts=true, λ_string = "lw")
-  Δt_all["all_sky_sw","use_luts_true"] = @elapsed all_sky(ds_sw; use_luts=true, λ_string = "sw")
+  all_sky_pgp(ds_lw; use_luts=false, λ_string = "lw", compile_first=true)
+  all_sky_pgp(ds_sw; use_luts=false, λ_string = "sw", compile_first=true)
+  all_sky_pgp(ds_lw; use_luts=true, λ_string = "lw", compile_first=true)
+  all_sky_pgp(ds_sw; use_luts=true, λ_string = "sw", compile_first=true)
+
+  if !pgp_only
+    Δt_all["all_sky_lw","use_luts_false"] = @elapsed all_sky(ds_lw; use_luts=false, λ_string = "lw")
+    Δt_all["all_sky_sw","use_luts_false"] = @elapsed all_sky(ds_sw; use_luts=false, λ_string = "sw")
+    Δt_all["all_sky_lw","use_luts_true"] = @elapsed all_sky(ds_lw; use_luts=true, λ_string = "lw")
+    Δt_all["all_sky_sw","use_luts_true"] = @elapsed all_sky(ds_sw; use_luts=true, λ_string = "sw")
+  end
+
+  Δt_all["all_sky_lw_pgp","use_luts_false"] = @elapsed all_sky_pgp(ds_lw; use_luts=false, λ_string = "lw")
+  Δt_all["all_sky_sw_pgp","use_luts_false"] = @elapsed all_sky_pgp(ds_sw; use_luts=false, λ_string = "sw")
+  Δt_all["all_sky_lw_pgp","use_luts_true"] = @elapsed all_sky_pgp(ds_lw; use_luts=true, λ_string = "lw")
+  Δt_all["all_sky_sw_pgp","use_luts_true"] = @elapsed all_sky_pgp(ds_sw; use_luts=true, λ_string = "sw")
 
   for (case,Δt) in Δt_all
     @show case, Δt

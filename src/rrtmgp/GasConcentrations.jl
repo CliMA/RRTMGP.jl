@@ -22,21 +22,8 @@ module GasConcentrations
 using DocStringExtensions
 using ..Utilities
 using ..Gases
-export GasConcs
+export GasConcs, GasConcsPGP
 export set_vmr!
-export GasConcSize
-
-"""
-    GasConcSize
-
-Sizes for gas concentrations
-"""
-struct GasConcSize{N,I}
-  ncol::I
-  nlay::I
-  s::NTuple{N,I}
-  nconcs::I
-end
 
 """
     GasConcs{FT}
@@ -56,14 +43,42 @@ struct GasConcs{FT,I}
   ncol::I
   "number of layers"
   nlay::I
-  "gas concentration problem size"
-  gsc::GasConcSize
+end
+function GasConcs(::Type{FT}, ::Type{I}, gas_names, ncol::I, nlay::I, ngases::I=length(gas_names)) where {FT<:AbstractFloat,I<:Int}
+  concs = zeros(FT, ngases, ncol, nlay)
+  return GasConcs{FT,I}(gas_names, concs, ncol, nlay)
 end
 
-function GasConcs(::Type{FT}, ::Type{I}, gas_names, ncol, nlay, gsc::GasConcSize) where {FT<:AbstractFloat,I<:Int}
-  concs = zeros(FT, gsc.nconcs, gsc.s...)
-  return GasConcs{FT,I}(gas_names, concs, gsc.s..., gsc)
+"""
+    GasConcsPGP{FT}
+
+Encapsulates a collection of volume mixing ratios (concentrations) of gases per grid point.
+Each concentration is associated with a name, normally the chemical formula.
+
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
+struct GasConcsPGP{FT}
+  "gas names"
+  gas_names::Vector{AbstractGas}
+  "gas concentrations arrays"
+  concs::Array{FT,1}
 end
+function GasConcsPGP(::Type{FT}, gas_names, ngases::I=length(gas_names)) where {FT<:AbstractFloat,I<:Int}
+  concs = zeros(FT, ngases)
+  return GasConcs{FT}(gas_names, concs)
+end
+
+function Base.convert(::Type{GasConcs}, data::Array{GasConcsPGP{FT}}) where {FT}
+  s = size(data)
+  ngases = length(first(data).concs)
+  return GasConcs{FT,typeof(ngases)}(first(data).gas_names,
+                      Array{FT}([data[i,j].concs[k] for k in 1:ngases, i in 1:s[1], j in 1:s[2]]), s...)
+end
+
+Base.convert(::Type{Array{GasConcsPGP}}, data::GasConcs{FT}) where {FT} =
+  [GasConcsPGP{FT}(data.gas_names, data.concs[:,i,j]) for i in 1:size(data.concs,2), j in 1:size(data.concs,3)]
+
 
 """
     set_vmr!(this::GasConcs{FT}, gas::AbstractGas, w) where FT
