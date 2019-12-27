@@ -13,7 +13,6 @@ Two variants apply to internal Planck sources (longwave radiation in the Earth's
 """
 module GasOptics
 
-using OffsetArrays
 using TimerOutputs
 using DocStringExtensions
 

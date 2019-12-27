@@ -10,7 +10,6 @@ The class can be used as-is but is also intended as an example of how to extend 
 """
 module CloudOptics
 
-using OffsetArrays
 using DocStringExtensions
 using ..OpticalProps
 using ..Utilities

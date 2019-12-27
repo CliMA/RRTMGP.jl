@@ -6,7 +6,6 @@ Reference state variables for look-up tables / interpolation
 module ReferenceStates
 
 using DocStringExtensions
-using OffsetArrays
 using ..Gases
 using ..Utilities
 export ReferenceState
@@ -39,15 +38,15 @@ struct ReferenceState{FT}
   press_log_delta::FT
   temp_delta::FT
   press_trop_log::FT
-  vmr::AbstractArray{FT,3}   # vmr(lower or upper atmosphere, gas, temp)
+  vmr::Array{FT,3}   # vmr(lower or upper atmosphere, gas, temp)
   function ReferenceState(press::Array{FT},
                           temp::Array{FT},
                           press_ref_trop::FT,
                           vmr_ref::Array{FT},
-                          available_gases::Vector{AbstractGas},
-                          gas_names::Vector{AbstractGas}) where {FT<:AbstractFloat}
+                          gases_prescribed::Vector{AbstractGas},
+                          gases_in_database::Vector{AbstractGas}) where {FT<:AbstractFloat}
 
-    gas_is_present = map(x->x in available_gases, gas_names)
+    gas_is_present = map(x->x in gases_prescribed, gases_in_database)
     ngas = count(gas_is_present)
 
     press_log = log.(press)
@@ -62,13 +61,13 @@ struct ReferenceState{FT}
     press_log_delta = (log(press_min)-log(press_max))/(length(press)-1)
     temp_delta      = (temp_max-temp_min)/(length(temp)-1)
 
-    vmr_ref_red = OffsetArray{FT}(undef, 1:size(vmr_ref, 1),0:ngas, 1:size(vmr_ref, 3))
+    vmr_ref_red = Array{FT}(undef, size(vmr_ref, 1),ngas+1, size(vmr_ref, 3))
 
     # Gas 0 is used in single-key species method, set to 1.0 (col_dry)
-    vmr_ref_red[:,0,:] = vmr_ref[:,1,:]
+    vmr_ref_red[:,1,:] = vmr_ref[:,1,:]
     for i = 1:ngas
-      idx = loc_in_array(available_gases[i], gas_names)
-      vmr_ref_red[:,i,:] = vmr_ref[:,idx+1,:]
+      idx = loc_in_array(gases_prescribed[i], gases_in_database)
+      vmr_ref_red[:,i+1,:] = vmr_ref[:,idx+1,:]
     end
     return new{FT}(press,
                    press_log,
