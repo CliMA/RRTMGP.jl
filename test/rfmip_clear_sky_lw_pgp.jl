@@ -97,10 +97,7 @@ function rfmip_clear_sky_lw_pgp(ds, optical_props_constructor; compile_first=fal
   gas_conc_array = read_and_block_gases_ty(ds[:rfmip], block_size, kdist_gas_names)
   sfc_emis_all, t_sfc_all = read_and_block_lw_bc(ds[:rfmip], block_size)
 
-  #
-  # Read k-distribution information. load_and_init() reads data from netCDF and calls
-  #   k_dist%init(); users might want to use their own reading methods
-  #
+  # Read k-distribution information:
   k_dist = load_and_init(ds[:k_dist], FT, gas_conc_array[1].gas_names)
   @assert source_is_internal(k_dist)
 

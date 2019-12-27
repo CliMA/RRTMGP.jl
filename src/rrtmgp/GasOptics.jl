@@ -13,9 +13,9 @@ Two variants apply to internal Planck sources (longwave radiation in the Earth's
 """
 module GasOptics
 
-using OffsetArrays
 using TimerOutputs
 using DocStringExtensions
+using StaticArrays
 
 const to_gor = TimerOutput()
 
@@ -43,7 +43,7 @@ and lower levels of the atmosphere.
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct GasOpticsAux{I}
+struct GasOpticsAux{I<:Int}
   "indexes for determining `col_gas`"
   idx_minor::Vector{I}
   "indexes that have special treatment in density scaling"
@@ -71,7 +71,7 @@ levels of the atmosphere for both full and reduced sets of gases.
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct GasOpticsVars{FT,I}
+struct GasOpticsVars{FT<:AbstractFloat,I<:Int}
   "minor g-point limits"
   minor_limits_gpt::Array{I,2}
   "minor scales with density"
@@ -80,15 +80,15 @@ struct GasOpticsVars{FT,I}
   scale_by_complement::Vector{Bool}
   "kminor start"
   kminor_start::Vector{I}
-  "absorption coefficient of minor species"
-  kminor::Array{FT,3} #, (n_minor,η,temperature)
+  "absorption coefficient of minor species (n_minor,η,temperature)"
+  kminor::Array{FT,3}
   "scaling gas"
   scaling_gas::Array{AbstractGas}
   "minor gases"
   minor_gases::Array{AbstractGas}
 end
 
-abstract type AbstractGasOptics{T,I} <: AbstractOpticalProps{T,I} end
+abstract type AbstractGasOptics{FT,I} <: AbstractOpticalProps{FT,I} end
 
 """
     KDistributionLongwave{FT,I} <: AbstractGasOptics{FT,I}
@@ -104,9 +104,9 @@ struct KDistributionLongwave{FT,I} <: AbstractGasOptics{FT,I}
   "Base optical properties"
   optical_props::OpticalPropsBase{FT,I}
   "GasOpticsVars in the lower atmosphere"
-  lower::GasOpticsVars
+  lower::GasOpticsVars{FT,I}
   "GasOpticsVars in the upper atmosphere"
-  upper::GasOpticsVars
+  upper::GasOpticsVars{FT,I}
   "Auxiliary variables (index maps) in the lower atmosphere"
   lower_aux::GasOpticsAux{I}
   "Auxiliary variables (index maps) in the upper atmosphere"
@@ -147,9 +147,9 @@ struct KDistributionShortwave{FT,I} <: AbstractGasOptics{FT,I}
   "Base optical properties"
   optical_props::OpticalPropsBase{FT,I}
   "GasOpticsVars in the lower atmosphere"
-  lower::GasOpticsVars
+  lower::GasOpticsVars{FT,I}
   "GasOpticsVars in the upper atmosphere"
-  upper::GasOpticsVars
+  upper::GasOpticsVars{FT,I}
   "Auxiliary variables (index maps) in the lower atmosphere"
   lower_aux::GasOpticsAux{I}
   "Auxiliary variables (index maps) in the upper atmosphere"
@@ -180,7 +180,7 @@ Interpolation coefficients
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct InterpolationCoefficients{FT,I}
+struct InterpolationCoefficients{FT<:AbstractFloat,I<:Int}
   "index for temperature"
   jtemp::Array{I,2}
   "index for pressure"
@@ -218,7 +218,7 @@ Interpolation coefficients per grid point
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-mutable struct InterpolationCoefficientsPGP{FT,I}
+mutable struct InterpolationCoefficientsPGP{FT<:AbstractFloat,I<:Int}
   "index for temperature"
   jtemp::I
   "index for pressure"
@@ -301,10 +301,10 @@ get_nflav(this::AbstractGasOptics) = size(this.flavor, 2)
 
 
 """
-    gas_optics!(this::KDistributionLongwave,
+    gas_optics!(this::KDistributionLongwave{FT,I},
                 as::AtmosphericState{FT,I},
-                optical_props::AbstractOpticalPropsArry,
-                sources::SourceFuncLongWave) where {FT<:AbstractFloat,I<:Int}
+                optical_props::AbstractOpticalPropsArry{FT,I},
+                sources::SourceFuncLongWave{FT,I}) where {FT<:AbstractFloat,I<:Int}
 
 Compute gas optical depth and Planck source functions given:
 
@@ -313,10 +313,10 @@ Compute gas optical depth and Planck source functions given:
  - `optical_props` optical properties, see [`AbstractOpticalPropsArry`](@ref)
  - `sources` longwave sources, see [`SourceFuncLongWave`](@ref)
 """
-function gas_optics!(this::KDistributionLongwave,
+function gas_optics!(this::KDistributionLongwave{FT,I},
                      as::AtmosphericState{FT,I},
-                     optical_props::AbstractOpticalPropsArry,
-                     sources::SourceFuncLongWave) where {FT<:AbstractFloat,I<:Int}
+                     optical_props::AbstractOpticalPropsArry{FT,I},
+                     sources::SourceFuncLongWave{FT,I}) where {FT<:AbstractFloat,I<:Int}
 
   ics = InterpolationCoefficients(FT, I, as.ncol, as.nlay, get_nflav(this))
   ics = convert(Array{InterpolationCoefficientsPGP}, ics)
@@ -328,14 +328,14 @@ function gas_optics!(this::KDistributionLongwave,
   @assert get_nlay(sources) == as.nlay
   @assert get_ngpt(sources) == get_ngpt(this.optical_props)
 
-  source!(this, as, ics, sources)
-  nothing
+  source!(sources, this, as, ics)
+  return nothing
 end
 
 """
-    gas_optics!(this::KDistributionShortwave{FT},
+    gas_optics!(this::KDistributionShortwave{FT,I},
                 as::AtmosphericState{FT,I},
-                optical_props::AbstractOpticalPropsArry,
+                optical_props::AbstractOpticalPropsArry{FT,I},
                 last_call=false) where {FT<:AbstractFloat,I<:Int}
 
 Compute gas optical depth given:
@@ -344,9 +344,9 @@ Compute gas optical depth given:
  - `as` atmospheric state, see [`AtmosphericState`](@ref)
  - `optical_props` optical properties, see [`AbstractOpticalPropsArry`](@ref)
 """
-function gas_optics!(this::KDistributionShortwave{FT},
+function gas_optics!(this::KDistributionShortwave{FT,I},
                      as::AtmosphericState{FT,I},
-                     optical_props::AbstractOpticalPropsArry,
+                     optical_props::AbstractOpticalPropsArry{FT,I},
                      last_call=false) where {FT<:AbstractFloat,I<:Int}
 
   ics = InterpolationCoefficients(FT, I, as.ncol,as.nlay, get_nflav(this))
@@ -363,7 +363,7 @@ end
     compute_gas_τs!(ics::InterpolationCoefficients,
                     this::AbstractGasOptics{FT},
                     as::AtmosphericState{FT,I},
-                    optical_props::AbstractOpticalPropsArry,
+                    optical_props::AbstractOpticalPropsArry{FT,I},
                     last_call=false) where {FT<:AbstractFloat,I<:Int}
 
 Returns optical properties and interpolation coefficients
@@ -377,10 +377,10 @@ Local variables
  - `τ`, `τ_Rayleigh` [ngpt,nlay,ncol] absorption, Rayleigh scattering optical depths
  - `col_mix` combination of major specie's column amounts [reference temperature level, flavor, column]
 """
-function compute_gas_τs!(ics::InterpolationCoefficients,
+function compute_gas_τs!(ics::InterpolationCoefficients{FT,I},
                          this::AbstractGasOptics{FT},
                          as::AtmosphericState{FT,I},
-                         optical_props::AbstractOpticalPropsArry,
+                         optical_props::AbstractOpticalPropsArry{FT,I},
                          last_call=false) where {FT<:AbstractFloat,I<:Int}
 
   ncol  = get_ncol(optical_props)
@@ -395,10 +395,9 @@ function compute_gas_τs!(ics::InterpolationCoefficients,
 
   τ .= 0
   @timeit to_gor "interpolation!" interpolation!(ics, this, as)
-  @timeit to_gor "compute_τ_absorption!" compute_τ_absorption!(τ, this, ics, as)
+  @timeit to_gor "compute_τ_absorption!" compute_τ_absorption!(τ, this, ics, as, last_call)
 
   if allocated(this.krayl)
-
     @timeit to_gor "compute_τ_Rayleigh!" compute_τ_Rayleigh!(τ_Rayleigh, this, ics, as)
   end
 
@@ -408,64 +407,29 @@ function compute_gas_τs!(ics::InterpolationCoefficients,
 end
 
 """
-    source!(this::KDistributionLongwave{FT},
+    source!(sources::SourceFuncLongWave{FT,I},
+            this::KDistributionLongwave{FT,I},
             as::AtmosphericState{FT,I},
-            ics::InterpolationCoefficients{FT,I},
-            sources::SourceFuncLongWave) where {FT<:AbstractFloat,I<:Int}
+            ics::InterpolationCoefficients{FT,I}) where {FT<:AbstractFloat,I<:Int}
 
-Compute Planck source functions at layer centers and levels
+Compute Planck source functions
+
+ - `sources` longwave sources, see [`SourceFuncLongWave`](@ref)
+
+given
 
  - `this` gas optics, see [`KDistributionLongwave`](@ref)
  - `as` atmospheric state, see [`AtmosphericState`](@ref)
  - `ics` interpolation coefficients, see [`InterpolationCoefficients`](@ref)
- - `sources` longwave sources, see [`SourceFuncLongWave`](@ref)
 
- - `lay_source_t`, `lev_source_inc_t`, `lev_source_dec_t` [ngpt,nlay,ncol]
- - `sfc_source_t`                                         [ngpt,     ncol]
+Compute internal (Planck) source functions at layers and levels,
+which depend on mapping from spectral space that creates k-distribution.
 """
-function source!(this::KDistributionLongwave{FT},
+function source!(sources::SourceFuncLongWave{FT,I},
+                 this::KDistributionLongwave{FT,I},
                  as::AtmosphericState{FT,I},
-                 ics::InterpolationCoefficients{FT,I},
-                 sources::SourceFuncLongWave) where {FT<:AbstractFloat,I<:Int}
-
-  ncol  = get_ncol(sources)
-  nlay  = get_nlay(sources)
-  ngpt  = get_ngpt(sources)
-  nbnd = get_nband(sources.optical_props)
-
-  lay_source_t     = zeros(FT, ngpt,nlay,ncol)
-  lev_source_inc_t = zeros(FT, ngpt,nlay,ncol)
-  lev_source_dec_t = zeros(FT, ngpt,nlay,ncol)
-  sfc_source_t     = zeros(FT, ngpt,ncol)
-
-  # Compute internal (Planck) source functions at layers and levels,
-  #  which depend on mapping from spectral space that creates k-distribution.
-  compute_Planck_source!(ncol,
-              nlay,
-              nbnd,
-              ngpt,
-              as.t_lay,
-              as.t_lev,
-              as.t_sfc,
-              fmerge(1,nlay,as.p_lay[1,1] > as.p_lay[1,nlay]),
-              ics,
-              get_gpoint_bands(this.optical_props),
-              get_band_lims_gpoint(this.optical_props),
-              this.planck_frac,
-              this.ref.temp_min,
-              this.totplnk_delta,
-              this.totplnk,
-              this.gpoint_flavor,
-              sfc_source_t,
-              lay_source_t,
-              lev_source_inc_t,
-              lev_source_dec_t)
-
-  sources.sfc_source .= convert(Array,transpose(sfc_source_t))
-
-  permutedims!(sources.lay_source, lay_source_t, [3,2,1])
-  permutedims!(sources.lev_source_inc, lev_source_inc_t, [3,2,1])
-  permutedims!(sources.lev_source_dec, lev_source_dec_t, [3,2,1])
+                 ics::InterpolationCoefficients{FT,I}) where {FT<:AbstractFloat,I<:Int}
+  compute_Planck_source!(sources, as, ics, this)
   return nothing
 end
 

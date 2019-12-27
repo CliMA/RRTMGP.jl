@@ -6,7 +6,6 @@ Atmospheric conditions used as inputs to RRTMGP.
 module AtmosphericStates
 
 using DocStringExtensions
-using OffsetArrays
 
 using ..Utilities
 using ..FortranIntrinsics
@@ -17,7 +16,7 @@ using ..ReferenceStates
 
 export AtmosphericState, AtmosphericStatePGP
 
-abstract type AbstractAtmosphericState{AbstractFloat,Integer} end
+abstract type AbstractAtmosphericState{FT<:AbstractFloat,I<:Int} end
 
 include("Interpolation.jl")
 
@@ -96,11 +95,13 @@ struct AtmosphericState{FT,I} <: AbstractAtmosphericState{FT,I}
   "surface temperatures [K]; (ncol)"
   t_sfc::Vector{FT}
   "column amounts for each gas, plus col_dry. gas amounts [molec/cm^2]"
-  col_gas::AbstractArray{FT,3}
+  col_gas::Array{FT,3}
   "Number of molecules per cm-2 of dry air"
   col_dry::Array{FT,2}
   "Indicates whether arrays are ordered in the vertical with 1 at the top or the bottom of the domain."
   top_at_1::Bool
+  "Surface layer."
+  sfc_lay::I
   "Number of layers."
   nlay::I
   "Number of columns."
@@ -131,7 +132,7 @@ function AtmosphericState(gas_conc::GasConcs{FT,I},
 
   ngas    = length(gas_conc.gas_names)
   vmr     = Array{FT}(undef, ncol,nlay,ngas) # volume mixing ratios
-  col_gas = OffsetArray{FT}(undef, 1:ncol,1:nlay,0:ngas) # column amounts for each gas, plus col_dry
+  col_gas = Array{FT}(undef, ncol,nlay,ngas+1) # column amounts for each gas, plus col_dry
 
   # Fill out the array of volume mixing ratios
   for gas in gas_conc.gas_names
@@ -149,9 +150,9 @@ function AtmosphericState(gas_conc::GasConcs{FT,I},
   check_range(col_dry, FT(0), floatmax(FT), "col_dry")
 
   # compute column gas amounts [molec/cm^2]
-  col_gas[:,:,0] .= col_dry
+  col_gas[:,:,1] .= col_dry
   for igas = 1:ngas
-    col_gas[:,:,igas] .= vmr[:,:,igas] .* col_dry
+    col_gas[:,:,igas+1] .= vmr[:,:,igas] .* col_dry
   end
   # Are the arrays ordered in the vertical with 1 at the top or the bottom of the domain?
   top_at_1 = p_lay[1, 1] < p_lay[1, nlay]
@@ -162,6 +163,7 @@ function AtmosphericState(gas_conc::GasConcs{FT,I},
   end
   check_extent(t_sfc, ncol, "t_sfc")
   check_range(t_sfc, ref.temp_min,  ref.temp_max,  "t_sfc")
+  sfc_lay = fmerge(1,nlay,p_lay[1,1] > p_lay[1,nlay])
 
   return AtmosphericState{FT,I}(gas_conc,
                                 p_lay,
@@ -172,6 +174,7 @@ function AtmosphericState(gas_conc::GasConcs{FT,I},
                                 col_gas,
                                 col_dry,
                                 top_at_1,
+                                sfc_lay,
                                 nlay,
                                 ncol)
 end
@@ -198,11 +201,13 @@ mutable struct AtmosphericStatePGP{FT,I} <: AbstractAtmosphericState{FT,I}
   "surface temperatures [K]"
   t_sfc::FT
   "column amounts for each gas, plus col_dry. gas amounts [molec/cm^2]"
-  col_gas::AbstractArray{FT,1}
+  col_gas::Array{FT,1}
   "Number of molecules per cm-2 of dry air"
   col_dry::FT
   "Indicates whether arrays are ordered in the vertical with 1 at the top or the bottom of the domain."
   top_at_1::Bool
+  "Surface layer."
+  sfc_lay::I
 end
 
 function AtmosphericStatePGP(gas_conc::GasConcsPGP{FT},
@@ -213,7 +218,8 @@ function AtmosphericStatePGP(gas_conc::GasConcsPGP{FT},
                              ref::ReferenceState,
                              col_dry::FT,
                              t_sfc::FT,
-                             top_at_1::Bool) where {FT<:AbstractFloat}
+                             sfc_lay::I,
+                             top_at_1::Bool) where {FT<:AbstractFloat,I<:Int}
   if t_lev==nothing
     t_lev = interpolate_var(p_lay, p_lev, t_lay)
   end
@@ -224,9 +230,8 @@ function AtmosphericStatePGP(gas_conc::GasConcsPGP{FT},
   check_range(t_lev, ref.temp_min,  ref.temp_max,  "t_lev")
 
   ngas    = length(gas_conc.gas_names)
-  I = eltype(ngas)
   vmr     = Array{FT}(undef, ngas) # volume mixing ratios
-  col_gas = OffsetArray{FT}(undef, 0:ngas) # column amounts for each gas, plus col_dry
+  col_gas = Array{FT}(undef, ngas+1) # column amounts for each gas, plus col_dry
 
   # Fill out the array of volume mixing ratios
   for gas in gas_conc.gas_names
@@ -234,15 +239,12 @@ function AtmosphericStatePGP(gas_conc::GasConcsPGP{FT},
     vmr[i_gas] .= gas_conc.concs[i_gas]
   end
 
-  # Compute dry air column amounts (number of molecule per cm^2) if user hasn't provided them
-  idx_h2o = loc_in_array(h2o(), gas_conc.gas_names)
-
   check_range(col_dry, FT(0), floatmax(FT), "col_dry")
 
   # compute column gas amounts [molec/cm^2]
-  col_gas[0] .= col_dry
+  col_gas[1] .= col_dry
   for igas = 1:ngas
-    col_gas[igas] .= vmr[igas] .* col_dry
+    col_gas[igas+1] .= vmr[igas] .* col_dry
   end
   # Are the arrays ordered in the vertical with 1 at the top or the bottom of the domain?
 
@@ -256,7 +258,8 @@ function AtmosphericStatePGP(gas_conc::GasConcsPGP{FT},
                                    t_sfc,
                                    col_gas,
                                    col_dry,
-                                   top_at_1)
+                                   top_at_1,
+                                   sfc_lay)
 end
 
 function Base.convert(::Type{AtmosphericState}, data::Array{AtmosphericStatePGP{FT,I}}) where {FT,I}
@@ -264,12 +267,13 @@ function Base.convert(::Type{AtmosphericState}, data::Array{AtmosphericStatePGP{
   ncol,nlay = s
   gas_conc = convert(GasConcs, [data[i,j].gas_conc for i in 1:s[1], j in 1:s[2]])
   top_at_1 = first(data).top_at_1
+  sfc_lay = first(data).sfc_lay
   ngas    = length(gas_conc.gas_names)
 
-  col_gas = OffsetArray{FT}(undef, 1:ncol,1:nlay,0:ngas)
+  col_gas = Array{FT}(undef, ncol,nlay,ngas+1)
   for i in 1:s[1]
     for j in 1:s[2]
-      for igas in 0:ngas
+      for igas in 1:ngas+1
         col_gas[i,j,igas] = data[i,j].col_gas[igas]
       end
     end
@@ -301,6 +305,7 @@ function Base.convert(::Type{AtmosphericState}, data::Array{AtmosphericStatePGP{
                                 col_gas,
                                 col_dry,
                                 top_at_1,
+                                sfc_lay,
                                 nlay, ncol)
 end
 
@@ -317,7 +322,8 @@ function Base.convert(::Type{Array{AtmosphericStatePGP}}, data::AtmosphericState
                              data.t_sfc[i],
                              data.col_gas[i,j,:],
                              data.col_dry[i,j],
-                             data.top_at_1) for i in 1:s[1], j in 1:s[2]]
+                             data.top_at_1,
+                             data.sfc_lay) for i in 1:s[1], j in 1:s[2]]
 
 end
 

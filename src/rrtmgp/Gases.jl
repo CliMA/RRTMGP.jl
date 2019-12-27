@@ -6,13 +6,14 @@ module Gases
 using InteractiveUtils
 export AbstractGas
 export chem_name, rfmip_name
-export h2o, o3, no2, co2, CCl4, CH3Br, CH3Cl, n2o, co, ch4, o2, n2, cfc22
+export DryGas, h2o, o3, no2, co2, CCl4, CH3Br, CH3Cl, n2o, co, ch4, o2, n2, cfc22
 export ccl4, cfc11, cfc12, hfc143a, hfc125, hfc23, hfc32, hfc134a, cf4, ch3br, ch3cl # not tested
 export h2o_frgn, h2o_self # TODO: figure out what these gases are
 export UncaughtGas
 
 abstract type AbstractGas end
 
+struct DryGas      <: AbstractGas end # Only dry component
 struct h2o         <: AbstractGas end # Included by default
 struct o3          <: AbstractGas end # Included by default
 struct no2         <: AbstractGas end # Included by default
@@ -55,6 +56,7 @@ function Base.convert(::Type{gas}, s::String) where {gas<:AbstractGas}
 end
 
 # Corresponding names in the RFMIP file:
+rfmip_name(::DryGas)      = "dry_component"
 rfmip_name(::h2o)         = "water_vapor"
 rfmip_name(::o3)          = "ozone"
 rfmip_name(::no2)         = "no2"

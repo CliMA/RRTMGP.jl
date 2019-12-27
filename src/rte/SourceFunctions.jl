@@ -36,11 +36,14 @@ struct SourceFuncLongWave{FT, I} <: AbstractOpticalProps{FT, I}
   lev_source_dec::Array{FT,3}
   "Surface source"
   sfc_source::Array{FT,2}
+  "Temporary array for Planck fraction"
+  p_frac::Array{FT,3}
 end
 
 function SourceFuncLongWave(ncol::I, nlay::I, optical_props::OpticalPropsBase{FT}) where {FT<:AbstractFloat,I<:Int}
   ngpt = get_ngpt(optical_props)
   op = deepcopy(optical_props)
+  p_frac         = zeros(FT, ncol,nlay,ngpt)
   lay_source     = zeros(FT, ncol,nlay,ngpt)
   lev_source_inc = zeros(FT, ncol,nlay,ngpt)
   lev_source_dec = zeros(FT, ncol,nlay,ngpt)
@@ -49,7 +52,8 @@ function SourceFuncLongWave(ncol::I, nlay::I, optical_props::OpticalPropsBase{FT
                                   lay_source,
                                   lev_source_inc,
                                   lev_source_dec,
-                                  sfc_source)
+                                  sfc_source,
+                                  p_frac)
 end
 
 """
@@ -74,6 +78,8 @@ struct SourceFuncLongWavePGP{FT, I} <: AbstractOpticalProps{FT, I}
   lev_source_dec::Array{FT,1}
   "Surface source"
   sfc_source::Array{FT,1}
+  "Temporary array for Planck fraction"
+  p_frac::Array{FT,1}
 end
 
 function Base.convert(::Type{SourceFuncLongWave}, data::Array{SourceFuncLongWavePGP{FT,I}}) where {FT,I}
@@ -85,7 +91,8 @@ function Base.convert(::Type{SourceFuncLongWave}, data::Array{SourceFuncLongWave
     Array{FT}([data[i,j].lay_source[k]     for i in 1:s[1], j in 1:s[2], k in 1:ngpt]),
     Array{FT}([data[i,j].lev_source_inc[k] for i in 1:s[1], j in 1:s[2], k in 1:ngpt]),
     Array{FT}([data[i,j].lev_source_dec[k] for i in 1:s[1], j in 1:s[2], k in 1:ngpt]),
-    Array{FT}([data[i,1].sfc_source[k]     for i in 1:s[1], k in 1:ngpt])
+    Array{FT}([data[i,1].sfc_source[k]     for i in 1:s[1], k in 1:ngpt]),
+    Array{FT}([data[i,j].p_frac[k]         for i in 1:s[1], j in 1:s[2], k in 1:ngpt])
     )
 end
 
@@ -95,7 +102,8 @@ Base.convert(::Type{Array{SourceFuncLongWavePGP}}, data::SourceFuncLongWave{FT,I
     data.lay_source[i,j,:],
     data.lev_source_inc[i,j,:],
     data.lev_source_dec[i,j,:],
-    data.sfc_source[i,:]
+    data.sfc_source[i,:],
+    data.p_frac[i,j,:]
     ) for i in 1:size(data.lay_source,1),
           j in 1:size(data.lay_source,2)]
 

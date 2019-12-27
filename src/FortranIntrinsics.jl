@@ -1,6 +1,5 @@
 module FortranIntrinsics
 using DelimitedFiles
-using OffsetArrays
 using Test
 
 export fmerge,
@@ -36,7 +35,7 @@ fint(x::Real) = abs(x) < 1 ? 0 : floor(x)
 Based on: http://gcc.gnu.org/onlinedocs/gfortran/MERGE.html
 TODO: FIX IMPLEMENTATION
 """
-fmerge(t_source, f_source, mask) = mask ? t_source : f_source
+@inline fmerge(t_source, f_source, mask) = mask ? t_source : f_source
 
 """
     fminloc(a, dim, mask=nothing)
