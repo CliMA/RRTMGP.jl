@@ -46,7 +46,9 @@ function interpolation!(ics::InterpolationCoefficients{FT,I},
                         ref::ReferenceState{FT},
                         play::Array{FT},
                         tlay::Array{FT},
-                        col_gas::AbstractArray{FT}) where {I<:Int,B<:Bool,FT<:AbstractFloat}
+                        col_gas::Array{FT}) where {I<:Int,B<:Bool,FT<:AbstractFloat}
+  @unpack_fields ics col_mix fmajor fminor j_η jpress jtemp tropo
+  @unpack_fields ref vmr temp_min temp_delta temp press_log press_log_delta press_trop_log
   # input dimensions
   ftemp = Array{FT}(undef, ncol, nlay)
   fpress = Array{FT}(undef, ncol, nlay)
@@ -55,49 +57,52 @@ function interpolation!(ics::InterpolationCoefficients{FT,I},
   @inbounds for ilay in 1:nlay
     @inbounds for icol in 1:ncol
       # index and factor for temperature interpolation
-      ics.jtemp[icol,ilay] = fint((tlay[icol,ilay] - (ref.temp_min - ref.temp_delta)) / ref.temp_delta)
-      ics.jtemp[icol,ilay] = min(ntemp - 1, max(1, ics.jtemp[icol,ilay])) # limit the index range
-      ftemp[icol,ilay] = (tlay[icol,ilay] - ref.temp[ics.jtemp[icol,ilay]]) / ref.temp_delta
+      jtemp[icol,ilay] = fint((tlay[icol,ilay] - (temp_min - temp_delta)) / temp_delta)
+      jtemp[icol,ilay] = min(ntemp - 1, max(1, jtemp[icol,ilay])) # limit the index range
+      ftemp[icol,ilay] = (tlay[icol,ilay] - temp[jtemp[icol,ilay]]) / temp_delta
 
       # index and factor for pressure interpolation
-      locpress = FT(1) + (log(play[icol,ilay]) - ref.press_log[1]) / ref.press_log_delta
-      ics.jpress[icol,ilay] = min(npres-1, max(1, fint(locpress)))
-      fpress[icol,ilay] = locpress - FT(ics.jpress[icol,ilay])
+      locpress = FT(1) + (log(play[icol,ilay]) - press_log[1]) / press_log_delta
+      jpress[icol,ilay] = min(npres-1, max(1, fint(locpress)))
+      fpress[icol,ilay] = locpress - FT(jpress[icol,ilay])
+      tropo[icol,ilay] = log(play[icol,ilay]) > press_trop_log
 
     end
   end
   # determine if in lower or upper part of atmosphere
-  ics.tropo .= log.(play) .> ref.press_trop_log
 
   @inbounds for ilay in 1:nlay
     @inbounds for icol in 1:ncol
       # itropo = 1 lower atmosphere; itropo = 2 upper atmosphere
-      itropo = fmerge(1,2,ics.tropo[icol,ilay])
+      itropo = fmerge(1,2,tropo[icol,ilay])
       # loop over implemented combinations of major species
       @inbounds for iflav in 1:nflav
-        igases .= flavor[:,iflav]
+        i_gases1 = flavor[1,iflav]+1
+        i_gases2 = flavor[2,iflav]+1
         @inbounds for itemp in 1:2
           # compute interpolation fractions needed for lower, then upper reference temperature level
           # compute binary species parameter (η) for flavor and temperature and
           #  associated interpolation index and factors
-          ratio_η_half = ref.vmr[itropo,igases[1],(ics.jtemp[icol,ilay]+itemp-1)] /
-                         ref.vmr[itropo,igases[2],(ics.jtemp[icol,ilay]+itemp-1)]
-          ics.col_mix[itemp,iflav,icol,ilay] = col_gas[icol,ilay,igases[1]] + ratio_η_half * col_gas[icol,ilay,igases[2]]
-          η = fmerge(col_gas[icol,ilay,igases[1]] / ics.col_mix[itemp,iflav,icol,ilay], FT(0.5),
-                      ics.col_mix[itemp,iflav,icol,ilay] > FT(2) * floatmin(FT))
+          ij = jtemp[icol,ilay]+itemp-1
+          vmr1 = vmr[itropo,i_gases1,ij]
+          vmr2 = vmr[itropo,i_gases2,ij]
+          ratio_η_half = vmr1 / vmr2
+          col_mix[itemp,iflav,icol,ilay] = col_gas[icol,ilay,i_gases1] + ratio_η_half * col_gas[icol,ilay,i_gases2]
+          η = fmerge(col_gas[icol,ilay,i_gases1] / col_mix[itemp,iflav,icol,ilay], FT(0.5),
+                      col_mix[itemp,iflav,icol,ilay] > FT(2) * floatmin(FT))
           loc_η = η * FT(neta-1)
-          ics.j_η[itemp,iflav,icol,ilay] = min(fint(loc_η)+1, neta-1)
+          j_η[itemp,iflav,icol,ilay] = min(fint(loc_η)+1, neta-1)
           f_η = mod(loc_η, 1)
           # compute interpolation fractions needed for minor species
           # ftemp_term = (FT(1)-ftemp(icol,ilay)) for itemp = 1, ftemp(icol,ilay) for itemp=2
           ftemp_term = (FT(2-itemp) + FT(2*itemp-3) * ftemp[icol,ilay])
-          ics.fminor[1,itemp,iflav,icol,ilay] = (1-f_η) * ftemp_term
-          ics.fminor[2,itemp,iflav,icol,ilay] =    f_η  * ftemp_term
+          fminor[1,itemp,iflav,icol,ilay] = (1-f_η) * ftemp_term
+          fminor[2,itemp,iflav,icol,ilay] =    f_η  * ftemp_term
           # compute interpolation fractions needed for major species
-          ics.fmajor[1,1,itemp,iflav,icol,ilay] = (FT(1)-fpress[icol,ilay]) * ics.fminor[1,itemp,iflav,icol,ilay]
-          ics.fmajor[2,1,itemp,iflav,icol,ilay] = (FT(1)-fpress[icol,ilay]) * ics.fminor[2,itemp,iflav,icol,ilay]
-          ics.fmajor[1,2,itemp,iflav,icol,ilay] =        fpress[icol,ilay]  * ics.fminor[1,itemp,iflav,icol,ilay]
-          ics.fmajor[2,2,itemp,iflav,icol,ilay] =        fpress[icol,ilay]  * ics.fminor[2,itemp,iflav,icol,ilay]
+          fmajor[1,1,itemp,iflav,icol,ilay] = (FT(1)-fpress[icol,ilay]) * fminor[1,itemp,iflav,icol,ilay]
+          fmajor[2,1,itemp,iflav,icol,ilay] = (FT(1)-fpress[icol,ilay]) * fminor[2,itemp,iflav,icol,ilay]
+          fmajor[1,2,itemp,iflav,icol,ilay] =        fpress[icol,ilay]  * fminor[1,itemp,iflav,icol,ilay]
+          fmajor[2,2,itemp,iflav,icol,ilay] =        fpress[icol,ilay]  * fminor[2,itemp,iflav,icol,ilay]
         end # reference temperatures
       end # iflav
     end # icol,ilay
@@ -341,7 +346,7 @@ function gas_optical_depths_minor!(ncol,
             #
             # Scaling of minor gas absortion coefficient begins with column amount of minor gas
             #
-            scaling = col_gas[icol,ilay,aux.idx_minor[imnr]]
+            scaling = col_gas[icol,ilay,aux.idx_minor[imnr]+1]
             #
             # Density scaling (e.g. for h2o continuum, collision-induced absorption)
             #
@@ -351,13 +356,13 @@ function gas_optical_depths_minor!(ncol,
               #
               scaling = scaling * (PaTohPa(FT)*play[icol,ilay]/tlay[icol,ilay])
               if aux.idx_minor_scaling[imnr] > 0  # there is a second gas that affects this gas's absorption
-                vmr_fact = FT(1) / col_gas[icol,ilay,0]
-                dry_fact = FT(1) / (FT(1) + col_gas[icol,ilay,idx_h2o] * vmr_fact)
+                vmr_fact = FT(1) / col_gas[icol,ilay,1]
+                dry_fact = FT(1) / (FT(1) + col_gas[icol,ilay,idx_h2o+1] * vmr_fact)
                 # scale by density of special gas
                 if atmos.scale_by_complement[imnr] # scale by densities of all gases but the special one
-                  scaling = scaling * (FT(1) - col_gas[icol,ilay,aux.idx_minor_scaling[imnr]] * vmr_fact * dry_fact)
+                  scaling = scaling * (FT(1) - col_gas[icol,ilay,aux.idx_minor_scaling[imnr]+1] * vmr_fact * dry_fact)
                 else
-                  scaling = scaling *          col_gas[icol,ilay,aux.idx_minor_scaling[imnr]] * vmr_fact * dry_fact
+                  scaling = scaling *          col_gas[icol,ilay,aux.idx_minor_scaling[imnr]+1] * vmr_fact * dry_fact
                 end
               end
             end
@@ -417,7 +422,7 @@ function compute_τ_Rayleigh!(ncol::I,nlay::I,nbnd::I,ngpt::I,
                                krayl::Array{FT,4},
                                idx_h2o::I,
                                col_dry::Array{FT,2},
-                               col_gas::AbstractArray{FT,3},
+                               col_gas::Array{FT,3},
                                ics::InterpolationCoefficients{FT},
                                τ_Rayleigh::Array{FT}) where {FT<:AbstractFloat, I<:Integer, B<:Bool}
   k = Array{FT}(undef, ngpt)
@@ -445,7 +450,7 @@ function compute_τ_Rayleigh!(ncol::I,nlay::I,nbnd::I,ngpt::I,
                               ics.jtemp[icol,ilay])
 
         τ_Rayleigh[gptS:gptE,ilay,icol] .= k[gptS:gptE] .*
-                                            (col_gas[icol,ilay,idx_h2o]+col_dry[icol,ilay])
+                                            (col_gas[icol,ilay,idx_h2o+1]+col_dry[icol,ilay])
       end
     end
   end

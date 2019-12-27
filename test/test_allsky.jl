@@ -23,6 +23,8 @@ include("DataSetFiles.jl")
   all_sky_pgp(ds_lw; use_luts=true, λ_string = "lw", compile_first=true)
   all_sky_pgp(ds_sw; use_luts=true, λ_string = "sw", compile_first=true)
 
+  # Profile.clear_malloc_data()
+
   if !pgp_only
     Δt_all["all_sky_lw","use_luts_false"] = @elapsed all_sky(ds_lw; use_luts=false, λ_string = "lw")
     Δt_all["all_sky_sw","use_luts_false"] = @elapsed all_sky(ds_sw; use_luts=false, λ_string = "sw")
