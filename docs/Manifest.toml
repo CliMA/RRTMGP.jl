@@ -273,7 +273,7 @@ deps = ["InteractiveUtils", "Markdown", "Sockets"]
 uuid = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
 
 [[RRTMGP]]
-deps = ["BenchmarkTools", "Compat", "Coverage", "DataDeps", "DelimitedFiles", "DocStringExtensions", "Documenter", "InteractiveUtils", "MbedTLS", "NCDatasets", "Pkg", "Profile", "ProgressMeter", "Quadmath", "Requires", "Test", "TimerOutputs"]
+deps = ["BenchmarkTools", "Compat", "Coverage", "DataDeps", "DelimitedFiles", "DocStringExtensions", "Documenter", "InteractiveUtils", "MbedTLS", "NCDatasets", "Pkg", "Profile", "ProgressMeter", "Quadmath", "Requires", "StaticArrays", "Test", "TimerOutputs"]
 path = ".."
 uuid = "a01a1ee8-cea4-48fc-987c-fc7878d79da1"
 version = "0.1.0"

@@ -90,10 +90,7 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor; compile_first=false)
   gas_conc_array = @timeit to "read_and_block_gases_ty" read_and_block_gases_ty(ds[:rfmip], block_size, kdist_gas_names)
   surface_albedo, total_solar_irradiance, solar_zenith_angle = @timeit to "read_and_block_sw_bc" read_and_block_sw_bc(ds[:rfmip], block_size)
 
-  #
-  # Read k-distribution information. load_and_init() reads data from netCDF and calls
-  #   k_dist%init(); users might want to use their own reading methods
-  #
+  # Read k-distribution information:
   k_dist = @timeit to "load_and_init" load_and_init(ds[:k_dist], FT, gas_conc_array[1].gas_names)
   @assert source_is_external(k_dist)
 

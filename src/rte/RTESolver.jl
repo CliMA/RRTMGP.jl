@@ -236,7 +236,7 @@ dimensions (nband, ncol) -> (ncol,ngpt), of `arr_out`, given
  - `ops` - a `AbstractOpticalProps`
  - `arr_in` - input array
 """
-function expand_and_transpose(ops::AbstractOpticalProps, arr_in::Array{FT}) where FT
+function expand_and_transpose(ops::AbstractOpticalProps{FT}, arr_in::Array{FT}) where {FT<:AbstractFloat}
   ncol  = size(arr_in,2)
   nband = get_nband(ops)
   ngpt  = get_ngpt(ops)

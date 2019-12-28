@@ -11,6 +11,8 @@ using ..Utilities
 export ReferenceState
 export get_press_min
 
+abstract type AbstractReferenceState{FT<:AbstractFloat} end
+
 """
     ReferenceState{FT}
 
@@ -19,7 +21,7 @@ Reference state variables for look-up tables / interpolation
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct ReferenceState{FT}
+struct ReferenceState{FT} <: AbstractReferenceState{FT}
   "Pressure"
   press::Vector{FT}
   "Log of pressure"

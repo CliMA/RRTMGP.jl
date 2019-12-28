@@ -34,7 +34,7 @@ Encapsulates a collection of volume mixing ratios (concentrations) of gases.
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct GasConcs{FT,I}
+struct GasConcs{FT<:AbstractFloat,I<:Int}
   "gas names"
   gas_names::Vector{AbstractGas}
   "gas concentrations arrays"
