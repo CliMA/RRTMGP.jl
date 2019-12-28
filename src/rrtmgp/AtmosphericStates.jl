@@ -98,6 +98,10 @@ struct AtmosphericState{FT,I} <: AbstractAtmosphericState{FT,I}
   col_gas::Array{FT,3}
   "Number of molecules per cm-2 of dry air"
   col_dry::Array{FT,2}
+  "troposphere mask: itropo = merge(1,2,tropo[icol,ilay]); itropo = 1 lower atmosphere; itropo = 2 upper atmosphere"
+  tropo::Array{Bool,2}
+  "Layer limits of upper, lower atmospheres"
+  tropo_lims::Array{I,3}
   "Indicates whether arrays are ordered in the vertical with 1 at the top or the bottom of the domain."
   top_at_1::Bool
   "Surface layer."
@@ -164,6 +168,21 @@ function AtmosphericState(gas_conc::GasConcs{FT,I},
   check_extent(t_sfc, ncol, "t_sfc")
   check_range(t_sfc, ref.temp_min,  ref.temp_max,  "t_sfc")
   sfc_lay = fmerge(1,nlay,p_lay[1,1] > p_lay[1,nlay])
+  tropo = log.(p_lay) .> ref.press_trop_log
+
+  # Layer limits of upper, lower atmospheres
+  tropo_lims = Array{I}(undef, ncol, 2, 2)
+  if top_at_1
+    tropo_lims[:, 1, 1] .= fminloc_wrapper(p_lay, dim=2, mask=tropo)
+    tropo_lims[:, 2, 1] .= nlay
+    tropo_lims[:, 1, 2] .= 1
+    tropo_lims[:, 2, 2] .= fmaxloc_wrapper(p_lay, dim=2, mask=(.!tropo))
+  else
+    tropo_lims[:, 1, 1] .= 1
+    tropo_lims[:, 2, 1] .= fminloc_wrapper(p_lay, dim=2, mask= tropo)
+    tropo_lims[:, 1, 2] .= fmaxloc_wrapper(p_lay, dim=2, mask=(.!tropo))
+    tropo_lims[:, 2, 2] .= nlay
+  end
 
   return AtmosphericState{FT,I}(gas_conc,
                                 p_lay,
@@ -173,6 +192,8 @@ function AtmosphericState(gas_conc::GasConcs{FT,I},
                                 t_sfc,
                                 col_gas,
                                 col_dry,
+                                tropo,
+                                tropo_lims,
                                 top_at_1,
                                 sfc_lay,
                                 nlay,
@@ -204,6 +225,10 @@ mutable struct AtmosphericStatePGP{FT,I} <: AbstractAtmosphericState{FT,I}
   col_gas::Array{FT,1}
   "Number of molecules per cm-2 of dry air"
   col_dry::FT
+  "troposphere mask: itropo = merge(1,2,tropo[icol,ilay]); itropo = 1 lower atmosphere; itropo = 2 upper atmosphere"
+  tropo::Bool
+  "Layer limits of upper, lower atmospheres"
+  tropo_lims::Array{I,2}
   "Indicates whether arrays are ordered in the vertical with 1 at the top or the bottom of the domain."
   top_at_1::Bool
   "Surface layer."
@@ -219,6 +244,7 @@ function AtmosphericStatePGP(gas_conc::GasConcsPGP{FT},
                              col_dry::FT,
                              t_sfc::FT,
                              sfc_lay::I,
+                             tropo_lims::Array{I,2},
                              top_at_1::Bool) where {FT<:AbstractFloat,I<:Int}
   if t_lev==nothing
     t_lev = interpolate_var(p_lay, p_lev, t_lay)
@@ -250,6 +276,8 @@ function AtmosphericStatePGP(gas_conc::GasConcsPGP{FT},
 
   check_range(t_sfc, ref.temp_min,  ref.temp_max,  "t_sfc")
 
+  tropo = log.(p_lay) .> ref.press_trop_log
+
   return AtmosphericStatePGP{FT,I}(gas_conc,
                                    p_lay,
                                    p_lev,
@@ -258,6 +286,8 @@ function AtmosphericStatePGP(gas_conc::GasConcsPGP{FT},
                                    t_sfc,
                                    col_gas,
                                    col_dry,
+                                   tropo,
+                                   tropo_lims,
                                    top_at_1,
                                    sfc_lay)
 end
@@ -268,6 +298,7 @@ function Base.convert(::Type{AtmosphericState}, data::Array{AtmosphericStatePGP{
   gas_conc = convert(GasConcs, [data[i,j].gas_conc for i in 1:s[1], j in 1:s[2]])
   top_at_1 = first(data).top_at_1
   sfc_lay = first(data).sfc_lay
+  s_tropo_lims = size(first(data).tropo_lims)
   ngas    = length(gas_conc.gas_names)
 
   col_gas = Array{FT}(undef, ncol,nlay,ngas+1)
@@ -295,6 +326,10 @@ function Base.convert(::Type{AtmosphericState}, data::Array{AtmosphericStatePGP{
       end
     end
   end
+  tropo  = Array{Bool}([data[i,j].tropo  for i in 1:s[1], j in 1:s[2]])
+  tropo_lims = Array{I}([data[i,1].tropo_lims[k,p] for i in 1:s[1],
+                                                     k in 1:s_tropo_lims[1],
+                                                     p in 1:s_tropo_lims[2]])
 
   return AtmosphericState{FT,I}(gas_conc,
                                 p_lay,
@@ -304,6 +339,8 @@ function Base.convert(::Type{AtmosphericState}, data::Array{AtmosphericStatePGP{
                                 t_sfc,
                                 col_gas,
                                 col_dry,
+                                tropo,
+                                tropo_lims,
                                 top_at_1,
                                 sfc_lay,
                                 nlay, ncol)
@@ -322,6 +359,8 @@ function Base.convert(::Type{Array{AtmosphericStatePGP}}, data::AtmosphericState
                              data.t_sfc[i],
                              data.col_gas[i,j,:],
                              data.col_dry[i,j],
+                             data.tropo[i,j],
+                             data.tropo_lims[i,:,:],
                              data.top_at_1,
                              data.sfc_lay) for i in 1:s[1], j in 1:s[2]]
 
