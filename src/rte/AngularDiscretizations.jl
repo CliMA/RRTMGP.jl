@@ -3,7 +3,7 @@ module AngularDiscretizations
 export AbstractAngularDiscretization
 export GaussQuadrature
 
-abstract type AbstractAngularDiscretization{AbstractFloat, Integer} end
+abstract type AbstractAngularDiscretization{FT<:AbstractFloat, I<:Int} end
 
 """
     GaussQuadrature{FT, I}

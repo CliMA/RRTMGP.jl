@@ -19,7 +19,7 @@ export AbstractFluxes, reduce!
 
 Abstract Fluxes struct
 """
-abstract type AbstractFluxes{FT} end
+abstract type AbstractFluxes{FT<:AbstractFloat} end
 
 include("FluxesBroadBand.jl")
 include("FluxesByBand.jl")
