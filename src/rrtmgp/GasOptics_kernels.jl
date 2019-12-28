@@ -38,8 +38,8 @@ function interpolation!(ics::InterpolationCoefficients{FT,I},
   npres = get_npres(go)
   ntemp = get_ntemp(go)
 
-  @unpack_fields as col_gas t_lay p_lay ncol nlay
-  @unpack_fields ics jtemp fmajor fminor jpress tropo col_mix j_η tropo_lims
+  @unpack_fields as col_gas t_lay p_lay ncol nlay tropo
+  @unpack_fields ics jtemp fmajor fminor jpress col_mix j_η
   @unpack_fields go ref flavor
   @unpack_fields ref press_log vmr press_log_delta temp temp_min temp_delta press_trop_log
 
@@ -59,7 +59,6 @@ function interpolation!(ics::InterpolationCoefficients{FT,I},
       locpress = FT(1) + (log(p_lay[icol,ilay]) - press_log[1]) / press_log_delta
       jpress[icol,ilay] = min(npres-1, max(1, fint(locpress)))
       fpress[icol,ilay] = locpress - FT(jpress[icol,ilay])
-      tropo[icol,ilay] = log(p_lay[icol,ilay]) > press_trop_log
     end
   end
   # determine if in lower or upper part of atmosphere
@@ -100,20 +99,6 @@ function interpolation!(ics::InterpolationCoefficients{FT,I},
       end # iflav
     end # icol,ilay
   end
-
-  # Layer limits of upper, lower atmospheres
-  if as.top_at_1
-    tropo_lims[:, 1, 1] .= fminloc_wrapper(p_lay, dim=2, mask=tropo)
-    tropo_lims[:, 2, 1] .= nlay
-    tropo_lims[:, 1, 2] .= 1
-    tropo_lims[:, 2, 2] .= fmaxloc_wrapper(p_lay, dim=2, mask=(.!tropo))
-  else
-    tropo_lims[:, 1, 1] .= 1
-    tropo_lims[:, 2, 1] .= fminloc_wrapper(p_lay, dim=2, mask= tropo)
-    tropo_lims[:, 1, 2] .= fmaxloc_wrapper(p_lay, dim=2, mask=(.!tropo))
-    tropo_lims[:, 2, 2] .= nlay
-  end
-
   return nothing
 
 end
@@ -141,7 +126,7 @@ function compute_τ_absorption!(τ::Array{FT,3},
                                as::AtmosphericState{FT,I},
                                last_call=false) where {FT<:AbstractFloat,I<:Int}
   fill!(τ, FT(0))
-  @timeit to_gor "go_major!" gas_optical_depths_major!(τ, go, ics) # Major Species
+  @timeit to_gor "go_major!" gas_optical_depths_major!(τ, go, as, ics) # Major Species
   @timeit to_gor "go_minor1!" gas_optical_depths_minor!(τ, go, as, ics, 1) # Minor Species - lower
   @timeit to_gor "go_minor2!" gas_optical_depths_minor!(τ, go, as, ics, 2) # Minor Species - upper
   return nothing
@@ -151,6 +136,7 @@ end
 """
     gas_optical_depths_major!(τ::Array{FT,3},
                               go::AbstractGasOptics{FT,I},
+                              as::AtmosphericState{FT,I},
                               ics::InterpolationCoefficients{FT,I}) where {FT<:AbstractFloat,I<:Int}
 
 compute minor species optical depths
@@ -164,9 +150,11 @@ given
 """
 function gas_optical_depths_major!(τ::Array{FT,3},
                                    go::AbstractGasOptics{FT,I},
+                                   as::AtmosphericState{FT,I},
                                    ics::InterpolationCoefficients{FT,I}) where {FT<:AbstractFloat,I<:Int}
 
-  @unpack_fields ics jtemp fmajor jpress tropo col_mix j_η
+  @unpack_fields as tropo
+  @unpack_fields ics jtemp fmajor jpress col_mix j_η
   @unpack_fields go kmajor gpoint_flavor optical_props
   band_lims_gpt = get_band_lims_gpoint(optical_props)
   nbnd = get_nband(optical_props)
@@ -242,8 +230,8 @@ function gas_optical_depths_minor!(τ::Array{FT,3},
                                    as::AtmosphericState{FT,I},
                                    ics::InterpolationCoefficients{FT,I},
                                    itropo::I) where {FT<:AbstractFloat, I<:Int}
-  @unpack_fields as col_gas t_lay p_lay
-  @unpack_fields ics jtemp fminor j_η tropo_lims
+  @unpack_fields as col_gas t_lay p_lay tropo_lims
+  @unpack_fields ics jtemp fminor j_η
   @unpack_fields go gpoint_flavor lower lower_aux upper upper_aux gas_names
   idx_h2o = loc_in_array(h2o(), gas_names)
   atmos = itropo==1 ? lower : upper
@@ -345,8 +333,8 @@ function compute_τ_Rayleigh!(τ_Rayleigh::Array{FT,3},
                              ics::InterpolationCoefficients{FT,I},
                              as::AtmosphericState{FT,I}) where {FT<:AbstractFloat, I<:Integer}
 
-  @unpack_fields as col_gas col_dry
-  @unpack_fields ics jtemp tropo fminor j_η
+  @unpack_fields as col_gas col_dry tropo
+  @unpack_fields ics jtemp fminor j_η
   @unpack_fields go krayl gpoint_flavor
 
   band_lims_gpt = get_band_lims_gpoint(go.optical_props)
@@ -403,8 +391,8 @@ function compute_Planck_source!(sources::SourceFuncLongWave{FT,I},
   @unpack_fields go ref totplnk_delta totplnk gpoint_flavor planck_frac optical_props
   @unpack_fields ref temp_min
   @unpack_fields sources sfc_source lay_source lev_source_inc lev_source_dec p_frac
-  @unpack_fields as t_lay t_lev t_sfc sfc_lay
-  @unpack_fields ics jtemp tropo j_η jpress fmajor
+  @unpack_fields as t_lay t_lev t_sfc sfc_lay tropo
+  @unpack_fields ics jtemp j_η jpress fmajor
 
   ncol  = get_ncol(sources)
   nlay  = get_nlay(sources)

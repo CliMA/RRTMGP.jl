@@ -187,27 +187,21 @@ struct InterpolationCoefficients{FT<:AbstractFloat,I<:Int}
   jpress::Array{I,2}
   "index for binary species parameter (η)"
   j_η::Array{I,4}
-  "troposphere mask: itropo = merge(1,2,tropo[icol,ilay]); itropo = 1 lower atmosphere; itropo = 2 upper atmosphere"
-  tropo::Array{Bool,2}
   "fractions for major species"
   fmajor::Array{FT,6}
   "fractions for minor species. [reference η level (temperature dependent), reference temperature level, flavor, layer]"
   fminor::Array{FT,5}
   "combination of major specie's column amounts"
   col_mix::Array{FT,4}
-  "Layer limits of upper, lower atmospheres"
-  tropo_lims::Array{I,3}
 end
 function InterpolationCoefficients(::Type{FT}, ::Type{I}, ncol, nlay, nflav) where {I<:Int, FT<:AbstractFloat}
   jtemp = Array{I}(undef,                ncol, nlay)
   jpress = Array{I}(undef,               ncol, nlay)
   j_η = Array{I}(undef, 2, nflav,        ncol, nlay)
-  tropo = Array{Bool}(undef,             ncol, nlay)
   fmajor = zeros(FT, 2,2,2, nflav,       ncol, nlay)
   fminor  = Array{FT}(undef, 2,2, nflav, ncol, nlay)
   col_mix  = Array{FT}(undef, 2, nflav,  ncol, nlay)
-  tropo_lims = Array{I}(undef,           ncol, 2, 2)
-  return InterpolationCoefficients{FT,I}(jtemp,jpress,j_η,tropo,fmajor,fminor,col_mix,tropo_lims)
+  return InterpolationCoefficients{FT,I}(jtemp,jpress,j_η,fmajor,fminor,col_mix)
 end
 
 """
@@ -225,28 +219,22 @@ mutable struct InterpolationCoefficientsPGP{FT<:AbstractFloat,I<:Int}
   jpress::I
   "index for binary species parameter (η)"
   j_η::Array{I,2}
-  "troposphere mask: itropo = merge(1,2,tropo[icol,ilay]); itropo = 1 lower atmosphere; itropo = 2 upper atmosphere"
-  tropo::Bool
   "fractions for major species"
   fmajor::Array{FT,4}
   "fractions for minor species. [reference η level (temperature dependent), reference temperature level, flavor, layer]"
   fminor::Array{FT,3}
   "combination of major specie's column amounts"
   col_mix::Array{FT,2}
-  "Layer limits of upper, lower atmospheres"
-  tropo_lims::Array{I,2}
 end
 
 function Base.convert(::Type{InterpolationCoefficients}, data::Array{InterpolationCoefficientsPGP{FT,I}}) where {FT,I}
   s = size(data)
   s_j_η = size(first(data).j_η)
-  s_tropo_lims = size(first(data).tropo_lims)
   s_fmajor = size(first(data).fmajor)
   s_fminor = size(first(data).fminor)
   s_col_mix = size(first(data).col_mix)
   jtemp  = Array{I}([data[i,j].jtemp  for i in 1:s[1], j in 1:s[2]])
   jpress = Array{I}([data[i,j].jpress for i in 1:s[1], j in 1:s[2]])
-  tropo  = Array{Bool}([data[i,j].tropo  for i in 1:s[1], j in 1:s[2]])
 
   j_η    = Array{I}([data[i,j].j_η[k,p] for k in 1:s_j_η[1],
                                              p in 1:s_j_η[2],
@@ -267,21 +255,16 @@ function Base.convert(::Type{InterpolationCoefficients}, data::Array{Interpolati
                                                   p in 1:s_col_mix[2],
                                                   i in 1:s[1],
                                                   j in 1:s[2]])
-  tropo_lims = Array{I}([data[i,1].tropo_lims[k,p] for i in 1:s[1],
-                                                     k in 1:s_tropo_lims[1],
-                                                     p in 1:s_tropo_lims[2]])
-  return InterpolationCoefficients{FT,I}(jtemp,jpress,j_η,tropo,fmajor,fminor,col_mix,tropo_lims)
+  return InterpolationCoefficients{FT,I}(jtemp,jpress,j_η,fmajor,fminor,col_mix)
 end
 
 Base.convert(::Type{Array{InterpolationCoefficientsPGP}}, data::InterpolationCoefficients{FT,I}) where {FT,I} =
   [InterpolationCoefficientsPGP{FT,I}(data.jtemp[i,j],
                                       data.jpress[i,j],
                                       data.j_η[:,:,i,j],
-                                      data.tropo[i,j],
                                       data.fmajor[:,:,:,:,i,j],
                                       data.fminor[:,:,:,i,j],
-                                      data.col_mix[:,:,i,j],
-                                      data.tropo_lims[i,:,:]) for i in 1:size(data.jtemp,1), j in 1:size(data.jtemp,2)]
+                                      data.col_mix[:,:,i,j]) for i in 1:size(data.jtemp,1), j in 1:size(data.jtemp,2)]
 
 """
     get_ngas(this::AbstractGasOptics)
