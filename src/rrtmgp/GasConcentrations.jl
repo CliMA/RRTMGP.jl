@@ -58,7 +58,7 @@ Each concentration is associated with a name, normally the chemical formula.
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct GasConcsPGP{FT}
+struct GasConcsPGP{FT<:AbstractFloat}
   "gas names"
   gas_names::Vector{AbstractGas}
   "gas concentrations arrays"

@@ -11,7 +11,7 @@ using ..Utilities
 export ShortwaveBCs
 export LongwaveBCs
 
-abstract type AbstractRadiativeBoundaryConditions{AbstractFloat} end
+abstract type AbstractRadiativeBoundaryConditions{FT<:AbstractFloat} end
 
 """
     ShortwaveBCs{FT}

@@ -23,17 +23,17 @@ export PadeMethod, LookUpTable
 export CloudOpticsLUT
 export CloudOpticsPade
 
-abstract type AbstractInterpolationMethod end
+abstract type AbstractInterpolationMethod{FT<:AbstractFloat} end
 
 """
-    PadeMethod <: AbstractInterpolationMethod
+    PadeMethod{FT} <: AbstractInterpolationMethod{FT}
 
 Pade approximation coefficients
 
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct PadeMethod{FT} <: AbstractInterpolationMethod
+struct PadeMethod{FT} <: AbstractInterpolationMethod{FT}
   "Extinction coefficients"
   ext::Array{FT}
   "Single scattering albedo"
@@ -85,14 +85,14 @@ struct PadeMethod{FT} <: AbstractInterpolationMethod
 end
 
 """
-    LookUpTable{FT,I} <: AbstractInterpolationMethod
+    LookUpTable{FT,I<:Int} <: AbstractInterpolationMethod{FT}
 
 Lookup table interpolation constants and coefficients
 
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct LookUpTable{FT,I} <: AbstractInterpolationMethod
+struct LookUpTable{FT,I<:Int} <: AbstractInterpolationMethod{FT}
   "particle size lower bound for interpolation"
   rad_lwr::FT
   "particle size upper bound for interpolation"
@@ -151,13 +151,13 @@ get_num_roughness_types(this::LookUpTable) = size(this.ext,  3)
 $(DocStringExtensions.FIELDS)
 """
 struct CloudOpticsLUT{FT, I} <: AbstractOpticalProps{FT, I}
-  base::OpticalPropsBase
+  base::OpticalPropsBase{FT,I}
   "Ice surface roughness category - needed for Yang (2013) ice optics parameterization"
   icergh::I
   "Interpolation method for liquid properties"
-  liq::LookUpTable
+  liq::LookUpTable{FT,I}
   "Interpolation method for ice properties"
-  ice::LookUpTable
+  ice::LookUpTable{FT,I}
 end
 
 """
@@ -168,13 +168,13 @@ $(DocStringExtensions.FIELDS)
 """
 struct CloudOpticsPade{FT, I} <: AbstractOpticalProps{FT, I}
   "Base optical properties"
-  base::OpticalPropsBase
+  base::OpticalPropsBase{FT,I}
   "Ice surface roughness category - needed for Yang (2013) ice optics parameterization"
   icergh::I
   "Interpolation method for liquid properties"
-  liq::AbstractInterpolationMethod
+  liq::PadeMethod{FT}
   "Interpolation method for ice properties"
-  ice::AbstractInterpolationMethod
+  ice::PadeMethod{FT}
 end
 
 """
@@ -395,7 +395,8 @@ end
 """
     compute_all_from_table!(nbnd::I,
                             clouds::CloudOpticalProps{FT},
-                            op::TwoStream{FT},
+                            lut::LookUpTable{FT,I},
+                            op::TwoStream{FT,I},
                             icergh::Union{Nothing,I}=nothing) where {FT<:AbstractFloat,I<:Int}
 
 Linearly interpolate values from a lookup table with "nsteps" evenly-spaced
@@ -407,31 +408,31 @@ given
 
  - `nbnd` number of bands
  - `clouds` cloud optical properties, see [`CloudOpticalProps`](@ref)
- - `aim` interpolation method, see [`AbstractInterpolationMethod`](@ref)
+ - `lut` interpolation method (look-up table), see [`LookUpTable`](@ref)
  - `icergh` ice surface roughness category - needed for Yang (2013) ice optics parameterization
 
 The table's second dimension is band. Returns 0 where `clouds.wp ≤ 0`.
 """
 function compute_all_from_table!(nbnd::I,
                                  clouds::CloudOpticalProps{FT},
-                                 aim::AbstractInterpolationMethod,
-                                 op::TwoStream{FT},
+                                 lut::LookUpTable{FT,I},
+                                 op::TwoStream{FT,I},
                                  icergh::Union{Nothing,I}=nothing) where {FT<:AbstractFloat,I<:Int}
 
   ncol,nlay = size(clouds.re)
 
-  offset = aim.rad_lwr
+  offset = lut.rad_lwr
 
-  τ_table   = icergh ≠ nothing ? aim.ext[:,:,icergh] : aim.ext
-  ssa_table = icergh ≠ nothing ? aim.ssa[:,:,icergh] : aim.ssa
-  asy_table = icergh ≠ nothing ? aim.asy[:,:,icergh] : aim.asy
+  τ_table   = icergh ≠ nothing ? lut.ext[:,:,icergh] : lut.ext
+  ssa_table = icergh ≠ nothing ? lut.ssa[:,:,icergh] : lut.ssa
+  asy_table = icergh ≠ nothing ? lut.asy[:,:,icergh] : lut.asy
 
   @inbounds for ibnd = 1:nbnd
     @inbounds for ilay = 1:nlay
       @inbounds for icol = 1:ncol
         if clouds.wp[icol,ilay] > FT(0)
-          index = convert(Int, min(floor((clouds.re[icol,ilay] - offset)/aim.step_size)+1, aim.nsteps-1))
-          fint = (clouds.re[icol,ilay] - offset)/aim.step_size - (index-1)
+          index = convert(Int, min(floor((clouds.re[icol,ilay] - offset)/lut.step_size)+1, lut.nsteps-1))
+          fint = (clouds.re[icol,ilay] - offset)/lut.step_size - (index-1)
           τ   = clouds.wp[icol,ilay] *           (τ_table[index,  ibnd] + fint * (τ_table[index+1,ibnd]   - τ_table[index,ibnd]))
           τs  = τ              *               (ssa_table[index,  ibnd] + fint * (ssa_table[index+1,ibnd] - ssa_table[index,ibnd]))
           op.g[icol,ilay,ibnd] = τs          * (asy_table[index,  ibnd] + fint * (asy_table[index+1,ibnd] - asy_table[index,ibnd]))
@@ -448,20 +449,20 @@ function compute_all_from_table!(nbnd::I,
 end
 function compute_all_from_table!(nbnd::I,
                                  clouds::CloudOpticalPropsPGP{FT},
-                                 aim::AbstractInterpolationMethod,
-                                 op::TwoStreamPGP{FT},
+                                 lut::LookUpTable{FT,I},
+                                 op::TwoStreamPGP{FT,I},
                                  icergh::Union{Nothing,I}=nothing) where {FT<:AbstractFloat,I<:Int}
 
-  offset = aim.rad_lwr
+  offset = lut.rad_lwr
 
-  τ_table   = icergh ≠ nothing ? aim.ext[:,:,icergh] : aim.ext
-  ssa_table = icergh ≠ nothing ? aim.ssa[:,:,icergh] : aim.ssa
-  asy_table = icergh ≠ nothing ? aim.asy[:,:,icergh] : aim.asy
+  τ_table   = icergh ≠ nothing ? lut.ext[:,:,icergh] : lut.ext
+  ssa_table = icergh ≠ nothing ? lut.ssa[:,:,icergh] : lut.ssa
+  asy_table = icergh ≠ nothing ? lut.asy[:,:,icergh] : lut.asy
 
   @inbounds for ibnd = 1:nbnd
     if clouds.wp > FT(0)
-      index = convert(Int, min(floor((clouds.re - offset)/aim.step_size)+1, aim.nsteps-1))
-      fint = (clouds.re - offset)/aim.step_size - (index-1)
+      index = convert(Int, min(floor((clouds.re - offset)/lut.step_size)+1, lut.nsteps-1))
+      fint = (clouds.re - offset)/lut.step_size - (index-1)
       τ   = clouds.wp *           (τ_table[index,  ibnd] + fint * (  τ_table[index+1,ibnd] - τ_table[index,ibnd]))
       τs  = τ         *         (ssa_table[index,  ibnd] + fint * (ssa_table[index+1,ibnd] - ssa_table[index,ibnd]))
       op.g[ibnd] = τs         * (asy_table[index,  ibnd] + fint * (asy_table[index+1,ibnd] - asy_table[index,ibnd]))
@@ -480,34 +481,34 @@ end
 #####
 
 """
-    compute_all_from_pade!(nbnd,
+    compute_all_from_pade!(nbnd::I,
                            clouds::CloudOpticalProps{FT},
-                           aim::AbstractInterpolationMethod,
-                           op::TwoStream{FT},
+                           pm::PadeMethod{FT},
+                           op::TwoStream{FT,I},
                            icergh::Union{Nothing,I}=nothing) where {FT<:AbstractFloat,I<:Int}
 
  - `nbnd` number of bands
  - `clouds` cloud optical properties, see [`CloudOpticalProps`](@ref)
- - `aim` interpolation method, see [`AbstractInterpolationMethod`](@ref)
+ - `pm` interpolation method (Pade), see [`PadeMethod`](@ref)
  - `op` optical properties, see [`TwoStream`](@ref)
  - `icergh` ice surface roughness category - needed for Yang (2013) ice optics parameterization
 """
 function compute_all_from_pade!(nbnd::I,
                                 clouds::CloudOpticalProps{FT},
-                                aim::AbstractInterpolationMethod,
-                                op::TwoStream{FT},
+                                pm::PadeMethod{FT},
+                                op::TwoStream{FT,I},
                                 icergh::Union{Nothing,I}=nothing) where {FT<:AbstractFloat,I<:Int}
 
-  nsizes = size(aim.ext,2)
+  nsizes = size(pm.ext,2)
   # Cloud optical properties from Pade coefficient method
   #   Hard coded assumptions: order of approximants, three size regimes
   m_ext, n_ext = 2, 3
   m_ssa, n_ssa = 2, 2
   m_asy, n_asy = 2, 2
 
-  coeffs_ext = icergh≠nothing ? aim.ext[:,:,:,icergh] : aim.ext
-  coeffs_ssa = icergh≠nothing ? aim.ssa[:,:,:,icergh] : aim.ssa
-  coeffs_asy = icergh≠nothing ? aim.asy[:,:,:,icergh] : aim.asy
+  coeffs_ext = icergh≠nothing ? pm.ext[:,:,:,icergh] : pm.ext
+  coeffs_ssa = icergh≠nothing ? pm.ssa[:,:,:,icergh] : pm.ssa
+  coeffs_asy = icergh≠nothing ? pm.asy[:,:,:,icergh] : pm.asy
 
   ncol,nlay = size(clouds.re)
   @inbounds for ibnd = 1:nbnd
@@ -520,13 +521,13 @@ function compute_all_from_pade!(nbnd::I,
           # This works only if there are precisely three size regimes (four bounds) and it's
           #   previously guaranteed that size_bounds(1) <= size <= size_bounds(4)
           #
-          irad = convert(Int, min(floor((re - aim.sizreg_ext[2])/aim.sizreg_ext[3])+2, 3))
+          irad = convert(Int, min(floor((re - pm.sizreg_ext[2])/pm.sizreg_ext[3])+2, 3))
           τ   = clouds.wp[icol,ilay] * pade_eval(ibnd, nbnd, nsizes, m_ext, n_ext, irad, re, coeffs_ext)
 
-          irad = convert(Int,min(floor((re - aim.sizreg_ssa[2])/aim.sizreg_ssa[3])+2, 3))
+          irad = convert(Int,min(floor((re - pm.sizreg_ssa[2])/pm.sizreg_ssa[3])+2, 3))
           # Pade approximants for co-albedo can sometimes be negative
           τs   = τ               * (FT(1) - max(FT(0), pade_eval(ibnd, nbnd, nsizes, m_ssa, n_ssa, irad, re, coeffs_ssa)))
-          irad = convert(Int, min(floor((re - aim.sizreg_asy[2])/aim.sizreg_asy[3])+2, 3))
+          irad = convert(Int, min(floor((re - pm.sizreg_asy[2])/pm.sizreg_asy[3])+2, 3))
           op.g[icol,ilay,ibnd] = τs  * pade_eval(ibnd, nbnd, nsizes, m_asy, n_asy, irad, re, coeffs_asy)
           op.ssa[icol,ilay,ibnd] = τs
           op.τ[icol,ilay,ibnd] = τ
@@ -541,20 +542,20 @@ function compute_all_from_pade!(nbnd::I,
 end
 function compute_all_from_pade!(nbnd::I,
                                 clouds::CloudOpticalPropsPGP{FT},
-                                aim::AbstractInterpolationMethod,
-                                op::TwoStreamPGP{FT},
+                                pm::PadeMethod{FT},
+                                op::TwoStreamPGP{FT,I},
                                 icergh::Union{Nothing,I}=nothing) where {FT<:AbstractFloat,I<:Int}
 
-  nsizes = size(aim.ext,2)
+  nsizes = size(pm.ext,2)
   # Cloud optical properties from Pade coefficient method
   #   Hard coded assumptions: order of approximants, three size regimes
   m_ext, n_ext = 2, 3
   m_ssa, n_ssa = 2, 2
   m_asy, n_asy = 2, 2
 
-  coeffs_ext = icergh≠nothing ? aim.ext[:,:,:,icergh] : aim.ext
-  coeffs_ssa = icergh≠nothing ? aim.ssa[:,:,:,icergh] : aim.ssa
-  coeffs_asy = icergh≠nothing ? aim.asy[:,:,:,icergh] : aim.asy
+  coeffs_ext = icergh≠nothing ? pm.ext[:,:,:,icergh] : pm.ext
+  coeffs_ssa = icergh≠nothing ? pm.ssa[:,:,:,icergh] : pm.ssa
+  coeffs_asy = icergh≠nothing ? pm.asy[:,:,:,icergh] : pm.asy
 
   @inbounds for ibnd = 1:nbnd
     if clouds.wp>FT(0)
@@ -564,13 +565,13 @@ function compute_all_from_pade!(nbnd::I,
       # This works only if there are precisely three size regimes (four bounds) and it's
       #   previously guaranteed that size_bounds(1) <= size <= size_bounds(4)
       #
-      irad = convert(Int, min(floor((re - aim.sizreg_ext[2])/aim.sizreg_ext[3])+2, 3))
+      irad = convert(Int, min(floor((re - pm.sizreg_ext[2])/pm.sizreg_ext[3])+2, 3))
       τ   = clouds.wp * pade_eval(ibnd, nbnd, nsizes, m_ext, n_ext, irad, re, coeffs_ext)
 
-      irad = convert(Int,min(floor((re - aim.sizreg_ssa[2])/aim.sizreg_ssa[3])+2, 3))
+      irad = convert(Int,min(floor((re - pm.sizreg_ssa[2])/pm.sizreg_ssa[3])+2, 3))
       # Pade approximants for co-albedo can sometimes be negative
       τs   = τ               * (FT(1) - max(FT(0), pade_eval(ibnd, nbnd, nsizes, m_ssa, n_ssa, irad, re, coeffs_ssa)))
-      irad = convert(Int, min(floor((re - aim.sizreg_asy[2])/aim.sizreg_asy[3])+2, 3))
+      irad = convert(Int, min(floor((re - pm.sizreg_asy[2])/pm.sizreg_asy[3])+2, 3))
       op.g[ibnd] = τs  * pade_eval(ibnd, nbnd, nsizes, m_asy, n_asy, irad, re, coeffs_asy)
       op.ssa[ibnd] = τs
       op.τ[ibnd] = τ
@@ -580,7 +581,6 @@ function compute_all_from_pade!(nbnd::I,
       op.g[ibnd] = FT(0)
     end
   end
-
 end
 
 #####
@@ -588,7 +588,14 @@ end
 #####
 
 """
-    pade_eval(iband, nbnd, nrads, m, n, irad, re, pade_coeffs_array)
+    pade_eval(iband::I,
+              nbnd::I,
+              nrads::I,
+              m::I,
+              n::I,
+              irad::I,
+              re::FT,
+              pade_coeffs::AbstractArray{FT}) where {FT<:AbstractFloat, I<:Int}
 
 Evaluate Pade approximant of order [m/n], given
 

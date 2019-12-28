@@ -26,7 +26,7 @@ include("Interpolation.jl")
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct SimpleGrid{FT}
+struct SimpleGrid{FT<:AbstractFloat}
   z
 end
 
