@@ -38,9 +38,12 @@ struct ReferenceState{FT} <: AbstractReferenceState{FT}
   temp_max::FT
   "Maximum of temperature"
   press_log_delta::FT
+  "temperature change between surface and top of atmosphere"
   temp_delta::FT
+  "logarithm of tropospheric pressure"
   press_trop_log::FT
-  vmr::Array{FT,3}   # vmr(lower or upper atmosphere, gas, temp)
+  "volume mixing ratio (lower or upper atmosphere, gas, temp)"
+  vmr::Array{FT,3}
   function ReferenceState(press::Array{FT},
                           temp::Array{FT},
                           press_ref_trop::FT,

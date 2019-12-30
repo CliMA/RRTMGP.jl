@@ -3,6 +3,7 @@ module RRTMGP
 include("Misc.jl")
 include("FortranIntrinsics.jl")
 include("Utilities.jl")
+include("MeshOrientations.jl")
 
 include(joinpath("rte","AngularDiscretizations.jl"))
 include(joinpath("rte","SolarZenithAngle.jl"))

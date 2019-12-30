@@ -171,7 +171,7 @@ function rfmip_clear_sky_lw_pgp(ds, optical_props_constructor; compile_first=fal
     bcs = LongwaveBCs(sfc_emis_spec)
 
     rte_lw!(optical_props,
-            as.top_at_1,
+            as.mesh_orientation,
             source,
             bcs,
             fluxes,

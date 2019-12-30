@@ -111,8 +111,6 @@ function all_sky_pgp(ds; use_luts=false, λ_string="", compile_first=false)
   clouds = get_optical_props(clouds_base, is_sw, ncol, nlay, ngpt)
   atmos  = get_optical_props(k_dist.optical_props, is_sw, ncol, nlay, ngpt)
 
-  top_at_1 = p_lay[1, 1] < p_lay[1, nlay]
-
   #  Boundary conditions depending on whether the k-distribution being supplied
   #   is LW or SW
   if is_sw
@@ -212,7 +210,7 @@ function all_sky_pgp(ds; use_luts=false, λ_string="", compile_first=false)
       increment!(clouds, atmos)
       bcs = LongwaveBCs(sfc_emis)
       rte_lw!(atmos,
-              as.top_at_1,
+              as.mesh_orientation,
               lw_sources,
               bcs,
               fluxes)
@@ -228,7 +226,7 @@ function all_sky_pgp(ds; use_luts=false, λ_string="", compile_first=false)
       increment!(clouds, atmos)
       bcs = ShortwaveBCs(toa_flux, sfc_alb_dir, sfc_alb_dif)
       rte_sw!(atmos,
-              as.top_at_1,
+              as.mesh_orientation,
               μ_0,
               bcs,
               fluxes)
