@@ -31,7 +31,6 @@ end
             gpt_flux_up::Array{FT,3},
             gpt_flux_dn::Array{FT,3},
             spectral_disc::AbstractOpticalProps,
-            top_at_1::Bool,
             gpt_flux_dn_dir::Union{Nothing,Array{FT,3}}=nothing) where FT<:AbstractFloat
 
 Compute `FluxesBroadBand` `this` by summing over the
@@ -40,7 +39,6 @@ spectral dimension, given
  - `gpt_flux_up` upward fluxes by gpoint [W/m2]
  - `gpt_flux_dn` downward fluxes by gpoint [W/m2]
  - `spectral_disc` optical properties containing spectral information
- - `top_at_1` bool indicating at top
 optional:
  - `gpt_flux_dn_dir` downward direct flux
 """
@@ -48,7 +46,6 @@ function reduce!(this::FluxesBroadBand,
                  gpt_flux_up::Array{FT,3},
                  gpt_flux_dn::Array{FT,3},
                  spectral_disc::AbstractOpticalProps,
-                 top_at_1::Bool,
                  gpt_flux_dn_dir::Union{Nothing,Array{FT,3}}=nothing) where FT<:AbstractFloat
 
   ncol,nlev,ngpt = size(gpt_flux_up)

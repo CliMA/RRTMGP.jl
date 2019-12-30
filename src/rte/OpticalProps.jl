@@ -38,6 +38,7 @@ export delta_scale!,
        get_band_lims_wavenumber,
        get_gpoint_bands,
        bands_are_equal,
+       gpt_range,
        get_band_lims_gpoint
 
 export get_nband,
@@ -409,6 +410,16 @@ Band associated with a specific g-point
 """
 convert_gpt2band(this::AbstractOpticalProps, gpt::I) where {I<:Int} = convert_gpt2band(this.base)
 convert_gpt2band(this::OpticalPropsBase, gpt::I) where {I<:Int} = this.gpt2band[gpt]
+
+"""
+    gpt_range(this::AbstractOpticalProps)
+
+A range of g-point bands, given the i-th band
+
+ - `this` optical properties, see [`AbstractOpticalProps`](@ref)
+"""
+gpt_range(this::AbstractOpticalProps{FT,I}, ibnd::I) where {FT,I} = gpt_range(this.base, ibnd)
+gpt_range(this::OpticalPropsBase{FT,I}, ibnd::I) where {FT,I<:Int} = this.band2gpt[1,ibnd]:this.band2gpt[2,ibnd]
 
 """
     bands_are_equal(this::AbstractOpticalProps{FT}, that::AbstractOpticalProps{FT}) where FT

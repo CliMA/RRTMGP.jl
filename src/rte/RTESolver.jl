@@ -53,6 +53,7 @@ The routine does error checking and choses which lower-level kernel to invoke ba
 module RTESolver
 
 using ..RadiativeBoundaryConditions
+using ..MeshOrientations
 using ..AngularDiscretizations
 using ..Utilities
 using ..OpticalProps
@@ -64,10 +65,10 @@ export rte_lw!, rte_sw!, expand_and_transpose
 
 """
     rte_sw!(atmos::AbstractOpticalPropsArry{FT},
-            top_at_1::Bool,
+            mesh_orientation::MeshOrientation{I},
             μ_0::Array{FT},
             bcs::ShortwaveBCs{FT},
-            fluxes::FluxesBroadBand{FT}) where {FT<:AbstractFloat}
+            fluxes::FluxesBroadBand{FT}) where {FT<:AbstractFloat,I<:Int}
 
 Computes
 
@@ -76,15 +77,15 @@ Computes
 given
 
  - `atmos` Optical properties provided as arrays (`AbstractOpticalPropsArry`)
- - `top_at_1` indicates that the top of the domain is at index 1
+ - `mesh_orientation` mesh orientation, see [`MeshOrientation`](@ref)
  - `μ_0` cosine of solar zenith angle (ncol)
  - `bcs` boundary conditions, see [`ShortwaveBCs`](@ref)
 """
 function rte_sw!(atmos::AbstractOpticalPropsArry{FT},
-                 top_at_1::Bool,
+                 mesh_orientation::MeshOrientation{I},
                  μ_0::Array{FT},
                  bcs::ShortwaveBCs{FT},
-                 fluxes::FluxesBroadBand{FT}) where {FT<:AbstractFloat}
+                 fluxes::FluxesBroadBand{FT}) where {FT<:AbstractFloat,I<:Int}
 
   ncol  = get_ncol(atmos)
   nlay  = get_nlay(atmos)
@@ -109,18 +110,18 @@ function rte_sw!(atmos::AbstractOpticalPropsArry{FT},
   #   On input flux_dn is the diffuse component; the last action in each solver is to add
   #   direct and diffuse to represent the total, consistent with the LW
   #
-  apply_BC!(gpt_flux_dir, ncol, nlay, ngpt, top_at_1,   bcs.toa_flux, μ_0)
+  apply_BC!(gpt_flux_dir, mesh_orientation.ilev_top, bcs.toa_flux, μ_0)
 
   if present(bcs.inc_flux_diffuse)
-    apply_BC!(gpt_flux_dn, ncol, nlay, ngpt, top_at_1, bcs.inc_flux_diffuse)
+    apply_BC!(gpt_flux_dn, mesh_orientation.ilev_top, bcs.inc_flux_diffuse)
   else
-    apply_BC!(gpt_flux_dn, ncol, nlay, ngpt, top_at_1)
+    apply_BC!(gpt_flux_dn, mesh_orientation.ilev_top)
   end
 
   validate!(atmos)
   if atmos isa OneScalar
     # Direct beam only
-    sw_solver_noscat!(ncol, nlay, ngpt, top_at_1,
+    sw_solver_noscat!(ncol, nlay, ngpt, mesh_orientation,
                       atmos.τ, μ_0,
                       gpt_flux_dir)
     # No diffuse flux
@@ -128,7 +129,7 @@ function rte_sw!(atmos::AbstractOpticalPropsArry{FT},
     # gpt_flux_dn .= FT(0)
   elseif atmos isa TwoStream
     # two-stream calculation with scattering
-    sw_solver!(ncol, nlay, ngpt, top_at_1,
+    sw_solver!(ncol, nlay, ngpt, mesh_orientation,
                atmos,
                μ_0,
                sfc_alb_dir_gpt,
@@ -143,29 +144,28 @@ function rte_sw!(atmos::AbstractOpticalPropsArry{FT},
           gpt_flux_up,
           gpt_flux_dn,
           atmos,
-          top_at_1,
           gpt_flux_dir)
 end
 
 """
     rte_lw!(optical_props::AbstractOpticalPropsArry{FT},
-            top_at_1::Bool,
+            mesh_orientation::MeshOrientation{I},
             sources::SourceFuncLongWave{FT, I},
             bcs::LongwaveBCs{FT},
             fluxes::FluxesBroadBand{FT},
-            n_gauss_angles=nothing) where {FT<:AbstractFloat,I<:Int}
+            angle_disc::Union{GaussQuadrature{FT,I},Nothing}=nothing) where {FT<:AbstractFloat,I<:Int}
 
 Interface using only optical properties and source functions as inputs; fluxes as outputs.
 
  - `optical_props` optical properties
- - `top_at_1` indicates that the top of the domain is at index 1
+ - `mesh_orientation` mesh orientation, see [`MeshOrientation`](@ref)
  - `sources` radiation sources
  - `bcs` boundary conditions, see [`LongwaveBCs`](@ref)
  - `fluxes` broadband fluxes, see [`AbstractFluxes`](@ref)
  - `n_gauss_angles` Number of angles used in Gaussian quadrature (no-scattering solution)
 """
 function rte_lw!(optical_props::AbstractOpticalPropsArry{FT},
-                 top_at_1::Bool,
+                 mesh_orientation::MeshOrientation{I},
                  sources::SourceFuncLongWave{FT, I},
                  bcs::LongwaveBCs{FT},
                  fluxes::FluxesBroadBand{FT},
@@ -196,17 +196,17 @@ function rte_lw!(optical_props::AbstractOpticalPropsArry{FT},
 
   #   Upper boundary condition
   if bcs.inc_flux ≠ nothing
-    apply_BC!(gpt_flux_dn, ncol, nlay, ngpt, top_at_1, bcs.inc_flux)
+    apply_BC!(gpt_flux_dn, mesh_orientation.ilev_top, bcs.inc_flux)
   else
     # Default is zero incident diffuse flux
-    apply_BC!(gpt_flux_dn, ncol, nlay, ngpt, top_at_1)
+    apply_BC!(gpt_flux_dn, mesh_orientation.ilev_top)
   end
 
   # Compute the radiative transfer...
   if optical_props isa OneScalar
 
     # No scattering two-stream calculation
-    lw_solver_noscat_GaussQuad!(ncol, nlay, ngpt, top_at_1,
+    lw_solver_noscat_GaussQuad!(ncol, nlay, ngpt, mesh_orientation,
                                 angle_disc,
                                 optical_props.τ,
                                 sources,
@@ -216,7 +216,7 @@ function rte_lw!(optical_props::AbstractOpticalPropsArry{FT},
 
   elseif optical_props isa TwoStream
     # two-stream calculation with scattering
-    lw_solver!(ncol, nlay, ngpt, top_at_1,
+    lw_solver!(ncol, nlay, ngpt, mesh_orientation,
                optical_props,
                sources,
                sfc_emis_gpt,
@@ -224,7 +224,7 @@ function rte_lw!(optical_props::AbstractOpticalPropsArry{FT},
                gpt_flux_dn)
   end
 
-  reduce!(fluxes, gpt_flux_up, gpt_flux_dn, optical_props, top_at_1)
+  reduce!(fluxes, gpt_flux_up, gpt_flux_dn, optical_props)
 end
 
 """

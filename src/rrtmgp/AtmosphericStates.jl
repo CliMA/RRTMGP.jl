@@ -8,6 +8,7 @@ module AtmosphericStates
 using DocStringExtensions
 
 using ..Utilities
+using ..MeshOrientations
 using ..FortranIntrinsics
 using ..PhysicalConstants
 using ..Gases
@@ -102,10 +103,10 @@ struct AtmosphericState{FT,I} <: AbstractAtmosphericState{FT,I}
   tropo::Array{Bool,2}
   "Layer limits of upper, lower atmospheres"
   tropo_lims::Array{I,3}
-  "Indicates whether arrays are ordered in the vertical with 1 at the top or the bottom of the domain."
-  top_at_1::Bool
-  "Surface layer."
-  sfc_lay::I
+  "Any tropospheric limits greater than 0"
+  gt_0_tropo_lims::Array{Bool,1}
+  "Mesh orientation, see [`MeshOrientation`](@ref)."
+  mesh_orientation::MeshOrientation{I}
   "Number of layers."
   nlay::I
   "Number of columns."
@@ -160,19 +161,19 @@ function AtmosphericState(gas_conc::GasConcs{FT,I},
   end
   # Are the arrays ordered in the vertical with 1 at the top or the bottom of the domain?
   top_at_1 = p_lay[1, 1] < p_lay[1, nlay]
+  mesh_orientation = MeshOrientation(top_at_1, nlay)
 
   if t_sfc == nothing
     t_sfc = Array{FT}(undef, ncol)
-    t_sfc .= t_lev[1, fmerge(nlay+1, 1, top_at_1)]
+    t_sfc .= t_lev[1, mesh_orientation.ilev_bot]
   end
   check_extent(t_sfc, ncol, "t_sfc")
   check_range(t_sfc, ref.temp_min,  ref.temp_max,  "t_sfc")
-  sfc_lay = fmerge(1,nlay,p_lay[1,1] > p_lay[1,nlay])
   tropo = log.(p_lay) .> ref.press_trop_log
 
   # Layer limits of upper, lower atmospheres
   tropo_lims = Array{I}(undef, ncol, 2, 2)
-  if top_at_1
+  if mesh_orientation.top_at_1
     tropo_lims[:, 1, 1] .= fminloc_wrapper(p_lay, dim=2, mask=tropo)
     tropo_lims[:, 2, 1] .= nlay
     tropo_lims[:, 1, 2] .= 1
@@ -184,6 +185,10 @@ function AtmosphericState(gas_conc::GasConcs{FT,I},
     tropo_lims[:, 2, 2] .= nlay
   end
 
+  gt_0_tropo_lims = Array{Bool}([false,false])
+  gt_0_tropo_lims[1] = any(tropo_lims[:,1,1] .> 0)
+  gt_0_tropo_lims[2] = any(tropo_lims[:,1,2] .> 0)
+
   return AtmosphericState{FT,I}(gas_conc,
                                 p_lay,
                                 p_lev,
@@ -194,8 +199,8 @@ function AtmosphericState(gas_conc::GasConcs{FT,I},
                                 col_dry,
                                 tropo,
                                 tropo_lims,
-                                top_at_1,
-                                sfc_lay,
+                                gt_0_tropo_lims,
+                                mesh_orientation,
                                 nlay,
                                 ncol)
 end
@@ -229,75 +234,18 @@ mutable struct AtmosphericStatePGP{FT,I} <: AbstractAtmosphericState{FT,I}
   tropo::Bool
   "Layer limits of upper, lower atmospheres"
   tropo_lims::Array{I,2}
-  "Indicates whether arrays are ordered in the vertical with 1 at the top or the bottom of the domain."
-  top_at_1::Bool
-  "Surface layer."
-  sfc_lay::I
-end
-
-function AtmosphericStatePGP(gas_conc::GasConcsPGP{FT},
-                             p_lay::Array{FT},
-                             p_lev::FT,
-                             t_lay::Array{FT},
-                             t_lev::Union{FT,Nothing},
-                             ref::ReferenceState,
-                             col_dry::FT,
-                             t_sfc::FT,
-                             sfc_lay::I,
-                             tropo_lims::Array{I,2},
-                             top_at_1::Bool) where {FT<:AbstractFloat,I<:Int}
-  if t_lev==nothing
-    t_lev = interpolate_var(p_lay, p_lev, t_lay)
-  end
-
-  check_range(p_lay, ref.press_min, ref.press_max, "p_lay")
-  check_range(p_lev, ref.press_min, ref.press_max, "p_lev")
-  check_range(t_lay, ref.temp_min,  ref.temp_max,  "t_lay")
-  check_range(t_lev, ref.temp_min,  ref.temp_max,  "t_lev")
-
-  ngas    = length(gas_conc.gas_names)
-  vmr     = Array{FT}(undef, ngas) # volume mixing ratios
-  col_gas = Array{FT}(undef, ngas+1) # column amounts for each gas, plus col_dry
-
-  # Fill out the array of volume mixing ratios
-  for gas in gas_conc.gas_names
-    i_gas = loc_in_array(gas, gas_conc.gas_names)
-    vmr[i_gas] .= gas_conc.concs[i_gas]
-  end
-
-  check_range(col_dry, FT(0), floatmax(FT), "col_dry")
-
-  # compute column gas amounts [molec/cm^2]
-  col_gas[1] .= col_dry
-  for igas = 1:ngas
-    col_gas[igas+1] .= vmr[igas] .* col_dry
-  end
-  # Are the arrays ordered in the vertical with 1 at the top or the bottom of the domain?
-
-  check_range(t_sfc, ref.temp_min,  ref.temp_max,  "t_sfc")
-
-  tropo = log.(p_lay) .> ref.press_trop_log
-
-  return AtmosphericStatePGP{FT,I}(gas_conc,
-                                   p_lay,
-                                   p_lev,
-                                   t_lay,
-                                   t_lev,
-                                   t_sfc,
-                                   col_gas,
-                                   col_dry,
-                                   tropo,
-                                   tropo_lims,
-                                   top_at_1,
-                                   sfc_lay)
+  "Any tropospheric limits greater than 0"
+  gt_0_tropo_lims::Array{Bool,1}
+  "Mesh orientation, see [`MeshOrientation`](@ref)."
+  mesh_orientation::MeshOrientation{I}
 end
 
 function Base.convert(::Type{AtmosphericState}, data::Array{AtmosphericStatePGP{FT,I}}) where {FT,I}
   s = size(data)
   ncol,nlay = s
   gas_conc = convert(GasConcs, [data[i,j].gas_conc for i in 1:s[1], j in 1:s[2]])
-  top_at_1 = first(data).top_at_1
-  sfc_lay = first(data).sfc_lay
+  mesh_orientation = first(data).mesh_orientation
+  gt_0_tropo_lims = first(data).gt_0_tropo_lims
   s_tropo_lims = size(first(data).tropo_lims)
   ngas    = length(gas_conc.gas_names)
 
@@ -341,15 +289,14 @@ function Base.convert(::Type{AtmosphericState}, data::Array{AtmosphericStatePGP{
                                 col_dry,
                                 tropo,
                                 tropo_lims,
-                                top_at_1,
-                                sfc_lay,
+                                gt_0_tropo_lims,
+                                mesh_orientation,
                                 nlay, ncol)
 end
 
 function Base.convert(::Type{Array{AtmosphericStatePGP}}, data::AtmosphericState{FT,I}) where {FT,I}
   s = size(data.p_lay)
   nlay, ncol = size(data.p_lay)
-  top_at_1 = data.top_at_1
   gas_conc = convert(Array{GasConcsPGP}, data.gas_conc)
   [AtmosphericStatePGP{FT,I}(gas_conc[i,j],
                              data.p_lay[i,j],
@@ -361,8 +308,8 @@ function Base.convert(::Type{Array{AtmosphericStatePGP}}, data::AtmosphericState
                              data.col_dry[i,j],
                              data.tropo[i,j],
                              data.tropo_lims[i,:,:],
-                             data.top_at_1,
-                             data.sfc_lay) for i in 1:s[1], j in 1:s[2]]
+                             data.gt_0_tropo_lims,
+                             data.mesh_orientation) for i in 1:s[1], j in 1:s[2]]
 
 end
 
