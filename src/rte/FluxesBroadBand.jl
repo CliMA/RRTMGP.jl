@@ -27,10 +27,10 @@ struct FluxesBroadBand{FT} <: AbstractFluxes{FT}
 end
 
 """
-    reduce!(this::FluxesBroadBand,
+    reduce!(this::FluxesBroadBand{FT},
             gpt_flux_up::Array{FT,3},
             gpt_flux_dn::Array{FT,3},
-            spectral_disc::AbstractOpticalProps,
+            spectral_disc::AbstractOpticalProps{FT},
             gpt_flux_dn_dir::Union{Nothing,Array{FT,3}}=nothing) where FT<:AbstractFloat
 
 Compute `FluxesBroadBand` `this` by summing over the
@@ -42,10 +42,10 @@ spectral dimension, given
 optional:
  - `gpt_flux_dn_dir` downward direct flux
 """
-function reduce!(this::FluxesBroadBand,
+function reduce!(this::FluxesBroadBand{FT},
                  gpt_flux_up::Array{FT,3},
                  gpt_flux_dn::Array{FT,3},
-                 spectral_disc::AbstractOpticalProps,
+                 spectral_disc::AbstractOpticalProps{FT},
                  gpt_flux_dn_dir::Union{Nothing,Array{FT,3}}=nothing) where FT<:AbstractFloat
 
   ncol,nlev,ngpt = size(gpt_flux_up)
@@ -59,7 +59,7 @@ function reduce!(this::FluxesBroadBand,
   gpt_flux_dn_dir ≠ nothing && @assert all(size(this.flux_dn_dir) .== (ncol,nlev))
 
   # Self-consistency -- shouldn't be asking for direct beam flux if it isn't supplied
-  @assert !(associated(this.flux_dn_dir) && !present(gpt_flux_dn_dir))
+  @assert !(this.flux_dn_dir ≠ nothing && gpt_flux_dn_dir==nothing)
 
   # Broadband fluxes - call the kernels
   this.flux_up .= sum_broadband(gpt_flux_up)

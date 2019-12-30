@@ -283,18 +283,14 @@ function gas_optics!(this::KDistributionLongwave{FT,I},
                      as::AtmosphericState{FT,I},
                      optical_props::AbstractOpticalPropsArry{FT,I},
                      sources::SourceFuncLongWave{FT,I}) where {FT<:AbstractFloat,I<:Int}
-
   ics = InterpolationCoefficients(FT, I, as.ncol, as.nlay, get_nflav(this))
   ics = convert(Array{InterpolationCoefficientsPGP}, ics)
   ics = convert(InterpolationCoefficients, ics)
-
   compute_gas_τs!(ics, this, as, optical_props)
-
   @assert get_ncol(sources) == as.ncol
   @assert get_nlay(sources) == as.nlay
   @assert get_ngpt(sources) == get_ngpt(this.optical_props)
-
-  source!(sources, this, as, ics)
+  source!(sources, as, ics, this)
   return nothing
 end
 
@@ -314,19 +310,17 @@ function gas_optics!(this::KDistributionShortwave{FT,I},
                      as::AtmosphericState{FT,I},
                      optical_props::AbstractOpticalPropsArry{FT,I},
                      last_call=false) where {FT<:AbstractFloat,I<:Int}
-
   ics = InterpolationCoefficients(FT, I, as.ncol,as.nlay, get_nflav(this))
   ics = convert(Array{InterpolationCoefficientsPGP}, ics)
   ics = convert(InterpolationCoefficients, ics)
-
   @timeit to_gor "compute_gas_τs!" compute_gas_τs!(ics, this, as, optical_props, last_call)
-
   last_call && @show to_gor
+  return nothing
 end
 
 
 """
-    compute_gas_τs!(ics::InterpolationCoefficients,
+    compute_gas_τs!(ics::InterpolationCoefficients{FT,I},
                     this::AbstractGasOptics{FT},
                     as::AtmosphericState{FT,I},
                     optical_props::AbstractOpticalPropsArry{FT,I},
@@ -348,56 +342,29 @@ function compute_gas_τs!(ics::InterpolationCoefficients{FT,I},
                          as::AtmosphericState{FT,I},
                          optical_props::AbstractOpticalPropsArry{FT,I},
                          last_call=false) where {FT<:AbstractFloat,I<:Int}
-
   ncol  = get_ncol(optical_props)
   nlay  = get_nlay(optical_props)
   ngpt  = get_ngpt(optical_props)
-
   τ          = Array{FT}(undef, ngpt,nlay,ncol) # absorption, Rayleigh scattering optical depths
   τ_Rayleigh = Array{FT}(undef, ngpt,nlay,ncol) # absorption, Rayleigh scattering optical depths
-
   # Check for presence of key species in GasConcs; return error if any key species are not present
   check_key_species_present(this, as.gas_conc.gas_names)
-
-  τ .= 0
   @timeit to_gor "interpolation!" interpolation!(ics, this, as)
   @timeit to_gor "compute_τ_absorption!" compute_τ_absorption!(τ, this, ics, as, last_call)
-
-  if allocated(this.krayl)
+  if this.krayl ≠ nothing
     @timeit to_gor "compute_τ_Rayleigh!" compute_τ_Rayleigh!(τ_Rayleigh, this, ics, as)
   end
-
   # Combine optical depths and reorder for radiative transfer solver.
-  @timeit to_gor "combine_and_reorder!" combine_and_reorder!(τ, τ_Rayleigh, allocated(this.krayl), optical_props)
-
-end
-
-"""
-    source!(sources::SourceFuncLongWave{FT,I},
-            this::KDistributionLongwave{FT,I},
-            as::AtmosphericState{FT,I},
-            ics::InterpolationCoefficients{FT,I}) where {FT<:AbstractFloat,I<:Int}
-
-Compute Planck source functions
-
- - `sources` longwave sources, see [`SourceFuncLongWave`](@ref)
-
-given
-
- - `this` gas optics, see [`KDistributionLongwave`](@ref)
- - `as` atmospheric state, see [`AtmosphericState`](@ref)
- - `ics` interpolation coefficients, see [`InterpolationCoefficients`](@ref)
-
-Compute internal (Planck) source functions at layers and levels,
-which depend on mapping from spectral space that creates k-distribution.
-"""
-function source!(sources::SourceFuncLongWave{FT,I},
-                 this::KDistributionLongwave{FT,I},
-                 as::AtmosphericState{FT,I},
-                 ics::InterpolationCoefficients{FT,I}) where {FT<:AbstractFloat,I<:Int}
-  compute_Planck_source!(sources, as, ics, this)
+  @timeit to_gor "combine_and_reorder!" combine_and_reorder!(optical_props, τ, τ_Rayleigh, this.krayl ≠ nothing)
   return nothing
 end
+
+"""
+    source!(args...)
+
+Compute source functions, currently set to Planck source
+"""
+source!(args...) = compute_Planck_source!(args...)
 
 #####
 ##### Initialization
@@ -413,7 +380,7 @@ end
 
 Initialize object based on data read from netCDF file however the user desires.
 Rayleigh scattering tables may or may not be present; this is indicated with allocation status
-This interface is for the internal-sources object -- includes Plank functions and fractions
+This interface is for the internal-sources object -- includes Planck functions and fractions
 """
 function get_k_dist_lw(totplnk,
                        planck_frac,
@@ -817,38 +784,6 @@ function create_gpoint_flavor(key_species, gpt2band, flavor)
     end
   end
   return gpoint_flavor
-end
-
-"""
-    combine_and_reorder!(τ::Array{FT,3},
-                         τ_Rayleigh::Array{FT,3},
-                         has_Rayleigh::Bool,
-                         optical_props::AbstractOpticalPropsArry{FT}) where FT
-
-Utility function to combine optical depths from gas absorption and Rayleigh scattering
-(and reorder them for convenience, while we're at it)
-"""
-function combine_and_reorder!(τ::Array{FT,3},
-                              τ_Rayleigh::Array{FT,3},
-                              has_Rayleigh::Bool,
-                              optical_props::AbstractOpticalPropsArry{FT}) where FT
-  if !has_Rayleigh
-    # index reorder (ngpt, nlay, ncol) -> (ncol,nlay,gpt)
-    permutedims!(optical_props.τ, τ, [3,2,1])
-    if optical_props isa TwoStream
-      optical_props.ssa .= FT(0)
-      optical_props.g   .= FT(0)
-    end
-  else
-    # combine optical depth and Rayleigh scattering
-    if optical_props isa OneScalar
-      # User is asking for absorption optical depth
-      permutedims!(optical_props.τ, τ, [3,2,1])
-
-    elseif optical_props isa TwoStream
-      combine_and_reorder_2str!(optical_props, τ, τ_Rayleigh)
-    end
-  end
 end
 
 #####

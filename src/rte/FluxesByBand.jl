@@ -25,10 +25,10 @@ mutable struct FluxesByBand{FT} <: AbstractFluxes{FT}
 end
 
 """
-    reduce!(this::FluxesByBand,
+    reduce!(this::FluxesByBand{FT},
             gpt_flux_up::Array{FT,3},
             gpt_flux_dn::Array{FT,3},
-            spectral_disc::AbstractOpticalProps,
+            spectral_disc::AbstractOpticalProps{FT},
             gpt_flux_dn_dir::Union{Nothing,Array{FT,3}}=nothing)
 
 Reduces fluxes by-band to broadband in `FluxesByBand` `this`, given
@@ -39,10 +39,10 @@ Reduces fluxes by-band to broadband in `FluxesByBand` `this`, given
 and, optionally,
  - `gpt_flux_dn_dir` direct flux downward
 """
-function reduce!(this::FluxesByBand,
+function reduce!(this::FluxesByBand{FT},
                  gpt_flux_up::Array{FT,3},
                  gpt_flux_dn::Array{FT,3},
-                 spectral_disc::AbstractOpticalProps,
+                 spectral_disc::AbstractOpticalProps{FT},
                  gpt_flux_dn_dir::Union{Nothing,Array{FT,3}}=nothing) where {FT<:AbstractFloat}
   ncol, nlev = size(gpt_flux_up)
   ngpt = get_ngpt(spectral_disc)
@@ -56,36 +56,36 @@ function reduce!(this::FluxesByBand,
 
   # Check sizes
   @assert size(gpt_flux_up, 3) == ngpt
-  associated(this.bnd_flux_up)     && @assert all(size(this.bnd_flux_up) .== (ncol, nlev, nbnd))
-  associated(this.bnd_flux_dn)     && @assert all(size(this.bnd_flux_dn) .== (ncol, nlev, nbnd))
-  associated(this.bnd_flux_dn_dir) && @assert all(size(this.bnd_flux_dn_dir) .== (ncol, nlev, nbnd))
-  associated(this.bnd_flux_net)    && @assert all(size(this.bnd_flux_net) .== (ncol, nlev, nbnd))
+  this.bnd_flux_up ≠ nothing     && @assert all(size(this.bnd_flux_up) .== (ncol, nlev, nbnd))
+  this.bnd_flux_dn ≠ nothing     && @assert all(size(this.bnd_flux_dn) .== (ncol, nlev, nbnd))
+  this.bnd_flux_dn_dir ≠ nothing && @assert all(size(this.bnd_flux_dn_dir) .== (ncol, nlev, nbnd))
+  this.bnd_flux_net ≠ nothing    && @assert all(size(this.bnd_flux_net) .== (ncol, nlev, nbnd))
   # Self-consistency -- shouldn't be asking for direct beam flux if it isn't supplied
-  @assert !(associated(this.bnd_flux_dn_dir) && !present(gpt_flux_dn_dir))
+  @assert !(this.bnd_flux_dn_dir ≠ nothing && gpt_flux_dn_dir==nothing)
 
   # Band-by-band fluxes
 
   # Up flux
-  if associated(this.bnd_flux_up)
+  if this.bnd_flux_up ≠ nothing
     this.bnd_flux_up = sum_byband(ncol, nlev, ngpt, nbnd, band_lims, gpt_flux_up)
   end
 
   # Down flux
-  if associated(this.bnd_flux_dn)
+  if this.bnd_flux_dn ≠ nothing
     this.bnd_flux_dn = sum_byband(ncol, nlev, ngpt, nbnd, band_lims, gpt_flux_dn)
   end
 
   # Direct Down flux
-  if associated(this.bnd_flux_dn_dir)
+  if this.bnd_flux_dn_dir ≠ nothing
     this.bnd_flux_dn_dir = sum_byband(ncol, nlev, ngpt, nbnd, band_lims, gpt_flux_dn_dir)
   end
 
   # Net flux
-  if(associated(this.bnd_flux_net))
+  if(this.bnd_flux_net ≠ nothing)
     #
     #  Reuse down and up results if possible
     #
-    if(associated(this.bnd_flux_dn) && associated(this.bnd_flux_up))
+    if(this.bnd_flux_dn ≠ nothing && this.bnd_flux_up ≠ nothing)
       this.bnd_flux_net = net_byband(ncol, nlev,       nbnd, this.bnd_flux_dn, this.bnd_flux_up)
     else
       this.bnd_flux_net = net_byband(ncol, nlev, ngpt, nbnd, band_lims, gpt_flux_dn, gpt_flux_up)

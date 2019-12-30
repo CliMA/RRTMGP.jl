@@ -64,32 +64,32 @@ using ..FortranIntrinsics
 export rte_lw!, rte_sw!, expand_and_transpose
 
 """
-    rte_sw!(atmos::AbstractOpticalPropsArry{FT},
+    rte_sw!(fluxes::FluxesBroadBand{FT},
+            optical_props::AbstractOpticalPropsArry{FT},
             mesh_orientation::MeshOrientation{I},
-            μ_0::Array{FT},
             bcs::ShortwaveBCs{FT},
-            fluxes::FluxesBroadBand{FT}) where {FT<:AbstractFloat,I<:Int}
+            μ_0::Array{FT}) where {FT<:AbstractFloat,I<:Int}
 
-Computes
+Compute broadband radiative fluxes
 
  - `fluxes` broadband fluxes, see [`AbstractFluxes`](@ref)
 
 given
 
- - `atmos` Optical properties provided as arrays (`AbstractOpticalPropsArry`)
+ - `optical_props` optical properties, see [`AbstractOpticalPropsArry`](@ref)
  - `mesh_orientation` mesh orientation, see [`MeshOrientation`](@ref)
- - `μ_0` cosine of solar zenith angle (ncol)
  - `bcs` boundary conditions, see [`ShortwaveBCs`](@ref)
+ - `μ_0` cosine of solar zenith angle (ncol)
 """
-function rte_sw!(atmos::AbstractOpticalPropsArry{FT},
+function rte_sw!(fluxes::FluxesBroadBand{FT},
+                 optical_props::AbstractOpticalPropsArry{FT},
                  mesh_orientation::MeshOrientation{I},
-                 μ_0::Array{FT},
                  bcs::ShortwaveBCs{FT},
-                 fluxes::FluxesBroadBand{FT}) where {FT<:AbstractFloat,I<:Int}
+                 μ_0::Array{FT}) where {FT<:AbstractFloat,I<:Int}
 
-  ncol  = get_ncol(atmos)
-  nlay  = get_nlay(atmos)
-  ngpt  = get_ngpt(atmos)
+  ncol  = get_ncol(optical_props)
+  nlay  = get_nlay(optical_props)
+  ngpt  = get_ngpt(optical_props)
 
   # Error checking -- consistency / sizes / validity of values
   @assert size(μ_0, 1) ==  ncol
@@ -101,8 +101,8 @@ function rte_sw!(atmos::AbstractOpticalPropsArry{FT},
 
   # Lower boundary condition -- expand surface albedos by band to gpoints
   #   and switch dimension ordering
-  sfc_alb_dir_gpt = expand_and_transpose(atmos, bcs.sfc_alb_direct)
-  sfc_alb_dif_gpt = expand_and_transpose(atmos, bcs.sfc_alb_diffuse)
+  sfc_alb_dir_gpt = expand_and_transpose(optical_props, bcs.sfc_alb_direct)
+  sfc_alb_dif_gpt = expand_and_transpose(optical_props, bcs.sfc_alb_diffuse)
 
   # Compute the radiative transfer...
   #
@@ -112,25 +112,25 @@ function rte_sw!(atmos::AbstractOpticalPropsArry{FT},
   #
   apply_BC!(gpt_flux_dir, mesh_orientation.ilev_top, bcs.toa_flux, μ_0)
 
-  if present(bcs.inc_flux_diffuse)
+  if bcs.inc_flux_diffuse ≠ nothing
     apply_BC!(gpt_flux_dn, mesh_orientation.ilev_top, bcs.inc_flux_diffuse)
   else
     apply_BC!(gpt_flux_dn, mesh_orientation.ilev_top)
   end
 
-  validate!(atmos)
-  if atmos isa OneScalar
+  validate!(optical_props)
+  if optical_props isa OneScalar
     # Direct beam only
     sw_solver_noscat!(ncol, nlay, ngpt, mesh_orientation,
-                      atmos.τ, μ_0,
+                      optical_props.τ, μ_0,
                       gpt_flux_dir)
     # No diffuse flux
     # gpt_flux_up .= FT(0)
     # gpt_flux_dn .= FT(0)
-  elseif atmos isa TwoStream
+  elseif optical_props isa TwoStream
     # two-stream calculation with scattering
     sw_solver!(ncol, nlay, ngpt, mesh_orientation,
-               atmos,
+               optical_props,
                μ_0,
                sfc_alb_dir_gpt,
                sfc_alb_dif_gpt,
@@ -143,32 +143,35 @@ function rte_sw!(atmos::AbstractOpticalPropsArry{FT},
   reduce!(fluxes,
           gpt_flux_up,
           gpt_flux_dn,
-          atmos,
+          optical_props,
           gpt_flux_dir)
 end
 
 """
-    rte_lw!(optical_props::AbstractOpticalPropsArry{FT},
+    rte_lw!(fluxes::FluxesBroadBand{FT},
+            optical_props::AbstractOpticalPropsArry{FT},
             mesh_orientation::MeshOrientation{I},
-            sources::SourceFuncLongWave{FT, I},
             bcs::LongwaveBCs{FT},
-            fluxes::FluxesBroadBand{FT},
+            sources::SourceFuncLongWave{FT, I},
             angle_disc::Union{GaussQuadrature{FT,I},Nothing}=nothing) where {FT<:AbstractFloat,I<:Int}
 
-Interface using only optical properties and source functions as inputs; fluxes as outputs.
+Compute broadband radiative fluxes
 
- - `optical_props` optical properties
+ - `fluxes` broadband fluxes, see [`FluxesBroadBand`](@ref)
+
+given
+
+ - `optical_props` optical properties, see [`AbstractOpticalPropsArry`](@ref)
  - `mesh_orientation` mesh orientation, see [`MeshOrientation`](@ref)
- - `sources` radiation sources
  - `bcs` boundary conditions, see [`LongwaveBCs`](@ref)
- - `fluxes` broadband fluxes, see [`AbstractFluxes`](@ref)
- - `n_gauss_angles` Number of angles used in Gaussian quadrature (no-scattering solution)
+ - `sources` radiation sources, see [`SourceFuncLongWave`](@ref)
+ - `angle_disc` Gaussian quadrature for angular discretization, [`GaussQuadrature`](@ref)
 """
-function rte_lw!(optical_props::AbstractOpticalPropsArry{FT},
+function rte_lw!(fluxes::FluxesBroadBand{FT},
+                 optical_props::AbstractOpticalPropsArry{FT},
                  mesh_orientation::MeshOrientation{I},
-                 sources::SourceFuncLongWave{FT, I},
                  bcs::LongwaveBCs{FT},
-                 fluxes::FluxesBroadBand{FT},
+                 sources::SourceFuncLongWave{FT, I},
                  angle_disc::Union{GaussQuadrature{FT,I},Nothing}=nothing) where {FT<:AbstractFloat,I<:Int}
 
   # Error checking

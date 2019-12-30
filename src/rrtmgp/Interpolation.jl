@@ -59,7 +59,7 @@ function interpolate_var(p_lay::Array{FT},
     end
   end
   for icol = 1:ncol
-    ϕ_lev[icol,nlay+1] = extrap_lower(p_lay[icol,nlay-1:nlay],p_lev[icol,nlay+1],ϕ_lay[icol,nlay-1:nlay])
+    ϕ_lev[icol,nlay+1] = extrap_upper(p_lay[icol,nlay-1:nlay],p_lev[icol,nlay+1],ϕ_lay[icol,nlay-1:nlay])
   end
   return ϕ_lev
 end

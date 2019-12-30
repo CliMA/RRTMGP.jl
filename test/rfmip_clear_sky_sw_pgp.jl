@@ -202,11 +202,11 @@ function rfmip_clear_sky_sw_pgp(ds, optical_props_constructor; compile_first=fal
 
     bcs = ShortwaveBCs(toa_flux, sfc_alb_spec, sfc_alb_spec)
 
-    @timeit to "rte_sw!" rte_sw!(optical_props,
+    @timeit to "rte_sw!" rte_sw!(fluxes,
+                                 optical_props,
                                  as.mesh_orientation,
-                                 μ_0,
                                  bcs,
-                                 fluxes)
+                                 μ_0)
 
 
     flux_up[:,:,b] .= fluxes.flux_up
