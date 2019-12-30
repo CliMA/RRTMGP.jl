@@ -136,10 +136,4 @@ function pack(arr::Array, mask::Array, v::Union{Nothing, Vector}=nothing)
   end
 end
 
-associated(a::Nothing) = false
-associated(a::AbstractArray) = length(a)>0
-allocated(a::Array) = a ≠ nothing
-allocated(a::Nothing) = false
-present(arg) = arg ≠ nothing
-
 end

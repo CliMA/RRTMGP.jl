@@ -68,8 +68,8 @@ Adds optical properties by g-point
 !!! Note:
     optical properties are defined at the same spectral resolution
 """
-increment_by_gpoint!(op_1::OneScalar, op_2::OneScalar) = (op_1.τ .= op_1.τ .+ op_2.τ)
-increment_by_gpoint!(op_1::OneScalar, op_2::TwoStream) = (op_1.τ .= op_1.τ .+ op_2.τ .* ( FT(1) .- op_2.ssa ))
+increment_by_gpoint!(op_1::OneScalar{FT}, op_2::OneScalar{FT}) where {FT} = (op_1.τ .= op_1.τ .+ op_2.τ)
+increment_by_gpoint!(op_1::OneScalar{FT}, op_2::TwoStream{FT}) where {FT} = (op_1.τ .= op_1.τ .+ op_2.τ .* ( FT(1) .- op_2.ssa ))
 function increment_by_gpoint!(op_1::TwoStream{FT}, op_2::OneScalar{FT}) where {FT<:AbstractFloat}
   @inbounds for igpt = 1:get_ngpt(op_1)
     @inbounds for ilay = 1:get_nlay(op_1)

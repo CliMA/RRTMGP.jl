@@ -155,11 +155,11 @@ function rfmip_clear_sky_lw(ds, optical_props_constructor; compile_first=false)
 
     bcs = LongwaveBCs(sfc_emis_spec)
 
-    rte_lw!(optical_props,
+    rte_lw!(fluxes,
+            optical_props,
             as.mesh_orientation,
-            source,
             bcs,
-            fluxes,
+            source,
             angle_disc)
 
     flux_up[:,:,b] .= fluxes.flux_up

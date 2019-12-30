@@ -219,12 +219,12 @@ Base.convert(::Type{Array{TwoStreamPGP}}, data::TwoStream{FT,I}) where {FT,I} =
 #####
 
 """
-    delta_scale!(this::OneScalar, fwd_scat_frac)
+    delta_scale!(this::OneScalar{FT}, fwd_scat_frac)
 
  - `this` optical properties, see [`OneScalar`](@ref)
  - `fwd_scat_frac` forward scattering fraction
 """
-delta_scale!(this::OneScalar, fwd_scat_frac) = ""
+delta_scale!(this::OneScalar{FT}, fwd_scat_frac) where {FT} = nothing
 
 """
     delta_scale!(this::TwoStream{FT}, for_ = nothing) where {FT<:AbstractFloat}
@@ -244,6 +244,7 @@ function delta_scale!(this::TwoStream{FT}, fwd_scat_frac = nothing) where {FT<:A
   else
     delta_scale_kernel!(this)
   end
+  return nothing
 end
 
 #####
@@ -283,19 +284,12 @@ end
 """
 function increment!(op_in::AbstractOpticalPropsArry, op_io::AbstractOpticalPropsArry)
   @assert bands_are_equal(op_in, op_io)
-
   if gpoints_are_equal(op_in, op_io)
-
-    # Increment by gpoint
-    #   (or by band if both op_in and op_io are defined that way)
+    # Increment by gpoint or by band if both op_in and op_io are defined that way
     increment_by_gpoint!(op_io, op_in)
-
   else
-
     # Values defined by-band will have ngpt = nband
     # We can use values by band in op_in to increment op_io
-    #   Anything else is an error
-
     @assert get_ngpt(op_in) == get_nband(op_io)
     # Increment by band
     increment_bybnd!(op_io, op_in)

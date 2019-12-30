@@ -231,7 +231,7 @@ Base.convert(::Type{Array{CloudOpticalPropsPGP}}, data::CloudOpticalProps{FT}) w
 Combine liquid and ice contributions into total cloud optical properties
    See also the `increment!` routines in `OpticalProps_kernels`
 """
-function combine_optical_props!(op::OneScalar, liq::TwoStream{FT}, ice::TwoStream{FT}) where {FT<:AbstractFloat}
+function combine_optical_props!(op::OneScalar{FT}, liq::TwoStream{FT}, ice::TwoStream{FT}) where {FT<:AbstractFloat}
   # Absorption optical depth  = (1-ssa) * τ = τ - τssa
   nbnd = size(liq.τ,3)
   op.τ[:,:,1:nbnd] .= (liq.τ .- liq.ssa) + (ice.τ .- ice.ssa)
@@ -244,7 +244,7 @@ function combine_optical_props!(op::TwoStream{FT}, liq::TwoStream{FT}, ice::TwoS
   op.ssa[:,:,1:nbnd] .= ssa ./ max.(eps(FT), τ)
   op.τ[:,:,1:nbnd] .= τ
 end
-function combine_optical_props!(op::OneScalarPGP, liq::TwoStreamPGP{FT}, ice::TwoStreamPGP{FT}) where {FT<:AbstractFloat}
+function combine_optical_props!(op::OneScalarPGP{FT}, liq::TwoStreamPGP{FT}, ice::TwoStreamPGP{FT}) where {FT<:AbstractFloat}
   # Absorption optical depth  = (1-ssa) * τ = τ - τssa
   nbnd = size(liq.τ,1)
   op.τ[1:nbnd] .= (liq.τ .- liq.ssa) + (ice.τ .- ice.ssa)

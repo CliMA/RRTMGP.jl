@@ -209,11 +209,11 @@ function all_sky_pgp(ds; use_luts=false, λ_string="", compile_first=false)
 
       increment!(clouds, atmos)
       bcs = LongwaveBCs(sfc_emis)
-      rte_lw!(atmos,
+      rte_lw!(fluxes,
+              atmos,
               as.mesh_orientation,
-              lw_sources,
               bcs,
-              fluxes)
+              lw_sources)
     else
       fluxes.flux_dn_dir .= flux_dir
 
@@ -225,11 +225,11 @@ function all_sky_pgp(ds; use_luts=false, λ_string="", compile_first=false)
       delta_scale!(clouds)
       increment!(clouds, atmos)
       bcs = ShortwaveBCs(toa_flux, sfc_alb_dir, sfc_alb_dif)
-      rte_sw!(atmos,
+      rte_sw!(fluxes,
+              atmos,
               as.mesh_orientation,
-              μ_0,
               bcs,
-              fluxes)
+              μ_0)
     end
     flux_up .= fluxes.flux_up
     flux_dn .= fluxes.flux_dn
