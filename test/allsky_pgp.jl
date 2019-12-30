@@ -111,8 +111,6 @@ function all_sky_pgp(ds; use_luts=false, λ_string="", compile_first=false)
   clouds = get_optical_props(clouds_base, is_sw, ncol, nlay, ngpt)
   atmos  = get_optical_props(k_dist.optical_props, is_sw, ncol, nlay, ngpt)
 
-  top_at_1 = p_lay[1, 1] < p_lay[1, nlay]
-
   #  Boundary conditions depending on whether the k-distribution being supplied
   #   is LW or SW
   if is_sw
@@ -178,6 +176,8 @@ function all_sky_pgp(ds; use_luts=false, λ_string="", compile_first=false)
   # Multiple iterations for big problem sizes, and to help identify data movement
   #   For CPUs we can introduce OpenMP threading over loop iterations
   #
+  ics = InterpolationCoefficients(FT, as.ncol, as.nlay, get_nflav(k_dist))
+  ics = convert(Array{InterpolationCoefficientsPGP}, ics)
 
   for iloop = 1:(compile_first ? 1 : nloops)
 
@@ -208,13 +208,22 @@ function all_sky_pgp(ds; use_luts=false, λ_string="", compile_first=false)
       atmos  = convert_optical_props_pgp(atmos , is_sw)
       as = convert(Array{AtmosphericStatePGP}, as)
       for i in eachindex(as)
-        gas_optics!(k_dist, as[i], atmos[i], lw_sources[i])
+        ics[i] = gas_optics!(k_dist, as[i], atmos[i], lw_sources[i])
       end
-      lw_sources = convert(SourceFuncLongWave, lw_sources, first(as).sfc_lay)
+      lw_sources = convert(SourceFuncLongWave, lw_sources, first(as).mesh_orientation.ilay_bot)
       atmos  = convert_optical_props(atmos , is_sw)
       as = convert(AtmosphericState, as)
 
       # ics = InterpolationCoefficients(FT, as.ncol, as.nlay, get_nflav(k_dist))
+      ics = convert(InterpolationCoefficients, ics)
+      # source!(lw_sources, k_dist, as, ics)
+      source!(lw_sources, as, ics, k_dist)
+
+# compute_Planck_source!(sources::SourceFuncLongWave{FT,I},
+#                                 as::AtmosphericState{FT,I},
+#                                 ics::InterpolationCoefficients{FT,I},
+#                                 go::KDistributionLongwave{FT,I})
+
       # source!(lw_sources, k_dist, as, ics)
       # gas_optics!(k_dist, as, atmos, lw_sources)
 
@@ -222,7 +231,7 @@ function all_sky_pgp(ds; use_luts=false, λ_string="", compile_first=false)
       increment!(clouds, atmos)
       bcs = LongwaveBCs(sfc_emis)
       rte_lw!(atmos,
-              as.top_at_1,
+              as.mesh_orientation,
               lw_sources,
               bcs,
               fluxes)
@@ -238,7 +247,7 @@ function all_sky_pgp(ds; use_luts=false, λ_string="", compile_first=false)
       increment!(clouds, atmos)
       bcs = ShortwaveBCs(toa_flux, sfc_alb_dir, sfc_alb_dif)
       rte_sw!(atmos,
-              as.top_at_1,
+              as.mesh_orientation,
               μ_0,
               bcs,
               fluxes)

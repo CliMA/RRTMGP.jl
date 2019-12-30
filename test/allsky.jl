@@ -105,8 +105,6 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
     atmos = OneScalar(k_dist.optical_props, ncol, nlay, ngpt)
   end
 
-  top_at_1 = p_lay[1, 1] < p_lay[1, nlay]
-
   #  Boundary conditions depending on whether the k-distribution being supplied
   #   is LW or SW
   if is_sw
@@ -182,12 +180,13 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
 
 
     if is_lw
-      gas_optics!(k_dist, as, atmos, lw_sources)
+      ics = gas_optics!(k_dist, as, atmos, lw_sources)
+      source!(lw_sources, as, ics, k_dist)
 
       increment!(clouds, atmos)
       bcs = LongwaveBCs(sfc_emis)
       rte_lw!(atmos,
-              as.top_at_1,
+              as.mesh_orientation,
               lw_sources,
               bcs,
               fluxes)
@@ -203,7 +202,7 @@ function all_sky(ds; use_luts=false, λ_string="", compile_first=false)
       increment!(clouds, atmos)
       bcs = ShortwaveBCs(toa_flux, sfc_alb_dir, sfc_alb_dif)
       rte_sw!(atmos,
-              as.top_at_1,
+              as.mesh_orientation,
               μ_0,
               bcs,
               fluxes)

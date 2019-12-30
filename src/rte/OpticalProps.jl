@@ -360,16 +360,6 @@ get_band_lims_gpoint(this::AbstractOpticalProps) = get_band_lims_gpoint(this.bas
 get_band_lims_gpoint(this::OpticalPropsBase) = this.band2gpt
 
 """
-    gpt_range(this::AbstractOpticalProps)
-
-A range of g-point bands, given the i-th band
-
- - `this` optical properties, see [`AbstractOpticalProps`](@ref)
-"""
-gpt_range(this::AbstractOpticalProps{FT,I}, ibnd::I) where {FT,I} = gpt_range(this.base, ibnd)
-gpt_range(this::OpticalPropsBase{FT,I}, ibnd::I) where {FT,I<:Int} = this.band2gpt[1,ibnd]:this.band2gpt[2,ibnd]
-
-"""
     convert_band2gpt(this::AbstractOpticalProps, band)
 
 First and last g-point of a specific band, given
@@ -420,6 +410,16 @@ Band associated with a specific g-point
 """
 convert_gpt2band(this::AbstractOpticalProps, gpt::I) where {I<:Int} = convert_gpt2band(this.base)
 convert_gpt2band(this::OpticalPropsBase, gpt::I) where {I<:Int} = this.gpt2band[gpt]
+
+"""
+    gpt_range(this::AbstractOpticalProps)
+
+A range of g-point bands, given the i-th band
+
+ - `this` optical properties, see [`AbstractOpticalProps`](@ref)
+"""
+gpt_range(this::AbstractOpticalProps{FT,I}, ibnd::I) where {FT,I} = gpt_range(this.base, ibnd)
+gpt_range(this::OpticalPropsBase{FT,I}, ibnd::I) where {FT,I<:Int} = this.band2gpt[1,ibnd]:this.band2gpt[2,ibnd]
 
 """
     bands_are_equal(this::AbstractOpticalProps{FT}, that::AbstractOpticalProps{FT}) where FT

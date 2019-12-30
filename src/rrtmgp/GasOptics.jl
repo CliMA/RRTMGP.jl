@@ -30,6 +30,7 @@ using ..GasConcentrations
 using ..OpticalProps
 using ..AtmosphericStates
 
+export get_nflav, InterpolationCoefficients, InterpolationCoefficientsPGP, source!
 export gas_optics!, get_k_dist_lw, get_k_dist_sw
 export source_is_internal, source_is_external
 export GasOpticsVars
@@ -276,23 +277,6 @@ Base.convert(::Type{Array{InterpolationCoefficientsPGP}}, data::InterpolationCoe
                                       data.col_mix[:,:,i,j]) for i in 1:size(data.jtemp,1), j in 1:size(data.jtemp,2)]
 
 """
-    get_ngas(this::AbstractGasOptics)
-
-Number of gases registered in the spectral configuration
-"""
-get_ngas(this::AbstractGasOptics) = length(this.gas_names)
-
-
-"""
-    get_nflav(this::AbstractGasOptics)
-
-Number of distinct major gas pairs in the spectral bands (referred to as
-"flavors" - all bands have a flavor even if there is one or no major gas)
-"""
-get_nflav(this::AbstractGasOptics) = size(this.flavor, 2)
-
-
-"""
     gas_optics!(this::KDistributionLongwave{FT,I},
                 as::AtmosphericState{FT,I},
                 optical_props::AbstractOpticalPropsArry{FT,I},
@@ -320,8 +304,8 @@ function gas_optics!(this::KDistributionLongwave{FT,I},
   @assert get_nlay(sources) == as.nlay
   @assert get_ngpt(sources) == get_ngpt(this.optical_props)
 
-  source!(sources, this, as, ics)
-  return nothing
+  # source!(sources, this, as, ics)
+  return ics
 end
 function gas_optics!(this::KDistributionLongwave{FT,I},
                      as::AtmosphericStatePGP{FT,I},
@@ -334,8 +318,8 @@ function gas_optics!(this::KDistributionLongwave{FT,I},
 
   @assert get_ngpt(sources) == get_ngpt(this.optical_props)
 
-  source!(sources, this, as, ics)
-  return nothing
+  # source!(sources, this, as, ics)
+  return ics
 end
 
 """
@@ -423,38 +407,11 @@ function compute_gas_τs!(ics::InterpolationCoefficientsPGP{FT,I},
 end
 
 """
-    source!(sources::SourceFuncLongWave{FT,I},
-            this::KDistributionLongwave{FT,I},
-            as::AtmosphericState{FT,I},
-            ics::InterpolationCoefficients{FT,I}) where {FT<:AbstractFloat,I<:Int}
+    source!(args...)
 
-Compute Planck source functions
-
- - `sources` longwave sources, see [`SourceFuncLongWave`](@ref)
-
-given
-
- - `this` gas optics, see [`KDistributionLongwave`](@ref)
- - `as` atmospheric state, see [`AtmosphericState`](@ref)
- - `ics` interpolation coefficients, see [`InterpolationCoefficients`](@ref)
-
-Compute internal (Planck) source functions at layers and levels,
-which depend on mapping from spectral space that creates k-distribution.
+Compute source functions (currently set to Planck source)
 """
-function source!(sources::SourceFuncLongWave{FT,I},
-                 this::KDistributionLongwave{FT,I},
-                 as::AtmosphericState{FT,I},
-                 ics::InterpolationCoefficients{FT,I}) where {FT<:AbstractFloat,I<:Int}
-  compute_Planck_source!(sources, as, ics, this)
-  return nothing
-end
-function source!(sources::SourceFuncLongWavePGP{FT,I},
-                 this::KDistributionLongwave{FT,I},
-                 as::AtmosphericStatePGP{FT,I},
-                 ics::InterpolationCoefficientsPGP{FT,I}) where {FT<:AbstractFloat,I<:Int}
-  compute_Planck_source!(sources, as, ics, this)
-  return nothing
-end
+source!(args...) = compute_Planck_source!(args...)
 
 #####
 ##### Initialization
@@ -931,11 +888,16 @@ function combine_and_reorder!(τ::Array{FT,1},
 end
 
 #####
-##### Sizes of tables: pressure, temperate, η (mixing fraction)
-#####   Equivalent routines for the number of gases and flavors
-#####   (get_ngas(), get_nflav()) are defined above because they're
-#####   used in function definitions
+##### Sizes of tables: pressure, temperate, η (mixing fraction), nflav
 #####
+
+"""
+    get_nflav(this::AbstractGasOptics)
+
+Number of distinct major gas pairs in the spectral bands (referred to as
+"flavors" - all bands have a flavor even if there is one or no major gas)
+"""
+get_nflav(this::AbstractGasOptics) = size(this.flavor, 2)
 
 """
     get_neta(this::AbstractGasOptics)

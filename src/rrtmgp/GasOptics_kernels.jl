@@ -354,7 +354,7 @@ function gas_optical_depths_minor!(τ::Array{FT,3},
                                    as::AtmosphericState{FT,I},
                                    ics::InterpolationCoefficients{FT,I},
                                    itropo::I) where {FT<:AbstractFloat, I<:Int}
-  @unpack_fields as col_gas t_lay p_lay tropo_lims
+  @unpack_fields as col_gas t_lay p_lay tropo_lims gt_0_tropo_lims
   @unpack_fields ics jtemp fminor j_η
   @unpack_fields go gpoint_flavor lower lower_aux upper upper_aux gas_names
   idx_h2o = loc_in_array(h2o(), gas_names)
@@ -371,7 +371,7 @@ function gas_optical_depths_minor!(τ::Array{FT,3},
   # First check skips the routine entirely if all columns are out of bounds...
   #
 
-  if as.any_tropo_lims[itropo]
+  if gt_0_tropo_lims[itropo]
     @inbounds for imnr in 1:size(scale_by_complement,1) # loop over minor absorbers in each band
       kminor_start_imnr = kminor_start[imnr]
       @inbounds for icol in 1:ncol
@@ -437,7 +437,7 @@ function gas_optical_depths_minor!(τ::Array{FT,1},
                                    as::AtmosphericStatePGP{FT,I},
                                    ics::InterpolationCoefficientsPGP{FT,I},
                                    itropo::I) where {FT<:AbstractFloat, I<:Int}
-  @unpack_fields as col_gas t_lay p_lay tropo_lims
+  @unpack_fields as col_gas t_lay p_lay tropo_lims gt_0_tropo_lims
   @unpack_fields ics jtemp fminor j_η
   @unpack_fields go gpoint_flavor lower lower_aux upper upper_aux gas_names
   idx_h2o = loc_in_array(h2o(), gas_names)
@@ -454,7 +454,7 @@ function gas_optical_depths_minor!(τ::Array{FT,1},
   # First check skips the routine entirely if all columns are out of bounds...
   #
 
-  if as.any_tropo_lims[itropo]
+  if gt_0_tropo_lims[itropo]
     @inbounds for imnr in 1:size(scale_by_complement,1) # loop over minor absorbers in each band
       kminor_start_imnr = kminor_start[imnr]
       #
@@ -629,8 +629,9 @@ function compute_Planck_source!(sources::SourceFuncLongWave{FT,I},
   @unpack_fields go ref totplnk_delta totplnk gpoint_flavor planck_frac optical_props
   @unpack_fields ref temp_min
   @unpack_fields sources sfc_source lay_source lev_source_inc lev_source_dec p_frac
-  @unpack_fields as t_lay t_lev t_sfc sfc_lay tropo
+  @unpack_fields as t_lay t_lev t_sfc mesh_orientation tropo
   @unpack_fields ics jtemp j_η jpress fmajor
+  @unpack_fields mesh_orientation ilay_bot
 
   ncol  = get_ncol(sources)
   nlay  = get_nlay(sources)
@@ -667,7 +668,7 @@ function compute_Planck_source!(sources::SourceFuncLongWave{FT,I},
         scaling = SVector{2,FT}(1,1)
 
         # interpolation in temperature, pressure, and η
-        @inbounds for igpt in gptS:gptE
+        @inbounds for igpt in gpt_range(optical_props, ibnd)
           τ_local = interpolate3D(scaling,
                               fmajor_sm1,
                               fmajor_sm2,
@@ -692,7 +693,7 @@ function compute_Planck_source!(sources::SourceFuncLongWave{FT,I},
     # Map to g-points
     @inbounds for ibnd in 1:nbnd
       @inbounds for igpt in gpt_range(optical_props, ibnd)
-        sfc_source[icol, igpt] = p_frac[icol,sfc_lay,igpt] * planck_function[ibnd, 1, icol]
+        sfc_source[icol, igpt] = p_frac[icol,ilay_bot,igpt] * planck_function[ibnd, 1, icol]
       end
     end
   end # icol
@@ -736,7 +737,7 @@ function compute_Planck_source!(sources::SourceFuncLongWavePGP{FT,I},
   @unpack_fields go ref totplnk_delta totplnk gpoint_flavor planck_frac optical_props
   @unpack_fields ref temp_min
   @unpack_fields sources sfc_source lay_source lev_source_inc lev_source_dec p_frac
-  @unpack_fields as t_lay t_lev t_sfc sfc_lay tropo
+  @unpack_fields as t_lay t_lev t_sfc tropo
   @unpack_fields ics jtemp j_η jpress fmajor
 
   ngpt  = get_ngpt(sources)
