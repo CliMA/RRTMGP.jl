@@ -30,6 +30,7 @@ using ..GasConcentrations
 using ..OpticalProps
 using ..AtmosphericStates
 
+export get_nflav, InterpolationCoefficients, InterpolationCoefficientsPGP, source!
 export gas_optics!, get_k_dist_lw, get_k_dist_sw
 export source_is_internal, source_is_external
 export GasOpticsVars
@@ -194,7 +195,7 @@ struct InterpolationCoefficients{FT<:AbstractFloat,I<:Int}
   "combination of major specie's column amounts"
   col_mix::Array{FT,4}
 end
-function InterpolationCoefficients(::Type{FT}, ::Type{I}, ncol, nlay, nflav) where {I<:Int, FT<:AbstractFloat}
+function InterpolationCoefficients(::Type{FT}, ncol::I, nlay::I, nflav::I) where {I<:Int, FT<:AbstractFloat}
   jtemp = Array{I}(undef,                ncol, nlay)
   jpress = Array{I}(undef,               ncol, nlay)
   j_η = Array{I}(undef, 2, nflav,        ncol, nlay)
@@ -225,6 +226,15 @@ mutable struct InterpolationCoefficientsPGP{FT<:AbstractFloat,I<:Int}
   fminor::Array{FT,3}
   "combination of major specie's column amounts"
   col_mix::Array{FT,2}
+end
+function InterpolationCoefficientsPGP(::Type{FT}, nflav::I) where {I<:Int, FT<:AbstractFloat}
+  jtemp = 0
+  jpress = 0
+  j_η = Array{I}(undef, 2, nflav)
+  fmajor = zeros(FT, 2,2,2, nflav)
+  fminor  = Array{FT}(undef, 2,2, nflav)
+  col_mix  = Array{FT}(undef, 2, nflav)
+  return InterpolationCoefficientsPGP{FT,I}(jtemp,jpress,j_η,fmajor,fminor,col_mix)
 end
 
 function Base.convert(::Type{InterpolationCoefficients}, data::Array{InterpolationCoefficientsPGP{FT,I}}) where {FT,I}
@@ -283,12 +293,22 @@ function gas_optics!(this::KDistributionLongwave{FT,I},
                      as::AtmosphericState{FT,I},
                      optical_props::AbstractOpticalPropsArry{FT,I},
                      sources::SourceFuncLongWave{FT,I}) where {FT<:AbstractFloat,I<:Int}
-  ics = InterpolationCoefficients(FT, I, as.ncol, as.nlay, get_nflav(this))
+  ics = InterpolationCoefficients(FT, as.ncol, as.nlay, get_nflav(this))
   ics = convert(Array{InterpolationCoefficientsPGP}, ics)
   ics = convert(InterpolationCoefficients, ics)
   compute_gas_τs!(ics, this, as, optical_props)
   @assert get_ncol(sources) == as.ncol
   @assert get_nlay(sources) == as.nlay
+  @assert get_ngpt(sources) == get_ngpt(this.optical_props)
+  source!(sources, as, ics, this)
+  return nothing
+end
+function gas_optics!(this::KDistributionLongwave{FT,I},
+                     as::AtmosphericStatePGP{FT,I},
+                     optical_props::AbstractOpticalPropsPGP{FT,I},
+                     sources::SourceFuncLongWavePGP{FT,I}) where {FT<:AbstractFloat,I<:Int}
+  ics = InterpolationCoefficientsPGP(FT, get_nflav(this))
+  compute_gas_τs!(ics, this, as, optical_props)
   @assert get_ngpt(sources) == get_ngpt(this.optical_props)
   source!(sources, as, ics, this)
   return nothing
@@ -310,11 +330,19 @@ function gas_optics!(this::KDistributionShortwave{FT,I},
                      as::AtmosphericState{FT,I},
                      optical_props::AbstractOpticalPropsArry{FT,I},
                      last_call=false) where {FT<:AbstractFloat,I<:Int}
-  ics = InterpolationCoefficients(FT, I, as.ncol,as.nlay, get_nflav(this))
+  ics = InterpolationCoefficients(FT, as.ncol, as.nlay, get_nflav(this))
   ics = convert(Array{InterpolationCoefficientsPGP}, ics)
   ics = convert(InterpolationCoefficients, ics)
   @timeit to_gor "compute_gas_τs!" compute_gas_τs!(ics, this, as, optical_props, last_call)
   last_call && @show to_gor
+  return nothing
+end
+function gas_optics!(this::KDistributionShortwave{FT,I},
+                     as::AtmosphericStatePGP{FT,I},
+                     optical_props::AbstractOpticalPropsPGP{FT,I},
+                     last_call=false) where {FT<:AbstractFloat,I<:Int}
+  ics = InterpolationCoefficientsPGP(FT, get_nflav(this))
+  compute_gas_τs!(ics, this, as, optical_props, last_call)
   return nothing
 end
 
@@ -342,11 +370,28 @@ function compute_gas_τs!(ics::InterpolationCoefficients{FT,I},
                          as::AtmosphericState{FT,I},
                          optical_props::AbstractOpticalPropsArry{FT,I},
                          last_call=false) where {FT<:AbstractFloat,I<:Int}
-  ncol  = get_ncol(optical_props)
-  nlay  = get_nlay(optical_props)
-  ngpt  = get_ngpt(optical_props)
-  τ          = Array{FT}(undef, ngpt,nlay,ncol) # absorption, Rayleigh scattering optical depths
-  τ_Rayleigh = Array{FT}(undef, ngpt,nlay,ncol) # absorption, Rayleigh scattering optical depths
+  τ′_size = get_τ′_size(optical_props)
+  τ          = Array{FT}(undef, τ′_size...) # absorption scattering optical depths
+  τ_Rayleigh = Array{FT}(undef, τ′_size...) # Rayleigh   scattering optical depths
+  # Check for presence of key species in GasConcs; return error if any key species are not present
+  check_key_species_present(this, as.gas_conc.gas_names)
+  @timeit to_gor "interpolation!" interpolation!(ics, this, as)
+  @timeit to_gor "compute_τ_absorption!" compute_τ_absorption!(τ, this, ics, as, last_call)
+  if this.krayl ≠ nothing
+    @timeit to_gor "compute_τ_Rayleigh!" compute_τ_Rayleigh!(τ_Rayleigh, this, ics, as)
+  end
+  # Combine optical depths and reorder for radiative transfer solver.
+  @timeit to_gor "combine_and_reorder!" combine_and_reorder!(optical_props, τ, τ_Rayleigh, this.krayl ≠ nothing)
+  return nothing
+end
+function compute_gas_τs!(ics::InterpolationCoefficientsPGP{FT,I},
+                         this::AbstractGasOptics{FT},
+                         as::AtmosphericStatePGP{FT,I},
+                         optical_props::AbstractOpticalPropsPGP{FT,I},
+                         last_call=false) where {FT<:AbstractFloat,I<:Int}
+  τ′_size = get_τ′_size(optical_props)
+  τ          = Array{FT}(undef, τ′_size...) # absorption scattering optical depths
+  τ_Rayleigh = Array{FT}(undef, τ′_size...) # Rayleigh   scattering optical depths
   # Check for presence of key species in GasConcs; return error if any key species are not present
   check_key_species_present(this, as.gas_conc.gas_names)
   @timeit to_gor "interpolation!" interpolation!(ics, this, as)

@@ -82,17 +82,17 @@ struct SourceFuncLongWavePGP{FT, I} <: AbstractOpticalProps{FT, I}
   p_frac::Array{FT,1}
 end
 
-function Base.convert(::Type{SourceFuncLongWave}, data::Array{SourceFuncLongWavePGP{FT,I}}) where {FT,I}
+function Base.convert(::Type{SourceFuncLongWave}, data::Array{SourceFuncLongWavePGP{FT,I}}, sfc_lay::I) where {FT,I}
   s = size(data)
   op = first(data).optical_props
   ngpt = get_ngpt(op)
   return SourceFuncLongWave{FT,I}(
     op,
-    Array{FT}([data[i,j].lay_source[k]     for i in 1:s[1], j in 1:s[2], k in 1:ngpt]),
-    Array{FT}([data[i,j].lev_source_inc[k] for i in 1:s[1], j in 1:s[2], k in 1:ngpt]),
-    Array{FT}([data[i,j].lev_source_dec[k] for i in 1:s[1], j in 1:s[2], k in 1:ngpt]),
-    Array{FT}([data[i,1].sfc_source[k]     for i in 1:s[1], k in 1:ngpt]),
-    Array{FT}([data[i,j].p_frac[k]         for i in 1:s[1], j in 1:s[2], k in 1:ngpt])
+    Array{FT}([data[i,j].lay_source[k]       for i in 1:s[1], j in 1:s[2], k in 1:ngpt]),
+    Array{FT}([data[i,j].lev_source_inc[k]   for i in 1:s[1], j in 1:s[2], k in 1:ngpt]),
+    Array{FT}([data[i,j].lev_source_dec[k]   for i in 1:s[1], j in 1:s[2], k in 1:ngpt]),
+    Array{FT}([data[i,sfc_lay].sfc_source[k] for i in 1:s[1], k in 1:ngpt]),
+    Array{FT}([data[i,j].p_frac[k]           for i in 1:s[1], j in 1:s[2], k in 1:ngpt])
     )
 end
 
@@ -128,9 +128,8 @@ struct SourceFuncShortWave{FT, I} <: AbstractOpticalProps{FT, I}
 end
 
 get_ncol(this::SourceFuncLongWave) = size(this.lay_source,1)
-
 get_nlay(this::SourceFuncLongWave) = size(this.lay_source,2)
-
 get_ngpt(this::SourceFuncLongWave) = size(this.lay_source,3)
+get_ngpt(this::SourceFuncLongWavePGP) = size(this.lay_source,1)
 
 end # module

@@ -230,7 +230,7 @@ mutable struct AtmosphericStatePGP{FT,I} <: AbstractAtmosphericState{FT,I}
   col_gas::Array{FT,1}
   "Number of molecules per cm-2 of dry air"
   col_dry::FT
-  "troposphere mask: itropo = merge(1,2,tropo[icol,ilay]); itropo = 1 lower atmosphere; itropo = 2 upper atmosphere"
+  "troposphere mask: itropo = merge(1,2,tropo); itropo = 1 lower atmosphere; itropo = 2 upper atmosphere"
   tropo::Bool
   "Layer limits of upper, lower atmospheres"
   tropo_lims::Array{I,2}
@@ -238,6 +238,8 @@ mutable struct AtmosphericStatePGP{FT,I} <: AbstractAtmosphericState{FT,I}
   gt_0_tropo_lims::Array{Bool,1}
   "Mesh orientation, see [`MeshOrientation`](@ref)."
   mesh_orientation::MeshOrientation{I}
+  "i-th layer."
+  ilay::I
 end
 
 function Base.convert(::Type{AtmosphericState}, data::Array{AtmosphericStatePGP{FT,I}}) where {FT,I}
@@ -309,7 +311,8 @@ function Base.convert(::Type{Array{AtmosphericStatePGP}}, data::AtmosphericState
                              data.tropo[i,j],
                              data.tropo_lims[i,:,:],
                              data.gt_0_tropo_lims,
-                             data.mesh_orientation) for i in 1:s[1], j in 1:s[2]]
+                             data.mesh_orientation,
+                             j) for i in 1:s[1], j in 1:s[2]]
 
 end
 

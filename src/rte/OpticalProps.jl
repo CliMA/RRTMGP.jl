@@ -39,6 +39,7 @@ export delta_scale!,
        get_gpoint_bands,
        bands_are_equal,
        gpt_range,
+       get_τ′_size,
        get_band_lims_gpoint
 
 export get_nband,
@@ -341,6 +342,16 @@ Number of g-points, given
 """
 get_ngpt(this::AbstractOpticalProps) = get_ngpt(this.base)
 get_ngpt(this::OpticalPropsBase) = max(this.band2gpt...)
+
+"""
+    get_τ′_size(this::AbstractOpticalProps)
+
+Size of τ′
+
+ - `this` optical properties, see [`AbstractOpticalProps`](@ref)
+"""
+get_τ′_size(this::AbstractOpticalPropsArry) = (size(this.τ,3),size(this.τ,2),size(this.τ,1))
+get_τ′_size(this::AbstractOpticalPropsPGP) = length(this.τ)
 
 
 """
