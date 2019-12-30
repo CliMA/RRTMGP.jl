@@ -38,6 +38,7 @@ export delta_scale!,
        get_band_lims_wavenumber,
        get_gpoint_bands,
        bands_are_equal,
+       gpt_range,
        get_band_lims_gpoint
 
 export get_nband,
@@ -357,6 +358,16 @@ The first and last g-point of all bands at once, given
 """
 get_band_lims_gpoint(this::AbstractOpticalProps) = get_band_lims_gpoint(this.base)
 get_band_lims_gpoint(this::OpticalPropsBase) = this.band2gpt
+
+"""
+    gpt_range(this::AbstractOpticalProps)
+
+A range of g-point bands, given the i-th band
+
+ - `this` optical properties, see [`AbstractOpticalProps`](@ref)
+"""
+gpt_range(this::AbstractOpticalProps{FT,I}, ibnd::I) where {FT,I} = gpt_range(this.base, ibnd)
+gpt_range(this::OpticalPropsBase{FT,I}, ibnd::I) where {FT,I<:Int} = this.band2gpt[1,ibnd]:this.band2gpt[2,ibnd]
 
 """
     convert_band2gpt(this::AbstractOpticalProps, band)

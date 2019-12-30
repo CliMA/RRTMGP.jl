@@ -205,9 +205,19 @@ function all_sky_pgp(ds; use_luts=false, λ_string="", compile_first=false)
     if is_lw
 
       lw_sources = convert(Array{SourceFuncLongWavePGP}, lw_sources)
-      lw_sources = convert(SourceFuncLongWave, lw_sources)
+      atmos  = convert_optical_props_pgp(atmos , is_sw)
+      as = convert(Array{AtmosphericStatePGP}, as)
+      for i in eachindex(as)
+        gas_optics!(k_dist, as[i], atmos[i], lw_sources[i])
+      end
+      lw_sources = convert(SourceFuncLongWave, lw_sources, first(as).sfc_lay)
+      atmos  = convert_optical_props(atmos , is_sw)
+      as = convert(AtmosphericState, as)
 
-      gas_optics!(k_dist, as, atmos, lw_sources)
+      # ics = InterpolationCoefficients(FT, as.ncol, as.nlay, get_nflav(k_dist))
+      # source!(lw_sources, k_dist, as, ics)
+      # gas_optics!(k_dist, as, atmos, lw_sources)
+
 
       increment!(clouds, atmos)
       bcs = LongwaveBCs(sfc_emis)
