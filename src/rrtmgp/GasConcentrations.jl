@@ -64,10 +64,6 @@ struct GasConcsPGP{FT<:AbstractFloat}
   "gas concentrations arrays"
   concs::Array{FT,1}
 end
-function GasConcsPGP(::Type{FT}, gas_names, ngases::I=length(gas_names)) where {FT<:AbstractFloat,I<:Int}
-  concs = zeros(FT, ngases)
-  return GasConcs{FT}(gas_names, concs)
-end
 
 function Base.convert(::Type{GasConcs}, data::Array{GasConcsPGP{FT}}) where {FT}
   s = size(data)
@@ -99,7 +95,7 @@ function set_vmr!(this::GasConcs{FT}, gas::AbstractGas, w::Vector{FT}) where FT
   this.concs[igas,:,:] .= reshape(w, 1, this.nlay)
   this.gas_names[igas] = gas
 end
-function set_vmr!(this::GasConcs, gas::AbstractGas, w::Array{FT, 2}) where FT
+function set_vmr!(this::GasConcs{FT}, gas::AbstractGas, w::Array{FT, 2}) where FT
   @assert !any(w .< FT(0)) || any(w .> FT(1))
   @assert !(this.ncol ≠ nothing && size(w, 1) ≠ this.ncol)
   @assert !(this.nlay ≠ nothing && size(w, 2) ≠ this.nlay)

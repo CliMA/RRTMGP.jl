@@ -163,7 +163,15 @@ function rfmip_clear_sky_sw_pgp(ds, optical_props_constructor; compile_first=fal
     fluxes.flux_up .= FT(0)
     fluxes.flux_dn .= FT(0)
 
-    @timeit to "gas_optics!" gas_optics!(k_dist, as, optical_props, b==b_tot)
+    optical_props  = convert_optical_props_pgp(optical_props)
+    as = convert(Array{AtmosphericStatePGP}, as)
+    for i in eachindex(as)
+      gas_optics!(k_dist, as[i], optical_props[i], b==b_tot)
+    end
+    optical_props  = convert_optical_props(optical_props)
+    as = convert(AtmosphericState, as)
+    # @timeit to "gas_optics!" gas_optics!(k_dist, as, optical_props, b==b_tot)
+
 
     check_extent(toa_flux, (as.ncol, ngpt), "toa_flux")
     toa_flux .= repeat(k_dist.solar_src', as.ncol)
@@ -202,11 +210,11 @@ function rfmip_clear_sky_sw_pgp(ds, optical_props_constructor; compile_first=fal
 
     bcs = ShortwaveBCs(toa_flux, sfc_alb_spec, sfc_alb_spec)
 
-    @timeit to "rte_sw!" rte_sw!(optical_props,
+    @timeit to "rte_sw!" rte_sw!(fluxes,
+                                 optical_props,
                                  as.mesh_orientation,
-                                 μ_0,
                                  bcs,
-                                 fluxes)
+                                 μ_0)
 
 
     flux_up[:,:,b] .= fluxes.flux_up

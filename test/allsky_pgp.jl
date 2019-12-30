@@ -44,12 +44,12 @@ get_optical_props(op_base, is_sw, ncol, nlay, ngpt) =
   is_sw ? TwoStream(op_base, ncol, nlay, ngpt) :
           OneScalar(op_base, ncol, nlay, ngpt)
 
-convert_optical_props_pgp(op, is_sw) =
-  is_sw ? convert(Array{TwoStreamPGP},op) :
-          convert(Array{OneScalarPGP},op)
-convert_optical_props(op, is_sw) =
-  is_sw ? convert(TwoStream,op) :
-          convert(OneScalar,op)
+convert_optical_props_pgp(op) =
+  op isa TwoStream ? convert(Array{TwoStreamPGP},op) :
+                     convert(Array{OneScalarPGP},op)
+convert_optical_props(op) =
+  eltype(op) <: TwoStreamPGP ? convert(TwoStream,op) :
+                               convert(OneScalar,op)
 
 function all_sky_pgp(ds; use_luts=false, λ_string="", compile_first=false)
   @assert λ_string == "sw" || λ_string == "lw"
@@ -181,8 +181,8 @@ function all_sky_pgp(ds; use_luts=false, λ_string="", compile_first=false)
 
   for iloop = 1:(compile_first ? 1 : nloops)
 
-    clouds = convert_optical_props_pgp(clouds, is_sw)
-    atmos  = convert_optical_props_pgp(atmos , is_sw)
+    clouds = convert_optical_props_pgp(clouds)
+    atmos  = convert_optical_props_pgp(atmos)
     clouds_ice = convert(Array{CloudOpticalPropsPGP}, clouds_ice)
     clouds_liq = convert(Array{CloudOpticalPropsPGP}, clouds_liq)
 
@@ -190,8 +190,8 @@ function all_sky_pgp(ds; use_luts=false, λ_string="", compile_first=false)
       cloud_optics!(cloud_optics_, clouds_liq[i], clouds_ice[i], clouds[i])
     end
 
-    clouds = convert_optical_props(clouds, is_sw)
-    atmos  = convert_optical_props(atmos , is_sw)
+    clouds = convert_optical_props(clouds)
+    atmos  = convert_optical_props(atmos)
     clouds_ice = convert(CloudOpticalProps, clouds_ice)
     clouds_liq = convert(CloudOpticalProps, clouds_liq)
 
@@ -205,40 +205,32 @@ function all_sky_pgp(ds; use_luts=false, λ_string="", compile_first=false)
     if is_lw
 
       lw_sources = convert(Array{SourceFuncLongWavePGP}, lw_sources)
-      atmos  = convert_optical_props_pgp(atmos , is_sw)
+      atmos  = convert_optical_props_pgp(atmos)
       as = convert(Array{AtmosphericStatePGP}, as)
       for i in eachindex(as)
-        ics[i] = gas_optics!(k_dist, as[i], atmos[i], lw_sources[i])
+        gas_optics!(k_dist, as[i], atmos[i], lw_sources[i])
       end
       lw_sources = convert(SourceFuncLongWave, lw_sources, first(as).mesh_orientation.ilay_bot)
-      atmos  = convert_optical_props(atmos , is_sw)
+      atmos  = convert_optical_props(atmos)
       as = convert(AtmosphericState, as)
-
-      # ics = InterpolationCoefficients(FT, as.ncol, as.nlay, get_nflav(k_dist))
-      ics = convert(InterpolationCoefficients, ics)
-      # source!(lw_sources, k_dist, as, ics)
-      source!(lw_sources, as, ics, k_dist)
-
-# compute_Planck_source!(sources::SourceFuncLongWave{FT,I},
-#                                 as::AtmosphericState{FT,I},
-#                                 ics::InterpolationCoefficients{FT,I},
-#                                 go::KDistributionLongwave{FT,I})
-
-      # source!(lw_sources, k_dist, as, ics)
-      # gas_optics!(k_dist, as, atmos, lw_sources)
-
 
       increment!(clouds, atmos)
       bcs = LongwaveBCs(sfc_emis)
-      rte_lw!(atmos,
+      rte_lw!(fluxes,
+              atmos,
               as.mesh_orientation,
-              lw_sources,
               bcs,
-              fluxes)
+              lw_sources)
     else
       fluxes.flux_dn_dir .= flux_dir
 
-      gas_optics!(k_dist, as, atmos)
+      atmos  = convert_optical_props_pgp(atmos)
+      as = convert(Array{AtmosphericStatePGP}, as)
+      for i in eachindex(as)
+        gas_optics!(k_dist, as[i], atmos[i])
+      end
+      atmos  = convert_optical_props(atmos)
+      as = convert(AtmosphericState, as)
 
       check_extent(toa_flux, (as.ncol, ngpt), "toa_flux")
       toa_flux .= repeat(k_dist.solar_src', as.ncol)
@@ -246,11 +238,11 @@ function all_sky_pgp(ds; use_luts=false, λ_string="", compile_first=false)
       delta_scale!(clouds)
       increment!(clouds, atmos)
       bcs = ShortwaveBCs(toa_flux, sfc_alb_dir, sfc_alb_dif)
-      rte_sw!(atmos,
+      rte_sw!(fluxes,
+              atmos,
               as.mesh_orientation,
-              μ_0,
               bcs,
-              fluxes)
+              μ_0)
     end
     flux_up .= fluxes.flux_up
     flux_dn .= fluxes.flux_dn

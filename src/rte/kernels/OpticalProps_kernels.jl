@@ -68,8 +68,8 @@ Adds optical properties by g-point
 !!! Note:
     optical properties are defined at the same spectral resolution
 """
-increment_by_gpoint!(op_1::OneScalar, op_2::OneScalar) = (op_1.τ .= op_1.τ .+ op_2.τ)
-increment_by_gpoint!(op_1::OneScalar, op_2::TwoStream) = (op_1.τ .= op_1.τ .+ op_2.τ .* ( FT(1) .- op_2.ssa ))
+increment_by_gpoint!(op_1::OneScalar{FT}, op_2::OneScalar{FT}) where {FT} = (op_1.τ .= op_1.τ .+ op_2.τ)
+increment_by_gpoint!(op_1::OneScalar{FT}, op_2::TwoStream{FT}) where {FT} = (op_1.τ .= op_1.τ .+ op_2.τ .* ( FT(1) .- op_2.ssa ))
 function increment_by_gpoint!(op_1::TwoStream{FT}, op_2::OneScalar{FT}) where {FT<:AbstractFloat}
   @inbounds for igpt = 1:get_ngpt(op_1)
     @inbounds for ilay = 1:get_nlay(op_1)
@@ -112,25 +112,22 @@ Adds optical properties by band
     resolution (e.g. by band instead of by gpoint)
 """
 function increment_bybnd!(op_1::OneScalar{FT}, op_2::OneScalar{FT}) where {FT<:AbstractFloat}
-  gpt_lims = get_band_lims_gpoint(op_1)
   @inbounds for ibnd = 1:get_nband(op_1)
-    @inbounds for igpt = gpt_lims[1, ibnd]:gpt_lims[2, ibnd]
+    @inbounds for igpt = gpt_range(op_1, ibnd)
       op_1.τ[:,:,igpt] .= op_1.τ[:,:,igpt] .+ op_2.τ[:,:,ibnd]
     end
   end
 end
 function increment_bybnd!(op_1::OneScalar{FT}, op_2::TwoStream{FT}) where {FT<:AbstractFloat}
-  gpt_lims = get_band_lims_gpoint(op_1)
   @inbounds for ibnd = 1:get_nband(op_1)
-    @inbounds for igpt = gpt_lims[1, ibnd]:gpt_lims[2, ibnd]
+    @inbounds for igpt = gpt_range(op_1, ibnd)
       op_1.τ[:,:,igpt] .= op_1.τ[:,:,igpt] .+ op_2.τ[:,:,ibnd] .* ( FT(1) .- op_2.ssa[:,:,ibnd])
     end
   end
 end
 function increment_bybnd!(op_1::TwoStream{FT}, op_2::OneScalar{FT}) where {FT<:AbstractFloat}
-  gpt_lims = get_band_lims_gpoint(op_1)
   @inbounds for ibnd = 1:get_nband(op_1)
-    @inbounds for igpt = gpt_lims[1, ibnd]:gpt_lims[2, ibnd]
+    @inbounds for igpt = gpt_range(op_1, ibnd)
       @inbounds for ilay = 1:get_nlay(op_1)
         @inbounds for icol = 1:get_ncol(op_1)
           τ12 = op_1.τ[icol,ilay,igpt] + op_2.τ[icol,ilay,ibnd]
@@ -143,9 +140,8 @@ function increment_bybnd!(op_1::TwoStream{FT}, op_2::OneScalar{FT}) where {FT<:A
   end
 end
 function increment_bybnd!(op_1::TwoStream{FT}, op_2::TwoStream{FT}) where {FT<:AbstractFloat}
-  gpt_lims = get_band_lims_gpoint(op_1)
   @inbounds for ibnd = 1:get_nband(op_1)
-    @inbounds for igpt = gpt_lims[1, ibnd]:gpt_lims[2, ibnd]
+    @inbounds for igpt = gpt_range(op_1, ibnd)
       @inbounds for ilay = 1:get_nlay(op_1)
         @inbounds for icol = 1:get_ncol(op_1)
           # t=τ1 + τ2

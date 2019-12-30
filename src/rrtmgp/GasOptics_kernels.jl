@@ -38,7 +38,7 @@ function interpolation!(ics::InterpolationCoefficients{FT,I},
   npres = get_npres(go)
   ntemp = get_ntemp(go)
 
-  @unpack_fields as col_gas t_lay p_lay ncol nlay tropo
+  @unpack_fields as col_gas t_lay p_lay tropo ncol nlay
   @unpack_fields ics jtemp fmajor fminor jpress col_mix j_η
   @unpack_fields go ref flavor
   @unpack_fields ref press_log vmr press_log_delta temp temp_min temp_delta
@@ -46,7 +46,6 @@ function interpolation!(ics::InterpolationCoefficients{FT,I},
   # input dimensions
   ftemp = Array{FT}(undef, ncol, nlay)
   fpress = Array{FT}(undef, ncol, nlay)
-  igases = Vector{I}(undef, 2)
 
   @inbounds for ilay in 1:nlay
     @inbounds for icol in 1:ncol
@@ -61,7 +60,6 @@ function interpolation!(ics::InterpolationCoefficients{FT,I},
       fpress[icol,ilay] = locpress - FT(jpress[icol,ilay])
     end
   end
-  # determine if in lower or upper part of atmosphere
 
   @inbounds for ilay in 1:nlay
     @inbounds for icol in 1:ncol
@@ -114,9 +112,6 @@ function interpolation!(ics::InterpolationCoefficientsPGP{FT,I},
   @unpack_fields ics jtemp fmajor fminor jpress col_mix j_η
   @unpack_fields go ref flavor
   @unpack_fields ref press_log vmr press_log_delta temp temp_min temp_delta
-
-  # input dimensions
-  igases = Vector{I}(undef, 2)
 
   # index and factor for temperature interpolation
   jtemp = fint((t_lay - (temp_min - temp_delta)) / temp_delta)
@@ -812,8 +807,8 @@ function compute_Planck_source!(sources::SourceFuncLongWavePGP{FT,I},
   # Map to g-points
   @inbounds for ibnd in 1:nbnd
     @inbounds for igpt in gpt_range(optical_props, ibnd)
-      lev_source_inc[igpt] = p_frac[igpt] * planck_function[ibnd,1]
-      lev_source_dec[igpt] = p_frac[igpt] * planck_function[ibnd,2]
+      lev_source_inc[igpt] = p_frac[igpt] * planck_function[ibnd,2]
+      lev_source_dec[igpt] = p_frac[igpt] * planck_function[ibnd,1]
     end
   end
   return nothing
@@ -933,33 +928,66 @@ function interpolate3D(scaling::SVector{2,FT},
 end
 
 """
-    combine_and_reorder_2str!(op::AbstractOpticalProps{FT},
-                              τ_abs::Array{FT,3},
-                              τ_Rayleigh::Array{FT,3}) where {FT<:AbstractFloat}
+    combine_and_reorder!(op::AbstractOpticalPropsArry{FT},
+                         τ_abs::Array{FT,3},
+                         τ_Rayleigh::Array{FT,3},
+                         has_Rayleigh::Bool) where {FT<:AbstractFloat}
 
 Combine absorption and Rayleigh optical depths for total `τ`, `ssa`, `g`
 
 !!! Reduce allocations
 """
-function combine_and_reorder_2str!(op::AbstractOpticalProps{FT},
-                                   τ_abs::Array{FT,3},
-                                   τ_Rayleigh::Array{FT,3}) where {FT<:AbstractFloat}
-  τ_Rayleigh′ = permutedims(τ_Rayleigh, [3,2,1])
-  τ_abs′ = permutedims(τ_abs, [3,2,1])
-  t = τ_abs′+τ_Rayleigh′
-  op.τ .= t
-  op.ssa .= map( (x,y) -> x > FT(2) * floatmin(FT) ? y/x : FT(0), t, τ_Rayleigh′)
-  op.g .= FT(0)
+function combine_and_reorder!(op::TwoStream{FT},
+                              τ_abs::Array{FT,3},
+                              τ_Rayleigh::Array{FT,3},
+                              has_Rayleigh::Bool) where {FT<:AbstractFloat}
+  fill!(op.g, FT(0))
+  if has_Rayleigh
+    @inbounds for icol in 1:size(op.τ,1)
+      @inbounds for ilay in 1:size(op.τ,2)
+        @inbounds for igpt in 1:get_ngpt(op)
+          τ_Rayleigh′ = τ_Rayleigh[igpt,ilay,icol]
+          τ_abs′ = τ_abs[igpt,ilay,icol]
+          τ = τ_abs′+τ_Rayleigh′
+          op.τ[icol,ilay,igpt] = τ
+          op.ssa[icol,ilay,igpt] = τ > FT(2) * floatmin(FT) ? τ_Rayleigh′/τ : FT(0)
+        end
+      end
+    end
+  else
+    permutedims!(op.τ, τ_abs, [3,2,1])
+    fill!(op.ssa, FT(0))
+  end
   return nothing
 end
-function combine_and_reorder_2str!(op::AbstractOpticalPropsPGP{FT},
-                                   τ_abs::Array{FT,1},
-                                   τ_Rayleigh::Array{FT,1}) where {FT<:AbstractFloat}
-  τ_Rayleigh′ = τ_Rayleigh
-  τ_abs′ = τ_abs
-  t = τ_abs′+τ_Rayleigh′
-  op.τ .= t
-  op.ssa .= map( (x,y) -> x > FT(2) * floatmin(FT) ? y/x : FT(0), t, τ_Rayleigh′)
-  op.g .= FT(0)
+function combine_and_reorder!(op::OneScalar{FT},
+                              τ::Array{FT,3},
+                              τ_Rayleigh::Array{FT,3},
+                              has_Rayleigh::Bool) where FT
+  permutedims!(op.τ, τ, [3,2,1])
+end
+function combine_and_reorder!(op::TwoStreamPGP{FT},
+                              τ_abs::Array{FT,1},
+                              τ_Rayleigh::Array{FT,1},
+                              has_Rayleigh::Bool) where {FT<:AbstractFloat}
+  fill!(op.g, FT(0))
+  if has_Rayleigh
+    @inbounds for igpt in 1:get_ngpt(op)
+      τ_Rayleigh′ = τ_Rayleigh[igpt]
+      τ_abs′ = τ_abs[igpt]
+      τ = τ_abs′+τ_Rayleigh′
+      op.τ[igpt] = τ
+      op.ssa[igpt] = τ > FT(2) * floatmin(FT) ? τ_Rayleigh′/τ : FT(0)
+    end
+  else
+    op.τ .= τ_abs
+    fill!(op.ssa, FT(0))
+  end
   return nothing
+end
+function combine_and_reorder!(op::OneScalarPGP{FT},
+                              τ::Array{FT,1},
+                              τ_Rayleigh::Array{FT,1},
+                              has_Rayleigh::Bool) where FT
+  op.τ .= τ
 end

@@ -164,17 +164,22 @@ function rfmip_clear_sky_lw_pgp(ds, optical_props_constructor; compile_first=fal
     fluxes.flux_dn .= FT(0)
 
     source = convert(Array{SourceFuncLongWavePGP}, source)
-    source = convert(SourceFuncLongWave, source, as.mesh_orientation.ilay_bot)
-
-    gas_optics!(k_dist, as, optical_props, source)
+    optical_props  = convert_optical_props_pgp(optical_props)
+    as = convert(Array{AtmosphericStatePGP}, as)
+    for i in eachindex(as)
+      gas_optics!(k_dist, as[i], optical_props[i], source[i])
+    end
+    source = convert(SourceFuncLongWave, source, first(as).mesh_orientation.ilay_bot)
+    optical_props  = convert_optical_props(optical_props)
+    as = convert(AtmosphericState, as)
 
     bcs = LongwaveBCs(sfc_emis_spec)
 
-    rte_lw!(optical_props,
+    rte_lw!(fluxes,
+            optical_props,
             as.mesh_orientation,
-            source,
             bcs,
-            fluxes,
+            source,
             angle_disc)
 
     flux_up[:,:,b] .= fluxes.flux_up
