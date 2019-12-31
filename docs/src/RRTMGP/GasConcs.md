@@ -6,6 +6,7 @@ CurrentModule = RRTMGP.GasConcentrations
 
 ```@docs
 GasConcs
+GasConcsPGP
 ```
 
 ```@docs

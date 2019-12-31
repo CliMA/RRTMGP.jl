@@ -56,8 +56,29 @@ export AbstractOpticalProps,
        TwoStreamPGP,
        OpticalPropsBase
 
+"""
+    AbstractOpticalProps{FT<:AbstractFloat,I<:Int}
+
+Abstract optical properties
+"""
 abstract type AbstractOpticalProps{FT<:AbstractFloat,I<:Int} end
+
+"""
+    AbstractOpticalPropsArry{FT,I} <: AbstractOpticalProps{FT,I}
+
+Abstract optical properties array. Includes arrays for
+optical depth and, depending on the approximation used,
+other variables.
+"""
 abstract type AbstractOpticalPropsArry{FT,I} <: AbstractOpticalProps{FT,I} end
+
+"""
+    AbstractOpticalPropsPGP{FT,I} <: AbstractOpticalProps{FT,I}
+
+Abstract optical properties array per-grid-point. Includes
+arrays for optical depth and, depending on the approximation
+used, other variables.
+"""
 abstract type AbstractOpticalPropsPGP{FT,I} <: AbstractOpticalProps{FT,I} end
 
 """
@@ -73,7 +94,7 @@ struct OpticalPropsBase{FT,I} <: AbstractOpticalProps{FT,I}
   band2gpt::Array{I,2}
   "Map from g-point to band. band = gpt2band(g-point)"
   gpt2band::Array{I,1}
-  "wavenumber band limits. (upper and lower wavenumber by band) = band_lims_wvn(2,band)"
+  "Wavenumber band limits. (upper and lower wavenumber by band) = band_lims_wvn(2,band)"
   band_lims_wvn::Array{FT,2}
   "Name of optical properties"
   name::AbstractString
@@ -111,9 +132,9 @@ calculations accounting for extinction and emission
 $(DocStringExtensions.FIELDS)
 """
 struct OneScalar{FT,I} <: AbstractOpticalPropsArry{FT,I}
-  "Base optical properties, see "
+  "Base optical properties, see [`OpticalPropsBase`](@ref)"
   base::Union{OpticalPropsBase{FT,I}, Nothing}
-  "optical depth"
+  "Optical depth"
   τ::Array{FT,3}
 end
 
@@ -133,9 +154,9 @@ per-grid-point
 $(DocStringExtensions.FIELDS)
 """
 struct OneScalarPGP{FT,I} <: AbstractOpticalPropsPGP{FT,I}
-  "optical properties discretization and mapping"
+  "Base optical properties, see [`OpticalPropsBase`](@ref)"
   base::Union{OpticalPropsBase{FT,I}, Nothing}
-  "optical depth"
+  "Optical depth"
   τ::Array{FT,1}
 end
 
@@ -163,13 +184,13 @@ calculations accounting for extinction and emission
 $(DocStringExtensions.FIELDS)
 """
 struct TwoStream{FT,I} <: AbstractOpticalPropsArry{FT,I}
-  "optical properties discretization and mapping"
+  "Base optical properties, see [`OpticalPropsBase`](@ref)"
   base::Union{OpticalPropsBase{FT,I}, Nothing}
-  "optical depth"
+  "Optical depth"
   τ::Array{FT,3}
-  "single-scattering albedo"
+  "Single-scattering albedo"
   ssa::Array{FT,3}
-  "asymmetry parameter"
+  "Asymmetry parameter"
   g::Array{FT,3}
 end
 
@@ -189,13 +210,13 @@ per-grid-point
 $(DocStringExtensions.FIELDS)
 """
 struct TwoStreamPGP{FT,I} <: AbstractOpticalPropsPGP{FT,I}
-  "optical properties discretization and mapping"
+  "Base optical properties, see [`OpticalPropsBase`](@ref)"
   base::Union{OpticalPropsBase{FT,I}, Nothing}
-  "optical depth"
+  "Optical depth"
   τ::Array{FT,1}
-  "single-scattering albedo"
+  "Single-scattering albedo"
   ssa::Array{FT,1}
-  "asymmetry parameter"
+  "Asymmetry parameter"
   g::Array{FT,1}
 end
 

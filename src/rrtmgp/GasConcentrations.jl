@@ -35,13 +35,13 @@ Encapsulates a collection of volume mixing ratios (concentrations) of gases.
 $(DocStringExtensions.FIELDS)
 """
 struct GasConcs{FT<:AbstractFloat,I<:Int}
-  "gas names"
+  "Gas names"
   gas_names::Vector{AbstractGas}
-  "gas concentrations arrays"
+  "Gas concentrations arrays"
   concs::Array{FT,3}
-  "number of columns"
+  "Number of columns"
   ncol::I
-  "number of layers"
+  "Number of layers"
   nlay::I
 end
 function GasConcs(::Type{FT}, ::Type{I}, gas_names, ncol::I, nlay::I, ngases::I=length(gas_names)) where {FT<:AbstractFloat,I<:Int}
@@ -59,9 +59,9 @@ Each concentration is associated with a name, normally the chemical formula.
 $(DocStringExtensions.FIELDS)
 """
 struct GasConcsPGP{FT<:AbstractFloat}
-  "gas names"
+  "Gas names"
   gas_names::Vector{AbstractGas}
-  "gas concentrations arrays"
+  "Gas concentrations arrays"
   concs::Array{FT,1}
 end
 
