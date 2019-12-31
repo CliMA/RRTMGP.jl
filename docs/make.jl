@@ -13,13 +13,17 @@ makedocs(
   modules = [Documenter, RRTMGP],
   pages = Any[
     "Home" => "index.md",
+    "Mathematical Formulation" => "MathFormulation.md",
     "RRTMGP" => Any[
     "Gas Concentrations" => "RRTMGP/GasConcs.md"
     "Gas Optics" => "RRTMGP/GasOptics.md"
     "References States" => "RRTMGP/ReferenceStates.md"
+    "Atmospheric States" => "RRTMGP/AtmosphericStates.md"
+    "Physical constants" => "RRTMGP/PhysicalConstants.md"
+    "Optical Properties" => "OpticalProps.md"
     ],
     "RTE" => Any[
-    "Optical Properties" => "RTE/OpticalProps.md"
+    "Optical Properties" => "OpticalProps.md"
     "Fluxes" => "RTE/Fluxes.md"
     "RTE Solver" => "RTE/RTESolver.md"
     "Solar Zenith Angle" => "RTE/SolarZenithAngle.md"

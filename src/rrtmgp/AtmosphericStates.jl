@@ -22,16 +22,6 @@ abstract type AbstractAtmosphericState{FT<:AbstractFloat,I<:Int} end
 include("Interpolation.jl")
 
 """
-    SimpleGrid{FT}
-
-# Fields
-$(DocStringExtensions.FIELDS)
-"""
-struct SimpleGrid{FT<:AbstractFloat}
-  z
-end
-
-"""
     get_col_dry(vmr_h2o, plev, tlay, latitude=nothing)
 
 Utility function, provided for user convenience
@@ -105,7 +95,7 @@ struct AtmosphericState{FT,I} <: AbstractAtmosphericState{FT,I}
   tropo_lims::Array{I,3}
   "Any tropospheric limits greater than 0"
   gt_0_tropo_lims::Array{Bool,1}
-  "Mesh orientation, see [`MeshOrientation`](@ref)."
+  "Mesh orientation, see [`MeshOrientation`](@ref)"
   mesh_orientation::MeshOrientation{I}
   "Number of layers."
   nlay::I
@@ -236,7 +226,7 @@ mutable struct AtmosphericStatePGP{FT,I} <: AbstractAtmosphericState{FT,I}
   tropo_lims::Array{I,2}
   "Any tropospheric limits greater than 0"
   gt_0_tropo_lims::Array{Bool,1}
-  "Mesh orientation, see [`MeshOrientation`](@ref)."
+  "Mesh orientation, see [`MeshOrientation`](@ref)"
   mesh_orientation::MeshOrientation{I}
   "i-th layer."
   ilay::I

@@ -8,6 +8,8 @@ CurrentModule = RRTMGP.OpticalProps
 OpticalPropsBase
 OneScalar
 TwoStream
+OneScalarPGP
+TwoStreamPGP
 ```
 
 ```@docs

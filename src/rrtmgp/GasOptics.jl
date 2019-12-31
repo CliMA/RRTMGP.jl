@@ -45,9 +45,9 @@ and lower levels of the atmosphere.
 $(DocStringExtensions.FIELDS)
 """
 struct GasOpticsAux{I<:Int}
-  "indexes for determining `col_gas`"
+  "Indexes for determining `col_gas`"
   idx_minor::Vector{I}
-  "indexes that have special treatment in density scaling"
+  "Indexes that have special treatment in density scaling"
   idx_minor_scaling::Vector{I}
   function GasOpticsAux(gas_names_present, gas_minor, identifier_minor, reduced_atmos, ::Type{I}) where I
     return new{I}(create_idx_minor(gas_names_present,
@@ -73,22 +73,27 @@ levels of the atmosphere for both full and reduced sets of gases.
 $(DocStringExtensions.FIELDS)
 """
 struct GasOpticsVars{FT<:AbstractFloat,I<:Int}
-  "minor g-point limits"
+  "Minor g-point limits"
   minor_limits_gpt::Array{I,2}
-  "minor scales with density"
+  "Minor scales with density"
   minor_scales_with_density::Vector{Bool}
-  "scale by complement"
+  "Scale by complement"
   scale_by_complement::Vector{Bool}
-  "kminor start"
+  "Start index for minor gas absorption coefficient"
   kminor_start::Vector{I}
-  "absorption coefficient of minor species (n_minor,η,temperature)"
+  "Absorption coefficient of minor species (n_minor,η,temperature)"
   kminor::Array{FT,3}
-  "scaling gas"
+  "Scaling gas"
   scaling_gas::Array{AbstractGas}
-  "minor gases"
+  "Minor gases"
   minor_gases::Array{AbstractGas}
 end
 
+"""
+    AbstractGasOptics{FT,I} <: AbstractOpticalProps{FT,I}
+
+Abstract gas optics, for long and short wave gas optics dispatch.
+"""
 abstract type AbstractGasOptics{FT,I} <: AbstractOpticalProps{FT,I} end
 
 """
@@ -104,21 +109,19 @@ struct KDistributionLongwave{FT,I} <: AbstractGasOptics{FT,I}
   ref::ReferenceState{FT}
   "Base optical properties"
   optical_props::OpticalPropsBase{FT,I}
-  "GasOpticsVars in the lower atmosphere"
+  "Gas optics variables in the lower atmosphere, see [`GasOpticsVars`](@ref)"
   lower::GasOpticsVars{FT,I}
-  "GasOpticsVars in the upper atmosphere"
+  "Gas optics variables in the upper atmosphere, see [`GasOpticsVars`](@ref)"
   upper::GasOpticsVars{FT,I}
-  "Auxiliary variables (index maps) in the lower atmosphere"
+  "Auxiliary variables (index maps) in the lower atmosphere, see [`GasOpticsAux`](@ref)"
   lower_aux::GasOpticsAux{I}
-  "Auxiliary variables (index maps) in the upper atmosphere"
+  "Auxiliary variables (index maps) in the upper atmosphere, see [`GasOpticsAux`](@ref)"
   upper_aux::GasOpticsAux{I}
   "Present gas names"
   gas_names::Vector{AbstractGas}
-  "Indexes of present gas names"
-  i_gases::Vector{I}
   "Absorption coefficient for major species (g-point,η,pressure,temperature)"
   kmajor::Array{FT,4}
-  "major species pair; [2, nflav]"
+  "Major species pair; [2, nflav]"
   flavor::Array{I,2}
   "Flavor per g-point: `lower.flavor = gpoint_flavor[1, 1:ngpt]`, `upper.flavor = gpoint_flavor[2, 1:ngpt]`"
   gpoint_flavor::Array{I,2}
@@ -126,9 +129,9 @@ struct KDistributionLongwave{FT,I} <: AbstractGasOptics{FT,I}
   is_key::Vector{Bool}
   "Stored fraction of Planck irradiance in band for given g-point"
   planck_frac::Array{FT,4}
-  "integrated Planck irradiance by band; [Planck temperatures,band]"
+  "Integrated Planck irradiance by band; [Planck temperatures,band]"
   totplnk::Array{FT,2}
-  "temperature steps in totplnk"
+  "Temperature steps in totplnk"
   totplnk_delta::FT
   "Absorption coefficient for Rayleigh scattering [g-point,η,temperature,upper/lower atmosphere]"
   krayl::Union{Array{FT,4},Nothing}
@@ -147,29 +150,27 @@ struct KDistributionShortwave{FT,I} <: AbstractGasOptics{FT,I}
   ref::ReferenceState{FT}
   "Base optical properties"
   optical_props::OpticalPropsBase{FT,I}
-  "GasOpticsVars in the lower atmosphere"
+  "Gas optics variables in the lower atmosphere, see [`GasOpticsVars`](@ref)"
   lower::GasOpticsVars{FT,I}
-  "GasOpticsVars in the upper atmosphere"
+  "Gas optics variables in the upper atmosphere, see [`GasOpticsVars`](@ref)"
   upper::GasOpticsVars{FT,I}
-  "Auxiliary variables (index maps) in the lower atmosphere"
+  "Auxiliary variables (index maps) in the lower atmosphere, see [`GasOpticsAux`](@ref)"
   lower_aux::GasOpticsAux{I}
-  "Auxiliary variables (index maps) in the upper atmosphere"
+  "Auxiliary variables (index maps) in the upper atmosphere, see [`GasOpticsAux`](@ref)"
   upper_aux::GasOpticsAux{I}
   "Present gas names"
   gas_names::Vector{AbstractGas}
-  "Indexes of present gas names"
-  i_gases::Vector{I}
   "Absorption coefficient for major species (g-point,η,pressure,temperature)"
   kmajor::Array{FT,4}
-  "major species pair; [2, nflav]"
+  "Major species pair; [2, nflav]"
   flavor::Array{I,2}
   "Flavor per g-point: lower.flavor = gpoint_flavor[1, g-point], upper.flavor = gpoint_flavor[2, g-point]"
   gpoint_flavor::Array{I,2}
   "Indicates whether a key species is in any band"
   is_key::Vector{Bool}
-  "incoming solar irradiance (g-point)"
-  solar_src::Vector{FT} # incoming solar irradiance(g-point)
-  "absorption coefficient for Rayleigh scattering (g-point,η,temperature,upper/lower atmosphere)"
+  "Incoming solar irradiance (g-point)"
+  solar_src::Vector{FT}
+  "Absorption coefficient for Rayleigh scattering (g-point,η,temperature,upper/lower atmosphere)"
   krayl::Union{Array{FT,4},Nothing}
 end
 
@@ -518,7 +519,6 @@ function init_abs_coeffs(gases_prescribed::Vector{AbstractGas},
 
   # Which gases known to the gas optics are present in the host model (gases_prescribed)?
   gas_names_present = intersect(gases_in_database, gases_prescribed)
-  i_gases = I[loc_in_array(gas, gas_names_present) for gas in gas_names_present]
 
   reduced_lower = reduce_minor_arrays(gases_prescribed, gas_minor, identifier_minor, lower)
   reduced_upper = reduce_minor_arrays(gases_prescribed, gas_minor, identifier_minor, upper)
@@ -552,7 +552,6 @@ function init_abs_coeffs(gases_prescribed::Vector{AbstractGas},
           lower_aux,
           upper_aux,
           gas_names_present,
-          i_gases,
           kmajor,
           flavor,
           gpoint_flavor,
@@ -671,7 +670,7 @@ end
                      identifier_minor::VG,
                      minor_gases_atm::VG) where {VG<:Vector{AbstractGas}}
 
-create index list for extracting col_gas needed for minor gas optical depth calculations
+create index list for extracting `col_gas` needed for minor gas optical depth calculations
 
  - `gas_names`
  - `gas_minor`
