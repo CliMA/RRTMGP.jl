@@ -14,13 +14,13 @@ $(DocStringExtensions.FIELDS)
 """
 mutable struct FluxesByBand{FT} <: AbstractFluxes{FT}
   fluxes_broadband
-  "upward flux"
+  "Upward flux"
   bnd_flux_up#::Array{FT,3}
-  "downward flux"
+  "Downward flux"
   bnd_flux_dn#::Array{FT,3}
-  "net flux"
+  "Net flux"
   bnd_flux_net#::Array{FT,3}
-  "downward direct flux"
+  "Downward direct flux"
   bnd_flux_dn_dir#::Array{FT,3}
 end
 

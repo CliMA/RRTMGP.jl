@@ -64,8 +64,8 @@ end
 
 Variables defined at
 
-  - upper  (log(p) < ref.press_trop_log)
-  - lower  (log(p) > ref.press_trop_log)
+  - upper  (`log(p) < ref.press_trop_log`)
+  - lower  (`log(p) > ref.press_trop_log`)
 
 levels of the atmosphere for both full and reduced sets of gases.
 
@@ -81,7 +81,7 @@ struct GasOpticsVars{FT<:AbstractFloat,I<:Int}
   scale_by_complement::Vector{Bool}
   "Start index for minor gas absorption coefficient"
   kminor_start::Vector{I}
-  "Absorption coefficient of minor species (n_minor,η,temperature)"
+  "Absorption coefficient of minor species (`n_minor,η,temperature`)"
   kminor::Array{FT,3}
   "Scaling gas"
   scaling_gas::Array{AbstractGas}
@@ -121,7 +121,7 @@ struct KDistributionLongwave{FT,I} <: AbstractGasOptics{FT,I}
   gas_names::Vector{AbstractGas}
   "Absorption coefficient for major species (g-point,η,pressure,temperature)"
   kmajor::Array{FT,4}
-  "Major species pair; [2, nflav]"
+  "Major species pair; (`2, nflav`)"
   flavor::Array{I,2}
   "Flavor per g-point: `lower.flavor = gpoint_flavor[1, 1:ngpt]`, `upper.flavor = gpoint_flavor[2, 1:ngpt]`"
   gpoint_flavor::Array{I,2}
@@ -129,11 +129,11 @@ struct KDistributionLongwave{FT,I} <: AbstractGasOptics{FT,I}
   is_key::Vector{Bool}
   "Stored fraction of Planck irradiance in band for given g-point"
   planck_frac::Array{FT,4}
-  "Integrated Planck irradiance by band; [Planck temperatures,band]"
+  "Integrated Planck irradiance by band; (Planck temperatures,band)"
   totplnk::Array{FT,2}
   "Temperature steps in totplnk"
   totplnk_delta::FT
-  "Absorption coefficient for Rayleigh scattering [g-point,η,temperature,upper/lower atmosphere]"
+  "Absorption coefficient for Rayleigh scattering (g-point,η,temperature,upper/lower atmosphere)"
   krayl::Union{Array{FT,4},Nothing}
 end
 
@@ -162,9 +162,9 @@ struct KDistributionShortwave{FT,I} <: AbstractGasOptics{FT,I}
   gas_names::Vector{AbstractGas}
   "Absorption coefficient for major species (g-point,η,pressure,temperature)"
   kmajor::Array{FT,4}
-  "Major species pair; [2, nflav]"
+  "Major species pair; (`2, nflav`)"
   flavor::Array{I,2}
-  "Flavor per g-point: lower.flavor = gpoint_flavor[1, g-point], upper.flavor = gpoint_flavor[2, g-point]"
+  "Flavor per g-point: `lower.flavor = gpoint_flavor[1, 1:ngpt]`, `upper.flavor = gpoint_flavor[2, 1:ngpt]`"
   gpoint_flavor::Array{I,2}
   "Indicates whether a key species is in any band"
   is_key::Vector{Bool}
@@ -183,17 +183,17 @@ Interpolation coefficients
 $(DocStringExtensions.FIELDS)
 """
 struct InterpolationCoefficients{FT<:AbstractFloat,I<:Int}
-  "index for temperature"
+  "Index for temperature"
   jtemp::Array{I,2}
-  "index for pressure"
+  "Index for pressure"
   jpress::Array{I,2}
-  "index for binary species parameter (η)"
+  "Index for binary species parameter (η)"
   j_η::Array{I,4}
-  "fractions for major species"
+  "Fractions for major species"
   fmajor::Array{FT,6}
-  "fractions for minor species. [reference η level (temperature dependent), reference temperature level, flavor, layer]"
+  "Fractions for minor species. [reference η level (temperature dependent), reference temperature level, flavor, layer]"
   fminor::Array{FT,5}
-  "combination of major specie's column amounts"
+  "Combination of major specie's column amounts"
   col_mix::Array{FT,4}
 end
 function InterpolationCoefficients(::Type{FT}, ncol::I, nlay::I, nflav::I) where {I<:Int, FT<:AbstractFloat}
@@ -215,17 +215,17 @@ Interpolation coefficients per grid point
 $(DocStringExtensions.FIELDS)
 """
 mutable struct InterpolationCoefficientsPGP{FT<:AbstractFloat,I<:Int}
-  "index for temperature"
+  "Index for temperature"
   jtemp::I
-  "index for pressure"
+  "Index for pressure"
   jpress::I
-  "index for binary species parameter (η)"
+  "Index for binary species parameter (η)"
   j_η::Array{I,2}
-  "fractions for major species"
+  "Fractions for major species"
   fmajor::Array{FT,4}
-  "fractions for minor species. [reference η level (temperature dependent), reference temperature level, flavor, layer]"
+  "Fractions for minor species. [reference η level (temperature dependent), reference temperature level, flavor, layer]"
   fminor::Array{FT,3}
-  "combination of major specie's column amounts"
+  "Combination of major specie's column amounts"
   col_mix::Array{FT,2}
 end
 function InterpolationCoefficientsPGP(::Type{FT}, nflav::I) where {I<:Int, FT<:AbstractFloat}
@@ -363,8 +363,8 @@ Returns optical properties and interpolation coefficients
  - `optical_props` optical properties, see [`AbstractOpticalPropsArry`](@ref)
 
 Local variables
- - `τ`, `τ_Rayleigh` [ngpt,nlay,ncol] absorption, Rayleigh scattering optical depths
- - `col_mix` combination of major specie's column amounts [reference temperature level, flavor, column]
+ - `τ`, `τ_Rayleigh` [`ngpt,nlay,ncol`] absorption, Rayleigh scattering optical depths
+ - `col_mix` combination of major specie's column amounts (reference temperature level, flavor, column)
 """
 function compute_gas_τs!(ics::InterpolationCoefficients{FT,I},
                          this::AbstractGasOptics{FT},

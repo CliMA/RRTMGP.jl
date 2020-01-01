@@ -75,21 +75,21 @@ $(DocStringExtensions.FIELDS)
 struct AtmosphericState{FT,I} <: AbstractAtmosphericState{FT,I}
   "Gas concentrations, in the form of volume mixing ratios"
   gas_conc::GasConcs{FT,I}
-  "layer pressures [Pa, mb]; (ncol,nlay)"
+  "Layer pressures [Pa, mb]; (`ncol,nlay`)"
   p_lay::Array{FT,2}
-  "level pressures [Pa, mb]; (ncol,nlay+1)"
+  "Level pressures [Pa, mb]; (`ncol,nlay+1`)"
   p_lev::Array{FT,2}
-  "layer temperatures [K]; (ncol,nlay)"
+  "Layer temperatures [K]; (`ncol,nlay`)"
   t_lay::Array{FT,2}
-  "level temperatures [K]; (ncol,nlay+1)"
+  "Level temperatures [K]; (`ncol,nlay+1`)"
   t_lev::Array{FT,2}
-  "surface temperatures [K]; (ncol)"
+  "Surface temperatures [K]; (`ncol`)"
   t_sfc::Vector{FT}
-  "column amounts for each gas, plus col_dry. gas amounts [molec/cm^2]"
+  "Column amounts for each gas, plus `col_dry`. gas amounts [`molec/cm^2`]"
   col_gas::Array{FT,3}
   "Number of molecules per cm-2 of dry air"
   col_dry::Array{FT,2}
-  "troposphere mask: itropo = merge(1,2,tropo[icol,ilay]); itropo = 1 lower atmosphere; itropo = 2 upper atmosphere"
+  "Troposphere mask: `itropo = merge(1,2,tropo[icol,ilay])`; `itropo = 1` lower atmosphere; `itropo = 2` upper atmosphere"
   tropo::Array{Bool,2}
   "Layer limits of upper, lower atmospheres"
   tropo_lims::Array{I,3}
@@ -206,21 +206,21 @@ $(DocStringExtensions.FIELDS)
 mutable struct AtmosphericStatePGP{FT,I} <: AbstractAtmosphericState{FT,I}
   "Gas concentrations, in the form of volume mixing ratios"
   gas_conc::GasConcsPGP{FT}
-  "layer pressures [Pa, mb]"
+  "Layer pressures [Pa, mb]"
   p_lay::FT
-  "level pressures [Pa, mb]"
+  "Level pressures [Pa, mb]"
   p_lev::Vector{FT}
-  "layer temperatures [K]"
+  "Layer temperatures [K]"
   t_lay::FT
-  "level temperatures [K]"
+  "Level temperatures [K]"
   t_lev::Vector{FT}
-  "surface temperatures [K]"
+  "Surface temperatures [K]"
   t_sfc::FT
-  "column amounts for each gas, plus col_dry. gas amounts [molec/cm^2]"
+  "Column amounts for each gas, plus `col_dry`. gas amounts [`molec/cm^2`]"
   col_gas::Array{FT,1}
   "Number of molecules per cm-2 of dry air"
   col_dry::FT
-  "troposphere mask: itropo = merge(1,2,tropo); itropo = 1 lower atmosphere; itropo = 2 upper atmosphere"
+  "Troposphere mask: `itropo = merge(1,2,tropo)`; `itropo = 1` lower atmosphere; `itropo = 2` upper atmosphere"
   tropo::Bool
   "Layer limits of upper, lower atmospheres"
   tropo_lims::Array{I,2}
@@ -228,7 +228,7 @@ mutable struct AtmosphericStatePGP{FT,I} <: AbstractAtmosphericState{FT,I}
   gt_0_tropo_lims::Array{Bool,1}
   "Mesh orientation, see [`MeshOrientation`](@ref)"
   mesh_orientation::MeshOrientation{I}
-  "i-th layer."
+  "Index of i-th layer."
   ilay::I
 end
 

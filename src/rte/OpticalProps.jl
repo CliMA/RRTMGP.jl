@@ -90,11 +90,11 @@ Base class for optical properties.
 $(DocStringExtensions.FIELDS)
 """
 struct OpticalPropsBase{FT,I} <: AbstractOpticalProps{FT,I}
-  "Map from band to g-point. (begin g-point, end g-point) = band2gpt(2,band)"
+  "Map from band to g-point. `(g_point_begin, g_point_end) = band2gpt[2,band]`"
   band2gpt::Array{I,2}
-  "Map from g-point to band. band = gpt2band(g-point)"
+  "Map from g-point to band. `band = gpt2band(gpt)`"
   gpt2band::Array{I,1}
-  "Wavenumber band limits. (upper and lower wavenumber by band) = band_lims_wvn(2,band)"
+  "Wavenumber band limits. `(upper_band_wvn, lower_band_wvn) = band_lims_wvn[2,band]`"
   band_lims_wvn::Array{FT,2}
   "Name of optical properties"
   name::AbstractString
