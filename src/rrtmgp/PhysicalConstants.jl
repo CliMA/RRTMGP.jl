@@ -16,9 +16,15 @@ export k_boltz,
 """
     k_boltz(::Type{FT})
 
-Physical constants, 2018 SI defintion of metric system
-  doi:10.1088/1681-7575/aa950a (see also https://www.nist.gov/si-redefinition/meet-constants)
+Physical constants, 2018 SI definition of metric system
+
 Boltzmann constant [J/K] = [(kg m^2)/(K s^2)]
+
+Refs:
+
+ - `doi:10.1088/1681-7575/aa950a`
+ - `https://www.nist.gov/si-redefinition/meet-constants`
+
 """
 k_boltz(::Type{FT}) where FT = FT(1.380649e-23)
 

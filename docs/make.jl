@@ -19,7 +19,7 @@ makedocs(
     "Gas Optics" => "RRTMGP/GasOptics.md"
     "References States" => "RRTMGP/ReferenceStates.md"
     "Atmospheric States" => "RRTMGP/AtmosphericStates.md"
-    "Physical constants" => "RRTMGP/PhysicalConstants.md"
+    "Physical Constants" => "RRTMGP/PhysicalConstants.md"
     "Optical Properties" => "OpticalProps.md"
     ],
     "RTE" => Any[

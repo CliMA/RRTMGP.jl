@@ -13,13 +13,13 @@ Contains upward, downward, net, and direct downward fluxes
 $(DocStringExtensions.FIELDS)
 """
 struct FluxesBroadBand{FT} <: AbstractFluxes{FT}
-  "upward flux"
+  "Upward flux"
   flux_up::Array{FT,2}
-  "downward flux"
+  "Downward flux"
   flux_dn::Array{FT,2}
-  "net flux"
+  "Net flux"
   flux_net::Array{FT,2}
-  "downward direct flux"
+  "Downward direct flux"
   flux_dn_dir::Union{Array{FT,2},Nothing}
   FluxesBroadBand(FT, s, include_direct::Bool=false) =
     include_direct ? new{FT}(ntuple(i->Array{FT}(undef, s...),4)...) :
