@@ -5,6 +5,7 @@ CurrentModule = RRTMGP.Fluxes
 ```
 
 ```@docs
+AbstractFluxes
 FluxesBroadBand
 FluxesByBand
 ```

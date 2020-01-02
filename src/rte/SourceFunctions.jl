@@ -15,6 +15,8 @@ export SourceFuncLongWave, SourceFuncLongWavePGP
 export SourceFuncShortWave
 export get_ncol, get_nlay, get_ngpt
 
+abstract type AbstractSourceFunc{FT,I} <: AbstractOpticalProps{FT, I} end
+
 """
     SourceFuncLongWave{FT, I} <: AbstractOpticalProps{FT, I}
 
@@ -25,7 +27,7 @@ spectral mapping in each direction separately, and at the surface
 
 $(DocStringExtensions.FIELDS)
 """
-struct SourceFuncLongWave{FT, I} <: AbstractOpticalProps{FT, I}
+struct SourceFuncLongWave{FT, I} <: AbstractSourceFunc{FT, I}
   "optical properties, see [`OpticalPropsBase`](@ref)"
   optical_props::OpticalPropsBase{FT,I}
   "Planck source at layer average temperature [W/m2] (ncol, nlay, ngpt)"
@@ -67,7 +69,7 @@ per grid point
 
 $(DocStringExtensions.FIELDS)
 """
-struct SourceFuncLongWavePGP{FT, I} <: AbstractOpticalProps{FT, I}
+struct SourceFuncLongWavePGP{FT, I} <: AbstractSourceFunc{FT, I}
   "optical properties, see [`OpticalPropsBase`](@ref)"
   optical_props::OpticalPropsBase{FT,I}
   "Planck source at layer average temperature [W/m2] (ngpt)"
@@ -116,7 +118,7 @@ Shortwave sources
 
 $(DocStringExtensions.FIELDS)
 """
-struct SourceFuncShortWave{FT, I} <: AbstractOpticalProps{FT, I}
+struct SourceFuncShortWave{FT, I} <: AbstractSourceFunc{FT, I}
   "optical properties, see [`OpticalPropsBase`](@ref)"
   optical_props::OpticalPropsBase{FT,I}
   "top of atmosphere source"

@@ -11,6 +11,14 @@ using ..Utilities
 export ShortwaveBCs
 export LongwaveBCs
 
+"""
+    AbstractRadiativeBoundaryConditions{FT<:AbstractFloat}
+
+Abstract class for radiative boundary conditions
+
+ - See [`ShortwaveBCs`](@ref)
+ - See [`LongwaveBCs`](@ref)
+"""
 abstract type AbstractRadiativeBoundaryConditions{FT<:AbstractFloat} end
 
 """
