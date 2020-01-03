@@ -67,7 +67,7 @@ end
 """
     AtmosphericState{FT}
 
-as = AtmosphericState(gas_conc, p_lay, p_lev, t_lay, t_lev)
+Atmospheric conditions, used to compute optical properties
 
 # Fields
 $(DocStringExtensions.FIELDS)
@@ -198,7 +198,7 @@ end
 """
     AtmosphericStatePGP{FT}
 
-as = AtmosphericStatePGP(gas_conc, p_lay, p_lev, t_lay, t_lev)
+Atmospheric conditions per-grid-point, used to compute optical properties
 
 # Fields
 $(DocStringExtensions.FIELDS)

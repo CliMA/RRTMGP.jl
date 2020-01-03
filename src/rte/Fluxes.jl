@@ -17,7 +17,10 @@ export AbstractFluxes, reduce!
 """
     AbstractFluxes{FT}
 
-Abstract Fluxes struct
+Abstract fluxes class
+
+ - See [`FluxesBroadBand`](@ref)
+ - See [`FluxesByBand`](@ref)
 """
 abstract type AbstractFluxes{FT<:AbstractFloat} end
 

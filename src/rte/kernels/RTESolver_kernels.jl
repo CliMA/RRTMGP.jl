@@ -31,13 +31,13 @@ LW_diff_sec(::Type{FT}) where FT = FT(1.66)  # 1./cos(diffusivity angle)
 """
     lw_solver_noscat!(ncol::I, nlay::I, ngpt::I,
                       mesh_orientation::MeshOrientation{I},
-                      D::Array{FT},
+                      D::Array{FT,2},
                       weight::FT,
-                      τ::Array{FT},
+                      τ::Array{FT,3},
                       source::SourceFuncLongWave{FT,I},
-                      sfc_emis::Array{FT},
-                      radn_up::Array{FT},
-                      radn_dn::Array{FT}) where {FT<:AbstractFloat,I<:Int}
+                      sfc_emis::Array{FT,2},
+                      radn_up::Array{FT,3},
+                      radn_dn::Array{FT,3}) where {FT<:AbstractFloat,I<:Int}
 
  - `source` longwave source function, see [`SourceFuncLongWave`](@ref)
  - `mesh_orientation` mesh orientation, see [`MeshOrientation`](@ref)
@@ -60,13 +60,13 @@ real(FT), dimension(:,:,:), pointer :: lev_source_up, lev_source_dn # Mapping in
 """
 function lw_solver_noscat!(ncol::I, nlay::I, ngpt::I,
                            mesh_orientation::MeshOrientation{I},
-                           D::Array{FT},
+                           D::Array{FT,2},
                            weight::FT,
-                           τ::Array{FT},
+                           τ::Array{FT,3},
                            source::SourceFuncLongWave{FT,I},
-                           sfc_emis::Array{FT},
-                           radn_up::Array{FT},
-                           radn_dn::Array{FT}) where {FT<:AbstractFloat,I<:Int}
+                           sfc_emis::Array{FT,2},
+                           radn_up::Array{FT,3},
+                           radn_dn::Array{FT,3}) where {FT<:AbstractFloat,I<:Int}
   τ_loc    = Array{FT}(undef,ncol,nlay)
   trans      = Array{FT}(undef,ncol,nlay)
   source_up  = Array{FT}(undef,ncol,nlay)
@@ -142,11 +142,11 @@ end
     lw_solver_noscat_GaussQuad!(ncol::I, nlay::I, ngpt::I,
                                 mesh_orientation::MeshOrientation{I},
                                 angle_disc::GaussQuadrature{FT,I},
-                                τ::Array{FT},
+                                τ::Array{FT,3},
                                 source::SourceFuncLongWave{FT, I},
-                                sfc_emis::Array{FT},
-                                flux_up::Array{FT},
-                                flux_dn::Array{FT}) where {I<:Int,FT<:AbstractFloat}
+                                sfc_emis::Array{FT,2},
+                                flux_up::Array{FT,3},
+                                flux_dn::Array{FT,3}) where {I<:Int,FT<:AbstractFloat}
 
 LW transport, no scattering, multi-angle quadrature
 Users provide a set of weights and quadrature angles
@@ -172,11 +172,11 @@ real(FT), dimension(ncol,       ngpt) :: Ds_ncol
 function lw_solver_noscat_GaussQuad!(ncol::I, nlay::I, ngpt::I,
                                      mesh_orientation::MeshOrientation{I},
                                      angle_disc::GaussQuadrature{FT,I},
-                                     τ::Array{FT},
+                                     τ::Array{FT,3},
                                      source::SourceFuncLongWave{FT, I},
-                                     sfc_emis::Array{FT},
-                                     flux_up::Array{FT},
-                                     flux_dn::Array{FT}) where {I<:Int,FT<:AbstractFloat}
+                                     sfc_emis::Array{FT,2},
+                                     flux_up::Array{FT,3},
+                                     flux_dn::Array{FT,3}) where {I<:Int,FT<:AbstractFloat}
 
   n_μ = angle_disc.n_gauss_angles
   Ds = angle_disc.gauss_Ds[1:n_μ,n_μ]
@@ -250,11 +250,11 @@ real(FT), dimension(ncol       ) :: source_sfc
 """
 function lw_solver!(ncol::I, nlay::I, ngpt::I,
                     mesh_orientation::MeshOrientation{I},
-                    optical_props::TwoStream{FT},
+                    optical_props::TwoStream{FT,I},
                     source::SourceFuncLongWave{FT},
-                    sfc_emis::Array{FT},
-                    flux_up::Array{FT},
-                    flux_dn::Array{FT}) where {I<:Int,FT<:AbstractFloat}
+                    sfc_emis::Array{FT,2},
+                    flux_up::Array{FT,3},
+                    flux_dn::Array{FT,3}) where {I<:Int,FT<:AbstractFloat}
 
   lev_source = Array{FT}(undef, ncol,nlay+1)
   source_sfc = Array{FT}(undef, ncol)
@@ -325,11 +325,11 @@ end
 #####
 
 """
-    sw_solver_noscat!(ncol, nlay, ngpt,
+    sw_solver_noscat!(ncol::I, nlay::I, ngpt::I,
                       mesh_orientation::MeshOrientation{I},
                       τ::Array{FT},
-                      μ_0,
-                      flux_dir) where {FT<:AbstractFloat,I<:Int}
+                      μ_0::Array{FT,1},
+                      flux_dir::Array{FT,3}) where {FT<:AbstractFloat,I<:Int}
 
  - `mesh_orientation` mesh orientation, see [`MeshOrientation`](@ref)
 
@@ -341,11 +341,11 @@ real(FT), dimension(ncol,nlay+1,ngpt), intent(inout) :: flux_dir     # Direct-be
 integer :: icol, ilev, igpt
 real(FT) :: μ_0_inv(ncol)
 """
-function sw_solver_noscat!(ncol, nlay, ngpt,
+function sw_solver_noscat!(ncol::I, nlay::I, ngpt::I,
                            mesh_orientation::MeshOrientation{I},
                            τ::Array{FT},
-                           μ_0,
-                           flux_dir) where {FT<:AbstractFloat,I<:Int}
+                           μ_0::Array{FT,1},
+                           flux_dir::Array{FT,3}) where {FT<:AbstractFloat,I<:Int}
 
   μ_0_inv = FT(1) ./ μ_0
   # Indexing into arrays for upward and downward propagation depends on the vertical
@@ -380,15 +380,15 @@ end
 #   transport
 
 """
-    sw_solver!(ncol, nlay, ngpt,
+    sw_solver!(ncol::I, nlay::I, ngpt::I,
                mesh_orientation::MeshOrientation{I},
-               optical_props::TwoStream{FT},
+               optical_props::TwoStream{FT,I},
                μ_0::Array{FT},
-               sfc_alb_dir,
-               sfc_alb_dif,
-               flux_up,
-               flux_dn,
-               flux_dir) where {FT<:AbstractFloat,I<:Int}
+               sfc_alb_dir::Array{FT,2},
+               sfc_alb_dif::Array{FT,2},
+               flux_up::Array{FT,3},
+               flux_dn::Array{FT,3},
+               flux_dir::Array{FT,3}) where {FT<:AbstractFloat,I<:Int}
 
  - `mesh_orientation` mesh orientation, see [`MeshOrientation`](@ref)
  - `optical_props` 2-stream optical properties, see [`TwoStream`](@ref)
@@ -403,15 +403,15 @@ real(FT), dimension(ncol,nlay) :: source_up, source_dn
 real(FT), dimension(ncol     ) :: source_srf
 # ------------------------------------
 """
-function sw_solver!(ncol, nlay, ngpt,
+function sw_solver!(ncol::I, nlay::I, ngpt::I,
                     mesh_orientation::MeshOrientation{I},
-                    optical_props::TwoStream{FT},
+                    optical_props::TwoStream{FT,I},
                     μ_0::Array{FT},
-                    sfc_alb_dir,
-                    sfc_alb_dif,
-                    flux_up,
-                    flux_dn,
-                    flux_dir) where {FT<:AbstractFloat,I<:Int}
+                    sfc_alb_dir::Array{FT,2},
+                    sfc_alb_dif::Array{FT,2},
+                    flux_up::Array{FT,3},
+                    flux_dn::Array{FT,3},
+                    flux_dir::Array{FT,3}) where {FT<:AbstractFloat,I<:Int}
 
   Rdif, Tdif, Rdir, Tdir, Tnoscat, source_up, source_dn = ntuple(i->zeros(FT, ncol,nlay), 7)
   source_srf = zeros(FT, ncol)
@@ -459,13 +459,13 @@ end
 
 """
     lw_source_noscat!(ncol::I, nlay::I,
-                      lay_source::Array{FT},
-                      lev_source_up::Array{FT},
-                      lev_source_dn::Array{FT},
-                      τ::Array{FT},
-                      trans::Array{FT},
-                      source_dn::Array{FT},
-                      source_up::Array{FT}) where {I<:Int,FT<:AbstractFloat}
+                      lay_source::Array{FT,2},
+                      lev_source_up::Array{FT,2},
+                      lev_source_dn::Array{FT,2},
+                      τ::Array{FT,2},
+                      trans::Array{FT,2},
+                      source_dn::Array{FT,2},
+                      source_up::Array{FT,2}) where {I<:Int,FT<:AbstractFloat}
 
 integer,                         intent(in) :: ncol, nlay
 real(FT), dimension(ncol, nlay), intent(in) :: lay_source,  # Planck source at layer center
@@ -480,13 +480,13 @@ real(FT), parameter :: τ_thresh = sqrt(epsilon(τ))
 
 """
 function lw_source_noscat!(ncol::I, nlay::I,
-                           lay_source::Array{FT},
-                           lev_source_up::Array{FT},
-                           lev_source_dn::Array{FT},
-                           τ::Array{FT},
-                           trans::Array{FT},
-                           source_dn::Array{FT},
-                           source_up::Array{FT}) where {I<:Int,FT<:AbstractFloat}
+                           lay_source::Array{FT,2},
+                           lev_source_up::Array{FT,2},
+                           lev_source_dn::Array{FT,2},
+                           τ::Array{FT,2},
+                           trans::Array{FT,2},
+                           source_dn::Array{FT,2},
+                           source_up::Array{FT,2}) where {I<:Int,FT<:AbstractFloat}
 
   τ_thresh = sqrt(eps(eltype(τ)))
 #    τ_thresh = abs(eps(eltype(τ)))
@@ -518,14 +518,14 @@ end
 """
     lw_transport_noscat!(ncol::I, nlay::I,
                          mesh_orientation::MeshOrientation{I},
-                         τ::Array{FT},
-                         trans::Array{FT},
-                         sfc_albedo::Array{FT},
-                         source_dn::Array{FT},
-                         source_up::Array{FT},
-                         source_sfc::Array{FT},
-                         radn_up::AbstractArray{FT},
-                         radn_dn::AbstractArray{FT}) where {I<:Int, FT<:AbstractFloat}
+                         τ::Array{FT,2},
+                         trans::Array{FT,2},
+                         sfc_albedo::Array{FT,1},
+                         source_dn::Array{FT,2},
+                         source_up::Array{FT,2},
+                         source_sfc::Array{FT,1},
+                         radn_up::AbstractArray{FT,2},
+                         radn_dn::AbstractArray{FT,2}) where {I<:Int, FT<:AbstractFloat}
 
  - `mesh_orientation` mesh orientation, see [`MeshOrientation`](@ref)
 
@@ -543,14 +543,14 @@ integer :: ilev
 """
 function lw_transport_noscat!(ncol::I, nlay::I,
                               mesh_orientation::MeshOrientation{I},
-                              τ::Array{FT},
-                              trans::Array{FT},
-                              sfc_albedo::Array{FT},
-                              source_dn::Array{FT},
-                              source_up::Array{FT},
-                              source_sfc::Array{FT},
-                              radn_up::AbstractArray{FT},
-                              radn_dn::AbstractArray{FT}) where {I<:Int, FT<:AbstractFloat}
+                              τ::Array{FT,2},
+                              trans::Array{FT,2},
+                              sfc_albedo::Array{FT,1},
+                              source_dn::Array{FT,2},
+                              source_up::Array{FT,2},
+                              source_sfc::Array{FT,1},
+                              radn_up::AbstractArray{FT,2},
+                              radn_dn::AbstractArray{FT,2}) where {I<:Int, FT<:AbstractFloat}
   if mesh_orientation.top_at_1
     #
     # Top of domain is index 1
@@ -598,13 +598,13 @@ end
 
 """
     lw_two_stream!(ncol::I, nlay::I,
-                   τ::Array{FT},
-                   w0::Array{FT},
-                   g::Array{FT},
-                   γ_1::Array{FT},
-                   γ_2::Array{FT},
-                   Rdif::Array{FT},
-                   Tdif::Array{FT}) where {I<:Int, FT<:AbstractFloat}
+                   τ::Array{FT,2},
+                   w0::Array{FT,2},
+                   g::Array{FT,2},
+                   γ_1::Array{FT,2},
+                   γ_2::Array{FT,2},
+                   Rdif::Array{FT,2},
+                   Tdif::Array{FT,2}) where {I<:Int, FT<:AbstractFloat}
 
 integer,                        intent(in)  :: ncol, nlay
 real(FT), dimension(ncol,nlay), intent(in)  :: τ, w0, g
@@ -623,13 +623,13 @@ real(FT) :: exp_minuskτ(ncol), exp_minus2kτ(ncol)
 real(FT), parameter :: LW_diff_sec = 1.66  # 1./cos(diffusivity angle)
 """
 function lw_two_stream!(ncol::I, nlay::I,
-                        τ::Array{FT},
-                        w0::Array{FT},
-                        g::Array{FT},
-                        γ_1::Array{FT},
-                        γ_2::Array{FT},
-                        Rdif::Array{FT},
-                        Tdif::Array{FT}) where {I<:Int, FT<:AbstractFloat}
+                        τ::Array{FT,2},
+                        w0::Array{FT,2},
+                        g::Array{FT,2},
+                        γ_1::Array{FT,2},
+                        γ_2::Array{FT,2},
+                        Rdif::Array{FT,2},
+                        Tdif::Array{FT,2}) where {I<:Int, FT<:AbstractFloat}
   k = Vector{FT}(undef, ncol)
   RT_term = Vector{FT}(undef, ncol)
   exp_minuskτ = Vector{FT}(undef, ncol)
@@ -688,9 +688,9 @@ end
 """
     lw_combine_sources!(ncol::I, nlay::I,
                         mesh_orientation::MeshOrientation{I},
-                        lev_src_inc::Array{FT},
-                        lev_src_dec::Array{FT},
-                        lev_source::Array{FT}) where {I<:Int,FT<:AbstractFloat}
+                        lev_src_inc::Array{FT,2},
+                        lev_src_dec::Array{FT,2},
+                        lev_source::Array{FT,2}) where {I<:Int,FT<:AbstractFloat}
 
  - `mesh_orientation` mesh orientation, see [`MeshOrientation`](@ref)
 
@@ -700,9 +700,9 @@ real(FT), dimension(ncol, nlay+1), intent(out) :: lev_source
 """
 function lw_combine_sources!(ncol::I, nlay::I,
                              mesh_orientation::MeshOrientation{I},
-                             lev_src_inc::Array{FT},
-                             lev_src_dec::Array{FT},
-                             lev_source::Array{FT}) where {I<:Int,FT<:AbstractFloat}
+                             lev_src_inc::Array{FT,2},
+                             lev_src_dec::Array{FT,2},
+                             lev_source::Array{FT,2}) where {I<:Int,FT<:AbstractFloat}
   ilay = 1
   @inbounds for icol in 1:ncol
     lev_source[icol, ilay] =        lev_src_dec[icol, ilay]
@@ -730,18 +730,18 @@ end
 """
     lw_source_2str!(ncol::I, nlay::I,
                     mesh_orientation::MeshOrientation{I},
-                    sfc_emis::Array{FT},
-                    sfc_src::Array{FT},
-                    lay_source::Array{FT},
-                    lev_source::Array{FT},
-                    γ_1::Array{FT},
-                    γ_2::Array{FT},
-                    rdif::Array{FT},
-                    tdif::Array{FT},
-                    τ::Array{FT},
-                    source_dn::Array{FT},
-                    source_up::Array{FT},
-                    source_sfc::Array{FT}) where {I<:Int,FT<:AbstractFloat}
+                    sfc_emis::Array{FT,1},
+                    sfc_src::Array{FT,1},
+                    lay_source::Array{FT,2},
+                    lev_source::Array{FT,2},
+                    γ_1::Array{FT,2},
+                    γ_2::Array{FT,2},
+                    rdif::Array{FT,2},
+                    tdif::Array{FT,2},
+                    τ::Array{FT,2},
+                    source_dn::Array{FT,2},
+                    source_up::Array{FT,2},
+                    source_sfc::Array{FT,1}) where {I<:Int,FT<:AbstractFloat}
 
  - `mesh_orientation` mesh orientation, see [`MeshOrientation`](@ref)
 
@@ -762,18 +762,18 @@ real(FT), dimension(:), pointer :: lev_source_bot, lev_source_top
 """
 function lw_source_2str!(ncol::I, nlay::I,
                          mesh_orientation::MeshOrientation{I},
-                         sfc_emis::Array{FT},
-                         sfc_src::Array{FT},
-                         lay_source::Array{FT},
-                         lev_source::Array{FT},
-                         γ_1::Array{FT},
-                         γ_2::Array{FT},
-                         rdif::Array{FT},
-                         tdif::Array{FT},
-                         τ::Array{FT},
-                         source_dn::Array{FT},
-                         source_up::Array{FT},
-                         source_sfc::Array{FT}) where {I<:Int,FT<:AbstractFloat}
+                         sfc_emis::Array{FT,1},
+                         sfc_src::Array{FT,1},
+                         lay_source::Array{FT,2},
+                         lev_source::Array{FT,2},
+                         γ_1::Array{FT,2},
+                         γ_2::Array{FT,2},
+                         rdif::Array{FT,2},
+                         tdif::Array{FT,2},
+                         τ::Array{FT,2},
+                         source_dn::Array{FT,2},
+                         source_up::Array{FT,2},
+                         source_sfc::Array{FT,1}) where {I<:Int,FT<:AbstractFloat}
 
   for ilay in 1:nlay
     if mesh_orientation.top_at_1
@@ -821,16 +821,16 @@ end
 # -------------------------------------------------------------------------------------------------
 
 """
-    sw_two_stream!(Rdif::Array{FT},
-                   Tdif::Array{FT},
-                   Rdir::Array{FT},
-                   Tdir::Array{FT},
-                   Tnoscat::Array{FT},
+    sw_two_stream!(Rdif::Array{FT,2},
+                   Tdif::Array{FT,2},
+                   Rdir::Array{FT,2},
+                   Tdir::Array{FT,2},
+                   Tnoscat::Array{FT,2},
                    ncol::I, nlay::I,
-                   μ_0::Array{FT},
-                   τ::Array{FT},
-                   w0::Array{FT},
-                   g::Array{FT}) where {I<:Int,FT<:AbstractFloat}
+                   μ_0::Array{FT,1},
+                   τ::Array{FT,2},
+                   w0::Array{FT,2},
+                   g::Array{FT,2}) where {I<:Int,FT<:AbstractFloat}
 
 integer,                        intent(in)  :: ncol, nlay
 real(FT), dimension(ncol),      intent(in)  :: μ_0
@@ -851,16 +851,16 @@ real(FT) :: k_μ, k_γ_3, k_γ_4
 real(FT) :: μ_0_inv(ncol)
 # ---------------------------------
 """
-function sw_two_stream!(Rdif::Array{FT},
-                        Tdif::Array{FT},
-                        Rdir::Array{FT},
-                        Tdir::Array{FT},
-                        Tnoscat::Array{FT},
+function sw_two_stream!(Rdif::Array{FT,2},
+                        Tdif::Array{FT,2},
+                        Rdir::Array{FT,2},
+                        Tdir::Array{FT,2},
+                        Tnoscat::Array{FT,2},
                         ncol::I, nlay::I,
-                        μ_0::Array{FT},
-                        τ::Array{FT},
-                        w0::Array{FT},
-                        g::Array{FT}) where {I<:Int,FT<:AbstractFloat}
+                        μ_0::Array{FT,1},
+                        τ::Array{FT,2},
+                        w0::Array{FT,2},
+                        g::Array{FT,2}) where {I<:Int,FT<:AbstractFloat}
 
   μ_0_inv = 1 ./ μ_0
   exp_minuskτ  = Array{FT}(undef, ncol)
@@ -959,14 +959,14 @@ end
 """
     sw_source_2str!(ncol::I, nlay::I,
                     mesh_orientation::MeshOrientation{I},
-                    Rdir::Array{FT},
-                    Tdir::Array{FT},
-                    Tnoscat::Array{FT},
-                    sfc_albedo::Array{FT},
-                    source_up::Array{FT},
-                    source_dn::Array{FT},
-                    source_sfc::Array{FT},
-                    flux_dn_dir::AbstractArray{FT}) where {I<:Int,FT<:AbstractFloat}
+                    Rdir::Array{FT,2},
+                    Tdir::Array{FT,2},
+                    Tnoscat::Array{FT,2},
+                    sfc_albedo::Array{FT,1},
+                    source_up::Array{FT,2},
+                    source_dn::Array{FT,2},
+                    source_sfc::Array{FT,1},
+                    flux_dn_dir::AbstractArray{FT,2}) where {I<:Int,FT<:AbstractFloat}
 
  - `mesh_orientation` mesh orientation, see [`MeshOrientation`](@ref)
 
@@ -980,14 +980,14 @@ real(FT), dimension(ncol, nlay+1), intent(inout) :: flux_dn_dir # Direct beam fl
 """
 function sw_source_2str!(ncol::I, nlay::I,
                          mesh_orientation::MeshOrientation{I},
-                         Rdir::Array{FT},
-                         Tdir::Array{FT},
-                         Tnoscat::Array{FT},
-                         sfc_albedo::Array{FT},
-                         source_up::Array{FT},
-                         source_dn::Array{FT},
-                         source_sfc::Array{FT},
-                         flux_dn_dir::AbstractArray{FT}) where {I<:Int,FT<:AbstractFloat}
+                         Rdir::Array{FT,2},
+                         Tdir::Array{FT,2},
+                         Tnoscat::Array{FT,2},
+                         sfc_albedo::Array{FT,1},
+                         source_up::Array{FT,2},
+                         source_dn::Array{FT,2},
+                         source_sfc::Array{FT,1},
+                         flux_dn_dir::AbstractArray{FT,2}) where {I<:Int,FT<:AbstractFloat}
 
   if mesh_orientation.top_at_1
     @inbounds for ilev in 1:nlay
@@ -1018,14 +1018,14 @@ end
 """
     adding!(ncol::I, nlay::I,
             mesh_orientation::MeshOrientation{I},
-            albedo_sfc::Array{FT},
-            rdif::Array{FT},
-            tdif::Array{FT},
-            src_dn::Array{FT},
-            src_up::Array{FT},
-            src_sfc::Array{FT},
-            flux_up::AbstractArray{FT},
-            flux_dn::AbstractArray{FT}) where {I<:Int,FT<:AbstractFloat}
+            albedo_sfc::Array{FT,1},
+            rdif::Array{FT,2},
+            tdif::Array{FT,2},
+            src_dn::Array{FT,2},
+            src_up::Array{FT,2},
+            src_sfc::Array{FT,1},
+            flux_up::AbstractArray{FT,2},
+            flux_dn::AbstractArray{FT,2}) where {I<:Int,FT<:AbstractFloat}
 
  - `mesh_orientation` mesh orientation, see [`MeshOrientation`](@ref)
 
@@ -1049,14 +1049,14 @@ real(FT), dimension(ncol,nlay  )  :: denom      # β in SH08
 """
 function adding!(ncol::I, nlay::I,
                  mesh_orientation::MeshOrientation{I},
-                 albedo_sfc::Array{FT},
-                 rdif::Array{FT},
-                 tdif::Array{FT},
-                 src_dn::Array{FT},
-                 src_up::Array{FT},
-                 src_sfc::Array{FT},
-                 flux_up::AbstractArray{FT},
-                 flux_dn::AbstractArray{FT}) where {I<:Int,FT<:AbstractFloat}
+                 albedo_sfc::Array{FT,1},
+                 rdif::Array{FT,2},
+                 tdif::Array{FT,2},
+                 src_dn::Array{FT,2},
+                 src_up::Array{FT,2},
+                 src_sfc::Array{FT,1},
+                 flux_up::AbstractArray{FT,2},
+                 flux_dn::AbstractArray{FT,2}) where {I<:Int,FT<:AbstractFloat}
   albedo = Array{FT}(undef, ncol,nlay+1)
   src    = Array{FT}(undef, ncol,nlay+1)
   denom  = Array{FT}(undef, ncol,nlay)
