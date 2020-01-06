@@ -234,9 +234,9 @@ end
     expand_and_transpose(ops::AbstractOpticalProps,arr_in::Array{FT}) where FT
 
 Expand from band to g-point dimension, transpose
-dimensions (nband, ncol) -> (ncol,ngpt), of `arr_out`, given
+dimensions (`nband`, `ncol`) -> (`ncol`, `ngpt`), of `arr_out`, given
 
- - `ops` - a `AbstractOpticalProps`
+ - `ops` - optical properties, see [`AbstractOpticalProps`](@ref)
  - `arr_in` - input array
 """
 function expand_and_transpose(ops::AbstractOpticalProps{FT}, arr_in::Array{FT}) where {FT<:AbstractFloat}
