@@ -276,6 +276,7 @@ end
 """
   validate!(this::OneScalar{FT}) where FT
 
+Validate values of optical properties
 """
 function validate!(this::OneScalar{FT}) where {FT<:AbstractFloat}
   # Validate sizes
@@ -285,6 +286,7 @@ end
 """
     validate!(this::TwoStream{FT}) where FT
 
+Validate values and sizes of optical properties
 """
 function validate!(this::TwoStream{FT}) where {FT<:AbstractFloat}
   # Validate sizes
@@ -303,6 +305,7 @@ end
 """
   increment!(op_in::AbstractOpticalPropsArry, op_io::AbstractOpticalPropsArry)
 
+Increment (combine) two sets of optical properties
 """
 function increment!(op_in::AbstractOpticalPropsArry, op_io::AbstractOpticalPropsArry)
   @assert bands_are_equal(op_in, op_io)

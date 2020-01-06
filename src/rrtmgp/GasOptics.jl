@@ -121,7 +121,7 @@ struct KDistributionLongwave{FT,I} <: AbstractGasOptics{FT,I}
   gas_names::Vector{AbstractGas}
   "Absorption coefficient for major species (g-point,η,pressure,temperature)"
   kmajor::Array{FT,4}
-  "Major species pair; [2, nflav]"
+  "Major species pair; `[2, nflav]`"
   flavor::Array{I,2}
   "Flavor per g-point: `lower.flavor = gpoint_flavor[1, 1:ngpt]`, `upper.flavor = gpoint_flavor[2, 1:ngpt]`"
   gpoint_flavor::Array{I,2}
@@ -129,11 +129,11 @@ struct KDistributionLongwave{FT,I} <: AbstractGasOptics{FT,I}
   is_key::Vector{Bool}
   "Stored fraction of Planck irradiance in band for given g-point"
   planck_frac::Array{FT,4}
-  "Integrated Planck irradiance by band; [Planck temperatures,band]"
+  "Integrated Planck irradiance by band; `[Planck temperatures,band]`"
   totplnk::Array{FT,2}
   "Temperature steps in totplnk"
   totplnk_delta::FT
-  "Absorption coefficient for Rayleigh scattering [g-point,η,temperature,upper/lower atmosphere]"
+  "Absorption coefficient for Rayleigh scattering `[g-point,η,temperature,upper/lower atmosphere]`"
   krayl::Union{Array{FT,4},Nothing}
 end
 
@@ -162,9 +162,9 @@ struct KDistributionShortwave{FT,I} <: AbstractGasOptics{FT,I}
   gas_names::Vector{AbstractGas}
   "Absorption coefficient for major species (g-point,η,pressure,temperature)"
   kmajor::Array{FT,4}
-  "Major species pair; [2, nflav]"
+  "Major species pair; `[2, nflav]`"
   flavor::Array{I,2}
-  "Flavor per g-point: lower.flavor = gpoint_flavor[1, g-point], upper.flavor = gpoint_flavor[2, g-point]"
+  "Flavor per g-point: `lower.flavor = gpoint_flavor[1, 1:ngpt]`, `upper.flavor = gpoint_flavor[2, 1:ngpt]`"
   gpoint_flavor::Array{I,2}
   "Indicates whether a key species is in any band"
   is_key::Vector{Bool}
@@ -191,7 +191,7 @@ struct InterpolationCoefficients{FT<:AbstractFloat,I<:Int}
   j_η::Array{I,4}
   "fractions for major species"
   fmajor::Array{FT,6}
-  "fractions for minor species. [reference η level (temperature dependent), reference temperature level, flavor, layer]"
+  "fractions for minor species. `[reference η level (temperature dependent), reference temperature level, flavor, layer]`"
   fminor::Array{FT,5}
   "combination of major specie's column amounts"
   col_mix::Array{FT,4}
@@ -223,7 +223,7 @@ mutable struct InterpolationCoefficientsPGP{FT<:AbstractFloat,I<:Int}
   j_η::Array{I,2}
   "fractions for major species"
   fmajor::Array{FT,4}
-  "fractions for minor species. [reference η level (temperature dependent), reference temperature level, flavor, layer]"
+  "fractions for minor species. `[reference η level (temperature dependent), reference temperature level, flavor, layer]`"
   fminor::Array{FT,3}
   "combination of major specie's column amounts"
   col_mix::Array{FT,2}
@@ -617,11 +617,8 @@ rewrite_key_species_pair(key_species_pair) =
     key_species_pair_exists(key_species_list, key_species_pair)
 
 True is key_species_pair exists in key_species_list
-
-integer, dimension(:,:), intent(in) :: key_species_list
-integer, dimension(2),   intent(in) :: key_species_pair
 """
-key_species_pair_exists(key_species_list, key_species_pair) =
+key_species_pair_exists(key_species_list::Array{I,2}, key_species_pair::Array{I,1}) where {I<:Int} =
   any([all(key_species_list[:,i] .== key_species_pair) for i=1:size(key_species_list,2)])
 
 
@@ -809,15 +806,14 @@ end
 """
     create_gpoint_flavor(key_species, gpt2band, flavor)
 
-create gpoint_flavor list a map pointing from each
-g-point to the corresponding entry in the "flavor list"
+Create `gpoint_flavor` list a map pointing from each
+g-point to the corresponding entry in the "flavor list" given
 
-integer, dimension(:,:,:), intent(in) :: key_species
-integer, dimension(:), intent(in) :: gpt2band
-integer, dimension(:,:), intent(in) :: flavor
-integer, dimension(:,:), intent(out) :: gpoint_flavor
+ - `key_species` key species
+ - `gpt2band` gpt to band mapping
+ - `flavor` array of flavor indexes returned from [`create_flavor`](@ref)
 """
-function create_gpoint_flavor(key_species, gpt2band, flavor)
+function create_gpoint_flavor(key_species::Array{I,3}, gpt2band::Array{I,1}, flavor::Array{I,2}) where {I<:Int}
   ngpt = length(gpt2band)
   gpoint_flavor = Array{Int}(undef, 2,ngpt)
   for igpt=1:ngpt
@@ -845,7 +841,7 @@ get_nflav(this::AbstractGasOptics) = size(this.flavor, 2)
 """
     get_neta(this::AbstractGasOptics)
 
-size of η dimension
+Size of η dimension
 """
 get_neta(this::AbstractGasOptics) = size(this.kmajor,2)
 
