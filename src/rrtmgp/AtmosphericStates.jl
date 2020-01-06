@@ -28,10 +28,10 @@ Utility function, provided for user convenience
 computes column amounts of dry air using hydrostatic equation
 
 # input
- - `vmr_h2o` volume mixing ratio of water vapor to dry air; (ncol,nlay)
- - `plev` Layer boundary pressures [Pa] (ncol,nlay+1)
- - `tlay` Layer temperatures [K] (ncol,nlay)
- - `latitude` Latitude [degrees] (ncol)
+ - `vmr_h2o` volume mixing ratio of water vapor to dry air; `(ncol,nlay)`
+ - `plev` Layer boundary pressures `[Pa]` `(ncol,nlay+1)`
+ - `tlay` Layer temperatures `[K]` `(ncol,nlay)`
+ - `latitude` Latitude `[degrees]` `(ncol)`
 """
 function get_col_dry(vmr_h2o, plev, tlay, latitude=nothing)
   FT = eltype(plev)
@@ -75,17 +75,17 @@ $(DocStringExtensions.FIELDS)
 struct AtmosphericState{FT,I} <: AbstractAtmosphericState{FT,I}
   "Gas concentrations, in the form of volume mixing ratios"
   gas_conc::GasConcs{FT,I}
-  "Layer pressures [Pa, mb]; (`ncol,nlay`)"
+  "Layer pressures `[Pa, mb]`; (`ncol,nlay`)"
   p_lay::Array{FT,2}
-  "Level pressures [Pa, mb]; (`ncol,nlay+1`)"
+  "Level pressures `[Pa, mb]`; (`ncol,nlay+1`)"
   p_lev::Array{FT,2}
-  "Layer temperatures [K]; (`ncol,nlay`)"
+  "Layer temperatures `[K]`; (`ncol,nlay`)"
   t_lay::Array{FT,2}
-  "Level temperatures [K]; (`ncol,nlay+1`)"
+  "Level temperatures `[K]`; (`ncol,nlay+1`)"
   t_lev::Array{FT,2}
-  "Surface temperatures [K]; (`ncol`)"
+  "Surface temperatures `[K]`; (`ncol`)"
   t_sfc::Vector{FT}
-  "Column amounts for each gas, plus `col_dry`. gas amounts [`molec/cm^2`]"
+  "Column amounts for each gas, plus `col_dry`. gas amounts `[molec/cm^2]`"
   col_gas::Array{FT,3}
   "Number of molecules per cm-2 of dry air"
   col_dry::Array{FT,2}
@@ -206,17 +206,17 @@ $(DocStringExtensions.FIELDS)
 mutable struct AtmosphericStatePGP{FT,I} <: AbstractAtmosphericState{FT,I}
   "Gas concentrations, in the form of volume mixing ratios"
   gas_conc::GasConcsPGP{FT}
-  "Layer pressures [Pa, mb]"
+  "Layer pressures `[Pa, mb]`"
   p_lay::FT
-  "Level pressures [Pa, mb]"
+  "Level pressures `[Pa, mb]`"
   p_lev::Vector{FT}
-  "Layer temperatures [K]"
+  "Layer temperatures `[K]`"
   t_lay::FT
-  "Level temperatures [K]"
+  "Level temperatures `[K]`"
   t_lev::Vector{FT}
-  "Surface temperatures [K]"
+  "Surface temperatures `[K]`"
   t_sfc::FT
-  "Column amounts for each gas, plus `col_dry`. gas amounts [`molec/cm^2`]"
+  "Column amounts for each gas, plus `col_dry`. gas amounts `[molec/cm^2]`"
   col_gas::Array{FT,1}
   "Number of molecules per cm-2 of dry air"
   col_dry::FT

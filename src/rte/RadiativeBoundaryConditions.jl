@@ -36,7 +36,7 @@ struct ShortwaveBCs{FT} <: AbstractRadiativeBoundaryConditions{FT}
   sfc_alb_direct::Array{FT}
   "surface albedo for diffuse radiation"
   sfc_alb_diffuse::Array{FT}
-  "incident diffuse flux at top of domain [W/m2] (ncol, ngpt)"
+  "incident diffuse flux at top of domain `[W/m2]` `(ncol, ngpt)`"
   inc_flux_diffuse::Union{Array{FT},Nothing}
   function ShortwaveBCs(toa_flux::Array{FT},
                         sfc_alb_direct::Array{FT},
@@ -67,9 +67,9 @@ Longwave boundary conditions
 $(DocStringExtensions.FIELDS)
 """
 struct LongwaveBCs{FT} <: AbstractRadiativeBoundaryConditions{FT}
-  "spectrally-resolved emissivity (nbands, block_size)"
+  "spectrally-resolved emissivity `(nbands, block_size)`"
   sfc_emis::Array{FT,2}
-  "incident flux at domain top [W/m2] (ncol, ngpts)"
+  "incident flux at domain top `[W/m2]` `(ncol, ngpts)`"
   inc_flux::Union{Array{FT,2},Nothing}
   function LongwaveBCs(sfc_emis::Array{FT},
                        inc_flux::Union{Array{FT},Nothing}=nothing) where {FT<:AbstractFloat}

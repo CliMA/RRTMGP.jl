@@ -32,7 +32,7 @@ LW_diff_sec(::Type{FT}) where FT = FT(1.66)  # 1./cos(diffusivity angle)
     lw_solver_noscat!(ncol::I, nlay::I, ngpt::I,
                       mesh_orientation::MeshOrientation{I},
                       D::Array{FT,2},
-                      weight::FT,
+                      w_μ::FT,
                       τ::Array{FT,3},
                       source::SourceFuncLongWave{FT,I},
                       sfc_emis::Array{FT,2},
@@ -47,7 +47,7 @@ LW_diff_sec(::Type{FT}) where FT = FT(1.66)  # 1./cos(diffusivity angle)
  - `radn_dn` - downward radiance [W/m2-str] Top level must contain incident flux boundary condition
 
 real(FT), dimension(ncol,       ngpt), intent(in   ) :: D            # secant of propagation angle  []
-real(FT),                              intent(in   ) :: weight       # quadrature weight
+real(FT),                              intent(in   ) :: w_μ       # quadrature weight
 real(FT), dimension(ncol,nlay,  ngpt), intent(in   ) :: τ          # Absorption optical thickness []
 
 # Local variables, no g-point dependency
@@ -61,7 +61,7 @@ real(FT), dimension(:,:,:), pointer :: lev_source_up, lev_source_dn # Mapping in
 function lw_solver_noscat!(ncol::I, nlay::I, ngpt::I,
                            mesh_orientation::MeshOrientation{I},
                            D::Array{FT,2},
-                           weight::FT,
+                           w_μ::FT,
                            τ::Array{FT,3},
                            source::SourceFuncLongWave{FT,I},
                            sfc_emis::Array{FT,2},
@@ -77,12 +77,11 @@ function lw_solver_noscat!(ncol::I, nlay::I, ngpt::I,
   # Level Planck sources for upward and downward radiation
   # When top_at_1, lev_source_up => lev_source_dec
   #                lev_source_dn => lev_source_inc, and vice-versa
+  top_level = mesh_orientation.ilev_top
   if mesh_orientation.top_at_1
-    top_level = 1
     lev_source_up = source.lev_source_dec
     lev_source_dn = source.lev_source_inc
   else
-    top_level = nlay+1
     lev_source_up = source.lev_source_inc
     lev_source_dn = source.lev_source_dec
   end
@@ -92,7 +91,7 @@ function lw_solver_noscat!(ncol::I, nlay::I, ngpt::I,
     # Transport is for intensity
     #   convert flux at top of domain to intensity assuming azimuthal isotropy
     #
-    radn_dn[:,top_level,igpt] .= radn_dn[:,top_level,igpt]./(FT(2) * π * weight)
+    radn_dn[:,top_level,igpt] ./= FT(2 * π) * w_μ
 
     #
     # Optical path and transmission, used in source function and transport calculations
@@ -132,8 +131,8 @@ function lw_solver_noscat!(ncol::I, nlay::I, ngpt::I,
     #
     # Convert intensity to flux assuming azimuthal isotropy and quadrature weight
     #
-    radn_dn[:,:,igpt] .= FT(2) * π * weight .* radn_dn[:,:,igpt]
-    radn_up[:,:,igpt] .= FT(2) * π * weight .* radn_up[:,:,igpt]
+    radn_dn[:,:,igpt] .*= FT(2 * π) * w_μ
+    radn_up[:,:,igpt] .*= FT(2 * π) * w_μ
   end  # g point loop
 
 end
@@ -180,7 +179,7 @@ function lw_solver_noscat_GaussQuad!(ncol::I, nlay::I, ngpt::I,
 
   n_μ = angle_disc.n_gauss_angles
   Ds = angle_disc.gauss_Ds[1:n_μ,n_μ]
-  weights = angle_disc.gauss_wts[1:n_μ,n_μ]
+  w_μ = angle_disc.gauss_wts[1:n_μ,n_μ]
   #
   # For the first angle output arrays store total flux
   #
@@ -191,7 +190,7 @@ function lw_solver_noscat_GaussQuad!(ncol::I, nlay::I, ngpt::I,
   lw_solver_noscat!(ncol, nlay, ngpt,
                     mesh_orientation,
                     Ds_ncol,
-                    weights[1],
+                    w_μ[1],
                     τ,
                     source,
                     sfc_emis,
@@ -207,7 +206,7 @@ function lw_solver_noscat_GaussQuad!(ncol::I, nlay::I, ngpt::I,
     lw_solver_noscat!(ncol, nlay, ngpt,
                       mesh_orientation,
                       Ds_ncol,
-                      weights[i_μ],
+                      w_μ[i_μ],
                       τ,
                       source,
                       sfc_emis,
@@ -347,7 +346,7 @@ function sw_solver_noscat!(ncol::I, nlay::I, ngpt::I,
                            μ_0::Array{FT,1},
                            flux_dir::Array{FT,3}) where {FT<:AbstractFloat,I<:Int}
 
-  μ_0_inv = FT(1) ./ μ_0
+  μ_0_inv = 1 ./ μ_0
   # Indexing into arrays for upward and downward propagation depends on the vertical
   #   orientation of the arrays (whether the domain top is at the first or last index)
   # We write the loops out explicitly so compilers will have no trouble optimizing them.
