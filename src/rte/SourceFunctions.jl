@@ -11,10 +11,16 @@ using ..OpticalProps
 using ..FortranIntrinsics
 import ..OpticalProps:get_ncol,get_nlay,get_ngpt
 
+export AbstractSourceFunc
 export SourceFuncLongWave, SourceFuncLongWavePGP
 export SourceFuncShortWave
 export get_ncol, get_nlay, get_ngpt
 
+"""
+    AbstractSourceFunc{FT,I} <: AbstractOpticalProps{FT, I}
+
+Abstract source function, to dispatch between short-wave and long-wave
+"""
 abstract type AbstractSourceFunc{FT,I} <: AbstractOpticalProps{FT, I} end
 
 """
@@ -30,11 +36,11 @@ $(DocStringExtensions.FIELDS)
 struct SourceFuncLongWave{FT, I} <: AbstractSourceFunc{FT, I}
   "optical properties, see [`OpticalPropsBase`](@ref)"
   optical_props::OpticalPropsBase{FT,I}
-  "Planck source at layer average temperature [W/m2] (ncol, nlay, ngpt)"
+  "Planck source at layer average temperature `[W/m2]` `(ncol, nlay, ngpt)`"
   lay_source::Array{FT,3}
-  "Planck source at layer edge in increasing ilay direction [W/m2] (ncol, nlay+1, ngpt), includes spectral weighting that accounts for state-dependent frequency to g-space mapping"
+  "Planck source at layer edge in increasing ilay direction `[W/m2]` `(ncol, nlay+1, ngpt)`, includes spectral weighting that accounts for state-dependent frequency to g-space mapping"
   lev_source_inc::Array{FT,3}
-  "Planck source at layer edge in decreasing ilay direction [W/m2] (ncol, nlay+1, ngpt), includes spectral weighting that accounts for state-dependent frequency to g-space mapping"
+  "Planck source at layer edge in decreasing ilay direction `[W/m2]` `(ncol, nlay+1, ngpt)`, includes spectral weighting that accounts for state-dependent frequency to g-space mapping"
   lev_source_dec::Array{FT,3}
   "Surface source"
   sfc_source::Array{FT,2}
@@ -72,11 +78,11 @@ $(DocStringExtensions.FIELDS)
 struct SourceFuncLongWavePGP{FT, I} <: AbstractSourceFunc{FT, I}
   "optical properties, see [`OpticalPropsBase`](@ref)"
   optical_props::OpticalPropsBase{FT,I}
-  "Planck source at layer average temperature [W/m2] (ngpt)"
+  "Planck source at layer average temperature `[W/m2]` `(ngpt)`"
   lay_source::Array{FT,1}
-  "Planck source at layer edge in increasing ilay direction [W/m2] (ngpt), includes spectral weighting that accounts for state-dependent frequency to g-space mapping"
+  "Planck source at layer edge in increasing ilay direction `[W/m2]` `(ngpt)`, includes spectral weighting that accounts for state-dependent frequency to g-space mapping"
   lev_source_inc::Array{FT,1}
-  "Planck source at layer edge in decreasing ilay direction [W/m2] (ngpt), includes spectral weighting that accounts for state-dependent frequency to g-space mapping"
+  "Planck source at layer edge in decreasing ilay direction `[W/m2]` `(ngpt)`, includes spectral weighting that accounts for state-dependent frequency to g-space mapping"
   lev_source_dec::Array{FT,1}
   "Surface source"
   sfc_source::Array{FT,1}

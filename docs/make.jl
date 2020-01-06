@@ -22,6 +22,7 @@ makedocs(
     "Mathematical Formulation" => "MathFormulation.md",
     "RRTMGP" => Any[
     "Gas Concentrations" => "RRTMGP/GasConcs.md"
+    "Gases" => "RRTMGP/Gases.md"
     "Gas Optics" => "RRTMGP/GasOptics.md"
     "References States" => "RRTMGP/ReferenceStates.md"
     "Source Functions" => "RRTMGP/SourceFunctions.md"

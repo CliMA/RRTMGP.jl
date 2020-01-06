@@ -1,5 +1,7 @@
 """
     Gases
+
+Class for specifying gases present in the atmosphere
 """
 module Gases
 
@@ -11,6 +13,11 @@ export ccl4, cfc11, cfc12, hfc143a, hfc125, hfc23, hfc32, hfc134a, cf4, ch3br, c
 export h2o_frgn, h2o_self # TODO: figure out what these gases are
 export UncaughtGas
 
+"""
+    AbstractGas
+
+Abstract gas class, for specifying present set of gases
+"""
 abstract type AbstractGas end
 
 struct DryGas      <: AbstractGas end # Only dry component
