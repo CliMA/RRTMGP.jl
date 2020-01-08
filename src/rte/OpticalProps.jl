@@ -140,8 +140,6 @@ end
 
 OneScalar(base::OpticalPropsBase{FT,I}, ncol::I, nlay::I, ngpt::I) where {FT<:AbstractFloat,I<:Int} =
   OneScalar{FT,I}(base, Array{FT}(undef, ncol, nlay, ngpt))
-OneScalar(::Type{FT}, ncol::I, nlay::I, ngpt::I) where {FT<:AbstractFloat,I<:Int} =
-  OneScalar{FT,I}(nothing, Array{FT}(undef, ncol, nlay, ngpt))
 
 """
     OneScalarPGP{FT,I} <: AbstractOpticalPropsArry{FT,I}
@@ -159,11 +157,6 @@ struct OneScalarPGP{FT,I} <: AbstractOpticalPropsPGP{FT,I}
   "Optical depth"
   τ::Array{FT,1}
 end
-
-OneScalarPGP(base::OpticalPropsBase{FT,I}, ngpt::I) where {FT<:AbstractFloat,I<:Int} =
-  OneScalarPGP{FT,I}(base, Array{FT}(undef, ngpt))
-OneScalarPGP(::Type{FT}, ngpt::I) where {FT<:AbstractFloat,I<:Int} =
-  OneScalarPGP{FT,I}(nothing, Array{FT}(undef, ngpt))
 
 function Base.convert(::Type{OneScalar}, data::Array{OneScalarPGP{FT,I}}) where {FT,I}
   s = size(data)
@@ -220,8 +213,6 @@ struct TwoStreamPGP{FT,I} <: AbstractOpticalPropsPGP{FT,I}
   g::Array{FT,1}
 end
 
-TwoStreamPGP(base::OpticalPropsBase{FT,I}, ngpt::I) where {FT<:AbstractFloat,I<:Int} =
-  TwoStreamPGP{FT,I}(base, ntuple(i->Array{FT}(undef, ngpt),3)... )
 TwoStreamPGP(::Type{FT}, ngpt::I) where {FT<:AbstractFloat,I<:Int} =
   TwoStreamPGP{FT,I}(nothing, ntuple(i->Array{FT}(undef, ngpt),3)... )
 
@@ -389,17 +380,6 @@ get_band_lims_gpoint(this::AbstractOpticalProps) = get_band_lims_gpoint(this.bas
 get_band_lims_gpoint(this::OpticalPropsBase) = this.band2gpt
 
 """
-    convert_band2gpt(this::AbstractOpticalProps, band)
-
-First and last g-point of a specific band, given
-
- - `this` optical properties, see [`AbstractOpticalProps`](@ref)
- - `band` index of i-th band
-"""
-convert_band2gpt(this::AbstractOpticalProps, band::I) where {I<:Int} = convert_band2gpt(this.base)
-convert_band2gpt(this::OpticalPropsBase, band::I) where {I<:Int} = this.band2gpt[:,band]
-
-"""
     get_band_lims_wavenumber(this::AbstractOpticalProps)
 
 Lower and upper wavenumber of all bands, given
@@ -410,16 +390,6 @@ get_band_lims_wavenumber(this::AbstractOpticalProps) = get_band_lims_wavenumber(
 get_band_lims_wavenumber(this::OpticalPropsBase) = this.band_lims_wvn
 
 """
-    get_band_lims_wavelength(this::AbstractOpticalProps)
-
-Lower and upper wavelength of all bands, given
-
- - `this` optical properties, see [`AbstractOpticalProps`](@ref)
-"""
-get_band_lims_wavelength(this::AbstractOpticalProps) = get_band_lims_wavelength(this.base)
-get_band_lims_wavelength(this::OpticalPropsBase) = 1 ./ this.band_lims_wvn
-
-"""
     get_gpoint_bands(this::AbstractOpticalProps)
 
 Bands for all the g-points at once, given
@@ -428,17 +398,6 @@ Bands for all the g-points at once, given
 """
 get_gpoint_bands(this::AbstractOpticalProps) = get_gpoint_bands(this.base)
 get_gpoint_bands(this::OpticalPropsBase) = this.gpt2band
-
-"""
-    convert_gpt2band(this::AbstractOpticalProps, gpt)
-
-Band associated with a specific g-point
-
- - `this` optical properties, see [`AbstractOpticalProps`](@ref)
- - `gpt` index of i-th g-point
-"""
-convert_gpt2band(this::AbstractOpticalProps, gpt::I) where {I<:Int} = convert_gpt2band(this.base)
-convert_gpt2band(this::OpticalPropsBase, gpt::I) where {I<:Int} = this.gpt2band[gpt]
 
 """
     gpt_range(this::AbstractOpticalProps)
