@@ -34,7 +34,6 @@ check_extent(array, s, label) = @assert all(size(array).==s)
 Assert range of values is valid
 """
 check_range(val::Array, minV, maxV, label) = any(val .< minV) || any(val .> maxV) ? error(strip(label) * " values out of range.") : nothing
-check_range(val, minV, maxV, label) = val < minV || val > maxV ? error(strip(label) * " values out of range.") : nothing
 
 # Values less than a floor
 any_vals_less_than(array::Array, check_value) = minimum(array) < check_value
@@ -42,7 +41,6 @@ function any_vals_less_than(array::Array, mask, check_value)
   temp = array[mask]
   return isempty(temp) ? false : minimum(temp) < check_value
 end
-any_vals_less_than(val, check_value) = val < check_value
 any_vals_less_than(val, mask, check_value) = mask ? val < check_value : false
 
 # Values outside a range
@@ -60,7 +58,6 @@ function any_vals_outside(array::Array, mask, checkMin, checkMax)
   maxValue = maximum(temp)
   return minValue < checkMin || maxValue > checkMax
 end
-any_vals_outside(val, checkMin, checkMax) = val < checkMin || val > checkMax
 any_vals_outside(val, mask, checkMin, checkMax) = mask ? val < checkMin || val > checkMax : false
 
 function reshape_for_comparison(flux::Array{FT}, nlay::I, ncol::I, nexp::I) where {FT, I}
