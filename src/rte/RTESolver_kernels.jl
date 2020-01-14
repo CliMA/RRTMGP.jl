@@ -78,13 +78,8 @@ function lw_solver_noscat!(ncol::I, nlay::I, ngpt::I,
   # When top_at_1, lev_source_up => lev_source_dec
   #                lev_source_dn => lev_source_inc, and vice-versa
   top_level = mesh_orientation.ilev_top
-  if mesh_orientation.top_at_1
-    lev_source_up = source.lev_source_dec
-    lev_source_dn = source.lev_source_inc
-  else
-    lev_source_up = source.lev_source_inc
-    lev_source_dn = source.lev_source_dec
-  end
+  lev_source_up = mesh_orientation.top_at_1 ? source.lev_source_dec : source.lev_source_inc
+  lev_source_dn = mesh_orientation.top_at_1 ? source.lev_source_inc : source.lev_source_dec
 
   @inbounds for igpt in 1:ngpt
     #
@@ -618,8 +613,6 @@ real(FT) :: k(ncol)
 # Ancillary variables
 real(FT) :: RT_term(ncol)
 real(FT) :: exp_minuskτ(ncol), exp_minus2kτ(ncol)
-
-real(FT), parameter :: LW_diff_sec = 1.66  # 1./cos(diffusivity angle)
 """
 function lw_two_stream!(ncol::I, nlay::I,
                         τ::Array{FT,2},
@@ -638,10 +631,9 @@ function lw_two_stream!(ncol::I, nlay::I,
       #
       # Coefficients differ from SW implementation because the phase function is more isotropic
       #   Here we follow Fu et al. 1997, doi:10.1175/1520-0469(1997)054<2799:MSPITI>2.0.CO;2
-      #   and use a diffusivity sec of 1.66
       #
-      γ_1[i,j]= LW_diff_sec(FT) * (FT(1) - FT(0.5) * w0[i,j] * (FT(1) + g[i,j])) # Fu et al. Eq 2.9
-      γ_2[i,j]= LW_diff_sec(FT) *          FT(0.5) * w0[i,j] * (FT(1) - g[i,j])  # Fu et al. Eq 2.10
+      γ_1[i,j] = LW_diff_sec(FT) * (FT(1) - FT(0.5) * w0[i,j] * (FT(1) + g[i,j])) # Fu et al. Eq 2.9
+      γ_2[i,j] = LW_diff_sec(FT) *          FT(0.5) * w0[i,j] * (FT(1) - g[i,j])  # Fu et al. Eq 2.10
     end
 
     # Written to encourage vectorization of exponential, square root
@@ -675,11 +667,12 @@ function lw_two_stream!(ncol::I, nlay::I,
 
   end
 end
+
 # -------------------------------------------------------------------------------------------------
 #
 # Source function combination
 # RRTMGP provides two source functions at each level
-#   using the spectral mapping from each of the adjascent layers.
+#   using the spectral mapping from each of the adjacent layers.
 #   Need to combine these for use in two-stream calculation.
 #
 # -------------------------------------------------------------------------------------------------
@@ -708,16 +701,16 @@ function lw_combine_sources!(ncol::I, nlay::I,
   end
   @inbounds for ilay in 2:nlay
     @inbounds for icol in 1:ncol
-      lev_source[icol, ilay] = sqrt(lev_src_dec[icol, ilay] *
-                                    lev_src_inc[icol, ilay-1])
+      lev_source[icol, ilay] = sqrt(lev_src_dec[icol, ilay] * lev_src_inc[icol, ilay-1])
     end
   end
   ilay = nlay+1
   @inbounds for icol in 1:ncol
-    lev_source[icol, ilay] =        lev_src_inc[icol, ilay-1]
+    lev_source[icol, ilay] = lev_src_inc[icol, ilay-1]
   end
 
 end
+
 # ---------------------------------------------------------------
 #
 # Compute LW source function for upward and downward emission at levels using linear-in-τ assumption
@@ -812,7 +805,7 @@ end
 # -------------------------------------------------------------------------------------------------
 #
 # Two-stream solutions to direct and diffuse reflectance and transmittance for a layer
-#    with optical depth τ, single scattering albedo w0, and asymmetery parameter g.
+#    with optical depth τ, single scattering albedo w0, and asymmetry parameter g.
 #
 # Equations are developed in Meador and Weaver, 1980,
 #    doi:10.1175/1520-0469(1980)037<0630:TSATRT>2.0.CO;2
@@ -909,7 +902,7 @@ function sw_two_stream!(Rdif::Array{FT,2},
     end
 
     #
-    # Transmittance of direct, unscattered beam. Also used below
+    # Transmittance of direct, non-scattered beam. Also used below
     #
     Tnoscat[1:ncol,j] .= exp.(-τ[1:ncol,j] .* μ_0_inv)
 
@@ -1153,6 +1146,19 @@ end
 #####
 
 """
+    apply_BC!(flux_dn::Array{FT},
+              ilay::I) where {I<:Integer,FT<:AbstractFloat}
+
+ - `ilay` apply BC at the i-th layer
+ - `flux_dn` Flux to be used as input to solvers below
+"""
+function apply_BC!(flux_dn::Array{FT,3},
+                   ilay::I) where {I<:Integer,FT<:AbstractFloat}
+  flux_dn[:,ilay, :] .= FT(0)
+  return nothing
+end
+
+"""
     apply_BC!(flux_dn::Array{FT,3},
               ilay::I,
               inc_flux::Array{FT,2}) where {I<:Integer,B<:Bool,FT<:AbstractFloat}
@@ -1164,7 +1170,6 @@ end
 function apply_BC!(flux_dn::Array{FT,3},
                    ilay::I,
                    inc_flux::Array{FT,2}) where {I<:Integer,FT<:AbstractFloat}
-  #   Upper boundary condition
   fill!(flux_dn, 0)
   flux_dn[:, ilay, :] .= inc_flux
   return nothing
@@ -1185,24 +1190,7 @@ function apply_BC!(flux_dn::Array{FT,3},
                    ilay::I,
                    inc_flux::Array{FT,2},
                    factor::Array{FT,1}) where {I<:Integer,FT<:AbstractFloat}
-  #   Upper boundary condition
   fill!(flux_dn, 0)
   flux_dn[:, ilay, :]  .= inc_flux .* spread(factor, 2, size(inc_flux,2))
   return nothing
 end
-
-"""
-    apply_BC!(flux_dn::Array{FT},
-              ilay::I) where {I<:Integer,FT<:AbstractFloat}
-
- - `ilay` apply BC at the i-th layer
- - `flux_dn` Flux to be used as input to solvers below
-"""
-function apply_BC!(flux_dn::Array{FT,3},
-                   ilay::I) where {I<:Integer,FT<:AbstractFloat}
-  #   Upper boundary condition
-  fill!(flux_dn, 0)
-  # flux_dn[:,ilay, :] .= FT(0)
-  return nothing
-end
-
