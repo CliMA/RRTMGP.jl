@@ -255,6 +255,6 @@ function expand_and_transpose(ops::AbstractOpticalProps{FT}, arr_in::Array{FT}) 
   return arr_out
 end
 
-include(joinpath("kernels","RTESolver_kernels.jl"))
+include("RTESolver_kernels.jl")
 
 end #module

@@ -446,6 +446,6 @@ function gpoints_are_equal(this::AbstractOpticalProps{FT}, that::AbstractOptical
   end
 end
 
-include(joinpath("kernels","OpticalProps_kernels.jl"))
+include("OpticalProps_kernels.jl")
 
 end # module
