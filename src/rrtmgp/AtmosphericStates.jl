@@ -154,8 +154,9 @@ function AtmosphericState(gas_conc::GasConcs{FT,I},
   mesh_orientation = MeshOrientation(top_at_1, nlay)
 
   if t_sfc == nothing
+    i_lev_bot = ilev_bot(mesh_orientation)
     t_sfc = Array{FT}(undef, ncol)
-    t_sfc .= t_lev[1, mesh_orientation.ilev_bot]
+    t_sfc .= t_lev[1, i_lev_bot]
   end
   check_extent(t_sfc, ncol, "t_sfc")
   check_range(t_sfc, ref.temp_min,  ref.temp_max,  "t_sfc")

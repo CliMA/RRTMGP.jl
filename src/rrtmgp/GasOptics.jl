@@ -19,6 +19,7 @@ using StaticArrays
 
 const to_gor = TimerOutput()
 
+using ..MeshOrientations
 using ..Gases
 using ..ReferenceStates
 using ..FortranIntrinsics

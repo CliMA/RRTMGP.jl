@@ -77,7 +77,7 @@ function lw_solver_noscat!(ncol::I, nlay::I, ngpt::I,
   # Level Planck sources for upward and downward radiation
   # When top_at_1, lev_source_up => lev_source_dec
   #                lev_source_dn => lev_source_inc, and vice-versa
-  top_level = mesh_orientation.ilev_top
+  top_level = ilev_top(mesh_orientation)
   lev_source_up = mesh_orientation.top_at_1 ? source.lev_source_dec : source.lev_source_inc
   lev_source_dn = mesh_orientation.top_at_1 ? source.lev_source_inc : source.lev_source_dec
 
@@ -194,7 +194,8 @@ function lw_solver_noscat_GaussQuad!(ncol::I, nlay::I, ngpt::I,
   #
   # For more than one angle use local arrays
   #
-  apply_BC!(radn_dn, mesh_orientation.ilev_top, flux_dn[:,mesh_orientation.ilev_top,:])
+  i_lev_top = ilev_top(mesh_orientation)
+  apply_BC!(radn_dn, i_lev_top, flux_dn[:,i_lev_top,:])
 
   for i_μ in 2:n_μ
     Ds_ncol .= Ds[i_μ]
@@ -345,25 +346,15 @@ function sw_solver_noscat!(ncol::I, nlay::I, ngpt::I,
   # Indexing into arrays for upward and downward propagation depends on the vertical
   #   orientation of the arrays (whether the domain top is at the first or last index)
   # We write the loops out explicitly so compilers will have no trouble optimizing them.
+  n̂ = nhat(mesh_orientation)
+  b = binary(mesh_orientation)
 
   # Downward propagation
-  if mesh_orientation.top_at_1
-    # For the flux at this level, what was the previous level, and which layer has the
-    #   radiation just passed through?
-    # layer index = level index - 1
-    # previous level is up (-1)
-    for igpt in 1:ngpt
-      for ilev in 2:nlay+1
-        flux_dir[:,ilev,igpt] .= flux_dir[:,ilev-1,igpt] .* exp.(-τ[:,ilev-1,igpt].*μ_0_inv)
-      end
-    end
-  else
-    # layer index = level index
-    # previous level is up (+1)
-    for igpt in 1:ngpt
-      for ilev in nlay:-1:1
-        flux_dir[:,ilev,igpt] .= flux_dir[:,ilev+1,igpt] .* exp.(-τ[:,ilev,igpt].*μ_0_inv)
-      end
+  # For the flux at this level, what was the previous level, and which layer has the
+  #   radiation just passed through?
+  for igpt in 1:ngpt
+    for ilev in lev_range(mesh_orientation)
+      flux_dir[:,ilev,igpt] .= flux_dir[:,ilev-n̂,igpt] .* exp.(-τ[:,ilev-b,igpt].*μ_0_inv)
     end
   end
 end
@@ -545,38 +536,21 @@ function lw_transport_noscat!(ncol::I, nlay::I,
                               source_sfc::Array{FT,1},
                               radn_up::AbstractArray{FT,2},
                               radn_dn::AbstractArray{FT,2}) where {I<:Int, FT<:AbstractFloat}
-  if mesh_orientation.top_at_1
-    #
-    # Top of domain is index 1
-    #
-    # Downward propagation
-    @inbounds for ilev in 2:nlay+1
-      radn_dn[:,ilev] .= trans[:,ilev-1].*radn_dn[:,ilev-1] .+ source_dn[:,ilev-1]
-    end
+  n̂ = nhat(mesh_orientation)
+  b = binary(mesh_orientation)
+  n_sfc = ilev_bot(mesh_orientation)
 
-    # Surface reflection and emission
-    radn_up[:,nlay+1] .= radn_dn[:,nlay+1].*sfc_albedo .+ source_sfc
+  # Downward propagation
+  @inbounds for ilev in lev_range(mesh_orientation)
+    radn_dn[:,ilev] .= trans[:,ilev-b].*radn_dn[:,ilev-n̂] .+ source_dn[:,ilev-b]
+  end
 
-    # Upward propagation
-    @inbounds for ilev in nlay:-1:1
-      radn_up[:,ilev] .= trans[:,ilev  ].*radn_up[:,ilev+1] .+ source_up[:,ilev]
-    end
-  else
-    #
-    # Top of domain is index nlay+1
-    #
-    # Downward propagation
-    @inbounds for ilev in nlay:-1:1
-      radn_dn[:,ilev] .= trans[:,ilev  ].*radn_dn[:,ilev+1] .+ source_dn[:,ilev]
-    end
+  # Surface reflection and emission
+  radn_up[:,n_sfc] .= radn_dn[:,n_sfc].*sfc_albedo .+ source_sfc
 
-    # Surface reflection and emission
-    radn_up[:,     1] .= radn_dn[:,     1].*sfc_albedo .+ source_sfc
-
-    # Upward propagation
-    @inbounds for ilev in 2:nlay+1
-      radn_up[:,ilev] .= trans[:,ilev-1] .* radn_up[:,ilev-1] .+  source_up[:,ilev-1]
-    end
+  # Upward propagation
+  @inbounds for ilev in lev_range_reversed(mesh_orientation)
+    radn_up[:,ilev] .= trans[:,ilev-1+b].*radn_up[:,ilev+n̂] .+ source_up[:,ilev-1+b]
   end
 end
 

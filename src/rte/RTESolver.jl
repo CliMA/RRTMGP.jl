@@ -110,12 +110,13 @@ function rte_sw!(fluxes::FluxesBroadBand{FT},
   #   On input flux_dn is the diffuse component; the last action in each solver is to add
   #   direct and diffuse to represent the total, consistent with the LW
   #
-  apply_BC!(gpt_flux_dir, mesh_orientation.ilev_top, bcs.toa_flux, μ_0)
+  i_lev_top = ilev_top(mesh_orientation)
+  apply_BC!(gpt_flux_dir, i_lev_top, bcs.toa_flux, μ_0)
 
   if bcs.inc_flux_diffuse ≠ nothing
-    apply_BC!(gpt_flux_dn, mesh_orientation.ilev_top, bcs.inc_flux_diffuse)
+    apply_BC!(gpt_flux_dn, i_lev_top, bcs.inc_flux_diffuse)
   else
-    apply_BC!(gpt_flux_dn, mesh_orientation.ilev_top)
+    apply_BC!(gpt_flux_dn, i_lev_top)
   end
 
   validate!(optical_props)
@@ -198,11 +199,12 @@ function rte_lw!(fluxes::FluxesBroadBand{FT},
   sfc_emis_gpt = expand_and_transpose(optical_props, bcs.sfc_emis)
 
   #   Upper boundary condition
+  i_lev_top = ilev_top(mesh_orientation)
   if bcs.inc_flux ≠ nothing
-    apply_BC!(gpt_flux_dn, mesh_orientation.ilev_top, bcs.inc_flux)
+    apply_BC!(gpt_flux_dn, i_lev_top, bcs.inc_flux)
   else
     # Default is zero incident diffuse flux
-    apply_BC!(gpt_flux_dn, mesh_orientation.ilev_top)
+    apply_BC!(gpt_flux_dn, i_lev_top)
   end
 
   # Compute the radiative transfer...
