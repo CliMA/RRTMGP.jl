@@ -169,7 +169,8 @@ function rfmip_clear_sky_lw_pgp(ds, optical_props_constructor; compile_first=fal
     for i in eachindex(as)
       gas_optics!(k_dist, as[i], optical_props[i], source[i])
     end
-    source = convert(SourceFuncLongWave, source, first(as).mesh_orientation.ilay_bot)
+    i_lay_bot = ilay_bot(first(as).mesh_orientation)
+    source = convert(SourceFuncLongWave, source, i_lay_bot)
     optical_props  = convert_optical_props(optical_props)
     as = convert(AtmosphericState, as)
 

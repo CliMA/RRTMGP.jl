@@ -626,7 +626,7 @@ function compute_Planck_source!(sources::SourceFuncLongWave{FT,I},
   @unpack_fields sources sfc_source lay_source lev_source_inc lev_source_dec p_frac
   @unpack_fields as t_lay t_lev t_sfc mesh_orientation tropo
   @unpack_fields ics jtemp j_η jpress fmajor
-  @unpack_fields mesh_orientation ilay_bot
+  i_lay_bot = ilay_bot(mesh_orientation)
 
   ncol  = get_ncol(sources)
   nlay  = get_nlay(sources)
@@ -688,7 +688,7 @@ function compute_Planck_source!(sources::SourceFuncLongWave{FT,I},
     # Map to g-points
     @inbounds for ibnd in 1:nbnd
       @inbounds for igpt in gpt_range(optical_props, ibnd)
-        sfc_source[icol, igpt] = p_frac[icol,ilay_bot,igpt] * planck_function[ibnd, 1, icol]
+        sfc_source[icol, igpt] = p_frac[icol,i_lay_bot,igpt] * planck_function[ibnd, 1, icol]
       end
     end
   end # icol

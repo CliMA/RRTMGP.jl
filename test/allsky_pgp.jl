@@ -5,6 +5,7 @@ using TimerOutputs
 const to = TimerOutput()
 using NCDatasets
 using RRTMGP.OpticalProps
+using RRTMGP.MeshOrientations
 using RRTMGP.Gases
 using RRTMGP.FortranIntrinsics
 using RRTMGP.Utilities
@@ -210,7 +211,8 @@ function all_sky_pgp(ds; use_luts=false, λ_string="", compile_first=false)
       for i in eachindex(as)
         gas_optics!(k_dist, as[i], atmos[i], lw_sources[i])
       end
-      lw_sources = convert(SourceFuncLongWave, lw_sources, first(as).mesh_orientation.ilay_bot)
+      i_lay_bot = ilay_bot(first(as).mesh_orientation)
+      lw_sources = convert(SourceFuncLongWave, lw_sources, i_lay_bot)
       atmos  = convert_optical_props(atmos)
       as = convert(AtmosphericState, as)
 
