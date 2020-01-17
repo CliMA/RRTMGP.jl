@@ -9,7 +9,7 @@ using DocStringExtensions
 
 export MeshOrientation
 export nhat, binary
-export lev_range, lev_range_reversed
+export lev_range, lev_range_reversed, lay_range, lay_range_reversed
 export ilev_top, ilev_bot, ilay_top, ilay_bot
 
 """
@@ -51,6 +51,18 @@ lev_range(mo::MeshOrientation) = mo.top_at_1 ? (2:mo.nlay+1) : (mo.nlay:-1:1)
 
 """
 lev_range_reversed(mo::MeshOrientation) = mo.top_at_1 ? (mo.nlay:-1:1) : (2:mo.nlay+1)
+
+"""
+    lay_range(mo::MeshOrientation)
+
+"""
+lay_range(mo::MeshOrientation) = mo.top_at_1 ? (1:mo.nlay) : (mo.nlay:-1:1)
+
+"""
+    lay_range_reversed(mo::MeshOrientation)
+
+"""
+lay_range_reversed(mo::MeshOrientation) = mo.top_at_1 ? (mo.nlay:-1:1) : (1:mo.nlay)
 
 binary(::Val{false}) = 0
 binary(::Val{true}) = 1
