@@ -2,9 +2,14 @@
 
 Julia implementation of Rapid and accurate Radiative Transfer Model for General Circulation Models.
 
-| **Documentation**                             | **Build Status**                                                        | Bors                                  |
-|:--------------------------------------------- |:------------------------------------------------------------------------|---------------------------------------|
-| [![latest][docs-latest-img]][docs-latest-url] | [![azure][azure-img]][azure-url] [![codecov][codecov-img]][codecov-url] | [![Bors enabled][bors-img]][bors-url] |
+|||
+|---------------------:|:----------------------------------------------|
+| **Documentation**    | [![latest][docs-latest-img]][docs-latest-url] |
+| **Azure Build**      | [![azure][azure-img]][azure-url]              |
+| **Code Coverage**    | [![codecov][codecov-img]][codecov-url]        |
+| **Bors**             | [![Bors enabled][bors-img]][bors-url]         |
+| **Travis Build**     | [![travis][travis-img]][travis-url]           |
+| **AppVeyor Build**   | [![appveyor][appveyor-img]][appveyor-url]     |
 
 [docs-latest-img]: https://img.shields.io/badge/docs-latest-blue.svg
 [docs-latest-url]: https://climate-machine.github.io/RRTMGP.jl/latest/
@@ -17,11 +22,6 @@ Julia implementation of Rapid and accurate Radiative Transfer Model for General 
 
 [bors-img]: https://bors.tech/images/badge_small.svg
 [bors-url]: https://app.bors.tech/repositories/20449
-
-
-| **Backup Build Status**                                                       |
-|:------------------------------------------------------------------------------|
-| [![appveyor][appveyor-img]][appveyor-url] [![travis][travis-img]][travis-url] |
 
 [travis-img]: https://travis-ci.org/climate-machine/RRTMGP.jl.svg?branch=master
 [travis-url]: https://travis-ci.org/climate-machine/RRTMGP.jl
