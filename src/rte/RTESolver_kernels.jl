@@ -65,6 +65,7 @@ function lw_solver_noscat!(mo::MeshOrientation{I},
                            radn_up::Array{FT,3},
                            radn_dn::Array{FT,3}) where {FT<:AbstractFloat,I<:Int}
   @unpack_fields optical_props τ
+  @unpack_fields source lay_source sfc_source
   ncol  = get_ncol(optical_props)
   nlay  = get_nlay(optical_props)
   ngpt  = get_ngpt(optical_props)
@@ -101,7 +102,7 @@ function lw_solver_noscat!(mo::MeshOrientation{I},
     # Source function for diffuse radiation
     #
     lw_source_noscat!(ncol, nlay,
-                      source.lay_source[:,:,igpt],
+                      lay_source[:,:,igpt],
                       lev_source_up[:,:,igpt],
                       lev_source_dn[:,:,igpt],
                       τ_loc,
@@ -112,7 +113,7 @@ function lw_solver_noscat!(mo::MeshOrientation{I},
     # Surface albedo, surface source function
     #
     sfc_albedo .= FT(1) .- sfc_emis[:,igpt]
-    source_sfc .= sfc_emis[:,igpt] .* source.sfc_source[:,igpt]
+    source_sfc .= sfc_emis[:,igpt] .* sfc_source[:,igpt]
     #
     # Transport
     #
@@ -461,8 +462,6 @@ real(FT), dimension(ncol, nlay), intent(in) :: lay_source,  # Planck source at l
 real(FT), dimension(ncol, nlay), intent(out):: source_dn, source_up
                                                                # Source function at layer edges
                                                                # Down at the bottom of the layer, up at the top
-real(FT), parameter :: τ_thresh = sqrt(epsilon(τ))
-
 """
 function lw_source_noscat!(ncol::I, nlay::I,
                            lay_source::Array{FT,2},
@@ -1075,7 +1074,8 @@ end
  - `flux_dn` Flux to be used as input to solvers below
 """
 function apply_BC!(flux_dn::Array{FT,3},
-                   ilay::I) where {I<:Integer,FT<:AbstractFloat}
+                   ilay::I,
+                   ::Nothing) where {I<:Integer,FT<:AbstractFloat}
   flux_dn[:,ilay, :] .= FT(0)
   return nothing
 end
