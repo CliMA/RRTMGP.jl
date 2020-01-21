@@ -122,15 +122,16 @@ function rte_sw!(fluxes::FluxesBroadBand{FT},
   validate!(optical_props)
   if optical_props isa OneScalar
     # Direct beam only
-    sw_solver_noscat!(ncol, nlay, ngpt, mesh_orientation,
-                      optical_props.τ, μ_0,
+    sw_solver_noscat!(mesh_orientation,
+                      optical_props,
+                      μ_0,
                       gpt_flux_dir)
     # No diffuse flux
     # gpt_flux_up .= FT(0)
     # gpt_flux_dn .= FT(0)
   elseif optical_props isa TwoStream
     # two-stream calculation with scattering
-    sw_solver!(ncol, nlay, ngpt, mesh_orientation,
+    sw_solver!(mesh_orientation,
                optical_props,
                μ_0,
                sfc_alb_dir_gpt,
@@ -210,18 +211,18 @@ function rte_lw!(fluxes::FluxesBroadBand{FT},
   # Compute the radiative transfer...
   if optical_props isa OneScalar
 
-    # No scattering two-stream calculation
-    lw_solver_noscat_GaussQuad!(ncol, nlay, ngpt, mesh_orientation,
+    # No scattering
+    lw_solver_noscat_GaussQuad!(mesh_orientation,
                                 angle_disc,
-                                optical_props.τ,
+                                optical_props,
                                 sources,
                                 sfc_emis_gpt,
                                 gpt_flux_up,
                                 gpt_flux_dn)
 
   elseif optical_props isa TwoStream
-    # two-stream calculation with scattering
-    lw_solver!(ncol, nlay, ngpt, mesh_orientation,
+    # With scattering
+    lw_solver!(mesh_orientation,
                optical_props,
                sources,
                sfc_emis_gpt,

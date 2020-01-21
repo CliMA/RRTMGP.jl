@@ -29,11 +29,10 @@ LW_diff_sec(::Type{FT}) where FT = FT(1.66)  # 1./cos(diffusivity angle)
 #
 
 """
-    lw_solver_noscat!(ncol::I, nlay::I, ngpt::I,
-                      mo::MeshOrientation{I},
+    lw_solver_noscat!(mo::MeshOrientation{I},
                       D::Array{FT,2},
                       w_μ::FT,
-                      τ::Array{FT,3},
+                      optical_props::OneScalar{FT,I},
                       source::SourceFuncLongWave{FT,I},
                       sfc_emis::Array{FT,2},
                       radn_up::Array{FT,3},
@@ -41,14 +40,13 @@ LW_diff_sec(::Type{FT}) where FT = FT(1.66)  # 1./cos(diffusivity angle)
 
  - `source` longwave source function, see [`SourceFuncLongWave`](@ref)
  - `mo` mesh orientation, see [`MeshOrientation`](@ref)
- - `optical_props` 2-stream optical properties, see [`TwoStream`](@ref)
+ - `optical_props` optical properties, see [`OneScalar`](@ref)
  - `sfc_emis` - surface emissivity
  - `radn_up` - upward radiance [W/m2-str]
  - `radn_dn` - downward radiance [W/m2-str] Top level must contain incident flux boundary condition
 
 real(FT), dimension(ncol,       ngpt), intent(in   ) :: D            # secant of propagation angle  []
 real(FT),                              intent(in   ) :: w_μ       # quadrature weight
-real(FT), dimension(ncol,nlay,  ngpt), intent(in   ) :: τ          # Absorption optical thickness []
 
 # Local variables, no g-point dependency
 real(FT), dimension(ncol,nlay) :: τ_loc,   # path length (τ/μ)
@@ -58,15 +56,19 @@ real(FT), dimension(ncol     ) :: source_sfc, sfc_albedo
 
 real(FT), dimension(:,:,:), pointer :: lev_source_up, lev_source_dn # Mapping increasing/decreasing indicies to up/down
 """
-function lw_solver_noscat!(ncol::I, nlay::I, ngpt::I,
-                           mo::MeshOrientation{I},
+function lw_solver_noscat!(mo::MeshOrientation{I},
                            D::Array{FT,2},
                            w_μ::FT,
-                           τ::Array{FT,3},
+                           optical_props::OneScalar{FT,I},
                            source::SourceFuncLongWave{FT,I},
                            sfc_emis::Array{FT,2},
                            radn_up::Array{FT,3},
                            radn_dn::Array{FT,3}) where {FT<:AbstractFloat,I<:Int}
+  @unpack_fields optical_props τ
+  ncol  = get_ncol(optical_props)
+  nlay  = get_nlay(optical_props)
+  ngpt  = get_ngpt(optical_props)
+
   τ_loc    = Array{FT}(undef,ncol,nlay)
   trans      = Array{FT}(undef,ncol,nlay)
   source_up  = Array{FT}(undef,ncol,nlay)
@@ -133,10 +135,9 @@ function lw_solver_noscat!(ncol::I, nlay::I, ngpt::I,
 end
 
 """
-    lw_solver_noscat_GaussQuad!(ncol::I, nlay::I, ngpt::I,
-                                mo::MeshOrientation{I},
+    lw_solver_noscat_GaussQuad!(mo::MeshOrientation{I},
                                 angle_disc::GaussQuadrature{FT,I},
-                                τ::Array{FT,3},
+                                optical_props::OneScalar{FT,I},
                                 source::SourceFuncLongWave{FT, I},
                                 sfc_emis::Array{FT,2},
                                 flux_up::Array{FT,3},
@@ -148,14 +149,13 @@ Routine sums over single-angle solutions for each sets of angles/weights
 
 given
 
- - `source` longwave source function, see [`SourceFuncLongWave`](@ref)
  - `mo` mesh orientation, see [`MeshOrientation`](@ref)
- - `optical_props` 2-stream optical properties, see [`TwoStream`](@ref)
- - `sfc_emis` - surface emissivity
  - `angle_disc` - angular discretization, see [`GaussQuadrature`](@ref)
+ - `optical_props` optical properties, see [`OneScalar`](@ref)
+ - `source` longwave source function, see [`SourceFuncLongWave`](@ref)
+ - `sfc_emis` - surface emissivity
  - `flux_up` upward radiance [W/m2-str]
  - `flux_dn` downward radiance, Top level must contain incident flux boundary condition
- - `τ` Absorption optical thickness [ncol,nlay,  ngpt]
 
  - `radn_dn` Fluxes per quad angle [ncol,nlay+1,ngpt]
  - `radn_up` Fluxes per quad angle [ncol,nlay+1,ngpt]
@@ -163,47 +163,46 @@ given
 # Local variables
 real(FT), dimension(ncol,       ngpt) :: Ds_ncol
 """
-function lw_solver_noscat_GaussQuad!(ncol::I, nlay::I, ngpt::I,
-                                     mo::MeshOrientation{I},
+function lw_solver_noscat_GaussQuad!(mo::MeshOrientation{I},
                                      angle_disc::GaussQuadrature{FT,I},
-                                     τ::Array{FT,3},
+                                     optical_props::OneScalar{FT,I},
                                      source::SourceFuncLongWave{FT, I},
                                      sfc_emis::Array{FT,2},
                                      flux_up::Array{FT,3},
                                      flux_dn::Array{FT,3}) where {I<:Int,FT<:AbstractFloat}
 
+  ncol  = get_ncol(optical_props)
+  nlay  = get_nlay(optical_props)
+  ngpt  = get_ngpt(optical_props)
+
   n_μ = angle_disc.n_gauss_angles
   Ds = angle_disc.gauss_Ds[1:n_μ,n_μ]
   w_μ = angle_disc.gauss_wts[1:n_μ,n_μ]
-  #
+
   # For the first angle output arrays store total flux
-  #
   Ds_ncol = Array{FT}(undef, ncol,ngpt)
   radn_up, radn_dn = ntuple(i->Array{FT}(undef, ncol,nlay+1,ngpt), 2)
 
   Ds_ncol .= Ds[1]
-  lw_solver_noscat!(ncol, nlay, ngpt,
-                    mo,
+  lw_solver_noscat!(mo,
                     Ds_ncol,
                     w_μ[1],
-                    τ,
+                    optical_props,
                     source,
                     sfc_emis,
                     flux_up,
                     flux_dn)
-  #
+
   # For more than one angle use local arrays
-  #
   i_lev_top = ilev_top(mo)
   apply_BC!(radn_dn, i_lev_top, flux_dn[:,i_lev_top,:])
 
   @inbounds for i_μ in 2:n_μ
     Ds_ncol .= Ds[i_μ]
-    lw_solver_noscat!(ncol, nlay, ngpt,
-                      mo,
+    lw_solver_noscat!(mo,
                       Ds_ncol,
                       w_μ[i_μ],
-                      τ,
+                      optical_props,
                       source,
                       sfc_emis,
                       radn_up,
@@ -214,13 +213,12 @@ function lw_solver_noscat_GaussQuad!(ncol::I, nlay::I, ngpt::I,
 end
 
 """
-    lw_solver!(ncol::I, nlay::I, ngpt::I,
-               mo::MeshOrientation{I},
-               optical_props::TwoStream{FT},
+    lw_solver!(mo::MeshOrientation{I},
+               optical_props::TwoStream{FT,I},
                source::SourceFuncLongWave{FT},
-               sfc_emis::Array{FT},
-               flux_up::Array{FT},
-               flux_dn::Array{FT}) where {I<:Int,FT<:AbstractFloat}
+               sfc_emis::Array{FT,2},
+               flux_up::Array{FT,3},
+               flux_dn::Array{FT,3}) where {I<:Int,FT<:AbstractFloat}
 
 Longwave calculation:
  - combine RRTMGP-specific sources at levels
@@ -243,13 +241,18 @@ real(FT), dimension(ncol,nlay+1) :: lev_source
 real(FT), dimension(ncol,nlay  ) :: source_dn, source_up
 real(FT), dimension(ncol       ) :: source_sfc
 """
-function lw_solver!(ncol::I, nlay::I, ngpt::I,
-                    mo::MeshOrientation{I},
+function lw_solver!(mo::MeshOrientation{I},
                     optical_props::TwoStream{FT,I},
                     source::SourceFuncLongWave{FT},
                     sfc_emis::Array{FT,2},
                     flux_up::Array{FT,3},
                     flux_dn::Array{FT,3}) where {I<:Int,FT<:AbstractFloat}
+
+  @unpack_fields optical_props τ ssa g
+  @unpack_fields source lev_source_inc lev_source_dec sfc_source lay_source
+  ncol  = get_ncol(optical_props)
+  nlay  = get_nlay(optical_props)
+  ngpt  = get_ngpt(optical_props)
 
   lev_source = Array{FT}(undef, ncol,nlay+1)
   source_sfc = Array{FT}(undef, ncol)
@@ -258,45 +261,41 @@ function lw_solver!(ncol::I, nlay::I, ngpt::I,
   sfc_albedo = Array{FT}(undef, ncol)
   Rdif, Tdif, γ_1, γ_2 = ntuple(i->Array{FT}(undef, ncol, nlay),4)
   @inbounds for igpt in 1:ngpt
-    #
+
     # RRTMGP provides source functions at each level using the spectral mapping
     #   of each adjacent layer. Combine these for two-stream calculations
-    #
     lw_combine_sources!(ncol, nlay, mo,
-                        source.lev_source_inc[:,:,igpt],
-                        source.lev_source_dec[:,:,igpt],
+                        lev_source_inc[:,:,igpt],
+                        lev_source_dec[:,:,igpt],
                         lev_source)
-    #
+
     # Cell properties: reflection, transmission for diffuse radiation
     #   Coupling coefficients needed for source function
-    #
     lw_two_stream!(ncol, nlay,
-                   optical_props.τ[:,:,igpt],
-                   optical_props.ssa[:,:,igpt],
-                   optical_props.g[:,:,igpt],
+                   τ[:,:,igpt],
+                   ssa[:,:,igpt],
+                   g[:,:,igpt],
                    γ_1,
                    γ_2,
                    Rdif,
                    Tdif)
-    #
+
     # Source function for diffuse radiation
-    #
     lw_source_2str!(ncol, nlay, mo,
                     sfc_emis[:,igpt],
-                    source.sfc_source[:,igpt],
-                    source.lay_source[:,:,igpt],
+                    sfc_source[:,igpt],
+                    lay_source[:,:,igpt],
                     lev_source,
                     γ_1,
                     γ_2,
                     Rdif,
                     Tdif,
-                    optical_props.τ[:,:,igpt],
+                    τ[:,:,igpt],
                     source_dn,
                     source_up,
                     source_sfc)
-    #
+
     # Transport
-    #
     sfc_albedo .= FT(1) .- sfc_emis[:,igpt]
     adding!(ncol, nlay, mo,
             sfc_albedo,
@@ -320,27 +319,26 @@ end
 #####
 
 """
-    sw_solver_noscat!(ncol::I, nlay::I, ngpt::I,
-                      mo::MeshOrientation{I},
-                      τ::Array{FT},
+    sw_solver_noscat!(mo::MeshOrientation{I},
+                      op::OneScalar{FT,I},
                       μ_0::Array{FT,1},
                       flux_dir::Array{FT,3}) where {FT<:AbstractFloat,I<:Int}
 
  - `mo` mesh orientation, see [`MeshOrientation`](@ref)
+ - `op` optical properties, see [`OneScalar`](@ref)
 
-integer,                    intent( in) :: ncol, nlay, ngpt # Number of columns, layers, g-points
-real(FT), dimension(ncol,nlay,  ngpt), intent( in) :: τ          # Absorption optical thickness []
-real(FT), dimension(ncol            ), intent( in) :: μ_0          # cosine of solar zenith angle
-real(FT), dimension(ncol,nlay+1,ngpt), intent(inout) :: flux_dir     # Direct-beam flux, spectral [W/m2]
-                                                                   # Top level must contain incident flux boundary condition
-integer :: icol, ilev, igpt
-real(FT) :: μ_0_inv(ncol)
+real(FT), dimension(ncol            ), intent( in) :: μ_0        # cosine of solar zenith angle
+real(FT), dimension(ncol,nlay+1,ngpt), intent(inout) :: flux_dir # Direct-beam flux, spectral [W/m2]
+                                                                 # Top level must contain incident flux boundary condition
 """
-function sw_solver_noscat!(ncol::I, nlay::I, ngpt::I,
-                           mo::MeshOrientation{I},
-                           τ::Array{FT},
+function sw_solver_noscat!(mo::MeshOrientation{I},
+                           op::OneScalar{FT,I},
                            μ_0::Array{FT,1},
                            flux_dir::Array{FT,3}) where {FT<:AbstractFloat,I<:Int}
+  @unpack_fields op τ
+  ncol  = get_ncol(op)
+  nlay  = get_nlay(op)
+  ngpt  = get_ngpt(op)
 
   μ_0_inv = 1 ./ μ_0
   # Indexing into arrays for upward and downward propagation depends on the vertical
@@ -388,8 +386,7 @@ real(FT), dimension(ncol,nlay) :: source_up, source_dn
 real(FT), dimension(ncol     ) :: source_srf
 # ------------------------------------
 """
-function sw_solver!(ncol::I, nlay::I, ngpt::I,
-                    mo::MeshOrientation{I},
+function sw_solver!(mo::MeshOrientation{I},
                     optical_props::TwoStream{FT,I},
                     μ_0::Array{FT},
                     sfc_alb_dir::Array{FT,2},
@@ -398,37 +395,35 @@ function sw_solver!(ncol::I, nlay::I, ngpt::I,
                     flux_dn::Array{FT,3},
                     flux_dir::Array{FT,3}) where {FT<:AbstractFloat,I<:Int}
 
+  @unpack_fields optical_props τ ssa g
+  ncol  = get_ncol(optical_props)
+  nlay  = get_nlay(optical_props)
+  ngpt  = get_ngpt(optical_props)
+
   Rdif, Tdif, Rdir, Tdir, Tnoscat, source_up, source_dn = ntuple(i->zeros(FT, ncol,nlay), 7)
   source_srf = zeros(FT, ncol)
 
   @inbounds for igpt in 1:ngpt
-    #
-    # Cell properties: transmittance and reflectance for direct and diffuse radiation
-    #
 
+    # Cell properties: transmittance and reflectance for direct and diffuse radiation
     sw_two_stream!(Rdif, Tdif, Rdir, Tdir, Tnoscat,
                    ncol, nlay, μ_0,
-                   optical_props.τ[:,:,igpt],
-                   optical_props.ssa[:,:,igpt],
-                   optical_props.g[:,:,igpt])
-    #
+                   τ[:,:,igpt],
+                   ssa[:,:,igpt],
+                   g[:,:,igpt])
+
     # Direct-beam and source for diffuse radiation
-    #
     sw_source_2str!(ncol, nlay, mo, Rdir, Tdir, Tnoscat, sfc_alb_dir[:,igpt],
                     source_up, source_dn, source_srf, @view(flux_dir[:,:,igpt]))
 
-    #
     # Transport
-    #
     adding!(ncol, nlay, mo,
             sfc_alb_dif[:,igpt], Rdif, Tdif,
             source_dn, source_up, source_srf,
             @view(flux_up[:,:,igpt]),
             @view(flux_dn[:,:,igpt]))
 
-    #
     # adding computes only diffuse flux; flux_dn is total
-    #
     flux_dn[:,:,igpt] .= flux_dn[:,:,igpt] .+ flux_dir[:,:,igpt]
   end
 end
@@ -441,6 +436,11 @@ end
 # Compute LW source function for upward and downward emission at levels using linear-in-τ assumption
 # See Clough et al., 1992, doi: 10.1029/92JD01419, Eq 13
 #
+
+function factor(τ::FT, trans::FT, τ_thresh::FT) where {FT<:AbstractFloat}
+  return τ > τ_thresh ? (1 - trans)/τ - trans : τ * (FT(1/2) - 1/3*τ)
+end
+
 
 """
     lw_source_noscat!(ncol::I, nlay::I,
@@ -473,25 +473,22 @@ function lw_source_noscat!(ncol::I, nlay::I,
                            source_dn::Array{FT,2},
                            source_up::Array{FT,2}) where {I<:Int,FT<:AbstractFloat}
 
-  τ_thresh = sqrt(eps(eltype(τ)))
-#    τ_thresh = abs(eps(eltype(τ)))
+  τ_thresh = sqrt(eps(FT)) # or abs(eps(FT))?
   @inbounds for ilay in 1:nlay
     @inbounds for icol in 1:ncol
-    #
+
     # Weighting factor. Use 2nd order series expansion when rounding error (~τ^2)
     #   is of order epsilon (smallest difference from 1. in working precision)
     #   Thanks to Peter Blossey
-    #
-    fact = fmerge((FT(1) - trans[icol,ilay])/τ[icol,ilay] - trans[icol,ilay],
-                  τ[icol, ilay] * ( FT(0.5) - FT(1)/FT(3)*τ[icol, ilay]   ),
-                  τ[icol, ilay] > τ_thresh)
-    #
+    B̄ = lay_source[icol,ilay]
+    B_D = lev_source_dn[icol,ilay]
+    B_U = lev_source_up[icol,ilay]
+    T = trans[icol,ilay]
+    fact = factor(τ[icol,ilay], T, τ_thresh)
+
     # Equation below is developed in Clough et al., 1992, doi:10.1029/92JD01419, Eq 13
-    #
-    source_dn[icol,ilay] = (FT(1) - trans[icol,ilay]) * lev_source_dn[icol,ilay] +
-                            FT(2) * fact * (lay_source[icol,ilay] - lev_source_dn[icol,ilay])
-    source_up[icol,ilay] = (FT(1) - trans[icol,ilay]) * lev_source_up[icol,ilay] +
-                            FT(2) * fact * (lay_source[icol,ilay] - lev_source_up[icol,ilay])
+    source_dn[icol,ilay] = (1 - T) * B_D + 2 * fact * (B̄ - B_D)
+    source_up[icol,ilay] = (1 - T) * B_U + 2 * fact * (B̄ - B_U)
     end
   end
 end

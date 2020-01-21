@@ -31,17 +31,17 @@ $(DocStringExtensions.FIELDS)
 """
 struct ShortwaveBCs{FT} <: AbstractRadiativeBoundaryConditions{FT}
   "top of atmosphere flux"
-  toa_flux::Array{FT}
+  toa_flux::Array{FT,2}
   "surface albedo for specular (direct) radiation"
-  sfc_alb_direct::Array{FT}
+  sfc_alb_direct::Array{FT,2}
   "surface albedo for diffuse radiation"
-  sfc_alb_diffuse::Array{FT}
+  sfc_alb_diffuse::Array{FT,2}
   "incident diffuse flux at top of domain `[W/m2]` `(ncol, ngpt)`"
-  inc_flux_diffuse::Union{Array{FT},Nothing}
-  function ShortwaveBCs(toa_flux::Array{FT},
-                        sfc_alb_direct::Array{FT},
-                        sfc_alb_diffuse::Array{FT},
-                        inc_flux_diffuse::Union{Array{FT},Nothing}=nothing) where {FT<:AbstractFloat}
+  inc_flux_diffuse::Union{Array{FT,2},Nothing}
+  function ShortwaveBCs(toa_flux::Array{FT,2},
+                        sfc_alb_direct::Array{FT,2},
+                        sfc_alb_diffuse::Array{FT,2},
+                        inc_flux_diffuse::Union{Array{FT,2},Nothing}=nothing) where {FT<:AbstractFloat}
     if inc_flux_diffuse ≠ nothing
       # @assert all(size(inc_flux_diffuse) .== (ncol, ngpt)) # TODO: Check sizes somehow
       @assert !any_vals_less_than(inc_flux_diffuse, FT(0))
