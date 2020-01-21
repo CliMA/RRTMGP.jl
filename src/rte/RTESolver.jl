@@ -112,12 +112,7 @@ function rte_sw!(fluxes::FluxesBroadBand{FT},
   #
   i_lev_top = ilev_top(mesh_orientation)
   apply_BC!(gpt_flux_dir, i_lev_top, bcs.toa_flux, μ_0)
-
-  if bcs.inc_flux_diffuse ≠ nothing
-    apply_BC!(gpt_flux_dn, i_lev_top, bcs.inc_flux_diffuse)
-  else
-    apply_BC!(gpt_flux_dn, i_lev_top)
-  end
+  apply_BC!(gpt_flux_dn, i_lev_top, bcs.inc_flux_diffuse)
 
   validate!(optical_props)
   if optical_props isa OneScalar
@@ -199,14 +194,8 @@ function rte_lw!(fluxes::FluxesBroadBand{FT},
 
   sfc_emis_gpt = expand_and_transpose(optical_props, bcs.sfc_emis)
 
-  #   Upper boundary condition
-  i_lev_top = ilev_top(mesh_orientation)
-  if bcs.inc_flux ≠ nothing
-    apply_BC!(gpt_flux_dn, i_lev_top, bcs.inc_flux)
-  else
-    # Default is zero incident diffuse flux
-    apply_BC!(gpt_flux_dn, i_lev_top)
-  end
+  # Upper boundary condition
+  apply_BC!(gpt_flux_dn, ilev_top(mesh_orientation), bcs.inc_flux)
 
   # Compute the radiative transfer...
   if optical_props isa OneScalar
