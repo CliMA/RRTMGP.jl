@@ -35,7 +35,7 @@ Contains a single routine to compute direct and diffuse fluxes of solar radiatio
  - optionally, a boundary condition for incident diffuse radiation
  - optionally, an integer number of angles at which to do Gaussian quadrature if scattering is neglected
 
-If optical properties are supplied via a `OneScalar` (absorption optical thickenss only)
+If optical properties are supplied via a `OneScalar` (absorption optical thickness only)
   then an emission/absorption solver is called
   If optical properties are supplied via a `TwoStream` fluxes are computed via
   two-stream calculations and adding.
@@ -99,11 +99,6 @@ function rte_sw!(fluxes::FluxesBroadBand{FT},
   gpt_flux_dn  = zeros(FT, ncol, nlay+1, ngpt)
   gpt_flux_dir = zeros(FT, ncol, nlay+1, ngpt)
 
-  # Lower boundary condition -- expand surface albedos by band to gpoints
-  #   and switch dimension ordering
-  sfc_alb_dir_gpt = expand_and_transpose(optical_props, bcs.sfc_alb_direct)
-  sfc_alb_dif_gpt = expand_and_transpose(optical_props, bcs.sfc_alb_diffuse)
-
   # Compute the radiative transfer...
   #
   # Apply boundary conditions
@@ -125,6 +120,12 @@ function rte_sw!(fluxes::FluxesBroadBand{FT},
     # gpt_flux_up .= FT(0)
     # gpt_flux_dn .= FT(0)
   elseif optical_props isa TwoStream
+
+    # Lower boundary condition -- expand surface albedos by band to gpoints
+    #   and switch dimension ordering
+    sfc_alb_dir_gpt = expand_and_transpose(optical_props, bcs.sfc_alb_direct)
+    sfc_alb_dif_gpt = expand_and_transpose(optical_props, bcs.sfc_alb_diffuse)
+
     # two-stream calculation with scattering
     sw_solver!(mesh_orientation,
                optical_props,
@@ -237,9 +238,9 @@ function expand_and_transpose(ops::AbstractOpticalProps{FT}, arr_in::Array{FT}) 
   ngpt  = get_ngpt(ops)
   arr_out = Array{FT}(undef,ncol, ngpt)
   limits = get_band_lims_gpoint(ops)
-  for iband = 1:nband
-    for icol = 1:ncol
-      for igpt = limits[1, iband]:limits[2, iband]
+  @inbounds for iband = 1:nband
+    @inbounds for icol = 1:ncol
+      @inbounds for igpt = limits[1, iband]:limits[2, iband]
         arr_out[icol, igpt] = arr_in[iband,icol]
       end
     end
