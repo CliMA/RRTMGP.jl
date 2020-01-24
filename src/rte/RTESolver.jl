@@ -52,6 +52,7 @@ The routine does error checking and choses which lower-level kernel to invoke ba
 """
 module RTESolver
 
+using DocStringExtensions
 using ..RadiativeBoundaryConditions
 using ..MeshOrientations
 using ..AngularDiscretizations
@@ -61,7 +62,10 @@ using ..Fluxes
 using ..SourceFunctions
 using ..FortranIntrinsics
 
+import ..Fluxes: reduce!
 export rte_lw!, rte_sw!, expand_and_transpose
+
+include("RTE.jl")
 
 """
     rte_sw!(fluxes::FluxesBroadBand{FT},
@@ -72,7 +76,7 @@ export rte_lw!, rte_sw!, expand_and_transpose
 
 Compute broadband radiative fluxes
 
- - `fluxes` broadband fluxes, see [`AbstractFluxes`](@ref)
+ - `fluxes` broadband fluxes, see [`FluxesBroadBand`](@ref)
 
 given
 
@@ -82,67 +86,20 @@ given
  - `μ_0` cosine of solar zenith angle (ncol)
 """
 function rte_sw!(fluxes::FluxesBroadBand{FT},
-                 optical_props::AbstractOpticalPropsArry{FT},
+                 optical_props::AbstractOpticalPropsArry{FT,I},
                  mesh_orientation::MeshOrientation{I},
                  bcs::ShortwaveBCs{FT},
                  μ_0::Array{FT}) where {FT<:AbstractFloat,I<:Int}
-
-  ncol  = get_ncol(optical_props)
-  nlay  = get_nlay(optical_props)
-  ngpt  = get_ngpt(optical_props)
-
-  # Error checking -- consistency / sizes / validity of values
-  @assert size(μ_0, 1) ==  ncol
-  @assert !any_vals_outside(μ_0, FT(0), FT(1))
-
-  gpt_flux_up  = zeros(FT, ncol, nlay+1, ngpt)
-  gpt_flux_dn  = zeros(FT, ncol, nlay+1, ngpt)
-  gpt_flux_dir = zeros(FT, ncol, nlay+1, ngpt)
+  base = RTEBase(fluxes, mesh_orientation, bcs, optical_props)
+  rte = RTEShortWave(base, μ_0, optical_props)
 
   # Compute the radiative transfer...
-  #
-  # Apply boundary conditions
-  #   On input flux_dn is the diffuse component; the last action in each solver is to add
-  #   direct and diffuse to represent the total, consistent with the LW
-  #
-  i_lev_top = ilev_top(mesh_orientation)
-  apply_BC!(gpt_flux_dir, i_lev_top, bcs.toa_flux, μ_0)
-  apply_BC!(gpt_flux_dn, i_lev_top, bcs.inc_flux_diffuse)
-
-  validate!(optical_props)
-  if optical_props isa OneScalar
-    # Direct beam only
-    sw_solver_noscat!(mesh_orientation,
-                      optical_props,
-                      μ_0,
-                      gpt_flux_dir)
-    # No diffuse flux
-    # gpt_flux_up .= FT(0)
-    # gpt_flux_dn .= FT(0)
-  elseif optical_props isa TwoStream
-
-    # Lower boundary condition -- expand surface albedos by band to gpoints
-    #   and switch dimension ordering
-    sfc_alb_dir_gpt = expand_and_transpose(optical_props, bcs.sfc_alb_direct)
-    sfc_alb_dif_gpt = expand_and_transpose(optical_props, bcs.sfc_alb_diffuse)
-
-    # two-stream calculation with scattering
-    sw_solver!(mesh_orientation,
-               optical_props,
-               μ_0,
-               sfc_alb_dir_gpt,
-               sfc_alb_dif_gpt,
-               gpt_flux_up,
-               gpt_flux_dn,
-               gpt_flux_dir)
-  end
+  solve!(rte, optical_props, mesh_orientation)
 
   # ...and reduce spectral fluxes to desired output quantities
-  reduce!(fluxes,
-          gpt_flux_up,
-          gpt_flux_dn,
-          optical_props,
-          gpt_flux_dir)
+  reduce!(rte.base, optical_props)
+  fluxes = rte.base.fluxes
+  return nothing
 end
 
 """
@@ -166,62 +123,29 @@ given
  - `angle_disc` Gaussian quadrature for angular discretization, [`GaussQuadrature`](@ref)
 """
 function rte_lw!(fluxes::FluxesBroadBand{FT},
-                 optical_props::AbstractOpticalPropsArry{FT},
+                 optical_props::AbstractOpticalPropsArry{FT,I},
                  mesh_orientation::MeshOrientation{I},
                  bcs::LongwaveBCs{FT},
                  sources::SourceFuncLongWave{FT, I},
                  angle_disc::Union{GaussQuadrature{FT,I},Nothing}=nothing) where {FT<:AbstractFloat,I<:Int}
 
-  # Error checking
-  ncol  = get_ncol(optical_props)
-  nlay  = get_nlay(optical_props)
-  ngpt  = get_ngpt(optical_props)
-
-  # Error checking -- consistency of sizes and validity of values
-  @assert get_ncol(sources) == ncol
-  @assert get_nlay(sources) == nlay
-  @assert get_ngpt(sources) == ngpt
-
-  if angle_disc == nothing
-    angle_disc = GaussQuadrature(FT, 1)
-  end
-
-  # Ensure values of τ, ssa, and g are reasonable
-  validate!(optical_props)
-
-  # Lower boundary condition -- expand surface emissivity by band to gpoints
-  gpt_flux_up  = Array{FT}(undef,ncol,nlay+1,ngpt)
-  gpt_flux_dn  = Array{FT}(undef,ncol,nlay+1,ngpt)
-
-  sfc_emis_gpt = expand_and_transpose(optical_props, bcs.sfc_emis)
-
-  # Upper boundary condition
-  apply_BC!(gpt_flux_dn, ilev_top(mesh_orientation), bcs.inc_flux)
+  base = RTEBase(fluxes, mesh_orientation, bcs, optical_props)
+  rte = RTELongWave(base, sources, angle_disc, optical_props)
 
   # Compute the radiative transfer...
-  if optical_props isa OneScalar
+  solve!(rte, optical_props, mesh_orientation)
 
-    # No scattering
-    lw_solver_noscat_GaussQuad!(mesh_orientation,
-                                angle_disc,
-                                optical_props,
-                                sources,
-                                sfc_emis_gpt,
-                                gpt_flux_up,
-                                gpt_flux_dn)
-
-  elseif optical_props isa TwoStream
-    # With scattering
-    lw_solver!(mesh_orientation,
-               optical_props,
-               sources,
-               sfc_emis_gpt,
-               gpt_flux_up,
-               gpt_flux_dn)
-  end
-
-  reduce!(fluxes, gpt_flux_up, gpt_flux_dn, optical_props)
+  reduce!(rte.base, optical_props)
+  fluxes = rte.base.fluxes
+  return nothing
 end
+
+"""
+    reduce!(base, optical_props)
+
+Wrapper for [`reduce!`](@ref Fluxes.reduce!)
+"""
+reduce!(base, optical_props) = reduce!(base.fluxes, base.gpt_flux_up, base.gpt_flux_dn, optical_props, base.gpt_flux_dir)
 
 """
     expand_and_transpose(ops::AbstractOpticalProps,arr_in::Array{FT}) where FT

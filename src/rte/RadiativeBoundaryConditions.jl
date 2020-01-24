@@ -8,6 +8,7 @@ module RadiativeBoundaryConditions
 using DocStringExtensions
 using ..Utilities
 
+export AbstractRadiativeBoundaryConditions
 export ShortwaveBCs
 export LongwaveBCs
 
