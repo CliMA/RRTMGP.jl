@@ -14,7 +14,6 @@ Numeric calculations for radiative transfer solvers.
  Application of boundary conditions
 =#
 
-
 LW_diff_sec(::Type{FT}) where FT = FT(1.66)  # 1./cos(diffusivity angle)
 
 
@@ -32,7 +31,7 @@ LW_diff_sec(::Type{FT}) where FT = FT(1.66)  # 1./cos(diffusivity angle)
     lw_solver_noscat!(mo::MeshOrientation{I},
                       D::Array{FT,2},
                       w_μ::FT,
-                      optical_props::OneScalar{FT,I},
+                      op::OneScalar{FT,I},
                       source::SourceFuncLongWave{FT,I},
                       sfc_emis::Array{FT,2},
                       radn_up::Array{FT,3},
@@ -40,7 +39,7 @@ LW_diff_sec(::Type{FT}) where FT = FT(1.66)  # 1./cos(diffusivity angle)
 
  - `source` longwave source function, see [`SourceFuncLongWave`](@ref)
  - `mo` mesh orientation, see [`MeshOrientation`](@ref)
- - `optical_props` optical properties, see [`OneScalar`](@ref)
+ - `op` optical properties, see [`OneScalar`](@ref)
  - `sfc_emis` - surface emissivity
  - `radn_up` - upward radiance [W/m2-str]
  - `radn_dn` - downward radiance [W/m2-str] Top level must contain incident flux boundary condition
@@ -59,16 +58,16 @@ real(FT), dimension(:,:,:), pointer :: lev_source_up, lev_source_dn # Mapping in
 function lw_solver_noscat!(mo::MeshOrientation{I},
                            D::Array{FT,2},
                            w_μ::FT,
-                           optical_props::OneScalar{FT,I},
+                           op::OneScalar{FT,I},
                            source::SourceFuncLongWave{FT,I},
                            sfc_emis::Array{FT,2},
                            radn_up::Array{FT,3},
                            radn_dn::Array{FT,3}) where {FT<:AbstractFloat,I<:Int}
-  @unpack_fields optical_props τ
+  @unpack_fields op τ
   @unpack_fields source lay_source sfc_source
-  ncol  = get_ncol(optical_props)
-  nlay  = get_nlay(optical_props)
-  ngpt  = get_ngpt(optical_props)
+  ncol  = get_ncol(op)
+  nlay  = get_nlay(op)
+  ngpt  = get_ngpt(op)
 
   τ_loc    = Array{FT}(undef,ncol,nlay)
   trans      = Array{FT}(undef,ncol,nlay)
@@ -132,49 +131,38 @@ function lw_solver_noscat!(mo::MeshOrientation{I},
     radn_dn[:,:,igpt] .*= FT(2 * π) * w_μ
     radn_up[:,:,igpt] .*= FT(2 * π) * w_μ
   end  # g point loop
+  return nothing
 
 end
 
 """
-    lw_solver_noscat_GaussQuad!(mo::MeshOrientation{I},
-                                angle_disc::GaussQuadrature{FT,I},
-                                optical_props::OneScalar{FT,I},
-                                source::SourceFuncLongWave{FT, I},
-                                sfc_emis::Array{FT,2},
-                                flux_up::Array{FT,3},
-                                flux_dn::Array{FT,3}) where {I<:Int,FT<:AbstractFloat}
+    solve!(rte::RTELongWaveNoScattering{FT,I}, op::OneScalar{FT,I}, mo::MeshOrientation{I}) where {FT,I}
 
-LW transport, no scattering, multi-angle quadrature
+Longwave transport, no scattering, multi-angle quadrature
 Users provide a set of weights and quadrature angles
 Routine sums over single-angle solutions for each sets of angles/weights
 
 given
 
+ - `rte` radiative transfer equation, see [`RTELongWaveNoScattering`](@ref)
+ - `op` optical properties, see [`OneScalar`](@ref)
  - `mo` mesh orientation, see [`MeshOrientation`](@ref)
- - `angle_disc` - angular discretization, see [`GaussQuadrature`](@ref)
- - `optical_props` optical properties, see [`OneScalar`](@ref)
- - `source` longwave source function, see [`SourceFuncLongWave`](@ref)
- - `sfc_emis` - surface emissivity
- - `flux_up` upward radiance [W/m2-str]
- - `flux_dn` downward radiance, Top level must contain incident flux boundary condition
-
- - `radn_dn` Fluxes per quad angle [ncol,nlay+1,ngpt]
- - `radn_up` Fluxes per quad angle [ncol,nlay+1,ngpt]
-
-# Local variables
-real(FT), dimension(ncol,       ngpt) :: Ds_ncol
 """
-function lw_solver_noscat_GaussQuad!(mo::MeshOrientation{I},
-                                     angle_disc::GaussQuadrature{FT,I},
-                                     optical_props::OneScalar{FT,I},
-                                     source::SourceFuncLongWave{FT, I},
-                                     sfc_emis::Array{FT,2},
-                                     flux_up::Array{FT,3},
-                                     flux_dn::Array{FT,3}) where {I<:Int,FT<:AbstractFloat}
+function solve!(rte::RTELongWaveNoScattering{FT,I}, op::OneScalar{FT,I}, mo::MeshOrientation{I}) where {FT,I}
 
-  ncol  = get_ncol(optical_props)
-  nlay  = get_nlay(optical_props)
-  ngpt  = get_ngpt(optical_props)
+  # Upper boundary condition
+  angle_disc = rte.angle_disc
+  source = rte.sources
+  sfc_emis = rte.sfc_emis_gpt
+  flux_up = rte.base.gpt_flux_up
+  flux_dn = rte.base.gpt_flux_dn
+  i_lev_top = ilev_top(mo)
+  inc_flux = rte.base.bcs.inc_flux
+  apply_BC!(flux_dn, i_lev_top, inc_flux)
+
+  ncol  = get_ncol(op)
+  nlay  = get_nlay(op)
+  ngpt  = get_ngpt(op)
 
   n_μ = angle_disc.n_gauss_angles
   Ds = angle_disc.gauss_Ds[1:n_μ,n_μ]
@@ -182,28 +170,15 @@ function lw_solver_noscat_GaussQuad!(mo::MeshOrientation{I},
 
   # For the first angle output arrays store total flux
   Ds_ncol = Array{FT}(undef, ncol,ngpt)
-  radn_up, radn_dn = ntuple(i->Array{FT}(undef, ncol,nlay+1,ngpt), 2)
+  radn_up, radn_dn = ntuple(i->zeros(FT, ncol,nlay+1,ngpt), 2)
 
-  Ds_ncol .= Ds[1]
-  lw_solver_noscat!(mo,
-                    Ds_ncol,
-                    w_μ[1],
-                    optical_props,
-                    source,
-                    sfc_emis,
-                    flux_up,
-                    flux_dn)
-
-  # For more than one angle use local arrays
-  i_lev_top = ilev_top(mo)
-  apply_BC!(radn_dn, i_lev_top, flux_dn[:,i_lev_top,:])
-
-  @inbounds for i_μ in 2:n_μ
+  @inbounds for i_μ in 1:n_μ
+    i_μ==1 && apply_BC!(radn_dn, i_lev_top, inc_flux)
     Ds_ncol .= Ds[i_μ]
     lw_solver_noscat!(mo,
                       Ds_ncol,
                       w_μ[i_μ],
-                      optical_props,
+                      op,
                       source,
                       sfc_emis,
                       radn_up,
@@ -211,15 +186,11 @@ function lw_solver_noscat_GaussQuad!(mo::MeshOrientation{I},
     flux_up .+= radn_up
     flux_dn .+= radn_dn
   end
+  return nothing
 end
 
 """
-    lw_solver!(mo::MeshOrientation{I},
-               optical_props::TwoStream{FT,I},
-               source::SourceFuncLongWave{FT},
-               sfc_emis::Array{FT,2},
-               flux_up::Array{FT,3},
-               flux_dn::Array{FT,3}) where {I<:Int,FT<:AbstractFloat}
+    solve!(rte::RTELongWave{FT,I}, op::TwoStream{FT,I}, mo::MeshOrientation{I}) where {FT,I}
 
 Longwave calculation:
  - combine RRTMGP-specific sources at levels
@@ -229,12 +200,9 @@ Longwave calculation:
 
 given
 
- - `source` longwave source function, see [`SourceFuncLongWave`](@ref)
+ - `rte` radiative transfer equation, see [`RTELongWave`](@ref)
+ - `op` optical properties, see [`TwoStream`](@ref)
  - `mo` mesh orientation, see [`MeshOrientation`](@ref)
- - `optical_props` 2-stream optical properties, see [`TwoStream`](@ref)
- - `sfc_emis` - surface emissivity
- - `flux_up` - upward flux [W/m2]
- - `flux_dn` - downward flux [W/m2] Top level must contain incident flux boundary condition
 
 real(FT), dimension(ncol,nlay  ) :: Rdif, Tdif, γ_1, γ_2
 real(FT), dimension(ncol       ) :: sfc_albedo
@@ -242,18 +210,22 @@ real(FT), dimension(ncol,nlay+1) :: lev_source
 real(FT), dimension(ncol,nlay  ) :: source_dn, source_up
 real(FT), dimension(ncol       ) :: source_sfc
 """
-function lw_solver!(mo::MeshOrientation{I},
-                    optical_props::TwoStream{FT,I},
-                    source::SourceFuncLongWave{FT},
-                    sfc_emis::Array{FT,2},
-                    flux_up::Array{FT,3},
-                    flux_dn::Array{FT,3}) where {I<:Int,FT<:AbstractFloat}
+function solve!(rte::RTELongWave{FT,I}, op::TwoStream{FT,I}, mo::MeshOrientation{I}) where {FT,I}
+  @unpack_fields rte base sfc_emis_gpt sources
+  @unpack_fields base gpt_flux_dn gpt_flux_up
+  inc_flux = rte.base.bcs.inc_flux
+  apply_BC!(gpt_flux_dn, ilev_top(mo), inc_flux)
 
-  @unpack_fields optical_props τ ssa g
+  source = sources
+  sfc_emis = sfc_emis_gpt
+  flux_up = gpt_flux_up
+  flux_dn = gpt_flux_dn
+
+  @unpack_fields op τ ssa g
   @unpack_fields source lev_source_inc lev_source_dec sfc_source lay_source
-  ncol  = get_ncol(optical_props)
-  nlay  = get_nlay(optical_props)
-  ngpt  = get_ngpt(optical_props)
+  ncol  = get_ncol(op)
+  nlay  = get_nlay(op)
+  ngpt  = get_ngpt(op)
 
   lev_source = Array{FT}(undef, ncol,nlay+1)
   source_sfc = Array{FT}(undef, ncol)
@@ -265,7 +237,7 @@ function lw_solver!(mo::MeshOrientation{I},
 
     # RRTMGP provides source functions at each level using the spectral mapping
     #   of each adjacent layer. Combine these for two-stream calculations
-    lw_combine_sources!(ncol, nlay, mo,
+    lw_combine_sources!(ncol, nlay,
                         lev_source_inc[:,:,igpt],
                         lev_source_dec[:,:,igpt],
                         lev_source)
@@ -298,7 +270,8 @@ function lw_solver!(mo::MeshOrientation{I},
 
     # Transport
     sfc_albedo .= FT(1) .- sfc_emis[:,igpt]
-    adding!(ncol, nlay, mo,
+    adding!(ncol, nlay,
+            mo,
             sfc_albedo,
             Rdif,
             Tdif,
@@ -308,6 +281,7 @@ function lw_solver!(mo::MeshOrientation{I},
             @view(flux_up[:,:,igpt]),
             @view(flux_dn[:,:,igpt]))
   end
+  return nothing
 
 end
 
@@ -315,36 +289,31 @@ end
 #####   Top-level shortwave kernels
 #####
 
-#####
-#####   Extinction-only i.e. solar direct beam
-#####
-
 """
-    sw_solver_noscat!(mo::MeshOrientation{I},
-                      op::OneScalar{FT,I},
-                      μ_0::Array{FT,1},
-                      flux_dir::Array{FT,3}) where {FT<:AbstractFloat,I<:Int}
+    solve!(rte::RTEShortWaveNoScattering{FT,I}, op::OneScalar{FT,I}, mo::MeshOrientation) where {FT,I}
 
- - `mo` mesh orientation, see [`MeshOrientation`](@ref)
+Solve the RTE with extinction-only i.e. solar direct beam.
+
+ - `rte` radiative transfer equation, see [`RTEShortWaveNoScattering`](@ref)
  - `op` optical properties, see [`OneScalar`](@ref)
-
-real(FT), dimension(ncol            ), intent( in) :: μ_0        # cosine of solar zenith angle
-real(FT), dimension(ncol,nlay+1,ngpt), intent(inout) :: flux_dir # Direct-beam flux, spectral [W/m2]
-                                                                 # Top level must contain incident flux boundary condition
+ - `mo` mesh orientation, see [`MeshOrientation`](@ref)
 """
-function sw_solver_noscat!(mo::MeshOrientation{I},
-                           op::OneScalar{FT,I},
-                           μ_0::Array{FT,1},
-                           flux_dir::Array{FT,3}) where {FT<:AbstractFloat,I<:Int}
+function solve!(rte::RTEShortWaveNoScattering{FT,I}, op::OneScalar{FT,I}, mo::MeshOrientation) where {FT,I}
+
+  @unpack_fields rte base μ_0
+  @unpack_fields base gpt_flux_dn bcs gpt_flux_dir
+  flux_dir = gpt_flux_dir
+  i_lev_top = ilev_top(mo)
+  apply_BC!(gpt_flux_dir, i_lev_top, bcs.toa_flux, μ_0)
+  apply_BC!(gpt_flux_dn, i_lev_top, bcs.inc_flux_diffuse)
+
   @unpack_fields op τ
   ncol  = get_ncol(op)
   nlay  = get_nlay(op)
   ngpt  = get_ngpt(op)
 
   μ_0_inv = 1 ./ μ_0
-  # Indexing into arrays for upward and downward propagation depends on the vertical
-  #   orientation of the arrays (whether the domain top is at the first or last index)
-  # We write the loops out explicitly so compilers will have no trouble optimizing them.
+  # Indexing into arrays for upward and downward propagation depends on orientation
   n̂ = nhat(mo)
   b = binary(mo)
 
@@ -356,50 +325,45 @@ function sw_solver_noscat!(mo::MeshOrientation{I},
       flux_dir[:,ilev,igpt] .= flux_dir[:,ilev-n̂,igpt] .* exp.(-τ[:,ilev-b,igpt].*μ_0_inv)
     end
   end
+  return nothing
 end
 
-# Shortwave two-stream calculation:
-#   compute layer reflectance, transmittance
-#   compute solar source function for diffuse radiation
-#   transport
 
 """
-    sw_solver!(ncol::I, nlay::I, ngpt::I,
-               mo::MeshOrientation{I},
-               optical_props::TwoStream{FT,I},
-               μ_0::Array{FT},
-               sfc_alb_dir::Array{FT,2},
-               sfc_alb_dif::Array{FT,2},
-               flux_up::Array{FT,3},
-               flux_dn::Array{FT,3},
-               flux_dir::Array{FT,3}) where {FT<:AbstractFloat,I<:Int}
+    solve!(rte::RTEShortWave{FT,I}, op::TwoStream{FT,I}, mo::MeshOrientation{I}) where {FT,I}
 
+Shortwave two-stream calculation:
+  compute layer reflectance, transmittance
+  compute solar source function for diffuse radiation
+  transport
+
+ - `rte` radiative transfer equation, see [`RTEShortWave`](@ref)
+ - `op` optical properties, see [`TwoStream`](@ref)
  - `mo` mesh orientation, see [`MeshOrientation`](@ref)
- - `optical_props` 2-stream optical properties, see [`TwoStream`](@ref)
- - `flux_up` - upward flux [W/m2]
- - `flux_dn` - downward flux [W/m2] Top level must contain incident flux boundary condition
 
-real(FT), dimension(ncol            ), intent(in   ) :: μ_0     # cosine of solar zenith angle
-real(FT), dimension(ncol,       ngpt), intent(in   ) :: sfc_alb_dir, sfc_alb_dif # Spectral albedo of surface to direct and diffuse radiation
-# -------------------------------------------
 real(FT), dimension(ncol,nlay) :: Rdif, Tdif, Rdir, Tdir, Tnoscat
 real(FT), dimension(ncol,nlay) :: source_up, source_dn
 real(FT), dimension(ncol     ) :: source_srf
-# ------------------------------------
 """
-function sw_solver!(mo::MeshOrientation{I},
-                    optical_props::TwoStream{FT,I},
-                    μ_0::Array{FT},
-                    sfc_alb_dir::Array{FT,2},
-                    sfc_alb_dif::Array{FT,2},
-                    flux_up::Array{FT,3},
-                    flux_dn::Array{FT,3},
-                    flux_dir::Array{FT,3}) where {FT<:AbstractFloat,I<:Int}
+function solve!(rte::RTEShortWave{FT,I}, op::TwoStream{FT,I}, mo::MeshOrientation{I}) where {FT,I}
+  @unpack_fields rte base
+  @unpack_fields base bcs
+  μ_0 = rte.μ_0
+  sfc_alb_dir = rte.sfc_alb_dir_gpt
+  sfc_alb_dif = rte.sfc_alb_dif_gpt
+  flux_up = base.gpt_flux_up
+  flux_dn = base.gpt_flux_dn
+  flux_dir = base.gpt_flux_dir
+  i_lev_top = ilev_top(mo)
 
-  @unpack_fields optical_props τ ssa g
-  ncol  = get_ncol(optical_props)
-  nlay  = get_nlay(optical_props)
-  ngpt  = get_ngpt(optical_props)
+  apply_BC!(flux_dir, i_lev_top, bcs.toa_flux, rte.μ_0)
+  apply_BC!(flux_dn, i_lev_top, bcs.inc_flux_diffuse)
+
+
+  @unpack_fields op τ ssa g
+  ncol  = get_ncol(op)
+  nlay  = get_nlay(op)
+  ngpt  = get_ngpt(op)
 
   Rdif, Tdif, Rdir, Tdir, Tnoscat, source_up, source_dn = ntuple(i->zeros(FT, ncol,nlay), 7)
   source_srf = zeros(FT, ncol)
@@ -418,30 +382,26 @@ function sw_solver!(mo::MeshOrientation{I},
                     source_up, source_dn, source_srf, @view(flux_dir[:,:,igpt]))
 
     # Transport
-    adding!(ncol, nlay, mo,
-            sfc_alb_dif[:,igpt], Rdif, Tdif,
-            source_dn, source_up, source_srf,
+    adding!(ncol, nlay,
+            mo,
+            sfc_alb_dif[:,igpt],
+            Rdif,
+            Tdif,
+            source_dn,
+            source_up,
+            source_srf,
             @view(flux_up[:,:,igpt]),
             @view(flux_dn[:,:,igpt]))
 
     # adding computes only diffuse flux; flux_dn is total
     flux_dn[:,:,igpt] .= flux_dn[:,:,igpt] .+ flux_dir[:,:,igpt]
   end
+  return nothing
 end
 
 #####
 #####   Lower-level longwave kernels
 #####
-
-#
-# Compute LW source function for upward and downward emission at levels using linear-in-τ assumption
-# See Clough et al., 1992, doi: 10.1029/92JD01419, Eq 13
-#
-
-function factor(τ::FT, trans::FT, τ_thresh::FT) where {FT<:AbstractFloat}
-  return τ > τ_thresh ? (1 - trans)/τ - trans : τ * (FT(1/2) - 1/3*τ)
-end
-
 
 """
     lw_source_noscat!(ncol::I, nlay::I,
@@ -453,15 +413,17 @@ end
                       source_dn::Array{FT,2},
                       source_up::Array{FT,2}) where {I<:Int,FT<:AbstractFloat}
 
-integer,                         intent(in) :: ncol, nlay
-real(FT), dimension(ncol, nlay), intent(in) :: lay_source,  # Planck source at layer center
+Compute LW source function for upward and downward emission at levels using linear-in-τ assumption
+See Clough et al., 1992, doi: 10.1029/92JD01419, Eq 13
+
+real(FT), dimension(ncol, nlay), intent(in) :: lay_source,     # Planck source at layer center
                                                lev_source_up,  # Planck source at levels (layer edges),
                                                lev_source_dn,  #   increasing/decreasing layer index
-                                               τ,         # Optical path (τ/μ)
-                                               trans         # Transmissivity (exp(-τ))
+                                               τ,              # Optical path (τ/μ)
+                                               trans           # Transmissivity (exp(-τ))
 real(FT), dimension(ncol, nlay), intent(out):: source_dn, source_up
-                                                               # Source function at layer edges
-                                                               # Down at the bottom of the layer, up at the top
+                                               # Source function at layer edges
+                                               # Down at the bottom of the layer, up at the top
 """
 function lw_source_noscat!(ncol::I, nlay::I,
                            lay_source::Array{FT,2},
@@ -471,25 +433,41 @@ function lw_source_noscat!(ncol::I, nlay::I,
                            trans::Array{FT,2},
                            source_dn::Array{FT,2},
                            source_up::Array{FT,2}) where {I<:Int,FT<:AbstractFloat}
-
-  τ_thresh = sqrt(eps(FT)) # or abs(eps(FT))?
   @inbounds for ilay in 1:nlay
     @inbounds for icol in 1:ncol
-
-    # Weighting factor. Use 2nd order series expansion when rounding error (~τ^2)
-    #   is of order epsilon (smallest difference from 1. in working precision)
-    #   Thanks to Peter Blossey
-    B̄ = lay_source[icol,ilay]
-    B_D = lev_source_dn[icol,ilay]
-    B_U = lev_source_up[icol,ilay]
-    T = trans[icol,ilay]
-    fact = factor(τ[icol,ilay], T, τ_thresh)
-
-    # Equation below is developed in Clough et al., 1992, doi:10.1029/92JD01419, Eq 13
-    source_dn[icol,ilay] = (1 - T) * B_D + 2 * fact * (B̄ - B_D)
-    source_up[icol,ilay] = (1 - T) * B_U + 2 * fact * (B̄ - B_U)
+      _source_dn, _source_up = lw_source_noscat(lay_source[icol,ilay],
+                                                lev_source_up[icol,ilay],
+                                                lev_source_dn[icol,ilay],
+                                                τ[icol,ilay],
+                                                trans[icol,ilay])
+      source_dn[icol,ilay] = _source_dn
+      source_up[icol,ilay] = _source_up
     end
   end
+  return nothing
+end
+function lw_source_noscat(lay_source::FT,
+                          lev_source_up::FT,
+                          lev_source_dn::FT,
+                          τ::FT,
+                          trans::FT) where {I<:Int,FT<:AbstractFloat}
+
+  τ_thresh = sqrt(eps(FT)) # or abs(eps(FT))?
+
+  # Weighting factor. Use 2nd order series expansion when rounding error (~τ^2)
+  #   is of order epsilon (smallest difference from 1. in working precision)
+  #   Thanks to Peter Blossey
+  B̄ = lay_source
+  B_D = lev_source_dn
+  B_U = lev_source_up
+  trans = trans
+  fact = τ > τ_thresh ? (1 - trans)/τ - trans : τ * (FT(1/2) - 1/3*τ)
+
+  # Equation below is developed in Clough et al., 1992, doi:10.1029/92JD01419, Eq 13
+  source_dn = (1 - trans) * B_D + 2 * fact * (B̄ - B_D)
+  source_up = (1 - trans) * B_U + 2 * fact * (B̄ - B_U)
+
+  return source_dn, source_up
 end
 
 #####
@@ -519,8 +497,6 @@ real(FT), dimension(ncol,nlay  ), intent(in   ) :: source_dn,
 real(FT), dimension(ncol       ), intent(in   ) :: source_sfc # Surface source function [W/m2]
 real(FT), dimension(ncol,nlay+1), intent(  out) :: radn_up    # Radiances [W/m2-str]
 real(FT), dimension(ncol,nlay+1), intent(inout) :: radn_dn    # Top level must contain incident flux boundary condition
-# Local variables
-integer :: ilev
 """
 function lw_transport_noscat!(ncol::I, nlay::I,
                               mo::MeshOrientation{I},
@@ -548,17 +524,8 @@ function lw_transport_noscat!(ncol::I, nlay::I,
   @inbounds for ilev in lev_range_reversed(mo)
     radn_up[:,ilev] .= trans[:,ilev-1+b].*radn_up[:,ilev+n̂] .+ source_up[:,ilev-1+b]
   end
+  return nothing
 end
-
-# -------------------------------------------------------------------------------------------------
-#
-# Longwave two-stream solutions to diffuse reflectance and transmittance for a layer
-#    with optical depth τ, single scattering albedo w0, and asymmetery parameter g.
-#
-# Equations are developed in Meador and Weaver, 1980,
-#    doi:10.1175/1520-0469(1980)037<0630:TSATRT>2.0.CO;2
-#
-# -------------------------------------------------------------------------------------------------
 
 """
     lw_two_stream!(ncol::I, nlay::I,
@@ -570,98 +537,79 @@ end
                    Rdif::Array{FT,2},
                    Tdif::Array{FT,2}) where {I<:Int, FT<:AbstractFloat}
 
-integer,                        intent(in)  :: ncol, nlay
-real(FT), dimension(ncol,nlay), intent(in)  :: τ, w0, g
-real(FT), dimension(ncol,nlay), intent(out) :: γ_1, γ_2, Rdif, Tdif
+Longwave two-stream solutions to diffuse reflectance and transmittance for a layer
+   with optical depth τ, single scattering albedo w0, and asymmetery parameter g.
 
-# -----------------------
-integer  :: i, j
-
-# Variables used in Meador and Weaver
-real(FT) :: k(ncol)
-
-# Ancillary variables
-real(FT) :: RT_term(ncol)
-real(FT) :: exp_minuskτ(ncol), exp_minus2kτ(ncol)
+Equations are developed in Meador and Weaver, 1980,
+   doi:10.1175/1520-0469(1980)037<0630:TSATRT>2.0.CO;2
 """
 function lw_two_stream!(ncol::I, nlay::I,
                         τ::Array{FT,2},
-                        w0::Array{FT,2},
+                        ssa::Array{FT,2},
                         g::Array{FT,2},
                         γ_1::Array{FT,2},
                         γ_2::Array{FT,2},
                         Rdif::Array{FT,2},
                         Tdif::Array{FT,2}) where {I<:Int, FT<:AbstractFloat}
-  k = Vector{FT}(undef, ncol)
-  RT_term = Vector{FT}(undef, ncol)
-  exp_minuskτ = Vector{FT}(undef, ncol)
-  exp_minus2kτ = Vector{FT}(undef, ncol)
   @inbounds for j in 1:nlay
     @inbounds for i in 1:ncol
-      #
-      # Coefficients differ from SW implementation because the phase function is more isotropic
-      #   Here we follow Fu et al. 1997, doi:10.1175/1520-0469(1997)054<2799:MSPITI>2.0.CO;2
-      #
-      γ_1[i,j] = LW_diff_sec(FT) * (FT(1) - FT(0.5) * w0[i,j] * (FT(1) + g[i,j])) # Fu et al. Eq 2.9
-      γ_2[i,j] = LW_diff_sec(FT) *          FT(0.5) * w0[i,j] * (FT(1) - g[i,j])  # Fu et al. Eq 2.10
+      _γ_1, _γ_2, _Rdif, _Tdif = lw_two_stream(τ[i,j], ssa[i,j], g[i,j])
+      γ_1[i,j] = _γ_1
+      γ_2[i,j] = _γ_2
+      Rdif[i,j] = _Rdif
+      Tdif[i,j] = _Tdif
     end
-
-    # Written to encourage vectorization of exponential, square root
-    # Eq 18;  k = SQRT(γ_1**2 - γ_2**2), limited below to avoid div by 0.
-    #   k = 0 for isotropic, conservative scattering; this lower limit on k
-    #   gives relative error with respect to conservative solution
-    #   of < 0.1% in Rdif down to τ = 10^-9
-    temp1 = γ_1[1:ncol,j] .- γ_2[1:ncol,j] .*
-            γ_1[1:ncol,j] .+ γ_2[1:ncol,j]
-
-    temp2 = max.(temp1, FT(1.e-12))
-    k .= sqrt.(temp2)
-    exp_minuskτ .= exp.(-τ[1:ncol,j].*k)
-
-    #
-    # Diffuse reflection and transmission
-    #
-    @inbounds for i in 1:ncol
-      exp_minus2kτ[i] = exp_minuskτ[i] * exp_minuskτ[i]
-
-      # Refactored to avoid rounding errors when k, γ_1 are of very different magnitudes
-      RT_term[i] = FT(1) / (k[i] * (FT(1) + exp_minus2kτ[i])  +
-                            γ_1[i,j] * (FT(1) - exp_minus2kτ[i]) )
-
-      # Equation 25
-      Rdif[i,j] = RT_term[i] * γ_2[i,j] * (FT(1) - exp_minus2kτ[i])
-
-      # Equation 26
-      Tdif[i,j] = RT_term[i] * FT(2) * k[i] * exp_minuskτ[i]
-    end
-
   end
+  return nothing
 end
 
-# -------------------------------------------------------------------------------------------------
-#
-# Source function combination
-# RRTMGP provides two source functions at each level
-#   using the spectral mapping from each of the adjacent layers.
-#   Need to combine these for use in two-stream calculation.
-#
-# -------------------------------------------------------------------------------------------------
+function lw_two_stream(τ::FT, ssa::FT, g::FT) where {FT<:AbstractFloat}
+  # Coefficients differ from SW implementation because the phase function is more isotropic
+  #   Here we follow Fu et al. 1997, doi:10.1175/1520-0469(1997)054<2799:MSPITI>2.0.CO;2
+  γ_1 = LW_diff_sec(FT) * (FT(1) - FT(0.5) * ssa * (FT(1) + g)) # Fu et al. Eq 2.9
+  γ_2 = LW_diff_sec(FT) *          FT(0.5) * ssa * (FT(1) - g)  # Fu et al. Eq 2.10
+
+  # Written to encourage vectorization of exponential, square root
+  # Eq 18;  k = SQRT(γ_1**2 - γ_2**2), limited below to avoid div by 0.
+  #   k = 0 for isotropic, conservative scattering; this lower limit on k
+  #   gives relative error with respect to conservative solution
+  #   of < 0.1% in Rdif down to τ = 10^-9
+  temp1 = γ_1 - γ_2 * γ_1 + γ_2
+
+  temp2 = max(temp1, FT(1.e-12))
+  k = sqrt(temp2)
+  exp_minuskτ = exp(-τ*k)
+
+  # Diffuse reflection and transmission
+  exp_minus2kτ = exp_minuskτ * exp_minuskτ
+
+  # Refactored to avoid rounding errors when k, γ_1 are of very different magnitudes
+  RT_term = FT(1) / (k * (FT(1) + exp_minus2kτ) +
+                   γ_1 * (FT(1) - exp_minus2kτ) )
+
+  Rdif = RT_term * γ_2 * (FT(1) - exp_minus2kτ) # Equation 25
+  Tdif = RT_term * FT(2) * k * exp_minuskτ # Equation 26
+
+  return γ_1,γ_2,Rdif,Tdif
+end
+
 
 """
     lw_combine_sources!(ncol::I, nlay::I,
-                        mo::MeshOrientation{I},
                         lev_src_inc::Array{FT,2},
                         lev_src_dec::Array{FT,2},
                         lev_source::Array{FT,2}) where {I<:Int,FT<:AbstractFloat}
 
- - `mo` mesh orientation, see [`MeshOrientation`](@ref)
+Source function combination
+RRTMGP provides two source functions at each level
+  using the spectral mapping from each of the adjacent layers.
+  Need to combine these for use in two-stream calculation.
 
 integer,                           intent(in ) :: ncol, nlay
 real(FT), dimension(ncol, nlay  ), intent(in ) :: lev_src_inc, lev_src_dec
 real(FT), dimension(ncol, nlay+1), intent(out) :: lev_source
 """
 function lw_combine_sources!(ncol::I, nlay::I,
-                             mo::MeshOrientation{I},
                              lev_src_inc::Array{FT,2},
                              lev_src_dec::Array{FT,2},
                              lev_source::Array{FT,2}) where {I<:Int,FT<:AbstractFloat}
@@ -678,16 +626,8 @@ function lw_combine_sources!(ncol::I, nlay::I,
   @inbounds for icol in 1:ncol
     lev_source[icol, ilay] = lev_src_inc[icol, ilay-1]
   end
-
+  return nothing
 end
-
-# ---------------------------------------------------------------
-#
-# Compute LW source function for upward and downward emission at levels using linear-in-τ assumption
-#   This version straight from ECRAD
-#   Source is provided as W/m2-str; factor of π converts to flux units
-#
-# ---------------------------------------------------------------
 
 """
     lw_source_2str!(ncol::I, nlay::I,
@@ -705,20 +645,21 @@ end
                     source_up::Array{FT,2},
                     source_sfc::Array{FT,1}) where {I<:Int,FT<:AbstractFloat}
 
+Compute LW source function for upward and downward emission at levels using linear-in-τ assumption
+  This version straight from ECRAD
+  Source is provided as W/m2-str; factor of π converts to flux units
+
  - `mo` mesh orientation, see [`MeshOrientation`](@ref)
 
-integer,                         intent(in) :: ncol, nlay
 real(FT), dimension(ncol      ), intent(in) :: sfc_emis, sfc_src
 real(FT), dimension(ncol, nlay), intent(in) :: lay_source,     # Planck source at layer center
-                                             τ,            # Optical depth (τ)
-                                             γ_1, γ_2, # Coupling coefficients
-                                             rdif, tdif       # Layer reflectance and transmittance
-real(FT), dimension(ncol, nlay+1), target,
-                               intent(in)  :: lev_source       # Planck source at layer edges
+                                                τ,             # Optical depth (τ)
+                                                γ_1, γ_2,      # Coupling coefficients
+                                                rdif, tdif     # Layer reflectance and transmittance
+real(FT), dimension(ncol, nlay+1), target, intent(in)  :: lev_source # Planck source at layer edges
 real(FT), dimension(ncol, nlay), intent(out) :: source_dn, source_up
-real(FT), dimension(ncol      ), intent(out) :: source_sfc      # Source function for upward radation at surface
+real(FT), dimension(ncol      ), intent(out) :: source_sfc   # Source function for upward radiation at surface
 
-integer             :: icol, ilay
 real(FT)            :: Z, Zup_top, Zup_bottom, Zdn_top, Zdn_bottom
 real(FT), dimension(:), pointer :: lev_source_bot, lev_source_top
 """
@@ -761,6 +702,7 @@ function lw_source_2str!(ncol::I, nlay::I,
   @inbounds for icol in 1:ncol
     source_sfc[icol] = π * sfc_emis[icol] * sfc_src[icol]
   end
+  return nothing
 end
 
 # -------------------------------------------------------------------------------------------------
@@ -816,96 +758,80 @@ function sw_two_stream!(Rdif::Array{FT,2},
                         ncol::I, nlay::I,
                         μ_0::Array{FT,1},
                         τ::Array{FT,2},
-                        w0::Array{FT,2},
+                        ssa::Array{FT,2},
                         g::Array{FT,2}) where {I<:Int,FT<:AbstractFloat}
-
-  μ_0_inv = 1 ./ μ_0
-  exp_minuskτ  = Array{FT}(undef, ncol)
-  exp_minus2kτ = Array{FT}(undef, ncol)
-  RT_term        = Array{FT}(undef, ncol)
-
-  γ_1, γ_2, γ_3, γ_4, α_1, α_2, k = ntuple(i->zeros(FT, ncol), 7)
 
   @inbounds for j in 1:nlay
     @inbounds for i in 1:ncol
-      # Zdunkowski Practical Improved Flux Method "PIFM"
-      #  (Zdunkowski et al., 1980;  Contributions to Atmospheric Physics 53, 147-66)
-      #
-      γ_1[i]= (FT(8) - w0[i,j] * (FT(5) + FT(3) * g[i,j])) * FT(.25)
-      γ_2[i]=  FT(3) *(w0[i,j] * (FT(1) -         g[i,j])) * FT(.25)
-      γ_3[i]= (FT(2) - FT(3) * μ_0[i] *           g[i,j] ) * FT(.25)
-      γ_4[i]=  FT(1) - γ_3[i]
-
-      α_1[i] = γ_1[i] * γ_4[i] + γ_2[i] * γ_3[i]           # Eq. 16
-      α_2[i] = γ_1[i] * γ_3[i] + γ_2[i] * γ_4[i]           # Eq. 17
-    end
-
-    # Written to encourage vectorization of exponential, square root
-    # Eq 18;  k = SQRT(γ_1**2 - γ_2**2), limited below to avoid div by 0.
-    #   k = 0 for isotropic, conservative scattering; this lower limit on k
-    #   gives relative error with respect to conservative solution
-    #   of < 0.1% in Rdif down to τ = 10^-9
-    temp = (γ_1 .- γ_2) .* (γ_1 .+ γ_2)
-    k .= sqrt.(max( temp..., FT(1.e-12)))
-    exp_minuskτ .= exp.(-τ[1:ncol,j] .* k)
-
-    #
-    # Diffuse reflection and transmission
-    #
-    @inbounds for i in 1:ncol
-      exp_minus2kτ[i] = exp_minuskτ[i] * exp_minuskτ[i]
-
-      # Refactored to avoid rounding errors when k, γ_1 are of very different magnitudes
-      RT_term[i] = FT(1) / (     k[i] * (FT(1) + exp_minus2kτ[i])  +
-                            γ_1[i] * (FT(1) - exp_minus2kτ[i]) )
-
-      # Equation 25
-      Rdif[i,j] = RT_term[i] * γ_2[i] * (FT(1) - exp_minus2kτ[i])
-
-      # Equation 26
-      Tdif[i,j] = RT_term[i] * FT(2) * k[i] * exp_minuskτ[i]
-    end
-
-    #
-    # Transmittance of direct, non-scattered beam. Also used below
-    #
-    Tnoscat[1:ncol,j] .= exp.(-τ[1:ncol,j] .* μ_0_inv)
-
-    #
-    # Direct reflect and transmission
-    #
-    @inbounds for i in 1:ncol
-      k_μ     = k[i] * μ_0[i]
-      k_γ_3 = k[i] * γ_3[i]
-      k_γ_4 = k[i] * γ_4[i]
-
-      #
-      # Equation 14, multiplying top and bottom by exp(-k*τ)
-      #   and rearranging to avoid div by 0.
-      #
-      RT_term[i] =  w0[i,j] * RT_term[i]/fmerge(FT(1) - k_μ*k_μ,
-                                                eps(FT),
-                                                abs(FT(1) - k_μ*k_μ) >= eps(FT))
-
-      Rdir[i,j] = RT_term[i]  *
-          ((FT(1) - k_μ) * (α_2[i] + k_γ_3)                     -
-           (FT(1) + k_μ) * (α_2[i] - k_γ_3) * exp_minus2kτ[i] -
-            FT(2) * (k_γ_3 - α_2[i] * k_μ)  * exp_minuskτ[i] * Tnoscat[i,j])
-
-      #
-      # Equation 15, multiplying top and bottom by exp(-k*τ),
-      #   multiplying through by exp(-τ/μ_0) to
-      #   prefer underflow to overflow
-      # Omitting direct transmittance
-      #
-      Tdir[i,j] = -RT_term[i] *
-                  ((FT(1) + k_μ) * (α_1[i] + k_γ_4)                     * Tnoscat[i,j] -
-                   (FT(1) - k_μ) * (α_1[i] - k_γ_4) * exp_minus2kτ[i] * Tnoscat[i,j] -
-                    FT(2) * (k_γ_4 + α_1[i] * k_μ)  * exp_minuskτ[i])
-
+      _Rdif,_Tdif,_Rdir,_Tdir,_Tnoscat = sw_two_stream(μ_0[i], τ[i,j], ssa[i,j], g[i,j])
+      Rdif[i,j] = _Rdif
+      Tdif[i,j] = _Tdif
+      Rdir[i,j] = _Rdir
+      Tdir[i,j] = _Tdir
+      Tnoscat[i,j] = _Tnoscat
     end
   end
   return nothing
+end
+function sw_two_stream(μ_0::FT, τ::FT, ssa::FT, g::FT) where {FT<:AbstractFloat}
+
+  μ_0_inv = 1 / μ_0
+  # Zdunkowski Practical Improved Flux Method "PIFM"
+  #  (Zdunkowski et al., 1980;  Contributions to Atmospheric Physics 53, 147-66)
+  γ_1 = (FT(8) - ssa * (FT(5) + FT(3) * g)) * FT(.25)
+  γ_2 =  FT(3) *(ssa * (FT(1) -         g)) * FT(.25)
+  γ_3 = (FT(2) - FT(3) * μ_0 *          g ) * FT(.25)
+  γ_4 =  FT(1) - γ_3
+  α_1 = γ_1 * γ_4 + γ_2 * γ_3           # Eq. 16
+  α_2 = γ_1 * γ_3 + γ_2 * γ_4           # Eq. 17
+
+  # Written to encourage vectorization of exponential, square root
+  # Eq 18;  k = SQRT(γ_1**2 - γ_2**2), limited below to avoid div by 0.
+  #   k = 0 for isotropic, conservative scattering; this lower limit on k
+  #   gives relative error with respect to conservative solution
+  #   of < 0.1% in Rdif down to τ = 10^-9
+  temp = (γ_1 - γ_2) * (γ_1 + γ_2)
+  k = sqrt(max(temp, FT(1.e-12)))
+  exp_minuskτ = exp(-τ * k)
+
+  # Diffuse reflection and transmission
+  exp_minus2kτ = exp_minuskτ * exp_minuskτ
+
+  # Refactored to avoid rounding errors when k, γ_1 are of very different magnitudes
+  RT_term = FT(1) / (   k * (FT(1) + exp_minus2kτ)  +
+                      γ_1 * (FT(1) - exp_minus2kτ) )
+
+  Rdif = RT_term * γ_2 * (FT(1) - exp_minus2kτ) # Equation 25
+  Tdif = RT_term * FT(2) * k * exp_minuskτ      # Equation 26
+
+  # Transmittance of direct, non-scattered beam. Also used below
+  Tnoscat = exp(-τ * μ_0_inv)
+
+  # Direct reflect and transmission
+  k_μ   = k * μ_0
+  k_γ_3 = k * γ_3
+  k_γ_4 = k * γ_4
+
+  # Equation 14, multiplying top and bottom by exp(-k*τ)
+  #   and rearranging to avoid div by 0.
+  cond = abs(FT(1) - k_μ*k_μ) >= eps(FT)
+  denom = cond ? FT(1) - k_μ*k_μ : eps(FT)
+  RT_term =  ssa * RT_term/denom
+
+  Rdir = RT_term  *
+      ((FT(1) - k_μ) * (α_2 + k_γ_3) -
+       (FT(1) + k_μ) * (α_2 - k_γ_3) * exp_minus2kτ -
+        FT(2) * (k_γ_3 - α_2 * k_μ)  * exp_minuskτ * Tnoscat)
+
+  # Equation 15, multiplying top and bottom by exp(-k*τ),
+  #   multiplying through by exp(-τ/μ_0) to
+  #   prefer underflow to overflow
+  # Omitting direct transmittance
+  Tdir = -RT_term *
+              ((FT(1) + k_μ) * (α_1 + k_γ_4)                * Tnoscat -
+               (FT(1) - k_μ) * (α_1 - k_γ_4) * exp_minus2kτ * Tnoscat -
+                FT(2) * (k_γ_4 + α_1 * k_μ)  * exp_minuskτ)
+  return Rdif,Tdif,Rdir,Tdir,Tnoscat
 end
 
 #####
