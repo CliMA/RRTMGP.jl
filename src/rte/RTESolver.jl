@@ -69,7 +69,7 @@ include("RTE.jl")
 
 """
     rte_sw!(fluxes::FluxesBroadBand{FT},
-            optical_props::AbstractOpticalPropsArry{FT},
+            op::AbstractOpticalPropsArry{FT},
             mesh_orientation::MeshOrientation{I},
             bcs::ShortwaveBCs{FT},
             μ_0::Array{FT}) where {FT<:AbstractFloat,I<:Int}
@@ -80,31 +80,31 @@ Compute broadband radiative fluxes
 
 given
 
- - `optical_props` optical properties, see [`AbstractOpticalPropsArry`](@ref)
+ - `op` optical properties, see [`AbstractOpticalPropsArry`](@ref)
  - `mesh_orientation` mesh orientation, see [`MeshOrientation`](@ref)
  - `bcs` boundary conditions, see [`ShortwaveBCs`](@ref)
  - `μ_0` cosine of solar zenith angle (ncol)
 """
 function rte_sw!(fluxes::FluxesBroadBand{FT},
-                 optical_props::AbstractOpticalPropsArry{FT,I},
+                 op::AbstractOpticalPropsArry{FT,I},
                  mesh_orientation::MeshOrientation{I},
                  bcs::ShortwaveBCs{FT},
                  μ_0::Array{FT}) where {FT<:AbstractFloat,I<:Int}
-  base = RTEBase(fluxes, mesh_orientation, bcs, optical_props)
-  rte = RTEShortWave(base, μ_0, optical_props)
+  base = RTEBase(fluxes, mesh_orientation, bcs, op)
+  rte = RTEShortWave(base, μ_0, op)
 
   # Compute the radiative transfer...
-  solve!(rte, optical_props, mesh_orientation)
+  solve!(rte, op, mesh_orientation)
 
   # ...and reduce spectral fluxes to desired output quantities
-  reduce!(rte.base, optical_props)
+  reduce!(rte.base, op)
   fluxes = rte.base.fluxes
   return nothing
 end
 
 """
     rte_lw!(fluxes::FluxesBroadBand{FT},
-            optical_props::AbstractOpticalPropsArry{FT},
+            op::AbstractOpticalPropsArry{FT},
             mesh_orientation::MeshOrientation{I},
             bcs::LongwaveBCs{FT},
             sources::SourceFuncLongWave{FT, I},
@@ -116,36 +116,36 @@ Compute broadband radiative fluxes
 
 given
 
- - `optical_props` optical properties, see [`AbstractOpticalPropsArry`](@ref)
+ - `op` optical properties, see [`AbstractOpticalPropsArry`](@ref)
  - `mesh_orientation` mesh orientation, see [`MeshOrientation`](@ref)
  - `bcs` boundary conditions, see [`LongwaveBCs`](@ref)
  - `sources` radiation sources, see [`SourceFuncLongWave`](@ref)
  - `angle_disc` Gaussian quadrature for angular discretization, [`GaussQuadrature`](@ref)
 """
 function rte_lw!(fluxes::FluxesBroadBand{FT},
-                 optical_props::AbstractOpticalPropsArry{FT,I},
+                 op::AbstractOpticalPropsArry{FT,I},
                  mesh_orientation::MeshOrientation{I},
                  bcs::LongwaveBCs{FT},
                  sources::SourceFuncLongWave{FT, I},
                  angle_disc::Union{GaussQuadrature{FT,I},Nothing}=nothing) where {FT<:AbstractFloat,I<:Int}
 
-  base = RTEBase(fluxes, mesh_orientation, bcs, optical_props)
-  rte = RTELongWave(base, sources, angle_disc, optical_props)
+  base = RTEBase(fluxes, mesh_orientation, bcs, op)
+  rte = RTELongWave(base, sources, angle_disc, op)
 
   # Compute the radiative transfer...
-  solve!(rte, optical_props, mesh_orientation)
+  solve!(rte, op, mesh_orientation)
 
-  reduce!(rte.base, optical_props)
+  reduce!(rte.base, op)
   fluxes = rte.base.fluxes
   return nothing
 end
 
 """
-    reduce!(base, optical_props)
+    reduce!(base, op)
 
 Wrapper for [`reduce!`](@ref Fluxes.reduce!)
 """
-reduce!(base, optical_props) = reduce!(base.fluxes, base.gpt_flux_up, base.gpt_flux_dn, optical_props, base.gpt_flux_dir)
+reduce!(base, op) = reduce!(base.fluxes, base.gpt_flux_up, base.gpt_flux_dn, op, base.gpt_flux_dir)
 
 """
     expand_and_transpose(ops::AbstractOpticalProps,arr_in::Array{FT}) where FT
