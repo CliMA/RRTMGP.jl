@@ -1,4 +1,6 @@
-# Radiative Transfer Equation (RTE)
+#####
+##### Radiative Transfer Equation (RTE)
+#####
 
 """
     AbstractRTE{FT<:AbstractFloat, I<:Int}
@@ -22,16 +24,17 @@ $(DocStringExtensions.FIELDS)
 struct RTEBase{FT<:AbstractFloat,I<:Int}
   "Broadband fluxes"
   fluxes::FluxesBroadBand{FT}
+  "mesh orientation, see [`MeshOrientation`](@ref)"
   mo::MeshOrientation{I}
+  "Boundary conditions, see [`AbstractRadiativeBoundaryConditions`](@ref)"
   bcs::AbstractRadiativeBoundaryConditions{FT}
   "Upward flux ``[W/m^2]``"
+ # - `flux_up` upward radiance [W/m2-str]
   gpt_flux_up::Array{FT,3}
   "Downward flux ``[W/m^2]`` Top level must contain incident flux boundary condition"
+ # - `flux_dn` downward radiance
   gpt_flux_dn::Array{FT,3}
- # - `sfc_emis` - surface emissivity
- # - `flux_up` upward radiance [W/m2-str]
- # - `flux_dn` downward radiance, Top level must contain incident flux boundary condition
-
+  "Direct flux ``[W/m^2]``"
   gpt_flux_dir::Union{Array{FT,3},Nothing}
   function RTEBase(fluxes::FluxesBroadBand{FT},
                    mo::MeshOrientation{I},
@@ -48,29 +51,75 @@ struct RTEBase{FT<:AbstractFloat,I<:Int}
   end
 end
 
+"""
+    RTELongWaveNoScattering{FT,I} <: AbstractRTE{FT,I}
+
+Longwave RTE without scattering
+
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
 struct RTELongWaveNoScattering{FT,I} <: AbstractRTE{FT,I}
+  "Base RTE, see [`RTEBase`](@ref)"
   base::RTEBase{FT,I}
+  "sources, see [`SourceFuncLongWave`](@ref)"
   sources::SourceFuncLongWave{FT, I}
+  "angular discretization, see [`GaussQuadrature`](@ref)"
   angle_disc::Union{GaussQuadrature{FT,I},Nothing}
+  "surface emissivity per grid point"
   sfc_emis_gpt::Array{FT,2}
 end
 
+"""
+    RTELongWave{FT,I} <: AbstractRTE{FT,I}
+
+Longwave RTE with scattering
+
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
 struct RTELongWave{FT,I} <: AbstractRTE{FT,I}
+  "Base RTE, see [`RTEBase`](@ref)"
   base::RTEBase{FT,I}
+  "sources, see [`SourceFuncLongWave`](@ref)"
   sources::SourceFuncLongWave{FT, I}
+  "angular discretization, see [`GaussQuadrature`](@ref)"
   angle_disc::Union{GaussQuadrature{FT,I},Nothing}
+  "surface emissivity per grid point"
   sfc_emis_gpt::Array{FT,2}
 end
 
+"""
+    RTEShortWaveNoScattering{FT,I} <: AbstractRTE{FT,I}
+
+Shortwave RTE without scattering
+
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
 struct RTEShortWaveNoScattering{FT,I} <: AbstractRTE{FT,I}
+  "Base RTE, see [`RTEBase`](@ref)"
   base::RTEBase{FT,I}
+  "Cosine of solar zenith angle"
   μ_0::Array{FT}
 end
 
+"""
+    RTEShortWave{FT,I} <: AbstractRTE{FT,I}
+
+Shortwave RTE with scattering
+
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
 struct RTEShortWave{FT,I} <: AbstractRTE{FT,I}
+  "Base RTE, see [`RTEBase`](@ref)"
   base::RTEBase{FT,I}
+  "Cosine of solar zenith angle"
   μ_0::Array{FT}
+  "Surface albedo for direct irradiation per grid point"
   sfc_alb_dir_gpt::Array{FT}
+  "Surface albedo for diffuse irradiation per grid point"
   sfc_alb_dif_gpt::Array{FT}
 end
 

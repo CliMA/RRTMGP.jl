@@ -312,8 +312,6 @@ function solve!(rte::RTEShortWaveNoScattering{FT,I}, op::OneScalar{FT,I}, mo::Me
   apply_BC!(gpt_flux_dn, i_lev_top, bcs.inc_flux_diffuse)
 
   @unpack_fields op τ
-  ncol  = get_ncol(op)
-  nlay  = get_nlay(op)
   ngpt  = get_ngpt(op)
 
   μ_0_inv = 1 ./ μ_0
