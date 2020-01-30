@@ -53,9 +53,9 @@ version = "1.0.0"
 
 [[CoverageTools]]
 deps = ["LibGit2"]
-git-tree-sha1 = "542c90fb36c426891cd7a82924337530453df38f"
+git-tree-sha1 = "328154f6062b0053588295df6bffe22e1436597a"
 uuid = "c36e975a-824b-4404-a568-ef97ca766997"
-version = "1.0.0"
+version = "1.1.0"
 
 [[DataAPI]]
 git-tree-sha1 = "674b67f344687a88310213ddfa8a2b3c76cc4252"
@@ -70,9 +70,9 @@ version = "0.7.1"
 
 [[DataStructures]]
 deps = ["InteractiveUtils", "OrderedCollections"]
-git-tree-sha1 = "a1b652fb77ae8ca7ea328fa7ba5aa151036e5c10"
+git-tree-sha1 = "b7720de347734f4716d1815b00ce5664ed6bbfd4"
 uuid = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
-version = "0.17.6"
+version = "0.17.9"
 
 [[Dates]]
 deps = ["Printf"]
@@ -119,6 +119,12 @@ deps = ["Dates", "Mmap", "Parsers", "Unicode"]
 git-tree-sha1 = "b34d7cef7b337321e97d22242c3c2b91f476748e"
 uuid = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
 version = "0.21.0"
+
+[[LaTeXStrings]]
+deps = ["Compat"]
+git-tree-sha1 = "7ab9b8788cfab2bdde22adf9004bda7ad9954b6c"
+uuid = "b964fa9f-0449-5b57-a5c2-d3ea65f4040f"
+version = "1.0.3"
 
 [[LibGit2]]
 uuid = "76f85450-5226-5b5a-8eaa-529ad045b433"
@@ -168,12 +174,12 @@ version = "1.1.0"
 
 [[Parsers]]
 deps = ["Dates", "Test"]
-git-tree-sha1 = "0139ba59ce9bc680e2925aec5b7db79065d60556"
+git-tree-sha1 = "d112c19ccca00924d5d3a38b11ae2b4b268dda39"
 uuid = "69de0a69-1ddd-5017-9359-2bf0b02dc9f0"
-version = "0.3.10"
+version = "0.3.11"
 
 [[Pkg]]
-deps = ["Dates", "LibGit2", "Markdown", "Printf", "REPL", "Random", "SHA", "UUIDs"]
+deps = ["Dates", "LibGit2", "Libdl", "Logging", "Markdown", "Printf", "REPL", "Random", "SHA", "Test", "UUIDs"]
 uuid = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 
 [[Printf]]
