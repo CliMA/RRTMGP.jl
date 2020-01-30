@@ -30,3 +30,12 @@ Julia implementation of Rapid and accurate Radiative Transfer Model for General 
 [appveyor-url]: https://ci.appveyor.com/project/climate-machine/rrtmgp-jl/branch/master
 
 This is based off of the [rte-rrtmgp](https://github.com/RobertPincus/rte-rrtmgp) repository.
+
+# Install
+
+`git clone https://github.com/climate-machine/RRTMGP.jl`
+
+# Acknowledgments
+
+ - Robert Pincus (@RobertPincus) for his invaluable help (and developing RRTMGP in the first place).
+ - NASA for images of the sun (for our logo)
