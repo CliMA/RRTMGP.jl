@@ -37,5 +37,5 @@ This is based off of the [rte-rrtmgp](https://github.com/RobertPincus/rte-rrtmgp
 
 # Acknowledgments
 
- - Robert Pincus (@RobertPincus) for his invaluable help (and developing RRTMGP in the first place).
- - NASA for images of the sun (for our logo)
+ - [Robert Pincus](https://github.com/RobertPincus) for his invaluable help (and developing RRTMGP in the first place).
+ - NASA for images of the sun (for our [logo](https://climate-machine.github.io/RRTMGP.jl/latest/assets/logo.png))

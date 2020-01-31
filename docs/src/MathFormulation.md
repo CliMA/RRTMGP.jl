@@ -4,18 +4,26 @@
 \newcommand{\DOT}{\cdot}                              % Math
 \newcommand{\DIV}{\DEL \DOT}                          % Math
 \newcommand{\PD}{\partial}                            % Math
-\newcommand{\sum}{\Sigma}                             % Math
+\newcommand{\dag}{\dagger}                            % Math
 ```
 
 ```math
+\newcommand{\dir}{\dag}                               % Direct
+\newcommand{\dif}{\star}                              % Diffuse
+\newcommand{\SFC}{\mathrm{sfc}}                       % Surface
+\newcommand{\TOA}{\mathrm{TOA}}                       % Top of atmosphere
 \newcommand{\F}{\mathcal F}                           % Generic fluxes in thermal energy equation
-\newcommand{\FR}{F_{\mathrm{rad}}}                    % Radiative flux
+\newcommand{\FR}[1]{F^{#1}_{\mathrm{rad}}}            % Radiative flux
 \newcommand{\τ}[1]{\tau_{#1}}                         % Optical depth
+\newcommand{\threshtau}[1]{\tau_{#1\mathrm{thresh}}}  % Optical depth
 \newcommand{\SSA}{\tilde{\omega}}                     % Single scattering albedo
+\newcommand{\SA}{\varepsilon_{\SFC}}                  % Surface albedo
+\newcommand{\EMIS}{\epsilon}                          % Emissivity
 \newcommand{\λ}{\lambda}                              % Wavelength
 \newcommand{\gpt}{\xi}                                % G-point variable
 \newcommand{\FS}{\mathcal F_{\mathcal S}}             % Symbol for source function
-\newcommand{\SMAP}{\mathcal M^{\lambda}}              % Symbol for spectral map
+\newcommand{\OPMAP}[1]{\mathcal M_{#1}^{\lambda}}     % Optical properties map
+\newcommand{\SMAP}{\Upsilon^{\lambda}}                % Radiative sources map
 \newcommand{\KD}{\mathcal K_{\mathrm{dist}}}          % Symbol for k-distribution
 \newcommand{\SV}{\mathcal S}                          % Symbol for thermal energy equation source term
 \newcommand{\AS}{\mathcal S_{\mathrm{atmos}}}         % Symbol for atmospheric state
@@ -25,7 +33,7 @@
 \newcommand{\ϕ}{\phi}                                 % Azimuthal angle
 \newcommand{\ρ}{\rho}                                 % Density ?
 \newcommand{\ν}{\nu}                                  % Frequency
-\newcommand{\RAD}{I}                                  % Radiative intensity
+\newcommand{\RAD}[1]{I^{#1}}                          % Radiative intensity
 \newcommand{\ks}{k_{\mathrm{scatter}}}                % Absorption coefficient for scattering
 \newcommand{\ka}{k_{\mathrm{abs}}}                    % Absorption coefficient
 \newcommand{\DA}{D}                                   % Secant of propagation angle
@@ -35,8 +43,12 @@
 \newcommand{\PhaseFun}[2]{P(#1,#2)}                   % Phase function
 \newcommand{\SpectralPhaseFun}[2]{P_{\ν}(#1,#2)}      % Spectral Phase function
 \newcommand{\ScatPhaseFun}[1]{P(#1)}                  % Scattering phase function
-\newcommand{\PlanckF}[1]{B(#1)}                       % Planck function
-\newcommand{\SpecPlanckF}[1]{B_{\ν}(#1)}                 % Spectral Planck function
+\newcommand{\PlanckF}[1]{\hat{B}(#1)}                 % Planck function
+\newcommand{\PlanckS}[1]{B^{#1}}                      % Layer Planck source
+\newcommand{\SpecPlanckF}[1]{B_{\ν}(#1)}              % Spectral Planck function
+\newcommand{\RSRC}[1]{S^{#1}}                         % Radiation source
+\newcommand{\SRSRC}[1]{\underline{S}^{#1}}            % Surface radiation source
+\newcommand{\BS}[1]{S^{#1}}                           % Level radiation source
 ```
 
 ```@meta
@@ -53,14 +65,14 @@ Radiative fluxes enter the thermal energy equation as follows:
 \end{align}
 ```
 
-Here, ``\F = \sum_i F_i``, with ``F_j = \FR`` for some ``j``.
+Here, ``\F = \sum_i F_i``, with ``F_j = \FR{net} = \FR{+} - \FR{-}`` for some ``j``. Note that ``\FR{+}`` and ``\FR{-}`` denote the sum of diffuse (``\dif``) and direct (``\dir``) upward and downward fluxes respectively.
 
 !!! note
     There are two implementations in `RRTMGP.jl`: one that operates on 1) all layers and multiple columns and 2) a single grid point.
 
 # Map atmospheric state to optical properties
 
-To solve for ``\FR``, one must choose an approximation for optical properties. In `RRTMGP.jl`, choices include
+To solve for ``\FR{net}``, one must choose an approximation for optical properties. In `RRTMGP.jl`, choices include
 
  - [`OneScalar`](@ref OpticalProps.OneScalar): optical depth (``\τ{}``) only
  - [`TwoStream`](@ref OpticalProps.TwoStream): optical depth (``\τ{}``), single scattering albedo (``\SSA``), asymmetry factor (``\ASY``)
@@ -84,21 +96,42 @@ Mathematically, let's write this entire computation as a map (a spectral map, si
 
 ```math
 \begin{align}
-\τ{\gpt} = \SMAP_1(\KD,\AS[,\FS]) \\
-(\τ{\gpt},\SSA_{\gpt},\ASY_{\gpt}) = \SMAP_2(\KD,\AS[,\FS]) \\
+\τ{\gpt} = \OPMAP{1}(\KD,\AS[,\FS]) \\
+(\τ{\gpt},\SSA_{\gpt},\ASY_{\gpt}) = \OPMAP{2}(\KD,\AS[,\FS]) \\
 \end{align}
 ```
 
+In addition, `GasOptics.gas_optics!` computes radiative sources (currently Planck sources), which are computed the same regardless of the type of optical properties:
+
+```math
+\begin{align}
+\PlanckS{*}_{\gpt},\PlanckS{+}_{\gpt},\PlanckS{-}_{\gpt} = \SMAP(\KD,\AS,\FS) \\
+\end{align}
+```
+
+Using the denoting notation:
+```math
+\begin{align}
+* &= \quad \text{at average temperature} \\
++ &= \quad \text{upward} \\
+- &= \quad \text{downward}
+\end{align}
+```
+
+
 # Computing fluxes given optical depth
+
+!!! note
+    This section is under development
 
 The radiative transfer equation under Thermodynamic Equilibrium (TE) in differential form is
 
 ```math
 \begin{align}
-d \frac{d\RAD_{\ν}}{\ρ k(\ν) ds} = - \RAD_{\ν} + J_{\ν} \\
+d \frac{d\RAD{}_{\ν}}{\ρ k(\ν) ds} = - \RAD{}_{\ν} + J_{\ν} \\
 \end{align}
 ```
-here ``\RAD_{\ν}`` is monochromatic intensity, ``J`` is the source function and ``k(\ν) = \ka(\ν)+\ks(\ν)``. Define the single scattering albedo and the normalized phase function as below:
+here ``\RAD{}_{\ν}`` is monochromatic intensity, ``J`` is the source function and ``k(\ν) = \ka(\ν)+\ks(\ν)``. Define the single scattering albedo and the normalized phase function as below:
 ```math
 \begin{align}
 \SSA(\nu) = \frac{\ks(\nu)}{k(\nu)}\\
@@ -115,52 +148,47 @@ The phase function tells the fraction of radiation scattering by an individual p
 If we define the optical depth ``d\τ{}`` as opposite to ``ds``, i.e., ``d\τ{} = -\rho k(\nu)ds``. Therefore, the radiative transfer equation is equivalent to
 ```math
 \begin{align}
-    \frac{d\RAD_{\nu}(\Omega)}{d\τ{}} = \RAD_{\nu}(\Omega) -
+    \frac{d\RAD{}_{\nu}(\Omega)}{d\τ{}} = \RAD{}_{\nu}(\Omega) -
     (1-\SSA_{\nu})\SpecPlanckF{T} -
     \frac{\SSA_{\nu}}{4\pi}\int_{4\pi}
-    \RAD_{\nu}(\Omega^{'}) \SpectralPhaseFun{\Omega}{\Omega^{'}} d\Omega^{'}
+    \RAD{}_{\nu}(\Omega^{'}) \SpectralPhaseFun{\Omega}{\Omega^{'}} d\Omega^{'}
 \end{align}
 ```
 The terms of right hand side is the attenuation by absorption and scattering, emission, and scattering, respectively.
 
-## Compactly
+# Equations derived from code
 
-The general form of the radiative transfer equation is
-
-```math
-\begin{align}
-\μ \frac{d \RAD(\τ{},\μ)}{d\τ{}} = \RAD(\τ{},\μ) - (1-\SSA) \PlanckF{T} - \frac{\SSA}{2} \int_{-1}^{1} \RAD(\τ{},\μ) P d\μ' \\
-\μ = \cos(\θ) \\
-\PhaseFun{\μ}{\μ'} = \frac{1}{2\π} \int_{2\π}^{0} \ScatPhaseFun{\cos(\Theta)} d\ϕ \\
-\cos(\Theta) = \μ\μ' + (1-{\μ'}^2)^{1/2}(1-\μ^2)^{1/2}\cos(\ϕ) \\
-\end{align}
-```
-
-## Short-wave, no scattering (one-scalar)
+## Short-wave, without scattering (one-scalar)
 
 ```math
 \begin{align}
-\FR = \sum \RAD_{\gpt} \\
-\RAD_{\gpt} = \RAD_{\gpt}^{TOA} e^{-\τ{} / \μ} \\
+\FR{+} = 0 \\
+\FR{-} = \FR{\dir} = \sum_{\gpt} \RAD{\dir}_{\gpt} \\
+\RAD{\dir}_{\gpt} = \RAD{\dir,\TOA}_{\gpt} e^{-\τ{} / \μ} \\
 \end{align}
 ```
 
-## Long-wave, no scattering (one-scalar)
+## Long-wave, without scattering (one-scalar)
 
 ```math
 \begin{align}
-\FR = \sum \RAD_{\gpt} \\
-\RAD_{\gpt}^{\pm} = \pm 2 \π \sum \RAD_{\gpt,\μ} w_{\μ} \\
-\transmittance = e^{-\τ{} D}
-\RAD_{\gpt,\μ} = (1 - \transmittance)
-\left\{
-  B_U + 2 (\bar{B} - B_U)
-\right\}
+\FR{\pm} = \sum_{\gpt} \RAD{\pm}_{\gpt} \\
+\RAD{\pm}_{\gpt} = 2 \π \sum_{\μ} \RAD{\pm}_{\gpt,\μ} w_{\μ} \\
+D = \text{quadrature secants} \\
+\transmittance = e^{-\τ{} D} \\
+f = \begin{cases}
+  \frac{1 - \transmittance}{\τ{}} - \transmittance & \τ{} > \threshtau{} \\
+  \τ{} \left(\frac{1}{2} - \frac{\τ{}}{3} \right)  & \text{otherwise} \\
+\end{cases} \\
+\RSRC{\pm}_{\gpt} = (1 - \transmittance) \PlanckS{\pm}_{\gpt} + 2 f (\PlanckS{*}_{\gpt} - \PlanckS{\pm}_{\gpt}) \\
+\RAD{+}_{\gpt,\μ} = \transmittance \RAD{\SFC}_{\gpt,\μ} + \RSRC{+}_{\gpt} \\
+\RAD{-}_{\gpt,\μ} = \transmittance \RAD{\TOA}_{\gpt,\μ} + \RSRC{-}_{\gpt} \\
 \end{align}
 ```
 
+## Short-wave, with scattering (two-stream)
 
-## Two-Stream case
+## Long-wave, with scattering (two-stream)
 
 
 # Data files
