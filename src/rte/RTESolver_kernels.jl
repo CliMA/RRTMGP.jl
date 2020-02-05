@@ -20,128 +20,16 @@ LW_diff_sec(::Type{FT}) where FT = FT(1.66)  # 1./cos(diffusivity angle)
 ##### Top-level long-wave kernels
 #####
 
-#
-# LW fluxes, no scattering, μ (cosine of integration angle) specified by column
-#  Does radiation calculation at user-supplied angles; converts radiances to flux
-#  using user-supplied weights
-#
-
-"""
-    lw_solver_noscat!(mo::MeshOrientation{I},
-                      D::Array{FT,2},
-                      w_μ::FT,
-                      op::OneScalar{FT,I},
-                      source::SourceFuncLongWave{FT,I},
-                      sfc_emis::Array{FT,2},
-                      radn_up::Array{FT,3},
-                      radn_dn::Array{FT,3}) where {FT<:AbstractFloat,I<:Int}
-
- - `source` longwave source function, see [`SourceFuncLongWave`](@ref)
- - `mo` mesh orientation, see [`MeshOrientation`](@ref)
- - `op` optical properties, see [`OneScalar`](@ref)
- - `sfc_emis` - surface emissivity
- - `radn_up` - upward radiance [W/m2-str]
- - `radn_dn` - downward radiance [W/m2-str] Top level must contain incident flux boundary condition
-
- - `D` secant of propagation angle  []
- - `w_μ` quadrature weight
-
-# Local variables, no g-point dependency
-real(FT), dimension(ncol,nlay) :: τ_loc,   # path length (τ/μ)
-                                  trans    # transmissivity  = exp(-τ)
-real(FT), dimension(ncol,nlay) :: source_dn, source_up
-real(FT), dimension(ncol     ) :: source_sfc, sfc_albedo
-
-real(FT), dimension(:,:,:), pointer :: lev_source_up, lev_source_dn # Mapping increasing/decreasing indicies to up/down
-"""
-function lw_solver_noscat!(mo::MeshOrientation{I},
-                           D::Array{FT,2},
-                           w_μ::FT,
-                           op::OneScalar{FT,I},
-                           source::SourceFuncLongWave{FT,I},
-                           sfc_emis::Array{FT,2},
-                           radn_up::Array{FT,3},
-                           radn_dn::Array{FT,3}) where {FT<:AbstractFloat,I<:Int}
-  @unpack_fields op τ
-  @unpack_fields source lay_source sfc_source
-  ncol  = get_ncol(op)
-  nlay  = get_nlay(op)
-  ngpt  = get_ngpt(op)
-
-  τ_loc    = Array{FT}(undef,ncol,nlay)
-  trans      = Array{FT}(undef,ncol,nlay)
-  source_up  = Array{FT}(undef,ncol,nlay)
-  source_dn  = Array{FT}(undef,ncol,nlay)
-  source_sfc = Array{FT}(undef,ncol)
-  sfc_albedo = Array{FT}(undef,ncol)
-  # Which way is up?
-  # Level Planck sources for upward and downward radiation
-  # When top_at_1, lev_source_up => lev_source_dec
-  #                lev_source_dn => lev_source_inc, and vice-versa
-  i_lev_top = ilev_top(mo)
-  lev_source_up = mo.top_at_1 ? source.lev_source_dec : source.lev_source_inc
-  lev_source_dn = mo.top_at_1 ? source.lev_source_inc : source.lev_source_dec
-
-  @inbounds for igpt in 1:ngpt
-    #
-    # Transport is for intensity
-    #   convert flux at top of domain to intensity assuming azimuthal isotropy
-    #
-    radn_dn[:,i_lev_top,igpt] ./= 2 * FT(π) * w_μ
-
-    #
-    # Optical path and transmission, used in source function and transport calculations
-    #
-    @inbounds for ilev in 1:nlay
-      τ_loc[:,ilev] .= τ[:,ilev,igpt] .* D[:,igpt]
-      trans[:,ilev] .= exp.(-τ_loc[:,ilev])
-    end
-    #
-    # Source function for diffuse radiation
-    #
-    @inbounds for ilay in 1:nlay
-      @inbounds for icol in 1:ncol
-        source_dn[icol,ilay], source_up[icol,ilay] =
-          lw_source_noscat(lay_source[icol,ilay,igpt],
-                           lev_source_up[icol,ilay,igpt],
-                           lev_source_dn[icol,ilay,igpt],
-                           τ_loc[icol,ilay],
-                           trans[icol,ilay])
-      end
-    end
-
-    #
-    # Surface albedo, surface source function
-    #
-    sfc_albedo .= 1 .- sfc_emis[:,igpt]
-    source_sfc .= sfc_emis[:,igpt] .* sfc_source[:,igpt]
-    #
-    # Transport
-    #
-    lw_transport_noscat!(ncol, nlay, mo,
-                         trans,
-                         sfc_albedo,
-                         source_dn,
-                         source_up,
-                         source_sfc,
-                         @view(radn_up[:,:,igpt]),
-                         @view(radn_dn[:,:,igpt]))
-    #
-    # Convert intensity to flux assuming azimuthal isotropy and quadrature weight
-    #
-    radn_dn[:,:,igpt] .*= 2 * FT(π) * w_μ
-    radn_up[:,:,igpt] .*= 2 * FT(π) * w_μ
-  end  # g point loop
-  return nothing
-
-end
-
 """
     solve!(rte::RTELongWaveNoScattering{FT,I}, op::OneScalar{FT,I}, mo::MeshOrientation{I}) where {FT,I}
 
 Longwave transport, no scattering, multi-angle quadrature
 Users provide a set of weights and quadrature angles
 Routine sums over single-angle solutions for each sets of angles/weights
+
+LW fluxes, no scattering, μ (cosine of integration angle) specified by column
+Does radiation calculation at user-supplied angles; converts radiances to flux
+using user-supplied weights
 
 given
 
@@ -173,17 +61,71 @@ function solve!(rte::RTELongWaveNoScattering{FT,I}, op::OneScalar{FT,I}, mo::Mes
   Ds_ncol = Array{FT}(undef, ncol,ngpt)
   radn_up, radn_dn = ntuple(i->zeros(FT, ncol,nlay+1,ngpt), 2)
 
+  @unpack_fields op τ
+  @unpack_fields source lay_source sfc_source
+  ncol  = get_ncol(op)
+  nlay  = get_nlay(op)
+  ngpt  = get_ngpt(op)
+
+  τ_loc    = Array{FT}(undef,ncol,nlay)
+  trans      = Array{FT}(undef,ncol,nlay)
+  source_up  = Array{FT}(undef,ncol,nlay)
+  source_dn  = Array{FT}(undef,ncol,nlay)
+  source_sfc = Array{FT}(undef,ncol)
+  sfc_albedo = Array{FT}(undef,ncol)
+  # Which way is up?
+  # Level Planck sources for upward and downward radiation
+  # When top_at_1, lev_source_up => lev_source_dec
+  #                lev_source_dn => lev_source_inc, and vice-versa
+  i_lev_top = ilev_top(mo)
+  lev_source_up = mo.top_at_1 ? source.lev_source_dec : source.lev_source_inc
+  lev_source_dn = mo.top_at_1 ? source.lev_source_inc : source.lev_source_dec
+
   @inbounds for i_μ in 1:n_μ
     i_μ==1 && apply_BC!(radn_dn, i_lev_top, inc_flux)
     Ds_ncol .= Ds[i_μ]
-    lw_solver_noscat!(mo,
-                      Ds_ncol,
-                      w_μ[i_μ],
-                      op,
-                      source,
-                      sfc_emis,
-                      radn_up,
-                      radn_dn)
+
+    @inbounds for igpt in 1:ngpt
+      # Transport is for intensity
+      #   convert flux at top of domain to intensity assuming azimuthal isotropy
+      radn_dn[:,i_lev_top,igpt] ./= 2 * FT(π) * w_μ[i_μ]
+
+      @inbounds for ilay in 1:nlay
+        @inbounds for icol in 1:ncol
+          # Optical path and transmission, used in source function and transport calculations
+          τ_loc[icol,ilay] = τ[icol,ilay,igpt] * Ds_ncol[icol,igpt]
+          trans[icol,ilay] = exp(-τ_loc[icol,ilay])
+
+          # Source function for diffuse radiation
+          source_dn[icol,ilay], source_up[icol,ilay] =
+            lw_source_noscat(lay_source[icol,ilay,igpt],
+                             lev_source_up[icol,ilay,igpt],
+                             lev_source_dn[icol,ilay,igpt],
+                             τ_loc[icol,ilay],
+                             trans[icol,ilay])
+        end
+      end
+
+      # Surface albedo, surface source function
+      sfc_albedo .= 1 .- sfc_emis[:,igpt]
+      source_sfc .= sfc_emis[:,igpt] .* sfc_source[:,igpt]
+
+      # Transport
+      lw_transport_noscat!(ncol, nlay, mo,
+                           trans,
+                           sfc_albedo,
+                           source_dn,
+                           source_up,
+                           source_sfc,
+                           @view(radn_up[:,:,igpt]),
+                           @view(radn_dn[:,:,igpt]))
+      #
+      # Convert intensity to flux assuming azimuthal isotropy and quadrature weight
+      #
+      radn_dn[:,:,igpt] .*= 2 * FT(π) * w_μ[i_μ]
+      radn_up[:,:,igpt] .*= 2 * FT(π) * w_μ[i_μ]
+    end  # g point loop
+
     flux_up .+= radn_up
     flux_dn .+= radn_dn
   end
@@ -221,6 +163,7 @@ function solve!(rte::RTELongWave{FT,I}, op::TwoStream{FT,I}, mo::MeshOrientation
   sfc_emis = sfc_emis_gpt
   flux_up = gpt_flux_up
   flux_dn = gpt_flux_dn
+  b = binary(mo)
 
   @unpack_fields op τ ssa g
   @unpack_fields source lev_source_inc lev_source_dec sfc_source lay_source
@@ -254,23 +197,25 @@ function solve!(rte::RTELongWave{FT,I}, op::TwoStream{FT,I}, mo::MeshOrientation
           lw_two_stream(τ[icol,ilay,igpt],
                         ssa[icol,ilay,igpt],
                         g[icol,ilay,igpt])
+
+        # Source function for diffuse radiation
+        lev_source_bot = lev_source[icol,ilay+b]
+        lev_source_top = lev_source[icol,ilay+1-b]
+
+        source_sfc[icol],
+        source_up[icol,ilay],
+        source_dn[icol,ilay] =
+          lw_source_2str(sfc_emis[icol,igpt],
+                         sfc_source[icol,igpt],
+                         lev_source_bot,
+                         lev_source_top,
+                         γ_1[icol,ilay],
+                         γ_2[icol,ilay],
+                         Rdif[icol,ilay],
+                         Tdif[icol,ilay],
+                         τ[icol,ilay,igpt])
       end
     end
-
-    # Source function for diffuse radiation
-    lw_source_2str!(ncol, nlay, mo,
-                    sfc_emis[:,igpt],
-                    sfc_source[:,igpt],
-                    lay_source[:,:,igpt],
-                    lev_source,
-                    γ_1,
-                    γ_2,
-                    Rdif,
-                    Tdif,
-                    τ[:,:,igpt],
-                    source_dn,
-                    source_up,
-                    source_sfc)
 
     # Transport
     sfc_albedo .= FT(1) .- sfc_emis[:,igpt]
@@ -345,7 +290,7 @@ Shortwave two-stream calculation:
 
  - `Rdif`, `Tdif`, `Rdir`, `Tdir`, `Tnoscat`
  - `source_up`, `source_dn`
- - `source_srf`
+ - `source_sfc`
 """
 function solve!(rte::RTEShortWave{FT,I}, op::TwoStream{FT,I}, mo::MeshOrientation{I}) where {FT,I}
   @unpack_fields rte base
@@ -361,35 +306,40 @@ function solve!(rte::RTEShortWave{FT,I}, op::TwoStream{FT,I}, mo::MeshOrientatio
   apply_BC!(flux_dir, i_lev_top, bcs.toa_flux, rte.μ_0)
   apply_BC!(flux_dn, i_lev_top, bcs.inc_flux_diffuse)
 
-
   @unpack_fields op τ ssa g
   ncol  = get_ncol(op)
   nlay  = get_nlay(op)
   ngpt  = get_ngpt(op)
 
-  Rdif, Tdif, Rdir, Tdir, Tnoscat, source_up, source_dn = ntuple(i->zeros(FT, ncol,nlay), 7)
-  source_srf = zeros(FT, ncol)
+  Rdif, Tdif, source_up, source_dn = ntuple(i->zeros(FT, ncol,nlay), 4)
+  source_sfc = zeros(FT, ncol)
+  b = binary(mo)
+  i_lev_sfc = ilev_bot(mo)
 
   @inbounds for igpt in 1:ngpt
 
     # Cell properties: transmittance and reflectance for direct and diffuse radiation
-    @inbounds for ilay in 1:nlay
+    @inbounds for ilay in lay_range(mo)
       @inbounds for icol in 1:ncol
         Rdif[icol,ilay],
         Tdif[icol,ilay],
-        Rdir[icol,ilay],
-        Tdir[icol,ilay],
-        Tnoscat[icol,ilay] =
+        Rdir, Tdir, Tnoscat =
           sw_two_stream(μ_0[icol],
                         τ[icol,ilay,igpt],
                         ssa[icol,ilay,igpt],
                         g[icol,ilay,igpt])
+
+        # Direct-beam and source for diffuse radiation
+        source_up[icol,ilay],
+        source_dn[icol,ilay],
+        flux_dir[icol,ilay+b,igpt] =
+          sw_source_2str(Rdir,
+                         Tdir,
+                         Tnoscat,
+                         flux_dir[icol,ilay+1-b,igpt])
+        source_sfc[icol] = flux_dir[icol,i_lev_sfc,igpt] * sfc_alb_dir[icol,igpt]
       end
     end
-
-    # Direct-beam and source for diffuse radiation
-    sw_source_2str!(ncol, nlay, mo, Rdir, Tdir, Tnoscat, sfc_alb_dir[:,igpt],
-                    source_up, source_dn, source_srf, @view(flux_dir[:,:,igpt]))
 
     # Transport
     adding!(ncol, nlay,
@@ -399,7 +349,7 @@ function solve!(rte::RTEShortWave{FT,I}, op::TwoStream{FT,I}, mo::MeshOrientatio
             Tdif,
             source_dn,
             source_up,
-            source_srf,
+            source_sfc,
             @view(flux_up[:,:,igpt]),
             @view(flux_dn[:,:,igpt]))
 
@@ -585,20 +535,15 @@ function lw_combine_sources!(ncol::I, nlay::I,
 end
 
 """
-    lw_source_2str!(ncol::I, nlay::I,
-                    mo::MeshOrientation{I},
-                    sfc_emis::Array{FT,1},
-                    sfc_src::Array{FT,1},
-                    lay_source::Array{FT,2},
-                    lev_source::Array{FT,2},
-                    γ_1::Array{FT,2},
-                    γ_2::Array{FT,2},
-                    rdif::Array{FT,2},
-                    tdif::Array{FT,2},
-                    τ::Array{FT,2},
-                    source_dn::Array{FT,2},
-                    source_up::Array{FT,2},
-                    source_sfc::Array{FT,1}) where {I<:Int,FT<:AbstractFloat}
+    lw_source_2str(sfc_emis::FT,
+                   sfc_src::FT,
+                   lev_source_bot::FT,
+                   lev_source_top::FT,
+                   γ_1::FT,
+                   γ_2::FT,
+                   rdif::FT,
+                   tdif::FT,
+                   τ::FT) where {FT<:AbstractFloat}
 
 Compute LW source function for upward and downward emission at levels using linear-in-τ assumption
   This version straight from ECRAD
@@ -607,57 +552,41 @@ Compute LW source function for upward and downward emission at levels using line
  - `mo` mesh orientation, see [`MeshOrientation`](@ref)
 
 real(FT), dimension(ncol      ), intent(in) :: sfc_emis, sfc_src
-real(FT), dimension(ncol, nlay), intent(in) :: lay_source,     # Planck source at layer center
-                                                τ,             # Optical depth (τ)
+real(FT), dimension(ncol, nlay), intent(in) :: τ,             # Optical depth (τ)
                                                 γ_1, γ_2,      # Coupling coefficients
                                                 rdif, tdif     # Layer reflectance and transmittance
-real(FT), dimension(ncol, nlay+1), target, intent(in)  :: lev_source # Planck source at layer edges
 real(FT), dimension(ncol, nlay), intent(out) :: source_dn, source_up
 real(FT), dimension(ncol      ), intent(out) :: source_sfc   # Source function for upward radiation at surface
+real(FT), dimension(:), pointer :: lev_source_bot, lev_source_top
 
 real(FT)            :: Z, Zup_top, Zup_bottom, Zdn_top, Zdn_bottom
-real(FT), dimension(:), pointer :: lev_source_bot, lev_source_top
 """
-function lw_source_2str!(ncol::I, nlay::I,
-                         mo::MeshOrientation{I},
-                         sfc_emis::Array{FT,1},
-                         sfc_src::Array{FT,1},
-                         lay_source::Array{FT,2},
-                         lev_source::Array{FT,2},
-                         γ_1::Array{FT,2},
-                         γ_2::Array{FT,2},
-                         rdif::Array{FT,2},
-                         tdif::Array{FT,2},
-                         τ::Array{FT,2},
-                         source_dn::Array{FT,2},
-                         source_up::Array{FT,2},
-                         source_sfc::Array{FT,1}) where {I<:Int,FT<:AbstractFloat}
-  b = binary(mo)
-  @inbounds for ilay in 1:nlay
-    lev_source_top = lev_source[:,ilay+1-b]
-    lev_source_bot = lev_source[:,ilay+b]
-    @inbounds for icol in 1:ncol
-      if τ[icol,ilay] > FT(1.0e-8)
-        #
-        # Toon et al. (JGR 1989) Eqs 26-27
-        #
-        Z = (lev_source_bot[icol]-lev_source_top[icol]) / (τ[icol,ilay]*(γ_1[icol,ilay]+γ_2[icol,ilay]))
-        Zup_top        =  Z + lev_source_top[icol]
-        Zup_bottom     =  Z + lev_source_bot[icol]
-        Zdn_top        = -Z + lev_source_top[icol]
-        Zdn_bottom     = -Z + lev_source_bot[icol]
-        source_up[icol,ilay] = π * (Zup_top    - rdif[icol,ilay] * Zdn_top    - tdif[icol,ilay] * Zup_bottom)
-        source_dn[icol,ilay] = π * (Zdn_bottom - rdif[icol,ilay] * Zup_bottom - tdif[icol,ilay] * Zdn_top)
-      else
-        source_up[icol,ilay] = FT(0)
-        source_dn[icol,ilay] = FT(0)
-      end
-    end
+function lw_source_2str(sfc_emis::FT,
+                        sfc_src::FT,
+                        lev_source_bot::FT,
+                        lev_source_top::FT,
+                        γ_1::FT,
+                        γ_2::FT,
+                        rdif::FT,
+                        tdif::FT,
+                        τ::FT) where {FT<:AbstractFloat}
+  if τ > FT(1.0e-8)
+    #
+    # Toon et al. (JGR 1989) Eqs 26-27
+    #
+    Z = (lev_source_bot-lev_source_top) / (τ*(γ_1+γ_2))
+    Zup_top        =  Z + lev_source_top
+    Zup_bottom     =  Z + lev_source_bot
+    Zdn_top        = -Z + lev_source_top
+    Zdn_bottom     = -Z + lev_source_bot
+    source_up = π * (Zup_top    - rdif * Zdn_top    - tdif * Zup_bottom)
+    source_dn = π * (Zdn_bottom - rdif * Zup_bottom - tdif * Zdn_top)
+  else
+    source_up = FT(0)
+    source_dn = FT(0)
   end
-  @inbounds for icol in 1:ncol
-    source_sfc[icol] = π * sfc_emis[icol] * sfc_src[icol]
-  end
-  return nothing
+  source_sfc = π * sfc_emis * sfc_src
+  return source_sfc, source_up, source_dn
 end
 
 #####
@@ -753,47 +682,23 @@ end
 #####
 
 """
-    sw_source_2str!(ncol::I, nlay::I,
-                    mo::MeshOrientation{I},
-                    Rdir::Array{FT,2},
-                    Tdir::Array{FT,2},
-                    Tnoscat::Array{FT,2},
-                    sfc_albedo::Array{FT,1},
-                    source_up::Array{FT,2},
-                    source_dn::Array{FT,2},
-                    source_sfc::Array{FT,1},
-                    flux_dn_dir::AbstractArray{FT,2}) where {I<:Int,FT<:AbstractFloat}
+    sw_source_2str(Rdir::FT,
+                   Tdir::FT,
+                   Tnoscat::FT,
+                   flux_dn_dir::FT) where {FT<:AbstractFloat}
 
- - `mo` mesh orientation, see [`MeshOrientation`](@ref)
-
-real(FT), dimension(ncol, nlay  ), intent(in   ) :: Rdir, Tdir, Tnoscat # Layer reflectance, transmittance for diffuse radiation
-real(FT), dimension(ncol        ), intent(in   ) :: sfc_albedo          # surface albedo for direct radiation
-real(FT), dimension(ncol, nlay  ), intent(  out) :: source_dn, source_up
-real(FT), dimension(ncol        ), intent(  out) :: source_sfc          # Source function for upward radation at surface
-real(FT), dimension(ncol, nlay+1), intent(inout) :: flux_dn_dir # Direct beam flux
-                                                                # intent(inout) because top layer includes incident flux
+ - `Rdir`, `Tdir`, `Tnoscat` # Layer reflectance, transmittance for diffuse radiation
+ - `source_dn`, `source_up`
+ - `flux_dn_dir` # Direct beam flux
 """
-function sw_source_2str!(ncol::I, nlay::I,
-                         mo::MeshOrientation{I},
-                         Rdir::Array{FT,2},
-                         Tdir::Array{FT,2},
-                         Tnoscat::Array{FT,2},
-                         sfc_albedo::Array{FT,1},
-                         source_up::Array{FT,2},
-                         source_dn::Array{FT,2},
-                         source_sfc::Array{FT,1},
-                         flux_dn_dir::AbstractArray{FT,2}) where {I<:Int,FT<:AbstractFloat}
-
-  b = binary(mo)
-  i_lev_sfc = ilev_bot(mo)
-
-  @inbounds for ilev in lay_range(mo)
-    source_up[:,ilev]     .=    Rdir[:,ilev] .* flux_dn_dir[:,ilev+1-b]
-    source_dn[:,ilev]     .=    Tdir[:,ilev] .* flux_dn_dir[:,ilev+1-b]
-    flux_dn_dir[:,ilev+b] .= Tnoscat[:,ilev] .* flux_dn_dir[:,ilev+1-b]
-  end
-  source_sfc .= flux_dn_dir[:,i_lev_sfc] .* sfc_albedo
-  return nothing
+function sw_source_2str(Rdir::FT,
+                        Tdir::FT,
+                        Tnoscat::FT,
+                        flux_dn_dir::FT) where {FT<:AbstractFloat}
+  source_up   =    Rdir * flux_dn_dir
+  source_dn   =    Tdir * flux_dn_dir
+  flux_dn_dir = Tnoscat * flux_dn_dir
+  return source_up, source_dn, flux_dn_dir
 end
 
 #####
