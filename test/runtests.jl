@@ -12,7 +12,6 @@ for submodule in [
                   "solar_zenith_angle",
                   # "Benchmarks",
                   joinpath("..","PartialImplementations", "PartialImplementations"), # compile only
-                  "DataDeps",
                   ]
 
   println("Testing $submodule")
