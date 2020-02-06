@@ -1,5 +1,4 @@
 module FortranIntrinsics
-using DelimitedFiles
 using Test
 
 export fmerge,

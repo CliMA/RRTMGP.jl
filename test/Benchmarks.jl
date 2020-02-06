@@ -2,6 +2,8 @@ using Test
 using RRTMGP
 using RRTMGP.OpticalProps
 using Profile
+using Pkg
+Pkg.add("BenchmarkTools")
 using BenchmarkTools
 
 include("rfmip_clear_sky_sw.jl")
