@@ -35,18 +35,25 @@ Encapsulates a collection of volume mixing ratios (concentrations) of gases.
 $(DocStringExtensions.FIELDS)
 """
 struct GasConcs{FT<:AbstractFloat,I<:Int}
-  "Gas names"
-  gas_names::Vector{AbstractGas}
-  "Gas concentrations arrays"
-  concs::Array{FT,3}
-  "Number of columns"
-  ncol::I
-  "Number of layers"
-  nlay::I
+    "Gas names"
+    gas_names::Vector{AbstractGas}
+    "Gas concentrations arrays"
+    concs::Array{FT,3}
+    "Number of columns"
+    ncol::I
+    "Number of layers"
+    nlay::I
 end
-function GasConcs(::Type{FT}, ::Type{I}, gas_names, ncol::I, nlay::I, ngases::I=length(gas_names)) where {FT<:AbstractFloat,I<:Int}
-  concs = zeros(FT, ngases, ncol, nlay)
-  return GasConcs{FT,I}(gas_names, concs, ncol, nlay)
+function GasConcs(
+    ::Type{FT},
+    ::Type{I},
+    gas_names,
+    ncol::I,
+    nlay::I,
+    ngases::I = length(gas_names),
+) where {FT<:AbstractFloat,I<:Int}
+    concs = zeros(FT, ngases, ncol, nlay)
+    return GasConcs{FT,I}(gas_names, concs, ncol, nlay)
 end
 
 """
@@ -59,21 +66,27 @@ Each concentration is associated with a name, normally the chemical formula.
 $(DocStringExtensions.FIELDS)
 """
 struct GasConcsPGP{FT<:AbstractFloat}
-  "Gas names"
-  gas_names::Vector{AbstractGas}
-  "Gas concentrations arrays"
-  concs::Array{FT,1}
+    "Gas names"
+    gas_names::Vector{AbstractGas}
+    "Gas concentrations arrays"
+    concs::Array{FT,1}
 end
 
 function Base.convert(::Type{GasConcs}, data::Array{GasConcsPGP{FT}}) where {FT}
-  s = size(data)
-  ngases = length(first(data).concs)
-  return GasConcs{FT,typeof(ngases)}(first(data).gas_names,
-                      Array{FT}([data[i,j].concs[k] for k in 1:ngases, i in 1:s[1], j in 1:s[2]]), s...)
+    s = size(data)
+    ngases = length(first(data).concs)
+    return GasConcs{FT,typeof(ngases)}(
+        first(data).gas_names,
+        Array{FT}([data[i, j].concs[k] for k in 1:ngases, i in 1:s[1], j in 1:s[2]]),
+        s...,
+    )
 end
 
 Base.convert(::Type{Array{GasConcsPGP}}, data::GasConcs{FT}) where {FT} =
-  [GasConcsPGP{FT}(data.gas_names, data.concs[:,i,j]) for i in 1:size(data.concs,2), j in 1:size(data.concs,3)]
+    [GasConcsPGP{FT}(data.gas_names, data.concs[:, i, j]) for i in 1:size(
+        data.concs,
+        2,
+    ), j in 1:size(data.concs, 3)]
 
 
 """
@@ -81,28 +94,36 @@ Base.convert(::Type{Array{GasConcsPGP}}, data::GasConcs{FT}) where {FT} =
 
 Set volume mixing ratio (vmr)
 """
-function set_vmr!(this::GasConcs{FT}, gas::AbstractGas, w::FT) where FT
-  @assert !(w < FT(0) || w > FT(1))
-  igas = loc_in_array(gas, this.gas_names)
-  this.concs[igas,:,:] .= w
-  this.gas_names[igas] = gas
+function set_vmr!(this::GasConcs{FT}, gas::AbstractGas, w::FT) where {FT}
+    @assert !(w < FT(0) || w > FT(1))
+    igas = loc_in_array(gas, this.gas_names)
+    this.concs[igas, :, :] .= w
+    this.gas_names[igas] = gas
 end
-function set_vmr!(this::GasConcs{FT}, gas::AbstractGas, w::Vector{FT}) where FT
-  @assert !any(w .< FT(0)) || any(w .> FT(1))
-  @assert !(this.nlay ≠ nothing && length(w) ≠ this.nlay)
-  igas = loc_in_array(gas, this.gas_names)
-  @assert igas ≠ -1 # assert gas is found
-  this.concs[igas,:,:] .= reshape(w, 1, this.nlay)
-  this.gas_names[igas] = gas
+function set_vmr!(
+    this::GasConcs{FT},
+    gas::AbstractGas,
+    w::Vector{FT},
+) where {FT}
+    @assert !any(w .< FT(0)) || any(w .> FT(1))
+    @assert !(this.nlay ≠ nothing && length(w) ≠ this.nlay)
+    igas = loc_in_array(gas, this.gas_names)
+    @assert igas ≠ -1 # assert gas is found
+    this.concs[igas, :, :] .= reshape(w, 1, this.nlay)
+    this.gas_names[igas] = gas
 end
-function set_vmr!(this::GasConcs{FT}, gas::AbstractGas, w::Array{FT, 2}) where FT
-  @assert !any(w .< FT(0)) || any(w .> FT(1))
-  @assert !(this.ncol ≠ nothing && size(w, 1) ≠ this.ncol)
-  @assert !(this.nlay ≠ nothing && size(w, 2) ≠ this.nlay)
-  igas = loc_in_array(gas, this.gas_names)
-  @assert igas ≠ -1 # assert gas is found
-  this.concs[igas,:,:] .= w
-  this.gas_names[igas] = gas
+function set_vmr!(
+    this::GasConcs{FT},
+    gas::AbstractGas,
+    w::Array{FT,2},
+) where {FT}
+    @assert !any(w .< FT(0)) || any(w .> FT(1))
+    @assert !(this.ncol ≠ nothing && size(w, 1) ≠ this.ncol)
+    @assert !(this.nlay ≠ nothing && size(w, 2) ≠ this.nlay)
+    igas = loc_in_array(gas, this.gas_names)
+    @assert igas ≠ -1 # assert gas is found
+    this.concs[igas, :, :] .= w
+    this.gas_names[igas] = gas
 end
 
 end # module

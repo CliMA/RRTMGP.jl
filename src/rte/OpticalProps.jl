@@ -42,10 +42,7 @@ export delta_scale!,
        get_τ′_size,
        get_band_lims_gpoint
 
-export get_nband,
-       get_ngpt,
-       get_ncol,
-       get_nlay
+export get_nband, get_ngpt, get_ncol, get_nlay
 
 export AbstractOpticalProps,
        AbstractOpticalPropsArry,
@@ -90,36 +87,43 @@ Base class for optical properties.
 $(DocStringExtensions.FIELDS)
 """
 struct OpticalPropsBase{FT,I} <: AbstractOpticalProps{FT,I}
-  "Map from band to g-point. `(g_point_begin, g_point_end) = band2gpt[2,band]`"
-  band2gpt::Array{I,2}
-  "Map from g-point to band. `band = gpt2band(gpt)`"
-  gpt2band::Array{I,1}
-  "Wavenumber band limits. `(upper_band_wvn, lower_band_wvn) = band_lims_wvn[2,band]`"
-  band_lims_wvn::Array{FT,2}
-  "Name of optical properties"
-  name::AbstractString
-  function OpticalPropsBase(name, band_lims_wvn::Array{FT}, band_lims_gpt=nothing) where FT
-    @assert size(band_lims_wvn,1) == 2
-    @assert !any(band_lims_wvn.<FT(0))
-    band_lims_gpt_lcl = Array{Int}(undef, 2, size(band_lims_wvn, 2))
-    if band_lims_gpt ≠ nothing
-      @assert size(band_lims_gpt,1) == 2
-      @assert size(band_lims_gpt,2) == size(band_lims_wvn,2)
-      @assert !any(band_lims_gpt .< 1)
-      band_lims_gpt_lcl .= band_lims_gpt
-    else
-      for iband in 1:size(band_lims_wvn, 2)
-        band_lims_gpt_lcl[1:2,iband] .= iband
-      end
-    end
-    band2gpt = band_lims_gpt_lcl
+    "Map from band to g-point. `(g_point_begin, g_point_end) = band2gpt[2,band]`"
+    band2gpt::Array{I,2}
+    "Map from g-point to band. `band = gpt2band(gpt)`"
+    gpt2band::Array{I,1}
+    "Wavenumber band limits. `(upper_band_wvn, lower_band_wvn) = band_lims_wvn[2,band]`"
+    band_lims_wvn::Array{FT,2}
+    "Name of optical properties"
+    name::AbstractString
+    function OpticalPropsBase(
+        name,
+        band_lims_wvn::Array{FT},
+        band_lims_gpt = nothing,
+    ) where {FT}
+        @assert size(band_lims_wvn, 1) == 2
+        @assert !any(band_lims_wvn .< FT(0))
+        band_lims_gpt_lcl = Array{Int}(undef, 2, size(band_lims_wvn, 2))
+        if band_lims_gpt ≠ nothing
+            @assert size(band_lims_gpt, 1) == 2
+            @assert size(band_lims_gpt, 2) == size(band_lims_wvn, 2)
+            @assert !any(band_lims_gpt .< 1)
+            band_lims_gpt_lcl .= band_lims_gpt
+        else
+            for iband in 1:size(band_lims_wvn, 2)
+                band_lims_gpt_lcl[1:2, iband] .= iband
+            end
+        end
+        band2gpt = band_lims_gpt_lcl
     # Make a map between g-points and bands
-    gpt2band = Array{Int}(undef, max(band_lims_gpt_lcl...))
-    for iband in 1:size(band_lims_gpt_lcl, 2)
-      gpt2band[band_lims_gpt_lcl[1,iband]:band_lims_gpt_lcl[2,iband]] .= iband
+        gpt2band = Array{Int}(undef, max(band_lims_gpt_lcl...))
+        for iband in 1:size(band_lims_gpt_lcl, 2)
+            gpt2band[band_lims_gpt_lcl[1, iband]:band_lims_gpt_lcl[
+                2,
+                iband,
+            ]] .= iband
+        end
+        return new{FT,Int}(band2gpt, gpt2band, band_lims_wvn, name)
     end
-    return new{FT,Int}(band2gpt,gpt2band,band_lims_wvn,name)
-  end
 end
 
 """
@@ -132,14 +136,19 @@ calculations accounting for extinction and emission
 $(DocStringExtensions.FIELDS)
 """
 struct OneScalar{FT,I} <: AbstractOpticalPropsArry{FT,I}
-  "Base optical properties, see [`OpticalPropsBase`](@ref)"
-  base::Union{OpticalPropsBase{FT,I}, Nothing}
-  "Optical depth"
-  τ::Array{FT,3}
+    "Base optical properties, see [`OpticalPropsBase`](@ref)"
+    base::Union{OpticalPropsBase{FT,I},Nothing}
+    "Optical depth"
+    τ::Array{FT,3}
 end
 
-OneScalar(base::OpticalPropsBase{FT,I}, ncol::I, nlay::I, ngpt::I) where {FT<:AbstractFloat,I<:Int} =
-  OneScalar{FT,I}(base, Array{FT}(undef, ncol, nlay, ngpt))
+OneScalar(
+    base::OpticalPropsBase{FT,I},
+    ncol::I,
+    nlay::I,
+    ngpt::I,
+) where {FT<:AbstractFloat,I<:Int} =
+    OneScalar{FT,I}(base, Array{FT}(undef, ncol, nlay, ngpt))
 
 """
     OneScalarPGP{FT,I} <: AbstractOpticalPropsArry{FT,I}
@@ -152,20 +161,29 @@ per-grid-point
 $(DocStringExtensions.FIELDS)
 """
 struct OneScalarPGP{FT,I} <: AbstractOpticalPropsPGP{FT,I}
-  "Base optical properties, see [`OpticalPropsBase`](@ref)"
-  base::Union{OpticalPropsBase{FT,I}, Nothing}
-  "Optical depth"
-  τ::Array{FT,1}
+    "Base optical properties, see [`OpticalPropsBase`](@ref)"
+    base::Union{OpticalPropsBase{FT,I},Nothing}
+    "Optical depth"
+    τ::Array{FT,1}
 end
 
-function Base.convert(::Type{OneScalar}, data::Array{OneScalarPGP{FT,I}}) where {FT,I}
-  s = size(data)
-  ngpt = length(first(data).τ)
-  return OneScalar{FT,I}(first(data).base, Array{FT}([data[i,j].τ[k] for i in 1:s[1], j in 1:s[2], k in 1:ngpt]))
+function Base.convert(
+    ::Type{OneScalar},
+    data::Array{OneScalarPGP{FT,I}},
+) where {FT,I}
+    s = size(data)
+    ngpt = length(first(data).τ)
+    return OneScalar{FT,I}(
+        first(data).base,
+        Array{FT}([data[i, j].τ[k] for i in 1:s[1], j in 1:s[2], k in 1:ngpt]),
+    )
 end
 
 Base.convert(::Type{Array{OneScalarPGP}}, data::OneScalar{FT,I}) where {FT,I} =
-  [OneScalarPGP{FT,I}(data.base, data.τ[i,j,:]) for i in 1:size(data.τ,1), j in 1:size(data.τ,2)]
+    [OneScalarPGP{FT,I}(data.base, data.τ[i, j, :]) for i in 1:size(data.τ, 1), j in 1:size(
+        data.τ,
+        2,
+    )]
 
 """
     TwoStream{FT,I} <: AbstractOpticalPropsArry{FT,I}
@@ -177,20 +195,32 @@ calculations accounting for extinction and emission
 $(DocStringExtensions.FIELDS)
 """
 struct TwoStream{FT,I} <: AbstractOpticalPropsArry{FT,I}
-  "Base optical properties, see [`OpticalPropsBase`](@ref)"
-  base::Union{OpticalPropsBase{FT,I}, Nothing}
-  "Optical depth"
-  τ::Array{FT,3}
-  "Single-scattering albedo"
-  ssa::Array{FT,3}
-  "Asymmetry parameter"
-  g::Array{FT,3}
+    "Base optical properties, see [`OpticalPropsBase`](@ref)"
+    base::Union{OpticalPropsBase{FT,I},Nothing}
+    "Optical depth"
+    τ::Array{FT,3}
+    "Single-scattering albedo"
+    ssa::Array{FT,3}
+    "Asymmetry parameter"
+    g::Array{FT,3}
 end
 
-TwoStream(base::OpticalPropsBase{FT,I}, ncol::I, nlay::I, ngpt::I) where {FT<:AbstractFloat,I<:Int} =
-  TwoStream{FT,I}(base, ntuple(i->Array{FT}(undef, ncol, nlay, ngpt),3)... )
-TwoStream(::Type{FT}, ncol::I, nlay::I, ngpt::I) where {FT<:AbstractFloat,I<:Int} =
-  TwoStream{FT,I}(nothing, ntuple(i->Array{FT}(undef, ncol, nlay, ngpt),3)... )
+TwoStream(
+    base::OpticalPropsBase{FT,I},
+    ncol::I,
+    nlay::I,
+    ngpt::I,
+) where {FT<:AbstractFloat,I<:Int} =
+    TwoStream{FT,I}(base, ntuple(i -> Array{FT}(undef, ncol, nlay, ngpt), 3)...)
+TwoStream(
+    ::Type{FT},
+    ncol::I,
+    nlay::I,
+    ngpt::I,
+) where {FT<:AbstractFloat,I<:Int} = TwoStream{FT,I}(
+    nothing,
+    ntuple(i -> Array{FT}(undef, ncol, nlay, ngpt), 3)...,
+)
 
 """
     TwoStreamPGP{FT,I} <: AbstractOpticalPropsArry{FT,I}
@@ -203,29 +233,40 @@ per-grid-point
 $(DocStringExtensions.FIELDS)
 """
 struct TwoStreamPGP{FT,I} <: AbstractOpticalPropsPGP{FT,I}
-  "Base optical properties, see [`OpticalPropsBase`](@ref)"
-  base::Union{OpticalPropsBase{FT,I}, Nothing}
-  "Optical depth"
-  τ::Array{FT,1}
-  "Single-scattering albedo"
-  ssa::Array{FT,1}
-  "Asymmetry parameter"
-  g::Array{FT,1}
+    "Base optical properties, see [`OpticalPropsBase`](@ref)"
+    base::Union{OpticalPropsBase{FT,I},Nothing}
+    "Optical depth"
+    τ::Array{FT,1}
+    "Single-scattering albedo"
+    ssa::Array{FT,1}
+    "Asymmetry parameter"
+    g::Array{FT,1}
 end
 
 TwoStreamPGP(::Type{FT}, ngpt::I) where {FT<:AbstractFloat,I<:Int} =
-  TwoStreamPGP{FT,I}(nothing, ntuple(i->Array{FT}(undef, ngpt),3)... )
+    TwoStreamPGP{FT,I}(nothing, ntuple(i -> Array{FT}(undef, ngpt), 3)...)
 
-function Base.convert(::Type{TwoStream}, data::Array{TwoStreamPGP{FT,I}}) where {FT,I}
-  s = size(data)
-  ngpt = length(first(data).τ)
-  return TwoStream{FT,I}(first(data).base, Array{FT}([data[i,j].τ[k]   for i in 1:s[1], j in 1:s[2], k in 1:ngpt]),
-                                           Array{FT}([data[i,j].ssa[k] for i in 1:s[1], j in 1:s[2], k in 1:ngpt]),
-                                           Array{FT}([data[i,j].g[k]   for i in 1:s[1], j in 1:s[2], k in 1:ngpt]))
+function Base.convert(
+    ::Type{TwoStream},
+    data::Array{TwoStreamPGP{FT,I}},
+) where {FT,I}
+    s = size(data)
+    ngpt = length(first(data).τ)
+    return TwoStream{FT,I}(
+        first(data).base,
+        Array{FT}([data[i, j].τ[k] for i in 1:s[1], j in 1:s[2], k in 1:ngpt]),
+        Array{FT}([data[i, j].ssa[k] for i in 1:s[1], j in 1:s[2], k in 1:ngpt]),
+        Array{FT}([data[i, j].g[k] for i in 1:s[1], j in 1:s[2], k in 1:ngpt]),
+    )
 end
 
 Base.convert(::Type{Array{TwoStreamPGP}}, data::TwoStream{FT,I}) where {FT,I} =
-  [TwoStreamPGP{FT,I}(data.base, data.τ[i,j,:], data.ssa[i,j,:],data.g[i,j,:]) for i in 1:size(data.τ,1), j in 1:size(data.τ,2)]
+    [TwoStreamPGP{FT,I}(
+        data.base,
+        data.τ[i, j, :],
+        data.ssa[i, j, :],
+        data.g[i, j, :],
+    ) for i in 1:size(data.τ, 1), j in 1:size(data.τ, 2)]
 
 #####
 #####  Delta-scaling
@@ -245,19 +286,22 @@ delta_scale!(this::OneScalar{FT}, fwd_scat_frac) where {FT} = nothing
  - `this` optical properties, see [`TwoStream`](@ref)
  - `fwd_scat_frac` forward scattering fraction
 """
-function delta_scale!(this::TwoStream{FT}, fwd_scat_frac = nothing) where {FT<:AbstractFloat}
-  ncol = get_ncol(this)
-  nlay = get_nlay(this)
-  ngpt = get_ngpt(this)
+function delta_scale!(
+    this::TwoStream{FT},
+    fwd_scat_frac = nothing,
+) where {FT<:AbstractFloat}
+    ncol = get_ncol(this)
+    nlay = get_nlay(this)
+    ngpt = get_ngpt(this)
 
-  if fwd_scat_frac ≠ nothing
-    @assert all(size(fwd_scat_frac) .== (ncol, nlay, ngpt))
-    @assert !any(fwd_scat_frac < FT(0) || fwd_scat_frac > FT(1))
-    delta_scale_kernel!(this, fwd_scat_frac)
-  else
-    delta_scale_kernel!(this)
-  end
-  return nothing
+    if fwd_scat_frac ≠ nothing
+        @assert all(size(fwd_scat_frac) .== (ncol, nlay, ngpt))
+        @assert !any(fwd_scat_frac < FT(0) || fwd_scat_frac > FT(1))
+        delta_scale_kernel!(this, fwd_scat_frac)
+    else
+        delta_scale_kernel!(this)
+    end
+    return nothing
 end
 
 #####
@@ -271,7 +315,7 @@ Validate values of optical properties
 """
 function validate!(this::OneScalar{FT}) where {FT<:AbstractFloat}
   # Validate sizes
-  @assert !any_vals_less_than(this.τ, FT(0))
+    @assert !any_vals_less_than(this.τ, FT(0))
 end
 
 """
@@ -281,12 +325,12 @@ Validate values and sizes of optical properties
 """
 function validate!(this::TwoStream{FT}) where {FT<:AbstractFloat}
   # Validate sizes
-  @assert all(size(this.ssa) == size(this.τ))
-  @assert all(size(this.g) == size(this.τ))
+    @assert all(size(this.ssa) == size(this.τ))
+    @assert all(size(this.g) == size(this.τ))
   # Valid values
-  @assert !any_vals_less_than(this.τ,  FT(0))
-  @assert !any_vals_outside(this.ssa,  FT(0), FT(1))
-  @assert !any_vals_outside(this.g  , FT(-1), FT(1))
+    @assert !any_vals_less_than(this.τ, FT(0))
+    @assert !any_vals_outside(this.ssa, FT(0), FT(1))
+    @assert !any_vals_outside(this.g, FT(-1), FT(1))
 end
 
 #####
@@ -298,18 +342,21 @@ end
 
 Increment (combine) two sets of optical properties
 """
-function increment!(op_in::AbstractOpticalPropsArry, op_io::AbstractOpticalPropsArry)
-  @assert bands_are_equal(op_in, op_io)
-  if gpoints_are_equal(op_in, op_io)
+function increment!(
+    op_in::AbstractOpticalPropsArry,
+    op_io::AbstractOpticalPropsArry,
+)
+    @assert bands_are_equal(op_in, op_io)
+    if gpoints_are_equal(op_in, op_io)
     # Increment by gpoint or by band if both op_in and op_io are defined that way
-    increment_by_gpoint!(op_io, op_in)
-  else
+        increment_by_gpoint!(op_io, op_in)
+    else
     # Values defined by-band will have ngpt = nband
     # We can use values by band in op_in to increment op_io
-    @assert get_ngpt(op_in) == get_nband(op_io)
+        @assert get_ngpt(op_in) == get_nband(op_io)
     # Increment by band
-    increment_bybnd!(op_io, op_in)
-  end
+        increment_bybnd!(op_io, op_in)
+    end
 end
 
 #####
@@ -346,7 +393,7 @@ Number of bands, given
  - `this` optical properties, see [`AbstractOpticalProps`](@ref)
 """
 get_nband(this::AbstractOpticalProps) = get_nband(this.base)
-get_nband(this::OpticalPropsBase) = size(this.band2gpt,2)
+get_nband(this::OpticalPropsBase) = size(this.band2gpt, 2)
 
 """
     get_ngpt(this::AbstractOpticalProps)
@@ -365,7 +412,8 @@ Size of τ′
 
  - `this` optical properties, see [`AbstractOpticalProps`](@ref)
 """
-get_τ′_size(this::AbstractOpticalPropsArry) = (size(this.τ,3),size(this.τ,2),size(this.τ,1))
+get_τ′_size(this::AbstractOpticalPropsArry) =
+    (size(this.τ, 3), size(this.τ, 2), size(this.τ, 1))
 get_τ′_size(this::AbstractOpticalPropsPGP) = length(this.τ)
 
 
@@ -376,7 +424,8 @@ The first and last g-point of all bands at once, given
 
  - `this` optical properties, see [`AbstractOpticalProps`](@ref)
 """
-get_band_lims_gpoint(this::AbstractOpticalProps) = get_band_lims_gpoint(this.base)
+get_band_lims_gpoint(this::AbstractOpticalProps) =
+    get_band_lims_gpoint(this.base)
 get_band_lims_gpoint(this::OpticalPropsBase) = this.band2gpt
 
 """
@@ -386,7 +435,8 @@ Lower and upper wavenumber of all bands, given
 
  - `this` optical properties, see [`AbstractOpticalProps`](@ref)
 """
-get_band_lims_wavenumber(this::AbstractOpticalProps) = get_band_lims_wavenumber(this.base)
+get_band_lims_wavenumber(this::AbstractOpticalProps) =
+    get_band_lims_wavenumber(this.base)
 get_band_lims_wavenumber(this::OpticalPropsBase) = this.band_lims_wvn
 
 """
@@ -406,8 +456,10 @@ A range of g-point bands, given the i-th band
 
  - `this` optical properties, see [`AbstractOpticalProps`](@ref)
 """
-gpt_range(this::AbstractOpticalProps{FT,I}, ibnd::I) where {FT,I} = gpt_range(this.base, ibnd)
-gpt_range(this::OpticalPropsBase{FT,I}, ibnd::I) where {FT,I<:Int} = this.band2gpt[1,ibnd]:this.band2gpt[2,ibnd]
+gpt_range(this::AbstractOpticalProps{FT,I}, ibnd::I) where {FT,I} =
+    gpt_range(this.base, ibnd)
+gpt_range(this::OpticalPropsBase{FT,I}, ibnd::I) where {FT,I<:Int} =
+    this.band2gpt[1, ibnd]:this.band2gpt[2, ibnd]
 
 """
     bands_are_equal(this::AbstractOpticalProps{FT}, that::AbstractOpticalProps{FT}) where FT
@@ -418,14 +470,17 @@ the same, (same number, same wavelength limits), given
  - `this` optical properties, see [`AbstractOpticalProps`](@ref)
  - `that` optical properties, see [`AbstractOpticalProps`](@ref)
 """
-function bands_are_equal(this::AbstractOpticalProps{FT}, that::AbstractOpticalProps{FT}) where FT
-  if get_nband(this) == get_nband(that) && get_nband(this) > 0
-    return all(abs.(get_band_lims_wavenumber(this) .-
-                    get_band_lims_wavenumber(that)) .<
-    FT(5) * spacing.(get_band_lims_wavenumber(this)))
-  else
-    return false
-  end
+function bands_are_equal(
+    this::AbstractOpticalProps{FT},
+    that::AbstractOpticalProps{FT},
+) where {FT}
+    if get_nband(this) == get_nband(that) && get_nband(this) > 0
+        return all(abs.(get_band_lims_wavenumber(this) .-
+                        get_band_lims_wavenumber(that)) .< FT(5) *
+                                                           spacing.(get_band_lims_wavenumber(this)))
+    else
+        return false
+    end
 end
 
 """
@@ -438,12 +493,15 @@ same mapping between bands and g-points), given
  - `this` optical properties, see [`AbstractOpticalProps`](@ref)
  - `that` optical properties, see [`AbstractOpticalProps`](@ref)
 """
-function gpoints_are_equal(this::AbstractOpticalProps{FT}, that::AbstractOpticalProps{FT}) where {FT}
-  if bands_are_equal(this, that) && get_ngpt(this) == get_ngpt(that)
-    return all(get_gpoint_bands(this) == get_gpoint_bands(that))
-  else
-    return false
-  end
+function gpoints_are_equal(
+    this::AbstractOpticalProps{FT},
+    that::AbstractOpticalProps{FT},
+) where {FT}
+    if bands_are_equal(this, that) && get_ngpt(this) == get_ngpt(that)
+        return all(get_gpoint_bands(this) == get_gpoint_bands(that))
+    else
+        return false
+    end
 end
 
 include("OpticalProps_kernels.jl")

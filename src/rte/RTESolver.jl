@@ -85,21 +85,23 @@ given
  - `bcs` boundary conditions, see [`ShortwaveBCs`](@ref)
  - `μ_0` cosine of solar zenith angle (ncol)
 """
-function rte_sw!(fluxes::FluxesBroadBand{FT},
-                 op::AbstractOpticalPropsArry{FT,I},
-                 mesh_orientation::MeshOrientation{I},
-                 bcs::ShortwaveBCs{FT},
-                 μ_0::Array{FT}) where {FT<:AbstractFloat,I<:Int}
-  base = RTEBase(fluxes, mesh_orientation, bcs, op)
-  rte = RTEShortWave(base, μ_0, op)
+function rte_sw!(
+    fluxes::FluxesBroadBand{FT},
+    op::AbstractOpticalPropsArry{FT,I},
+    mesh_orientation::MeshOrientation{I},
+    bcs::ShortwaveBCs{FT},
+    μ_0::Array{FT},
+) where {FT<:AbstractFloat,I<:Int}
+    base = RTEBase(fluxes, mesh_orientation, bcs, op)
+    rte = RTEShortWave(base, μ_0, op)
 
   # Compute the radiative transfer...
-  solve!(rte, op, mesh_orientation)
+    solve!(rte, op, mesh_orientation)
 
   # ...and reduce spectral fluxes to desired output quantities
-  reduce!(rte.base, op)
-  fluxes = rte.base.fluxes
-  return nothing
+    reduce!(rte.base, op)
+    fluxes = rte.base.fluxes
+    return nothing
 end
 
 """
@@ -122,22 +124,24 @@ given
  - `sources` radiation sources, see [`SourceFuncLongWave`](@ref)
  - `angle_disc` Gaussian quadrature for angular discretization, [`GaussQuadrature`](@ref)
 """
-function rte_lw!(fluxes::FluxesBroadBand{FT},
-                 op::AbstractOpticalPropsArry{FT,I},
-                 mesh_orientation::MeshOrientation{I},
-                 bcs::LongwaveBCs{FT},
-                 sources::SourceFuncLongWave{FT, I},
-                 angle_disc::Union{GaussQuadrature{FT,I},Nothing}=nothing) where {FT<:AbstractFloat,I<:Int}
+function rte_lw!(
+    fluxes::FluxesBroadBand{FT},
+    op::AbstractOpticalPropsArry{FT,I},
+    mesh_orientation::MeshOrientation{I},
+    bcs::LongwaveBCs{FT},
+    sources::SourceFuncLongWave{FT,I},
+    angle_disc::Union{GaussQuadrature{FT,I},Nothing} = nothing,
+) where {FT<:AbstractFloat,I<:Int}
 
-  base = RTEBase(fluxes, mesh_orientation, bcs, op)
-  rte = RTELongWave(base, sources, angle_disc, op)
+    base = RTEBase(fluxes, mesh_orientation, bcs, op)
+    rte = RTELongWave(base, sources, angle_disc, op)
 
   # Compute the radiative transfer...
-  solve!(rte, op, mesh_orientation)
+    solve!(rte, op, mesh_orientation)
 
-  reduce!(rte.base, op)
-  fluxes = rte.base.fluxes
-  return nothing
+    reduce!(rte.base, op)
+    fluxes = rte.base.fluxes
+    return nothing
 end
 
 """
@@ -145,7 +149,13 @@ end
 
 Wrapper for [`reduce!`](@ref Fluxes.reduce!)
 """
-reduce!(base, op) = reduce!(base.fluxes, base.gpt_flux_up, base.gpt_flux_dn, op, base.gpt_flux_dir)
+reduce!(base, op) = reduce!(
+    base.fluxes,
+    base.gpt_flux_up,
+    base.gpt_flux_dn,
+    op,
+    base.gpt_flux_dir,
+)
 
 """
     expand_and_transpose(ops::AbstractOpticalProps,arr_in::Array{FT}) where FT
@@ -156,20 +166,23 @@ dimensions (`nband`, `ncol`) -> (`ncol`, `ngpt`), of `arr_out`, given
  - `ops` - optical properties, see [`AbstractOpticalProps`](@ref)
  - `arr_in` - input array
 """
-function expand_and_transpose(ops::AbstractOpticalProps{FT}, arr_in::Array{FT}) where {FT<:AbstractFloat}
-  ncol  = size(arr_in,2)
-  nband = get_nband(ops)
-  ngpt  = get_ngpt(ops)
-  arr_out = Array{FT}(undef,ncol, ngpt)
-  limits = get_band_lims_gpoint(ops)
-  @inbounds for iband = 1:nband
-    @inbounds for icol = 1:ncol
-      @inbounds for igpt = limits[1, iband]:limits[2, iband]
-        arr_out[icol, igpt] = arr_in[iband,icol]
-      end
+function expand_and_transpose(
+    ops::AbstractOpticalProps{FT},
+    arr_in::Array{FT},
+) where {FT<:AbstractFloat}
+    ncol = size(arr_in, 2)
+    nband = get_nband(ops)
+    ngpt = get_ngpt(ops)
+    arr_out = Array{FT}(undef, ncol, ngpt)
+    limits = get_band_lims_gpoint(ops)
+    @inbounds for iband in 1:nband
+        @inbounds for icol in 1:ncol
+            @inbounds for igpt in limits[1, iband]:limits[2, iband]
+                arr_out[icol, igpt] = arr_in[iband, icol]
+            end
+        end
     end
-  end
-  return arr_out
+    return arr_out
 end
 
 include("RTESolver_kernels.jl")
