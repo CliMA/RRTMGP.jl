@@ -21,21 +21,22 @@ Mesh orientation
 $(DocStringExtensions.FIELDS)
 """
 struct MeshOrientation{I}
-  "Indicates whether arrays are ordered in the vertical with 1 at the top or the bottom of the domain."
-  top_at_1::Bool
-  "Number of layers"
-  nlay::I
-  MeshOrientation(top_at_1::Bool, nlay::I) where {I<:Int} = new{I}(top_at_1, nlay)
+    "Indicates whether arrays are ordered in the vertical with 1 at the top or the bottom of the domain."
+    top_at_1::Bool
+    "Number of layers"
+    nlay::I
+    MeshOrientation(top_at_1::Bool, nlay::I) where {I<:Int} =
+        new{I}(top_at_1, nlay)
 end
 
 """ i-th level at the top of the domain"""
-ilev_top(mo::MeshOrientation) = mo.top_at_1 ? 1 : mo.nlay+1
+ilev_top(mo::MeshOrientation) = mo.top_at_1 ? 1 : mo.nlay + 1
 
 """i-th level at the bottom of the domain"""
-ilev_bot(mo::MeshOrientation) = !mo.top_at_1 ? 1 : mo.nlay+1
+ilev_bot(mo::MeshOrientation) = !mo.top_at_1 ? 1 : mo.nlay + 1
 
 """i-th layer at the top of the domain"""
-ilay_top(mo::MeshOrientation) =  mo.top_at_1 ? 1 : mo.nlay
+ilay_top(mo::MeshOrientation) = mo.top_at_1 ? 1 : mo.nlay
 
 """i-th layer at the bottom of the domain"""
 ilay_bot(mo::MeshOrientation) = !mo.top_at_1 ? 1 : mo.nlay
@@ -50,7 +51,8 @@ lev_range(mo::MeshOrientation) = mo.top_at_1 ? (2:mo.nlay+1) : (mo.nlay:-1:1)
     lev_range_reversed(mo::MeshOrientation)
 
 """
-lev_range_reversed(mo::MeshOrientation) = mo.top_at_1 ? (mo.nlay:-1:1) : (2:mo.nlay+1)
+lev_range_reversed(mo::MeshOrientation) =
+    mo.top_at_1 ? (mo.nlay:-1:1) : (2:mo.nlay+1)
 
 """
     lay_range(mo::MeshOrientation)
@@ -62,7 +64,8 @@ lay_range(mo::MeshOrientation) = mo.top_at_1 ? (1:mo.nlay) : (mo.nlay:-1:1)
     lay_range_reversed(mo::MeshOrientation)
 
 """
-lay_range_reversed(mo::MeshOrientation) = mo.top_at_1 ? (mo.nlay:-1:1) : (1:mo.nlay)
+lay_range_reversed(mo::MeshOrientation) =
+    mo.top_at_1 ? (mo.nlay:-1:1) : (1:mo.nlay)
 
 binary(::Val{false}) = 0
 binary(::Val{true}) = 1

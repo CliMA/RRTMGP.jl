@@ -16,15 +16,15 @@ using RRTMGP.AtmosphericStates
 using RRTMGP.SourceFunctions
 using RRTMGP.AngularDiscretizations
 @static if haspkg("Plots")
-  using Plots
-  const export_plots = true
+    using Plots
+    const export_plots = true
 else
-  const export_plots = false
+    const export_plots = false
 end
 
 include(joinpath("PostProcessing.jl"))
-include(joinpath("..","ReadInputData","ReadInputs.jl"))
-include(joinpath("..","ReadInputData","LoadCoefficients.jl"))
+include(joinpath("..", "ReadInputData", "ReadInputs.jl"))
+include(joinpath("..", "ReadInputData", "LoadCoefficients.jl"))
 
 """
 Example program to demonstrate the calculation of longwave radiative fluxes in clear, aerosol-free skies.
@@ -45,30 +45,34 @@ Optical properties of the atmosphere as array of values
    In the longwave we include only absorption optical depth (_1scl)
    Shortwave calculations use optical depth, single-scattering albedo, asymmetry parameter (_2str)
 """
-function rfmip_clear_sky_lw(ds, optical_props_constructor; compile_first=false)
+function rfmip_clear_sky_lw(
+    ds,
+    optical_props_constructor;
+    compile_first = false,
+)
 
-  FT = Float64
-  I  = Int
-  deg_to_rad = acos(-FT(1))/FT(180)
-  angle_disc = GaussQuadrature(FT, 1)
+    FT = Float64
+    I = Int
+    deg_to_rad = acos(-FT(1)) / FT(180)
+    angle_disc = GaussQuadrature(FT, 1)
 
-  ncol, nlay, nexp = read_size(ds[:rfmip])
+    ncol, nlay, nexp = read_size(ds[:rfmip])
 
-  forcing_index = 1
-  block_size = 8
+    forcing_index = 1
+    block_size = 8
 
   # How big is the problem? Does it fit into blocks of the size we've specified?
-  @assert mod(ncol*nexp, block_size) == 0
-  nblocks = Int((ncol*nexp)/block_size)
+    @assert mod(ncol * nexp, block_size) == 0
+    nblocks = Int((ncol * nexp) / block_size)
 
-  @assert 1 <= forcing_index <= 3
+    @assert 1 <= forcing_index <= 3
 
   #
   # Identify the set of gases used in the calculation based on the forcing index
   #   A gas might have a different name in the k-distribution than in the files
   #   provided by RFMIP (e.g. 'co2' and 'carbon_dioxide')
   #
-  kdist_gas_names = determine_gas_names(ds[:k_dist], forcing_index)
+    kdist_gas_names = determine_gas_names(ds[:k_dist], forcing_index)
 
   # --------------------------------------------------
   #
@@ -77,36 +81,43 @@ function rfmip_clear_sky_lw(ds, optical_props_constructor; compile_first=false)
   #
   # Allocation on assignment within reading routines
   #
-  p_lay_all, p_lev_all, t_lay_all, t_lev_all = read_and_block_pt(ds[:rfmip], block_size)
+    p_lay_all, p_lev_all, t_lay_all, t_lev_all = read_and_block_pt(
+        ds[:rfmip],
+        block_size,
+    )
   #
   # Are the arrays ordered in the vertical with 1 at the top or the bottom of the domain?
   #
 
-  top_at_1 = p_lay_all[1, 1, 1] < p_lay_all[1, nlay, 1]
+    top_at_1 = p_lay_all[1, 1, 1] < p_lay_all[1, nlay, 1]
 
   #
   # Read the gas concentrations and surface properties
   #
-  gas_conc_array = read_and_block_gases_ty(ds[:rfmip], block_size, kdist_gas_names)
-  sfc_emis_all, t_sfc_all = read_and_block_lw_bc(ds[:rfmip], block_size)
+    gas_conc_array = read_and_block_gases_ty(
+        ds[:rfmip],
+        block_size,
+        kdist_gas_names,
+    )
+    sfc_emis_all, t_sfc_all = read_and_block_lw_bc(ds[:rfmip], block_size)
 
   # Read k-distribution information:
-  k_dist = load_and_init(ds[:k_dist], FT, gas_conc_array[1].gas_names)
-  @assert source_is_internal(k_dist)
+    k_dist = load_and_init(ds[:k_dist], FT, gas_conc_array[1].gas_names)
+    @assert source_is_internal(k_dist)
 
-  nbnd = get_nband(k_dist.optical_props)
-  ngpt = get_ngpt(k_dist.optical_props)
+    nbnd = get_nband(k_dist.optical_props)
+    ngpt = get_ngpt(k_dist.optical_props)
 
   #
   # RRTMGP won't run with pressure less than its minimum. The top level in the RFMIP file
   #   is set to 10^-3 Pa. Here we pretend the layer is just a bit less deep.
   #   This introduces an error but shows input sanitizing.
   #
-  if top_at_1
-    p_lev_all[:,1,:] .= get_press_min(k_dist.ref) + eps(FT)
-  else
-    p_lev_all[:,nlay+1,:] .= get_press_min(k_dist.ref) + eps(FT)
-  end
+    if top_at_1
+        p_lev_all[:, 1, :] .= get_press_min(k_dist.ref) + eps(FT)
+    else
+        p_lev_all[:, nlay+1, :] .= get_press_min(k_dist.ref) + eps(FT)
+    end
 
   #
   # RTE will fail if passed solar zenith angles greater than 90 degree. We replace any with
@@ -119,91 +130,115 @@ function rfmip_clear_sky_lw(ds, optical_props_constructor; compile_first=false)
   #   gas optical properties, and source functions. The %alloc() routines carry along
   #   the spectral discretization from the k-distribution.
   #
-  flux_up = Array{FT}(undef, block_size, nlay+1, nblocks)
-  flux_dn = Array{FT}(undef, block_size, nlay+1, nblocks)
+    flux_up = Array{FT}(undef, block_size, nlay + 1, nblocks)
+    flux_dn = Array{FT}(undef, block_size, nlay + 1, nblocks)
 
-  sfc_emis_spec = Array{FT}(undef, nbnd,block_size)
+    sfc_emis_spec = Array{FT}(undef, nbnd, block_size)
 
-  optical_props = optical_props_constructor(k_dist.optical_props, block_size, nlay, ngpt)
-  source = SourceFuncLongWave(block_size,nlay,k_dist.optical_props)
+    optical_props = optical_props_constructor(
+        k_dist.optical_props,
+        block_size,
+        nlay,
+        ngpt,
+    )
+    source = SourceFuncLongWave(block_size, nlay, k_dist.optical_props)
 
   #
   # Loop over blocks
   #
-  fluxes = FluxesBroadBand(FT, (size(flux_up,1),size(flux_up,2)))
+    fluxes = FluxesBroadBand(FT, (size(flux_up, 1), size(flux_up, 2)))
 
-  local as
+    local as
 
-  for b = 1:(compile_first ? 1 : nblocks)
-    for icol = 1:block_size
-      for ibnd = 1:nbnd
-        sfc_emis_spec[ibnd,icol] = sfc_emis_all[icol,b]
-      end
-    end
-    gas_conc = gas_conc_array[b]
-    p_lay = p_lay_all[:,:,b]
-    p_lev = p_lev_all[:,:,b]
-    t_lay = t_lay_all[:,:,b]
-    t_lev = t_lev_all[:,:,b]
-    t_sfc = t_sfc_all[:,  b]
-    as = AtmosphericState(gas_conc, p_lay, p_lev, t_lay, t_lev, k_dist.ref, nothing, t_sfc)
+    for b in 1:(compile_first ? 1 : nblocks)
+        for icol in 1:block_size
+            for ibnd in 1:nbnd
+                sfc_emis_spec[ibnd, icol] = sfc_emis_all[icol, b]
+            end
+        end
+        gas_conc = gas_conc_array[b]
+        p_lay = p_lay_all[:, :, b]
+        p_lev = p_lev_all[:, :, b]
+        t_lay = t_lay_all[:, :, b]
+        t_lev = t_lev_all[:, :, b]
+        t_sfc = t_sfc_all[:, b]
+        as = AtmosphericState(
+            gas_conc,
+            p_lay,
+            p_lev,
+            t_lay,
+            t_lev,
+            k_dist.ref,
+            nothing,
+            t_sfc,
+        )
 
-    fluxes.flux_up .= FT(0)
-    fluxes.flux_dn .= FT(0)
+        fluxes.flux_up .= FT(0)
+        fluxes.flux_dn .= FT(0)
 
-    gas_optics!(k_dist, as, optical_props, source)
+        gas_optics!(k_dist, as, optical_props, source)
 
-    bcs = LongwaveBCs(sfc_emis_spec)
+        bcs = LongwaveBCs(sfc_emis_spec)
 
-    rte_lw!(fluxes,
+        rte_lw!(
+            fluxes,
             optical_props,
             as.mesh_orientation,
             bcs,
             source,
-            angle_disc)
+            angle_disc,
+        )
 
-    flux_up[:,:,b] .= fluxes.flux_up
-    flux_dn[:,:,b] .= fluxes.flux_dn
+        flux_up[:, :, b] .= fluxes.flux_up
+        flux_dn[:, :, b] .= fluxes.flux_dn
 
-  end
+    end
 
-  if export_plots
-    case = "clearsky_lw_"*string(optical_props_constructor)
-    heating_rate, z = compute_heating_rate(fluxes.flux_up, fluxes.flux_dn, as)
-    plot(heating_rate, z, title="Clear sky longwave heating rates",
-                          xlabel="heating rate",
-                          ylabel="pressure")
-    out_dir = "output"
-    mkpath(out_dir)
-    savefig(joinpath(out_dir,case*".png"))
-  end
+    if export_plots
+        case = "clearsky_lw_" * string(optical_props_constructor)
+        heating_rate, z = compute_heating_rate(
+            fluxes.flux_up,
+            fluxes.flux_dn,
+            as,
+        )
+        plot(
+            heating_rate,
+            z,
+            title = "Clear sky longwave heating rates",
+            xlabel = "heating rate",
+            ylabel = "pressure",
+        )
+        out_dir = "output"
+        mkpath(out_dir)
+        savefig(joinpath(out_dir, case * ".png"))
+    end
 
   # reshaping the flux_up and flux_dn arrays for comparison with Fortran code.
-  flux_up = reshape_for_comparison(flux_up, nlay, ncol, nexp)
-  flux_dn = reshape_for_comparison(flux_dn, nlay, ncol, nexp)
+    flux_up = reshape_for_comparison(flux_up, nlay, ncol, nexp)
+    flux_dn = reshape_for_comparison(flux_dn, nlay, ncol, nexp)
 
   # comparing with reference data
-  rlu_ref = ds[:flx_up]["rlu"][:]
-  rld_ref = ds[:flx_dn]["rld"][:]
+    rlu_ref = ds[:flx_up]["rlu"][:]
+    rld_ref = ds[:flx_dn]["rld"][:]
 
-  diff_up = maximum( abs.( flux_up .- rlu_ref ) )
-  diff_dn = maximum( abs.( flux_dn .- rld_ref ) )
+    diff_up = maximum(abs.(flux_up .- rlu_ref))
+    diff_dn = maximum(abs.(flux_dn .- rld_ref))
 
-  diff_up_ulps = maximum( abs.( flux_up .- rlu_ref ) ./ eps.(rlu_ref) )
-  diff_dn_ulps = maximum( abs.( flux_dn .- rld_ref ) ./ eps.(rld_ref) )
+    diff_up_ulps = maximum(abs.(flux_up .- rlu_ref) ./ eps.(rlu_ref))
+    diff_dn_ulps = maximum(abs.(flux_dn .- rld_ref) ./ eps.(rld_ref))
 
   # @show sqrt(1/eps(FT))
   # @show diff_up, diff_up_ulps, maximum(abs.(rlu_ref))
   # @show diff_dn, diff_dn_ulps, maximum(abs.(rld_ref))
 
-  if !compile_first
-    if optical_props_constructor isa TwoStream
-      @test diff_up_ulps < sqrt(1/(1e6eps(FT)))
-      @test diff_dn_ulps < sqrt(1/(1e6eps(FT)))
-    else
-      @test diff_up_ulps < sqrt(1/(1e5eps(FT)))
-      @test diff_dn_ulps < sqrt(1/(1e3eps(FT)))
+    if !compile_first
+        if optical_props_constructor isa TwoStream
+            @test diff_up_ulps < sqrt(1 / (1e6 * eps(FT)))
+            @test diff_dn_ulps < sqrt(1 / (1e6 * eps(FT)))
+        else
+            @test diff_up_ulps < sqrt(1 / (1e5 * eps(FT)))
+            @test diff_dn_ulps < sqrt(1 / (1e3 * eps(FT)))
+        end
     end
-  end
-  return nothing
+    return nothing
 end

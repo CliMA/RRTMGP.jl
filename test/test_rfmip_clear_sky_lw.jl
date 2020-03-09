@@ -4,32 +4,44 @@ include("rfmip_clear_sky_lw_pgp.jl")
 include("DataSetFiles.jl")
 
 @testset "rfmip clear sky longwave driver" begin
-  datafolder = RRTMGP.data_folder_rrtmgp()
+    datafolder = RRTMGP.data_folder_rrtmgp()
 
-  ds = dataset_dict(data_files_dict(datafolder, "lw"))
+    ds = dataset_dict(data_files_dict(datafolder, "lw"))
 
-  Δt_all = Dict()
+    Δt_all = Dict()
 
-  if !pgp_only
-    rfmip_clear_sky_lw(ds, OneScalar; compile_first=true)
-    rfmip_clear_sky_lw(ds, TwoStream; compile_first=true)
-  end
+    if !pgp_only
+        rfmip_clear_sky_lw(ds, OneScalar; compile_first = true)
+        rfmip_clear_sky_lw(ds, TwoStream; compile_first = true)
+    end
 
-  rfmip_clear_sky_lw_pgp(ds, OneScalar; compile_first=true)
-  rfmip_clear_sky_lw_pgp(ds, TwoStream; compile_first=true)
+    rfmip_clear_sky_lw_pgp(ds, OneScalar; compile_first = true)
+    rfmip_clear_sky_lw_pgp(ds, TwoStream; compile_first = true)
 
-  if !pgp_only
-    Δt_all["clear_sky_lw", "1scl"] = @elapsed rfmip_clear_sky_lw(ds, OneScalar)
-    Δt_all["clear_sky_lw", "2str"] = @elapsed rfmip_clear_sky_lw(ds, TwoStream)
-  end
+    if !pgp_only
+        Δt_all["clear_sky_lw", "1scl"] = @elapsed rfmip_clear_sky_lw(
+            ds,
+            OneScalar,
+        )
+        Δt_all["clear_sky_lw", "2str"] = @elapsed rfmip_clear_sky_lw(
+            ds,
+            TwoStream,
+        )
+    end
 
-  Δt_all["clear_sky_lw_pgp", "1scl"] = @elapsed rfmip_clear_sky_lw_pgp(ds, OneScalar)
-  Δt_all["clear_sky_lw_pgp", "2str"] = @elapsed rfmip_clear_sky_lw_pgp(ds, TwoStream)
+    Δt_all["clear_sky_lw_pgp", "1scl"] = @elapsed rfmip_clear_sky_lw_pgp(
+        ds,
+        OneScalar,
+    )
+    Δt_all["clear_sky_lw_pgp", "2str"] = @elapsed rfmip_clear_sky_lw_pgp(
+        ds,
+        TwoStream,
+    )
 
-  for (case,Δt) in Δt_all
-    @show case, Δt
-  end
+    for (case, Δt) in Δt_all
+        @show case, Δt
+    end
 
-  close.(values(ds))
+    close.(values(ds))
 
 end

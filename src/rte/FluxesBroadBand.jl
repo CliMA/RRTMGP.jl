@@ -13,17 +13,17 @@ Contains upward, downward, net, and direct downward fluxes
 $(DocStringExtensions.FIELDS)
 """
 struct FluxesBroadBand{FT} <: AbstractFluxes{FT}
-  "Upward flux"
-  flux_up::Array{FT,2}
-  "Downward flux"
-  flux_dn::Array{FT,2}
-  "Net flux"
-  flux_net::Array{FT,2}
-  "Downward direct flux"
-  flux_dn_dir::Union{Array{FT,2},Nothing}
-  FluxesBroadBand(FT, s, include_direct::Bool=false) =
-    include_direct ? new{FT}(ntuple(i->Array{FT}(undef, s...),4)...) :
-                     new{FT}(ntuple(i->Array{FT}(undef, s...),3)...,nothing)
+    "Upward flux"
+    flux_up::Array{FT,2}
+    "Downward flux"
+    flux_dn::Array{FT,2}
+    "Net flux"
+    flux_net::Array{FT,2}
+    "Downward direct flux"
+    flux_dn_dir::Union{Array{FT,2},Nothing}
+    FluxesBroadBand(FT, s, include_direct::Bool = false) =
+        include_direct ? new{FT}(ntuple(i -> Array{FT}(undef, s...), 4)...) :
+        new{FT}(ntuple(i -> Array{FT}(undef, s...), 3)..., nothing)
 end
 
 """
@@ -42,34 +42,43 @@ spectral dimension, given
 optional:
  - `gpt_flux_dn_dir` downward direct flux
 """
-function reduce!(this::FluxesBroadBand{FT},
-                 gpt_flux_up::Array{FT,3},
-                 gpt_flux_dn::Array{FT,3},
-                 spectral_disc::AbstractOpticalProps{FT},
-                 gpt_flux_dn_dir::Union{Nothing,Array{FT,3}}=nothing) where FT<:AbstractFloat
+function reduce!(
+    this::FluxesBroadBand{FT},
+    gpt_flux_up::Array{FT,3},
+    gpt_flux_dn::Array{FT,3},
+    spectral_disc::AbstractOpticalProps{FT},
+    gpt_flux_dn_dir::Union{Nothing,Array{FT,3}} = nothing,
+) where {FT<:AbstractFloat}
 
-  ncol,nlev,ngpt = size(gpt_flux_up)
+    ncol, nlev, ngpt = size(gpt_flux_up)
 
   # Check array sizes
-  @assert all(size(gpt_flux_dn) .== (ncol,nlev,ngpt))
-  @assert all(size(this.flux_up) .== (ncol,nlev))
-  @assert all(size(this.flux_dn) .== (ncol,nlev))
-  @assert all(size(this.flux_net) .== (ncol,nlev))
-  gpt_flux_dn_dir ≠ nothing && @assert all(size(gpt_flux_dn_dir) .== (ncol,nlev,ngpt))
-  gpt_flux_dn_dir ≠ nothing && @assert all(size(this.flux_dn_dir) .== (ncol,nlev))
+    @assert all(size(gpt_flux_dn) .== (ncol, nlev, ngpt))
+    @assert all(size(this.flux_up) .== (ncol, nlev))
+    @assert all(size(this.flux_dn) .== (ncol, nlev))
+    @assert all(size(this.flux_net) .== (ncol, nlev))
+    gpt_flux_dn_dir ≠ nothing && @assert all(size(gpt_flux_dn_dir) .== (
+        ncol,
+        nlev,
+        ngpt,
+    ))
+    gpt_flux_dn_dir ≠ nothing && @assert all(size(this.flux_dn_dir) .== (
+        ncol,
+        nlev,
+    ))
 
   # Self-consistency -- shouldn't be asking for direct beam flux if it isn't supplied
-  @assert !(this.flux_dn_dir ≠ nothing && gpt_flux_dn_dir==nothing)
+    @assert !(this.flux_dn_dir ≠ nothing && gpt_flux_dn_dir == nothing)
 
   # Broadband fluxes - call the kernels
-  this.flux_up .= sum_broadband(gpt_flux_up)
-  this.flux_dn .= sum_broadband(gpt_flux_dn)
-  if this.flux_dn_dir ≠ nothing
-    this.flux_dn_dir .= sum_broadband(gpt_flux_dn_dir)
-  end
+    this.flux_up .= sum_broadband(gpt_flux_up)
+    this.flux_dn .= sum_broadband(gpt_flux_dn)
+    if this.flux_dn_dir ≠ nothing
+        this.flux_dn_dir .= sum_broadband(gpt_flux_dn_dir)
+    end
 
   #  Reuse down and up results if possible
-  this.flux_net .= net_broadband(this.flux_dn, this.flux_up)
+    this.flux_net .= net_broadband(this.flux_dn, this.flux_up)
 end
 
 #####
@@ -82,11 +91,15 @@ end
 
 Broadband, computing via spectral reduction over all points
 """
-sum_broadband(spectral_flux::Array{FT}) where {FT} = sum(spectral_flux, dims=3)[:,:,1]
+sum_broadband(spectral_flux::Array{FT}) where {FT} =
+    sum(spectral_flux, dims = 3)[:, :, 1]
 
 """
     net_broadband(flux_dn, flux_up)
 
 Net flux when broadband flux up and down are already available
 """
-net_broadband(flux_dn::Array{FT}, flux_up::Array{FT}) where {FT<:AbstractFloat} = flux_dn .- flux_up
+net_broadband(
+    flux_dn::Array{FT},
+    flux_up::Array{FT},
+) where {FT<:AbstractFloat} = flux_dn .- flux_up
