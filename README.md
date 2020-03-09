@@ -33,7 +33,17 @@ This is based off of the [rte-rrtmgp](https://github.com/RobertPincus/rte-rrtmgp
 
 # Install
 
-`git clone https://github.com/climate-machine/RRTMGP.jl`
+RRTMGP.jl is registered in the general Julia registry. To install, enter the package manager by typing `]` in the Julia REPL, and then type:
+
+```julia
+pkg> add RRTMGP
+```
+
+Then, to use
+
+```julia
+julia> using RRTMGP
+```
 
 # Acknowledgments
 
