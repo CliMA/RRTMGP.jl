@@ -21,13 +21,15 @@ Reference state variables for look-up tables / interpolation
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct ReferenceState{FT} <: AbstractReferenceState{FT}
+struct ReferenceState{FT,
+                      VFT<:AbstractVector{FT},
+                      AFT3<:AbstractArray{FT,3}} <: AbstractReferenceState{FT}
     "Pressure"
-    press::Vector{FT}
+    press::VFT
     "Log of pressure"
-    press_log::Vector{FT}
+    press_log::VFT
     "Temperature"
-    temp::Vector{FT}
+    temp::VFT
     "Minimum of pressure"
     press_min::FT
     "Maximum of pressure"
@@ -43,15 +45,15 @@ struct ReferenceState{FT} <: AbstractReferenceState{FT}
     "Logarithm of tropospheric pressure"
     press_trop_log::FT
     "Volume mixing ratio (lower or upper atmosphere, gas, temp)"
-    vmr::Array{FT,3}
+    vmr::AFT3
     function ReferenceState(
-        press::Array{FT},
-        temp::Array{FT},
+        press::VFT,
+        temp::VFT,
         press_ref_trop::FT,
-        vmr_ref::Array{FT},
-        gases_prescribed::Vector{AbstractGas},
-        gases_in_database::Vector{AbstractGas},
-    ) where {FT<:AbstractFloat}
+        vmr_ref::AFT3,
+        gases_prescribed::VG,
+        gases_in_database::VG,
+    ) where {FT<:AbstractFloat,VFT<:AbstractVector{FT},AFT3<:AbstractArray{FT,3},VG<:AbstractVector{AbstractGas}}
 
         gas_is_present = map(x -> x in gases_prescribed, gases_in_database)
         ngas = count(gas_is_present)
@@ -83,7 +85,7 @@ struct ReferenceState{FT} <: AbstractReferenceState{FT}
             idx = loc_in_array(gases_prescribed[i], gases_in_database)
             vmr_ref_red[:, i+1, :] = vmr_ref[:, idx+1, :]
         end
-        return new{FT}(
+        return new{FT,VFT,AFT3}(
             press,
             press_log,
             temp,

@@ -86,20 +86,24 @@ Base class for optical properties.
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct OpticalPropsBase{FT,I} <: AbstractOpticalProps{FT,I}
+struct OpticalPropsBase{FT,
+                        I,
+                        VI<:AbstractVector{I},
+                        AI2<:AbstractArray{I,2},
+                        AFT2<:AbstractArray{FT,2}} <: AbstractOpticalProps{FT,I}
     "Map from band to g-point. `(g_point_begin, g_point_end) = band2gpt[2,band]`"
-    band2gpt::Array{I,2}
+    band2gpt::AI2
     "Map from g-point to band. `band = gpt2band(gpt)`"
-    gpt2band::Array{I,1}
+    gpt2band::VI
     "Wavenumber band limits. `(upper_band_wvn, lower_band_wvn) = band_lims_wvn[2,band]`"
-    band_lims_wvn::Array{FT,2}
+    band_lims_wvn::AFT2
     "Name of optical properties"
     name::AbstractString
     function OpticalPropsBase(
         name,
-        band_lims_wvn::Array{FT},
+        band_lims_wvn::AFT2,
         band_lims_gpt = nothing,
-    ) where {FT}
+    ) where {FT<:AbstractFloat,AFT2<:AbstractArray{FT,2}}
         @assert size(band_lims_wvn, 1) == 2
         @assert !any(band_lims_wvn .< FT(0))
         band_lims_gpt_lcl = Array{Int}(undef, 2, size(band_lims_wvn, 2))
@@ -114,15 +118,17 @@ struct OpticalPropsBase{FT,I} <: AbstractOpticalProps{FT,I}
             end
         end
         band2gpt = band_lims_gpt_lcl
+        AI2 = typeof(band2gpt)
     # Make a map between g-points and bands
         gpt2band = Array{Int}(undef, max(band_lims_gpt_lcl...))
+        VI = typeof(gpt2band)
         for iband in 1:size(band_lims_gpt_lcl, 2)
             gpt2band[band_lims_gpt_lcl[1, iband]:band_lims_gpt_lcl[
                 2,
                 iband,
             ]] .= iband
         end
-        return new{FT,Int}(band2gpt, gpt2band, band_lims_wvn, name)
+        return new{FT,Int,VI,AI2,AFT2}(band2gpt, gpt2band, band_lims_wvn, name)
     end
 end
 

@@ -48,11 +48,11 @@ and lower levels of the atmosphere.
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct GasOpticsAux{I<:Int}
+struct GasOpticsAux{I,VI<:AbstractVector{I}}
     "Indexes for determining `col_gas`"
-    idx_minor::Vector{I}
+    idx_minor::VI
     "Indexes that have special treatment in density scaling"
-    idx_minor_scaling::Vector{I}
+    idx_minor_scaling::VI
     function GasOpticsAux(
         gas_names_present,
         gas_minor,
@@ -60,18 +60,17 @@ struct GasOpticsAux{I<:Int}
         reduced_atmos,
         ::Type{I},
     ) where {I}
-        return new{I}(
-            create_idx_minor(
+    idx_minor = create_idx_minor(
                 gas_names_present,
                 gas_minor,
                 identifier_minor,
                 reduced_atmos.minor_gases,
-            ),
-            create_idx_minor_scaling(
+            )
+    idx_minor_scaling = create_idx_minor_scaling(
                 gas_names_present,
                 reduced_atmos.scaling_gas,
-            ),
-        )
+            )
+        return new{eltype(idx_minor),typeof(idx_minor)}(idx_minor, idx_minor_scaling)
     end
 end
 
@@ -88,22 +87,30 @@ levels of the atmosphere for both full and reduced sets of gases.
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct GasOpticsVars{FT<:AbstractFloat,I<:Int}
+struct GasOpticsVars{FT<:AbstractFloat,
+                     I<:Int,
+                     VB<:AbstractVector{Bool},
+                     VI<:AbstractVector{I},
+                     AI2<:AbstractArray{I,2},
+                     AFT3<:AbstractArray{FT,3},
+                     VG<:AbstractVector{AbstractGas}
+                     }
     "Minor g-point limits"
-    minor_limits_gpt::Array{I,2}
+    minor_limits_gpt::AI2
     "Minor scales with density"
-    minor_scales_with_density::Vector{Bool}
+    minor_scales_with_density::VB
     "Scale by complement"
-    scale_by_complement::Vector{Bool}
+    scale_by_complement::VB
     "Start index for minor gas absorption coefficient"
-    kminor_start::Vector{I}
+    kminor_start::VI
     "Absorption coefficient of minor species (n_minor,η,temperature)"
-    kminor::Array{FT,3}
+    kminor::AFT3
     "Scaling gas"
-    scaling_gas::Array{AbstractGas}
+    scaling_gas::VG
     "Minor gases"
-    minor_gases::Array{AbstractGas}
+    minor_gases::VG
 end
+GasOpticsVars(args...) = GasOpticsVars{typeof.(args...)}(args...)
 
 """
     AbstractGasOptics{FT,I} <: AbstractOpticalProps{FT,I}
@@ -120,37 +127,37 @@ Gas optics with internal sources (for longwave radiation)
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct KDistributionLongwave{FT,I} <: AbstractGasOptics{FT,I}
+struct KDistributionLongwave{FT,I,VB,VI,AI2,VFT,AFT2,AFT3,AFT4,VG} <: AbstractGasOptics{FT,I}
     "Reference state data"
-    ref::ReferenceState{FT}
+    ref::ReferenceState{FT,VFT,AFT3}
     "Base optical properties"
-    optical_props::OpticalPropsBase{FT,I}
+    optical_props::OpticalPropsBase{FT,I,VI,AI2,AFT2}
     "Gas optics variables in the lower atmosphere, see [`GasOpticsVars`](@ref)"
-    lower::GasOpticsVars{FT,I}
+    lower::GasOpticsVars{FT,I,VB,VI,AI2,AFT3,VG}
     "Gas optics variables in the upper atmosphere, see [`GasOpticsVars`](@ref)"
-    upper::GasOpticsVars{FT,I}
+    upper::GasOpticsVars{FT,I,VB,VI,AI2,AFT3,VG}
     "Auxiliary variables (index maps) in the lower atmosphere, see [`GasOpticsAux`](@ref)"
-    lower_aux::GasOpticsAux{I}
+    lower_aux::GasOpticsAux{I,VI}
     "Auxiliary variables (index maps) in the upper atmosphere, see [`GasOpticsAux`](@ref)"
-    upper_aux::GasOpticsAux{I}
+    upper_aux::GasOpticsAux{I,VI}
     "Present gas names"
-    gas_names::Vector{AbstractGas}
+    gas_names::VG
     "Absorption coefficient for major species (g-point,η,pressure,temperature)"
-    kmajor::Array{FT,4}
+    kmajor::AFT4
     "Major species pair; `[2, nflav]`"
-    flavor::Array{I,2}
+    flavor::AI2
     "Flavor per g-point: `lower.flavor = gpoint_flavor[1, 1:ngpt]`, `upper.flavor = gpoint_flavor[2, 1:ngpt]`"
-    gpoint_flavor::Array{I,2}
+    gpoint_flavor::AI2
     "Indicates whether a key species is in any band"
-    is_key::Vector{Bool}
+    is_key::VB
     "Stored fraction of Planck irradiance in band for given g-point"
-    planck_frac::Array{FT,4}
+    planck_frac::AFT4
     "Integrated Planck irradiance by band; `[Planck temperatures,band]`"
-    totplnk::Array{FT,2}
+    totplnk::AFT2
     "Temperature steps in totplnk"
     totplnk_delta::FT
     "Absorption coefficient for Rayleigh scattering `[g-point,η,temperature,upper/lower atmosphere]`"
-    krayl::Union{Array{FT,4},Nothing}
+    krayl::Union{AFT4,Nothing}
 end
 
 """
@@ -161,33 +168,33 @@ Gas optics with external sources (for shortwave radiation)
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct KDistributionShortwave{FT,I} <: AbstractGasOptics{FT,I}
+struct KDistributionShortwave{FT,I,VB,VI,AI2,VFT,AFT2,AFT3,AFT4,VG} <: AbstractGasOptics{FT,I}
     "Reference state data"
-    ref::ReferenceState{FT}
+    ref::ReferenceState{FT,VFT,AFT3}
     "Base optical properties"
-    optical_props::OpticalPropsBase{FT,I}
+    optical_props::OpticalPropsBase{FT,I,VI,AI2,AFT2}
     "Gas optics variables in the lower atmosphere, see [`GasOpticsVars`](@ref)"
-    lower::GasOpticsVars{FT,I}
+    lower::GasOpticsVars{FT,I,VB,VI,AI2,AFT3,VG}
     "Gas optics variables in the upper atmosphere, see [`GasOpticsVars`](@ref)"
-    upper::GasOpticsVars{FT,I}
+    upper::GasOpticsVars{FT,I,VB,VI,AI2,AFT3,VG}
     "Auxiliary variables (index maps) in the lower atmosphere, see [`GasOpticsAux`](@ref)"
-    lower_aux::GasOpticsAux{I}
+    lower_aux::GasOpticsAux{I,VI}
     "Auxiliary variables (index maps) in the upper atmosphere, see [`GasOpticsAux`](@ref)"
-    upper_aux::GasOpticsAux{I}
+    upper_aux::GasOpticsAux{I,VI}
     "Present gas names"
-    gas_names::Vector{AbstractGas}
+    gas_names::VG
     "Absorption coefficient for major species (g-point,η,pressure,temperature)"
-    kmajor::Array{FT,4}
+    kmajor::AFT4
     "Major species pair; `[2, nflav]`"
-    flavor::Array{I,2}
+    flavor::AI2
     "Flavor per g-point: `lower.flavor = gpoint_flavor[1, 1:ngpt]`, `upper.flavor = gpoint_flavor[2, 1:ngpt]`"
-    gpoint_flavor::Array{I,2}
+    gpoint_flavor::AI2
     "Indicates whether a key species is in any band"
-    is_key::Vector{Bool}
+    is_key::VB
     "Incoming solar irradiance (g-point)"
-    solar_src::Vector{FT}
+    solar_src::VFT
     "Absorption coefficient for Rayleigh scattering (g-point,η,temperature,upper/lower atmosphere)"
-    krayl::Union{Array{FT,4},Nothing}
+    krayl::Union{AFT4,Nothing}
 end
 
 """
@@ -523,7 +530,14 @@ function get_k_dist_lw(
     ref::ReferenceState{FT},
     args...,
 ) where {FT<:AbstractFloat}
+
+    # optical_props,reduced_lower,reduced_upper,lower_aux,upper_aux,gas_names_present,kmajor,flavor,gpoint_flavor,is_key
     abs_coeffs = init_abs_coeffs(args...)
+
+    _,I,VB,VI,AI2,AFT3,VG = typeof(abs_coeffs[3]).parameters
+    _,I,VI,AI2,AFT2 = typeof(abs_coeffs[1]).parameters
+    _,VFT,AFT3 = typeof(ref).parameters
+    AFT4 = typeof(abs_coeffs[7])
 
     if rayl_lower ≠ nothing && rayl_upper ≠ nothing
         krayl = zeros(FT, size(rayl_lower)..., 2)
@@ -534,7 +548,7 @@ function get_k_dist_lw(
     end
     totplnk_delta = (ref.temp_max - ref.temp_min) / (size(totplnk, 1) - 1)
 
-    return KDistributionLongwave{FT,Int}(
+    return KDistributionLongwave{FT,I,VB,VI,AI2,VFT,AFT2,AFT3,AFT4,VG}(
         ref,
         abs_coeffs...,
         planck_frac,
@@ -565,6 +579,12 @@ function get_k_dist_sw(
 ) where {FT<:AbstractFloat}
     abs_coeffs = init_abs_coeffs(args...)
 
+    # optical_props,reduced_lower,reduced_upper,lower_aux,upper_aux,gas_names_present,kmajor,flavor,gpoint_flavor,is_key
+    _,I,VB,VI,AI2,AFT3,VG = typeof(abs_coeffs[3]).parameters
+    _,I,VI,AI2,AFT2 = typeof(abs_coeffs[1]).parameters
+    _,VFT,AFT3 = typeof(ref).parameters
+    AFT4 = typeof(abs_coeffs[7])
+
     if rayl_lower ≠ nothing && rayl_upper ≠ nothing
         krayl = zeros(FT, size(rayl_lower)..., 2)
         krayl[:, :, :, 1] = rayl_lower
@@ -573,7 +593,11 @@ function get_k_dist_sw(
         krayl = nothing
     end
 
-    return KDistributionShortwave{FT,Int}(ref, abs_coeffs..., solar_src, krayl)
+    return KDistributionShortwave{FT,I,VB,VI,AI2,VFT,AFT2,AFT3,AFT4,VG}(
+        ref,
+        abs_coeffs...,
+        solar_src,
+        krayl)
 
 end
 
@@ -955,7 +979,7 @@ function reduce_minor_arrays(
             end
         end
     end
-    return GasOpticsVars{FT,I}(
+    return GasOpticsVars(
         atmos_red_minor_limits_gpt,
         atmos_red_minor_scales_with_density,
         atmos_red_scale_by_complement,

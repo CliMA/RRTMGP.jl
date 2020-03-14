@@ -34,20 +34,20 @@ function load_and_init(ds, ::Type{FT}, gases_prescribed::Vector{AbstractGas}) wh
   rayl_upper = haskey(ds,"rayl_upper") ? Array{FT}(ds["rayl_upper"][:]) : nothing
   @assert haskey(ds,"rayl_lower") == haskey(ds,"rayl_upper")
 
-  lower = GasOpticsVars{FT,I}(Array{I}(ds["minor_limits_gpt_lower"][:]),
-                              Array{Bool}(ds["minor_scales_with_density_lower"][:]),
-                              Array{Bool}(ds["scale_by_complement_lower"][:]),
-                              Array{I}(ds["kminor_start_lower"][:]),
-                              Array{FT}(ds["kminor_lower"][:]),
-                              read_gases(ds, "scaling_gas_lower"),
-                              read_gases(ds, "minor_gases_lower"))
-  upper = GasOpticsVars{FT,I}(Array{I}(ds["minor_limits_gpt_upper"][:]),
-                              Array{Bool}(ds["minor_scales_with_density_upper"][:]),
-                              Array{Bool}(ds["scale_by_complement_upper"][:]),
-                              Array{I}(ds["kminor_start_upper"][:]),
-                              Array{FT}(ds["kminor_upper"][:]),
-                              read_gases(ds, "scaling_gas_upper"),
-                              read_gases(ds, "minor_gases_upper"))
+  lower = GasOpticsVars(Array{I}(ds["minor_limits_gpt_lower"][:]),
+                        Array{Bool}(ds["minor_scales_with_density_lower"][:]),
+                        Array{Bool}(ds["scale_by_complement_lower"][:]),
+                        Array{I}(ds["kminor_start_lower"][:]),
+                        Array{FT}(ds["kminor_lower"][:]),
+                        read_gases(ds, "scaling_gas_lower"),
+                        read_gases(ds, "minor_gases_lower"))
+  upper = GasOpticsVars(Array{I}(ds["minor_limits_gpt_upper"][:]),
+                        Array{Bool}(ds["minor_scales_with_density_upper"][:]),
+                        Array{Bool}(ds["scale_by_complement_upper"][:]),
+                        Array{I}(ds["kminor_start_upper"][:]),
+                        Array{FT}(ds["kminor_upper"][:]),
+                        read_gases(ds, "scaling_gas_upper"),
+                        read_gases(ds, "minor_gases_upper"))
 
   ref = ReferenceState(Array{FT}(ds["press_ref"][:]),
                        Array{FT}(ds["temp_ref"][:]),
