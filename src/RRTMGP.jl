@@ -1,5 +1,6 @@
 module RRTMGP
 
+include("Architectures.jl")
 include("Misc.jl")
 include("FortranIntrinsics.jl")
 include("Utilities.jl")
