@@ -12,6 +12,8 @@ linspace(start, stop; num = 100) =
 """
     calc_point_insolation(t, ϕ, γ::FT, π_, e) where FT
 
+Where ϕ is latitude, γ is obliquity, π_ is the longitude of perihelion
+and e is eccentricity.
 """
 function calc_point_insolation(t, ϕ, γ::FT, π_, e) where {FT}
   # convert inputs from degrees to radians
