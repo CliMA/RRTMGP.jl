@@ -15,7 +15,7 @@ linspace(start, stop; num = 100) =
 Where t is in days since Jan. 1, ϕ is latitude, γ is obliquity, ϖ is the longitude of perihelion
 and e is eccentricity. (all angles given in degrees)
 """
-function calc_point_insolation(t, ϕ, γ::FT, π_, e) where {FT}
+function calc_point_insolation(t, ϕ, γ::FT, ϖ, e) where {FT}
   # convert inputs from degrees to radians
     ϕ = ϕ * 2 * π / FT(360)
     γ = γ * 2 * π / FT(360)
@@ -78,7 +78,7 @@ function calc_day_lat_insolation(
     n_days::I,
     n_lats::I,
     γ::FT,
-    π_,
+    ϖ,
     e,
 ) where {FT<:AbstractFloat,I<:Int}
     d_arr = Array{I}(round.(linspace(0, 365, num = n_days)))
@@ -87,7 +87,7 @@ function calc_day_lat_insolation(
   # loop over days
     for (i, day) in enumerate(d_arr)
         for (j, lat) in enumerate(l_arr)
-            F_arr[i, j] = calc_point_insolation(day, lat, γ, π_, e)
+            F_arr[i, j] = calc_point_insolation(day, lat, γ, ϖ, e)
         end
     end
     return F_arr
