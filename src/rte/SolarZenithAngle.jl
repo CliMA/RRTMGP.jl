@@ -10,14 +10,16 @@ linspace(start, stop; num = 100) =
     collect(range(start, stop = stop, length = num))
 
 """
-    calc_point_insolation(t, ϕ, γ::FT, π_, e) where FT
+    calc_point_insolation(t, ϕ, γ, ϖ, e)
 
+Where t is in days since Jan. 1, ϕ is latitude, γ is obliquity, ϖ is the longitude of perihelion
+and e is eccentricity. (all angles given in degrees)
 """
-function calc_point_insolation(t, ϕ, γ::FT, π_, e) where {FT}
+function calc_point_insolation(t, ϕ, γ::FT, ϖ, e) where {FT}
   # convert inputs from degrees to radians
     ϕ = ϕ * 2 * π / FT(360)
     γ = γ * 2 * π / FT(360)
-    π_ = π_ * 2 * π / FT(360)
+    ϖ = ϖ * 2 * π / FT(360)
 
   # constants
     Ya = 365.26 # days
@@ -26,7 +28,7 @@ function calc_point_insolation(t, ϕ, γ::FT, π_, e) where {FT}
 
   # step 1, calculate the mean anomaly at vernal equinox
     β = sqrt(1 - e^2)
-    M_VE = -π_ + (e + e^3 / 4) * (1 + β) * sin(π_)
+    M_VE = -ϖ + (e + e^3 / 4) * (1 + β) * sin(ϖ)
 
   # step 2, calculate the mean anomaly
     M = (2 * π * (t - t_VE)) / (Ya) + M_VE
@@ -38,7 +40,7 @@ function calc_point_insolation(t, ϕ, γ::FT, π_, e) where {FT}
     d = (1 - e^2) / (1 + e * cos(A))
 
   # step 5, calculate the solar longitude
-    L_s = A + π_
+    L_s = A + ϖ
 
   # step 6, calculate the declination angle
     δ = asin(sin(γ) * sin(L_s))
@@ -67,7 +69,7 @@ end
     calc_day_lat_insolation(n_days::I,
                             n_lats::I,
                             γ::FT,
-                            π_,
+                            ϖ,
                             e) where {FT<:AbstractFloat,I<:Int}
 
 
@@ -76,7 +78,7 @@ function calc_day_lat_insolation(
     n_days::I,
     n_lats::I,
     γ::FT,
-    π_,
+    ϖ,
     e,
 ) where {FT<:AbstractFloat,I<:Int}
     d_arr = Array{I}(round.(linspace(0, 365, num = n_days)))
@@ -85,7 +87,7 @@ function calc_day_lat_insolation(
   # loop over days
     for (i, day) in enumerate(d_arr)
         for (j, lat) in enumerate(l_arr)
-            F_arr[i, j] = calc_point_insolation(day, lat, γ, π_, e)
+            F_arr[i, j] = calc_point_insolation(day, lat, γ, ϖ, e)
         end
     end
     return F_arr
