@@ -7,15 +7,15 @@
 
 # 2018 constants
 γ_0 = 23.44
-π_0 = 282.95
+ϖ_0 = 282.95
 e_0 = 0.017
 
 # ndays, nlats
 ndays = 365
 nlats = 180
 
-F0 = calc_day_lat_insolation(ndays, nlats, γ_0, π_0, e_0)
-plot_day_lat_insolation(ndays, nlats, F0, &quot;YlOrRd&quot;, &quot;gamma_0 = $(γ_0), pi_0 = $(π_0), e = $(e_0)&quot;, &quot;example2.png&quot;)
+F0 = calc_day_lat_insolation(ndays, nlats, γ_0, ϖ_0, e_0)
+plot_day_lat_insolation(ndays, nlats, F0, &quot;YlOrRd&quot;, &quot;gamma_0 = $(γ_0), pi_0 = $(ϖ_0), e = $(e_0)&quot;, &quot;example2.png&quot;)
 
 #####
 ##### Example 3
@@ -23,15 +23,15 @@ plot_day_lat_insolation(ndays, nlats, F0, &quot;YlOrRd&quot;, &quot;gamma_0 = $(
 
 # turn longitude of perihelion by 180°
 γ_0 = 23.44
-π_1 = 282.95 + 180.0
+ϖ_1 = 282.95 + 180.0
 e_0 = 0.017
 
 ndays = 365
 nlats = 180
 
-F1 = calc_day_lat_insolation(ndays,nlats,γ_0,π_1,e_0)
-plot_day_lat_insolation(ndays,nlats,F1,&quot;YlOrRd&quot;,  &quot;γ_0 = $(γ_0)^∘, π_0 = $(π_0)^∘, e = $(e_0)&quot;, &quot;example3a.png&quot;)
-plot_day_lat_insolation(ndays,nlats,F1-F0,&quot;PRGn&quot;, &quot;ToA Insolation Difference: π_0_1 = 102.95^∘ - π_0_0 = 282.95^∘&quot;, &quot;example3b.png&quot;)
+F1 = calc_day_lat_insolation(ndays,nlats,γ_0,ϖ_1,e_0)
+plot_day_lat_insolation(ndays,nlats,F1,&quot;YlOrRd&quot;,  &quot;γ_0 = $(γ_0)^∘, ϖ_0 = $(ϖ_0)^∘, e = $(e_0)&quot;, &quot;example3a.png&quot;)
+plot_day_lat_insolation(ndays,nlats,F1-F0,&quot;PRGn&quot;, &quot;ToA Insolation Difference: ϖ_0_1 = 102.95^∘ - ϖ_0_0 = 282.95^∘&quot;, &quot;example3b.png&quot;)
 
 #####
 ##### Example 4
@@ -39,28 +39,28 @@ plot_day_lat_insolation(ndays,nlats,F1-F0,&quot;PRGn&quot;, &quot;ToA Insolation
 
 # perihelion back to normal. decrease γ to 22.0°
 γ_1 = 22.0
-π_0 = 282.95
+ϖ_0 = 282.95
 e_0 = 0.017
 
 # ndays, nlats
 ndays = 365
 nlats = 180
 
-F2 = calc_day_lat_insolation(ndays,nlats,γ_1,π_0,e_0)
-plot_day_lat_insolation(ndays,nlats,F2,&quot;YlOrRd&quot;,  &quot;γ_0 = $(γ_0)^∘, π_0 = $(π_0)^∘, e = $(e_0)&quot;, &quot;example4a.png&quot;)
+F2 = calc_day_lat_insolation(ndays,nlats,γ_1,ϖ_0,e_0)
+plot_day_lat_insolation(ndays,nlats,F2,&quot;YlOrRd&quot;,  &quot;γ_0 = $(γ_0)^∘, ϖ_0 = $(ϖ_0)^∘, e = $(e_0)&quot;, &quot;example4a.png&quot;)
 plot_day_lat_insolation(ndays,nlats,F2-F0,&quot;PRGn&quot;, &quot;ToA Insolation Difference: γ_1 = $(γ_1)^∘ - γ_0 = $(γ_0)^∘&quot;, &quot;example4b.png&quot;)
 
 # decrease γ to 18.0°
 γ_2 = 18.0
-π_0 = 282.95
+ϖ_0 = 282.95
 e_0 = 0.017
 
 # ndays, nlats
 ndays = 365
 nlats = 180
 
-F3 = calc_day_lat_insolation(ndays,nlats,γ_2,π_0,e_0)
-plot_day_lat_insolation(ndays,nlats,F3,&quot;YlOrRd&quot;, &quot;γ_0 = $(γ_0)^∘, π_0 = $(π_0)^∘, e = $(e_0)&quot;, &quot;example4c.png&quot;)
+F3 = calc_day_lat_insolation(ndays,nlats,γ_2,ϖ_0,e_0)
+plot_day_lat_insolation(ndays,nlats,F3,&quot;YlOrRd&quot;, &quot;γ_0 = $(γ_0)^∘, ϖ_0 = $(ϖ_0)^∘, e = $(e_0)&quot;, &quot;example4c.png&quot;)
 plot_day_lat_insolation(ndays,nlats,F3-F0,&quot;PRGn&quot;, &quot;ToA Insolation Difference: γ_1 = $(γ_1)^∘ - γ_0 = $(γ_0)^∘&quot;, &quot;example4d.png&quot;)
 
 #####
@@ -69,28 +69,28 @@ plot_day_lat_insolation(ndays,nlats,F3-F0,&quot;PRGn&quot;, &quot;ToA Insolation
 
 # now change obliquity to 60.0°
 γ_3 = 60.0
-π_0 = 282.95
+ϖ_0 = 282.95
 e_0 = 0.017
 
 # ndays, nlats
 ndays = 365
 nlats = 180
 
-F4 = calc_day_lat_insolation(ndays,nlats,γ_3,π_0,e_0)
-plot_day_lat_insolation(ndays,nlats,F4,&quot;YlOrRd&quot;, &quot;γ_0 = $(γ_0)^∘, π_0 = $(π_0)^∘, e = $(e_0)&quot;, &quot;example6a.png&quot;)
+F4 = calc_day_lat_insolation(ndays,nlats,γ_3,ϖ_0,e_0)
+plot_day_lat_insolation(ndays,nlats,F4,&quot;YlOrRd&quot;, &quot;γ_0 = $(γ_0)^∘, ϖ_0 = $(ϖ_0)^∘, e = $(e_0)&quot;, &quot;example6a.png&quot;)
 plot_day_lat_insolation(ndays,nlats,F4-F0,&quot;PRGn&quot;, &quot;ToA Insolation Difference: γ_1 = 60.0^∘ - γ_0 = 23.44^∘&quot;, &quot;example6b.png&quot;)
 
 # now change obliquity to 97.86°
 γ = 97.86
-π_0 = 282.95
+ϖ_0 = 282.95
 e_0 = 0.017
 
 # ndays, nlats
 ndays = 365
 nlats = 180
 
-F5 = calc_day_lat_insolation(ndays,nlats,γ,π_0,e_0)
-plot_day_lat_insolation(ndays,nlats,F5,&quot;YlOrRd&quot;, &quot;γ_0 = $(γ_0)^∘, π_0 = $(π_0)^∘, e = $(e_0)&quot;, &quot;example6c.png&quot;)
+F5 = calc_day_lat_insolation(ndays,nlats,γ,ϖ_0,e_0)
+plot_day_lat_insolation(ndays,nlats,F5,&quot;YlOrRd&quot;, &quot;γ_0 = $(γ_0)^∘, ϖ_0 = $(ϖ_0)^∘, e = $(e_0)&quot;, &quot;example6c.png&quot;)
 plot_day_lat_insolation(ndays,nlats,F5-F0,&quot;PRGn&quot;, &quot;ToA Insolation Difference: γ_1 = 97.86^∘ - γ_0 = 23.44^∘&quot;, &quot;example6d.png&quot;)</code></pre><pre><code class="language-none">/home/vsts/.julia/packages/GR/yMV3y/src/../deps/gr/bin/gksqt: error while loading shared libraries: libQt5Widgets.so.5: cannot open shared object file: No such file or directory
 connect: Connection refused
 GKS: can&#39;t connect to GKS socket application
@@ -156,4 +156,4 @@ connect: Connection refused
 GKS: can&#39;t connect to GKS socket application
 
 GKS: Open failed in routine OPEN_WS
-GKS: GKS not in proper state. GKS must be either in the state WSOP or WSAC in routine ACTIVATE_WS</code></pre><h2 id="Example-2-1"><a class="docs-heading-anchor" href="#Example-2-1">Example 2</a><a class="docs-heading-anchor-permalink" href="#Example-2-1" title="Permalink"></a></h2><p><img src="example2.png" alt/></p><h2 id="Example-3-1"><a class="docs-heading-anchor" href="#Example-3-1">Example 3</a><a class="docs-heading-anchor-permalink" href="#Example-3-1" title="Permalink"></a></h2><p><img src="example3a.png" alt/> <img src="example3b.png" alt/></p><h2 id="Example-4-1"><a class="docs-heading-anchor" href="#Example-4-1">Example 4</a><a class="docs-heading-anchor-permalink" href="#Example-4-1" title="Permalink"></a></h2><p><img src="example4a.png" alt/> <img src="example4b.png" alt/> <img src="example4c.png" alt/> <img src="example4d.png" alt/></p><h2 id="Example-6-1"><a class="docs-heading-anchor" href="#Example-6-1">Example 6</a><a class="docs-heading-anchor-permalink" href="#Example-6-1" title="Permalink"></a></h2><p><img src="example6a.png" alt/> <img src="example6b.png" alt/> <img src="example6c.png" alt/> <img src="example6d.png" alt/></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="RTESolver.html">« RTE Solver</a><a class="docs-footer-nextpage" href="../References.html">References »</a></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Thursday 26 March 2020 07:00">Thursday 26 March 2020</span>. Using Julia version 1.3.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+GKS: GKS not in proper state. GKS must be either in the state WSOP or WSAC in routine ACTIVATE_WS</code></pre><h2 id="Example-2-1"><a class="docs-heading-anchor" href="#Example-2-1">Example 2</a><a class="docs-heading-anchor-permalink" href="#Example-2-1" title="Permalink"></a></h2><p><img src="example2.png" alt/></p><h2 id="Example-3-1"><a class="docs-heading-anchor" href="#Example-3-1">Example 3</a><a class="docs-heading-anchor-permalink" href="#Example-3-1" title="Permalink"></a></h2><p><img src="example3a.png" alt/> <img src="example3b.png" alt/></p><h2 id="Example-4-1"><a class="docs-heading-anchor" href="#Example-4-1">Example 4</a><a class="docs-heading-anchor-permalink" href="#Example-4-1" title="Permalink"></a></h2><p><img src="example4a.png" alt/> <img src="example4b.png" alt/> <img src="example4c.png" alt/> <img src="example4d.png" alt/></p><h2 id="Example-6-1"><a class="docs-heading-anchor" href="#Example-6-1">Example 6</a><a class="docs-heading-anchor-permalink" href="#Example-6-1" title="Permalink"></a></h2><p><img src="example6a.png" alt/> <img src="example6b.png" alt/> <img src="example6c.png" alt/> <img src="example6d.png" alt/></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="RTESolver.html">« RTE Solver</a><a class="docs-footer-nextpage" href="../References.html">References »</a></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Friday 3 April 2020 14:23">Friday 3 April 2020</span>. Using Julia version 1.3.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
