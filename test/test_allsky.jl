@@ -1,7 +1,7 @@
 using Profile
 include("allsky.jl")
 include("allsky_pgp.jl")
-include("DataSetFiles.jl")
+include("data_set_files.jl")
 
 @testset "All sky" begin
     datafolder = RRTMGP.data_folder_rrtmgp()

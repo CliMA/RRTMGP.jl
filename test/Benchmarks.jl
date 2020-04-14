@@ -9,7 +9,7 @@ using BenchmarkTools
 include("rfmip_clear_sky_sw.jl")
 include("rfmip_clear_sky_lw.jl")
 include("allsky.jl")
-include("DataSetFiles.jl")
+include("data_set_files.jl")
 
 @testset "Benchmark suite" begin
     datafolder = RRTMGP.data_folder_rrtmgp()

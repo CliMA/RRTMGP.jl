@@ -1,7 +1,7 @@
 using Profile
 include("rfmip_clear_sky_sw.jl")
 include("rfmip_clear_sky_sw_pgp.jl")
-include("DataSetFiles.jl")
+include("data_set_files.jl")
 
 @testset "rfmip clear sky shortwave driver" begin
     datafolder = RRTMGP.data_folder_rrtmgp()
