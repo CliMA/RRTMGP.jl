@@ -16,16 +16,10 @@ include("data_set_files.jl")
 
     ds_clearsky_sw = dataset_dict(data_files_dict(datafolder, "sw"))
     ds_clearsky_lw = dataset_dict(data_files_dict(datafolder, "lw"))
-    ds_allsky_sw = dataset_dict(data_files_dict(
-        datafolder,
-        "sw";
-        allsky = true,
-    ))
-    ds_allsky_lw = dataset_dict(data_files_dict(
-        datafolder,
-        "lw";
-        allsky = true,
-    ))
+    ds_allsky_sw =
+        dataset_dict(data_files_dict(datafolder, "sw"; allsky = true))
+    ds_allsky_lw =
+        dataset_dict(data_files_dict(datafolder, "lw"; allsky = true))
 
     refresh_pr = true
     refresh_params = true
@@ -38,12 +32,8 @@ include("data_set_files.jl")
     refresh_pr && rm(pr_file, force = true)
 
     suite = BenchmarkGroup()
-    !refresh_params && loadparams!(
-        suite,
-        BenchmarkTools.load(params_file)[1],
-        :evals,
-        :samples,
-    )
+    !refresh_params &&
+    loadparams!(suite, BenchmarkTools.load(params_file)[1], :evals, :samples)
     !refresh_master && (master = BenchmarkTools.load(master_file)[1])
 
     suite["allsky"] = BenchmarkGroup(["clouds"])
@@ -63,27 +53,19 @@ include("data_set_files.jl")
         )
     end
     suite["clearsky"] = BenchmarkGroup(["clear"])
-    suite["clearsky"]["lw_1scl"] = @benchmarkable rfmip_clear_sky_lw(
-        $(ds_clearsky_lw),
-        OneScalar,
-    )
-    suite["clearsky"]["lw_2str"] = @benchmarkable rfmip_clear_sky_lw(
-        $(ds_clearsky_lw),
-        TwoStream,
-    )
-    suite["clearsky"]["sw_1scl"] = @benchmarkable rfmip_clear_sky_sw(
-        $(ds_clearsky_sw),
-        OneScalar,
-    )
-    suite["clearsky"]["sw_2str"] = @benchmarkable rfmip_clear_sky_sw(
-        $(ds_clearsky_sw),
-        TwoStream,
-    )
+    suite["clearsky"]["lw_1scl"] =
+        @benchmarkable rfmip_clear_sky_lw($(ds_clearsky_lw), OneScalar)
+    suite["clearsky"]["lw_2str"] =
+        @benchmarkable rfmip_clear_sky_lw($(ds_clearsky_lw), TwoStream)
+    suite["clearsky"]["sw_1scl"] =
+        @benchmarkable rfmip_clear_sky_sw($(ds_clearsky_sw), OneScalar)
+    suite["clearsky"]["sw_2str"] =
+        @benchmarkable rfmip_clear_sky_sw($(ds_clearsky_sw), TwoStream)
 
     refresh_params && tune!(suite)
 
     pr = refresh_pr ? run(suite, verbose = true) :
-         BenchmarkTools.load(pr_file)[1]
+        BenchmarkTools.load(pr_file)[1]
     refresh_master && (master = deepcopy(pr))
 
     refresh_params && BenchmarkTools.save(params_file, params(suite))
@@ -98,8 +80,8 @@ include("data_set_files.jl")
     close.(values(ds_allsky_sw))
     close.(values(ds_allsky_lw))
 
-  # Profile.clear()
-  # Profile.@profile run_driver(datafolder, OneScalar)
-  # Profile.@profile run_driver(datafolder, TwoStream)
-  # Profile.print()
+    # Profile.clear()
+    # Profile.@profile run_driver(datafolder, OneScalar)
+    # Profile.@profile run_driver(datafolder, TwoStream)
+    # Profile.print()
 end
