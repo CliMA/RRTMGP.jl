@@ -1,7 +1,7 @@
 using Profile
 include("rfmip_clear_sky_sw.jl")
 include("rfmip_clear_sky_sw_pgp.jl")
-include("DataSetFiles.jl")
+include("data_set_files.jl")
 
 @testset "rfmip clear sky shortwave driver" begin
     datafolder = RRTMGP.data_folder_rrtmgp()
@@ -19,24 +19,24 @@ include("DataSetFiles.jl")
     rfmip_clear_sky_sw_pgp(ds, TwoStream; compile_first = true)
 
     if !pgp_only
-        Δt_all["clear_sky_sw", "1scl"] = @elapsed rfmip_clear_sky_sw(
-            ds,
-            OneScalar,
-        )
-        Δt_all["clear_sky_sw", "2str"] = @elapsed rfmip_clear_sky_sw(
-            ds,
-            TwoStream,
-        )
+        Δt_all[
+            "clear_sky_sw",
+            "1scl",
+        ] = @elapsed rfmip_clear_sky_sw(ds, OneScalar)
+        Δt_all[
+            "clear_sky_sw",
+            "2str",
+        ] = @elapsed rfmip_clear_sky_sw(ds, TwoStream)
     end
 
-    Δt_all["clear_sky_sw_pgp", "1scl"] = @elapsed rfmip_clear_sky_sw_pgp(
-        ds,
-        OneScalar,
-    )
-    Δt_all["clear_sky_sw_pgp", "2str"] = @elapsed rfmip_clear_sky_sw_pgp(
-        ds,
-        TwoStream,
-    )
+    Δt_all[
+        "clear_sky_sw_pgp",
+        "1scl",
+    ] = @elapsed rfmip_clear_sky_sw_pgp(ds, OneScalar)
+    Δt_all[
+        "clear_sky_sw_pgp",
+        "2str",
+    ] = @elapsed rfmip_clear_sky_sw_pgp(ds, TwoStream)
 
     for (case, Δt) in Δt_all
         @show case, Δt
