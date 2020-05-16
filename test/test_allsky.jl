@@ -12,16 +12,16 @@ include("data_set_files.jl")
     Δt_all = Dict()
 
     if !pgp_only
-        all_sky(ds_lw; use_luts = false, λ_string = "lw", compile_first = true)
-        all_sky(ds_sw; use_luts = false, λ_string = "sw", compile_first = true)
-        all_sky(ds_lw; use_luts = true, λ_string = "lw", compile_first = true)
-        all_sky(ds_sw; use_luts = true, λ_string = "sw", compile_first = true)
+        all_sky(ds_lw; use_luts = false, λ_string = "lw")
+        all_sky(ds_sw; use_luts = false, λ_string = "sw")
+        all_sky(ds_lw; use_luts = true, λ_string = "lw")
+        all_sky(ds_sw; use_luts = true, λ_string = "sw")
     end
 
-    all_sky_pgp(ds_lw; use_luts = false, λ_string = "lw", compile_first = true)
-    all_sky_pgp(ds_sw; use_luts = false, λ_string = "sw", compile_first = true)
-    all_sky_pgp(ds_lw; use_luts = true, λ_string = "lw", compile_first = true)
-    all_sky_pgp(ds_sw; use_luts = true, λ_string = "sw", compile_first = true)
+    all_sky_pgp(ds_lw; use_luts = false, λ_string = "lw")
+    all_sky_pgp(ds_sw; use_luts = false, λ_string = "sw")
+    all_sky_pgp(ds_lw; use_luts = true, λ_string = "lw")
+    all_sky_pgp(ds_sw; use_luts = true, λ_string = "sw")
 
     # Profile.clear_malloc_data()
 

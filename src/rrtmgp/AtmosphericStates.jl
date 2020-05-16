@@ -35,17 +35,14 @@ computes column amounts of dry air using hydrostatic equation
 """
 function get_col_dry(vmr_h2o, plev, tlay, latitude = nothing)
     FT = eltype(plev)
-
-  # first and second term of Helmert formula
+    ncol, nlay, nlev = size(plev, 1), size(tlay, 2), size(plev, 2)
+    # first and second term of Helmert formula
     helmert1 = FT(9.80665)
     helmert2 = FT(0.02586)
-  # local variables
-    g0 = zeros(FT, size(tlay, 1)) # (ncol)
-    delta_plev = zeros(FT, size(tlay, 1), size(tlay, 2)) # (ncol,nlay)
-    m_air = zeros(FT, size(tlay, 1), size(tlay, 2)) # average mass of air; (ncol,nlay)
-
-    nlay = size(tlay, 2)
-    nlev = size(plev, 2)
+    # local variables
+    g0 = zeros(FT, ncol) # (ncol)
+    delta_plev = zeros(FT, ncol, nlay) # (ncol,nlay)
+    m_air = zeros(FT, ncol, nlay) # average mass of air; (ncol,nlay)
 
     if latitude ≠ nothing
         g0 .= helmert1 - helmert2 * cos(FT(2) * π * latitude / FT(180)) # acceleration due to gravity [m/s^2]
@@ -54,14 +51,16 @@ function get_col_dry(vmr_h2o, plev, tlay, latitude = nothing)
     end
     delta_plev .= abs.(plev[:, 1:nlev-1] .- plev[:, 2:nlev])
 
-  # Get average mass of moist air per mole of moist air
+    # Get average mass of moist air per mole of moist air
     m_air .= (m_dry(FT) .+ m_h2o(FT) .* vmr_h2o) ./ (1 .+ vmr_h2o)
 
-  # Hydrostatic equation
-    col_dry = zeros(FT, size(tlay, 1), size(tlay, 2))
-    col_dry .= FT(10) .* delta_plev .* avogad(FT) ./ (
-        FT(1000) * m_air .* FT(100) .* spread(g0, 2, nlay)
-    )
+    # Hydrostatic equation
+    col_dry = zeros(FT, ncol, nlay)
+    for i = 1:ncol
+        col_dry[i, :] .=
+            FT(10) .* delta_plev[i, :] .* avogad(FT) ./
+            (FT(1000) * m_air[i, :] .* FT(100) .* g0[i]) #spread(g0, 2, nlay) )
+    end
     col_dry .= col_dry ./ (FT(1) .+ vmr_h2o)
     return col_dry
 end
@@ -133,13 +132,13 @@ function AtmosphericState(
     vmr = Array{FT}(undef, ncol, nlay, ngas) # volume mixing ratios
     col_gas = Array{FT}(undef, ncol, nlay, ngas + 1) # column amounts for each gas, plus col_dry
 
-  # Fill out the array of volume mixing ratios
+    # Fill out the array of volume mixing ratios
     for gas in gas_conc.gas_names
         i_gas = loc_in_array(gas, gas_conc.gas_names)
         vmr[:, :, i_gas] .= gas_conc.concs[i_gas, :, :]
     end
 
-  # Compute dry air column amounts (number of molecule per cm^2) if user hasn't provided them
+    # Compute dry air column amounts (number of molecule per cm^2) if user hasn't provided them
     idx_h2o = loc_in_array(h2o(), gas_conc.gas_names)
     if col_dry == nothing
         col_dry = get_col_dry(vmr[:, :, idx_h2o], p_lev, t_lay) # dry air column amounts computation
@@ -148,12 +147,12 @@ function AtmosphericState(
     check_extent(col_dry, (ncol, nlay), "col_dry")
     check_range(col_dry, FT(0), floatmax(FT), "col_dry")
 
-  # compute column gas amounts [molec/cm^2]
+    # compute column gas amounts [molec/cm^2]
     col_gas[:, :, 1] .= col_dry
-    for igas in 1:ngas
+    for igas = 1:ngas
         col_gas[:, :, igas+1] .= vmr[:, :, igas] .* col_dry
     end
-  # Are the arrays ordered in the vertical with 1 at the top or the bottom of the domain?
+    # Are the arrays ordered in the vertical with 1 at the top or the bottom of the domain?
     top_at_1 = p_lay[1, 1] < p_lay[1, nlay]
     mesh_orientation = MeshOrientation(top_at_1, nlay)
 
@@ -166,7 +165,7 @@ function AtmosphericState(
     check_range(t_sfc, ref.temp_min, ref.temp_max, "t_sfc")
     tropo = log.(p_lay) .> ref.press_trop_log
 
-  # Layer limits of upper, lower atmospheres
+    # Layer limits of upper, lower atmospheres
     tropo_lims = Array{I}(undef, ncol, 2, 2)
     if mesh_orientation.top_at_1
         tropo_lims[:, 1, 1] .= fminloc_wrapper(p_lay, dim = 2, mask = tropo)
@@ -245,32 +244,30 @@ function Base.convert(
 ) where {FT,I}
     s = size(data)
     ncol, nlay = s
-    gas_conc = convert(
-        GasConcs,
-        [data[i, j].gas_conc for i in 1:s[1], j in 1:s[2]],
-    )
+    gas_conc =
+        convert(GasConcs, [data[i, j].gas_conc for i = 1:s[1], j = 1:s[2]])
     mesh_orientation = first(data).mesh_orientation
     gt_0_tropo_lims = first(data).gt_0_tropo_lims
     s_tropo_lims = size(first(data).tropo_lims)
     ngas = length(gas_conc.gas_names)
 
     col_gas = Array{FT}(undef, ncol, nlay, ngas + 1)
-    for i in 1:s[1]
-        for j in 1:s[2]
-            for igas in 1:ngas+1
+    for i = 1:s[1]
+        for j = 1:s[2]
+            for igas = 1:ngas+1
                 col_gas[i, j, igas] = data[i, j].col_gas[igas]
             end
         end
     end
 
-    col_dry = [data[i, j].col_dry for i in 1:s[1], j in 1:s[2]]
-    p_lay = [data[i, j].p_lay for i in 1:s[1], j in 1:s[2]]
-    t_lay = [data[i, j].t_lay for i in 1:s[1], j in 1:s[2]]
-    t_sfc = [data[i].t_sfc for i in 1:s[1]]
+    col_dry = [data[i, j].col_dry for i = 1:s[1], j = 1:s[2]]
+    p_lay = [data[i, j].p_lay for i = 1:s[1], j = 1:s[2]]
+    t_lay = [data[i, j].t_lay for i = 1:s[1], j = 1:s[2]]
+    t_sfc = [data[i].t_sfc for i = 1:s[1]]
 
     p_lev, t_lev = ntuple(i -> Array{FT}(undef, ncol, nlay + 1), 2)
-    for i in 1:s[1]
-        for j in 1:s[2]
+    for i = 1:s[1]
+        for j = 1:s[2]
             p_lev[i, j] = data[i, j].p_lev[1]
             t_lev[i, j] = data[i, j].t_lev[1]
             if j == s[2]
@@ -279,8 +276,11 @@ function Base.convert(
             end
         end
     end
-    tropo = Array{Bool}([data[i, j].tropo for i in 1:s[1], j in 1:s[2]])
-    tropo_lims = Array{I}([data[i, 1].tropo_lims[k, p] for i in 1:s[1], k in 1:s_tropo_lims[1], p in 1:s_tropo_lims[2]])
+    tropo = Array{Bool}([data[i, j].tropo for i = 1:s[1], j = 1:s[2]])
+    tropo_lims = Array{I}([
+        data[i, 1].tropo_lims[k, p]
+        for i = 1:s[1], k = 1:s_tropo_lims[1], p = 1:s_tropo_lims[2]
+    ])
 
     return AtmosphericState{FT,I}(
         gas_conc,
@@ -307,21 +307,23 @@ function Base.convert(
     s = size(data.p_lay)
     nlay, ncol = size(data.p_lay)
     gas_conc = convert(Array{GasConcsPGP}, data.gas_conc)
-    [AtmosphericStatePGP{FT,I}(
-        gas_conc[i, j],
-        data.p_lay[i, j],
-        [data.p_lev[i, j], data.p_lev[i, j+1]],
-        data.t_lay[i, j],
-        [data.t_lev[i, j], data.t_lev[i, j+1]],
-        data.t_sfc[i],
-        data.col_gas[i, j, :],
-        data.col_dry[i, j],
-        data.tropo[i, j],
-        data.tropo_lims[i, :, :],
-        data.gt_0_tropo_lims,
-        data.mesh_orientation,
-        j,
-    ) for i in 1:s[1], j in 1:s[2]]
+    [
+        AtmosphericStatePGP{FT,I}(
+            gas_conc[i, j],
+            data.p_lay[i, j],
+            [data.p_lev[i, j], data.p_lev[i, j+1]],
+            data.t_lay[i, j],
+            [data.t_lev[i, j], data.t_lev[i, j+1]],
+            data.t_sfc[i],
+            data.col_gas[i, j, :],
+            data.col_dry[i, j],
+            data.tropo[i, j],
+            data.tropo_lims[i, :, :],
+            data.gt_0_tropo_lims,
+            data.mesh_orientation,
+            j,
+        ) for i = 1:s[1], j = 1:s[2]
+    ]
 
 end
 

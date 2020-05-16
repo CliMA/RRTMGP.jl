@@ -11,12 +11,12 @@ include("data_set_files.jl")
     Δt_all = Dict()
 
     if !pgp_only
-        rfmip_clear_sky_sw(ds, OneScalar; compile_first = true)
-        rfmip_clear_sky_sw(ds, TwoStream; compile_first = true)
+        rfmip_clear_sky_sw(ds, OneScalar)
+        rfmip_clear_sky_sw(ds, TwoStream)
     end
 
-    rfmip_clear_sky_sw_pgp(ds, OneScalar; compile_first = true)
-    rfmip_clear_sky_sw_pgp(ds, TwoStream; compile_first = true)
+    rfmip_clear_sky_sw_pgp(ds, OneScalar)
+    rfmip_clear_sky_sw_pgp(ds, TwoStream)
 
     if !pgp_only
         Δt_all[
