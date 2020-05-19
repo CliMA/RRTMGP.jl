@@ -8,7 +8,6 @@ module SourceFunctions
 
 using DocStringExtensions
 using ..OpticalProps
-using ..FortranIntrinsics
 import ..OpticalProps: get_ncol, get_nlay, get_ngpt
 
 export AbstractSourceFunc
@@ -106,25 +105,35 @@ function Base.convert(
     ngpt = get_ngpt(op)
     return SourceFuncLongWave{FT,I}(
         op,
-        Array{FT}([data[i, j].lay_source[k] for i in 1:s[1], j in 1:s[2], k in 1:ngpt]),
-        Array{FT}([data[i, j].lev_source_inc[k] for i in 1:s[1], j in 1:s[2], k in 1:ngpt]),
-        Array{FT}([data[i, j].lev_source_dec[k] for i in 1:s[1], j in 1:s[2], k in 1:ngpt]),
-        Array{FT}([data[i, sfc_lay].sfc_source[k] for i in 1:s[1], k in 1:ngpt]),
-        Array{FT}([data[i, j].p_frac[k] for i in 1:s[1], j in 1:s[2], k in 1:ngpt]),
+        Array{FT}([
+            data[i, j].lay_source[k] for i = 1:s[1], j = 1:s[2], k = 1:ngpt
+        ]),
+        Array{FT}([
+            data[i, j].lev_source_inc[k] for i = 1:s[1], j = 1:s[2], k = 1:ngpt
+        ]),
+        Array{FT}([
+            data[i, j].lev_source_dec[k] for i = 1:s[1], j = 1:s[2], k = 1:ngpt
+        ]),
+        Array{FT}([data[i, sfc_lay].sfc_source[k] for i = 1:s[1], k = 1:ngpt]),
+        Array{FT}([
+            data[i, j].p_frac[k] for i = 1:s[1], j = 1:s[2], k = 1:ngpt
+        ]),
     )
 end
 
 Base.convert(
     ::Type{Array{SourceFuncLongWavePGP}},
     data::SourceFuncLongWave{FT,I},
-) where {FT,I} = [SourceFuncLongWavePGP{FT,I}(
+) where {FT,I} = [
+    SourceFuncLongWavePGP{FT,I}(
         data.optical_props,
         data.lay_source[i, j, :],
         data.lev_source_inc[i, j, :],
         data.lev_source_dec[i, j, :],
         data.sfc_source[i, :],
         data.p_frac[i, j, :],
-    ) for i in 1:size(data.lay_source, 1), j in 1:size(data.lay_source, 2)]
+    ) for i = 1:size(data.lay_source, 1), j = 1:size(data.lay_source, 2)
+]
 
 """
     SourceFuncShortWave{FT, I} <: AbstractOpticalProps{FT, I}

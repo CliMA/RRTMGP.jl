@@ -7,7 +7,6 @@ using NCDatasets
 using RRTMGP.OpticalProps
 using RRTMGP.MeshOrientations
 using RRTMGP.Gases
-using RRTMGP.FortranIntrinsics
 using RRTMGP.Utilities
 using RRTMGP.GasOptics
 using RRTMGP.GasConcentrations
@@ -82,10 +81,10 @@ function all_sky_pgp(ds; use_luts = false, λ_string = "")
     end
 
     #  If we trusted in Fortran allocate-on-assign we could skip the temp_array here
-    p_lay = deepcopy(spread_new(p_lay[1, :], 1, ncol))
-    t_lay = deepcopy(spread_new(t_lay[1, :], 1, ncol))
-    p_lev = deepcopy(spread_new(p_lev[1, :], 1, ncol))
-    t_lev = deepcopy(spread_new(t_lev[1, :], 1, ncol))
+    p_lay = deepcopy(repeat(reshape(p_lay[1, :], 1, :), ncol, 1))
+    t_lay = deepcopy(repeat(reshape(t_lay[1, :], 1, :), ncol, 1))
+    p_lev = deepcopy(repeat(reshape(p_lev[1, :], 1, :), ncol, 1))
+    t_lev = deepcopy(repeat(reshape(t_lev[1, :], 1, :), ncol, 1))
 
     # This puts pressure and temperature arrays on the GPU
     # load data into classes
@@ -185,20 +184,16 @@ function all_sky_pgp(ds; use_luts = false, λ_string = "")
             #
             # Ice and liquid will overlap in a few layers
             #
-            clouds_liq.wp[icol, ilay] = fmerge(
-                FT(10),
-                FT(0),
-                cloud_mask[icol, ilay] && as.t_lay[icol, ilay] > FT(263),
-            )
-            clouds_ice.wp[icol, ilay] = fmerge(
-                FT(10),
-                FT(0),
-                cloud_mask[icol, ilay] && as.t_lay[icol, ilay] < FT(273),
-            )
+            clouds_liq.wp[icol, ilay] =
+                cloud_mask[icol, ilay] && as.t_lay[icol, ilay] > FT(263) ?
+                FT(10) : FT(0)
+            clouds_ice.wp[icol, ilay] =
+                cloud_mask[icol, ilay] && as.t_lay[icol, ilay] < FT(273) ?
+                FT(10) : FT(0)
             clouds_liq.re[icol, ilay] =
-                fmerge(rel_val, FT(0), clouds_liq.wp[icol, ilay] > FT(0))
+                clouds_liq.wp[icol, ilay] > FT(0) ? rel_val : FT(0)
             clouds_ice.re[icol, ilay] =
-                fmerge(rei_val, FT(0), clouds_ice.wp[icol, ilay] > FT(0))
+                clouds_ice.wp[icol, ilay] > FT(0) ? rei_val : FT(0)
         end
     end
 

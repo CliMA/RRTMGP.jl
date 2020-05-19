@@ -43,7 +43,7 @@ function solve!(
     mo::MeshOrientation{I},
 ) where {FT,I}
 
-  # Upper boundary condition
+    # Upper boundary condition
     angle_disc = rte.angle_disc
     source = rte.sources
     sfc_emis = rte.sfc_emis_gpt
@@ -61,7 +61,7 @@ function solve!(
     Ds = angle_disc.gauss_Ds[1:n_μ, n_μ]
     w_μ = angle_disc.gauss_wts[1:n_μ, n_μ]
 
-  # For the first angle output arrays store total flux
+    # For the first angle output arrays store total flux
     Ds_ncol = Array{FT}(undef, ncol, ngpt)
     radn_up, radn_dn = ntuple(i -> zeros(FT, ncol, nlay + 1, ngpt), 2)
 
@@ -77,47 +77,47 @@ function solve!(
     source_dn = Array{FT}(undef, ncol, nlay)
     source_sfc = Array{FT}(undef, ncol)
     sfc_albedo = Array{FT}(undef, ncol)
-  # Which way is up?
-  # Level Planck sources for upward and downward radiation
-  # When top_at_1, lev_source_up => lev_source_dec
-  #                lev_source_dn => lev_source_inc, and vice-versa
+    # Which way is up?
+    # Level Planck sources for upward and downward radiation
+    # When top_at_1, lev_source_up => lev_source_dec
+    #                lev_source_dn => lev_source_inc, and vice-versa
     i_lev_top = ilev_top(mo)
     lev_source_up = mo.top_at_1 ? source.lev_source_dec : source.lev_source_inc
     lev_source_dn = mo.top_at_1 ? source.lev_source_inc : source.lev_source_dec
 
-    @inbounds for i_μ in 1:n_μ
+    @inbounds for i_μ = 1:n_μ
         i_μ == 1 && apply_BC!(radn_dn, i_lev_top, inc_flux)
         Ds_ncol .= Ds[i_μ]
 
-        @inbounds for igpt in 1:ngpt
-      # Transport is for intensity
-      #   convert flux at top of domain to intensity assuming azimuthal isotropy
+        @inbounds for igpt = 1:ngpt
+            # Transport is for intensity
+            #   convert flux at top of domain to intensity assuming azimuthal isotropy
             radn_dn[:, i_lev_top, igpt] ./= 2 * FT(π) * w_μ[i_μ]
 
-            @inbounds for ilay in 1:nlay
-                @inbounds for icol in 1:ncol
-          # Optical path and transmission, used in source function and transport calculations
-                    τ_loc[icol, ilay] = τ[icol, ilay, igpt] *
-                                        Ds_ncol[icol, igpt]
+            @inbounds for ilay = 1:nlay
+                @inbounds for icol = 1:ncol
+                    # Optical path and transmission, used in source function and transport calculations
+                    τ_loc[icol, ilay] =
+                        τ[icol, ilay, igpt] * Ds_ncol[icol, igpt]
                     trans[icol, ilay] = exp(-τ_loc[icol, ilay])
 
-          # Source function for diffuse radiation
-                    source_dn[icol, ilay],
-                    source_up[icol, ilay] = lw_source_noscat(
-                        lay_source[icol, ilay, igpt],
-                        lev_source_up[icol, ilay, igpt],
-                        lev_source_dn[icol, ilay, igpt],
-                        τ_loc[icol, ilay],
-                        trans[icol, ilay],
-                    )
+                    # Source function for diffuse radiation
+                    source_dn[icol, ilay], source_up[icol, ilay] =
+                        lw_source_noscat(
+                            lay_source[icol, ilay, igpt],
+                            lev_source_up[icol, ilay, igpt],
+                            lev_source_dn[icol, ilay, igpt],
+                            τ_loc[icol, ilay],
+                            trans[icol, ilay],
+                        )
                 end
             end
 
-      # Surface albedo, surface source function
+            # Surface albedo, surface source function
             sfc_albedo .= 1 .- sfc_emis[:, igpt]
             source_sfc .= sfc_emis[:, igpt] .* sfc_source[:, igpt]
 
-      # Transport
+            # Transport
             lw_transport_noscat!(
                 ncol,
                 nlay,
@@ -130,9 +130,9 @@ function solve!(
                 @view(radn_up[:, :, igpt]),
                 @view(radn_dn[:, :, igpt])
             )
-      #
-      # Convert intensity to flux assuming azimuthal isotropy and quadrature weight
-      #
+            #
+            # Convert intensity to flux assuming azimuthal isotropy and quadrature weight
+            #
             radn_dn[:, :, igpt] .*= 2 * FT(π) * w_μ[i_μ]
             radn_up[:, :, igpt] .*= 2 * FT(π) * w_μ[i_μ]
         end  # g point loop
@@ -192,10 +192,10 @@ function solve!(
     source_up = Array{FT}(undef, ncol, nlay)
     sfc_albedo = Array{FT}(undef, ncol)
     Rdif, Tdif, γ_1, γ_2 = ntuple(i -> Array{FT}(undef, ncol, nlay), 4)
-    @inbounds for igpt in 1:ngpt
+    @inbounds for igpt = 1:ngpt
 
-    # RRTMGP provides source functions at each level using the spectral mapping
-    #   of each adjacent layer. Combine these for two-stream calculations
+        # RRTMGP provides source functions at each level using the spectral mapping
+        #   of each adjacent layer. Combine these for two-stream calculations
         lw_combine_sources!(
             ncol,
             nlay,
@@ -204,10 +204,10 @@ function solve!(
             lev_source,
         )
 
-    # Cell properties: reflection, transmission for diffuse radiation
-    #   Coupling coefficients needed for source function
-        @inbounds for ilay in 1:nlay
-            @inbounds for icol in 1:ncol
+        # Cell properties: reflection, transmission for diffuse radiation
+        #   Coupling coefficients needed for source function
+        @inbounds for ilay = 1:nlay
+            @inbounds for icol = 1:ncol
                 γ_1[icol, ilay],
                 γ_2[icol, ilay],
                 Rdif[icol, ilay],
@@ -217,27 +217,26 @@ function solve!(
                     g[icol, ilay, igpt],
                 )
 
-        # Source function for diffuse radiation
+                # Source function for diffuse radiation
                 lev_source_bot = lev_source[icol, ilay+b]
                 lev_source_top = lev_source[icol, ilay+1-b]
 
-                source_sfc[icol],
-                source_up[icol, ilay],
-                source_dn[icol, ilay] = lw_source_2str(
-                    sfc_emis[icol, igpt],
-                    sfc_source[icol, igpt],
-                    lev_source_bot,
-                    lev_source_top,
-                    γ_1[icol, ilay],
-                    γ_2[icol, ilay],
-                    Rdif[icol, ilay],
-                    Tdif[icol, ilay],
-                    τ[icol, ilay, igpt],
-                )
+                source_sfc[icol], source_up[icol, ilay], source_dn[icol, ilay] =
+                    lw_source_2str(
+                        sfc_emis[icol, igpt],
+                        sfc_source[icol, igpt],
+                        lev_source_bot,
+                        lev_source_top,
+                        γ_1[icol, ilay],
+                        γ_2[icol, ilay],
+                        Rdif[icol, ilay],
+                        Tdif[icol, ilay],
+                        τ[icol, ilay, igpt],
+                    )
             end
         end
 
-    # Transport
+        # Transport
         sfc_albedo .= FT(1) .- sfc_emis[:, igpt]
         adding!(
             ncol,
@@ -287,17 +286,18 @@ function solve!(
     ngpt = get_ngpt(op)
 
     μ_0_inv = 1 ./ μ_0
-  # Indexing into arrays for upward and downward propagation depends on orientation
+    # Indexing into arrays for upward and downward propagation depends on orientation
     n̂ = nhat(mo)
     b = binary(mo)
 
-  # Downward propagation
-  # For the flux at this level, what was the previous level, and which layer has the
-  #   radiation just passed through?
-    @inbounds for igpt in 1:ngpt
+    # Downward propagation
+    # For the flux at this level, what was the previous level, and which layer has the
+    #   radiation just passed through?
+    @inbounds for igpt = 1:ngpt
         @inbounds for ilev in lev_range(mo)
-            flux_dir[:, ilev, igpt] .= flux_dir[:, ilev-n̂, igpt] .*
-                                       exp.(-τ[:, ilev-b, igpt] .* μ_0_inv)
+            flux_dir[:, ilev, igpt] .=
+                flux_dir[:, ilev-n̂, igpt] .*
+                exp.(-τ[:, ilev-b, igpt] .* μ_0_inv)
         end
     end
     return nothing
@@ -348,23 +348,20 @@ function solve!(
     b = binary(mo)
     i_lev_sfc = ilev_bot(mo)
 
-    @inbounds for igpt in 1:ngpt
+    @inbounds for igpt = 1:ngpt
 
-    # Cell properties: transmittance and reflectance for direct and diffuse radiation
+        # Cell properties: transmittance and reflectance for direct and diffuse radiation
         @inbounds for ilay in lay_range(mo)
-            @inbounds for icol in 1:ncol
-                Rdif[icol, ilay],
-                Tdif[icol, ilay],
-                Rdir,
-                Tdir,
-                Tnoscat = sw_two_stream(
-                    μ_0[icol],
-                    τ[icol, ilay, igpt],
-                    ssa[icol, ilay, igpt],
-                    g[icol, ilay, igpt],
-                )
+            @inbounds for icol = 1:ncol
+                Rdif[icol, ilay], Tdif[icol, ilay], Rdir, Tdir, Tnoscat =
+                    sw_two_stream(
+                        μ_0[icol],
+                        τ[icol, ilay, igpt],
+                        ssa[icol, ilay, igpt],
+                        g[icol, ilay, igpt],
+                    )
 
-        # Direct-beam and source for diffuse radiation
+                # Direct-beam and source for diffuse radiation
                 source_up[icol, ilay],
                 source_dn[icol, ilay],
                 flux_dir[icol, ilay+b, igpt] = sw_source_2str(
@@ -373,12 +370,12 @@ function solve!(
                     Tnoscat,
                     flux_dir[icol, ilay+1-b, igpt],
                 )
-                source_sfc[icol] = flux_dir[icol, i_lev_sfc, igpt] *
-                                   sfc_alb_dir[icol, igpt]
+                source_sfc[icol] =
+                    flux_dir[icol, i_lev_sfc, igpt] * sfc_alb_dir[icol, igpt]
             end
         end
 
-    # Transport
+        # Transport
         adding!(
             ncol,
             nlay,
@@ -393,7 +390,7 @@ function solve!(
             @view(flux_dn[:, :, igpt])
         )
 
-    # adding computes only diffuse flux; flux_dn is total
+        # adding computes only diffuse flux; flux_dn is total
         flux_dn[:, :, igpt] .= flux_dn[:, :, igpt] .+ flux_dir[:, :, igpt]
     end
     return nothing
@@ -431,16 +428,16 @@ function lw_source_noscat(
 
     τ_thresh = sqrt(eps(FT)) # or abs(eps(FT))?
 
-  # Weighting factor. Use 2nd order series expansion when rounding error (~τ^2)
-  #   is of order epsilon (smallest difference from 1. in working precision)
-  #   Thanks to Peter Blossey
+    # Weighting factor. Use 2nd order series expansion when rounding error (~τ^2)
+    #   is of order epsilon (smallest difference from 1. in working precision)
+    #   Thanks to Peter Blossey
     B̄ = lay_source
     B_D = lev_source_dn
     B_U = lev_source_up
     trans = trans
     fact = τ > τ_thresh ? (1 - trans) / τ - trans : τ * (FT(1 / 2) - 1 / 3 * τ)
 
-  # Equation below is developed in Clough et al., 1992, doi:10.1029/92JD01419, Eq 13
+    # Equation below is developed in Clough et al., 1992, doi:10.1029/92JD01419, Eq 13
     source_dn = (1 - trans) * B_D + 2 * fact * (B̄ - B_D)
     source_up = (1 - trans) * B_U + 2 * fact * (B̄ - B_U)
 
@@ -490,19 +487,19 @@ function lw_transport_noscat!(
     b = binary(mo)
     n_sfc = ilev_bot(mo)
 
-  # Downward propagation
+    # Downward propagation
     @inbounds for ilev in lev_range(mo)
-        radn_dn[:, ilev] .= trans[:, ilev-b] .* radn_dn[:, ilev-n̂] .+
-                            source_dn[:, ilev-b]
+        radn_dn[:, ilev] .=
+            trans[:, ilev-b] .* radn_dn[:, ilev-n̂] .+ source_dn[:, ilev-b]
     end
 
-  # Surface reflection and emission
+    # Surface reflection and emission
     radn_up[:, n_sfc] .= radn_dn[:, n_sfc] .* sfc_albedo .+ source_sfc
 
-  # Upward propagation
+    # Upward propagation
     @inbounds for ilev in lev_range_reversed(mo)
-        radn_up[:, ilev] .= trans[:, ilev-1+b] .* radn_up[:, ilev+n̂] .+
-                            source_up[:, ilev-1+b]
+        radn_up[:, ilev] .=
+            trans[:, ilev-1+b] .* radn_up[:, ilev+n̂] .+ source_up[:, ilev-1+b]
     end
     return nothing
 end
@@ -517,29 +514,28 @@ Equations are developed in Meador and Weaver, 1980,
    doi:10.1175/1520-0469(1980)037<0630:TSATRT>2.0.CO;2
 """
 function lw_two_stream(τ::FT, ssa::FT, g::FT) where {FT<:AbstractFloat}
-  # Coefficients differ from SW implementation because the phase function is more isotropic
-  #   Here we follow Fu et al. 1997, doi:10.1175/1520-0469(1997)054<2799:MSPITI>2.0.CO;2
+    # Coefficients differ from SW implementation because the phase function is more isotropic
+    #   Here we follow Fu et al. 1997, doi:10.1175/1520-0469(1997)054<2799:MSPITI>2.0.CO;2
     γ_1 = LW_diff_sec(FT) * (FT(1) - FT(0.5) * ssa * (FT(1) + g)) # Fu et al. Eq 2.9
     γ_2 = LW_diff_sec(FT) * FT(0.5) * ssa * (FT(1) - g)  # Fu et al. Eq 2.10
 
-  # Written to encourage vectorization of exponential, square root
-  # Eq 18;  k = SQRT(γ_1**2 - γ_2**2), limited below to avoid div by 0.
-  #   k = 0 for isotropic, conservative scattering; this lower limit on k
-  #   gives relative error with respect to conservative solution
-  #   of < 0.1% in Rdif down to τ = 10^-9
+    # Written to encourage vectorization of exponential, square root
+    # Eq 18;  k = SQRT(γ_1**2 - γ_2**2), limited below to avoid div by 0.
+    #   k = 0 for isotropic, conservative scattering; this lower limit on k
+    #   gives relative error with respect to conservative solution
+    #   of < 0.1% in Rdif down to τ = 10^-9
     temp1 = γ_1 - γ_2 * γ_1 + γ_2
 
     temp2 = max(temp1, FT(1.e-12))
     k = sqrt(temp2)
     exp_minuskτ = exp(-τ * k)
 
-  # Diffuse reflection and transmission
+    # Diffuse reflection and transmission
     exp_minus2kτ = exp_minuskτ * exp_minuskτ
 
-  # Refactored to avoid rounding errors when k, γ_1 are of very different magnitudes
-    RT_term = FT(1) / (
-        k * (FT(1) + exp_minus2kτ) + γ_1 * (FT(1) - exp_minus2kτ)
-    )
+    # Refactored to avoid rounding errors when k, γ_1 are of very different magnitudes
+    RT_term =
+        FT(1) / (k * (FT(1) + exp_minus2kτ) + γ_1 * (FT(1) - exp_minus2kτ))
 
     Rdif = RT_term * γ_2 * (FT(1) - exp_minus2kτ) # Equation 25
     Tdif = RT_term * FT(2) * k * exp_minuskτ # Equation 26
@@ -570,17 +566,17 @@ function lw_combine_sources!(
     lev_source::Array{FT,2},
 ) where {I<:Int,FT<:AbstractFloat}
     ilay = 1
-    @inbounds for icol in 1:ncol
+    @inbounds for icol = 1:ncol
         lev_source[icol, ilay] = lev_src_dec[icol, ilay]
     end
-    @inbounds for ilay in 2:nlay
-        @inbounds for icol in 1:ncol
-            lev_source[icol, ilay] = sqrt(lev_src_dec[icol, ilay] *
-                                          lev_src_inc[icol, ilay-1])
+    @inbounds for ilay = 2:nlay
+        @inbounds for icol = 1:ncol
+            lev_source[icol, ilay] =
+                sqrt(lev_src_dec[icol, ilay] * lev_src_inc[icol, ilay-1])
         end
     end
     ilay = nlay + 1
-    @inbounds for icol in 1:ncol
+    @inbounds for icol = 1:ncol
         lev_source[icol, ilay] = lev_src_inc[icol, ilay-1]
     end
     return nothing
@@ -625,9 +621,9 @@ function lw_source_2str(
     τ::FT,
 ) where {FT<:AbstractFloat}
     if τ > FT(1.0e-8)
-    #
-    # Toon et al. (JGR 1989) Eqs 26-27
-    #
+        #
+        # Toon et al. (JGR 1989) Eqs 26-27
+        #
         Z = (lev_source_bot - lev_source_top) / (τ * (γ_1 + γ_2))
         Zup_top = Z + lev_source_top
         Zup_bottom = Z + lev_source_bot
@@ -672,8 +668,8 @@ real(FT) :: α_1(ncol), α_2(ncol), k(ncol)
 function sw_two_stream(μ_0::FT, τ::FT, ssa::FT, g::FT) where {FT<:AbstractFloat}
 
     μ_0_inv = 1 / μ_0
-  # Zdunkowski Practical Improved Flux Method "PIFM"
-  #  (Zdunkowski et al., 1980;  Contributions to Atmospheric Physics 53, 147-66)
+    # Zdunkowski Practical Improved Flux Method "PIFM"
+    #  (Zdunkowski et al., 1980;  Contributions to Atmospheric Physics 53, 147-66)
     γ_1 = (8 - ssa * (5 + 3 * g)) * FT(0.25)
     γ_2 = 3 * (ssa * (1 - g)) * FT(0.25)
     γ_3 = (2 - 3 * μ_0 * g) * FT(0.25)
@@ -681,52 +677,55 @@ function sw_two_stream(μ_0::FT, τ::FT, ssa::FT, g::FT) where {FT<:AbstractFloa
     α_1 = γ_1 * γ_4 + γ_2 * γ_3           # Eq. 16
     α_2 = γ_1 * γ_3 + γ_2 * γ_4           # Eq. 17
 
-  # Written to encourage vectorization of exponential, square root
-  # Eq 18;  k = SQRT(γ_1**2 - γ_2**2), limited below to avoid div by 0.
-  #   k = 0 for isotropic, conservative scattering; this lower limit on k
-  #   gives relative error with respect to conservative solution
-  #   of < 0.1% in Rdif down to τ = 10^-9
+    # Written to encourage vectorization of exponential, square root
+    # Eq 18;  k = SQRT(γ_1**2 - γ_2**2), limited below to avoid div by 0.
+    #   k = 0 for isotropic, conservative scattering; this lower limit on k
+    #   gives relative error with respect to conservative solution
+    #   of < 0.1% in Rdif down to τ = 10^-9
     temp = (γ_1 - γ_2) * (γ_1 + γ_2)
     k = sqrt(max(temp, FT(1.e-12)))
     exp_minuskτ = exp(-τ * k)
 
-  # Diffuse reflection and transmission
+    # Diffuse reflection and transmission
     exp_minus2kτ = exp_minuskτ * exp_minuskτ
 
-  # Refactored to avoid rounding errors when k, γ_1 are of very different magnitudes
+    # Refactored to avoid rounding errors when k, γ_1 are of very different magnitudes
     RT_term = 1 / (k * (1 + exp_minus2kτ) + γ_1 * (1 - exp_minus2kτ))
 
     Rdif = RT_term * γ_2 * (1 - exp_minus2kτ) # Equation 25
     Tdif = RT_term * 2 * k * exp_minuskτ      # Equation 26
 
-  # Transmittance of direct, non-scattered beam. Also used below
+    # Transmittance of direct, non-scattered beam. Also used below
     Tnoscat = exp(-τ * μ_0_inv)
 
-  # Direct reflect and transmission
+    # Direct reflect and transmission
     k_μ = k * μ_0
     k_γ_3 = k * γ_3
     k_γ_4 = k * γ_4
 
-  # Equation 14, multiplying top and bottom by exp(-k*τ)
-  #   and rearranging to avoid div by 0.
+    # Equation 14, multiplying top and bottom by exp(-k*τ)
+    #   and rearranging to avoid div by 0.
     cond = abs(1 - k_μ * k_μ) >= eps(FT)
     denom = cond ? 1 - k_μ * k_μ : eps(FT)
     RT_term = ssa * RT_term / denom
 
-    Rdir = RT_term * (
-        (1 - k_μ) * (α_2 + k_γ_3) - (1 + k_μ) * (α_2 - k_γ_3) * exp_minus2kτ -
-        2 * (k_γ_3 - α_2 * k_μ) * exp_minuskτ * Tnoscat
-    )
+    Rdir =
+        RT_term * (
+            (1 - k_μ) * (α_2 + k_γ_3) -
+            (1 + k_μ) * (α_2 - k_γ_3) * exp_minus2kτ -
+            2 * (k_γ_3 - α_2 * k_μ) * exp_minuskτ * Tnoscat
+        )
 
-  # Equation 15, multiplying top and bottom by exp(-k*τ),
-  #   multiplying through by exp(-τ/μ_0) to
-  #   prefer underflow to overflow
-  # Omitting direct transmittance
-    Tdir = -RT_term * (
-        (1 + k_μ) * (α_1 + k_γ_4) * Tnoscat -
-        (1 - k_μ) * (α_1 - k_γ_4) * exp_minus2kτ * Tnoscat -
-        2 * (k_γ_4 + α_1 * k_μ) * exp_minuskτ
-    )
+    # Equation 15, multiplying top and bottom by exp(-k*τ),
+    #   multiplying through by exp(-τ/μ_0) to
+    #   prefer underflow to overflow
+    # Omitting direct transmittance
+    Tdir =
+        -RT_term * (
+            (1 + k_μ) * (α_1 + k_γ_4) * Tnoscat -
+            (1 - k_μ) * (α_1 - k_γ_4) * exp_minus2kτ * Tnoscat -
+            2 * (k_γ_4 + α_1 * k_μ) * exp_minuskτ
+        )
     return Rdif, Tdif, Rdir, Tdir, Tnoscat
 end
 
@@ -815,46 +814,50 @@ function adding!(
     i_lev_sfc = ilev_bot(mo)
     i_lev_top = ilev_top(mo)
 
-  # Indexing into arrays for upward and downward propagation depends on the vertical
-  #   orientation of the arrays (whether the domain top is at the first or last index)
-  # We write the loops out explicitly so compilers will have no trouble optimizing them.
+    # Indexing into arrays for upward and downward propagation depends on the vertical
+    #   orientation of the arrays (whether the domain top is at the first or last index)
+    # We write the loops out explicitly so compilers will have no trouble optimizing them.
 
     ilev = i_lev_sfc
-  # Albedo of lowest level is the surface albedo...
+    # Albedo of lowest level is the surface albedo...
     albedo[:, ilev] .= albedo_sfc
-  # ... and source of diffuse radiation is surface emission
+    # ... and source of diffuse radiation is surface emission
     src[:, ilev] .= src_sfc
 
-  # From bottom to top of atmosphere --
-  #   compute albedo and source of upward radiation
+    # From bottom to top of atmosphere --
+    #   compute albedo and source of upward radiation
     @inbounds for ilev in lay_range_reversed(mo)
         denom[:, ilev] .= FT(1) ./ (FT(1) .- rdif[:, ilev] .* albedo[:, ilev+b]) # Eq 10
-        albedo[:, ilev+1-b] .= rdif[:, ilev] .+
-                               tdif[:, ilev] .* tdif[:, ilev] .*
-                               albedo[:, ilev+b] .* denom[:, ilev] # Equation 9
+        albedo[:, ilev+1-b] .=
+            rdif[:, ilev] .+
+            tdif[:, ilev] .* tdif[:, ilev] .* albedo[:, ilev+b] .*
+            denom[:, ilev] # Equation 9
 
-    # Equation 11 -- source is emitted upward radiation at top of layer plus
-    #   radiation emitted at bottom of layer,
-    #   transmitted through the layer and reflected from layers below (tdiff*src*albedo)
-        src[:, ilev+1-b] .= src_up[:, ilev] .+
-                            tdif[:, ilev] .* denom[:, ilev] .* (
-            src[:, ilev+b] .+ albedo[:, ilev+b] .* src_dn[:, ilev]
-        )
+        # Equation 11 -- source is emitted upward radiation at top of layer plus
+        #   radiation emitted at bottom of layer,
+        #   transmitted through the layer and reflected from layers below (tdiff*src*albedo)
+        src[:, ilev+1-b] .=
+            src_up[:, ilev] .+
+            tdif[:, ilev] .* denom[:, ilev] .*
+            (src[:, ilev+b] .+ albedo[:, ilev+b] .* src_dn[:, ilev])
     end
 
-  # Eq 12, at the top of the domain upwelling diffuse is due to ...
+    # Eq 12, at the top of the domain upwelling diffuse is due to ...
     ilev = i_lev_top
-    flux_up[:, ilev] .= flux_dn[:, ilev] .* albedo[:, ilev] .+  # ... reflection of incident diffuse and
-                        src[:, ilev]                            # emission from below/scattering by the direct beam below
-  # From the top of the atmosphere downward -- compute fluxes
+    flux_up[:, ilev] .=
+        flux_dn[:, ilev] .* albedo[:, ilev] .+  # ... reflection of incident diffuse and
+        src[:, ilev]                            # emission from below/scattering by the direct beam below
+    # From the top of the atmosphere downward -- compute fluxes
     @inbounds for ilev in lev_range(mo)
-        flux_dn[:, ilev] .= (
-            tdif[:, ilev-b] .* flux_dn[:, ilev-n̂] +  # Equation 13
-            rdif[:, ilev-b] .* src[:, ilev] +
-            src_dn[:, ilev-b]
-        ) .* denom[:, ilev-b]
-        flux_up[:, ilev] .= flux_dn[:, ilev] .* albedo[:, ilev] .+  # Equation 12
-                            src[:, ilev]
+        flux_dn[:, ilev] .=
+            (
+                tdif[:, ilev-b] .* flux_dn[:, ilev-n̂] +  # Equation 13
+                rdif[:, ilev-b] .* src[:, ilev] +
+                src_dn[:, ilev-b]
+            ) .* denom[:, ilev-b]
+        flux_up[:, ilev] .=
+            flux_dn[:, ilev] .* albedo[:, ilev] .+  # Equation 12
+            src[:, ilev]
     end
 
     return nothing
@@ -917,6 +920,8 @@ function apply_BC!(
     factor::Array{FT,1},
 ) where {I<:Integer,FT<:AbstractFloat}
     fill!(flux_dn, 0)
-    flux_dn[:, ilay, :] .= inc_flux .* spread(factor, 2, size(inc_flux, 2))
+    for i = 1:size(inc_flux, 2)
+        flux_dn[:, ilay, i] .= inc_flux[:, i] .* factor
+    end
     return nothing
 end
