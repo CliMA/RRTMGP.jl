@@ -24,7 +24,6 @@ Note that `ds` is used to denote an NC dataset.
 using RRTMGP.GasConcentrations
 using RRTMGP.Utilities
 using RRTMGP.Gases
-using RRTMGP.FortranIntrinsics
 using NCDatasets
 
 """
@@ -39,48 +38,52 @@ Read profiles for all columns
 """
 function read_atmos(ds, FT, I, gases_prescribed)
 
-  ncol = ds.dim["col"]
-  nlay = ds.dim["lay"]
-  nlev = ds.dim["lev"]
-  @assert nlev == nlay+1
+    ncol = ds.dim["col"]
+    nlay = ds.dim["lay"]
+    nlev = ds.dim["lev"]
+    @assert nlev == nlay + 1
 
-  p_lay = Array{FT}(ds["p_lay"][:])
-  t_lay = Array{FT}(ds["t_lay"][:])
-  p_lev = Array{FT}(ds["p_lev"][:])
-  t_lev = Array{FT}(ds["t_lev"][:])
+    p_lay = Array{FT}(ds["p_lay"][:])
+    t_lay = Array{FT}(ds["t_lay"][:])
+    p_lev = Array{FT}(ds["p_lev"][:])
+    t_lev = Array{FT}(ds["t_lev"][:])
 
-  gases_to_look_for = [h2o(),
-                       co2(),
-                       o3(),
-                       n2o(),
-                       co(),
-                       ch4(),
-                       o2(),
-                       n2(),
-                       ccl4(),
-                       cfc11(),
-                       cfc12(),
-                       cfc22(),
-                       hfc143a(),
-                       hfc125(),
-                       hfc23(),
-                       hfc32(),
-                       hfc134a(),
-                       cf4(),
-                       no2()]
+    gases_to_look_for = [
+        h2o(),
+        co2(),
+        o3(),
+        n2o(),
+        co(),
+        ch4(),
+        o2(),
+        n2(),
+        ccl4(),
+        cfc11(),
+        cfc12(),
+        cfc22(),
+        hfc143a(),
+        hfc125(),
+        hfc23(),
+        hfc32(),
+        hfc134a(),
+        cf4(),
+        no2(),
+    ]
 
-  gases_in_database = filter(ug->haskey(ds, "vmr_"*chem_name(ug)), gases_to_look_for)
+    gases_in_database =
+        filter(ug -> haskey(ds, "vmr_" * chem_name(ug)), gases_to_look_for)
 
-  gas_concs = GasConcs(FT, I, gases_prescribed, ncol, nlay, length(gases_in_database))
+    gas_concs =
+        GasConcs(FT, I, gases_prescribed, ncol, nlay, length(gases_in_database))
 
-  for eg in gases_in_database
-    set_vmr!(gas_concs, eg, Array{FT}(ds["vmr_"*chem_name(eg)][:]))
-  end
+    for eg in gases_in_database
+        set_vmr!(gas_concs, eg, Array{FT}(ds["vmr_"*chem_name(eg)][:]))
+    end
 
-  # col_dry has unchanged allocation status on return if the variable isn't present in the netCDF file
-  col_dry = haskey(ds, "col_dry") ? Array{FT}(ds["col_dry"][:]) : nothing
+    # col_dry has unchanged allocation status on return if the variable isn't present in the netCDF file
+    col_dry = haskey(ds, "col_dry") ? Array{FT}(ds["col_dry"][:]) : nothing
 
-  return p_lay, t_lay, p_lev, t_lev, gas_concs, col_dry
+    return p_lay, t_lay, p_lev, t_lev, gas_concs, col_dry
 end
 
 
@@ -89,7 +92,7 @@ end
 
 Does this file contain variables needed to do SW calculations?
 """
-is_sw(ds) = haskey(ds,"solar_zenith_angle")
+is_sw(ds) = haskey(ds, "solar_zenith_angle")
 
 """
     is_lw(ds)
@@ -110,18 +113,20 @@ read_lw_bc(ds) = ds["t_sfc"][:], ds["emis_sfc"][:]
 
 Read LW radiative transfer parameters
 """
-read_lw_rt(ds) = length( size( ds["angle"] ) )
+read_lw_rt(ds) = length(size(ds["angle"]))
 
 """
     read_sw_bc(ds)
 
 Read SW boundary conditions for all columns
 """
-read_sw_bc(ds) = (ds["solar_zenith_angle"][:],
-                  ds["total_solar_irradiance"][:],
-                  ds["sfc_alb_direct"],
-                  ds["sfc_alb_diffuse"],
-                  haskey(ds,"tsi_scaling") ? ds["tsi_scaling"][:] : nothing)
+read_sw_bc(ds) = (
+    ds["solar_zenith_angle"][:],
+    ds["total_solar_irradiance"][:],
+    ds["sfc_alb_direct"],
+    ds["sfc_alb_diffuse"],
+    haskey(ds, "tsi_scaling") ? ds["tsi_scaling"][:] : nothing,
+)
 
 
 """
@@ -130,10 +135,11 @@ read_sw_bc(ds) = (ds["solar_zenith_angle"][:],
 Read spectral discretization
 """
 function read_spectral_disc!(ds, spectral_disc::AbstractOpticalProps)
-  @assert ds.dim["pair"] == 2
-  band_lims_wvn = ds["band_lims_wvn"][:]
-  band_lims_gpt = ds["band_lims_gpt"][:]
-  spectral_disc.base = OpticalPropsBase("read_spectral_disc!", band_lims_wvn, band_lims_gpt)
+    @assert ds.dim["pair"] == 2
+    band_lims_wvn = ds["band_lims_wvn"][:]
+    band_lims_gpt = ds["band_lims_gpt"][:]
+    spectral_disc.base =
+        OpticalPropsBase("read_spectral_disc!", band_lims_wvn, band_lims_gpt)
 end
 
 """
@@ -155,9 +161,7 @@ read_direction(ds) = (ds.attrib["top_at_1"] == 1)
 
 Sources of upward and downward diffuse radiation, for each layer and at the surface
 """
-read_sources(ds) = ds["source_up"][:],
-                   ds["source_dn"][:],
-                   ds["source_sfc"][:]
+read_sources(ds) = ds["source_up"][:], ds["source_dn"][:], ds["source_sfc"][:]
 
 """
     read_lw_Planck_sources!(ds, sources::SourceFuncLongWave{FT}) where FT
@@ -165,27 +169,28 @@ read_sources(ds) = ds["source_up"][:],
 Longwave sources at layer centers; edges in two directions; surface
    Also directionality since this will be needed for solution
 """
-function read_lw_Planck_sources!(ds, sources::SourceFuncLongWave{FT}) where FT
-  ncol  = ds.dim["col"]
-  nlay  = ds.dim["lay"]
-  ngpt  = ds.dim["gpt"]
-  nband = ds.dim["band"]
-  # Error checking
-  @assert ds.dim["pair"] == 2
-  @assert haskey(ds,"lay_src")
+function read_lw_Planck_sources!(ds, sources::SourceFuncLongWave{FT}) where {FT}
+    ncol = ds.dim["col"]
+    nlay = ds.dim["lay"]
+    ngpt = ds.dim["gpt"]
+    nband = ds.dim["band"]
+    # Error checking
+    @assert ds.dim["pair"] == 2
+    @assert haskey(ds, "lay_src")
 
-  # Spectral discretization
-  band_lims_wvn = ds["band_lims_wvn"][:]
-  band_lims_gpt = ds["band_lims_gpt"][:]
+    # Spectral discretization
+    band_lims_wvn = ds["band_lims_wvn"][:]
+    band_lims_gpt = ds["band_lims_gpt"][:]
 
-  sources.optical_props = OpticalPropsBase("SourceFuncLongWave", band_lims_wvn, band_lims_gpt)
-  sources.τ .= Array{FT}(undef, ncol, nlay)
+    sources.optical_props =
+        OpticalPropsBase("SourceFuncLongWave", band_lims_wvn, band_lims_gpt)
+    sources.τ .= Array{FT}(undef, ncol, nlay)
 
-  sources.lay_source     .= ds["lay_src"][:]
-  sources.lev_source_inc .= ds["lev_src_inc"][:]
-  sources.lev_source_dec .= ds["lev_src_dec"][:]
-  sources.sfc_source     .= ds["sfc_src"][:]
-  return nothing
+    sources.lay_source .= ds["lay_src"][:]
+    sources.lev_source_inc .= ds["lev_src_inc"][:]
+    sources.lev_source_dec .= ds["lev_src_dec"][:]
+    sources.sfc_source .= ds["sfc_src"][:]
+    return nothing
 
 end
 
@@ -203,12 +208,12 @@ read_sw_solar_sources(ds) = ds["toa_src"][:]
 Two-stream results: reflection and transmission for diffuse and direct radiation; also extinction
 """
 function read_two_stream(ds)
-  Rdif    = ds["Rdif"][:]
-  Tdif    = ds["Tdif"][:]
-  Rdir = haskey(ds,"Rdir") ? ds["Rdir"][:] : nothing
-  Tdir = haskey(ds,"Tdir") ? ds["Tdir"][:] : nothing
-  Tnoscat = haskey(ds,"Tnoscat") ? ds["Tnoscat"][:] : nothing
-  return Rdif, Tdif, Rdir, Tdir, Tnoscat
+    Rdif = ds["Rdif"][:]
+    Tdif = ds["Tdif"][:]
+    Rdir = haskey(ds, "Rdir") ? ds["Rdir"][:] : nothing
+    Tdir = haskey(ds, "Tdir") ? ds["Tdir"][:] : nothing
+    Tnoscat = haskey(ds, "Tnoscat") ? ds["Tnoscat"][:] : nothing
+    return Rdif, Tdif, Rdir, Tdir, Tnoscat
 end
 
 """
@@ -216,9 +221,11 @@ end
 
 g-point fluxes
 """
-read_gpt_fluxes(ds) = (ds["gpt_flux_up"][:],
-                       ds["gpt_flux_dn"][:],
-                       haskey(ds,"gpt_flux_dn_dir") ? ds["gpt_flux_dn_dir"][:] : nothing)
+read_gpt_fluxes(ds) = (
+    ds["gpt_flux_up"][:],
+    ds["gpt_flux_dn"][:],
+    haskey(ds, "gpt_flux_dn_dir") ? ds["gpt_flux_dn_dir"][:] : nothing,
+)
 
 """
     read_size(ds)
@@ -226,11 +233,11 @@ read_gpt_fluxes(ds) = (ds["gpt_flux_up"][:],
 Find the size of the problem: columns, layers, perturbations (experiments)
 """
 function read_size(ds)
-  ncol = Int(ds.dim["site"])
-  nlay = Int(ds.dim["layer"])
-  nexp = Int(ds.dim["expt"])
-  @assert ds.dim["level"] == nlay+1
-  return ncol, nlay, nexp
+    ncol = Int(ds.dim["site"])
+    nlay = Int(ds.dim["layer"])
+    nexp = Int(ds.dim["expt"])
+    @assert ds.dim["level"] == nlay + 1
+    return ncol, nlay, nexp
 end
 
 """
@@ -245,49 +252,55 @@ Return layer and level
 """
 function read_and_block_pt(ds, blocksize)
 
-  FT = Float64
-  ncol_l, nlay_l, nexp_l = read_size(ds)
+    FT = Float64
+    ncol_l, nlay_l, nexp_l = read_size(ds)
 
-  @assert !any([ncol_l, nlay_l, nexp_l]  .== 0)
-  @assert (ncol_l*nexp_l)%blocksize == 0
+    @assert !any([ncol_l, nlay_l, nexp_l] .== 0)
+    @assert (ncol_l * nexp_l) % blocksize == 0
 
-  nblocks = Int((ncol_l*nexp_l)/blocksize)
+    nblocks = Int((ncol_l * nexp_l) / blocksize)
 
-  p_lay = Array{FT}(undef,blocksize,nlay_l  ,nblocks)
-  t_lay = Array{FT}(undef,blocksize,nlay_l  ,nblocks)
-  p_lev = Array{FT}(undef,blocksize,nlay_l+1,nblocks)
-  t_lev = Array{FT}(undef,blocksize,nlay_l+1,nblocks)
+    p_lay = Array{FT}(undef, blocksize, nlay_l, nblocks)
+    t_lay = Array{FT}(undef, blocksize, nlay_l, nblocks)
+    p_lev = Array{FT}(undef, blocksize, nlay_l + 1, nblocks)
+    t_lev = Array{FT}(undef, blocksize, nlay_l + 1, nblocks)
 
-  # Read p, T data; reshape to suit RRTMGP dimensions
-  pres_layer = Array{FT}(ds["pres_layer"][:])
-  temp3d = reshape( repeat(pres_layer,1,1,nexp_l), nlay_l, blocksize, nblocks )
+    # Read p, T data; reshape to suit RRTMGP dimensions
+    pres_layer = Array{FT}(ds["pres_layer"][:])
+    temp3d =
+        reshape(repeat(pres_layer, 1, 1, nexp_l), nlay_l, blocksize, nblocks)
 
-  for b = 1:nblocks
-    p_lay[:,:,b] = transpose(temp3d[:,:,b])
-  end
+    for b = 1:nblocks
+        p_lay[:, :, b] = transpose(temp3d[:, :, b])
+    end
 
-  temp_layer = Array{FT}(ds["temp_layer"][:])
-  temp3d = reshape(temp_layer, nlay_l, blocksize, nblocks )
+    temp_layer = Array{FT}(ds["temp_layer"][:])
+    temp3d = reshape(temp_layer, nlay_l, blocksize, nblocks)
 
-  for b = 1:nblocks
-    t_lay[:,:,b] = transpose(temp3d[:,:,b])
-  end
+    for b = 1:nblocks
+        t_lay[:, :, b] = transpose(temp3d[:, :, b])
+    end
 
-  pres_level = Array{FT}(ds["pres_level"][:])
-  temp3d = reshape( repeat(pres_level,1,1,nexp_l), nlay_l+1, blocksize, nblocks )
+    pres_level = Array{FT}(ds["pres_level"][:])
+    temp3d = reshape(
+        repeat(pres_level, 1, 1, nexp_l),
+        nlay_l + 1,
+        blocksize,
+        nblocks,
+    )
 
-  for b = 1:nblocks
-    p_lev[:,:,b] = transpose(temp3d[:,:,b])
-  end
+    for b = 1:nblocks
+        p_lev[:, :, b] = transpose(temp3d[:, :, b])
+    end
 
-  temp_level = Array{FT}(ds["temp_level"][:])
-  temp3d = reshape(temp_level,nlay_l+1, blocksize, nblocks )
+    temp_level = Array{FT}(ds["temp_level"][:])
+    temp3d = reshape(temp_level, nlay_l + 1, blocksize, nblocks)
 
-  for b = 1:nblocks
-    t_lev[:,:,b] = transpose(temp3d[:,:,b])
-  end
+    for b = 1:nblocks
+        t_lev[:, :, b] = transpose(temp3d[:, :, b])
+    end
 
-  return p_lay, p_lev, t_lay, t_lev
+    return p_lay, p_lev, t_lay, t_lev
 end
 
 """
@@ -300,26 +313,26 @@ Read and reshape shortwave boundary conditions
  - `solar_zenith_angle` solar zenith angle
 """
 function read_and_block_sw_bc(ds, blocksize)
-  FT = Float64
-  ncol_l, nlay_l, nexp_l = read_size(ds)
+    FT = Float64
+    ncol_l, nlay_l, nexp_l = read_size(ds)
 
-  @assert !any([ncol_l, nlay_l, nexp_l] .== 0)
-  @assert (ncol_l*nexp_l)%blocksize == 0
-  nblocks = Int((ncol_l*nexp_l)/blocksize)
+    @assert !any([ncol_l, nlay_l, nexp_l] .== 0)
+    @assert (ncol_l * nexp_l) % blocksize == 0
+    nblocks = Int((ncol_l * nexp_l) / blocksize)
 
-  # Check that output arrays are sized correctly : blocksize, nlay, (ncol * nexp)/blocksize
-  surface_albedo = Array{FT}(ds["surface_albedo"][:])
-  temp2D = repeat(surface_albedo,1,nexp_l)
-  surface_albedo = reshape(temp2D,blocksize,nblocks)
+    # Check that output arrays are sized correctly : blocksize, nlay, (ncol * nexp)/blocksize
+    surface_albedo = Array{FT}(ds["surface_albedo"][:])
+    temp2D = repeat(surface_albedo, 1, nexp_l)
+    surface_albedo = reshape(temp2D, blocksize, nblocks)
 
-  total_solar_irradiance = Array{FT}(ds["total_solar_irradiance"][:])
-  temp2D = repeat(total_solar_irradiance,1,nexp_l)
-  total_solar_irradiance = reshape(temp2D, blocksize, nblocks)
+    total_solar_irradiance = Array{FT}(ds["total_solar_irradiance"][:])
+    temp2D = repeat(total_solar_irradiance, 1, nexp_l)
+    total_solar_irradiance = reshape(temp2D, blocksize, nblocks)
 
-  solar_zenith_angle = Array{FT}(ds["solar_zenith_angle"][:])
-  temp2D = repeat(solar_zenith_angle,1,nexp_l)
-  solar_zenith_angle = reshape(temp2D, blocksize, nblocks)
-  return surface_albedo, total_solar_irradiance, solar_zenith_angle
+    solar_zenith_angle = Array{FT}(ds["solar_zenith_angle"][:])
+    temp2D = repeat(solar_zenith_angle, 1, nexp_l)
+    solar_zenith_angle = reshape(temp2D, blocksize, nblocks)
+    return surface_albedo, total_solar_irradiance, solar_zenith_angle
 end
 
 """
@@ -331,19 +344,20 @@ Read and reshape longwave boundary conditions
  - `surface_temperature` surface temperature
 """
 function read_and_block_lw_bc(ds, blocksize)
-  FT = Float64
+    FT = Float64
 
-  ncol_l, nlay_l, nexp_l = read_size(ds)
-  @assert !any([ncol_l, nlay_l, nexp_l]  .== 0)
-  @assert (ncol_l*nexp_l)%blocksize == 0
-  nblocks = convert(Int,(ncol_l*nexp_l)/blocksize)
+    ncol_l, nlay_l, nexp_l = read_size(ds)
+    @assert !any([ncol_l, nlay_l, nexp_l] .== 0)
+    @assert (ncol_l * nexp_l) % blocksize == 0
+    nblocks = convert(Int, (ncol_l * nexp_l) / blocksize)
 
-  temp2D = repeat( ds["surface_emissivity"][:] ,1,nexp_l)
-  surface_emissivity  = Array{FT}(reshape(temp2D,blocksize,nblocks))
+    temp2D = repeat(ds["surface_emissivity"][:], 1, nexp_l)
+    surface_emissivity = Array{FT}(reshape(temp2D, blocksize, nblocks))
 
-  surface_temperature = Array{FT}(reshape( ds["surface_temperature"][:], blocksize, nblocks )) # alternate version
+    surface_temperature =
+        Array{FT}(reshape(ds["surface_temperature"][:], blocksize, nblocks)) # alternate version
 
-  return surface_emissivity, surface_temperature
+    return surface_emissivity, surface_temperature
 end
 
 """
@@ -359,22 +373,22 @@ one containing the name as contained in the RFMIP input files - depending on the
 """
 function determine_gas_names(ds, forcing_index)
 
-  @assert any(forcing_index .== [1,2,3])
-  if forcing_index == 1
-    names_in_kdist = convert.(AbstractGas, read_kdist_gas_names(ds))
+    @assert any(forcing_index .== [1, 2, 3])
+    if forcing_index == 1
+        names_in_kdist = convert.(AbstractGas, read_kdist_gas_names(ds))
 
-  # elseif forcing_index == 2
+        # elseif forcing_index == 2
 
-  #   # Not part of the RFMIP specification, but oxygen is included because it's a major
-  #   #    gas in some bands in the SW
-  #   names_in_kdist = [co2(), ch4(), n2o(), o2(), cfc12(), cfc11()]
-  # elseif forcing_index == 3
+        #   # Not part of the RFMIP specification, but oxygen is included because it's a major
+        #   #    gas in some bands in the SW
+        #   names_in_kdist = [co2(), ch4(), n2o(), o2(), cfc12(), cfc11()]
+        # elseif forcing_index == 3
 
-  #   # Not part of the RFMIP specification, but oxygen is included because it's a major
-  #   #    gas in some bands in the SW
-  #   names_in_kdist = [co2(), ch4(), n2o(), o2(), cfc12(), hfc134a()]
-  end
-  return names_in_kdist
+        #   # Not part of the RFMIP specification, but oxygen is included because it's a major
+        #   #    gas in some bands in the SW
+        #   names_in_kdist = [co2(), ch4(), n2o(), o2(), cfc12(), hfc134a()]
+    end
+    return names_in_kdist
 
 end
 
@@ -384,7 +398,9 @@ end
 Read the names of the gases known to the k-distribution
 """
 read_kdist_gas_names(ds) =
-  lowercase.(strip.( String[join(ds["gas_names"][:][:,i]) for i = 1:ds.dim["absorber"]] ))
+    lowercase.(strip.(String[
+        join(ds["gas_names"][:][:, i]) for i = 1:ds.dim["absorber"]
+    ]))
 
 """
     read_and_block_gases_ty(ds, blocksize, gas_names)
@@ -407,60 +423,70 @@ a descriptive name, so a map is provided between these.
  - `blocksize`
  - `gas_conc_array` vector of [`GasConcs`](@ref)
 """
-function read_and_block_gases_ty(ds,
-                                 blocksize,
-                                 gas_names::Vector{AbstractGas})
-  ncol_l, nlay_l, nexp_l = read_size(ds)
-  @assert !any([ncol_l, nlay_l, nexp_l] .== 0)
-  @assert (ncol_l*nexp_l)%blocksize == 0
-  nblocks = Int((ncol_l*nexp_l)/blocksize)
-  FT = Float64
-  I = Int
-  gas_concs = GasConcs(FT, I, gas_names, blocksize, nlay_l)
-  gas_conc_array = GasConcs[deepcopy(gas_concs) for i in 1:nblocks]
+function read_and_block_gases_ty(ds, blocksize, gas_names::Vector{AbstractGas})
+    ncol_l, nlay_l, nexp_l = read_size(ds)
+    @assert !any([ncol_l, nlay_l, nexp_l] .== 0)
+    @assert (ncol_l * nexp_l) % blocksize == 0
+    nblocks = Int((ncol_l * nexp_l) / blocksize)
+    FT = Float64
+    I = Int
+    gas_concs = GasConcs(FT, I, gas_names, blocksize, nlay_l)
+    gas_conc_array = GasConcs[deepcopy(gas_concs) for i = 1:nblocks]
 
-  # Experiment index for each column
-  exp_num = freshape(spread(convert(Array,collect(1:nexp_l)'), 1, ncol_l), [blocksize, nblocks], order=[1,2])
+    # Experiment index for each column
+    exp_num = reshape(
+        repeat(convert(Array, collect(1:nexp_l)'), ncol_l, 1),
+        blocksize,
+        nblocks,
+    )
+    # Water vapor and ozone depend on col, lay, exp: look just like other fields
+    for gas in (h2o(), o3())
+        gas_conc = Array{FT}(ds[rfmip_name(gas)][:])
+        gas_conc_scaling = read_scaling(ds, FT, rfmip_name(gas))
+        gas_conc_temp_3d =
+            reshape(gas_conc, nlay_l, blocksize, nblocks) .* gas_conc_scaling
 
-  # Water vapor and ozone depend on col, lay, exp: look just like other fields
-  for gas in (h2o(), o3())
-    gas_conc = Array{FT}(ds[rfmip_name(gas)][:])
-    gas_conc_scaling = read_scaling(ds, FT, rfmip_name(gas))
-    gas_conc_temp_3d = reshape(gas_conc, nlay_l, blocksize, nblocks ) .* gas_conc_scaling
-
-    for b = 1:nblocks
-      gas_conc_temp_3d_t = convert(Array, transpose(gas_conc_temp_3d[:,:,b]))
-      set_vmr!(gas_conc_array[b], gas, gas_conc_temp_3d_t)
-    end
-  end
-
-  # All other gases are a function of experiment only
-  for gas in gas_names
-
-    # Skip 3D fields above, also NO2 since RFMIP doesn't have this
-    if gas in [h2o(), o3(), no2()]
-      continue
+        for b = 1:nblocks
+            gas_conc_temp_3d_t =
+                convert(Array, transpose(gas_conc_temp_3d[:, :, b]))
+            set_vmr!(gas_conc_array[b], gas, gas_conc_temp_3d_t)
+        end
     end
 
-    # Read the values as a function of experiment
-    gas_conc_scaling = read_scaling(ds, FT, rfmip_name(gas) * "_GM")
-    gas_conc_temp_1d = ds[rfmip_name(gas) * "_GM"][:] * gas_conc_scaling
+    # All other gases are a function of experiment only
+    for gas in gas_names
 
-    for b = 1:nblocks
-      # Does every value in this block belong to the same experiment?
-      if all( exp_num[2:end,b] .- exp_num[1,b] .== 0 )
-        # Provide a scalar value
-        set_vmr!(gas_conc_array[b], gas, gas_conc_temp_1d[exp_num[1,b]])
-      else
-        # Create 2D field, blocksize x nlay, with scalar values from each experiment
-        set_vmr!(gas_conc_array[b], gas, spread(gas_conc_temp_1d[exp_num[:,b]], 2, nlay_l))
-      end
+        # Skip 3D fields above, also NO2 since RFMIP doesn't have this
+        if gas in [h2o(), o3(), no2()]
+            continue
+        end
+
+        # Read the values as a function of experiment
+        gas_conc_scaling = read_scaling(ds, FT, rfmip_name(gas) * "_GM")
+        gas_conc_temp_1d = ds[rfmip_name(gas)*"_GM"][:] * gas_conc_scaling
+
+        for b = 1:nblocks
+            # Does every value in this block belong to the same experiment?
+            if all(exp_num[2:end, b] .- exp_num[1, b] .== 0)
+                # Provide a scalar value
+                set_vmr!(
+                    gas_conc_array[b],
+                    gas,
+                    gas_conc_temp_1d[exp_num[1, b]],
+                )
+            else
+                # Create 2D field, blocksize x nlay, with scalar values from each experiment
+                set_vmr!(
+                    gas_conc_array[b],
+                    gas,
+                    repeat(gas_conc_temp_1d[exp_num[:, b]], 1, nlay_l),
+                )
+            end
+        end
+
     end
 
-  end
-
-  return gas_conc_array
+    return gas_conc_array
 end
 
 read_scaling(ds, FT, varName) = parse(FT, ds[varName].attrib["units"])
-

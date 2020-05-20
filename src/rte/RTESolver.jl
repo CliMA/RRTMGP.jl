@@ -60,7 +60,6 @@ using ..Utilities
 using ..OpticalProps
 using ..Fluxes
 using ..SourceFunctions
-using ..FortranIntrinsics
 
 import ..Fluxes: reduce!
 export rte_lw!, rte_sw!, expand_and_transpose
@@ -95,10 +94,10 @@ function rte_sw!(
     base = RTEBase(fluxes, mesh_orientation, bcs, op)
     rte = RTEShortWave(base, μ_0, op)
 
-  # Compute the radiative transfer...
+    # Compute the radiative transfer...
     solve!(rte, op, mesh_orientation)
 
-  # ...and reduce spectral fluxes to desired output quantities
+    # ...and reduce spectral fluxes to desired output quantities
     reduce!(rte.base, op)
     fluxes = rte.base.fluxes
     return nothing
@@ -136,7 +135,7 @@ function rte_lw!(
     base = RTEBase(fluxes, mesh_orientation, bcs, op)
     rte = RTELongWave(base, sources, angle_disc, op)
 
-  # Compute the radiative transfer...
+    # Compute the radiative transfer...
     solve!(rte, op, mesh_orientation)
 
     reduce!(rte.base, op)
@@ -175,9 +174,9 @@ function expand_and_transpose(
     ngpt = get_ngpt(ops)
     arr_out = Array{FT}(undef, ncol, ngpt)
     limits = get_band_lims_gpoint(ops)
-    @inbounds for iband in 1:nband
-        @inbounds for icol in 1:ncol
-            @inbounds for igpt in limits[1, iband]:limits[2, iband]
+    @inbounds for iband = 1:nband
+        @inbounds for icol = 1:ncol
+            @inbounds for igpt = limits[1, iband]:limits[2, iband]
                 arr_out[icol, igpt] = arr_in[iband, icol]
             end
         end

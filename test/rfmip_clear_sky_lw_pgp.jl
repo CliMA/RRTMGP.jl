@@ -5,7 +5,6 @@ using ProgressMeter
 using TimerOutputs
 const to = TimerOutput()
 using RRTMGP.OpticalProps
-using RRTMGP.FortranIntrinsics
 using RRTMGP.Utilities
 using RRTMGP.GasOptics
 using RRTMGP.GasConcentrations

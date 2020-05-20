@@ -5,7 +5,6 @@ using ProgressMeter
 using TimerOutputs
 const to = TimerOutput()
 using RRTMGP.OpticalProps
-using RRTMGP.FortranIntrinsics
 using RRTMGP.Utilities
 using RRTMGP.GasOptics
 using RRTMGP.GasConcentrations
@@ -141,8 +140,7 @@ function rfmip_clear_sky_sw_pgp(ds, optical_props_constructor)
     #
     for b = 1:nblocks
         usecol[1:block_size, b] .=
-            solar_zenith_angle[1:block_size, b] .<
-            FT(90) - FT(2) * spacing(FT(90))
+            solar_zenith_angle[1:block_size, b] .< FT(90) - FT(2) * eps(FT(90))
     end
 
     #
@@ -222,11 +220,8 @@ function rfmip_clear_sky_sw_pgp(ds, optical_props_constructor)
         # Cosine of the solar zenith angle
         #
         for icol = 1:block_size
-            μ_0[icol] = fmerge(
-                cos(solar_zenith_angle[icol, b] * deg_to_rad),
-                FT(1),
-                usecol[icol, b],
-            )
+            μ_0[icol] = usecol[icol, b] ?
+                cos(solar_zenith_angle[icol, b] * deg_to_rad) : FT(1)
         end
 
         #

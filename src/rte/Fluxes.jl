@@ -9,7 +9,6 @@ Compute output quantities from RTE based on spectrally-resolved flux profiles
 module Fluxes
 
 using DocStringExtensions
-using ..FortranIntrinsics
 using ..OpticalProps
 
 export AbstractFluxes, reduce!

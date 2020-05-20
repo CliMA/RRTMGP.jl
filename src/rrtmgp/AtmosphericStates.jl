@@ -9,7 +9,6 @@ using DocStringExtensions
 
 using ..Utilities
 using ..MeshOrientations
-using ..FortranIntrinsics
 using ..PhysicalConstants
 using ..Gases
 using ..GasConcentrations
@@ -59,7 +58,7 @@ function get_col_dry(vmr_h2o, plev, tlay, latitude = nothing)
     for i = 1:ncol
         col_dry[i, :] .=
             FT(10) .* delta_plev[i, :] .* avogad(FT) ./
-            (FT(1000) * m_air[i, :] .* FT(100) .* g0[i]) #spread(g0, 2, nlay) )
+            (FT(1000) * m_air[i, :] .* FT(100) .* g0[i])
     end
     col_dry .= col_dry ./ (FT(1) .+ vmr_h2o)
     return col_dry
@@ -168,15 +167,19 @@ function AtmosphericState(
     # Layer limits of upper, lower atmospheres
     tropo_lims = Array{I}(undef, ncol, 2, 2)
     if mesh_orientation.top_at_1
-        tropo_lims[:, 1, 1] .= fminloc_wrapper(p_lay, dim = 2, mask = tropo)
-        tropo_lims[:, 2, 1] .= nlay
-        tropo_lims[:, 1, 2] .= 1
-        tropo_lims[:, 2, 2] .= fmaxloc_wrapper(p_lay, dim = 2, mask = (.!tropo))
+        for i = 1:ncol
+            tropo_lims[i, 1, 1] = findfirst(tropo[i, :] .== 1)
+            tropo_lims[i, 2, 1] = nlay
+            tropo_lims[i, 1, 2] = 1
+            tropo_lims[i, 2, 2] = findlast(tropo[i, :] .== 0)
+        end
     else
-        tropo_lims[:, 1, 1] .= 1
-        tropo_lims[:, 2, 1] .= fminloc_wrapper(p_lay, dim = 2, mask = tropo)
-        tropo_lims[:, 1, 2] .= fmaxloc_wrapper(p_lay, dim = 2, mask = (.!tropo))
-        tropo_lims[:, 2, 2] .= nlay
+        for i = 1:ncol
+            tropo_lims[i, 1, 1] = 1
+            tropo_lims[i, 2, 1] = findlast(tropo[i, :] .== 1)
+            tropo_lims[i, 1, 2] = tropo_lims[i, 2, 1] + 1
+            tropo_lims[i, 2, 2] = nlay
+        end
     end
 
     gt_0_tropo_lims = Array{Bool}([false, false])

@@ -22,7 +22,6 @@ const to_gor = TimerOutput()
 using ..MeshOrientations
 using ..Gases
 using ..ReferenceStates
-using ..FortranIntrinsics
 using ..PhysicalConstants
 using ..Utilities
 using ..OpticalProps
@@ -32,9 +31,7 @@ using ..OpticalProps
 using ..AtmosphericStates
 
 export get_nflav,
-       InterpolationCoefficients,
-       InterpolationCoefficientsPGP,
-       source!
+    InterpolationCoefficients, InterpolationCoefficientsPGP, source!
 export gas_optics!, get_k_dist_lw, get_k_dist_sw
 export source_is_internal, source_is_external
 export GasOpticsVars
@@ -285,13 +282,30 @@ function Base.convert(
     s_fmajor = size(first(data).fmajor)
     s_fminor = size(first(data).fminor)
     s_col_mix = size(first(data).col_mix)
-    jtemp = Array{I}([data[i, j].jtemp for i in 1:s[1], j in 1:s[2]])
-    jpress = Array{I}([data[i, j].jpress for i in 1:s[1], j in 1:s[2]])
+    jtemp = Array{I}([data[i, j].jtemp for i = 1:s[1], j = 1:s[2]])
+    jpress = Array{I}([data[i, j].jpress for i = 1:s[1], j = 1:s[2]])
 
-    j_η = Array{I}([data[i, j].j_η[k, p] for k in 1:s_j_η[1], p in 1:s_j_η[2], i in 1:s[1], j in 1:s[2]])
-    fmajor = Array{FT}([data[i, j].fmajor[k, p, q, r] for k in 1:s_fmajor[1], p in 1:s_fmajor[2], q in 1:s_fmajor[3], r in 1:s_fmajor[4], i in 1:s[1], j in 1:s[2]])
-    fminor = Array{FT}([data[i, j].fminor[k, p, q] for k in 1:s_fminor[1], p in 1:s_fminor[2], q in 1:s_fminor[3], i in 1:s[1], j in 1:s[2]])
-    col_mix = Array{FT}([data[i, j].col_mix[k, p] for k in 1:s_col_mix[1], p in 1:s_col_mix[2], i in 1:s[1], j in 1:s[2]])
+    j_η = Array{I}([
+        data[i, j].j_η[k, p]
+        for k = 1:s_j_η[1], p = 1:s_j_η[2], i = 1:s[1], j = 1:s[2]
+    ])
+    fmajor = Array{FT}([
+        data[i, j].fmajor[k, p, q, r]
+        for
+        k = 1:s_fmajor[1],
+        p = 1:s_fmajor[2],
+        q = 1:s_fmajor[3], r = 1:s_fmajor[4], i = 1:s[1], j = 1:s[2]
+    ])
+    fminor = Array{FT}([
+        data[i, j].fminor[k, p, q]
+        for
+        k = 1:s_fminor[1],
+        p = 1:s_fminor[2], q = 1:s_fminor[3], i = 1:s[1], j = 1:s[2]
+    ])
+    col_mix = Array{FT}([
+        data[i, j].col_mix[k, p]
+        for k = 1:s_col_mix[1], p = 1:s_col_mix[2], i = 1:s[1], j = 1:s[2]
+    ])
     return InterpolationCoefficients{FT,I}(
         jtemp,
         jpress,
@@ -305,14 +319,16 @@ end
 Base.convert(
     ::Type{Array{InterpolationCoefficientsPGP}},
     data::InterpolationCoefficients{FT,I},
-) where {FT,I} = [InterpolationCoefficientsPGP{FT,I}(
+) where {FT,I} = [
+    InterpolationCoefficientsPGP{FT,I}(
         data.jtemp[i, j],
         data.jpress[i, j],
         data.j_η[:, :, i, j],
         data.fmajor[:, :, :, :, i, j],
         data.fminor[:, :, :, i, j],
         data.col_mix[:, :, i, j],
-    ) for i in 1:size(data.jtemp, 1), j in 1:size(data.jtemp, 2)]
+    ) for i = 1:size(data.jtemp, 1), j = 1:size(data.jtemp, 2)
+]
 
 """
     gas_optics!(this::KDistributionLongwave{FT,I},
@@ -427,7 +443,7 @@ function compute_gas_τs!(
     τ′_size = get_τ′_size(optical_props)
     τ = Array{FT}(undef, τ′_size...) # absorption scattering optical depths
     τ_Rayleigh = Array{FT}(undef, τ′_size...) # Rayleigh   scattering optical depths
-  # Check for presence of key species in GasConcs; return error if any key species are not present
+    # Check for presence of key species in GasConcs; return error if any key species are not present
     check_key_species_present(this, as.gas_conc.gas_names)
     @timeit to_gor "interpolation!" interpolation!(ics, this, as)
     @timeit to_gor "compute_τ_absorption!" compute_τ_absorption!(
@@ -445,7 +461,7 @@ function compute_gas_τs!(
             as,
         )
     end
-  # Combine optical depths and reorder for radiative transfer solver.
+    # Combine optical depths and reorder for radiative transfer solver.
     @timeit to_gor "combine_and_reorder!" combine_and_reorder!(
         optical_props,
         τ,
@@ -464,7 +480,7 @@ function compute_gas_τs!(
     τ′_size = get_τ′_size(optical_props)
     τ = Array{FT}(undef, τ′_size...) # absorption scattering optical depths
     τ_Rayleigh = Array{FT}(undef, τ′_size...) # Rayleigh   scattering optical depths
-  # Check for presence of key species in GasConcs; return error if any key species are not present
+    # Check for presence of key species in GasConcs; return error if any key species are not present
     check_key_species_present(this, as.gas_conc.gas_names)
     @timeit to_gor "interpolation!" interpolation!(ics, this, as)
     @timeit to_gor "compute_τ_absorption!" compute_τ_absorption!(
@@ -482,7 +498,7 @@ function compute_gas_τs!(
             as,
         )
     end
-  # Combine optical depths and reorder for radiative transfer solver.
+    # Combine optical depths and reorder for radiative transfer solver.
     @timeit to_gor "combine_and_reorder!" combine_and_reorder!(
         optical_props,
         τ,
@@ -609,7 +625,7 @@ function init_abs_coeffs(
     upper::GasOpticsVars{FT},
 ) where {FT<:AbstractFloat,I<:Int}
 
-  # Which gases known to the gas optics are present in the host model (gases_prescribed)?
+    # Which gases known to the gas optics are present in the host model (gases_prescribed)?
     gas_names_present = intersect(gases_in_database, gases_prescribed)
 
     reduced_lower = reduce_minor_arrays(
@@ -640,8 +656,8 @@ function init_abs_coeffs(
         I,
     )
 
-  # create flavor list
-  # Reduce (remap) key_species list; checks that all key gases are present in incoming
+    # create flavor list
+    # Reduce (remap) key_species list; checks that all key gases are present in incoming
     key_species_red = create_key_species_reduce(
         gases_in_database,
         gas_names_present,
@@ -650,18 +666,18 @@ function init_abs_coeffs(
 
     flavor = create_flavor(key_species_red)
 
-  # create gpoint_flavor list
+    # create gpoint_flavor list
     gpoint_flavor = create_gpoint_flavor(
         key_species_red,
         get_gpoint_bands(optical_props),
         flavor,
     )
 
-  # Which species are key in one or more bands?
-  #   flavor is an index into gas_names_present
-    is_key = Bool[false for i in 1:length(gas_names_present)]
-    for j in 1:size(flavor, 2)
-        for i in 1:size(flavor, 1) # should be 2
+    # Which species are key in one or more bands?
+    #   flavor is an index into gas_names_present
+    is_key = Bool[false for i = 1:length(gas_names_present)]
+    for j = 1:size(flavor, 2)
+        for i = 1:size(flavor, 1) # should be 2
             if flavor[i, j] ≠ 0
                 is_key[flavor[i, j]] = true
             end
@@ -694,7 +710,7 @@ function check_key_species_present(
     gas_names::Vector{AbstractGas},
 )
     key_gas_names = pack(this.gas_names, this.is_key)
-    for igas in 1:length(key_gas_names)
+    for igas = 1:length(key_gas_names)
         @assert key_gas_names[igas] in gas_names
     end
 end
@@ -751,11 +767,10 @@ True is key_species_pair exists in key_species_list
 key_species_pair_exists(
     key_species_list::Array{I,2},
     key_species_pair::Array{I,1},
-) where {I<:Int} =
-    any([all(key_species_list[:, i] .== key_species_pair) for i in 1:size(
-        key_species_list,
-        2,
-    )])
+) where {I<:Int} = any([
+    all(key_species_list[:, i] .== key_species_pair)
+    for i = 1:size(key_species_list, 2)
+])
 
 
 """
@@ -769,32 +784,28 @@ function create_flavor(key_species::Array{I,3}) where {I<:Int}
 
     key_species_list = Array{Int}(undef, 2, size(key_species, 3) * 2)
 
-  # prepare list of key_species
+    # prepare list of key_species
     i = 1
-    for ibnd in 1:size(key_species, 3)
-        for iatm in 1:size(key_species, 1)
+    for ibnd = 1:size(key_species, 3)
+        for iatm = 1:size(key_species, 1)
             key_species_list[:, i] .= key_species[:, iatm, ibnd]
             i += 1
         end
     end
-  # rewrite single key_species pairs
-    for i in 1:size(key_species_list, 2)
-        key_species_list[:, i] .= rewrite_key_species_pair(key_species_list[
-            :,
-            i,
-        ])
+    # rewrite single key_species pairs
+    for i = 1:size(key_species_list, 2)
+        key_species_list[:, i] .=
+            rewrite_key_species_pair(key_species_list[:, i])
     end
-  # count unique key species pairs
+    # count unique key species pairs
     x = key_species_list
-    key_species_pair_absent = [!key_species_pair_exists(x[:, 1:i-1], x[:, i]) for i in 1:size(
-        x,
-        2,
-    )]
+    key_species_pair_absent =
+        [!key_species_pair_exists(x[:, 1:i-1], x[:, i]) for i = 1:size(x, 2)]
     iflavor = count(key_species_pair_absent)
-  # fill flavors
+    # fill flavors
     flavor = Array{Int}(undef, 2, iflavor)
     iflavor = 0
-    for i in 1:size(key_species_list, 2)
+    for i = 1:size(key_species_list, 2)
         if key_species_pair_absent[i]
             iflavor += 1
             flavor[:, iflavor] = key_species_list[:, i]
@@ -822,9 +833,9 @@ function create_idx_minor(
     identifier_minor::VG,
     minor_gases_atm::VG,
 ) where {VG<:Vector{AbstractGas}}
-  # Find identifying gas for minor species in list of possible identifiers (e.g. h2o_slf)
+    # Find identifying gas for minor species in list of possible identifiers (e.g. h2o_slf)
     idx_mnr = map(x -> loc_in_array(x, identifier_minor), minor_gases_atm)
-  # Find name of gas associated with minor species identifier (e.g. h2o)
+    # Find name of gas associated with minor species identifier (e.g. h2o)
     return map(x -> loc_in_array(gas_minor[x], gas_names), idx_mnr)
 end
 
@@ -891,11 +902,13 @@ function reduce_minor_arrays(
     mask = map(x -> loc_in_array(x, identifier_minor), atmos.minor_gases)
     gas_is_present = map(x -> x in gases_prescribed, gas_minor[mask])
 
-    for i in 1:length(atmos.minor_gases)
+    for i = 1:length(atmos.minor_gases)
         if gas_is_present[i]
-            tot_g = tot_g + (
-                atmos.minor_limits_gpt[2, i] - atmos.minor_limits_gpt[1, i] + 1
-            )
+            tot_g =
+                tot_g + (
+                    atmos.minor_limits_gpt[2, i] -
+                    atmos.minor_limits_gpt[1, i] + 1
+                )
         end
     end
     red_nm = count(gas_is_present)
@@ -914,41 +927,28 @@ function reduce_minor_arrays(
         atmos_red_minor_gases = pack(atmos.minor_gases, gas_is_present)
         atmos_red_scaling_gas = pack(atmos.scaling_gas, gas_is_present)
 
-        atmos_red_minor_scales_with_density = pack(
-            atmos.minor_scales_with_density,
-            gas_is_present,
-        )
-        atmos_red_scale_by_complement = pack(
-            atmos.scale_by_complement,
-            gas_is_present,
-        )
+        atmos_red_minor_scales_with_density =
+            pack(atmos.minor_scales_with_density, gas_is_present)
+        atmos_red_scale_by_complement =
+            pack(atmos.scale_by_complement, gas_is_present)
         atmos_red_kminor_start = pack(atmos.kminor_start, gas_is_present)
 
-        atmos_red_kminor = zeros(
-            FT,
-            tot_g,
-            size(atmos.kminor, 2),
-            size(atmos.kminor, 3),
-        )
+        atmos_red_kminor =
+            zeros(FT, tot_g, size(atmos.kminor, 2), size(atmos.kminor, 3))
         atmos_red_minor_limits_gpt = Array{I}(undef, 2, red_nm)
 
         icnt = 0
         n_elim = 0
-        for i in 1:nm
+        for i = 1:nm
             ng = atmos.minor_limits_gpt[2, i] - atmos.minor_limits_gpt[1, i] + 1
             if gas_is_present[i]
                 icnt = icnt + 1
-                atmos_red_minor_limits_gpt[1:2, icnt] = atmos.minor_limits_gpt[
-                    1:2,
-                    i,
-                ]
+                atmos_red_minor_limits_gpt[1:2, icnt] =
+                    atmos.minor_limits_gpt[1:2, i]
                 atmos_red_kminor_start[icnt] = atmos.kminor_start[i] - n_elim
-                for j in 1:ng
-                    atmos_red_kminor[
-                        atmos_red_kminor_start[icnt]+j-1,
-                        :,
-                        :,
-                    ] = atmos.kminor[atmos.kminor_start[i]+j-1, :, :]
+                for j = 1:ng
+                    atmos_red_kminor[atmos_red_kminor_start[icnt]+j-1, :, :] =
+                        atmos.kminor[atmos.kminor_start[i]+j-1, :, :]
                 end
             else
                 n_elim = n_elim + ng
@@ -1002,8 +1002,8 @@ function create_gpoint_flavor(
 ) where {I<:Int}
     ngpt = length(gpt2band)
     gpoint_flavor = Array{Int}(undef, 2, ngpt)
-    for igpt in 1:ngpt
-        for iatm in 1:2
+    for igpt = 1:ngpt
+        for iatm = 1:2
             gpoint_flavor[iatm, igpt] = key_species_pair2flavor(
                 flavor,
                 rewrite_key_species_pair(key_species[:, iatm, gpt2band[igpt]]),
@@ -1049,5 +1049,19 @@ Number of temperatures
 get_ntemp(this::AbstractGasOptics) = size(this.kmajor, 4)
 
 include("GasOptics_kernels.jl")
+
+"""
+    pack
+
+Based on https://gcc.gnu.org/onlinedocs/gfortran/PACK.html
+"""
+function pack(arr::Array, mask::Array, v::Union{Nothing,Vector} = nothing)
+    if v == nothing
+        return reshape([x for (m, x) in zip(mask, arr) if m], count(mask))
+    else
+        @assert length(v) >= count(mask)
+        return reshape([x for (m, x) in zip(mask, arr) if m], length(v))
+    end
+end
 
 end #module
