@@ -1,6 +1,9 @@
 #### PostProcessing
-
-using RRTMGP.PhysicalConstants
+using CLIMAParameters
+using CLIMAParameters.Planet
+struct EarthParameterSet <: AbstractEarthParameterSet end
+using CLIMAParameters.Planet: cp_d
+const param_set = EarthParameterSet()
 
 """
     compute_heating_rate(flux_up::Array{FT},
@@ -22,13 +25,13 @@ function compute_heating_rate(
     nlay = as.nlay
     heating_rate = Array{FT}(undef, ncol, nlay)
     z = convert(Array, as.p_lay[1, :])
-    for ilay in 1:nlay
-        heating_rate[:, ilay] .= (
-            flux_up[:, ilay+1] .- flux_up[:, ilay] .- flux_dn[:, ilay+1] .+
-            flux_dn[:, ilay]
-        ) .* grav(FT) ./ (
-            cp_dry(FT) .* (as.p_lev[:, ilay+1] .- as.p_lev[:, ilay])
-        )
+    for ilay = 1:nlay
+        heating_rate[:, ilay] .=
+            (
+                flux_up[:, ilay+1] .- flux_up[:, ilay] .- flux_dn[:, ilay+1] .+
+                flux_dn[:, ilay]
+            ) .* grav(FT) ./
+            (FT(cp_d(param_set)) .* (as.p_lev[:, ilay+1] .- as.p_lev[:, ilay]))
     end
     heating_rate = convert(Array, sum(heating_rate, dims = 1)' / ncol)
     return heating_rate, z
