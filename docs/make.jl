@@ -29,7 +29,6 @@ makedocs(
             "K-Distribution" => "RRTMGP/KDistribution.md"
             "Mesh Orientation" => "MeshOrientation.md"
             "Atmospheric States" => "RRTMGP/AtmosphericStates.md"
-            "Physical Constants" => "RRTMGP/PhysicalConstants.md"
             "Optical Properties" => "OpticalProps.md"
         ],
         "RTE"=>Any[

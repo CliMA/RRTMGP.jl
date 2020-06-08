@@ -14,6 +14,15 @@ using RRTMGP.Fluxes
 using RRTMGP.AtmosphericStates
 using RRTMGP.SourceFunctions
 using RRTMGP.AngularDiscretizations
+
+using CLIMAParameters
+import CLIMAParameters.Planet: molmass_dryair, molmass_water
+struct EarthParameterSet <: AbstractEarthParameterSet end
+const param_set = EarthParameterSet()
+# overriding CLIMAParameters as different precision is needed by RRTMGP
+CLIMAParameters.Planet.molmass_dryair(::EarthParameterSet) = 0.028964
+CLIMAParameters.Planet.molmass_water(::EarthParameterSet) = 0.018016
+
 @static if haspkg("Plots")
     using Plots
     const export_plots = true
@@ -164,6 +173,7 @@ function rfmip_clear_sky_lw_pgp(ds, optical_props_constructor)
             t_lay,
             t_lev,
             k_dist.ref,
+            param_set,
             nothing,
             t_sfc,
         )

@@ -13,6 +13,13 @@ using RRTMGP.RTESolver
 using RRTMGP.Fluxes
 using RRTMGP.AtmosphericStates
 
+using CLIMAParameters
+import CLIMAParameters.Planet: molmass_dryair, molmass_water
+struct EarthParameterSet <: AbstractEarthParameterSet end
+const param_set = EarthParameterSet()
+# overriding CLIMAParameters as different precision is needed by RRTMGP
+CLIMAParameters.Planet.molmass_dryair(::EarthParameterSet) = 0.028964
+CLIMAParameters.Planet.molmass_water(::EarthParameterSet) = 0.018016
 
 @static if haspkg("Plots")
     using Plots
@@ -171,8 +178,17 @@ function rfmip_clear_sky_sw_pgp(ds, optical_props_constructor)
         p_lev = p_lev_all[:, :, b]
         t_lay = t_lay_all[:, :, b]
         gas_conc = gas_conc_array[b]
-        as =
-            AtmosphericState(gas_conc, p_lay, p_lev, t_lay, nothing, k_dist.ref)
+        as = AtmosphericState(
+            gas_conc,
+            p_lay,
+            p_lev,
+            t_lay,
+            nothing,
+            k_dist.ref,
+            param_set,
+            nothing,
+            nothing,
+        )
         as = convert(Array{AtmosphericStatePGP}, as)
         as = convert(AtmosphericState, as)
 

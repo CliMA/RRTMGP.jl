@@ -9,10 +9,12 @@ using DocStringExtensions
 
 using ..Utilities
 using ..MeshOrientations
-using ..PhysicalConstants
 using ..Gases
 using ..GasConcentrations
 using ..ReferenceStates
+
+using CLIMAParameters
+using CLIMAParameters.Planet: molmass_dryair, molmass_water
 
 export AtmosphericState, AtmosphericStatePGP
 
@@ -32,7 +34,7 @@ computes column amounts of dry air using hydrostatic equation
  - `tlay` Layer temperatures `[K]` `(ncol,nlay)`
  - `latitude` Latitude `[degrees]` `(ncol)`
 """
-function get_col_dry(vmr_h2o, plev, tlay, latitude = nothing)
+function get_col_dry(vmr_h2o, plev, tlay, param_set, latitude = nothing)
     FT = eltype(plev)
     ncol, nlay, nlev = size(plev, 1), size(tlay, 2), size(plev, 2)
     # first and second term of Helmert formula
@@ -46,18 +48,22 @@ function get_col_dry(vmr_h2o, plev, tlay, latitude = nothing)
     if latitude ≠ nothing
         g0 .= helmert1 - helmert2 * cos(FT(2) * π * latitude / FT(180)) # acceleration due to gravity [m/s^2]
     else
-        g0 .= grav(FT)
+        g0 .= helmert1
     end
     delta_plev .= abs.(plev[:, 1:nlev-1] .- plev[:, 2:nlev])
 
     # Get average mass of moist air per mole of moist air
-    m_air .= (m_dry(FT) .+ m_h2o(FT) .* vmr_h2o) ./ (1 .+ vmr_h2o)
+    m_air .=
+        (
+            FT(molmass_dryair(param_set)) .+
+            FT(molmass_water(param_set)) .* vmr_h2o
+        ) ./ (1 .+ vmr_h2o)
 
     # Hydrostatic equation
     col_dry = zeros(FT, ncol, nlay)
     for i = 1:ncol
         col_dry[i, :] .=
-            FT(10) .* delta_plev[i, :] .* avogad(FT) ./
+            FT(10) .* delta_plev[i, :] .* FT(avogad()) ./
             (FT(1000) * m_air[i, :] .* FT(100) .* g0[i])
     end
     col_dry .= col_dry ./ (FT(1) .+ vmr_h2o)
@@ -101,6 +107,8 @@ struct AtmosphericState{FT,I} <: AbstractAtmosphericState{FT,I}
     nlay::I
     "Number of columns."
     ncol::I
+    "Parameter set"
+    param_set::AbstractParameterSet
 end
 function AtmosphericState(
     gas_conc::GasConcs{FT,I},
@@ -109,6 +117,7 @@ function AtmosphericState(
     t_lay::Array{FT,2},
     t_lev::Union{Array{FT,2},Nothing},
     ref::ReferenceState{FT},
+    param_set,
     col_dry::Union{Array{FT,2},Nothing} = nothing,
     t_sfc::Union{Vector{FT},Nothing} = nothing,
 ) where {I<:Int,FT<:AbstractFloat}
@@ -140,7 +149,7 @@ function AtmosphericState(
     # Compute dry air column amounts (number of molecule per cm^2) if user hasn't provided them
     idx_h2o = loc_in_array(h2o(), gas_conc.gas_names)
     if col_dry == nothing
-        col_dry = get_col_dry(vmr[:, :, idx_h2o], p_lev, t_lay) # dry air column amounts computation
+        col_dry = get_col_dry(vmr[:, :, idx_h2o], p_lev, t_lay, param_set) # dry air column amounts computation
     end
 
     check_extent(col_dry, (ncol, nlay), "col_dry")
@@ -201,6 +210,7 @@ function AtmosphericState(
         mesh_orientation,
         nlay,
         ncol,
+        param_set,
     )
 end
 
@@ -239,6 +249,8 @@ mutable struct AtmosphericStatePGP{FT,I} <: AbstractAtmosphericState{FT,I}
     mesh_orientation::MeshOrientation{I}
     "Index of i-th layer."
     ilay::I
+    "Parameter set"
+    param_set::AbstractParameterSet
 end
 
 function Base.convert(
@@ -267,6 +279,8 @@ function Base.convert(
     p_lay = [data[i, j].p_lay for i = 1:s[1], j = 1:s[2]]
     t_lay = [data[i, j].t_lay for i = 1:s[1], j = 1:s[2]]
     t_sfc = [data[i].t_sfc for i = 1:s[1]]
+
+    param_set = data[1].param_set
 
     p_lev, t_lev = ntuple(i -> Array{FT}(undef, ncol, nlay + 1), 2)
     for i = 1:s[1]
@@ -300,6 +314,7 @@ function Base.convert(
         mesh_orientation,
         nlay,
         ncol,
+        param_set,
     )
 end
 
@@ -325,6 +340,7 @@ function Base.convert(
             data.gt_0_tropo_lims,
             data.mesh_orientation,
             j,
+            data.param_set,
         ) for i = 1:s[1], j = 1:s[2]
     ]
 

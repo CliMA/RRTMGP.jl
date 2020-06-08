@@ -22,7 +22,6 @@ const to_gor = TimerOutput()
 using ..MeshOrientations
 using ..Gases
 using ..ReferenceStates
-using ..PhysicalConstants
 using ..Utilities
 using ..OpticalProps
 using ..SourceFunctions
