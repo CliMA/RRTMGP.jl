@@ -241,7 +241,7 @@ function read_size(ds)
 end
 
 """
-    read_and_block_pt(ds, blocksize)
+    read_and_block_pt(ds)
 
 Return layer and level
 
@@ -250,55 +250,24 @@ Return layer and level
  - `t_lay` layer temperature dimensions (ncol, nlay, nblocks)
  - `t_lev` level temperature dimensions (ncol, nlay+1, nblocks)
 """
-function read_and_block_pt(ds, blocksize)
-
+function read_and_block_pt(ds)
     FT = Float64
     ncol_l, nlay_l, nexp_l = read_size(ds)
-
     @assert !any([ncol_l, nlay_l, nexp_l] .== 0)
-    @assert (ncol_l * nexp_l) % blocksize == 0
-
-    nblocks = Int((ncol_l * nexp_l) / blocksize)
-
-    p_lay = Array{FT}(undef, blocksize, nlay_l, nblocks)
-    t_lay = Array{FT}(undef, blocksize, nlay_l, nblocks)
-    p_lev = Array{FT}(undef, blocksize, nlay_l + 1, nblocks)
-    t_lev = Array{FT}(undef, blocksize, nlay_l + 1, nblocks)
 
     # Read p, T data; reshape to suit RRTMGP dimensions
-    pres_layer = Array{FT}(ds["pres_layer"][:])
-    temp3d =
-        reshape(repeat(pres_layer, 1, 1, nexp_l), nlay_l, blocksize, nblocks)
-
-    for b = 1:nblocks
-        p_lay[:, :, b] = transpose(temp3d[:, :, b])
-    end
-
-    temp_layer = Array{FT}(ds["temp_layer"][:])
-    temp3d = reshape(temp_layer, nlay_l, blocksize, nblocks)
-
-    for b = 1:nblocks
-        t_lay[:, :, b] = transpose(temp3d[:, :, b])
-    end
-
-    pres_level = Array{FT}(ds["pres_level"][:])
-    temp3d = reshape(
-        repeat(pres_level, 1, 1, nexp_l),
+    p_lay = transpose(kron(ones(1, nexp_l), Array{FT}(ds["pres_layer"][:])))
+    p_lev = transpose(kron(ones(1, nexp_l), Array{FT}(ds["pres_level"][:])))
+    t_lay = transpose(reshape(
+        Array{FT}(ds["temp_layer"][:]),
+        nlay_l,
+        ncol_l * nexp_l,
+    ))
+    t_lev = transpose(reshape(
+        Array{FT}(ds["temp_level"][:]),
         nlay_l + 1,
-        blocksize,
-        nblocks,
-    )
-
-    for b = 1:nblocks
-        p_lev[:, :, b] = transpose(temp3d[:, :, b])
-    end
-
-    temp_level = Array{FT}(ds["temp_level"][:])
-    temp3d = reshape(temp_level, nlay_l + 1, blocksize, nblocks)
-
-    for b = 1:nblocks
-        t_lev[:, :, b] = transpose(temp3d[:, :, b])
-    end
+        ncol_l * nexp_l,
+    ))
 
     return p_lay, p_lev, t_lay, t_lev
 end
@@ -312,26 +281,17 @@ Read and reshape shortwave boundary conditions
  - `total_solar_irradiance` total solar irradiance
  - `solar_zenith_angle` solar zenith angle
 """
-function read_and_block_sw_bc(ds, blocksize)
+function read_and_block_sw_bc(ds)
     FT = Float64
     ncol_l, nlay_l, nexp_l = read_size(ds)
-
+    blocksize = ncol_l * nexp_l
     @assert !any([ncol_l, nlay_l, nexp_l] .== 0)
-    @assert (ncol_l * nexp_l) % blocksize == 0
-    nblocks = Int((ncol_l * nexp_l) / blocksize)
 
     # Check that output arrays are sized correctly : blocksize, nlay, (ncol * nexp)/blocksize
-    surface_albedo = Array{FT}(ds["surface_albedo"][:])
-    temp2D = repeat(surface_albedo, 1, nexp_l)
-    surface_albedo = reshape(temp2D, blocksize, nblocks)
-
-    total_solar_irradiance = Array{FT}(ds["total_solar_irradiance"][:])
-    temp2D = repeat(total_solar_irradiance, 1, nexp_l)
-    total_solar_irradiance = reshape(temp2D, blocksize, nblocks)
-
-    solar_zenith_angle = Array{FT}(ds["solar_zenith_angle"][:])
-    temp2D = repeat(solar_zenith_angle, 1, nexp_l)
-    solar_zenith_angle = reshape(temp2D, blocksize, nblocks)
+    surface_albedo = repeat(Array{FT}(ds["surface_albedo"][:]), nexp_l)
+    total_solar_irradiance =
+        repeat(Array{FT}(ds["total_solar_irradiance"][:]), nexp_l)
+    solar_zenith_angle = repeat(Array{FT}(ds["solar_zenith_angle"][:]), nexp_l)
     return surface_albedo, total_solar_irradiance, solar_zenith_angle
 end
 
@@ -343,19 +303,18 @@ Read and reshape longwave boundary conditions
  - `surface_emissivity` surface emissivity
  - `surface_temperature` surface temperature
 """
-function read_and_block_lw_bc(ds, blocksize)
+function read_and_block_lw_bc(ds)
     FT = Float64
-
     ncol_l, nlay_l, nexp_l = read_size(ds)
+    ncols = ncol_l * nexp_l
     @assert !any([ncol_l, nlay_l, nexp_l] .== 0)
-    @assert (ncol_l * nexp_l) % blocksize == 0
-    nblocks = convert(Int, (ncol_l * nexp_l) / blocksize)
 
-    temp2D = repeat(ds["surface_emissivity"][:], 1, nexp_l)
-    surface_emissivity = Array{FT}(reshape(temp2D, blocksize, nblocks))
-
+    surface_emissivity = Array{FT}(reshape(
+        repeat(ds["surface_emissivity"][:], 1, nexp_l),
+        ncols,
+    ))
     surface_temperature =
-        Array{FT}(reshape(ds["surface_temperature"][:], blocksize, nblocks)) # alternate version
+        Array{FT}(reshape(ds["surface_temperature"][:], ncols)) # alternate version
 
     return surface_emissivity, surface_temperature
 end
@@ -403,7 +362,7 @@ read_kdist_gas_names(ds) =
     ]))
 
 """
-    read_and_block_gases_ty(ds, blocksize, gas_names)
+    read_and_block_gases_ty(ds, gas_names)
 
 Read and reshape gas concentrations. RRTMGP requires gas concentrations to be supplied via a class
 (GasConcs). Gas concentrations are set via a call to set_vmr!(gas_concs, name, values)
@@ -420,37 +379,25 @@ Fields in the RFMIP file have a trailing _GM (global mean); some fields use a ch
 a descriptive name, so a map is provided between these.
 
  - `gas_names` Names used by the k-distribution/gas concentration type
- - `blocksize`
  - `gas_conc_array` vector of [`GasConcs`](@ref)
 """
-function read_and_block_gases_ty(ds, blocksize, gas_names::Vector{AbstractGas})
+function read_and_block_gases_ty(ds, gas_names::Vector{AbstractGas})
     ncol_l, nlay_l, nexp_l = read_size(ds)
+    ncols = ncol_l * nexp_l
     @assert !any([ncol_l, nlay_l, nexp_l] .== 0)
-    @assert (ncol_l * nexp_l) % blocksize == 0
-    nblocks = Int((ncol_l * nexp_l) / blocksize)
     FT = Float64
     I = Int
-    gas_concs = GasConcs(FT, I, gas_names, blocksize, nlay_l)
-    gas_conc_array = GasConcs[deepcopy(gas_concs) for i = 1:nblocks]
+    gas_conc_array = GasConcs(FT, I, gas_names, ncols, nlay_l)
 
     # Experiment index for each column
-    exp_num = reshape(
-        repeat(convert(Array, collect(1:nexp_l)'), ncol_l, 1),
-        blocksize,
-        nblocks,
-    )
+    exp_num = repeat(collect(1:nexp_l)', ncol_l, 1)[:]
     # Water vapor and ozone depend on col, lay, exp: look just like other fields
     for gas in (h2o(), o3())
         gas_conc = Array{FT}(ds[rfmip_name(gas)][:])
         gas_conc_scaling = read_scaling(ds, FT, rfmip_name(gas))
-        gas_conc_temp_3d =
-            reshape(gas_conc, nlay_l, blocksize, nblocks) .* gas_conc_scaling
-
-        for b = 1:nblocks
-            gas_conc_temp_3d_t =
-                convert(Array, transpose(gas_conc_temp_3d[:, :, b]))
-            set_vmr!(gas_conc_array[b], gas, gas_conc_temp_3d_t)
-        end
+        gas_conc_temp_3d = reshape(gas_conc, nlay_l, ncols) .* gas_conc_scaling
+        gas_conc_temp_3d_t = convert(Array, transpose(gas_conc_temp_3d))
+        set_vmr!(gas_conc_array, gas, gas_conc_temp_3d_t)
     end
 
     # All other gases are a function of experiment only
@@ -465,27 +412,19 @@ function read_and_block_gases_ty(ds, blocksize, gas_names::Vector{AbstractGas})
         gas_conc_scaling = read_scaling(ds, FT, rfmip_name(gas) * "_GM")
         gas_conc_temp_1d = ds[rfmip_name(gas)*"_GM"][:] * gas_conc_scaling
 
-        for b = 1:nblocks
-            # Does every value in this block belong to the same experiment?
-            if all(exp_num[2:end, b] .- exp_num[1, b] .== 0)
-                # Provide a scalar value
-                set_vmr!(
-                    gas_conc_array[b],
-                    gas,
-                    gas_conc_temp_1d[exp_num[1, b]],
-                )
-            else
-                # Create 2D field, blocksize x nlay, with scalar values from each experiment
-                set_vmr!(
-                    gas_conc_array[b],
-                    gas,
-                    repeat(gas_conc_temp_1d[exp_num[:, b]], 1, nlay_l),
-                )
-            end
+        # Does every value in this block belong to the same experiment?
+        if all(exp_num[2:end] .- exp_num[1] .== 0)
+            # Provide a scalar value
+            set_vmr!(gas_conc_array, gas, gas_conc_temp_1d[exp_num[1]])
+        else
+            # Create 2D field, ncols x nlay, with scalar values from each experiment
+            set_vmr!(
+                gas_conc_array,
+                gas,
+                repeat(gas_conc_temp_1d[exp_num[:]], 1, nlay_l),
+            )
         end
-
     end
-
     return gas_conc_array
 end
 
