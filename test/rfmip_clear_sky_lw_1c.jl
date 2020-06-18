@@ -30,15 +30,21 @@ else
     const export_plots = false
 end
 
+#-----------
+ENV["DATADEPS_ALWAYS_ACCEPT"] = true
+
+# Only run the per-grid-point tests
+pgp_only = false
+include("data_set_files.jl")
+datafolder = RRTMGP.data_folder_rrtmgp()
+println("datafolder = $datafolder")
+ds = dataset_dict(data_files_dict(datafolder, "lw"))
+
+#-----------
+
 include(joinpath("PostProcessing.jl"))
 include(joinpath("..", "ReadInputData", "ReadInputs.jl"))
 include(joinpath("..", "ReadInputData", "LoadCoefficients.jl"))
-
-convert_optical_props_pgp(op::AbstractOpticalPropsArry) =
-    op isa TwoStream ? convert(Array{TwoStreamPGP}, op) :
-    convert(Array{OneScalarPGP}, op)
-convert_optical_props(op) =
-    eltype(op) <: TwoStreamPGP ? convert(TwoStream, op) : convert(OneScalar, op)
 
 """
 Example program to demonstrate the calculation of longwave radiative fluxes in clear, aerosol-free skies.
@@ -59,7 +65,7 @@ Optical properties of the atmosphere as array of values
    In the longwave we include only absorption optical depth (_1scl)
    Shortwave calculations use optical depth, single-scattering albedo, asymmetry parameter (_2str)
 """
-function rfmip_clear_sky_lw_pgp(ds, optical_props_constructor)
+function rfmip_clear_sky_lw_ga(ds, optical_props_constructor)
 
     FT = Float64
     I = Int
@@ -67,9 +73,11 @@ function rfmip_clear_sky_lw_pgp(ds, optical_props_constructor)
     angle_disc = GaussQuadrature(FT, 1)
 
     ncol, nlay, nexp = read_size(ds[:rfmip])
-
+    #**********************************************************
+    ncol, nexp = 1, 1
+    #**********************************************************
     forcing_index = 1
-    block_size = ncol * nexp#8
+    block_size = ncol * nexp #8
 
     # How big is the problem? Does it fit into blocks of the size we've specified?
     @assert 1 <= forcing_index <= 3
@@ -87,7 +95,12 @@ function rfmip_clear_sky_lw_pgp(ds, optical_props_constructor)
     # Allocation on assignment within reading routines
     #
     p_lay_all, p_lev_all, t_lay_all, t_lev_all = read_and_block_pt(ds[:rfmip])
-    #
+    #Restricting to col #1****************************************************
+    p_lay_all = p_lay_all[1:1, :]
+    p_lev_all = p_lev_all[1:1, :]
+    t_lay_all = t_lay_all[1:1, :]
+    t_lev_all = t_lev_all[1:1, :]
+    #*************************************************************************
     # Are the arrays ordered in the vertical with 1 at the top or the bottom of the domain?
     #
     top_at_1 = p_lay_all[1, 1] < p_lay_all[1, nlay]
@@ -95,14 +108,25 @@ function rfmip_clear_sky_lw_pgp(ds, optical_props_constructor)
     # Read the gas concentrations and surface properties
     #
     gas_conc = read_and_block_gases_ty(ds[:rfmip], kdist_gas_names)
+    #Restricting to col #1****************************************************
+    gas_conc = GasConcs{FT,I}(
+        gas_conc.gas_names,
+        gas_conc.concs[:, 1:1, :],
+        ncol,
+        nlay,
+    )
+    #*************************************************************************
     sfc_emis_all, t_sfc_all = read_and_block_lw_bc(ds[:rfmip])
+    #Restricting to col #1****************************************************
+    sfc_emis_all = sfc_emis_all[1:1]
+    t_sfc_all = t_sfc_all[1:1]
+    #*************************************************************************
     # Read k-distribution information:
     k_dist = load_and_init(ds[:k_dist], FT, gas_conc.gas_names)
     @assert source_is_internal(k_dist)
 
     nbnd = get_nband(k_dist.optical_props)
     ngpt = get_ngpt(k_dist.optical_props)
-
     #
     # RRTMGP won't run with pressure less than its minimum. The top level in the RFMIP file
     #   is set to 10^-3 Pa. Here we pretend the layer is just a bit less deep.
@@ -129,14 +153,9 @@ function rfmip_clear_sky_lw_pgp(ds, optical_props_constructor)
 
     sfc_emis_spec = Array{FT}(undef, nbnd, block_size)
 
-
     optical_props =
         optical_props_constructor(k_dist.optical_props, block_size, nlay, ngpt)
-    optical_props = convert_optical_props_pgp(optical_props)
-    optical_props = convert_optical_props(optical_props)
-
     source = SourceFuncLongWave(block_size, nlay, k_dist.optical_props)
-
     #
     # Loop over blocks
     #
@@ -144,7 +163,6 @@ function rfmip_clear_sky_lw_pgp(ds, optical_props_constructor)
 
     local as
 
-    b = 1
     for icol = 1:block_size
         for ibnd = 1:nbnd
             sfc_emis_spec[ibnd, icol] = sfc_emis_all[icol]
@@ -155,6 +173,7 @@ function rfmip_clear_sky_lw_pgp(ds, optical_props_constructor)
     t_lay = t_lay_all[:, :]
     t_lev = t_lev_all[:, :]
     t_sfc = t_sfc_all[:]
+
     as = AtmosphericState(
         gas_conc,
         p_lay,
@@ -166,22 +185,11 @@ function rfmip_clear_sky_lw_pgp(ds, optical_props_constructor)
         nothing,
         t_sfc,
     )
-    as = convert(Array{AtmosphericStatePGP}, as)
-    as = convert(AtmosphericState, as)
 
     fluxes.flux_up .= FT(0)
     fluxes.flux_dn .= FT(0)
 
-    source = convert(Array{SourceFuncLongWavePGP}, source)
-    optical_props = convert_optical_props_pgp(optical_props)
-    as = convert(Array{AtmosphericStatePGP}, as)
-    for i in eachindex(as)
-        gas_optics!(k_dist, as[i], optical_props[i], source[i])
-    end
-    i_lay_bot = ilay_bot(first(as).mesh_orientation)
-    source = convert(SourceFuncLongWave, source, i_lay_bot)
-    optical_props = convert_optical_props(optical_props)
-    as = convert(AtmosphericState, as)
+    gas_optics!(k_dist, as, optical_props, source)
 
     bcs = LongwaveBCs(sfc_emis_spec)
 
@@ -210,14 +218,10 @@ function rfmip_clear_sky_lw_pgp(ds, optical_props_constructor)
     flux_up = reshape_for_comparison(flux_up, nlay, ncol, nexp)
     flux_dn = reshape_for_comparison(flux_dn, nlay, ncol, nexp)
 
-    # comparing with reference data
-    rlu_ref = ds[:flx_up]["rlu"][:]
-    rld_ref = ds[:flx_dn]["rld"][:]
-
     rel_err_up, rel_err_dn = rel_err(flux_up, flux_dn, rlu_ref, rld_ref)
 
     println("******************************************************")
-    println("rfmip_clear_sky_lw_pgp -> $optical_props_constructor \n")
+    println("rfmip_clear_sky_lw_1c -> $optical_props_constructor \n")
     println("Max rel_err_flux_up = $rel_err_up; Max rel_err_flux_dn = $rel_err_dn")
     println("******************************************************")
 
@@ -231,3 +235,11 @@ function rfmip_clear_sky_lw_pgp(ds, optical_props_constructor)
 
     return nothing
 end
+#-----------------------------------------------------------
+println("OneScalar, normal version")
+rfmip_clear_sky_lw_ga(ds, OneScalar)
+println("============================================")
+println("TwoStream, normal version")
+rfmip_clear_sky_lw_ga(ds, TwoStream)
+println("============================================")
+#-----------------------------------------------------------

@@ -66,7 +66,6 @@ function rfmip_clear_sky_lw(ds, optical_props_constructor)
     block_size = ncol * nexp #8
 
     # How big is the problem? Does it fit into blocks of the size we've specified?
-    @assert mod(ncol * nexp, block_size) == 0
     @assert 1 <= forcing_index <= 3
     #
     # Identify the set of gases used in the calculation based on the forcing index
@@ -191,18 +190,19 @@ function rfmip_clear_sky_lw(ds, optical_props_constructor)
     rlu_ref = ds[:flx_up]["rlu"][:]
     rld_ref = ds[:flx_dn]["rld"][:]
 
-    diff_up = maximum(abs.(flux_up .- rlu_ref))
-    diff_dn = maximum(abs.(flux_dn .- rld_ref))
+    rel_err_up, rel_err_dn = rel_err(flux_up, flux_dn, rlu_ref, rld_ref)
 
-    diff_up_ulps = maximum(abs.(flux_up .- rlu_ref) ./ eps.(rlu_ref))
-    diff_dn_ulps = maximum(abs.(flux_dn .- rld_ref) ./ eps.(rld_ref))
+    println("******************************************************")
+    println("rfmip_clear_sky_lw -> $optical_props_constructor \n")
+    println("Max rel_err_flux_up = $rel_err_up; Max rel_err_flux_dn = $rel_err_dn")
+    println("******************************************************")
 
-    if optical_props_constructor isa TwoStream
-        @test diff_up_ulps < sqrt(1 / (1e6 * eps(FT)))
-        @test diff_dn_ulps < sqrt(1 / (1e6 * eps(FT)))
+    if optical_props_constructor == TwoStream
+        @test rel_err_up < FT(0.01)
+        @test rel_err_dn < FT(0.15)
     else
-        @test diff_up_ulps < sqrt(1 / (1e5 * eps(FT)))
-        @test diff_dn_ulps < sqrt(1 / (1e3 * eps(FT)))
+        @test rel_err_up < FT(1e-6)
+        @test rel_err_dn < FT(1e-6)
     end
     return nothing
 end
