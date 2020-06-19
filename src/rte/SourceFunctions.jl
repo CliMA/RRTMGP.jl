@@ -34,7 +34,7 @@ $(DocStringExtensions.FIELDS)
 """
 struct SourceFuncLongWave{FT,I} <: AbstractSourceFunc{FT,I}
     "optical properties, see [`OpticalPropsBase`](@ref)"
-    optical_props::OpticalPropsBase{FT,I}
+    optical_props::Union{OpticalPropsBase{FT,I},Nothing}
     "Planck source at layer average temperature `[W/m2]` `(ncol, nlay, ngpt)`"
     lay_source::Array{FT,3}
     "Planck source at layer edge in increasing ilay direction `[W/m2]` `(ncol, nlay+1, ngpt)`, includes spectral weighting that accounts for state-dependent frequency to g-space mapping"
@@ -146,7 +146,7 @@ $(DocStringExtensions.FIELDS)
 """
 struct SourceFuncShortWave{FT,I} <: AbstractSourceFunc{FT,I}
     "optical properties, see [`OpticalPropsBase`](@ref)"
-    optical_props::OpticalPropsBase{FT,I}
+    optical_props::Union{OpticalPropsBase{FT,I}}
     "top of atmosphere source"
     toa_source
     "Source at layer edge in increasing ilay direction"

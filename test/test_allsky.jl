@@ -23,7 +23,7 @@ include("data_set_files.jl")
     all_sky_pgp(ds_lw; use_luts = true, λ_string = "lw")
     all_sky_pgp(ds_sw; use_luts = true, λ_string = "sw")
 
-    # Profile.clear_malloc_data()
+    Profile.clear_malloc_data()
 
     if !pgp_only
         Δt_all["all_sky_lw", "use_luts_false"] =

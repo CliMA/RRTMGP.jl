@@ -87,14 +87,14 @@ function rfmip_clear_sky_sw_pgp(ds, optical_props_constructor)
     #
     # Allocation on assignment within reading routines
     #
-    p_lay_all,
-    p_lev_all,
-    t_lay_all,
-    t_lev_all = @timeit to "read_and_block_pt" read_and_block_pt(ds[:rfmip])
+    p_lay,
+    p_lev,
+    t_lay,
+    t_lev = @timeit to "read_and_block_pt" read_and_block_pt(ds[:rfmip])
     #
     # Are the arrays ordered in the vertical with 1 at the top or the bottom of the domain?
     #
-    top_at_1 = p_lay_all[1, 1] < p_lay_all[1, nlay]
+    top_at_1 = p_lay[1, 1] < p_lay[1, nlay]
     #
     # Read the gas concentrations and surface properties
     #
@@ -122,9 +122,9 @@ function rfmip_clear_sky_sw_pgp(ds, optical_props_constructor)
     #   This introduces an error but shows input sanitizing.
     #
     if top_at_1
-        p_lev_all[:, 1] .= get_press_min(k_dist.ref) + eps(FT)
+        p_lev[:, 1] .= get_press_min(k_dist.ref) + eps(FT)
     else
-        p_lev_all[:, nlay+1] .= get_press_min(k_dist.ref) + eps(FT)
+        p_lev[:, nlay+1] .= get_press_min(k_dist.ref) + eps(FT)
     end
 
     toa_flux = zeros(FT, block_size, get_ngpt(k_dist.optical_props))
@@ -161,9 +161,6 @@ function rfmip_clear_sky_sw_pgp(ds, optical_props_constructor)
     local as
 
     #    @showprogress 1 "Computing..." for b = 1:b_tot
-    p_lay = p_lay_all[:, :]
-    p_lev = p_lev_all[:, :]
-    t_lay = t_lay_all[:, :]
 
     as = AtmosphericState(
         gas_conc,
@@ -279,22 +276,19 @@ function rfmip_clear_sky_sw_pgp(ds, optical_props_constructor)
     rsu_ref = ds[:flx_up]["rsu"][:]
     rsd_ref = ds[:flx_dn]["rsd"][:]
 
-    diff_up = maximum(abs.(flux_up .- rsu_ref))
-    diff_dn = maximum(abs.(flux_dn .- rsd_ref))
+    rel_err_up, rel_err_dn = rel_err(flux_up, flux_dn, rsu_ref, rsd_ref)
 
-    diff_up_ulps = maximum(abs.(flux_up .- rsu_ref) ./ eps.(rsu_ref))
-    diff_dn_ulps = maximum(abs.(flux_dn .- rsd_ref) ./ eps.(rsd_ref))
+    println("******************************************************")
+    println("rfmip_clear_sky_sw_pgp -> $optical_props_constructor \n")
+    println("Max rel_err_flux_up = $rel_err_up; Max rel_err_flux_dn = $rel_err_dn")
+    println("******************************************************")
 
-    # @show sqrt(1/eps(FT))
-    # @show diff_up, diff_up_ulps, maximum(abs.(rsu_ref))
-    # @show diff_dn, diff_dn_ulps, maximum(abs.(rsd_ref))
-
-    if optical_props_constructor isa TwoStream
-        @test diff_up_ulps < sqrt(1 / (1e6 * eps(FT)))
-        @test diff_dn_ulps < sqrt(1 / (1e6 * eps(FT)))
+    if optical_props_constructor == TwoStream
+        @test rel_err_up < FT(1e-7)
+        @test rel_err_dn < FT(1e-7)
     else
-        @test diff_up_ulps < sqrt(1 / (eps(FT))) # 1.6776966e7
-        @test diff_dn_ulps < sqrt(1 / (eps(FT))) # 1.6777158e7
+        @test rel_err_up < FT(1.1)
+        @test rel_err_dn < FT(1.1)
     end
     @show to
 

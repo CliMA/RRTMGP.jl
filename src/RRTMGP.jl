@@ -1,6 +1,5 @@
 module RRTMGP
 
-include("Architectures.jl")
 include("Misc.jl")
 include("Utilities.jl")
 include("MeshOrientations.jl")
@@ -19,5 +18,6 @@ include(joinpath("rrtmgp", "ReferenceStates.jl"))
 include(joinpath("rrtmgp", "GasConcentrations.jl"))
 include(joinpath("rrtmgp", "AtmosphericStates.jl"))
 include(joinpath("rrtmgp", "GasOptics.jl"))
+include(joinpath("rrtmgp", "GrayAtmos.jl"))
 
 end # module
