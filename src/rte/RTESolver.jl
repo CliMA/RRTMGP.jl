@@ -62,7 +62,7 @@ using ..Fluxes
 using ..SourceFunctions
 
 import ..Fluxes: reduce!
-export rte_lw!, rte_sw!, expand_and_transpose
+export rte_lw!, rte_sw!, expand_and_transpose, rte_lw_gray_solve!, GrayRTE
 
 include("RTE.jl")
 
@@ -131,7 +131,6 @@ function rte_lw!(
     sources::SourceFuncLongWave{FT,I},
     angle_disc::Union{GaussQuadrature{FT,I},Nothing} = nothing,
 ) where {FT<:AbstractFloat,I<:Int}
-
     base = RTEBase(fluxes, mesh_orientation, bcs, op)
     rte = RTELongWave(base, sources, angle_disc, op)
 
@@ -185,5 +184,6 @@ function expand_and_transpose(
 end
 
 include("RTESolver_kernels.jl")
+include("GrayRTESolver.jl")
 
 end #module

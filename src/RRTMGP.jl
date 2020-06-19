@@ -19,5 +19,6 @@ include(joinpath("rrtmgp", "ReferenceStates.jl"))
 include(joinpath("rrtmgp", "GasConcentrations.jl"))
 include(joinpath("rrtmgp", "AtmosphericStates.jl"))
 include(joinpath("rrtmgp", "GasOptics.jl"))
+include(joinpath("rrtmgp", "GrayAtmos.jl"))
 
 end # module

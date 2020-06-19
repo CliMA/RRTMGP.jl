@@ -60,7 +60,6 @@ function solve!(
     n_μ = angle_disc.n_gauss_angles
     Ds = angle_disc.gauss_Ds[1:n_μ, n_μ]
     w_μ = angle_disc.gauss_wts[1:n_μ, n_μ]
-
     # For the first angle output arrays store total flux
     Ds_ncol = Array{FT}(undef, ncol, ngpt)
     radn_up, radn_dn = ntuple(i -> zeros(FT, ncol, nlay + 1, ngpt), 2)
