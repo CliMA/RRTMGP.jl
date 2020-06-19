@@ -263,22 +263,19 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor)
     rsu_ref = ds[:flx_up]["rsu"][:]
     rsd_ref = ds[:flx_dn]["rsd"][:]
 
-    diff_up = maximum(abs.(flux_up .- rsu_ref))
-    diff_dn = maximum(abs.(flux_dn .- rsd_ref))
+    rel_err_up, rel_err_dn = rel_err(flux_up, flux_dn, rsu_ref, rsd_ref)
 
-    diff_up_ulps = maximum(abs.(flux_up .- rsu_ref) ./ eps.(rsu_ref))
-    diff_dn_ulps = maximum(abs.(flux_dn .- rsd_ref) ./ eps.(rsd_ref))
+    println("******************************************************")
+    println("rfmip_clear_sky_sw -> $optical_props_constructor \n")
+    println("Max rel_err_flux_up = $rel_err_up; Max rel_err_flux_dn = $rel_err_dn")
+    println("******************************************************")
 
-    # @show sqrt(1/eps(FT))
-    # @show diff_up, diff_up_ulps, maximum(abs.(rsu_ref))
-    # @show diff_dn, diff_dn_ulps, maximum(abs.(rsd_ref))
-
-    if optical_props_constructor isa TwoStream
-        @test diff_up_ulps < sqrt(1 / (1e6 * eps(FT)))
-        @test diff_dn_ulps < sqrt(1 / (1e6 * eps(FT)))
+    if optical_props_constructor == TwoStream
+        @test rel_err_up < FT(1e-7)
+        @test rel_err_dn < FT(1e-7)
     else
-        @test diff_up_ulps < sqrt(1 / (eps(FT))) # 1.6776966e7
-        @test diff_dn_ulps < sqrt(1 / (eps(FT))) # 1.6777158e7
+        @test rel_err_up < FT(1.1)
+        @test rel_err_dn < FT(1.1)
     end
     @show to
     return nothing
