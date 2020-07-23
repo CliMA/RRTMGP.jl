@@ -44,8 +44,8 @@ function rte_lw_gray_solve!(
     ngpt = 1
 
     n_μ = angle_disc.n_gauss_angles
-    Ds = angle_disc.gauss_Ds[1:n_μ, n_μ]
-    w_μ = angle_disc.gauss_wts[1:n_μ, n_μ]
+    Ds = @view angle_disc.gauss_Ds[1:n_μ, n_μ]
+    w_μ = @view angle_disc.gauss_wts[1:n_μ, n_μ]
 
     lev_source_up = top_at_1 ? source.lev_source_dec : source.lev_source_inc
     lev_source_dn = top_at_1 ? source.lev_source_inc : source.lev_source_dec
@@ -57,7 +57,8 @@ function rte_lw_gray_solve!(
 
     # Transport is for intensity
     #   convert flux at top of domain to intensity assuming azimuthal isotropy
-    flux_dn[:, i_lev_top] ./= 2 * FT(π) * w_μ[1]
+    flux_dn_top = @view(flux_dn[:, i_lev_top])
+    flux_dn_top .*= 1/(2 * FT(π) * w_μ[1])
 
     # Downward propagation
     @inbounds for ilev in lev_range(mesh_orientation), icol = 1:ncol

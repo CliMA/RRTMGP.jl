@@ -120,13 +120,14 @@ function gray_atmos_lw_equil(optical_props_constructor)
             gray_as.t_lev,
         )
 
-        T_ex_lev[:] .=
-            (
-                (fluxes.flux_dn[1, :] .+ (fluxes.flux_net[1, :] ./ 2.0)) /
-                Stefan()
-            ) .^ 0.25
-        flux_grad[:] .= fluxes.flux_net[1, 2:end] - fluxes.flux_net[1, 1:end-1]
-
+        @views begin
+            T_ex_lev .=
+                (
+                    (fluxes.flux_dn[1, :] .+ (fluxes.flux_net[1, :] ./ 2.0)) /
+                    Stefan()
+                ) .^ 0.25
+            flux_grad .= fluxes.flux_net[1, 2:end] - fluxes.flux_net[1, 1:end-1]
+        end
         if maximum(abs.(flux_grad)) < flux_grad_toler
             println("Integration time = $(i/(24.0/tstep) / 365.0) years")
             break
