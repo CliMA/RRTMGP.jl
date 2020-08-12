@@ -1,8 +1,6 @@
 status = [
   "test-os (ubuntu-latest)",
-  "test-os (windows-latest)",
-  "test-os (macos-latest)",
-  "buildkite/rrtmgp-ci"
+  "test-os (macos-latest)"
 ]
 delete_merged_branches = true
 timeout_sec = 86400
