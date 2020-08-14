@@ -16,7 +16,7 @@ using ..ReferenceStates
 using CLIMAParameters
 using CLIMAParameters.Planet: molmass_dryair, molmass_water
 
-export AtmosphericState, AtmosphericStatePGP
+export AtmosphericState, AtmosphericStatePGP, AbstractAtmosphericState
 
 abstract type AbstractAtmosphericState{FT<:AbstractFloat,I<:Int} end
 
@@ -126,7 +126,6 @@ function AtmosphericState(
     if t_lev == nothing
         t_lev = interpolate_var(p_lay, p_lev, t_lay, ncol, nlay)
     end
-
     check_extent(p_lay, (ncol, nlay), "p_lay")
     check_extent(p_lev, (ncol, nlay + 1), "p_lev")
     check_extent(t_lay, (ncol, nlay), "t_lay")

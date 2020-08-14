@@ -39,7 +39,8 @@ export delta_scale!,
     bands_are_equal,
     gpt_range,
     get_τ′_size,
-    get_band_lims_gpoint
+    get_band_lims_gpoint,
+    AbstractOpticalPropsArry
 
 export get_nband, get_ngpt, get_ncol, get_nlay
 
@@ -146,6 +147,14 @@ OneScalar(
     ngpt::I,
 ) where {FT<:AbstractFloat,I<:Int} =
     OneScalar{FT,I}(base, Array{FT}(undef, ncol, nlay, ngpt))
+
+OneScalar(
+    ::Type{FT},
+    ncol::I,
+    nlay::I,
+    ngpt::I,
+) where {FT<:AbstractFloat,I<:Int} =
+    OneScalar{FT,I}(nothing, Array{FT}(undef, ncol, nlay, ngpt))
 
 """
     OneScalarPGP{FT,I} <: AbstractOpticalPropsArry{FT,I}

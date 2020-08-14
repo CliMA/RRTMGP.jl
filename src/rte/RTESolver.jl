@@ -131,7 +131,6 @@ function rte_lw!(
     sources::SourceFuncLongWave{FT,I},
     angle_disc::Union{GaussQuadrature{FT,I},Nothing} = nothing,
 ) where {FT<:AbstractFloat,I<:Int}
-
     base = RTEBase(fluxes, mesh_orientation, bcs, op)
     rte = RTELongWave(base, sources, angle_disc, op)
 
