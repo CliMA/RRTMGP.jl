@@ -17,7 +17,7 @@ Julia implementation of Rapid and accurate Radiative Transfer Model for General 
 [codecov-url]: https://codecov.io/gh/CliMA/RRTMGP.jl
 
 [buildkite-img]: https://badge.buildkite.com/ee3a0c43cf4925ee14a966f794ac85d0b9439244d23e43b308.svg
-[buildkite-url]: https://buildkite.com/clima/rrtmgp-ci)
+[buildkite-url]: https://buildkite.com/clima/rrtmgp-ci
 
 [bors-img]: https://bors.tech/images/badge_small.svg
 [bors-url]: https://app.bors.tech/repositories/24778
