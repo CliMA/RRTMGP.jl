@@ -1,6 +1,5 @@
 module RRTMGP
 
-include("Architectures.jl")
 include("Misc.jl")
 include("Utilities.jl")
 include("MeshOrientations.jl")

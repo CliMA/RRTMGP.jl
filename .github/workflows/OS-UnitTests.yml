@@ -2,14 +2,17 @@ name: OS Unit Tests
 
 on:
   pull_request:
-
+  push:
+    branches:
+      - staging
+      - trying
 jobs:
   test-os:
     timeout-minutes: 30
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest]
 
     runs-on: ${{ matrix.os }}
 
