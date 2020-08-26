@@ -27,6 +27,7 @@ include(joinpath("gray_optics", "GrayOptics.jl"))
 include(joinpath("gray_optics", "GraySources.jl"))
 include(joinpath("gray_optics", "GrayFluxes.jl"))
 include(joinpath("gray_optics", "GrayAtmosphericStates.jl"))
+include(joinpath("gray_optics", "GrayUtils.jl"))
 include(joinpath("gray_optics", "GrayBCs.jl"))
 include(joinpath("gray_optics", "GrayAtmos.jl"))
 

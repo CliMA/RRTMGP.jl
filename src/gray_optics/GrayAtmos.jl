@@ -1,5 +1,7 @@
 module GrayAtmos
-using ..Device: array_type
+using KernelAbstractions
+using CUDA
+using ..Device: array_type, array_device
 using ..GrayAtmosphericStates
 using DocStringExtensions
 import GaussQuadrature
@@ -9,11 +11,14 @@ using ..GrayAngularDiscretizations
 using ..GrayOptics
 using ..GrayBCs
 
-using CLIMAParameters: Stefan
-using CLIMAParameters.Planet: grav, R_d
+using CLIMAParameters
+using CLIMAParameters.Planet: grav, R_d, cp_d
 
 export gas_optics_gray_atmos!,
-    compute_gas_τs_gray_atmos!, tlay_to_tlev!, GrayRRTMGP
+    compute_gas_τs_gray_atmos!,
+    update_profile_lw_kernel!,
+    GrayRRTMGP,
+    compute_gray_heating_rate!
 
 function gas_optics_gray_atmos!(
     as::GrayAtmosphericState{FT,FTA1D,FTA2D,I,B},
@@ -27,9 +32,9 @@ function gas_optics_gray_atmos!(
     FTA3D<:AbstractArray{FT,3},
     B<:Bool,
 }
-
     compute_gas_τs_gray_atmos!(as, optical_props)
     compute_Planck_source!(source, as)
+
     if typeof(optical_props) == GrayTwoStream{FT,FTA2D}
         optical_props.ssa .= FT(0)
         optical_props.g .= FT(0)
@@ -53,17 +58,64 @@ function compute_gas_τs_gray_atmos!(
     p_lay = as.p_lay
     p_lev = as.p_lev
     α = as.α
+    d0 = as.d0
+    τ = optical_props.τ
+    #----Launcing KA Kernel---------------------------
+    max_threads = 256
+    thr_y = min(32, ncol)
+    thr_x = min(Int(floor(FT(max_threads / thr_y))), nlay)
 
-    for icol = 1:ncol
-        p0 = (top_at_1 ? as.p_lev[icol, end] : as.p_lev[icol, 1])
-        d0 = as.d0[icol]
-        for ilay = 1:nlay
-            optical_props.τ[icol, ilay] = abs(
-                (α * d0 * (p_lay[icol, ilay] ./ p0) .^ α ./ p_lay[icol, ilay]) * (p_lev[icol, ilay+1] - p_lev[icol, ilay]),
-            )
-        end
-    end
+    device = array_device(τ)
+    workgroup = (thr_x, thr_y)
+    ndrange = (nlay, ncol)
+    #----------------------------------
+    kernel = compute_gas_τs_gray_atmos_kernel!(device, workgroup)
+    event = kernel(
+        p_lay,
+        p_lev,
+        d0,
+        α,
+        top_at_1,
+        τ,
+        Val(nlay),
+        Val(ncol),
+        ndrange = ndrange,
+    )
+    wait(event)
+    #----------------------------------
     return nothing
+end
+
+# This functions calculates the optical thickness based on pressure 
+# and lapse rate for a gray atmosphere. 
+# See Schneider 2004, J. Atmos. Sci. (2004) 61 (12): 1317–1340.
+# https://doi.org/10.1175/1520-0469(2004)061<1317:TTATTS>2.0.CO;2
+
+@kernel function compute_gas_τs_gray_atmos_kernel!(
+    p_lay::FTA2D,
+    p_lev::FTA2D,
+    d0::FTA1D,
+    α::FT,
+    top_at_1::Bool,
+    τ::FTA2D,
+    ::Val{nlay},
+    ::Val{ncol},
+) where {
+    FT<:AbstractFloat,
+    FTA1D<:AbstractArray{FT,1},
+    FTA2D<:AbstractArray{FT,2},
+    nlay,
+    ncol,
+}
+    glay, gcol = @index(Global, NTuple)  # global col & lay ids
+
+    p0 = top_at_1 ? p_lev[end, gcol] : p_lev[1, gcol]
+
+    τ[glay, gcol] = abs(
+        (α * d0[gcol] * (p_lay[glay, gcol] ./ p0) .^ α ./ p_lay[glay, gcol]) * (p_lev[glay+1, gcol] - p_lev[glay, gcol]),
+    )
+
+    @synchronize
 end
 
 function compute_Planck_source!(
@@ -79,53 +131,69 @@ function compute_Planck_source!(
 }
     ncol = as.ncol
     nlay = as.nlay
+    t_lay = as.t_lay
+    t_lev = as.t_lev
+    t_sfc = as.t_sfc
     sfc_source = source.sfc_source
     lay_source = source.lay_source
     lev_source_inc = source.lev_source_inc
     lev_source_dec = source.lev_source_dec
-    t_lay = as.t_lay
-    t_lev = as.t_lev
+    sbc = FT(Stefan())
+    #----Launcing KA Kernel---------------------------
+    max_threads = 256
+    thr_y = min(32, ncol)
+    thr_x = min(Int(floor(FT(max_threads / thr_y))), nlay)
 
-    for icol = 1:ncol
-        sfc_source[icol, 1] = Stefan() * as.t_sfc[icol]^4 / FT(π) # computing sfc_source
-        for ilay = 1:nlay
-            lay_source[icol, ilay, 1] =
-                Stefan() * t_lay[icol, ilay]^FT(4) / FT(π) # computing lay_source
-
-            lev_source_inc[icol, ilay, 1] =
-                Stefan() * t_lev[icol, ilay+1]^4.0 / FT(π)
-            lev_source_dec[icol, ilay, 1] =
-                Stefan() * t_lev[icol, ilay]^4.0 / FT(π)
-        end
-    end
+    device = array_device(lay_source)
+    workgroup = (thr_x, thr_y)
+    ndrange = (nlay, ncol)
+    #----------------------------------
+    kernel = compute_Planck_source_kernel!(device, workgroup)
+    event = kernel(
+        t_sfc,
+        t_lay,
+        t_lev,
+        sfc_source,
+        lay_source,
+        lev_source_inc,
+        lev_source_dec,
+        sbc,
+        Val(nlay),
+        Val(ncol),
+        ndrange = ndrange,
+    )
+    wait(event)
+    #----------------------------------
     return nothing
 end
 
-function tlay_to_tlev!(
-    p_lay::FTA2D,
-    p_lev::FTA2D,
+@kernel function compute_Planck_source_kernel!(
+    t_sfc::FTA1D,
     t_lay::FTA2D,
     t_lev::FTA2D,
-) where {FT<:AbstractFloat,FTA2D<:AbstractArray{FT,2}}
-    ncol, nlay, nlev = size(t_lay, 1), size(t_lay, 2), size(t_lev, 2)
-    #    for ilay in nlay:-1:2
-    #        t_lev[1, ilay] = 2 * t_lay[1, ilay] - t_lev[1, ilay+1]
-    #    end
-    #    t_lev[1, 1] = 2 * t_lay[1, 1] - t_lev[1, 2]
+    sfc_source::FTA2D,
+    lay_source::FTA3D,
+    lev_source_inc::FTA3D,
+    lev_source_dec::FTA3D,
+    sbc::FT,
+    ::Val{nlay},
+    ::Val{ncol},
+) where {
+    FT<:AbstractFloat,
+    FTA1D<:AbstractArray{FT,1},
+    FTA2D<:AbstractArray{FT,2},
+    FTA3D<:AbstractArray{FT,3},
+    nlay,
+    ncol,
+}
+    glay, gcol = @index(Global, NTuple)  # global col & lay ids
 
-    for icol = 1:ncol
-        for j = 2:nlay-1
-            t_lev[icol, j] =
-                FT(1 / 3) * t_lay[icol, j-1] + FT(5 / 6) * t_lay[icol, j] -
-                FT(1 / 6) * t_lay[icol, j+1]
-        end
-        t_lev[icol, 1] = FT(2) * t_lay[icol, 1] - t_lev[icol, 2]
-        t_lev[icol, nlay] =
-            FT(1 / 3) * t_lay[icol, nlay] + FT(5 / 6) * t_lay[icol, nlay-1] -
-            FT(1 / 6) * t_lay[icol, nlay-2]
-        t_lev[icol, nlay+1] = FT(2) * t_lay[icol, nlay] - t_lev[icol, nlay]
-    end
+    sfc_source[gcol, 1] = sbc * t_sfc[gcol]^FT(4) / FT(π)   # computing sfc_source
+    lay_source[glay, gcol, 1] = sbc * t_lay[glay, gcol]^FT(4) / FT(π)   # computing lay_source
+    lev_source_inc[glay, gcol, 1] = sbc * t_lev[glay+1, gcol]^FT(4) / FT(π)
+    lev_source_dec[glay, gcol, 1] = sbc * t_lev[glay, gcol]^FT(4) / FT(π)
 
+    @synchronize
 end
 
 struct GrayRRTMGP{
@@ -139,12 +207,12 @@ struct GrayRRTMGP{
     GS<:AbstractGraySource{FT},
     BC<:AbstractGrayBCs{FT,FTA1D},
 }
-    as::GrayAtmosphericState{FT,FTA1D,FTA2D,I,B}
-    op::OP
-    src::GS
-    bcs::BC
-    flux::GrayFlux{FT,FTA2D}
-    angle_disc::AngularDiscretization{FT,FTA1D,I}
+    as::GrayAtmosphericState{FT,FTA1D,FTA2D,I,B}  # atmoshperic state
+    op::OP                                        # optical properties
+    src::GS                                       # source functions
+    bcs::BC                                       # boundary conditions
+    flux::GrayFlux{FT,FTA2D}                      # fluxes
+    angle_disc::AngularDiscretization{FT,FTA1D,I} # angular discretization
 
     function GrayRRTMGP(
         nlay::Int,

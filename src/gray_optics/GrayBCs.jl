@@ -8,7 +8,7 @@ export AbstractGrayBCs, GrayLwBCs
 abstract type AbstractGrayBCs{FT<:AbstractFloat,FTA1D<:AbstractArray{FT,1}} end
 
 """
-    GrayLwBCs{FT}
+    GrayLwBCs{FT,FTA1D}
 
 Longwave boundary conditions
 
@@ -35,11 +35,10 @@ struct GrayLwBCs{FT,FTA1D} <: AbstractGrayBCs{FT,FTA1D}
     end
 end
 
-#=
 """
-    GraySwBCs{FT}
+    GraySwBCs{FT,FTA1D}
 
-Longwave boundary conditions
+Shortwave boundary conditions
 
 # Fields
 $(DocStringExtensions.FIELDS)
@@ -55,5 +54,4 @@ struct GraySwBCs{FT,FTA1D} <: AbstractGrayBCs{FT,FTA1D}
     inc_flux_diffuse::FTA1D
 end
 
-=#
 end

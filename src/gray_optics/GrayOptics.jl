@@ -32,12 +32,12 @@ function GrayOneScalar(
     nlay::Int,
     ::Type{DA},
 ) where {FT<:AbstractFloat,DA}
-    return GrayOneScalar{FT,DA{FT,2}}(DA{FT,2}(undef, ncol, nlay))
+    return GrayOneScalar{FT,DA{FT,2}}(DA{FT,2}(undef, nlay, ncol))
 end
 
 """
-    GrayTwoStream{FT    <: AbstractFloat,
-                  FTA2D <: AbstractArray{FT,2}} <: AbstractGrayOpticalProps{FT,FTA2D}
+    GrayTwoStream{FT<:AbstractFloat,
+                     FTA2D<:AbstractArray{FT,2}} <: AbstractGrayOpticalProps{FT,FTA2D}
 
 Two stream approximation for optical depth, used in
 calculations accounting for extinction and emission
@@ -62,9 +62,9 @@ function GrayTwoStream(
     ::Type{DA},
 ) where {FT<:AbstractFloat,DA}
     return GrayTwoStream{FT,DA{FT,2}}(
-        DA{FT,2}(undef, ncol, nlay),
-        DA{FT,2}(undef, ncol, nlay),
-        DA{FT,2}(undef, ncol, nlay),
+        DA{FT,2}(undef, nlay, ncol),
+        DA{FT,2}(undef, nlay, ncol),
+        DA{FT,2}(undef, nlay, ncol),
     )
 end
 
