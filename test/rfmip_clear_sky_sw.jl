@@ -84,15 +84,15 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor)
     #
     # Allocation on assignment within reading routines
     #
-    p_lay_all,
-    p_lev_all,
-    t_lay_all,
-    t_lev_all = @timeit to "read_and_block_pt" read_and_block_pt(ds[:rfmip])
+    p_lay,
+    p_lev,
+    t_lay,
+    t_lev = @timeit to "read_and_block_pt" read_and_block_pt(ds[:rfmip])
     #
     # Are the arrays ordered in the vertical with 1 at the top or the bottom of the domain?
     #
 
-    top_at_1 = p_lay_all[1, 1] < p_lay_all[1, nlay]
+    top_at_1 = p_lay[1, 1] < p_lay[1, nlay]
     #
     # Read the gas concentrations and surface properties
     #
@@ -102,7 +102,7 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor)
     )
     surface_albedo, total_solar_irradiance, solar_zenith_angle =
         @timeit to "read_and_block_sw_bc" read_and_block_sw_bc(ds[:rfmip],)
-
+    #-----------------------------------------------
     # Read k-distribution information:
     k_dist = @timeit to "load_and_init" load_and_init(
         ds[:k_dist],
@@ -120,9 +120,9 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor)
     #   This introduces an error but shows input sanitizing.
     #
     if top_at_1
-        p_lev_all[:, 1] .= get_press_min(k_dist.ref) + eps(FT)
+        p_lev[:, 1] .= get_press_min(k_dist.ref) + eps(FT)
     else
-        p_lev_all[:, nlay+1] .= get_press_min(k_dist.ref) + eps(FT)
+        p_lev[:, nlay+1] .= get_press_min(k_dist.ref) + eps(FT)
     end
 
     toa_flux = zeros(FT, block_size, get_ngpt(k_dist.optical_props))
@@ -155,10 +155,6 @@ function rfmip_clear_sky_sw(ds, optical_props_constructor)
     fluxes = FluxesBroadBand(FT, (size(flux_up, 1), size(flux_up, 2)), true)
 
     local as
-
-    p_lay = p_lay_all[:, :]
-    p_lev = p_lev_all[:, :]
-    t_lay = t_lay_all[:, :]
 
     as = AtmosphericState(
         gas_conc,

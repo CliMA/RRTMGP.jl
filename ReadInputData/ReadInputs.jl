@@ -256,18 +256,20 @@ function read_and_block_pt(ds)
     @assert !any([ncol_l, nlay_l, nexp_l] .== 0)
 
     # Read p, T data; reshape to suit RRTMGP dimensions
-    p_lay = transpose(kron(ones(1, nexp_l), Array{FT}(ds["pres_layer"][:])))
-    p_lev = transpose(kron(ones(1, nexp_l), Array{FT}(ds["pres_level"][:])))
-    t_lay = transpose(reshape(
+    p_lay =
+        Array(transpose(kron(ones(1, nexp_l), Array{FT}(ds["pres_layer"][:]))))
+    p_lev =
+        Array(transpose(kron(ones(1, nexp_l), Array{FT}(ds["pres_level"][:]))))
+    t_lay = Array(transpose(reshape(
         Array{FT}(ds["temp_layer"][:]),
         nlay_l,
         ncol_l * nexp_l,
-    ))
-    t_lev = transpose(reshape(
+    )))
+    t_lev = Array(transpose(reshape(
         Array{FT}(ds["temp_level"][:]),
         nlay_l + 1,
         ncol_l * nexp_l,
-    ))
+    )))
 
     return p_lay, p_lev, t_lay, t_lev
 end

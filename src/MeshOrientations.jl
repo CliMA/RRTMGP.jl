@@ -20,13 +20,13 @@ Mesh orientation
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct MeshOrientation{I}
+struct MeshOrientation{I<:Int}
     "Indicates whether arrays are ordered in the vertical with 1 at the top or the bottom of the domain."
     top_at_1::Bool
     "Number of layers"
     nlay::I
     MeshOrientation(top_at_1::Bool, nlay::I) where {I<:Int} =
-        new{I}(top_at_1, nlay)
+        new{eltype(nlay)}(top_at_1, nlay)
 end
 
 """ i-th level at the top of the domain"""

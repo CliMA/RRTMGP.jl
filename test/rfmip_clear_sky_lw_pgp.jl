@@ -86,16 +86,16 @@ function rfmip_clear_sky_lw_pgp(ds, optical_props_constructor)
     #
     # Allocation on assignment within reading routines
     #
-    p_lay_all, p_lev_all, t_lay_all, t_lev_all = read_and_block_pt(ds[:rfmip])
+    p_lay, p_lev, t_lay, t_lev = read_and_block_pt(ds[:rfmip])
     #
     # Are the arrays ordered in the vertical with 1 at the top or the bottom of the domain?
     #
-    top_at_1 = p_lay_all[1, 1] < p_lay_all[1, nlay]
+    top_at_1 = p_lay[1, 1] < p_lay[1, nlay]
     #
     # Read the gas concentrations and surface properties
     #
     gas_conc = read_and_block_gases_ty(ds[:rfmip], kdist_gas_names)
-    sfc_emis_all, t_sfc_all = read_and_block_lw_bc(ds[:rfmip])
+    sfc_emis, t_sfc = read_and_block_lw_bc(ds[:rfmip])
     # Read k-distribution information:
     k_dist = load_and_init(ds[:k_dist], FT, gas_conc.gas_names)
     @assert source_is_internal(k_dist)
@@ -109,9 +109,9 @@ function rfmip_clear_sky_lw_pgp(ds, optical_props_constructor)
     #   This introduces an error but shows input sanitizing.
     #
     if top_at_1
-        p_lev_all[:, 1] .= get_press_min(k_dist.ref) + eps(FT)
+        p_lev[:, 1] .= get_press_min(k_dist.ref) + eps(FT)
     else
-        p_lev_all[:, nlay+1] .= get_press_min(k_dist.ref) + eps(FT)
+        p_lev[:, nlay+1] .= get_press_min(k_dist.ref) + eps(FT)
     end
     #
     # RTE will fail if passed solar zenith angles greater than 90 degree. We replace any with
@@ -147,14 +147,9 @@ function rfmip_clear_sky_lw_pgp(ds, optical_props_constructor)
     b = 1
     for icol = 1:block_size
         for ibnd = 1:nbnd
-            sfc_emis_spec[ibnd, icol] = sfc_emis_all[icol]
+            sfc_emis_spec[ibnd, icol] = sfc_emis[icol]
         end
     end
-    p_lay = p_lay_all[:, :]
-    p_lev = p_lev_all[:, :]
-    t_lay = t_lay_all[:, :]
-    t_lev = t_lev_all[:, :]
-    t_sfc = t_sfc_all[:]
     as = AtmosphericState(
         gas_conc,
         p_lay,

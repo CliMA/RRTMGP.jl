@@ -30,7 +30,7 @@ function compute_heating_rate(
             (
                 flux_up[:, ilay+1] .- flux_up[:, ilay] .- flux_dn[:, ilay+1] .+
                 flux_dn[:, ilay]
-            ) .* grav(FT) ./
+            ) .* grav(param_set) ./
             (FT(cp_d(param_set)) .* (as.p_lev[:, ilay+1] .- as.p_lev[:, ilay]))
     end
     heating_rate = convert(Array, sum(heating_rate, dims = 1)' / ncol)

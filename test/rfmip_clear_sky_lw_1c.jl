@@ -37,7 +37,6 @@ ENV["DATADEPS_ALWAYS_ACCEPT"] = true
 pgp_only = false
 include("data_set_files.jl")
 datafolder = RRTMGP.data_folder_rrtmgp()
-println("datafolder = $datafolder")
 ds = dataset_dict(data_files_dict(datafolder, "lw"))
 
 #-----------
@@ -94,16 +93,16 @@ function rfmip_clear_sky_lw_ga(ds, optical_props_constructor)
     #
     # Allocation on assignment within reading routines
     #
-    p_lay_all, p_lev_all, t_lay_all, t_lev_all = read_and_block_pt(ds[:rfmip])
+    p_lay, p_lev, t_lay, t_lev = read_and_block_pt(ds[:rfmip])
     #Restricting to col #1****************************************************
-    p_lay_all = p_lay_all[1:1, :]
-    p_lev_all = p_lev_all[1:1, :]
-    t_lay_all = t_lay_all[1:1, :]
-    t_lev_all = t_lev_all[1:1, :]
+    p_lay = p_lay[1:1, :]
+    p_lev = p_lev[1:1, :]
+    t_lay = t_lay[1:1, :]
+    t_lev = t_lev[1:1, :]
     #*************************************************************************
     # Are the arrays ordered in the vertical with 1 at the top or the bottom of the domain?
     #
-    top_at_1 = p_lay_all[1, 1] < p_lay_all[1, nlay]
+    top_at_1 = p_lay[1, 1] < p_lay[1, nlay]
     #
     # Read the gas concentrations and surface properties
     #
@@ -116,10 +115,12 @@ function rfmip_clear_sky_lw_ga(ds, optical_props_constructor)
         nlay,
     )
     #*************************************************************************
-    sfc_emis_all, t_sfc_all = read_and_block_lw_bc(ds[:rfmip])
+    sfc_emis, t_sfc = read_and_block_lw_bc(ds[:rfmip])
     #Restricting to col #1****************************************************
-    sfc_emis_all = sfc_emis_all[1:1]
-    t_sfc_all = t_sfc_all[1:1]
+    sfc_emis = sfc_emis[1:1]
+    t_sfc = t_sfc[1:1]
+    @show sfc_emis
+    @show t_sfc
     #*************************************************************************
     # Read k-distribution information:
     k_dist = load_and_init(ds[:k_dist], FT, gas_conc.gas_names)
@@ -133,9 +134,9 @@ function rfmip_clear_sky_lw_ga(ds, optical_props_constructor)
     #   This introduces an error but shows input sanitizing.
     #
     if top_at_1
-        p_lev_all[:, 1] .= get_press_min(k_dist.ref) + eps(FT)
+        p_lev[:, 1] .= get_press_min(k_dist.ref) + eps(FT)
     else
-        p_lev_all[:, nlay+1] .= get_press_min(k_dist.ref) + eps(FT)
+        p_lev[:, nlay+1] .= get_press_min(k_dist.ref) + eps(FT)
     end
     #
     # RTE will fail if passed solar zenith angles greater than 90 degree. We replace any with
@@ -165,14 +166,10 @@ function rfmip_clear_sky_lw_ga(ds, optical_props_constructor)
 
     for icol = 1:block_size
         for ibnd = 1:nbnd
-            sfc_emis_spec[ibnd, icol] = sfc_emis_all[icol]
+            sfc_emis_spec[ibnd, icol] = sfc_emis[icol]
         end
     end
-    p_lay = p_lay_all[:, :]
-    p_lev = p_lev_all[:, :]
-    t_lay = t_lay_all[:, :]
-    t_lev = t_lev_all[:, :]
-    t_sfc = t_sfc_all[:]
+    t_sfc = t_sfc[:]
 
     as = AtmosphericState(
         gas_conc,
@@ -190,9 +187,9 @@ function rfmip_clear_sky_lw_ga(ds, optical_props_constructor)
     fluxes.flux_dn .= FT(0)
 
     gas_optics!(k_dist, as, optical_props, source)
-
+    #-----------------------------------
     bcs = LongwaveBCs(sfc_emis_spec)
-
+    @show sum(source.sfc_source)
     rte_lw!(fluxes, optical_props, as.mesh_orientation, bcs, source, angle_disc)
 
     flux_up[:, :] .= fluxes.flux_up
@@ -214,6 +211,9 @@ function rfmip_clear_sky_lw_ga(ds, optical_props_constructor)
         savefig(joinpath(out_dir, case * ".png"))
     end
 
+    # comparing with reference data
+    rlu_ref = ds[:flx_up]["rlu"][:][:, 1:1, 1:1]
+    rld_ref = ds[:flx_dn]["rld"][:][:, 1:1, 1:1]
     # reshaping the flux_up and flux_dn arrays for comparison with Fortran code.
     flux_up = reshape_for_comparison(flux_up, nlay, ncol, nexp)
     flux_dn = reshape_for_comparison(flux_dn, nlay, ncol, nexp)

@@ -29,10 +29,10 @@ struct RTEBase{FT<:AbstractFloat,I<:Int}
     "Boundary conditions, see [`AbstractRadiativeBoundaryConditions`](@ref)"
     bcs::AbstractRadiativeBoundaryConditions{FT}
     "Upward flux ``[W/m^2]``"
- # - `flux_up` upward radiance [W/m2-str]
+    # - `flux_up` upward radiance [W/m2-str]
     gpt_flux_up::Array{FT,3}
     "Downward flux ``[W/m^2]`` Top level must contain incident flux boundary condition"
- # - `flux_dn` downward radiance
+    # - `flux_dn` downward radiance
     gpt_flux_dn::Array{FT,3}
     "Direct flux ``[W/m^2]``"
     gpt_flux_dir::Union{Array{FT,3},Nothing}
@@ -48,8 +48,8 @@ struct RTEBase{FT<:AbstractFloat,I<:Int}
         ngpt = get_ngpt(op)
         gpt_flux_up = zeros(FT, ncol, nlay + 1, ngpt)
         gpt_flux_dn = zeros(FT, ncol, nlay + 1, ngpt)
-        gpt_flux_dir = fluxes.flux_dn_dir == nothing ? nothing :
-                       similar(gpt_flux_dn)
+        gpt_flux_dir =
+            fluxes.flux_dn_dir == nothing ? nothing : similar(gpt_flux_dn)
         return new{FT,I}(
             fluxes,
             mo,
@@ -146,7 +146,7 @@ function RTELongWave(
     @assert get_nlay(sources) == nlay
     @assert get_ngpt(sources) == ngpt
     angle_disc == nothing && (angle_disc = GaussQuadrature(FT, 1))
-  # Lower boundary condition -- expand surface emissivity by band to gpoints
+    # Lower boundary condition -- expand surface emissivity by band to gpoints
     sfc_emis_gpt = expand_and_transpose(op, base.bcs.sfc_emis)
     return RTELongWaveNoScattering{FT,I}(
         base,
@@ -169,7 +169,7 @@ function RTELongWave(
     @assert get_nlay(sources) == nlay
     @assert get_ngpt(sources) == ngpt
     angle_disc == nothing && (angle_disc = GaussQuadrature(FT, 1))
-  # Lower boundary condition -- expand surface emissivity by band to gpoints
+    # Lower boundary condition -- expand surface emissivity by band to gpoints
     sfc_emis_gpt = expand_and_transpose(op, base.bcs.sfc_emis)
     return RTELongWave{FT,I}(base, sources, angle_disc, sfc_emis_gpt)
 end
@@ -179,7 +179,7 @@ function RTEShortWave(
     μ_0::Array{FT},
     op::OneScalar{FT},
 ) where {FT,I}
-  # Error checking -- consistency / sizes / validity of values
+    # Error checking -- consistency / sizes / validity of values
     ncol = get_ncol(op)
     @assert size(μ_0, 1) == ncol
     @assert !any_vals_outside(μ_0, FT(0), FT(1))
@@ -191,8 +191,8 @@ function RTEShortWave(
     μ_0::Array{FT},
     op::TwoStream{FT},
 ) where {FT,I}
-  # Lower boundary condition -- expand surface albedos by band to gpoints
-  #   and switch dimension ordering
+    # Lower boundary condition -- expand surface albedos by band to gpoints
+    #   and switch dimension ordering
     sfc_alb_dir_gpt = expand_and_transpose(op, base.bcs.sfc_alb_direct)
     sfc_alb_dif_gpt = expand_and_transpose(op, base.bcs.sfc_alb_diffuse)
     return RTEShortWave{FT,I}(base, μ_0, sfc_alb_dir_gpt, sfc_alb_dif_gpt)
