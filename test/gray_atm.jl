@@ -9,6 +9,8 @@ using RRTMGP.GrayRTESolver
 using RRTMGP.GrayOptics
 using RRTMGP.GrayUtils
 
+using BenchmarkTools
+
 using CLIMAParameters
 import CLIMAParameters.Planet: cp_d, grav, R_d
 struct EarthParameterSet <: AbstractEarthParameterSet end
@@ -54,7 +56,7 @@ function gray_atmos_lw_equil(
     end
 
     println("Running longwave test for gray atmosphere model - $(OPC); ncol = $ncol; DA = $DA")
-    gray_flux = GrayFlux(ncol, nlay, nlev, FT, DA)
+    gray_flux = GrayFluxLW(ncol, nlay, nlev, FT, DA)
 
     gray_rrtmgp = GrayRRTMGP(
         nlay,
@@ -147,8 +149,7 @@ function gray_atmos_lw_comparison(
     n_gauss_angles = I(1) # for non-scattering calculation
     sfc_emis = Array{FT}(undef, ncol)
     sfc_emis .= 1.0
-
-    println("Running longwave comparison, for pressure grid vs altitude grid, test for gray atmosphere model")
+    #println("Running longwave comparison, for pressure grid vs altitude grid, test for gray atmosphere model - $(optical_props_constructor)")
     if ncol == 1
         lat = DA{FT}([0]) # latitude
     else
@@ -157,7 +158,7 @@ function gray_atmos_lw_comparison(
     #----pressure grid
     nlay = 60
     nlev = nlay + 1
-    gray_flux_pr_grd = GrayFlux(ncol, nlay, nlev, FT, DA)
+    gray_flux_pr_grd = GrayFluxLW(ncol, nlay, nlev, FT, DA)
     gray_rrtmgp_pr_grd = GrayRRTMGP(
         nlay,
         lat,
@@ -173,12 +174,11 @@ function gray_atmos_lw_comparison(
         DA,
     )
 
-    @show gray_rrtmgp_pr_grd.as.top_at_1
     gray_atmos_lw!(gray_rrtmgp_pr_grd)
     #----altitude grid
     nlev = ncls + 1 + (poly_ord - 1) * ncls
     nlay = nlev - 1
-    gray_flux_alt_grd = GrayFlux(ncol, nlay, nlev, FT, DA)
+    gray_flux_alt_grd = GrayFluxLW(ncol, nlay, nlev, FT, DA)
     gray_rrtmgp_alt_grd = GrayRRTMGP(
         lat,
         p0,
@@ -247,6 +247,107 @@ function gray_atmos_lw_comparison(
     return nothing
 end
 #------------------------------------------------------------------------------
+
+function gray_atmos_sw_test(
+    ::Type{OPC},
+    ncol::Int,
+    ::Type{FT},
+    ::Type{I},
+    ::Type{DA},
+) where {OPC<:AbstractGrayOpticalProps,FT<:AbstractFloat,I<:Int,DA}
+
+    nlay = 60                                 # number of layers
+    p0 = FT(100000)                           # surface pressure (Pa)
+    pe = FT(9000)                             # TOA pressure (Pa)
+    nbnd, ngpt = 1, 1                         # # of nbands/g-points (=1 for gray radiation)
+    nlev = nlay + 1                           # # of layers
+    tb = FT(320)                              # surface temperature
+    tstep = 6.0                               # timestep in hours
+    Δt = FT(60 * 60 * tstep)                  # timestep in seconds
+    ndays = 365 * 40                          # # of simulation days
+    nsteps = ndays * (24 / tstep)             # number of timesteps
+    temp_toler = FT(0.1)                      # tolerance for temperature (Kelvin)
+    flux_grad_toler = FT(1e-5)                # tolerance for flux gradient
+    n_gauss_angles = I(1)                     # for non-scattering calculation
+    max_threads = Int(256)                    # maximum number of threads for KA kernels
+
+    toa_flux = Array{FT}(undef, ncol) # top of atmosphere flux
+    sfc_alb_direct = Array{FT}(undef, ncol) # surface albedo (direct)
+    sfc_alb_diffuse = Array{FT}(undef, ncol) # surface albedo (diffuse)
+    inc_flux_diffuse = nothing
+    zenith = Array{FT}(undef, ncol) # cosecant of solar zenith angle
+
+    top_at_1 = false                          # Top-of-atmos at pt# 1 (true/false)
+
+    if ncol == 1
+        lat = DA{FT}([0])                     # latitude
+    else
+        lat = DA{FT}(range(FT(-π / 2), FT(π / 2), length = ncol)) # latitude
+    end
+
+    toa_flux .= FT(1407.679)
+    sfc_alb_direct .= FT(0.1)
+    sfc_alb_diffuse .= FT(0.1)
+    zenith .= FT(1.66)               # corresponding to ~52.95 deg zenith angle
+
+    gray_flux = gray_flux_sw(ncol, nlay, nlev, FT, DA, OPC)
+    println("Running shortwave test for gray atmosphere model - $(OPC); ncol = $ncol; DA = $DA")
+
+    gray_rrtmgp = GrayRRTMGP(
+        nlay,
+        lat,
+        p0,
+        pe,
+        OPC,
+        toa_flux,
+        sfc_alb_direct,
+        sfc_alb_diffuse,
+        inc_flux_diffuse,
+        zenith,
+        gray_flux,
+        n_gauss_angles,
+        param_set,
+        top_at_1,
+        "sw",
+        DA,
+    )
+
+    gray_atmos_sw!(gray_rrtmgp, max_threads = max_threads)
+
+    # testing with exact solution
+    ot_tot = sum(gray_rrtmgp.op.τ[:, 1]) * zenith[1]
+    exact = toa_flux[1] * zenith[1] * exp(-ot_tot)
+
+    @show gray_rrtmgp.flux.flux_dn_dir[:, 1]
+    @show ot_tot
+    #=    
+        toler = sqrt(eps(FT))
+        if top_at_1
+            diff = abs(exact - gray_rrtmgp.flux.flux_dn_dir[end,1])
+            @show (diff, toler)
+            @test diff < toler
+        else
+            diff = abs(exact - gray_rrtmgp.flux.flux_dn_dir[1,1])
+            @show (diff, toler)
+            @test diff < toler
+        end
+    =#
+
+    return nothing
+end
+
+#------------------------------------------------------------------------------
+#=
+if DA == CuArray
+#    gray_atmos_sw_test(GrayOneScalar, Int(4096), Float64, Int, DA)
+    gray_atmos_sw_test(GrayTwoStream, Int(4096), Float64, Int, DA)
+else
+#    gray_atmos_sw_test(GrayOneScalar, Int(9), Float64, Int, DA)
+    gray_atmos_sw_test(GrayTwoStream, Int(9), Float64, Int, DA)
+end
+=#
+
+
 if DA == CuArray
     @time gray_atmos_lw_equil(GrayOneScalar, Int(4096), Float64, Int, DA)
     @time gray_atmos_lw_equil(GrayTwoStream, Int(4096), Float64, Int, DA)
@@ -254,8 +355,15 @@ else
     @time gray_atmos_lw_equil(GrayOneScalar, Int(9), Float64, Int, DA)
     @time gray_atmos_lw_equil(GrayTwoStream, Int(9), Float64, Int, DA)
 end
+
+
+
+
+
 #=
 # for visual verification
-@time gray_atmos_lw_comparison(GrayOneScalar, Int(3), Float64, Int, DA)
-@time gray_atmos_lw_comparison(GrayTwoStream, Int(3), Float64, Int, DA)
+println("Running longwave comparison, for pressure grid vs altitude grid, test for gray atmosphere model - GrayOneScalar")
+@btime gray_atmos_lw_comparison(GrayOneScalar, Int(1), Float64, Int, DA)
+println("Running longwave comparison, for pressure grid vs altitude grid, test for gray atmosphere model - GrayTwoStream")
+@btime gray_atmos_lw_comparison(GrayTwoStream, Int(1), Float64, Int, DA)
 =#

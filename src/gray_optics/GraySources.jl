@@ -5,7 +5,11 @@ using ..Device: array_type
 using ..GrayOptics: GrayOneScalar, GrayTwoStream, AbstractGrayOpticalProps
 
 export AbstractGraySource,
-    GraySourceLWNoScat, GraySourceLW2Str, source_func_longwave_gray_atmos
+    GraySourceLWNoScat,
+    GraySourceLW2Str,
+    source_func_longwave_gray_atmos,
+    GraySourceSW2Str,
+    source_func_shortwave_gray_atmos
 
 abstract type AbstractGraySource{FT} end
 
@@ -99,7 +103,6 @@ function source_func_longwave_gray_atmos(
     ::Type{OPC},
     ::Type{DA},
 ) where {FT<:AbstractFloat,I<:Int,OPC<:AbstractGrayOpticalProps,DA}
-    println("DA = $DA")
     lay_source = DA{FT}(undef, nlay, ncol, ngpt)
     lev_source_inc = DA{FT}(undef, nlay, ncol, ngpt)
     lev_source_dec = DA{FT}(undef, nlay, ncol, ngpt)
@@ -143,6 +146,79 @@ function source_func_longwave_gray_atmos(
             Tdif,
             albedo,
             src,
+        )
+    end
+end
+
+"""
+    GraySourceSW2Str{
+    FT<:AbstractFloat,
+    FTA1D<:AbstractArray{FT,1},
+    FTA2D<:AbstractArray{FT,2},
+    FTA3D<:AbstractArray{FT,3},
+} <: AbstractGraySource{FT}
+
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+"""
+struct GraySourceSW2Str{
+    FT<:AbstractFloat,
+    FTA1D<:AbstractArray{FT,1},
+    FTA2D<:AbstractArray{FT,2},
+} <: AbstractGraySource{FT}
+    "Surface source"
+    src_sfc::FTA1D
+    "Surface albedo"
+    sfc_albedo::FTA1D
+    "temporary storage array, used in 2 stream calculations"
+    src_up::FTA2D
+    "temporary storage array, used in 2 stream calculations"
+    src_dn::FTA2D
+    "temporary storage array, used in 2 stream calculations"
+    Rdif::FTA2D
+    "temporary storage array, used in 2 stream calculations"
+    Tdif::FTA2D
+    "temporary storage array, used in 2 stream calculations"
+    Rdir::FTA2D
+    "temporary storage array, used in 2 stream calculations"
+    Tdir::FTA2D
+    "temporary storage array, used in 2 stream calculations"
+    Tnoscat::FTA2D
+end
+
+function source_func_shortwave_gray_atmos(
+    ::Type{FT},
+    ncol::I,
+    nlay::I,
+    ::Type{OPC},
+    ::Type{DA},
+) where {FT<:AbstractFloat,I<:Int,OPC<:AbstractGrayOpticalProps,DA}
+
+    if OPC == GrayOneScalar
+        return nothing
+    else
+        ngpt = 1
+        src_sfc = DA{FT}(undef, ncol)
+        sfc_albedo = DA{FT}(undef, ncol)
+        src_up = DA{FT}(undef, nlay, ncol)
+        src_dn = DA{FT}(undef, nlay, ncol)
+        Rdif = DA{FT}(undef, nlay, ncol)
+        Tdif = DA{FT}(undef, nlay, ncol)
+        Rdir = DA{FT}(undef, nlay, ncol)
+        Tdir = DA{FT}(undef, nlay, ncol)
+        Tnoscat = DA{FT}(undef, nlay, ncol)
+        return GraySourceSW2Str{FT,typeof(src_sfc),typeof(src_up)}(
+            src_sfc,
+            sfc_albedo,
+            src_up,
+            src_dn,
+            Rdif,
+            Tdif,
+            Rdir,
+            Tdir,
+            Tnoscat,
         )
     end
 end

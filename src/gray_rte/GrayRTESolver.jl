@@ -6,8 +6,7 @@ using ..GraySources
 using ..GrayAtmos
 using ..GrayOptics
 
-export gray_atmos_lw!,
-    rte_lw_noscat_gray_solve!, rte_lw_2stream_gray_solve!, adding_gray!
+export gray_atmos_lw!, gray_atmos_sw!, rte_sw_noscat_gray_solve!
 
 using KernelAbstractions
 using CUDA
@@ -30,23 +29,47 @@ function gray_atmos_lw!(
     B<:Bool,
 }
     # setting references
-    flux = gray_rrtmgp.flux
-    flux_up = flux.flux_up               # upward flux
-    flux_dn = flux.flux_dn               # downward flux
-    flux_net = flux.flux_net             # net flux
-
     as = gray_rrtmgp.as                  # gray atmospheric state
     optical_props = gray_rrtmgp.op       # optical properties
     source = gray_rrtmgp.src             # Planck sources
-    nlay = as.nlay                       # number of layers per column
     # computing optical properties
-    gas_optics_gray_atmos!(as, optical_props, source)
+    gas_optics_gray_atmos!("lw", as, optical_props, source)
 
     # solving radiative transfer equation
     if typeof(gray_rrtmgp.op) == GrayOneScalar{FT,FTA2D}
         rte_lw_noscat_gray_solve!(gray_rrtmgp, max_threads = max_threads) # no-scattering solver
     else
         rte_lw_2stream_gray_solve!(gray_rrtmgp, max_threads = max_threads) # 2-stream solver
+    end
+
+    return nothing
+end
+# -------------------------------------------------------------------------------------------------
+# Solver for the longwave gray radiation problem
+# -------------------------------------------------------------------------------------------------
+
+function gray_atmos_sw!(
+    gray_rrtmgp::GrayRRTMGP{FT,I,FTA1D,FTA2D,FTA3D,B};
+    max_threads::I = Int(256),
+) where {
+    FT<:AbstractFloat,
+    I<:Int,
+    FTA1D<:AbstractArray{FT,1},
+    FTA2D<:AbstractArray{FT,2},
+    FTA3D<:AbstractArray{FT,3},
+    B<:Bool,
+}
+    # setting references
+    as = gray_rrtmgp.as                  # gray atmospheric state
+    optical_props = gray_rrtmgp.op       # optical properties
+    # computing optical properties
+    gas_optics_gray_atmos!("sw", as, optical_props)
+
+    # solving radiative transfer equation
+    if typeof(gray_rrtmgp.op) == GrayOneScalar{FT,FTA2D}
+        rte_sw_noscat_gray_solve!(gray_rrtmgp, max_threads = max_threads) # no-scattering solver
+    else
+        rte_sw_2stream_gray_solve!(gray_rrtmgp, max_threads = max_threads) # 2-stream solver
     end
 
     return nothing
@@ -171,6 +194,7 @@ function rte_lw_2stream_gray_solve!(
     top_at_1 = gray_rrtmgp.as.top_at_1
     source = gray_rrtmgp.src
     sfc_emis = gray_rrtmgp.bcs.sfc_emis
+    is_emis = true
     inc_flux = gray_rrtmgp.bcs.inc_flux
     ncol, nlev, ngpt = size(flux_up, 2), size(flux_up, 1), 1
     nlay = nlev - 1
@@ -253,9 +277,11 @@ function rte_lw_2stream_gray_solve!(
 
     workgroup = (thr_x)
     ndrange = (ncol)
-
+    #            # ... and source of diffuse radiation is surface emission
+    #            src[nlev, gcol] = FT(π) * sfc_emis_alb[gcol] * sfc_source[gcol]
     comp_stream = adding_gray_kernel!(device, workgroup)(
         top_at_1,
+        is_emis,
         sfc_emis,
         Rdif,
         Tdif,
@@ -273,6 +299,143 @@ function rte_lw_2stream_gray_solve!(
         dependencies = (comp_stream,),
     )
     wait(comp_stream)
+    #------------------------------------------------
+    return nothing
+end
+
+function rte_sw_noscat_gray_solve!(
+    gray_rrtmgp::GrayRRTMGP{FT,I,FTA1D,FTA2D,FTA3D,B};
+    max_threads::I = Int(256),
+) where {
+    FT<:AbstractFloat,
+    FTA1D<:AbstractArray{FT,1},
+    FTA2D<:AbstractArray{FT,2},
+    FTA3D<:AbstractArray{FT,3},
+    I<:Int,
+    B<:Bool,
+}
+    println("entered rte_sw_noscat_gray_solve!")
+
+    # Setting references
+    flux_dn_dir = gray_rrtmgp.flux.flux_dn_dir
+    toa_flux = gray_rrtmgp.bcs.toa_flux
+    zenith = gray_rrtmgp.bcs.zenith
+    τ = gray_rrtmgp.op.τ
+    top_at_1 = gray_rrtmgp.as.top_at_1
+    ncol = gray_rrtmgp.as.ncol
+    nlay = gray_rrtmgp.as.nlay
+    nlev = nlay + 1
+    #-----------------------------------------------------------------------------------
+    device = array_device(flux_dn_dir)
+    comp_stream = Event(device)
+    thr_x = min(max_threads, ncol)
+    workgroup = (thr_x)
+    ndrange = (ncol)
+
+    comp_stream = rte_sw_noscat_gray_solve_kernel!(device, workgroup)(
+        toa_flux,
+        zenith,
+        τ,
+        flux_dn_dir,
+        top_at_1,
+        Val(nlev),
+        Val(ncol),
+        ndrange = ndrange,
+        dependencies = (comp_stream,),
+    )
+    wait(comp_stream)
+
+    return nothing
+end
+
+function rte_sw_2stream_gray_solve!(
+    gray_rrtmgp::GrayRRTMGP{FT,I,FTA1D,FTA2D,FTA3D,B};
+    max_threads::I = Int(256),
+) where {
+    FT<:AbstractFloat,
+    FTA1D<:AbstractArray{FT,1},
+    FTA2D<:AbstractArray{FT,2},
+    FTA3D<:AbstractArray{FT,3},
+    I<:Int,
+    B<:Bool,
+} # 2-stream solver
+
+    println("in rte_sw_2stream_gray_solve!")
+    #---setting references------------------------------
+    zenith = gray_rrtmgp.bcs.zenith
+    τ = gray_rrtmgp.op.τ
+    ssa = gray_rrtmgp.op.ssa
+    g = gray_rrtmgp.op.g
+    Rdif = gray_rrtmgp.src.Rdif
+    Tdif = gray_rrtmgp.src.Tdif
+    Rdir = gray_rrtmgp.src.Rdir
+    Tdir = gray_rrtmgp.src.Tdir
+    Tnoscat = gray_rrtmgp.src.Tnoscat
+    src_up = gray_rrtmgp.src.src_up
+    src_dn = gray_rrtmgp.src.src_dn
+    src_sfc = gray_rrtmgp.src.src_sfc
+    flux_up = gray_rrtmgp.flux.flux_up
+    flux_dn = gray_rrtmgp.flux.flux_dn
+    flux_net = gray_rrtmgp.flux.flux_net
+    flux_dn_dir = gray_rrtmgp.flux.flux_dn_dir
+    top_at_1 = gray_rrtmgp.as.top_at_1
+    ncol = size(flux_up, 2)
+    nlev = size(flux_up, 1)
+    nlay = nlev - 1
+
+    sfc_alb_dir = gray_rrtmgp.bcs.sfc_alb_direct
+    sfc_alb_dif = gray_rrtmgp.bcs.sfc_alb_diffuse
+    toa_flux = gray_rrtmgp.bcs.toa_flux
+    #----------------------------------------------------
+    device = array_device(flux_up)
+    comp_stream = Event(device)
+    #----------------------------------------------------
+
+    println("here 1")
+    sw_two_stream!(zenith, τ, ssa, g, Rdif, Tdif, Rdir, Tdir, Tnoscat)
+
+    sw_source_2str!(
+        top_at_1,
+        toa_flux,
+        zenith,
+        Rdir,
+        Tdir,
+        Tnoscat,
+        sfc_alb_dir,
+        src_up,
+        src_dn,
+        src_sfc,
+        flux_dn_dir,
+    )
+    # -------------------------------------------------------------------------------------------------    
+    # Transport
+    thr_x = min(max_threads, ncol)
+
+    workgroup = (thr_x)
+    ndrange = (ncol)
+
+    sfc_emis = FT(1) .- sfc_alb_dif
+    #= 
+    comp_stream = adding_gray_kernel!(device, workgroup)(
+        top_at_1,
+        sfc_emis,
+        Rdif,
+        Tdif,
+        src_up,
+        src_dn,
+        src_sfc,
+        flux_up,
+        flux_dn,
+        flux_net,
+        albedo,
+        src,
+        Val(nlev),
+        Val(ncol),
+        ndrange = ndrange,
+        dependencies = (comp_stream,),
+    )
+    wait(comp_stream)
+    =#
     #------------------------------------------------
     return nothing
 end

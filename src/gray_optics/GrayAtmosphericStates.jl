@@ -116,7 +116,6 @@ function setup_gray_as_pr_grid(
     )
     wait(event)
     #------------------------------------------------
-    @show top_at_1
     return GrayAtmosphericState{FT,DA{FT,1},DA{FT,2},Int,typeof(top_at_1)}(
         p_lay,
         p_lev,
@@ -242,7 +241,6 @@ function setup_gray_as_alt_grid(
 
         t_sfc[icol] = (top_at_1 ? t_lev[end, icol] : t_lev[1, icol])
     end
-    @show top_at_1
     return GrayAtmosphericState{FT,DA{FT,1},DA{FT,2},Int,typeof(top_at_1)}(
         p_lay,
         p_lev,

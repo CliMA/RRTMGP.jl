@@ -3,7 +3,7 @@ module GrayBCs
 using ..Device: array_type
 using DocStringExtensions
 
-export AbstractGrayBCs, GrayLwBCs
+export AbstractGrayBCs, GrayLwBCs, GraySwBCs
 
 abstract type AbstractGrayBCs{FT<:AbstractFloat,FTA1D<:AbstractArray{FT,1}} end
 
@@ -51,7 +51,42 @@ struct GraySwBCs{FT,FTA1D} <: AbstractGrayBCs{FT,FTA1D}
     "surface albedo for diffuse radiation"
     sfc_alb_diffuse::FTA1D
     "incident diffuse flux at top of domain `[W/m2]` `(ncol, ngpt)`"
-    inc_flux_diffuse::FTA1D
+    inc_flux_diffuse::Union{FTA1D,Nothing}
+    "zenith angle `radians`"
+    zenith::FTA1D
+
+    function GraySwBCs(
+        ::Type{DA},
+        toa_flux::FTA1D,
+        sfc_alb_direct::FTA1D,
+        sfc_alb_diffuse::FTA1D,
+        zenith::FTA1D,
+        inc_flux_diffuse::Union{FTA1D,Nothing} = nothing,
+    ) where {DA,FT<:AbstractFloat,FTA1D<:AbstractArray{FT,1}}
+
+        @assert length(size(toa_flux)) == 1
+        @assert length(size(sfc_alb_direct)) == 1
+        @assert length(size(sfc_alb_diffuse)) == 1
+        @assert length(size(zenith)) == 1
+
+        toa_flux = DA{FT}(toa_flux)
+        sfc_alb_direct = DA{FT}(sfc_alb_direct)
+        sfc_alb_diffuse = DA{FT}(sfc_alb_diffuse)
+        zenith = DA{FT}(zenith)
+
+        if inc_flux_diffuse ≠ nothing
+            @assert length(size(inc_flux_diffuse)) == 1
+            inc_flux_diffuse = DA{FT}(inc_flux_diffuse)
+        end
+
+        return new{FT,DA{FT,1}}(
+            toa_flux,
+            sfc_alb_direct,
+            sfc_alb_diffuse,
+            inc_flux_diffuse,
+            zenith,
+        )
+    end
 end
 
 end

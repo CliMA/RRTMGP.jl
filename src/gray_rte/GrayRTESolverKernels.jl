@@ -264,7 +264,8 @@ end
 # ---------------------------------------------------------------
 @kernel function adding_gray_kernel!(
     top_at_1::B,
-    sfc_emis::FTA1D,
+    is_sfc_emis::B,
+    sfc_emis_alb::FTA1D,
     Rdif::FTA2D,
     Tdif::FTA2D,
     src_up::FTA2D,
@@ -297,10 +298,14 @@ end
 
     if top_at_1
         #--------------------------------------------------------------------------------------
-        # Albedo of lowest level is the surface albedo...
-        albedo[nlev, gcol] = FT(1) - sfc_emis[gcol]
-        # ... and source of diffuse radiation is surface emission
-        src[nlev, gcol] = FT(π) * sfc_emis[gcol] * sfc_source[gcol]
+        if is_sfc_emis # longwave
+            # Albedo of lowest level is the surface albedo...
+            albedo[nlev, gcol] = FT(1) - sfc_emis_alb[gcol]
+            # ... and source of diffuse radiation is surface emission
+            src[nlev, gcol] = FT(π) * sfc_emis_alb[gcol] * sfc_source[gcol, 1]
+        else # shortwave
+
+        end
         # From bottom to top of atmosphere --
         # compute albedo and source of upward radiation
         @inbounds for ilev = nlay:-1:1
@@ -342,10 +347,14 @@ end
         #--------------------------------------------------------------------------------------
     else
         #--------------------------------------------------------------------------------------
-        # Albedo of lowest level is the surface albedo...
-        albedo[1, gcol] = FT(1) - sfc_emis[gcol]
-        # ... and source of diffuse radiation is surface emission
-        src[1, gcol] = FT(π) * sfc_emis[gcol] * sfc_source[gcol]
+        if is_sfc_emis # longwave
+            # Albedo of lowest level is the surface albedo...
+            albedo[1, gcol] = FT(1) - sfc_emis_alb[gcol]
+            # ... and source of diffuse radiation is surface emission
+            src[1, gcol] = FT(π) * sfc_emis_alb[gcol] * sfc_source[gcol, 1]
+        else # shortwave
+
+        end
         #--------------------------------------------------------
         # From bottom to top of atmosphere --
         #   compute albedo and source of upward radiation
@@ -390,4 +399,189 @@ end
         flux_net[ilev, gcol] = flux_up[ilev, gcol] - flux_dn[ilev, gcol]
     end
     @synchronize
+end
+
+@kernel function rte_sw_noscat_gray_solve_kernel!(
+    toa_flux::FTA1D,
+    zenith::FTA1D,
+    τ::FTA2D,
+    flux_dn_dir::FTA2D,
+    top_at_1::Bool,
+    ::Val{nlev},
+    ::Val{ncol},
+) where {
+    FT<:AbstractFloat,
+    FTA1D<:AbstractArray{FT,1},
+    FTA2D<:AbstractArray{FT,2},
+    nlev,
+    ncol,
+}
+    gcol = @index(Global, Linear) # global col ids
+
+    if top_at_1
+        flux_dn_dir[1, gcol] = toa_flux[gcol] * zenith[gcol]
+
+        for ilev = 2:nlev
+            flux_dn_dir[ilev, gcol] =
+                flux_dn_dir[ilev-1, gcol] * exp(-τ[ilev-1, gcol] * zenith[gcol])
+        end
+    else
+        flux_dn_dir[nlev, gcol] = toa_flux[gcol] * zenith[gcol]
+
+        for ilev = nlev-1:-1:1
+            flux_dn_dir[ilev, gcol] =
+                flux_dn_dir[ilev+1, gcol] * exp(-τ[ilev, gcol] * zenith[gcol])
+        end
+    end
+
+end
+
+#-------------------------------------------------------------------------------------------------
+#
+# Two-stream solutions to direct and diffuse reflectance and transmittance for a layer
+# with optical depth tau, single scattering albedo w0, and asymmetery parameter g.
+# 
+# Equations are developed in Meador and Weaver, 1980,
+# doi:10.1175/1520-0469(1980)037<0630:TSATRT>2.0.CO;2
+#
+#-------------------------------------------------------------------------------------------------
+function sw_two_stream!(
+    zenith::FTA1D,
+    τ::FTA2D,
+    ssa::FTA2D,
+    g::FTA2D,
+    Rdif::FTA2D,
+    Tdif::FTA2D,
+    Rdir::FTA2D,
+    Tdir::FTA2D,
+    Tnoscat::FTA2D,
+) where {
+    FT<:AbstractFloat,
+    FTA1D<:AbstractArray{FT,1},
+    FTA2D<:AbstractArray{FT,2},
+}
+    nlay = size(τ, 1)
+    ncol = size(τ, 2)
+
+    for icol = 1:ncol, ilay = 1:nlay
+        # Zdunkowski Practical Improved Flux Method "PIFM"
+        #  (Zdunkowski et al., 1980;  Contributions to Atmospheric Physics 53, 147-66)
+
+        γ1 =
+            (FT(8) - ssa[ilay, icol] * (FT(5) + FT(3) * g[ilay, icol])) *
+            FT(0.25)
+        γ2 = FT(3) * (ssa[ilay, icol] * (FT(1) - g[ilay, icol])) * FT(0.25)
+        γ3 = (FT(2) - (FT(3) / zenith[icol]) * g[ilay, icol]) * FT(0.25)
+        γ4 = FT(1) - γ3
+        α1 = γ1 * γ4 + γ2 * γ3                          # Eq. 16
+        α2 = γ1 * γ3 + γ2 * γ4                          # Eq. 17
+        k = sqrt(max((γ1 - γ2) * (γ1 + γ2), FT(1e-12)))
+
+        exp_minusktau = exp(-τ[ilay, icol] * k)
+        exp_minus2ktau = exp_minusktau * exp_minusktau
+
+        # Refactored to avoid rounding errors when k, gamma1 are of very different magnitudes
+        RT_term =
+            FT(1) /
+            (k * (FT(1) + exp_minus2ktau) + γ1 * (FT(1) - exp_minus2ktau))
+
+        Rdif[ilay, icol] = RT_term * γ2 * (FT(1) - exp_minus2ktau) # Eqn. 25
+        Tdif[ilay, icol] = RT_term * FT(2) * k * exp_minusktau     # Eqn. 26
+
+        # Transmittance of direct, unscattered beam. Also used below
+        Tnoscat[ilay, icol] = exp(-τ[ilay, icol] * zenith[icol])
+
+
+        # Direct reflect and transmission
+        k_μ = k / zenith[icol]
+        k_γ3 = k * γ3
+        k_γ4 = k * γ4
+
+        # Equation 14, multiplying top and bottom by exp(-k*tau)
+        #   and rearranging to avoid div by 0.
+        if abs(FT(1) - k_μ * k_μ) ≥ eps(FT)
+            RT_term = ssa[ilay, icol] * RT_term / (FT(1) - k_μ * k_μ)
+        else
+            RT_term = ssa[ilay, icol] * RT_term / eps(FT)
+        end
+
+        Rdir[ilay, icol] =
+            RT_term * (
+                (FT(1) - k_μ) * (α2 + k_γ3) -
+                (FT(1) + k_μ) * (α2 - k_γ3) * exp_minus2ktau -
+                FT(2) * (k_γ3 - α2 * k_μ) * exp_minusktau * Tnoscat[ilay, icol]
+            )
+
+        #
+        # Equation 15, multiplying top and bottom by exp(-k*tau),
+        #   multiplying through by exp(-tau/mu0) to
+        #   prefer underflow to overflow
+        # Omitting direct transmittance
+        #
+        Tdir[ilay, icol] =
+            -RT_term * (
+                (FT(1) + k_μ) * (α1 + k_γ4) * Tnoscat[ilay, icol] -
+                (FT(1) - k_μ) *
+                (α1 - k_γ4) *
+                exp_minus2ktau *
+                Tnoscat[ilay, icol] - FT(2) * (k_γ4 + α1 * k_μ) * exp_minusktau
+            )
+    end
+
+    println("exiting sw_two_stream!")
+    return nothing
+end
+
+
+function sw_source_2str!(
+    top_at_1::Bool,
+    toa_flux::FTA1D,
+    zenith::FTA1D,
+    Rdir::FTA2D,
+    Tdir::FTA2D,
+    Tnoscat::FTA2D,
+    sfc_albedo::FTA1D,
+    src_up::FTA2D,
+    src_dn::FTA2D,
+    src_sfc::FTA1D,
+    flux_dn_dir::FTA2D,
+) where {
+    FT<:AbstractFloat,
+    FTA1D<:AbstractArray{FT,1},
+    FTA2D<:AbstractArray{FT,2},
+}
+    nlay = size(src_up, 1)
+    ncol = size(src_up, 2)
+    nlev = nlay + 1
+
+    if top_at_1
+        for icol = 1:ncol
+            flux_dn_dir[1, icol] = toa_flux[icol] * zenith[icol]
+            for ilev = 1:nlay
+                src_up[ilev, icol] = Rdir[ilev, icol] * flux_dn_dir[ilev, icol]
+                src_dn[ilev, icol] = Tdir[ilev, icol] * flux_dn_dir[ilev, icol]
+                flux_dn_dir[ilev+1, icol] =
+                    Tnoscat[ilev, icol] * flux_dn_dir[ilev, icol]
+            end
+            src_sfc[icol] = flux_dn_dir[nlay+1, icol] * sfc_albedo[icol]
+        end
+    else
+        # layer index = level index
+        # previous level is up (+1)
+        for icol = 1:ncol
+            flux_dn_dir[nlev, icol] = toa_flux[icol] * zenith[icol]
+            for ilev = nlay:-1:1
+                src_up[ilev, icol] =
+                    Rdir[ilev, icol] * flux_dn_dir[ilev+1, icol]
+                src_dn[ilev, icol] =
+                    Tdir[ilev, icol] * flux_dn_dir[ilev+1, icol]
+                flux_dn_dir[ilev, icol] =
+                    Tnoscat[ilev, icol] * flux_dn_dir[ilev+1, icol]
+            end
+            src_sfc[icol] = flux_dn_dir[1, icol] * sfc_albedo[icol]
+        end
+    end
+
+    println("exiting sw_source_2str!")
+    return nothing
 end

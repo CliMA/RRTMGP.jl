@@ -21,9 +21,10 @@ export gas_optics_gray_atmos!,
     compute_gray_heating_rate!
 
 function gas_optics_gray_atmos!(
+    stype,
     as::GrayAtmosphericState{FT,FTA1D,FTA2D,I,B},
     optical_props::AbstractGrayOpticalProps{FT,FTA2D},
-    source::AbstractGraySource{FT},
+    source::Union{AbstractGraySource{FT},Nothing} = nothing,
 ) where {
     FT<:AbstractFloat,
     I<:Int,
@@ -33,7 +34,9 @@ function gas_optics_gray_atmos!(
     B<:Bool,
 }
     compute_gas_τs_gray_atmos!(as, optical_props)
-    compute_Planck_source!(source, as)
+    if stype == "lw"
+        compute_Planck_source!(source, as)
+    end
 
     if typeof(optical_props) == GrayTwoStream{FT,FTA2D}
         optical_props.ssa .= FT(0)
@@ -204,14 +207,14 @@ struct GrayRRTMGP{
     FTA3D<:AbstractArray{FT,3},
     B<:Bool,
     OP<:AbstractGrayOpticalProps{FT,FTA2D},
-    GS<:AbstractGraySource{FT},
+    GS<:Union{AbstractGraySource{FT},Nothing},
     BC<:AbstractGrayBCs{FT,FTA1D},
 }
     as::GrayAtmosphericState{FT,FTA1D,FTA2D,I,B}  # atmoshperic state
     op::OP                                        # optical properties
     src::GS                                       # source functions
     bcs::BC                                       # boundary conditions
-    flux::GrayFlux{FT,FTA2D}                      # fluxes
+    flux::AbstractGrayFlux{FT}                    # fluxes
     angle_disc::AngularDiscretization{FT,FTA1D,I} # angular discretization
 
     function GrayRRTMGP(
@@ -221,7 +224,7 @@ struct GrayRRTMGP{
         pe::FT,
         optical_props_constructor,
         sfc_emis::Array{FT,1},
-        flux::GrayFlux{FT,FTA2D},
+        flux::AbstractGrayFlux{FT},
         n_gauss_angles::Int,
         param_set,
         top_at_1::Bool,
@@ -234,48 +237,36 @@ struct GrayRRTMGP{
         DA,
     }
         ncol, ngpt, nbnd = length(lat), 1, 1
-        if stype == "lw"
-            as = setup_gray_as_pr_grid(
-                nlay,
-                lat,
-                p0,
-                pe,
-                param_set,
-                top_at_1,
-                DA,
-            )
-            optical_props = optical_props_constructor(FT, ncol, nlay, DA)
-            sf = source_func_longwave_gray_atmos(
-                FT,
-                ncol,
-                nlay,
-                ngpt,
-                optical_props_constructor,
-                DA,
-            )
-            bc = GrayLwBCs(DA, sfc_emis)
-            ang_disc = AngularDiscretization(FT, n_gauss_angles, DA)
-            return new{
-                FT,
-                Int,
-                DA{FT,1},
-                DA{FT,2},
-                DA{FT,3},
-                Bool,
-                typeof(optical_props),
-                typeof(sf),
-                typeof(bc),
-            }(
-                as,
-                optical_props,
-                sf,
-                bc,
-                flux,
-                ang_disc,
-            )
-        else
-            error("Shortwave solver not yet supported")
-        end
+        as = setup_gray_as_pr_grid(nlay, lat, p0, pe, param_set, top_at_1, DA)
+        optical_props = optical_props_constructor(FT, ncol, nlay, DA)
+        sf = source_func_longwave_gray_atmos(
+            FT,
+            ncol,
+            nlay,
+            ngpt,
+            optical_props_constructor,
+            DA,
+        )
+        bc = GrayLwBCs(DA, sfc_emis)
+        ang_disc = AngularDiscretization(FT, n_gauss_angles, DA)
+        return new{
+            FT,
+            Int,
+            DA{FT,1},
+            DA{FT,2},
+            DA{FT,3},
+            Bool,
+            typeof(optical_props),
+            typeof(sf),
+            typeof(bc),
+        }(
+            as,
+            optical_props,
+            sf,
+            bc,
+            flux,
+            ang_disc,
+        )
     end
 
     function GrayRRTMGP(
@@ -286,7 +277,7 @@ struct GrayRRTMGP{
         poly_order::Int,
         optical_props_constructor,
         sfc_emis::Array{FT,1},
-        flux::GrayFlux{FT,FTA2D},
+        flux::AbstractGrayFlux{FT},
         n_gauss_angles::Int,
         param_set,
         top_at_1::Bool,
@@ -301,51 +292,108 @@ struct GrayRRTMGP{
         nlev = Int(ncls + 1 + (poly_order - 1) * ncls)
         nlay = Int(nlev - 1)
         ncol, ngpt, nbnd = length(lat), 1, 1
-        if stype == "lw"
-            as = setup_gray_as_alt_grid(
-                lat,
-                p0,
-                zend,
-                ncls,
-                poly_order,
-                param_set,
-                top_at_1,
-                DA,
-            )
-            optical_props = optical_props_constructor(FT, ncol, nlay, DA)
-            sf = source_func_longwave_gray_atmos(
-                FT,
-                ncol,
-                nlay,
-                ngpt,
-                optical_props_constructor,
-                DA,
-            )
-            bc = GrayLwBCs(DA, sfc_emis)
-            ang_disc = AngularDiscretization(FT, n_gauss_angles, DA)
-            return new{
-                FT,
-                Int,
-                DA{FT,1},
-                DA{FT,2},
-                DA{FT,3},
-                Bool,
-                typeof(optical_props),
-                typeof(sf),
-                typeof(bc),
-            }(
-                as,
-                optical_props,
-                sf,
-                bc,
-                flux,
-                ang_disc,
-            )
-        else
-            error("Shortwave solver not yet supported")
-        end
+        as = setup_gray_as_alt_grid(
+            lat,
+            p0,
+            zend,
+            ncls,
+            poly_order,
+            param_set,
+            top_at_1,
+            DA,
+        )
+        optical_props = optical_props_constructor(FT, ncol, nlay, DA)
+        sf = source_func_longwave_gray_atmos(
+            FT,
+            ncol,
+            nlay,
+            ngpt,
+            optical_props_constructor,
+            DA,
+        )
+        bc = GrayLwBCs(DA, sfc_emis)
+        ang_disc = AngularDiscretization(FT, n_gauss_angles, DA)
+        return new{
+            FT,
+            Int,
+            DA{FT,1},
+            DA{FT,2},
+            DA{FT,3},
+            Bool,
+            typeof(optical_props),
+            typeof(sf),
+            typeof(bc),
+        }(
+            as,
+            optical_props,
+            sf,
+            bc,
+            flux,
+            ang_disc,
+        )
     end
 
+    function GrayRRTMGP(
+        nlay::Int,
+        lat::FTA1D,
+        p0::FT,
+        pe::FT,
+        optical_props_constructor,
+        toa_flux::FTA1D,
+        sfc_alb_direct::FTA1D,
+        sfc_alb_diffuse::FTA1D,
+        inc_flux_diffuse::Union{FTA1D,Nothing},
+        zenith::FTA1D,
+        flux::AbstractGrayFlux{FT},
+        n_gauss_angles::Int,
+        param_set,
+        top_at_1::Bool,
+        stype,
+        ::Type{DA},
+    ) where {
+        FT<:AbstractFloat,
+        FTA1D<:AbstractArray{FT,1},
+        FTA2D<:AbstractArray{FT,2},
+        DA,
+    }
+        ncol, ngpt, nbnd = length(lat), 1, 1
+        as = setup_gray_as_pr_grid(nlay, lat, p0, pe, param_set, top_at_1, DA)
+        optical_props = optical_props_constructor(FT, ncol, nlay, DA)
+        sf = source_func_shortwave_gray_atmos(
+            FT,
+            ncol,
+            nlay,
+            optical_props_constructor,
+            DA,
+        )
+        bc = GraySwBCs(
+            DA,
+            toa_flux,
+            sfc_alb_direct,
+            sfc_alb_diffuse,
+            zenith,
+            inc_flux_diffuse,
+        )
+        ang_disc = AngularDiscretization(FT, n_gauss_angles, DA)
+        return new{
+            FT,
+            Int,
+            DA{FT,1},
+            DA{FT,2},
+            DA{FT,3},
+            Bool,
+            typeof(optical_props),
+            typeof(sf),
+            typeof(bc),
+        }(
+            as,
+            optical_props,
+            sf,
+            bc,
+            flux,
+            ang_disc,
+        )
+    end
 end
 
 end
