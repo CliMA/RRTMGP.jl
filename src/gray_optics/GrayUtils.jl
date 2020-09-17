@@ -12,7 +12,7 @@ using CLIMAParameters.Planet: grav, cp_d
 export update_profile_lw!, compute_gray_heating_rate!, GPU_minmax
 
 function update_profile_lw!(
-    as::GrayAtmosphericState{FT,FTA1D,FTA2D,I,B},
+    as::GrayAtmosphericState{FT,FTA1D,FTA2D,I},
     flux::GrayFlux{FT,FTA2D},
     hr_lay::FTA2D,
     flux_grad::FTA2D,
@@ -120,7 +120,7 @@ end
 end
 
 function compute_gray_heating_rate!(
-    as::GrayAtmosphericState{FT,FTA1D,FTA2D,I,B},
+    as::GrayAtmosphericState{FT,FTA1D,FTA2D,I},
     flux::GrayFlux{FT,FTA2D},
     hr_lay::FTA2D,
     param_set::AbstractEarthParameterSet,

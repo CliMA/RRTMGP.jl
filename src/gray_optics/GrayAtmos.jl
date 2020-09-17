@@ -21,7 +21,7 @@ export gas_optics_gray_atmos!,
     compute_gray_heating_rate!
 
 function gas_optics_gray_atmos!(
-    as::GrayAtmosphericState{FT,FTA1D,FTA2D,I,B},
+    as::GrayAtmosphericState{FT,FTA1D,FTA2D,I},
     optical_props::AbstractGrayOpticalProps{FT,FTA2D},
     source::AbstractGraySource{FT},
 ) where {
@@ -43,7 +43,7 @@ function gas_optics_gray_atmos!(
 end
 
 function compute_gas_τs_gray_atmos!(
-    as::GrayAtmosphericState{FT,FTA1D,FTA2D,I,B},
+    as::GrayAtmosphericState{FT,FTA1D,FTA2D,I},
     optical_props::AbstractGrayOpticalProps{FT,FTA2D},
 ) where {
     FT<:AbstractFloat,
@@ -54,7 +54,6 @@ function compute_gas_τs_gray_atmos!(
 }
     ncol = as.ncol
     nlay = as.nlay
-    top_at_1 = as.top_at_1
     p_lay = as.p_lay
     p_lev = as.p_lev
     α = as.α
@@ -70,17 +69,8 @@ function compute_gas_τs_gray_atmos!(
     ndrange = (nlay, ncol)
     #----------------------------------
     kernel = compute_gas_τs_gray_atmos_kernel!(device, workgroup)
-    event = kernel(
-        p_lay,
-        p_lev,
-        d0,
-        α,
-        top_at_1,
-        τ,
-        Val(nlay),
-        Val(ncol),
-        ndrange = ndrange,
-    )
+    event =
+        kernel(p_lay, p_lev, d0, α, τ, Val(nlay), Val(ncol), ndrange = ndrange)
     wait(event)
     #----------------------------------
     return nothing
@@ -96,7 +86,6 @@ end
     p_lev::FTA2D,
     d0::FTA1D,
     α::FT,
-    top_at_1::Bool,
     τ::FTA2D,
     ::Val{nlay},
     ::Val{ncol},
@@ -109,7 +98,7 @@ end
 }
     glay, gcol = @index(Global, NTuple)  # global col & lay ids
 
-    p0 = top_at_1 ? p_lev[end, gcol] : p_lev[1, gcol]
+    p0 = p_lev[1, gcol]
 
     τ[glay, gcol] = abs(
         (α * d0[gcol] * (p_lay[glay, gcol] ./ p0) .^ α ./ p_lay[glay, gcol]) * (p_lev[glay+1, gcol] - p_lev[glay, gcol]),
@@ -120,7 +109,7 @@ end
 
 function compute_Planck_source!(
     source::AbstractGraySource{FT},
-    as::GrayAtmosphericState{FT,FTA1D,FTA2D,I,B},
+    as::GrayAtmosphericState{FT,FTA1D,FTA2D,I},
 ) where {
     FT<:AbstractFloat,
     I<:Int,
@@ -207,7 +196,7 @@ struct GrayRRTMGP{
     GS<:AbstractGraySource{FT},
     BC<:AbstractGrayBCs{FT,FTA1D},
 }
-    as::GrayAtmosphericState{FT,FTA1D,FTA2D,I,B}  # atmoshperic state
+    as::GrayAtmosphericState{FT,FTA1D,FTA2D,I}    # atmoshperic state
     op::OP                                        # optical properties
     src::GS                                       # source functions
     bcs::BC                                       # boundary conditions
@@ -224,7 +213,6 @@ struct GrayRRTMGP{
         flux::GrayFlux{FT,FTA2D},
         n_gauss_angles::Int,
         param_set,
-        top_at_1::Bool,
         stype,
         ::Type{DA},
     ) where {
@@ -235,15 +223,7 @@ struct GrayRRTMGP{
     }
         ncol, ngpt, nbnd = length(lat), 1, 1
         if stype == "lw"
-            as = setup_gray_as_pr_grid(
-                nlay,
-                lat,
-                p0,
-                pe,
-                param_set,
-                top_at_1,
-                DA,
-            )
+            as = setup_gray_as_pr_grid(nlay, lat, p0, pe, param_set, DA)
             optical_props = optical_props_constructor(FT, ncol, nlay, DA)
             sf = source_func_longwave_gray_atmos(
                 FT,
@@ -289,7 +269,6 @@ struct GrayRRTMGP{
         flux::GrayFlux{FT,FTA2D},
         n_gauss_angles::Int,
         param_set,
-        top_at_1::Bool,
         stype,
         ::Type{DA},
     ) where {
@@ -309,7 +288,6 @@ struct GrayRRTMGP{
                 ncls,
                 poly_order,
                 param_set,
-                top_at_1,
                 DA,
             )
             optical_props = optical_props_constructor(FT, ncol, nlay, DA)

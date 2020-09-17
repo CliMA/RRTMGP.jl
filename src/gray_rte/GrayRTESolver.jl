@@ -73,7 +73,6 @@ function rte_lw_noscat_gray_solve!(
     flux_up = gray_rrtmgp.flux.flux_up     # upward flux
     flux_dn = gray_rrtmgp.flux.flux_dn     # downward flux
     flux_net = gray_rrtmgp.flux.flux_net   # net flux
-    top_at_1 = gray_rrtmgp.as.top_at_1     # is top-of-atmos located at point # 1?
     source = gray_rrtmgp.src               # Planck sources
     sfc_emis = gray_rrtmgp.bcs.sfc_emis    # Surface emissivity
     inc_flux = gray_rrtmgp.bcs.inc_flux    # Surface flux
@@ -84,14 +83,12 @@ function rte_lw_noscat_gray_solve!(
     nlay = nlev - 1                 # number of layers
     ngpt = 1                        # number of g-points (only 1 for gray radiation model
 
-    i_lev_top = top_at_1 ? 1 : nlev # index for top level of column
-    n_sfc = top_at_1 ? nlev : 1     # index for bottom level of column
     n_μ = gray_rrtmgp.angle_disc.n_gauss_angles
     Ds = gray_rrtmgp.angle_disc.gauss_Ds
     w_μ = gray_rrtmgp.angle_disc.gauss_wts
 
-    lev_source_up = top_at_1 ? source.lev_source_dec : source.lev_source_inc # Mapping increasing/decreasing indices to up/down
-    lev_source_dn = top_at_1 ? source.lev_source_inc : source.lev_source_dec
+    lev_source_up = source.lev_source_inc # Mapping increasing/decreasing indices to up/down
+    lev_source_dn = source.lev_source_dec
     lay_source = source.lay_source # Planck source at average layer temperature [W/m^2]
     sfc_source = source.sfc_source # Surface source function [W/m^2]
     source_up = source.source_up
@@ -141,7 +138,6 @@ function rte_lw_noscat_gray_solve!(
         n_μ,
         Ds,
         w_μ,
-        top_at_1,
         Val(nlay),
         Val(nlev),
         Val(ncol),
@@ -168,7 +164,6 @@ function rte_lw_2stream_gray_solve!(
     flux_up = gray_rrtmgp.flux.flux_up
     flux_dn = gray_rrtmgp.flux.flux_dn
     flux_net = gray_rrtmgp.flux.flux_net
-    top_at_1 = gray_rrtmgp.as.top_at_1
     source = gray_rrtmgp.src
     sfc_emis = gray_rrtmgp.bcs.sfc_emis
     inc_flux = gray_rrtmgp.bcs.inc_flux
@@ -177,8 +172,6 @@ function rte_lw_2stream_gray_solve!(
     lev_src_inc, lev_src_dec = source.lev_source_inc, source.lev_source_dec
     lev_source = source.lev_source
     lay_source, sfc_source = source.lay_source, source.sfc_source
-    i_lev_top = top_at_1 ? 1 : nlev
-    n_sfc = top_at_1 ? nlev : 1
 
     τ = gray_rrtmgp.op.τ
     g = gray_rrtmgp.op.g
@@ -188,9 +181,9 @@ function rte_lw_2stream_gray_solve!(
     src_up, src_dn = source.src_up, source.src_dn # Source function for diffuse radiation
     albedo, src = source.albedo, source.src
     #----------------------------------------------------------------------------------
-    if inc_flux ≠ nothing
-        flux_dn[i_lev_top, 1] = inc_flux[1]
-    end
+    #    if inc_flux ≠ nothing
+    #        flux_dn[i_lev_top, 1] = inc_flux[1]
+    #    end
     #-----------------------------------------------------------------------------------
     lw_diff_sec = FT(1.66)
     #-----------------------------------------------------------------------------------
@@ -241,7 +234,6 @@ function rte_lw_2stream_gray_solve!(
         Tdif,
         Rdif,
         lw_diff_sec,
-        top_at_1,
         Val(nlay),
         Val(ncol),
         ndrange = ndrange,
@@ -255,7 +247,6 @@ function rte_lw_2stream_gray_solve!(
     ndrange = (ncol)
 
     comp_stream = adding_gray_kernel!(device, workgroup)(
-        top_at_1,
         sfc_emis,
         Rdif,
         Tdif,

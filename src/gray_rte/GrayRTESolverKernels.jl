@@ -66,7 +66,6 @@ end
     n_μ::Int,
     Ds::FTA1D,
     w_μ::FTA1D,
-    top_at_1::Bool,
     ::Val{nlay},
     ::Val{nlev},
     ::Val{ncol},
@@ -80,7 +79,6 @@ end
     ncol,
 }
     gcol = @index(Global, Linear) # global col ids
-    i_lev_top = top_at_1 ? 1 : nlev # index for top level of column
 
     @inbounds for ilev = 1:nlev
         flux_dn[ilev, gcol] = FT(0)
@@ -88,53 +86,30 @@ end
     end
 
     if inc_flux ≠ nothing
-        flux_dn[i_lev_top, gcol] = inc_flux[gcol]
+        flux_dn[nlev, gcol] = inc_flux[gcol]
     end
     # Transport is for intensity
     #   convert flux at top of domain to intensity assuming azimuthal isotropy
-    flux_dn[i_lev_top, gcol] /= (FT(2) * FT(π) * w_μ[1])
+    flux_dn[nlev, gcol] /= (FT(2) * FT(π) * w_μ[1])
 
-    if top_at_1
-        #-------Top of domain is index 1
-        # Downward propagation
-        @inbounds for ilev = 2:nlev
-            flux_dn[ilev, gcol] =
-                trans[ilev-1, gcol] * flux_dn[ilev-1, gcol] +
-                source_dn[ilev-1, gcol]
-        end
-        # Surface reflection and emission
-        flux_up[nlev, gcol] =
-            flux_dn[nlev, gcol] * (FT(1) - sfc_emis[gcol]) + sfc_source[gcol, 1]
-
-        # Upward propagation
-        @inbounds for ilev = nlay:-1:1
-            flux_up[ilev, gcol] =
-                trans[ilev, gcol] * flux_up[ilev+1, gcol] +
-                source_up[ilev, gcol]
-        end
-        #-----------------------------------
-    else
-        #-------Top of domain is index nlev
-        # Downward propagation
-        @inbounds for ilev = nlay:-1:1
-            flux_dn[ilev, gcol] =
-                trans[ilev, gcol] * flux_dn[ilev+1, gcol] +
-                source_dn[ilev, gcol]
-        end
-
-        # Surface reflection and emission
-        flux_up[1, gcol] =
-            flux_dn[1, gcol] * (FT(1) - sfc_emis[gcol]) + sfc_source[gcol, 1]
-
-        # Upward propagation
-        @inbounds for ilev = 2:nlay+1
-            flux_up[ilev, gcol] =
-                trans[ilev-1, gcol] * flux_up[ilev-1, gcol] +
-                source_up[ilev-1, gcol]
-        end
-        #-----------------------------------
+    #-------Top of domain is index nlev
+    # Downward propagation
+    @inbounds for ilev = nlay:-1:1
+        flux_dn[ilev, gcol] =
+            trans[ilev, gcol] * flux_dn[ilev+1, gcol] + source_dn[ilev, gcol]
     end
 
+    # Surface reflection and emission
+    flux_up[1, gcol] =
+        flux_dn[1, gcol] * (FT(1) - sfc_emis[gcol]) + sfc_source[gcol, 1]
+
+    # Upward propagation
+    @inbounds for ilev = 2:nlay+1
+        flux_up[ilev, gcol] =
+            trans[ilev-1, gcol] * flux_up[ilev-1, gcol] +
+            source_up[ilev-1, gcol]
+    end
+    #-----------------------------------
     @inbounds for ilev = 1:nlev
         flux_up[ilev, gcol] *= (FT(2) * FT(π) * w_μ[1])
         flux_dn[ilev, gcol] *= (FT(2) * FT(π) * w_μ[1])
@@ -184,7 +159,6 @@ end
     Tdif::FTA2D,
     Rdif::FTA2D,
     lw_diff_sec::FT,
-    top_at_1::Bool,
     ::Val{nlay},
     ::Val{ncol},
 ) where {FT<:AbstractFloat,FTA2D<:AbstractArray{FT,2},nlay,ncol}
@@ -220,13 +194,9 @@ end
     # This version straight from ECRAD
     # Source is provided as W/m2-str; factor of pi converts to flux units
     # lw_source_2str
-    if top_at_1
-        top = glay
-        bot = glay + 1
-    else
-        top = glay + 1
-        bot = glay
-    end
+
+    top = glay + 1
+    bot = glay
 
     if τ[glay, gcol] > 1.0e-8
         # Toon et al. (JGR 1989) Eqs 26-27
@@ -263,7 +233,6 @@ end
 #
 # ---------------------------------------------------------------
 @kernel function adding_gray_kernel!(
-    top_at_1::B,
     sfc_emis::FTA1D,
     Rdif::FTA2D,
     Tdif::FTA2D,
@@ -295,96 +264,49 @@ end
         flux_up[ilev, gcol] = FT(0)
     end
 
-    if top_at_1
-        #--------------------------------------------------------------------------------------
-        # Albedo of lowest level is the surface albedo...
-        albedo[nlev, gcol] = FT(1) - sfc_emis[gcol]
-        # ... and source of diffuse radiation is surface emission
-        src[nlev, gcol] = FT(π) * sfc_emis[gcol] * sfc_source[gcol]
-        # From bottom to top of atmosphere --
-        # compute albedo and source of upward radiation
-        @inbounds for ilev = nlay:-1:1
-            denom = FT(1) / (FT(1) - Rdif[ilev, gcol] * albedo[ilev+1, gcol])
-            albedo[ilev, gcol] =
-                Rdif[ilev, gcol] + (
-                    Tdif[ilev, gcol] *
-                    Tdif[ilev, gcol] *
-                    albedo[ilev+1, gcol] *
-                    denom
-                )
-            # Equation 11 -- source is emitted upward radiation at top of layer plus
-            # radiation emitted at bottom of layer,
-            # transmitted through the layer and reflected from layers below (tdiff*src*albedo)
-            src[ilev, gcol] =
-                src_up[ilev, gcol] +
-                Tdif[ilev, gcol] *
-                denom *
-                (src[ilev+1, gcol] + albedo[ilev+1, gcol] * src_dn[ilev, gcol])
-        end
-
-        # Eq 12, at the top of the domain upwelling diffuse is due to ...
-        flux_up[1, gcol] = flux_dn[1, gcol] * albedo[1, gcol] + src[1, gcol] # reflection of incident diffuse and
-        # emission from below
-
-        # From the top of the atmosphere downward -- compute fluxes
-        @inbounds for ilev = 2:nlay+1
-            denom = FT(1) / (FT(1) - Rdif[ilev-1, gcol] * albedo[ilev, gcol])
-            flux_dn[ilev, gcol] =
-                (
-                    Tdif[ilev-1, gcol] * flux_dn[ilev-1, gcol] + # Equation 13
-                    Rdif[ilev-1, gcol] * src[ilev, gcol] +
-                    src_dn[ilev-1, gcol]
-                ) * denom
-            flux_up[ilev, gcol] =
-                flux_dn[ilev, gcol] * albedo[ilev, gcol] + # Equation 12
-                src[ilev, gcol]
-        end
-        #--------------------------------------------------------------------------------------
-    else
-        #--------------------------------------------------------------------------------------
-        # Albedo of lowest level is the surface albedo...
-        albedo[1, gcol] = FT(1) - sfc_emis[gcol]
-        # ... and source of diffuse radiation is surface emission
-        src[1, gcol] = FT(π) * sfc_emis[gcol] * sfc_source[gcol]
-        #--------------------------------------------------------
-        # From bottom to top of atmosphere --
-        #   compute albedo and source of upward radiation
-        @inbounds for ilev = 1:nlay
-            denom = FT(1) / (FT(1) - Rdif[ilev, gcol] * albedo[ilev, gcol])  # Eq 10
-            albedo[ilev+1, gcol] =
-                Rdif[ilev, gcol] +
-                Tdif[ilev, gcol] * Tdif[ilev, gcol] * albedo[ilev, gcol] * denom # Equation 9
-            # 
-            # Equation 11 -- source is emitted upward radiation at top of layer plus
-            # radiation emitted at bottom of layer,
-            # transmitted through the layer and reflected from layers below (Tdiff*src*albedo)
-            src[ilev+1, gcol] =
-                src_up[ilev, gcol] +
-                Tdif[ilev, gcol] *
-                denom *
-                (src[ilev, gcol] + albedo[ilev, gcol] * src_dn[ilev, gcol])
-        end
-
-        # Eq 12, at the top of the domain upwelling diffuse is due to ...
-        flux_up[nlev, gcol] =
-            flux_dn[nlev, gcol] * albedo[nlev, gcol] + # ... reflection of incident diffuse and
-            src[nlev, gcol]                          # scattering by the direct beam below
-
-        # From the top of the atmosphere downward -- compute fluxes
-        @inbounds for ilev = nlay:-1:1
-            denom = FT(1) / (FT(1) - Rdif[ilev, gcol] * albedo[ilev, gcol])  # Eq 10
-            flux_dn[ilev, gcol] =
-                (
-                    Tdif[ilev, gcol] * flux_dn[ilev+1, gcol] + # Equation 13
-                    Rdif[ilev, gcol] * src[ilev, gcol] +
-                    src_dn[ilev, gcol]
-                ) * denom
-            flux_up[ilev, gcol] =
-                flux_dn[ilev, gcol] * albedo[ilev, gcol] + # Equation 12
-                src[ilev, gcol]
-        end
-        #--------------------------------------------------------------------------------------
+    #--------------------------------------------------------------------------------------
+    # Albedo of lowest level is the surface albedo...
+    albedo[1, gcol] = FT(1) - sfc_emis[gcol]
+    # ... and source of diffuse radiation is surface emission
+    src[1, gcol] = FT(π) * sfc_emis[gcol] * sfc_source[gcol]
+    #--------------------------------------------------------
+    # From bottom to top of atmosphere --
+    #   compute albedo and source of upward radiation
+    @inbounds for ilev = 1:nlay
+        denom = FT(1) / (FT(1) - Rdif[ilev, gcol] * albedo[ilev, gcol])  # Eq 10
+        albedo[ilev+1, gcol] =
+            Rdif[ilev, gcol] +
+            Tdif[ilev, gcol] * Tdif[ilev, gcol] * albedo[ilev, gcol] * denom # Equation 9
+        # 
+        # Equation 11 -- source is emitted upward radiation at top of layer plus
+        # radiation emitted at bottom of layer,
+        # transmitted through the layer and reflected from layers below (Tdiff*src*albedo)
+        src[ilev+1, gcol] =
+            src_up[ilev, gcol] +
+            Tdif[ilev, gcol] *
+            denom *
+            (src[ilev, gcol] + albedo[ilev, gcol] * src_dn[ilev, gcol])
     end
+
+    # Eq 12, at the top of the domain upwelling diffuse is due to ...
+    flux_up[nlev, gcol] =
+        flux_dn[nlev, gcol] * albedo[nlev, gcol] + # ... reflection of incident diffuse and
+        src[nlev, gcol]                          # scattering by the direct beam below
+
+    # From the top of the atmosphere downward -- compute fluxes
+    @inbounds for ilev = nlay:-1:1
+        denom = FT(1) / (FT(1) - Rdif[ilev, gcol] * albedo[ilev, gcol])  # Eq 10
+        flux_dn[ilev, gcol] =
+            (
+                Tdif[ilev, gcol] * flux_dn[ilev+1, gcol] + # Equation 13
+                Rdif[ilev, gcol] * src[ilev, gcol] +
+                src_dn[ilev, gcol]
+            ) * denom
+        flux_up[ilev, gcol] =
+            flux_dn[ilev, gcol] * albedo[ilev, gcol] + # Equation 12
+            src[ilev, gcol]
+    end
+    #--------------------------------------------------------------------------------------
 
     @inbounds for ilev = 1:nlev
         flux_net[ilev, gcol] = flux_up[ilev, gcol] - flux_dn[ilev, gcol]
