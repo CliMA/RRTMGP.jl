@@ -44,7 +44,6 @@ function gray_atmos_lw_equil(
     n_gauss_angles = I(1)             # for non-scattering calculation
     sfc_emis = Array{FT}(undef, ncol) # surface emissivity
     sfc_emis .= FT(1.0)
-    top_at_1 = false                  # Top-of-atmos at pt# 1 (true/false)
     max_threads = Int(256)            # maximum number of threads for KA kernels
 
     if ncol == 1
@@ -66,7 +65,6 @@ function gray_atmos_lw_equil(
         gray_flux,
         n_gauss_angles,
         param_set,
-        top_at_1,
         "lw",
         DA,
     )
@@ -142,9 +140,7 @@ function gray_atmos_lw_comparison(
     zend = FT(15000)                 # upper limit for altitude (m)
     ncls = 10
     poly_ord = 5                     # polynomial order for altitude grid
-    top_at_1 = false                 # is top of atmos at pt# 1?
-
-    n_gauss_angles = I(1) # for non-scattering calculation
+    n_gauss_angles = I(1)            # for non-scattering calculation
     sfc_emis = Array{FT}(undef, ncol)
     sfc_emis .= 1.0
 
@@ -168,12 +164,10 @@ function gray_atmos_lw_comparison(
         gray_flux_pr_grd,
         n_gauss_angles,
         param_set,
-        top_at_1,
         "lw",
         DA,
     )
 
-    @show gray_rrtmgp_pr_grd.as.top_at_1
     gray_atmos_lw!(gray_rrtmgp_pr_grd)
     #----altitude grid
     nlev = ncls + 1 + (poly_ord - 1) * ncls
@@ -190,7 +184,6 @@ function gray_atmos_lw_comparison(
         gray_flux_alt_grd,
         n_gauss_angles,
         param_set,
-        top_at_1,
         "lw",
         DA,
     )
@@ -254,6 +247,7 @@ else
     @time gray_atmos_lw_equil(GrayOneScalar, Int(9), Float64, Int, DA)
     @time gray_atmos_lw_equil(GrayTwoStream, Int(9), Float64, Int, DA)
 end
+
 #=
 # for visual verification
 @time gray_atmos_lw_comparison(GrayOneScalar, Int(3), Float64, Int, DA)
