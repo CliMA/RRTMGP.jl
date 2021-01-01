@@ -3,83 +3,83 @@
 # See Clough et al., 1992, doi: 10.1029/92JD01419, Eq 13
 
 @kernel function rte_lw_noscat_gray_source_kernel!(
-    lay_source::FTA3D,
-    lev_source_up::FTA3D,
-    lev_source_dn::FTA3D,
-    τ::FTA2D,
-    trans::FTA2D,
-    source_up::FTA2D,
-    source_dn::FTA2D,
-    Ds::FTA1D,
+    gray_rrtmgp::GrayRRTMGP{FT,I,FTA1D,FTA2D},
     ::Val{nlay},
     ::Val{ncol},
 ) where {
     FT<:AbstractFloat,
+    I<:Int,
     FTA1D<:AbstractArray{FT,1},
     FTA2D<:AbstractArray{FT,2},
-    FTA3D<:AbstractArray{FT,3},
     nlay,
     ncol,
 }
     glay, gcol = @index(Global, NTuple)  # global col & lay ids
 
+    # setting references
+    source_up = gray_rrtmgp.src.source_up
+    source_dn = gray_rrtmgp.src.source_dn
+    lev_source_up = gray_rrtmgp.src.lev_source_inc
+    lev_source_dn = gray_rrtmgp.src.lev_source_dec
+    lay_source = gray_rrtmgp.src.lay_source
+    Ds = gray_rrtmgp.angle_disc.gauss_Ds
+    τ = gray_rrtmgp.op.τ
+    #---------------------
+
     τ_thresh = sqrt(eps(FT)) # or abs(eps(FT))?
     τ_loc = τ[glay, gcol] * Ds[1]      # Optical path and transmission,
-    trans[glay, gcol] = exp(-τ_loc)    # used in source function and transport calculations
 
+    trans = exp(-τ_loc)    # used in source function and transport calculations
     # Weighting factor. Use 2nd order series expansion when rounding error (~tau^2)
     # is of order epsilon (smallest difference from 1. in working precision)
     # Thanks to Peter Blossey
 
-    fact = (τ_loc > τ_thresh) ?
-        ((FT(1) - trans[glay, gcol]) / τ_loc - trans[glay, gcol]) :
+    fact = (τ_loc > τ_thresh) ? ((FT(1) - trans) / τ_loc - trans) :
         τ_loc * (FT(1 / 2) - FT(1 / 3) * τ_loc)
 
     # Equations below are developed in Clough et al., 1992, doi:10.1029/92JD01419, Eq 13
 
     source_up[glay, gcol] =
-        (FT(1) - trans[glay, gcol]) * lev_source_up[glay, gcol, 1] +
-        FT(2) *
-        fact *
-        (lay_source[glay, gcol, 1] - lev_source_up[glay, gcol, 1])
+        (FT(1) - trans) * lev_source_up[glay, gcol] +
+        FT(2) * fact * (lay_source[glay, gcol] - lev_source_up[glay, gcol])
 
     source_dn[glay, gcol] =
-        (FT(1) - trans[glay, gcol]) * lev_source_dn[glay, gcol, 1] +
-        FT(2) *
-        fact *
-        (lay_source[glay, gcol, 1] - lev_source_dn[glay, gcol, 1])
+        (FT(1) - trans) * lev_source_dn[glay, gcol] +
+        FT(2) * fact * (lay_source[glay, gcol] - lev_source_dn[glay, gcol])
 
     @synchronize
 end
 
+
 @kernel function rte_lw_noscat_gray_transport_kernel!(
-    flux_up::FTA2D,
-    flux_dn::FTA2D,
-    flux_net::FTA2D,
-    trans::FTA2D,
-    source_up::FTA2D,
-    source_dn::FTA2D,
-    sfc_source::FTA2D,
-    sfc_emis::FTA1D,
-    inc_flux::Union{Nothing,FTA1D},
-    τ::FTA2D,
-    n_μ::Int,
-    Ds::FTA1D,
-    w_μ::FTA1D,
+    gray_rrtmgp::GrayRRTMGP{FT,I,FTA1D,FTA2D},
     ::Val{nlay},
     ::Val{nlev},
     ::Val{ncol},
 ) where {
     FT<:AbstractFloat,
+    I<:Int,
     FTA1D<:AbstractArray{FT,1},
     FTA2D<:AbstractArray{FT,2},
-    FTA3D<:AbstractArray{FT,3},
     nlay,
     nlev,
     ncol,
 }
     gcol = @index(Global, Linear) # global col ids
-
+    # setting references
+    source_up = gray_rrtmgp.src.source_up
+    source_dn = gray_rrtmgp.src.source_dn
+    sfc_source = gray_rrtmgp.src.sfc_source
+    flux_up = gray_rrtmgp.flux.flux_up
+    flux_dn = gray_rrtmgp.flux.flux_dn
+    flux_net = gray_rrtmgp.flux.flux_net
+    sfc_emis = gray_rrtmgp.bcs.sfc_emis
+    inc_flux = gray_rrtmgp.bcs.inc_flux
+    Ds = gray_rrtmgp.angle_disc.gauss_Ds
+    w_μ = gray_rrtmgp.angle_disc.gauss_wts
+    n_μ = gray_rrtmgp.angle_disc.n_gauss_angles
+    τ = gray_rrtmgp.op.τ
+    #--------------------------------------------
     @inbounds for ilev = 1:nlev
         flux_dn[ilev, gcol] = FT(0)
         flux_up[ilev, gcol] = FT(0)
@@ -95,8 +95,9 @@ end
     #-------Top of domain is index nlev
     # Downward propagation
     @inbounds for ilev = nlay:-1:1
+        trans = exp(-τ[ilev, gcol] * Ds[1])
         flux_dn[ilev, gcol] =
-            trans[ilev, gcol] * flux_dn[ilev+1, gcol] + source_dn[ilev, gcol]
+            trans * flux_dn[ilev+1, gcol] + source_dn[ilev, gcol]
     end
 
     # Surface reflection and emission
@@ -105,9 +106,9 @@ end
 
     # Upward propagation
     @inbounds for ilev = 2:nlay+1
+        trans = exp(-τ[ilev-1, gcol] * Ds[1])
         flux_up[ilev, gcol] =
-            trans[ilev-1, gcol] * flux_up[ilev-1, gcol] +
-            source_up[ilev-1, gcol]
+            trans * flux_up[ilev-1, gcol] + source_up[ilev-1, gcol]
     end
     #-----------------------------------
     @inbounds for ilev = 1:nlev
@@ -119,18 +120,10 @@ end
 end
 
 @kernel function rte_lw_2stream_gray_combine_sources_kernel!(
-    lev_source_inc::FTA3D,
-    lev_source_dec::FTA3D,
-    lev_source::FTA2D,
+    src::GraySourceLW2Str{FT,FTA2D},
     ::Val{nlev},
     ::Val{ncol},
-) where {
-    FT<:AbstractFloat,
-    FTA2D<:AbstractArray{FT,2},
-    FTA3D<:AbstractArray{FT,3},
-    nlev,
-    ncol,
-}
+) where {FT<:AbstractFloat,FTA2D<:AbstractArray{FT,2},nlev,ncol}
     # RRTMGP provides source functions at each level using the spectral mapping
     # of each adjacent layer. Combine these for two-stream calculations
     # lw combine sources
@@ -139,29 +132,29 @@ end
     nlay = nlev - 1
 
     if glev == 1
-        lev_source[1, gcol] = lev_source_dec[1, gcol]
+        src.lev_source[1, gcol] = src.lev_source_dec[1, gcol]
     elseif glev == nlev
-        lev_source[nlev, gcol] = lev_source_inc[nlay, gcol]
+        src.lev_source[nlev, gcol] = src.lev_source_inc[nlay, gcol]
     else
-        lev_source[glev, gcol] =
-            sqrt(lev_source_dec[glev, gcol] * lev_source_inc[glev-1, gcol])
+        src.lev_source[glev, gcol] = sqrt(
+            src.lev_source_dec[glev, gcol] * src.lev_source_inc[glev-1, gcol],
+        )
     end
     @synchronize
 end
 
 @kernel function rte_lw_2stream_gray_source_kernel!(
-    τ::FTA2D,
-    ssa::FTA2D,
-    g::FTA2D,
-    lev_source::FTA2D,
-    src_up::FTA2D,
-    src_dn::FTA2D,
-    Tdif::FTA2D,
-    Rdif::FTA2D,
-    lw_diff_sec::FT,
+    gray_rrtmgp::GrayRRTMGP{FT,I,FTA1D,FTA2D},
     ::Val{nlay},
     ::Val{ncol},
-) where {FT<:AbstractFloat,FTA2D<:AbstractArray{FT,2},nlay,ncol}
+) where {
+    FT<:AbstractFloat,
+    FTA1D<:AbstractArray{FT,1},
+    FTA2D<:AbstractArray{FT,2},
+    I<:Int,
+    nlay,
+    ncol,
+}
     # Cell properties: reflection, transmission for diffuse radiation
     # Coupling coefficients needed for source function
     # -------------------------------------------------------------------------------------------------
@@ -174,6 +167,17 @@ end
     #
     # -------------------------------------------------------------------------------------------------    
     glay, gcol = @index(Global, NTuple)  # global col & layer ids
+    # setting references
+    τ = gray_rrtmgp.op.τ
+    ssa = gray_rrtmgp.op.ssa
+    g = gray_rrtmgp.op.g
+    Rdif = gray_rrtmgp.src.Rdif
+    Tdif = gray_rrtmgp.src.Tdif
+    lev_source = gray_rrtmgp.src.lev_source
+    src_up = gray_rrtmgp.src.src_up
+    src_dn = gray_rrtmgp.src.src_dn
+    # ------------------
+    lw_diff_sec = FT(1.66)
 
     γ1 = lw_diff_sec * (1 - FT(0.5) * ssa[glay, gcol] * (1 + g[glay, gcol]))
     γ2 = lw_diff_sec * FT(0.5) * ssa[glay, gcol] * (1 - g[glay, gcol])
@@ -233,30 +237,31 @@ end
 #
 # ---------------------------------------------------------------
 @kernel function adding_gray_kernel!(
-    sfc_emis::FTA1D,
-    Rdif::FTA2D,
-    Tdif::FTA2D,
-    src_up::FTA2D,
-    src_dn::FTA2D,
-    sfc_source::FTA2D,
-    flux_up::FTA2D,
-    flux_dn::FTA2D,
-    flux_net::FTA2D,
-    albedo::FTA2D,
-    src::FTA2D,
+    gray_rrtmgp::GrayRRTMGP{FT,I,FTA1D,FTA2D},
     ::Val{nlev},
     ::Val{ncol},
 ) where {
     FT<:AbstractFloat,
     FTA1D<:AbstractArray{FT,1},
     FTA2D<:AbstractArray{FT,2},
-    FTA3D<:AbstractArray{FT,3},
-    B<:Bool,
+    I<:Int,
     nlev,
     ncol,
 }
     gcol = @index(Global, Linear)  # global col ids
-
+    # setting references
+    albedo = gray_rrtmgp.src.albedo
+    sfc_source = gray_rrtmgp.src.sfc_source
+    Rdif = gray_rrtmgp.src.Rdif
+    Tdif = gray_rrtmgp.src.Tdif
+    src_up = gray_rrtmgp.src.src_up
+    src_dn = gray_rrtmgp.src.src_dn
+    src = gray_rrtmgp.src.src
+    flux_up = gray_rrtmgp.flux.flux_up
+    flux_dn = gray_rrtmgp.flux.flux_dn
+    flux_net = gray_rrtmgp.flux.flux_net
+    sfc_emis = gray_rrtmgp.bcs.sfc_emis
+    # ------------------
     nlay = nlev - 1
 
     @inbounds for ilev = 1:nlev

@@ -2,6 +2,7 @@ module GrayOptics
 
 using DocStringExtensions
 using ..Device: array_type
+using Adapt
 
 export AbstractGrayOpticalProps, GrayOneScalar, GrayTwoStream
 
@@ -24,6 +25,12 @@ struct GrayOneScalar{FT<:AbstractFloat,FTA2D<:AbstractArray{FT,2}} <:
        AbstractGrayOpticalProps{FT,FTA2D}
     "Optical Depth"
     τ::FTA2D
+end
+
+function Adapt.adapt_structure(to, x::GrayOneScalar)
+    FT = eltype(x.τ)
+    FTA2D = typeof(adapt(to, x.τ))
+    GrayOneScalar{FT,FTA2D}(adapt(to, x.τ))
 end
 
 function GrayOneScalar(
@@ -53,6 +60,12 @@ struct GrayTwoStream{FT<:AbstractFloat,FTA2D<:AbstractArray{FT,2}} <:
     ssa::FTA2D
     "Asymmetry parameter"
     g::FTA2D
+end
+
+function Adapt.adapt_structure(to, x::GrayTwoStream)
+    FT = eltype(x.τ)
+    FTA2D = typeof(adapt(to, x.τ))
+    GrayTwoStream{FT,FTA2D}(adapt(to, x.τ), adapt(to, x.ssa), adapt(to, x.g))
 end
 
 function GrayTwoStream(
