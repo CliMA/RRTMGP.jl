@@ -3,7 +3,7 @@ using KernelAbstractions
 using CUDA
 using ..Device: array_type, array_device
 using DocStringExtensions
-
+using Adapt
 using GaussQuadrature
 using CLIMAParameters
 using CLIMAParameters.Planet: grav, R_d
@@ -44,6 +44,25 @@ struct GrayAtmosphericState{
     nlay::I
     "Number of columns."
     ncol::I
+end
+
+function Adapt.adapt_structure(to, x::GrayAtmosphericState)
+    FT = eltype(x.p_lay)
+    I = eltype(x.nlay)
+    FTA1D = typeof(adapt(to, x.t_sfc))
+    FTA2D = typeof(adapt(to, x.p_lay))
+    GrayAtmosphericState{FT,FTA1D,FTA2D,I}(
+        adapt(to, x.p_lay),
+        adapt(to, x.p_lev),
+        adapt(to, x.t_lay),
+        adapt(to, x.t_lev),
+        adapt(to, x.z_lev),
+        adapt(to, x.t_sfc),
+        x.α,
+        adapt(to, x.d0),
+        x.nlay,
+        x.ncol,
+    )
 end
 
 # This functions sets up a model temperature and pressure 

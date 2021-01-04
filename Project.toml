@@ -4,6 +4,7 @@ authors = ["Charles Kawczynski <kawczynski.charles@gmail.com>"]
 version = "0.1.0"
 
 [deps]
+Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
 CLIMAParameters = "6eacf6c3-8458-43b9-ae03-caf5306d3d53"
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 Compat = "34da2185-b29b-5c13-b0c7-acf172513d20"

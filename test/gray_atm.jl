@@ -53,7 +53,7 @@ function gray_atmos_lw_equil(
     end
 
     println("Running longwave test for gray atmosphere model - $(OPC); ncol = $ncol; DA = $DA")
-    gray_flux = GrayFlux(ncol, nlay, nlev, FT, DA)
+    gray_flux = GrayFluxLW(ncol, nlay, nlev, FT, DA)
 
     gray_rrtmgp = GrayRRTMGP(
         nlay,
@@ -143,8 +143,9 @@ function gray_atmos_lw_comparison(
     n_gauss_angles = I(1)            # for non-scattering calculation
     sfc_emis = Array{FT}(undef, ncol)
     sfc_emis .= 1.0
+    max_threads = Int(256)            # maximum number of threads for KA kernels
 
-    println("Running longwave comparison, for pressure grid vs altitude grid, test for gray atmosphere model")
+    println("Running longwave comparison, for pressure grid vs altitude grid, test for gray atmosphere model; $(optical_props_constructor)")
     if ncol == 1
         lat = DA{FT}([0]) # latitude
     else
@@ -153,7 +154,7 @@ function gray_atmos_lw_comparison(
     #----pressure grid
     nlay = 60
     nlev = nlay + 1
-    gray_flux_pr_grd = GrayFlux(ncol, nlay, nlev, FT, DA)
+    gray_flux_pr_grd = GrayFluxLW(ncol, nlay, nlev, FT, DA)
     gray_rrtmgp_pr_grd = GrayRRTMGP(
         nlay,
         lat,
@@ -168,11 +169,12 @@ function gray_atmos_lw_comparison(
         DA,
     )
 
-    gray_atmos_lw!(gray_rrtmgp_pr_grd)
+    gray_atmos_lw!(gray_rrtmgp_pr_grd, max_threads = max_threads)
+
     #----altitude grid
     nlev = ncls + 1 + (poly_ord - 1) * ncls
     nlay = nlev - 1
-    gray_flux_alt_grd = GrayFlux(ncol, nlay, nlev, FT, DA)
+    gray_flux_alt_grd = GrayFluxLW(ncol, nlay, nlev, FT, DA)
     gray_rrtmgp_alt_grd = GrayRRTMGP(
         lat,
         p0,
@@ -193,6 +195,7 @@ function gray_atmos_lw_comparison(
 
     gray_atmos_lw!(gray_rrtmgp_alt_grd)
     #--------------------------------------------------
+    #=
     for icol = 1:ncol
         lat_str = "lat_" * string(lat[icol] * 180.0 / π) * "_"
         lat_tit = "lat = " * string(lat[icol] * 180.0 / π) * " deg"
@@ -237,6 +240,7 @@ function gray_atmos_lw_comparison(
         mkpath(out_dir)
         savefig(joinpath(out_dir, case * ".png"))
     end
+    =#
     return nothing
 end
 #------------------------------------------------------------------------------
@@ -247,6 +251,7 @@ else
     @time gray_atmos_lw_equil(GrayOneScalar, Int(9), Float64, Int, DA)
     @time gray_atmos_lw_equil(GrayTwoStream, Int(9), Float64, Int, DA)
 end
+
 
 #=
 # for visual verification
