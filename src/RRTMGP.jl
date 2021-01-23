@@ -2,14 +2,16 @@ module RRTMGP
 
 include("Device.jl")
 
-include(joinpath("optics", "GrayAngularDiscretizations.jl"))
-include(joinpath("optics", "GrayOptics.jl"))
-include(joinpath("optics", "GraySources.jl"))
-include(joinpath("optics", "GrayFluxes.jl"))
-include(joinpath("optics", "GrayAtmosphericStates.jl"))
+include(joinpath("optics", "Vmrs.jl"))
+include(joinpath("optics", "LookUpTables.jl"))
+include(joinpath("optics", "AngularDiscretizations.jl"))
+include(joinpath("optics", "AtmosphericStates.jl"))
+include(joinpath("optics", "Sources.jl"))
+include(joinpath("optics", "Optics.jl"))
+include(joinpath("optics", "Fluxes.jl"))
 include(joinpath("optics", "GrayUtils.jl"))
-include(joinpath("optics", "GrayBCs.jl"))
-include(joinpath("optics", "GrayAtmos.jl"))
+include(joinpath("optics", "BCs.jl"))
+include(joinpath("optics", "RTE.jl"))
 
 include(joinpath("rte", "GrayRTESolver.jl"))
 

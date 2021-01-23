@@ -1,59 +1,41 @@
-module GrayBCs
+module BCs
 
 using ..Device: array_type
 using DocStringExtensions
 using Adapt
 
-export AbstractGrayBCs, GrayLwBCs
+export AbstractBCs, LwBCs, SwBCs
 
-abstract type AbstractGrayBCs{
+abstract type AbstractBCs{
     FT<:AbstractFloat,
     FTA1D<:AbstractArray{FT,1},
     FTA1DN<:Union{Nothing,AbstractArray{FT,1}},
 } end
 
 """
-    GrayLwBCs{FT,FTA1D}
+    LwBCs{FT,FTA1D}
 
 Longwave boundary conditions
 
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct GrayLwBCs{FT,FTA1D,FTA1DN} <: AbstractGrayBCs{FT,FTA1D,FTA1DN}
+struct LwBCs{FT,FTA1D,FTA1DN} <: AbstractBCs{FT,FTA1D,FTA1DN}
     "Surface emissivity `[W/m²]` `(ncol)`"
     sfc_emis::FTA1D
     "incident flux at top of atmosphere `[W/m²]` `(ncol)`"
     inc_flux::FTA1DN
 end
-
-function Adapt.adapt_structure(to, x::GrayLwBCs)
-    FT = eltype(x.sfc_emis)
-    FTA1D = typeof(adapt(to, x.sfc_emis))
-    FTA1DN = typeof(adapt(to, x.inc_flux))
-    GrayLwBCs{FT,FTA1D,FTA1DN}(adapt(to, x.sfc_emis), adapt(to, x.inc_flux))
-end
-
-function GrayLwBCs(::Type{DA}, sfc_emis, inc_flux = nothing) where {DA}
-    FT = eltype(sfc_emis)
-
-    @assert length(size(sfc_emis)) == 1
-    sfc_emis = DA{FT}(sfc_emis)
-    if inc_flux ≠ nothing
-        @assert length(size(inc_flux)) == 1
-        inc_flux = DA{FT}(inc_flux)
-    end
-
-    return GrayLwBCs{FT,DA{FT,1},typeof(inc_flux)}(sfc_emis, inc_flux)
-end
+LwBCs(sfc_emis, inc_flux) = LwBCs{eltype(sfc_emis), typeof(sfc_emis), typeof(inc_flux)}(sfc_emis, inc_flux)
+Adapt.@adapt_structure LwBCs
 
 """
-    GraySwBCs{FT,FTA1D}
+    SwBCs{FT,FTA1D}
 Shortwave boundary conditions
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct GraySwBCs{FT,FTA1D,FTA1DN} <: AbstractGrayBCs{FT,FTA1D,FTA1DN}
+struct SwBCs{FT,FTA1D,FTA1DN} <: AbstractBCs{FT,FTA1D,FTA1DN}
     "top of atmosphere flux"
     toa_flux::FTA1D
     "surface albedo for specular (direct) radiation"
@@ -65,22 +47,11 @@ struct GraySwBCs{FT,FTA1D,FTA1DN} <: AbstractGrayBCs{FT,FTA1D,FTA1DN}
     "zenith angle `radians`"
     zenith::FTA1D
 end
+Adapt.@adapt_structure SwBCs
 
-function Adapt.adapt_structure(to, x::GraySwBCs)
-    FT = eltype(x.toa_flux)
-    FTA1D = typeof(adapt(to, x.toa_flux))
-    FTA1DN = typeof(adapt(to, x.inc_flux_diffuse))
-    GraySwBCs{FT,FTA1D,FTA1DN}(
-        adapt(to, x.toa_flux),
-        adapt(to, x.sfc_alb_direct),
-        adapt(to, x.sfc_alb_diffuse),
-        adapt(to, x.inc_flux_diffuse),
-        adapt(to, x.zenith),
-    )
-end
-
-function GraySwBCs(
+function SwBCs(
     ::Type{DA},
+    ::Type{FT},
     toa_flux::FTA1D,
     sfc_alb_direct::FTA1D,
     sfc_alb_diffuse::FTA1D,
@@ -103,7 +74,7 @@ function GraySwBCs(
         inc_flux_diffuse = DA{FT}(inc_flux_diffuse)
     end
 
-    return new{FT,typeof(toa_flux),typeof(inc_flux_diffuse)}(
+    return SwBCs{FT,typeof(toa_flux),typeof(inc_flux_diffuse)}(
         toa_flux,
         sfc_alb_direct,
         sfc_alb_diffuse,

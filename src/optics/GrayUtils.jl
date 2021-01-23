@@ -3,8 +3,8 @@ module GrayUtils
 using KernelAbstractions
 using CUDA
 using ..Device: array_type, array_device
-using ..GrayAtmosphericStates
-using ..GrayFluxes
+using ..AtmosphericStates
+using ..Fluxes
 
 using CLIMAParameters
 using CLIMAParameters.Planet: grav, cp_d
@@ -13,7 +13,7 @@ export update_profile_lw!, compute_gray_heating_rate!, GPU_minmax
 
 function update_profile_lw!(
     as::GrayAtmosphericState{FT,FTA1D,FTA2D,I},
-    flux::AbstractGrayFlux{FT,FTA2D},
+    flux::AbstractFlux{FT,FTA2D},
     hr_lay::FTA2D,
     flux_grad::FTA2D,
     T_ex_lev::FTA2D,
@@ -121,7 +121,7 @@ end
 
 function compute_gray_heating_rate!(
     as::GrayAtmosphericState{FT,FTA1D,FTA2D,I},
-    flux::AbstractGrayFlux{FT,FTA2D},
+    flux::AbstractFlux{FT,FTA2D},
     hr_lay::FTA2D,
     param_set::AbstractEarthParameterSet,
 ) where {

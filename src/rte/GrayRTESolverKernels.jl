@@ -2,8 +2,8 @@
 # Compute LW source function for upward and downward emission at levels using linear-in-tau assumption
 # See Clough et al., 1992, doi: 10.1029/92JD01419, Eq 13
 
-@kernel function rte_lw_noscat_gray_source_kernel!(
-    gray_rrtmgp::GrayRRTMGP{FT,I,FTA1D,FTA2D},
+@kernel function rte_lw_noscat_source_kernel!(
+    slv::Solver{FT,I,FTA1D,FTA2D},
     ::Val{nlay},
     ::Val{ncol},
 ) where {
@@ -17,13 +17,13 @@
     glay, gcol = @index(Global, NTuple)  # global col & lay ids
 
     # setting references
-    source_up = gray_rrtmgp.src.source_up
-    source_dn = gray_rrtmgp.src.source_dn
-    lev_source_up = gray_rrtmgp.src.lev_source_inc
-    lev_source_dn = gray_rrtmgp.src.lev_source_dec
-    lay_source = gray_rrtmgp.src.lay_source
-    Ds = gray_rrtmgp.angle_disc.gauss_Ds
-    τ = gray_rrtmgp.op.τ
+    source_up = slv.src_lw.source_up
+    source_dn = slv.src_lw.source_dn
+    lev_source_up = slv.src_lw.lev_source_inc
+    lev_source_dn = slv.src_lw.lev_source_dec
+    lay_source = slv.src_lw.lay_source
+    Ds = slv.angle_disc.gauss_Ds
+    τ = slv.op.τ
     #---------------------
 
     τ_thresh = sqrt(eps(FT)) # or abs(eps(FT))?
@@ -50,9 +50,9 @@
     @synchronize
 end
 
-
-@kernel function rte_lw_noscat_gray_transport_kernel!(
-    gray_rrtmgp::GrayRRTMGP{FT,I,FTA1D,FTA2D},
+@kernel function rte_lw_noscat_transport_kernel!(
+    slv::Solver{FT,I,FTA1D,FTA2D},
+    flux::AbstractFlux{FT,FTA2D},
     ::Val{nlay},
     ::Val{nlev},
     ::Val{ncol},
@@ -67,18 +67,19 @@ end
 }
     gcol = @index(Global, Linear) # global col ids
     # setting references
-    source_up = gray_rrtmgp.src.source_up
-    source_dn = gray_rrtmgp.src.source_dn
-    sfc_source = gray_rrtmgp.src.sfc_source
-    flux_up = gray_rrtmgp.flux.flux_up
-    flux_dn = gray_rrtmgp.flux.flux_dn
-    flux_net = gray_rrtmgp.flux.flux_net
-    sfc_emis = gray_rrtmgp.bcs.sfc_emis
-    inc_flux = gray_rrtmgp.bcs.inc_flux
-    Ds = gray_rrtmgp.angle_disc.gauss_Ds
-    w_μ = gray_rrtmgp.angle_disc.gauss_wts
-    n_μ = gray_rrtmgp.angle_disc.n_gauss_angles
-    τ = gray_rrtmgp.op.τ
+    source_up = slv.src_lw.source_up
+    source_dn = slv.src_lw.source_dn
+    sfc_source = slv.src_lw.sfc_source
+    sfc_emis = slv.bcs_lw.sfc_emis
+    inc_flux = slv.bcs_lw.inc_flux
+    Ds = slv.angle_disc.gauss_Ds
+    w_μ = slv.angle_disc.gauss_wts
+    n_μ = slv.angle_disc.n_gauss_angles
+    τ = slv.op.τ
+
+    flux_up = flux.flux_up
+    flux_dn = flux.flux_dn
+    flux_net = flux.flux_net
     #--------------------------------------------
     @inbounds for ilev = 1:nlev
         flux_dn[ilev, gcol] = FT(0)
@@ -119,8 +120,8 @@ end
     @synchronize
 end
 
-@kernel function rte_lw_2stream_gray_combine_sources_kernel!(
-    src::GraySourceLW2Str{FT,FTA2D},
+@kernel function rte_lw_2stream_combine_sources_kernel!(
+    src::SourceLW2Str{FT,FTA2D},
     ::Val{nlev},
     ::Val{ncol},
 ) where {FT<:AbstractFloat,FTA2D<:AbstractArray{FT,2},nlev,ncol}
@@ -143,8 +144,8 @@ end
     @synchronize
 end
 
-@kernel function rte_lw_2stream_gray_source_kernel!(
-    gray_rrtmgp::GrayRRTMGP{FT,I,FTA1D,FTA2D},
+@kernel function rte_lw_2stream_source_kernel!(
+    slv::Solver{FT,I,FTA1D,FTA2D},
     ::Val{nlay},
     ::Val{ncol},
 ) where {
@@ -168,14 +169,14 @@ end
     # -------------------------------------------------------------------------------------------------    
     glay, gcol = @index(Global, NTuple)  # global col & layer ids
     # setting references
-    τ = gray_rrtmgp.op.τ
-    ssa = gray_rrtmgp.op.ssa
-    g = gray_rrtmgp.op.g
-    Rdif = gray_rrtmgp.src.Rdif
-    Tdif = gray_rrtmgp.src.Tdif
-    lev_source = gray_rrtmgp.src.lev_source
-    src_up = gray_rrtmgp.src.src_up
-    src_dn = gray_rrtmgp.src.src_dn
+    τ = slv.op.τ
+    ssa = slv.op.ssa
+    g = slv.op.g
+    Rdif = slv.src_lw.Rdif
+    Tdif = slv.src_lw.Tdif
+    lev_source = slv.src_lw.lev_source
+    src_up = slv.src_lw.src_up
+    src_dn = slv.src_lw.src_dn
     # ------------------
     lw_diff_sec = FT(1.66)
 
@@ -236,8 +237,10 @@ end
 #   This routine is shared by longwave and shortwave
 #
 # ---------------------------------------------------------------
-@kernel function adding_gray_kernel!(
-    gray_rrtmgp::GrayRRTMGP{FT,I,FTA1D,FTA2D},
+@kernel function adding_kernel!(
+    slv::Solver{FT,I,FTA1D,FTA2D},
+    flux::AbstractFlux{FT,FTA2D},
+    islw::Bool,
     ::Val{nlev},
     ::Val{ncol},
 ) where {
@@ -250,17 +253,31 @@ end
 }
     gcol = @index(Global, Linear)  # global col ids
     # setting references
-    albedo = gray_rrtmgp.src.albedo
-    sfc_source = gray_rrtmgp.src.sfc_source
-    Rdif = gray_rrtmgp.src.Rdif
-    Tdif = gray_rrtmgp.src.Tdif
-    src_up = gray_rrtmgp.src.src_up
-    src_dn = gray_rrtmgp.src.src_dn
-    src = gray_rrtmgp.src.src
-    flux_up = gray_rrtmgp.flux.flux_up
-    flux_dn = gray_rrtmgp.flux.flux_dn
-    flux_net = gray_rrtmgp.flux.flux_net
-    sfc_emis = gray_rrtmgp.bcs.sfc_emis
+    if islw
+        albedo = slv.src_lw.albedo
+        sfc_source = slv.src_lw.sfc_source
+        Rdif = slv.src_lw.Rdif
+        Tdif = slv.src_lw.Tdif
+        src_up = slv.src_lw.src_up
+        src_dn = slv.src_lw.src_dn
+        src = slv.src_lw.src
+        sfc_emis = slv.bcs_lw.sfc_emis
+        flux_up = flux.flux_up
+        flux_dn = flux.flux_dn
+        flux_net = flux.flux_net
+    else
+        #        albedo = slv.src_lw.albedo
+        #        sfc_source = slv.src_lw.sfc_source
+        #        Rdif = slv.src_lw.Rdif
+        #        Tdif = slv.src_lw.Tdif
+        #        src_up = slv.src_lw.src_up
+        #        src_dn = slv.src_lw.src_dn
+        #        src = slv.src_lw.src
+        #        sfc_emis = slv.bcs_lw.sfc_emis
+        #        flux_up = flux.flux_up
+        #        flux_dn = flux.flux_dn
+        #        flux_net = flux.flux_net
+    end
     # ------------------
     nlay = nlev - 1
 
@@ -316,5 +333,155 @@ end
     @inbounds for ilev = 1:nlev
         flux_net[ilev, gcol] = flux_up[ilev, gcol] - flux_dn[ilev, gcol]
     end
+    @synchronize
+end
+# ---------------------------------------------------------------
+@kernel function rte_sw_noscat_solve_kernel!(
+    slv::Solver{FT,I,FTA1D,FTA2D},
+    flux::AbstractFlux{FT,FTA2D},
+    ::Val{nlev},
+    ::Val{ncol},
+) where {
+    FT<:AbstractFloat,
+    I<:Int,
+    FTA1D<:AbstractArray{FT,1},
+    FTA2D<:AbstractArray{FT,2},
+    nlev,
+    ncol,
+}
+    gcol = @index(Global, Linear) # global col ids
+    toa_flux = slv.bcs_sw.toa_flux
+    zenith = slv.bcs_sw.zenith
+    τ = slv.op.τ
+    flux_dn_dir = flux.flux_dn_dir
+
+    flux_dn_dir[nlev, gcol] = toa_flux[gcol] * zenith[gcol]
+
+    for ilev = nlev-1:-1:1
+        flux_dn_dir[ilev, gcol] =
+            flux_dn_dir[ilev+1, gcol] * exp(-τ[ilev, gcol] * zenith[gcol])
+    end
+end
+# ---------------------------------------------------------------
+#-------------------------------------------------------------------------------------------------
+#
+# Two-stream solutions to direct and diffuse reflectance and transmittance for a layer
+# with optical depth tau, single scattering albedo w0, and asymmetery parameter g.
+# 
+# Equations are developed in Meador and Weaver, 1980,
+# doi:10.1175/1520-0469(1980)037<0630:TSATRT>2.0.CO;2
+#
+#-------------------------------------------------------------------------------------------------
+@kernel function sw_two_stream_kernel!(
+    slv::Solver{FT,I,FTA1D,FTA2D},
+    ::Val{nlay},
+    ::Val{ncol},
+) where {
+    FT<:AbstractFloat,
+    FTA1D<:AbstractArray{FT,1},
+    FTA2D<:AbstractArray{FT,2},
+    I<:Int,
+    nlay,
+    ncol,
+}
+    glay, gcol = @index(Global, NTuple)  # global col & lay ids
+
+    zenith = slv.bcs_sw.zenith
+    τ, ssa, g = slv.op.τ, slv.op.ssa, slv.op.g
+    Rdif, Tdif = slv.src_sw.Rdif, slv.src_sw.Tdif
+    Rdir, Tdir = slv.src_sw.Rdir, slv.src_sw.Tdir
+    Tnoscat = slv.src_sw.Tnoscat
+
+    # Zdunkowski Practical Improved Flux Method "PIFM"
+    #  (Zdunkowski et al., 1980;  Contributions to Atmospheric Physics 53, 147-66)
+    γ1 = (FT(8) - ssa[glay, gcol] * (FT(5) + FT(3) * g[glay, gcol])) * FT(0.25)
+    γ2 = FT(3) * (ssa[glay, gcol] * (FT(1) - g[glay, gcol])) * FT(0.25)
+    γ3 = (FT(2) - (FT(3) / zenith[gcol]) * g[glay, gcol]) * FT(0.25)
+    γ4 = FT(1) - γ3
+    α1 = γ1 * γ4 + γ2 * γ3                          # Eq. 16
+    α2 = γ1 * γ3 + γ2 * γ4                          # Eq. 17
+    k = sqrt(max((γ1 - γ2) * (γ1 + γ2), FT(1e-12)))
+
+    exp_minusktau = exp(-τ[glay, gcol] * k)
+    exp_minus2ktau = exp_minusktau * exp_minusktau
+
+    # Refactored to avoid rounding errors when k, gamma1 are of very different magnitudes
+    RT_term =
+        FT(1) / (k * (FT(1) + exp_minus2ktau) + γ1 * (FT(1) - exp_minus2ktau))
+
+    Rdif[glay, gcol] = RT_term * γ2 * (FT(1) - exp_minus2ktau) # Eqn. 25
+    Tdif[glay, gcol] = RT_term * FT(2) * k * exp_minusktau     # Eqn. 26
+
+    # Transmittance of direct, unscattered beam. Also used below
+    Tnoscat[glay, gcol] = exp(-τ[glay, gcol] * zenith[gcol])
+
+    # Direct reflect and transmission
+    k_μ = k / zenith[gcol]
+    k_γ3 = k * γ3
+    k_γ4 = k * γ4
+
+    # Equation 14, multiplying top and bottom by exp(-k*tau)
+    #   and rearranging to avoid div by 0.
+    if abs(FT(1) - k_μ * k_μ) ≥ eps(FT)
+        RT_term = ssa[glay, gcol] * RT_term / (FT(1) - k_μ * k_μ)
+    else
+        RT_term = ssa[glay, gcol] * RT_term / eps(FT)
+    end
+
+    Rdir[glay, gcol] =
+        RT_term * (
+            (FT(1) - k_μ) * (α2 + k_γ3) -
+            (FT(1) + k_μ) * (α2 - k_γ3) * exp_minus2ktau -
+            FT(2) * (k_γ3 - α2 * k_μ) * exp_minusktau * Tnoscat[glay, gcol]
+        )
+    #
+    # Equation 15, multiplying top and bottom by exp(-k*tau),
+    #   multiplying through by exp(-tau/mu0) to
+    #   prefer underflow to overflow
+    # Omitting direct transmittance
+    #
+    Tdir[glay, gcol] =
+        -RT_term * (
+            (FT(1) + k_μ) * (α1 + k_γ4) * Tnoscat[glay, gcol] -
+            (FT(1) - k_μ) * (α1 - k_γ4) * exp_minus2ktau * Tnoscat[glay, gcol] -
+            FT(2) * (k_γ4 + α1 * k_μ) * exp_minusktau
+        )
+    @synchronize
+end
+
+@kernel function sw_source_2str_kernel!(
+    slv::Solver{FT,I,FTA1D,FTA2D},
+    flux::AbstractFlux{FT,FTA2D},
+    ::Val{nlay},
+    ::Val{ncol},
+) where {
+    FT<:AbstractFloat,
+    FTA1D<:AbstractArray{FT,1},
+    FTA2D<:AbstractArray{FT,2},
+    I<:Int,
+    nlay,
+    ncol,
+}
+    gcol = @index(Global, Linear) # global col ids
+
+    toa_flux = slv.bcs_sw.toa_flux
+    zenith = slv.bcs_sw.zenith
+    Rdir, Tdir = slv.src_sw.Rdir, slv.src_sw.Tdir
+    Tnoscat = slv.src_sw.Tnoscat
+    sfc_albedo = slv.src_sw.sfc_albedo
+    src_up, src_dn = slv.src_sw.src_up, slv.src_sw.src_dn
+    src_sfc = slv.src_sw.src_sfc
+    flux_dn_dir = flux.flux_dn_dir
+
+    # layer index = level index
+    # previous level is up (+1)
+    flux_dn_dir[nlay+1, gcol] = toa_flux[gcol] * zenith[gcol]
+    for ilev = nlay:-1:1
+        src_up[ilev, gcol] = Rdir[ilev, gcol] * flux_dn_dir[ilev+1, gcol]
+        src_dn[ilev, gcol] = Tdir[ilev, gcol] * flux_dn_dir[ilev+1, gcol]
+        flux_dn_dir[ilev, gcol] =
+            Tnoscat[ilev, gcol] * flux_dn_dir[ilev+1, gcol]
+    end
+    src_sfc[gcol] = flux_dn_dir[1, gcol] * sfc_albedo[gcol]
     @synchronize
 end

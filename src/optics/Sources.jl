@@ -1,21 +1,25 @@
-module GraySources
+module Sources
 
 using DocStringExtensions
 using ..Device: array_type, array_device
-using ..GrayOptics: GrayOneScalar, GrayTwoStream, AbstractGrayOpticalProps
+#using ..Optics: OneScalar, TwoStream, AbstractOpticalProps
 
 using Adapt
 
-export AbstractGraySource,
-    GraySourceLWNoScat, GraySourceLW2Str, source_func_longwave_gray_atmos
+export AbstractSource,
+       SourceLWNoScat, 
+       SourceLW2Str, 
+       SourceSW2Str,
+       source_func_longwave,
+       source_func_shortwave
 
-abstract type AbstractGraySource{FT} end
+abstract type AbstractSource{FT,FTA2D} end
 
 """
-    GraySourceLWNoScat{
+    SourceLWNoScat{
     FT<:AbstractFloat,
     FTA2D<:AbstractArray{FT,2},
-} <: AbstractGraySource{FT}
+} <: AbstractSource{FT}
 
 Longwave sources: computed at layer center, layer edges, 
 and at the surface for no scattering calculations
@@ -24,8 +28,8 @@ and at the surface for no scattering calculations
 
 $(DocStringExtensions.FIELDS)
 """
-struct GraySourceLWNoScat{FT<:AbstractFloat,FTA2D<:AbstractArray{FT,2}} <:
-       AbstractGraySource{FT}
+struct SourceLWNoScat{FT<:AbstractFloat,
+                      FTA2D<:AbstractArray{FT,2}} <: AbstractSource{FT,FTA2D}
     "Planck source at layer average temperature `[W/m2]` `(nlay, ncol, ngpt)`"
     lay_source::FTA2D
     "Planck source at layer edge in increasing ilay direction `[W/m2]` `(nlay+1, ncol, ngpt)`, includes spectral weighting that accounts for state-dependent frequency to g-space mapping"
@@ -39,25 +43,13 @@ struct GraySourceLWNoScat{FT<:AbstractFloat,FTA2D<:AbstractArray{FT,2}} <:
     "temporary storage array used in no scattering GPU calculations"
     source_dn::FTA2D
 end
-
-function Adapt.adapt_structure(to, x::GraySourceLWNoScat)
-    FT = eltype(x.lay_source)
-    FTA2D = typeof(adapt(to, x.sfc_source))
-    GraySourceLWNoScat{FT,FTA2D}(
-        adapt(to, x.lay_source),
-        adapt(to, x.lev_source_inc),
-        adapt(to, x.lev_source_dec),
-        adapt(to, x.sfc_source),
-        adapt(to, x.source_up),
-        adapt(to, x.source_dn),
-    )
-end
+Adapt.@adapt_structure SourceLWNoScat
 
 """
-    GraySourceLW2Str{
+    SourceLW2Str{
     FT<:AbstractFloat,
     FTA2D<:AbstractArray{FT,2},
-} <: AbstractGraySource{FT}
+} <: AbstractSource{FT}
 
 Longwave sources: computed at layer center, layer edges, 
 and at the surface for 2-stream calculations
@@ -66,8 +58,8 @@ and at the surface for 2-stream calculations
 
 $(DocStringExtensions.FIELDS)
 """
-struct GraySourceLW2Str{FT<:AbstractFloat,FTA2D<:AbstractArray{FT,2}} <:
-       AbstractGraySource{FT}
+struct SourceLW2Str{FT<:AbstractFloat,
+                    FTA2D<:AbstractArray{FT,2}} <: AbstractSource{FT,FTA2D}
     "Planck source at layer average temperature `[W/m2]` `(nlay, ncol, ngpt)`"
     lay_source::FTA2D
     "Planck source at layer edge in increasing ilay direction `[W/m2]` `(nlay+1, ncol, ngpt)`, includes spectral weighting that accounts for state-dependent frequency to g-space mapping"
@@ -91,43 +83,26 @@ struct GraySourceLW2Str{FT<:AbstractFloat,FTA2D<:AbstractArray{FT,2}} <:
     "temporary storage array, used in 2 stream calculations"
     src::FTA2D
 end
+Adapt.@adapt_structure SourceLW2Str
 
-function Adapt.adapt_structure(to, x::GraySourceLW2Str)
-    FT = eltype(x.lay_source)
-    FTA2D = typeof(adapt(to, x.sfc_source))
-    GraySourceLW2Str{FT,FTA2D}(
-        adapt(to, x.lay_source),
-        adapt(to, x.lev_source_inc),
-        adapt(to, x.lev_source_dec),
-        adapt(to, x.sfc_source),
-        adapt(to, x.lev_source),
-        adapt(to, x.src_up),
-        adapt(to, x.src_dn),
-        adapt(to, x.Rdif),
-        adapt(to, x.Tdif),
-        adapt(to, x.albedo),
-        adapt(to, x.src),
-    )
-end
-
-function source_func_longwave_gray_atmos(
+function source_func_longwave(
     ::Type{FT},
     ncol::I,
     nlay::I,
     ngpt::I,
-    ::Type{OPC},
+    OPC::Symbol,
     ::Type{DA},
-) where {FT<:AbstractFloat,I<:Int,OPC<:AbstractGrayOpticalProps,DA}
+) where {FT<:AbstractFloat,I<:Int,DA}
     println("DA = $DA")
     lay_source = DA{FT}(undef, nlay, ncol)
     lev_source_inc = DA{FT}(undef, nlay, ncol)
     lev_source_dec = DA{FT}(undef, nlay, ncol)
     sfc_source = DA{FT}(undef, ncol, ngpt)
 
-    if OPC == GrayOneScalar
+    if OPC == :OneScalar
         source_up = DA{FT}(undef, nlay, ncol)
         source_dn = DA{FT}(undef, nlay, ncol)
-        return GraySourceLWNoScat{eltype(lay_source),DA{FT,2}}(
+        return SourceLWNoScat{eltype(lay_source),DA{FT,2}}(
             lay_source,
             lev_source_inc,
             lev_source_dec,
@@ -143,7 +118,7 @@ function source_func_longwave_gray_atmos(
         Tdif = DA{FT}(undef, nlay, ncol)
         albedo = DA{FT}(undef, nlay + 1, ncol)
         src = DA{FT}(undef, nlay + 1, ncol)
-        return GraySourceLW2Str{FT,DA{FT,2}}(
+        return SourceLW2Str{FT,DA{FT,2}}(
             lay_source,
             lev_source_inc,
             lev_source_dec,
@@ -158,5 +133,57 @@ function source_func_longwave_gray_atmos(
         )
     end
 end
+
+struct SourceSW2Str{
+    FT<:AbstractFloat,
+    FTA1D<:AbstractArray{FT,1},
+    FTA2D<:AbstractArray{FT,2},
+} <: AbstractSource{FT,FTA2D}
+    src_sfc::FTA1D
+    sfc_albedo::FTA1D
+    src_up::FTA2D
+    src_dn::FTA2D
+    Rdif::FTA2D
+    Tdif::FTA2D
+    Rdir::FTA2D
+    Tdir::FTA2D
+    Tnoscat::FTA2D
+end
+Adapt.@adapt_structure SourceSW2Str
+
+function source_func_shortwave(
+    ::Type{FT},
+    ncol::I,
+    nlay::I,
+    opc::Symbol,
+    ::Type{DA},
+) where {FT<:AbstractFloat,I<:Int,DA}
+
+    if opc == :OneScalar
+        return nothing
+    else
+        src_sfc = DA{FT}(undef, ncol)
+        sfc_albedo = DA{FT}(undef, ncol)
+        src_up = DA{FT}(undef, nlay, ncol)
+        src_dn = DA{FT}(undef, nlay, ncol)
+        Rdif = DA{FT}(undef, nlay, ncol)
+        Tdif = DA{FT}(undef, nlay, ncol)
+        Rdir = DA{FT}(undef, nlay, ncol)
+        Tdir = DA{FT}(undef, nlay, ncol)
+        Tnoscat = DA{FT}(undef, nlay, ncol)
+        return SourceSW2Str{FT,typeof(src_sfc),typeof(src_up)}(
+            src_sfc,
+            sfc_albedo,
+            src_up,
+            src_dn,
+            Rdif,
+            Tdif,
+            Rdir,
+            Tdir,
+            Tnoscat,
+        )
+    end
+end
+
 
 end

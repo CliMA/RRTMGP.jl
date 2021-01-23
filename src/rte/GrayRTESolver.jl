@@ -6,24 +6,23 @@ using CUDA
 using Adapt
 
 using ..Device: array_type, array_device
-using ..GrayAngularDiscretizations
-using ..GrayFluxes
-using ..GrayBCs
-using ..GraySources
-using ..GrayAtmos
-using ..GrayOptics
+using ..AngularDiscretizations
+using ..Fluxes
+using ..BCs
+using ..Sources
+using ..RTE
+using ..Optics
+using ..LookUpTables
 
-export gray_atmos_lw!,
-    rte_lw_noscat_gray_solve!, rte_lw_2stream_gray_solve!, adding_gray!
+export solve_lw!, solve_sw!
 
 
 include("GrayRTESolverKernels.jl")
 # -------------------------------------------------------------------------------------------------
 # Solver for the longwave gray radiation problem
 # -------------------------------------------------------------------------------------------------
-
-function gray_atmos_lw!(
-    gray_rrtmgp::GrayRRTMGP{FT,I,FTA1D,FTA2D};
+function solve_lw!(
+    slv::Solver{FT,I,FTA1D,FTA2D};
     max_threads::I = Int(256),
 ) where {
     FT<:AbstractFloat,
@@ -31,23 +30,60 @@ function gray_atmos_lw!(
     FTA1D<:AbstractArray{FT,1},
     FTA2D<:AbstractArray{FT,2},
 }
-    # setting references
-    flux = gray_rrtmgp.flux
-    flux_up = flux.flux_up               # upward flux
-    flux_dn = flux.flux_dn               # downward flux
-    flux_net = flux.flux_net             # net flux
-
-    as = gray_rrtmgp.as                  # gray atmospheric state
-    optical_props = gray_rrtmgp.op       # optical properties
-    source = gray_rrtmgp.src             # Planck sources
-    nlay = as.nlay                       # number of layers per column
     # computing optical properties
-    gas_optics_gray_atmos!(as, optical_props, source)
+    compute_optical_props!(slv.as, slv.op, islw = true, sf = slv.src_lw)
     # solving radiative transfer equation
-    if typeof(gray_rrtmgp.op) == GrayOneScalar{FT,FTA2D}
-        rte_lw_noscat_gray_solve!(gray_rrtmgp, max_threads = max_threads) # no-scattering solver
+    if typeof(slv.op) == OneScalar{FT,FTA2D}
+        rte_lw_noscat_solve!(slv, isgray = true, max_threads = max_threads) # no-scattering solver
     else
-        rte_lw_2stream_gray_solve!(gray_rrtmgp, max_threads = max_threads) # 2-stream solver
+        rte_lw_2stream_solve!(slv, isgray = true, max_threads = max_threads) # 2-stream solver
+    end
+    return nothing
+end
+# -------------------------------------------------------------------------------------------------
+# Solver for the longwave radiation problem with full gas optics (RRTMGP)
+# -------------------------------------------------------------------------------------------------
+function solve_lw!(
+    slv::Solver{FT,I,FTA1D,FTA2D},
+    lkp::LookUpLW{I,FT,UI8,UI8A1D,IA1D,IA2D,IA3D,FTA1D,FTA2D,FTA3D,FTA4D};
+    max_threads::I = Int(256),
+) where {
+    I<:Int,
+    FT<:AbstractFloat,
+    UI8<:UInt8,
+    UI8A1D<:AbstractArray{UI8,1},
+    IA1D<:AbstractArray{I,1},
+    IA2D<:AbstractArray{I,2},
+    IA3D<:AbstractArray{I,3},
+    FTA1D<:AbstractArray{FT,1},
+    FTA2D<:AbstractArray{FT,2},
+    FTA3D<:AbstractArray{FT,3},
+    FTA4D<:AbstractArray{FT,4},
+}
+    n_gpt = lkp.n_gpt
+    set_flux_to_zero!(slv.flux_lw)
+    for igpt = 1:n_gpt
+        # computing optical properties
+        compute_optical_props!(
+            slv.as,
+            lkp,
+            slv.op,
+            igpt,
+            islw = true,
+            sf = slv.src_lw,
+            max_threads = max_threads,
+        )
+        # solving radiative transfer equation
+        if typeof(slv.op) == OneScalar{FT,FTA2D}
+            rte_lw_noscat_solve!(slv, isgray = false, max_threads = max_threads) # no-scattering solver
+        else
+            rte_lw_2stream_solve!(
+                slv,
+                isgray = false,
+                max_threads = max_threads,
+            ) # 2-stream solver
+        end
+        add_to_flux!(slv.flux_lw, slv.fluxb_lw)
     end
     return nothing
 end
@@ -58,8 +94,9 @@ end
 #   using user-supplied weights
 #
 # ---------------------------------------------------------------    
-function rte_lw_noscat_gray_solve!(
-    gray_rrtmgp::GrayRRTMGP{FT,I,FTA1D,FTA2D};
+function rte_lw_noscat_solve!(
+    slv::Solver{FT,I,FTA1D,FTA2D};
+    isgray::Bool = false,
     max_threads::I = Int(256),
 ) where {
     FT<:AbstractFloat,
@@ -68,14 +105,18 @@ function rte_lw_noscat_gray_solve!(
     I<:Int,
 }
     # Setting references 
-    τ = gray_rrtmgp.op.τ                   # Optical thickness
+    τ = slv.op.τ         # Optical thickness
+    ncol = slv.as.ncol   # number of columns
+    nlay = slv.as.nlay
+    nlev = nlay + 1      # number of levels
 
-    ncol = size(gray_rrtmgp.flux.flux_up, 2)         # number of columns
-    nlev = size(gray_rrtmgp.flux.flux_up, 1)         # number of levels
-    nlay = nlev - 1                 # number of layers
-    ngpt = 1                        # number of g-points (only 1 for gray radiation model
+    if isgray
+        flux = slv.flux_lw
+    else
+        flux = slv.fluxb_lw
+    end
 
-    device = array_device(gray_rrtmgp.flux.flux_up)
+    device = array_device(slv.op.τ)
     comp_stream = Event(device)
     #------Launching source computation kernel-----------------------
     thr_y = min(32, ncol)
@@ -84,8 +125,8 @@ function rte_lw_noscat_gray_solve!(
     workgroup = (thr_x, thr_y)
     ndrange = (nlay, ncol)
 
-    comp_stream = rte_lw_noscat_gray_source_kernel!(device, workgroup)(
-        gray_rrtmgp,
+    comp_stream = rte_lw_noscat_source_kernel!(device, workgroup)(
+        slv,
         Val(nlay),
         Val(ncol),
         ndrange = ndrange,
@@ -97,8 +138,9 @@ function rte_lw_noscat_gray_solve!(
     workgroup = (thr_x)
     ndrange = (ncol)
 
-    comp_stream = rte_lw_noscat_gray_transport_kernel!(device, workgroup)(
-        gray_rrtmgp,
+    comp_stream = rte_lw_noscat_transport_kernel!(device, workgroup)(
+        slv,
+        flux,
         Val(nlay),
         Val(nlev),
         Val(ncol),
@@ -110,8 +152,9 @@ function rte_lw_noscat_gray_solve!(
     return nothing
 end
 
-function rte_lw_2stream_gray_solve!(
-    gray_rrtmgp::GrayRRTMGP{FT,I,FTA1D,FTA2D};
+function rte_lw_2stream_solve!(
+    slv::Solver{FT,I,FTA1D,FTA2D};
+    isgray::Bool = false,
     max_threads::I = Int(256),
 ) where {
     FT<:AbstractFloat,
@@ -119,38 +162,41 @@ function rte_lw_2stream_gray_solve!(
     FTA2D<:AbstractArray{FT,2},
     I<:Int,
 }
-    # Setting references
-    flux_up = gray_rrtmgp.flux.flux_up
-    flux_dn = gray_rrtmgp.flux.flux_dn
-    flux_net = gray_rrtmgp.flux.flux_net
-    source = gray_rrtmgp.src
-    sfc_emis = gray_rrtmgp.bcs.sfc_emis
-    inc_flux = gray_rrtmgp.bcs.inc_flux
-    ncol, nlev, ngpt = size(flux_up, 2), size(flux_up, 1), 1
-    nlay = nlev - 1
+    ncol, nlay = slv.as.ncol, slv.as.nlay
+    nlev = nlay + 1
+    islw = true # for adding kernel
+
+    if isgray
+        flux = slv.flux_lw
+    else
+        flux = slv.fluxb_lw
+    end
     #----------------------------------------------------------------------------------
+    # Setting references
+    #    flux_dn = slv.flux.flux_dn
+    #    inc_flux = slv.bcs_lw.inc_flux
     #    if inc_flux ≠ nothing
     #        flux_dn[i_lev_top, 1] = inc_flux[1]
     #    end
     #-----------------------------------------------------------------------------------
-    device = array_device(gray_rrtmgp.src.lev_source)
+    device = array_device(slv.op.τ)
     comp_stream = Event(device)
-
     #------Launching source computation kernel-----------------------
+
     thr_y = min(32, ncol)
     thr_x = min(Int(floor(FT(max_threads / thr_y))), nlev)
 
     workgroup = (thr_x, thr_y)
     ndrange = (nlev, ncol)
 
-    comp_stream =
-        rte_lw_2stream_gray_combine_sources_kernel!(device, workgroup)(
-            gray_rrtmgp.src,
-            Val(nlev),
-            Val(ncol),
-            ndrange = ndrange,
-            dependencies = (comp_stream,),
-        )
+    comp_stream = rte_lw_2stream_combine_sources_kernel!(device, workgroup)(
+        slv.src_lw,
+        Val(nlev),
+        Val(ncol),
+        ndrange = ndrange,
+        dependencies = (comp_stream,),
+    )
+
     # Cell properties: reflection, transmission for diffuse radiation
     # Coupling coefficients needed for source function
     # -------------------------------------------------------------------------------------------------
@@ -168,8 +214,8 @@ function rte_lw_2stream_gray_solve!(
     workgroup = (thr_x, thr_y)
     ndrange = (nlay, ncol)
 
-    comp_stream = rte_lw_2stream_gray_source_kernel!(device, workgroup)(
-        gray_rrtmgp,
+    comp_stream = rte_lw_2stream_source_kernel!(device, workgroup)(
+        slv,
         Val(nlay),
         Val(ncol),
         ndrange = ndrange,
@@ -182,8 +228,10 @@ function rte_lw_2stream_gray_solve!(
     workgroup = (thr_x)
     ndrange = (ncol)
 
-    comp_stream = adding_gray_kernel!(device, workgroup)(
-        gray_rrtmgp,
+    comp_stream = adding_kernel!(device, workgroup)(
+        slv,
+        flux,
+        islw,
         Val(nlev),
         Val(ncol),
         ndrange = ndrange,
@@ -194,4 +242,165 @@ function rte_lw_2stream_gray_solve!(
     return nothing
 end
 
+# -------------------------------------------------------------------------------------------------
+# Solver for the shortwave gray radiation problem
+# -------------------------------------------------------------------------------------------------
+function solve_sw!(
+    slv::Solver{FT,I,FTA1D,FTA2D};
+    max_threads::I = Int(256),
+) where {
+    FT<:AbstractFloat,
+    I<:Int,
+    FTA1D<:AbstractArray{FT,1},
+    FTA2D<:AbstractArray{FT,2},
+}
+    # computing optical properties
+    compute_optical_props!(slv.as, slv.op, islw = false, sf = slv.src_sw)
+
+    # solving radiative transfer equation
+    if typeof(slv.op) == OneScalar{FT,FTA2D}
+        rte_sw_noscat_solve!(slv, isgray = true, max_threads = max_threads) # no-scattering solver
+    else
+        rte_sw_2stream_solve!(slv, isgray = true, max_threads = max_threads) # 2-stream solver
+    end
+
+    return nothing
+end
+# -------------------------------------------------------------------------------------------------
+# Solver for the shortwave radiation problem with full gas optics (RRTMGP)
+# -------------------------------------------------------------------------------------------------
+function solve_sw!(
+    slv::Solver{FT,I,FTA1D,FTA2D},
+    lkp::LookUpSW{I,FT,UI8,UI8A1D,IA1D,IA2D,IA3D,FTA1D,FTA2D,FTA3D,FTA4D};
+    max_threads::I = Int(256),
+) where {
+    I<:Int,
+    FT<:AbstractFloat,
+    UI8<:UInt8,
+    UI8A1D<:AbstractArray{UI8,1},
+    IA1D<:AbstractArray{I,1},
+    IA2D<:AbstractArray{I,2},
+    IA3D<:AbstractArray{I,3},
+    FTA1D<:AbstractArray{FT,1},
+    FTA2D<:AbstractArray{FT,2},
+    FTA3D<:AbstractArray{FT,3},
+    FTA4D<:AbstractArray{FT,4},
+}
+    n_gpt = lkp.n_gpt
+    set_flux_to_zero!(slv.flux_sw)
+    #=
+        for igpt in 1:n_gpt
+            # computing optical properties
+            compute_optical_props!(slv.as, slv.op, islw = false, sf = slv.src_sw)
+            # solving radiative transfer equation
+            if typeof(slv.op) == OneScalar{FT,FTA2D}
+                rte_sw_noscat_solve!(slv, isgray = false, max_threads = max_threads) # no-scattering solver
+            else
+                rte_sw_2stream_solve!(slv, isgray = false, max_threads = max_threads) # 2-stream solver
+            end
+            add_to_flux!(slv.flux_sw, slv.fluxb_sw)
+        end
+    =#
+
+    return nothing
+end
+#--------------------------------------------------------------------------------------------------
+function rte_sw_noscat_solve!(
+    slv::Solver{FT,I,FTA1D,FTA2D};
+    isgray::Bool = false,
+    max_threads::I = Int(256),
+) where {
+    FT<:AbstractFloat,
+    FTA1D<:AbstractArray{FT,1},
+    FTA2D<:AbstractArray{FT,2},
+    I<:Int,
+}
+    println("entered rte_sw_noscat_solve!")
+    nlev, ncol = slv.as.nlay + 1, slv.as.ncol
+    flux = (isgray ? slv.flux_sw : slv.fluxb_sw)
+    #-----------------------------------------------------------------------------------
+    device = array_device(slv.op.τ)
+    comp_stream = Event(device)
+    thr_x = min(max_threads, ncol)
+    workgroup = (thr_x)
+    ndrange = (ncol)
+
+    comp_stream = rte_sw_noscat_solve_kernel!(device, workgroup)(
+        slv,
+        flux,
+        Val(nlev),
+        Val(ncol),
+        ndrange = ndrange,
+        dependencies = (comp_stream,),
+    )
+    wait(comp_stream)
+    return nothing
+end
+#--------------------------------------------------------------------------------------------------
+function rte_sw_2stream_solve!(
+    slv::Solver{FT,I,FTA1D,FTA2D};
+    isgray::Bool = false,
+    max_threads::I = Int(256),
+) where {
+    FT<:AbstractFloat,
+    FTA1D<:AbstractArray{FT,1},
+    FTA2D<:AbstractArray{FT,2},
+    I<:Int,
+}
+    println("entered rte_sw_2stream_solve!")
+    nlay, ncol = slv.as.nlay, slv.as.ncol
+    flux = (isgray ? slv.flux_sw : slv.fluxb_sw)
+    islw = false
+    #--------------------------------------
+    device = array_device(slv.op.τ)
+    comp_stream = Event(device)
+    #----launching sw_two_stream_kernel----------------------------------
+    thr_y = min(32, ncol)
+    thr_x = min(Int(floor(FT(max_threads / thr_y))), nlay)
+
+    workgroup = (thr_x, thr_y)
+    ndrange = (nlay, ncol)
+
+    comp_stream = sw_two_stream_kernel!(device, workgroup)(
+        slv,
+        Val(nlay),
+        Val(ncol),
+        ndrange = ndrange,
+        dependencies = (comp_stream,),
+    )
+    #--------------------------------------
+    thr_x = min(max_threads, ncol)
+    workgroup = (thr_x)
+    ndrange = (ncol)
+
+    comp_stream = sw_source_2str_kernel!(device, workgroup)(
+        slv,
+        flux,
+        Val(nlay),
+        Val(ncol),
+        ndrange = ndrange,
+        dependencies = (comp_stream,),
+    )
+    # -------------------------------------------------------------------------------------------------    
+    #    # adding function only computes diffuse flux
+    #    thr_x = min(max_threads, ncol)
+
+    #    workgroup = (thr_x)
+    #    ndrange = (ncol)
+
+    #    comp_stream = adding_kernel!(device, workgroup)(
+    #        slv,
+    #        flux,
+    #        islw,
+    #        Val(nlev),
+    #        Val(ncol),
+    #        ndrange = ndrange,
+    #        dependencies = (comp_stream,),
+    #    )    
+    wait(comp_stream)
+    #--------------------------------------
+    return nothing
+end
+#--------------------------------------------------------------------------------------------------
+#--------------------------------------------------------------------------------------------------
 end

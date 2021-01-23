@@ -1,4 +1,4 @@
-module GrayAtmosphericStates
+module AtmosphericStates
 using KernelAbstractions
 using CUDA
 using ..Device: array_type, array_device
@@ -8,10 +8,125 @@ using GaussQuadrature
 using CLIMAParameters
 using CLIMAParameters.Planet: grav, R_d
 
-export GrayAtmosphericState, setup_gray_as_pr_grid, setup_gray_as_alt_grid
+using ..Vmrs
+
+export AbstractAtmosphericState,
+       AtmosphericState,
+       GrayAtmosphericState,
+       setup_gray_as_pr_grid, 
+       setup_gray_as_alt_grid
+
+abstract type AbstractAtmosphericState{FT,FTA1D,FTA2D,I} end
 
 """
-    GrayAtmosphericState{FT}
+    AtmosphericState{
+    FT<:AbstractFloat,
+    FTA1D<:AbstractArray{FT,1},
+    FTA2D<:AbstractArray{FT,2},
+    FTA3D<:AbstractArray{FT,3},
+    VMR<:Vmr{FT,FTA1D,FTA2D},
+    I<:Int,
+} <: AbstractAtmosphericState{FT,FTA1D,FTA2D,I}
+
+Atmospheric conditions, used to compute optical properties with the gray atmosphere approximation
+
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
+struct AtmosphericState{
+    FT<:AbstractFloat,
+    FTA1D<:AbstractArray{FT,1},
+    FTA2D<:AbstractArray{FT,2},
+    VMR<:Vmr{FT,FTA1D,FTA2D},
+    I<:Int,
+} <: AbstractAtmosphericState{FT,FTA1D,FTA2D,I}
+    "longitude (`ncol`)"
+    lon::FTA1D
+    "latitude (`ncol`)"
+    lat::FTA1D
+    "surface emissivity (`ncol`)"
+    sfc_emis::FTA1D
+    "surface albedo (`ncol`)"
+    sfc_alb::FTA1D
+    "zenith angle (`ncol`)"
+    zenith::FTA1D
+    "total solar irradiance (`ncol`)"
+    irrad::FTA1D
+    "Layer pressures `[Pa, mb]`; (`nlay,ncol`)"
+    p_lay::FTA2D
+    "Level pressures `[Pa, mb]`; (`nlay+1,ncol`)"
+    p_lev::FTA2D
+    "Layer temperatures `[K]`; (`nlay,ncol`)"
+    t_lay::FTA2D
+    "Level temperatures `[K]`; (`nlay+1,ncol`)"
+    t_lev::FTA2D
+    "Surface temperatures `[K]`; (`ncol`)"
+    t_sfc::FTA1D
+    "Number of molecules per cm-2 of dry air"
+    col_dry::FTA2D
+    "volume mixing ratio of all relevant gases"
+    vmr::VMR
+    "Number of layers."
+    nlay::I
+    "Number of columns."
+    ncol::I
+    "Number of gases."
+    ngas::I
+end
+Adapt.@adapt_structure AtmosphericState
+
+function AtmosphericState(
+    nlay::Int,
+    ncol::Int,
+    ngas::Int,
+    ::Type{FT},
+    ::Type{DA},
+) where {
+    FT<:AbstractFloat,
+    DA,
+}
+    nlev     = Int(nlay + 1)
+    lon      = DA{FT}(undef,       ncol)       # longitude
+    lat      = DA{FT}(undef,       ncol)       # latitude
+    sfc_emis = DA{FT}(undef,       ncol)       # sfc emissivity
+    sfc_alb  = DA{FT}(undef,       ncol)       # sfc albedo
+    zenith   = DA{FT}(undef,       ncol)       # zenith
+    irrad    = DA{FT}(undef,       ncol)       # solar irradiance
+    p_lay    = DA{FT}(undef, nlay, ncol)       # layer mean pressure
+    p_lev    = DA{FT}(undef, nlev, ncol)       # level pressure
+    t_lay    = DA{FT}(undef, nlay, ncol)       # layer mean temperature
+    t_lev    = DA{FT}(undef, nlev, ncol)       # level temperature
+    t_sfc    = DA{FT}(undef,       ncol)       # surface temperatures (can be different from t_lev[1,:])
+    col_dry  = DA{FT}(undef, nlay, ncol)       # col dry
+    vmr      = Vmr(ngas, nlay, ncol, FT, DA)   # volume mixing ratios of relevant gases
+    #------------------------------------------------
+    return AtmosphericState{FT,DA{FT,1},DA{FT,2},DA{FT,3},typeof(vmr),Int}(
+        lon,
+        lat,
+        sfc_emis,
+        sfc_alb,
+        zenith,
+        irrad,
+        p_lay,
+        p_lev,
+        t_lay,
+        t_lev,
+        t_sfc,
+        col_dry,
+        vmr,
+        nlay,
+        ncol,
+        ngas,
+    )
+end
+
+"""
+    GrayAtmosphericState{
+    FT<:AbstractFloat,
+    FTA1D<:AbstractArray{FT,1},
+    FTA2D<:AbstractArray{FT,2},
+    I<:Int,
+} <: AbstractAtmosphericState{FT,FTA1D,FTA2D,I}
 
 Atmospheric conditions, used to compute optical properties with the gray atmosphere approximation
 
@@ -23,7 +138,7 @@ struct GrayAtmosphericState{
     FTA1D<:AbstractArray{FT,1},
     FTA2D<:AbstractArray{FT,2},
     I<:Int,
-}
+} <: AbstractAtmosphericState{FT,FTA1D,FTA2D,I}
     "Layer pressures `[Pa, mb]`; (`nlay,ncol`)"
     p_lay::FTA2D
     "Level pressures `[Pa, mb]`; (`nlay+1,ncol`)"
@@ -45,25 +160,8 @@ struct GrayAtmosphericState{
     "Number of columns."
     ncol::I
 end
-
-function Adapt.adapt_structure(to, x::GrayAtmosphericState)
-    FT = eltype(x.p_lay)
-    I = eltype(x.nlay)
-    FTA1D = typeof(adapt(to, x.t_sfc))
-    FTA2D = typeof(adapt(to, x.p_lay))
-    GrayAtmosphericState{FT,FTA1D,FTA2D,I}(
-        adapt(to, x.p_lay),
-        adapt(to, x.p_lev),
-        adapt(to, x.t_lay),
-        adapt(to, x.t_lev),
-        adapt(to, x.z_lev),
-        adapt(to, x.t_sfc),
-        x.α,
-        adapt(to, x.d0),
-        x.nlay,
-        x.ncol,
-    )
-end
+Adapt.@adapt_structure GrayAtmosphericState
+#---------------------------------------------------------------
 
 # This functions sets up a model temperature and pressure 
 # distributions for a gray atmosphere based on a pressure grid
@@ -289,7 +387,6 @@ end
     t_sfc[gcol] = t_lev[1, gcol]
 
     #---------------------------------
-
 end
 #-------------------------------------------------------------------------
 
