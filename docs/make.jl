@@ -37,7 +37,6 @@ makedocs(
             "Boundary Conditions" => "RTE/BoundaryConditions.md"
             "Angular Discretizations" => "RTE/AngularDiscretizations.md"
             "RTE Solver" => "RTE/RTESolver.md"
-            "Solar Zenith Angle" => "RTE/SolarZenithAngle.md"
         ],
         "References"=>"References.md",
     ],
