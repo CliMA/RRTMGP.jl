@@ -1,6 +1,5 @@
 using RRTMGP
 using NCDatasets
-using NCDatasets
 
 include("data_set_files.jl")
 
