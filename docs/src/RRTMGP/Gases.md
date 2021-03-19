@@ -1,8 +1,3 @@
 # Gases
 
-```@meta
-CurrentModule = RRTMGP.Gases
-```
-```@docs
-AbstractGas
-```
+To be added back in...

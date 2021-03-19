@@ -1,12 +1,10 @@
 # Source Functions
 
 ```@meta
-CurrentModule = RRTMGP.SourceFunctions
+CurrentModule = RRTMGP.GraySources
 ```
 
 ```@docs
-AbstractSourceFunc
-SourceFuncLongWave
-SourceFuncLongWavePGP
-SourceFuncShortWave
+GraySourceLWNoScat
+GraySourceLW2Str
 ```
