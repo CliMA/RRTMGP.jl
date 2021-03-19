@@ -8,10 +8,10 @@ steps:
       - "julia --color=yes --project -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
       - "julia --color=yes --project test/runtests.jl"
     agents:
-      config: cpu 
+      config: cpu
       queue: central
       slurm_ntasks: 1
-      slurm_mem_per_cpu: 6G  
+      slurm_mem_per_cpu: 6G
 
   - label: "run units tests GPU"
     command:

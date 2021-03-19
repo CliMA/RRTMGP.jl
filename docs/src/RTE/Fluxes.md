@@ -1,16 +1,9 @@
 # Fluxes
 
 ```@meta
-CurrentModule = RRTMGP.Fluxes
+CurrentModule = RRTMGP.GrayFluxes
 ```
 
 ```@docs
-AbstractFluxes
-FluxesBroadBand
-FluxesByBand
+GrayFluxLW
 ```
-
-```@docs
-reduce!
-```
-

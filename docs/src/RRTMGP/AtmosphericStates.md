@@ -1,18 +1,9 @@
 # Atmospheric State
 
 ```@meta
-CurrentModule = RRTMGP.AtmosphericStates
+CurrentModule = RRTMGP.GrayAtmosphericStates
 ```
 
 ```@docs
-AtmosphericState
-AtmosphericStatePGP
+GrayAtmosphericState
 ```
-
-```@docs
-get_col_dry
-extrap_lower
-extrap_upper
-interpolate_var
-```
-

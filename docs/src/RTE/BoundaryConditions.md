@@ -1,11 +1,13 @@
 # Boundary Conditions
 
 ```@meta
-CurrentModule = RRTMGP.RadiativeBoundaryConditions
+CurrentModule = RRTMGP.GrayBCs
 ```
 
 ```@docs
-AbstractRadiativeBoundaryConditions
-ShortwaveBCs
-LongwaveBCs
+GrayLwBCs
+GraySwBCs
 ```
+
+│     RRTMGP.GraySources.GraySourceLWNoScat
+│     RRTMGP.GraySources.GraySourceLW2Str

@@ -1,25 +1,10 @@
 # Optical Properties
 
 ```@meta
-CurrentModule = RRTMGP.OpticalProps
+CurrentModule = RRTMGP.GrayOptics
 ```
 
 ```@docs
-AbstractOpticalProps
-AbstractOpticalPropsArry
-AbstractOpticalPropsPGP
-OpticalPropsBase
-OneScalar
-TwoStream
-OneScalarPGP
-TwoStreamPGP
+GrayOneScalar
+GrayTwoStream
 ```
-
-```@docs
-delta_scale!
-validate!
-increment!
-bands_are_equal
-gpoints_are_equal
-```
-

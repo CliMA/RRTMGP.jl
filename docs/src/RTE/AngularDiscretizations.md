@@ -1,9 +1,9 @@
 # Angular Discretization
 
 ```@meta
-CurrentModule = RRTMGP.AngularDiscretizations
+CurrentModule = RRTMGP.GrayAngularDiscretizations
 ```
 
 ```@docs
-GaussQuadrature
+AngularDiscretization
 ```

@@ -1,15 +1,3 @@
 # Gas Concentrations
 
-```@meta
-CurrentModule = RRTMGP.GasConcentrations
-```
-
-```@docs
-GasConcs
-GasConcsPGP
-```
-
-```@docs
-set_vmr!
-```
-
+To be added back in...

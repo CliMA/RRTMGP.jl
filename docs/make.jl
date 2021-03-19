@@ -1,11 +1,9 @@
-Base.HOME_PROJECT[] = abspath(Base.HOME_PROJECT[]) # JuliaLang/julia/pull/28625
-
 using RRTMGP, Documenter, LaTeXStrings
 
 makedocs(
     sitename = "RRTMGP.jl",
     doctest = false,
-    strict = false,
+    strict = true,
     format = Documenter.HTML(
         prettyurls = get(ENV, "CI", nothing) == "true",
         mathengine = MathJax(Dict(
@@ -15,8 +13,8 @@ makedocs(
             ),
         )),
     ),
-    clean = false,
-    modules = [Documenter, RRTMGP],
+    clean = true,
+    modules = [RRTMGP],
     pages = Any[
         "Home"=>"index.md",
         "Mathematical Formulation"=>"MathFormulation.md",
@@ -27,7 +25,6 @@ makedocs(
             "References States" => "RRTMGP/ReferenceStates.md"
             "Source Functions" => "RRTMGP/SourceFunctions.md"
             "K-Distribution" => "RRTMGP/KDistribution.md"
-            "Mesh Orientation" => "MeshOrientation.md"
             "Atmospheric States" => "RRTMGP/AtmosphericStates.md"
             "Optical Properties" => "OpticalProps.md"
         ],

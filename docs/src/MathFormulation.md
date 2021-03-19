@@ -74,18 +74,18 @@ Here, ``\F = \sum_i F_i``, with ``F_j = \FR{net} = \FR{+} - \FR{-}`` for some ``
 
 To solve for ``\FR{net}``, one must choose an approximation for optical properties. In `RRTMGP.jl`, choices include
 
- - [`OneScalar`](@ref OpticalProps.OneScalar): optical depth (``\τ{}``) only
- - [`TwoStream`](@ref OpticalProps.TwoStream): optical depth (``\τ{}``), single scattering albedo (``\SSA``), asymmetry factor (``\ASY``)
+ - [`OneScalar`]: optical depth (``\τ{}``) only
+ - [`TwoStream`]: optical depth (``\τ{}``), single scattering albedo (``\SSA``), asymmetry factor (``\ASY``)
 
-To compute either set of optical properties, one must call [`gas_optics!`](@ref GasOptics.gas_optics!) with the following arguments:
+To compute either set of optical properties, one must call [`gas_optics!`] with the following arguments:
 
- - A [K-Distribution](@ref) ``\KD``, `KDistributionLongwave` or `KDistributionShortwave`: typically read from [Data files](@ref)
- - An [`AtmosphericState`](@ref AtmosphericStates.AtmosphericState) ``\AS``, defined by: temperature ``\temperature``, pressure ``\pressure``, set of gas concentrations ([`AbstractGas`](@ref Gases.AbstractGas))
- - [optionally] An [`AbstractSourceFunc`](@ref SourceFunctions.AbstractSourceFunc) ``\FS``, `SourceFuncLongWave` or `SourceFuncShortWave`: source functions
+ - A [K-Distribution] ``\KD``, `KDistributionLongwave` or `KDistributionShortwave`: typically read from [Data files]
+ - An [`AtmosphericState`] ``\AS``, defined by: temperature ``\temperature``, pressure ``\pressure``, set of gas concentrations ([`AbstractGas`])
+ - [optionally] An [`AbstractSourceFunc`] ``\FS``, `SourceFuncLongWave` or `SourceFuncShortWave`: source functions
 
 Calling `GasOptics.gas_optics!` computes the optical depths via a 3D interpolation routine in the following simplified steps:
 
- - Initialize and compute [`InterpolationCoefficients`](@ref GasOptics.InterpolationCoefficients)
+ - Initialize and compute [`InterpolationCoefficients`]
  - Compute absorption optical depth ``\τ{absorption}`` for major and minor gas species (which has binary variation as a function of height `itropo=1,2`)
  - Compute Rayleigh scattering optical depth ``\τ{Rayleigh}``
  - Compute total optical depth: ``\τ{total} = \τ{absorption}+\τ{Rayleigh}``

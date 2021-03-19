@@ -1,13 +1,10 @@
 # RTE Solver
 
 ```@meta
-CurrentModule = RRTMGP.RTESolver
+CurrentModule = RRTMGP.GrayRTESolver
 ```
 
 ```@docs
-rte_sw!
-rte_lw!
-expand_and_transpose
 ```
 
 
