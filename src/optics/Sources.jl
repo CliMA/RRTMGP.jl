@@ -13,7 +13,7 @@ export AbstractSource,
        source_func_longwave,
        source_func_shortwave
 
-abstract type AbstractSource{FT,FTA2D} end
+abstract type AbstractSource{FT} end
 
 """
     SourceLWNoScat{
@@ -29,7 +29,8 @@ and at the surface for no scattering calculations
 $(DocStringExtensions.FIELDS)
 """
 struct SourceLWNoScat{FT<:AbstractFloat,
-                      FTA2D<:AbstractArray{FT,2}} <: AbstractSource{FT,FTA2D}
+                      FTA1D<:AbstractArray{FT,1},
+                      FTA2D<:AbstractArray{FT,2}} <: AbstractSource{FT}
     "Planck source at layer average temperature `[W/m2]` `(nlay, ncol, ngpt)`"
     lay_source::FTA2D
     "Planck source at layer edge in increasing ilay direction `[W/m2]` `(nlay+1, ncol, ngpt)`, includes spectral weighting that accounts for state-dependent frequency to g-space mapping"
@@ -37,7 +38,7 @@ struct SourceLWNoScat{FT<:AbstractFloat,
     "Planck source at layer edge in decreasing ilay direction `[W/m2]` `(nlay+1, ncol, ngpt)`, includes spectral weighting that accounts for state-dependent frequency to g-space mapping"
     lev_source_dec::FTA2D
     "Surface source"
-    sfc_source::FTA2D
+    sfc_source::FTA1D
     "temporary storage array used in no scattering GPU calculations"
     source_up::FTA2D
     "temporary storage array used in no scattering GPU calculations"
@@ -59,7 +60,9 @@ and at the surface for 2-stream calculations
 $(DocStringExtensions.FIELDS)
 """
 struct SourceLW2Str{FT<:AbstractFloat,
-                    FTA2D<:AbstractArray{FT,2}} <: AbstractSource{FT,FTA2D}
+                    FTA1D<:AbstractArray{FT,1},
+                    FTA2D<:AbstractArray{FT,2},
+} <: AbstractSource{FT}
     "Planck source at layer average temperature `[W/m2]` `(nlay, ncol, ngpt)`"
     lay_source::FTA2D
     "Planck source at layer edge in increasing ilay direction `[W/m2]` `(nlay+1, ncol, ngpt)`, includes spectral weighting that accounts for state-dependent frequency to g-space mapping"
@@ -67,7 +70,7 @@ struct SourceLW2Str{FT<:AbstractFloat,
     "Planck source at layer edge in decreasing ilay direction `[W/m2]` `(nlay+1, ncol, ngpt)`, includes spectral weighting that accounts for state-dependent frequency to g-space mapping"
     lev_source_dec::FTA2D
     "Surface source"
-    sfc_source::FTA2D
+    sfc_source::FTA1D
     "level source `[W/m2]` `(nlay+1, ncol, ngpt)`, used in 2 stream calculations"
     lev_source::FTA2D
     "temporary storage array, used in 2 stream calculations"
@@ -97,12 +100,12 @@ function source_func_longwave(
     lay_source = DA{FT}(undef, nlay, ncol)
     lev_source_inc = DA{FT}(undef, nlay, ncol)
     lev_source_dec = DA{FT}(undef, nlay, ncol)
-    sfc_source = DA{FT}(undef, ncol, ngpt)
+    sfc_source = DA{FT}(undef, ncol)
 
     if OPC == :OneScalar
         source_up = DA{FT}(undef, nlay, ncol)
         source_dn = DA{FT}(undef, nlay, ncol)
-        return SourceLWNoScat{eltype(lay_source),DA{FT,2}}(
+        return SourceLWNoScat{eltype(lay_source),typeof(sfc_source),DA{FT,2}}(
             lay_source,
             lev_source_inc,
             lev_source_dec,
@@ -118,7 +121,7 @@ function source_func_longwave(
         Tdif = DA{FT}(undef, nlay, ncol)
         albedo = DA{FT}(undef, nlay + 1, ncol)
         src = DA{FT}(undef, nlay + 1, ncol)
-        return SourceLW2Str{FT,DA{FT,2}}(
+        return SourceLW2Str{FT,typeof(sfc_source),DA{FT,2}}(
             lay_source,
             lev_source_inc,
             lev_source_dec,
@@ -138,9 +141,9 @@ struct SourceSW2Str{
     FT<:AbstractFloat,
     FTA1D<:AbstractArray{FT,1},
     FTA2D<:AbstractArray{FT,2},
-} <: AbstractSource{FT,FTA2D}
-    src_sfc::FTA1D
-    sfc_albedo::FTA1D
+} <: AbstractSource{FT}
+    sfc_source::FTA1D
+    albedo::FTA2D
     src_up::FTA2D
     src_dn::FTA2D
     Rdif::FTA2D
@@ -148,6 +151,8 @@ struct SourceSW2Str{
     Rdir::FTA2D
     Tdir::FTA2D
     Tnoscat::FTA2D
+    "temporary storage array, used in 2 stream calculations"
+    src::FTA2D    
 end
 Adapt.@adapt_structure SourceSW2Str
 
@@ -162,8 +167,8 @@ function source_func_shortwave(
     if opc == :OneScalar
         return nothing
     else
-        src_sfc = DA{FT}(undef, ncol)
-        sfc_albedo = DA{FT}(undef, ncol)
+        sfc_source = DA{FT}(undef, ncol)
+        albedo = DA{FT}(undef, nlay + 1, ncol)
         src_up = DA{FT}(undef, nlay, ncol)
         src_dn = DA{FT}(undef, nlay, ncol)
         Rdif = DA{FT}(undef, nlay, ncol)
@@ -171,9 +176,10 @@ function source_func_shortwave(
         Rdir = DA{FT}(undef, nlay, ncol)
         Tdir = DA{FT}(undef, nlay, ncol)
         Tnoscat = DA{FT}(undef, nlay, ncol)
-        return SourceSW2Str{FT,typeof(src_sfc),typeof(src_up)}(
-            src_sfc,
-            sfc_albedo,
+        src = DA{FT}(undef, nlay + 1, ncol)
+        return SourceSW2Str{FT,typeof(sfc_source),typeof(src_up)}(
+            sfc_source,
+            albedo,
             src_up,
             src_dn,
             Rdif,
@@ -181,6 +187,7 @@ function source_func_shortwave(
             Rdir,
             Tdir,
             Tnoscat,
+            src,
         )
     end
 end

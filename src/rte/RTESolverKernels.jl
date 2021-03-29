@@ -17,14 +17,10 @@
     glay, gcol = @index(Global, NTuple)  # global col & lay ids
 
     # setting references
-    source_up = slv.src_lw.source_up
-    source_dn = slv.src_lw.source_dn
-    lev_source_up = slv.src_lw.lev_source_inc
-    lev_source_dn = slv.src_lw.lev_source_dec
-    lay_source = slv.src_lw.lay_source
+    @unpack source_up, source_dn, lev_source_inc, lev_source_dec, lay_source =
+        slv.src_lw
     Ds = slv.angle_disc.gauss_Ds
     τ = slv.op.τ
-    #---------------------
 
     τ_thresh = sqrt(eps(FT)) # or abs(eps(FT))?
     τ_loc = τ[glay, gcol] * Ds[1]      # Optical path and transmission,
@@ -40,19 +36,19 @@
     # Equations below are developed in Clough et al., 1992, doi:10.1029/92JD01419, Eq 13
 
     source_up[glay, gcol] =
-        (FT(1) - trans) * lev_source_up[glay, gcol] +
-        FT(2) * fact * (lay_source[glay, gcol] - lev_source_up[glay, gcol])
+        (FT(1) - trans) * lev_source_inc[glay, gcol] +
+        FT(2) * fact * (lay_source[glay, gcol] - lev_source_inc[glay, gcol])
 
     source_dn[glay, gcol] =
-        (FT(1) - trans) * lev_source_dn[glay, gcol] +
-        FT(2) * fact * (lay_source[glay, gcol] - lev_source_dn[glay, gcol])
-
-    @synchronize
+        (FT(1) - trans) * lev_source_dec[glay, gcol] +
+        FT(2) * fact * (lay_source[glay, gcol] - lev_source_dec[glay, gcol])
 end
 
 @kernel function rte_lw_noscat_transport_kernel!(
     slv::Solver{FT,I,FTA1D,FTA2D},
     flux::AbstractFlux{FT,FTA2D},
+    igpt::Int,
+    ibnd::Int,
     ::Val{nlay},
     ::Val{nlev},
     ::Val{ncol},
@@ -67,33 +63,28 @@ end
 }
     gcol = @index(Global, Linear) # global col ids
     # setting references
-    source_up = slv.src_lw.source_up
-    source_dn = slv.src_lw.source_dn
-    sfc_source = slv.src_lw.sfc_source
-    sfc_emis = slv.bcs_lw.sfc_emis
-    inc_flux = slv.bcs_lw.inc_flux
+    @unpack source_up, source_dn, sfc_source = slv.src_lw
+    @unpack sfc_emis, inc_flux = slv.bcs_lw
+    @unpack flux_up, flux_dn, flux_net = flux
+
     Ds = slv.angle_disc.gauss_Ds
     w_μ = slv.angle_disc.gauss_wts
     n_μ = slv.angle_disc.n_gauss_angles
     τ = slv.op.τ
 
-    flux_up = flux.flux_up
-    flux_dn = flux.flux_dn
-    flux_net = flux.flux_net
-    #--------------------------------------------
     @inbounds for ilev = 1:nlev
         flux_dn[ilev, gcol] = FT(0)
         flux_up[ilev, gcol] = FT(0)
     end
 
     if inc_flux ≠ nothing
-        flux_dn[nlev, gcol] = inc_flux[gcol]
+        flux_dn[nlev, gcol] = inc_flux[gcol, igpt]
     end
     # Transport is for intensity
     #   convert flux at top of domain to intensity assuming azimuthal isotropy
     flux_dn[nlev, gcol] /= (FT(2) * FT(π) * w_μ[1])
 
-    #-------Top of domain is index nlev
+    # Top of domain is index nlev
     # Downward propagation
     @inbounds for ilev = nlay:-1:1
         trans = exp(-τ[ilev, gcol] * Ds[1])
@@ -103,7 +94,8 @@ end
 
     # Surface reflection and emission
     flux_up[1, gcol] =
-        flux_dn[1, gcol] * (FT(1) - sfc_emis[gcol]) + sfc_source[gcol, 1]
+        flux_dn[1, gcol] * (FT(1) - sfc_emis[ibnd, gcol]) +
+        sfc_emis[ibnd, gcol] * sfc_source[gcol]
 
     # Upward propagation
     @inbounds for ilev = 2:nlay+1
@@ -111,20 +103,25 @@ end
         flux_up[ilev, gcol] =
             trans * flux_up[ilev-1, gcol] + source_up[ilev-1, gcol]
     end
-    #-----------------------------------
+
     @inbounds for ilev = 1:nlev
         flux_up[ilev, gcol] *= (FT(2) * FT(π) * w_μ[1])
         flux_dn[ilev, gcol] *= (FT(2) * FT(π) * w_μ[1])
         flux_net[ilev, gcol] = flux_up[ilev, gcol] - flux_dn[ilev, gcol]
     end
-    @synchronize
 end
 
 @kernel function rte_lw_2stream_combine_sources_kernel!(
-    src::SourceLW2Str{FT,FTA2D},
+    src::SourceLW2Str{FT,FTA1D,FTA2D},
     ::Val{nlev},
     ::Val{ncol},
-) where {FT<:AbstractFloat,FTA2D<:AbstractArray{FT,2},nlev,ncol}
+) where {
+    FT<:AbstractFloat,
+    FTA1D<:AbstractArray{FT,1},
+    FTA2D<:AbstractArray{FT,2},
+    nlev,
+    ncol,
+}
     # RRTMGP provides source functions at each level using the spectral mapping
     # of each adjacent layer. Combine these for two-stream calculations
     # lw combine sources
@@ -141,7 +138,6 @@ end
             src.lev_source_dec[glev, gcol] * src.lev_source_inc[glev-1, gcol],
         )
     end
-    @synchronize
 end
 
 @kernel function rte_lw_2stream_source_kernel!(
@@ -169,15 +165,9 @@ end
     # -------------------------------------------------------------------------------------------------    
     glay, gcol = @index(Global, NTuple)  # global col & layer ids
     # setting references
-    τ = slv.op.τ
-    ssa = slv.op.ssa
-    g = slv.op.g
-    Rdif = slv.src_lw.Rdif
-    Tdif = slv.src_lw.Tdif
-    lev_source = slv.src_lw.lev_source
-    src_up = slv.src_lw.src_up
-    src_dn = slv.src_lw.src_dn
-    # ------------------
+    @unpack τ, ssa, g = slv.op
+    @unpack Rdif, Tdif, lev_source, src_up, src_dn = slv.src_lw
+
     lw_diff_sec = FT(1.66)
 
     γ1 = lw_diff_sec * (1 - FT(0.5) * ssa[glay, gcol] * (1 + g[glay, gcol]))
@@ -226,8 +216,6 @@ end
         src_up[glay, gcol] = FT(0)
         src_dn[glay, gcol] = FT(0)
     end
-
-    @synchronize
 end
 
 # ---------------------------------------------------------------
@@ -241,6 +229,8 @@ end
     slv::Solver{FT,I,FTA1D,FTA2D},
     flux::AbstractFlux{FT,FTA2D},
     islw::Bool,
+    igpt::Int,
+    ibnd::Int,
     ::Val{nlev},
     ::Val{ncol},
 ) where {
@@ -252,48 +242,49 @@ end
     ncol,
 }
     gcol = @index(Global, Linear)  # global col ids
-    # setting references
-    if islw
-        albedo = slv.src_lw.albedo
-        sfc_source = slv.src_lw.sfc_source
-        Rdif = slv.src_lw.Rdif
-        Tdif = slv.src_lw.Tdif
-        src_up = slv.src_lw.src_up
-        src_dn = slv.src_lw.src_dn
-        src = slv.src_lw.src
-        sfc_emis = slv.bcs_lw.sfc_emis
-        flux_up = flux.flux_up
-        flux_dn = flux.flux_dn
-        flux_net = flux.flux_net
-    else
-        #        albedo = slv.src_lw.albedo
-        #        sfc_source = slv.src_lw.sfc_source
-        #        Rdif = slv.src_lw.Rdif
-        #        Tdif = slv.src_lw.Tdif
-        #        src_up = slv.src_lw.src_up
-        #        src_dn = slv.src_lw.src_dn
-        #        src = slv.src_lw.src
-        #        sfc_emis = slv.bcs_lw.sfc_emis
-        #        flux_up = flux.flux_up
-        #        flux_dn = flux.flux_dn
-        #        flux_net = flux.flux_net
-    end
-    # ------------------
     nlay = nlev - 1
+    # setting references
+    @unpack flux_up, flux_dn, flux_net = flux
 
-    @inbounds for ilev = 1:nlev
-        flux_dn[ilev, gcol] = FT(0)
-        flux_up[ilev, gcol] = FT(0)
+    if islw && slv.src_lw isa SourceLW2Str
+        @unpack albedo, sfc_source, Rdif, Tdif, src_up, src_dn, src = slv.src_lw
+        sfc_emis = slv.bcs_lw.sfc_emis
+
+        @inbounds for ilev = 1:nlev
+            flux_dn[ilev, gcol] = FT(0)
+            flux_up[ilev, gcol] = FT(0)
+        end
+
+        if slv.bcs_lw.inc_flux ≠ nothing
+            flux_dn[nlev, gcol] = slv.bcs_lw.inc_flux[gcol, igpt]
+        end
+        # Albedo of lowest level is the surface albedo...
+        albedo[1, gcol] = FT(1) - sfc_emis[ibnd, gcol]
+        # ... and source of diffuse radiation is surface emission
+        src[1, gcol] = FT(π) * sfc_emis[ibnd, gcol] * sfc_source[gcol]
+    elseif slv.src_sw isa SourceSW2Str
+        @unpack albedo, sfc_source, Rdif, Tdif, src_up, src_dn, src = slv.src_sw
+
+        @inbounds for ilev = 1:nlev
+            flux_dn[ilev, gcol] = FT(0)
+            flux_up[ilev, gcol] = FT(0)
+        end
+
+        # Albedo of lowest level is the surface albedo...
+        albedo[1, gcol] = slv.bcs_sw.sfc_alb_diffuse[ibnd, gcol]
+        # ... and source of diffuse radiation is surface emission
+        src[1, gcol] = sfc_source[gcol]
+    else # do nothing
     end
-
     #--------------------------------------------------------------------------------------
-    # Albedo of lowest level is the surface albedo...
-    albedo[1, gcol] = FT(1) - sfc_emis[gcol]
-    # ... and source of diffuse radiation is surface emission
-    src[1, gcol] = FT(π) * sfc_emis[gcol] * sfc_source[gcol]
+    #    # Albedo of lowest level is the surface albedo...
+    #    albedo[1, gcol] = FT(1) - sfc_emis[gcol]
+    #    # ... and source of diffuse radiation is surface emission
+    #    src[1, gcol] = FT(π) * sfc_emis[gcol] * sfc_source[gcol]
     #--------------------------------------------------------
     # From bottom to top of atmosphere --
     #   compute albedo and source of upward radiation
+
     @inbounds for ilev = 1:nlay
         denom = FT(1) / (FT(1) - Rdif[ilev, gcol] * albedo[ilev, gcol])  # Eq 10
         albedo[ilev+1, gcol] =
@@ -328,17 +319,16 @@ end
             flux_dn[ilev, gcol] * albedo[ilev, gcol] + # Equation 12
             src[ilev, gcol]
     end
-    #--------------------------------------------------------------------------------------
 
     @inbounds for ilev = 1:nlev
         flux_net[ilev, gcol] = flux_up[ilev, gcol] - flux_dn[ilev, gcol]
     end
-    @synchronize
 end
 # ---------------------------------------------------------------
 @kernel function rte_sw_noscat_solve_kernel!(
     slv::Solver{FT,I,FTA1D,FTA2D},
     flux::AbstractFlux{FT,FTA2D},
+    solar_frac::FT,
     ::Val{nlev},
     ::Val{ncol},
 ) where {
@@ -350,19 +340,17 @@ end
     ncol,
 }
     gcol = @index(Global, Linear) # global col ids
-    toa_flux = slv.bcs_sw.toa_flux
-    zenith = slv.bcs_sw.zenith
+    @unpack toa_flux, zenith = slv.bcs_sw
     τ = slv.op.τ
     flux_dn_dir = flux.flux_dn_dir
 
-    flux_dn_dir[nlev, gcol] = toa_flux[gcol] * zenith[gcol]
+    flux_dn_dir[nlev, gcol] = toa_flux[gcol] * solar_frac * cos(zenith[gcol])
 
     for ilev = nlev-1:-1:1
         flux_dn_dir[ilev, gcol] =
-            flux_dn_dir[ilev+1, gcol] * exp(-τ[ilev, gcol] * zenith[gcol])
+            flux_dn_dir[ilev+1, gcol] * exp(-τ[ilev, gcol] / cos(zenith[gcol]))
     end
 end
-# ---------------------------------------------------------------
 #-------------------------------------------------------------------------------------------------
 #
 # Two-stream solutions to direct and diffuse reflectance and transmittance for a layer
@@ -387,16 +375,14 @@ end
     glay, gcol = @index(Global, NTuple)  # global col & lay ids
 
     zenith = slv.bcs_sw.zenith
-    τ, ssa, g = slv.op.τ, slv.op.ssa, slv.op.g
-    Rdif, Tdif = slv.src_sw.Rdif, slv.src_sw.Tdif
-    Rdir, Tdir = slv.src_sw.Rdir, slv.src_sw.Tdir
-    Tnoscat = slv.src_sw.Tnoscat
+    @unpack τ, ssa, g = slv.op
+    @unpack Rdif, Tdif, Rdir, Tdir, Tnoscat = slv.src_sw
 
     # Zdunkowski Practical Improved Flux Method "PIFM"
     #  (Zdunkowski et al., 1980;  Contributions to Atmospheric Physics 53, 147-66)
     γ1 = (FT(8) - ssa[glay, gcol] * (FT(5) + FT(3) * g[glay, gcol])) * FT(0.25)
     γ2 = FT(3) * (ssa[glay, gcol] * (FT(1) - g[glay, gcol])) * FT(0.25)
-    γ3 = (FT(2) - (FT(3) / zenith[gcol]) * g[glay, gcol]) * FT(0.25)
+    γ3 = (FT(2) - (FT(3) * cos(zenith[gcol])) * g[glay, gcol]) * FT(0.25)
     γ4 = FT(1) - γ3
     α1 = γ1 * γ4 + γ2 * γ3                          # Eq. 16
     α2 = γ1 * γ3 + γ2 * γ4                          # Eq. 17
@@ -413,10 +399,10 @@ end
     Tdif[glay, gcol] = RT_term * FT(2) * k * exp_minusktau     # Eqn. 26
 
     # Transmittance of direct, unscattered beam. Also used below
-    Tnoscat[glay, gcol] = exp(-τ[glay, gcol] * zenith[gcol])
+    Tnoscat[glay, gcol] = exp(-τ[glay, gcol] / cos(zenith[gcol]))
 
     # Direct reflect and transmission
-    k_μ = k / zenith[gcol]
+    k_μ = k * cos(zenith[gcol])
     k_γ3 = k * γ3
     k_γ4 = k * γ4
 
@@ -446,12 +432,13 @@ end
             (FT(1) - k_μ) * (α1 - k_γ4) * exp_minus2ktau * Tnoscat[glay, gcol] -
             FT(2) * (k_γ4 + α1 * k_μ) * exp_minusktau
         )
-    @synchronize
 end
 
 @kernel function sw_source_2str_kernel!(
     slv::Solver{FT,I,FTA1D,FTA2D},
     flux::AbstractFlux{FT,FTA2D},
+    solar_frac::FT,
+    ibnd::I,
     ::Val{nlay},
     ::Val{ncol},
 ) where {
@@ -464,24 +451,18 @@ end
 }
     gcol = @index(Global, Linear) # global col ids
 
-    toa_flux = slv.bcs_sw.toa_flux
-    zenith = slv.bcs_sw.zenith
-    Rdir, Tdir = slv.src_sw.Rdir, slv.src_sw.Tdir
-    Tnoscat = slv.src_sw.Tnoscat
-    sfc_albedo = slv.src_sw.sfc_albedo
-    src_up, src_dn = slv.src_sw.src_up, slv.src_sw.src_dn
-    src_sfc = slv.src_sw.src_sfc
+    @unpack toa_flux, zenith, sfc_alb_direct = slv.bcs_sw
+    @unpack Rdir, Tdir, Tnoscat, src_up, src_dn, sfc_source = slv.src_sw
     flux_dn_dir = flux.flux_dn_dir
 
     # layer index = level index
     # previous level is up (+1)
-    flux_dn_dir[nlay+1, gcol] = toa_flux[gcol] * zenith[gcol]
+    flux_dn_dir[nlay+1, gcol] = toa_flux[gcol] * solar_frac * cos(zenith[gcol])
     for ilev = nlay:-1:1
         src_up[ilev, gcol] = Rdir[ilev, gcol] * flux_dn_dir[ilev+1, gcol]
         src_dn[ilev, gcol] = Tdir[ilev, gcol] * flux_dn_dir[ilev+1, gcol]
         flux_dn_dir[ilev, gcol] =
             Tnoscat[ilev, gcol] * flux_dn_dir[ilev+1, gcol]
     end
-    src_sfc[gcol] = flux_dn_dir[1, gcol] * sfc_albedo[gcol]
-    @synchronize
+    sfc_source[gcol] = flux_dn_dir[1, gcol] * sfc_alb_direct[ibnd, gcol]
 end

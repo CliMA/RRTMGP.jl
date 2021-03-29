@@ -6,7 +6,7 @@ using RRTMGP
 using RRTMGP.AngularDiscretizations
 using RRTMGP.Fluxes
 using RRTMGP.RTE
-using RRTMGP.GrayRTESolver
+using RRTMGP.RTESolver
 using RRTMGP.Optics
 using RRTMGP.GrayUtils
 using RRTMGP.AtmosphericStates
@@ -33,26 +33,26 @@ function gray_atmos_lw_equil(
     ::Type{I},
     ::Type{DA},
 ) where {FT<:AbstractFloat,I<:Int,DA}
-    nlay = 60                         # number of layers
-    p0 = FT(100000)                   # surface pressure (Pa)
-    pe = FT(9000)                     # TOA pressure (Pa)
-    nbnd, ngpt = 1, 1                 # # of nbands/g-points (=1 for gray radiation)
-    nlev = nlay + 1                   # # of layers
-    tb = FT(320)                      # surface temperature
-    tstep = 6.0                       # timestep in hours
-    Δt = FT(60 * 60 * tstep)          # timestep in seconds
-    ndays = 365 * 40                  # # of simulation days
-    nsteps = ndays * (24 / tstep)     # number of timesteps
-    temp_toler = FT(0.1)              # tolerance for temperature (Kelvin)
-    flux_grad_toler = FT(1e-5)        # tolerance for flux gradient
-    n_gauss_angles = I(1)             # for non-scattering calculation
-    sfc_emis = Array{FT}(undef, ncol) # surface emissivity
+    nlay = 60                               # number of layers
+    p0 = FT(100000)                         # surface pressure (Pa)
+    pe = FT(9000)                           # TOA pressure (Pa)
+    nbnd, ngpt = 1, 1                       # # of nbands/g-points (=1 for gray radiation)
+    nlev = nlay + 1                         # # of layers
+    tb = FT(320)                            # surface temperature
+    tstep = 6.0                             # timestep in hours
+    Δt = FT(60 * 60 * tstep)                # timestep in seconds
+    ndays = 365 * 40                        # # of simulation days
+    nsteps = ndays * (24 / tstep)           # number of timesteps
+    temp_toler = FT(0.1)                    # tolerance for temperature (Kelvin)
+    flux_grad_toler = FT(1e-5)              # tolerance for flux gradient
+    n_gauss_angles = I(1)                   # for non-scattering calculation
+    sfc_emis = Array{FT}(undef, nbnd, ncol) # surface emissivity
     sfc_emis .= FT(1.0)
-    inc_flux = nothing                # incoming flux
-    max_threads = Int(256)            # maximum number of threads for KA kernels
+    inc_flux = nothing                      # incoming flux
+    max_threads = Int(256)                  # maximum number of threads for KA kernels
 
     if ncol == 1
-        lat = DA{FT}([0])             # latitude
+        lat = DA{FT}([0])                   # latitude
     else
         lat = DA{FT}(range(FT(-π / 2), FT(π / 2), length = ncol)) # latitude
     end
@@ -61,7 +61,7 @@ function gray_atmos_lw_equil(
     as = setup_gray_as_pr_grid(nlay, lat, p0, pe, param_set, DA)
     op = init_optical_props(opc, FT, DA, ncol, nlay)
     src_lw = source_func_longwave(FT, ncol, nlay, ngpt, opc, DA)
-    bcs_lw = LwBCs(DA{FT,1}(sfc_emis), inc_flux)
+    bcs_lw = LwBCs(DA{FT,2}(sfc_emis), inc_flux)
     angle_disc = AngularDiscretization(opc, FT, n_gauss_angles, DA)
     fluxb_lw = nothing #FluxLW(ncol, nlay, FT, DA) 
     flux_lw = FluxLW(ncol, nlay, FT, DA)
@@ -167,15 +167,16 @@ function gray_atmos_sw_test(
     ndays = 365 * 40                  # # of simulation days
     nsteps = ndays * (24 / tstep)     # number of timesteps
     n_gauss_angles = I(1)             # for non-scattering calculation
-    sfc_emis = Array{FT}(undef, ncol) # surface emissivity
+    sfc_emis = Array{FT}(undef, nbnd, ncol) # surface emissivity
     sfc_emis .= FT(1.0)
     max_threads = Int(256)            # maximum number of threads for KA kernels
+    deg2rad = FT(π) / FT(180)
 
+    zenith = Array{FT}(undef, ncol)   # solar zenith angle in radians
     toa_flux = Array{FT}(undef, ncol) # top of atmosphere flux
-    sfc_alb_direct = Array{FT}(undef, ncol) # surface albedo (direct)
-    sfc_alb_diffuse = Array{FT}(undef, ncol) # surface albedo (diffuse)
+    sfc_alb_direct = Array{FT}(undef, nbnd, ncol) # surface albedo (direct)
+    sfc_alb_diffuse = nothing               # surface albedo (diffuse)
     inc_flux_diffuse = nothing
-    zenith = Array{FT}(undef, ncol) # cosecant of solar zenith angle
 
     top_at_1 = false                          # Top-of-atmos at pt# 1 (true/false)
 
@@ -185,10 +186,9 @@ function gray_atmos_sw_test(
         lat = DA{FT}(range(FT(-π / 2), FT(π / 2), length = ncol)) # latitude
     end
 
+    zenith .= deg2rad * 52.95 #acsc(FT(1.66))               # corresponding to ~52.95 deg zenith angle    
     toa_flux .= FT(1407.679)
     sfc_alb_direct .= FT(0.1)
-    sfc_alb_diffuse .= FT(0.1)
-    zenith .= FT(1.66)               # corresponding to ~52.95 deg zenith angle    
 
     as = setup_gray_as_pr_grid(nlay, lat, p0, pe, param_set, DA) # init gray atmos state
     op = init_optical_props(opc, FT, DA, ncol, nlay) # init optical properties
@@ -196,14 +196,14 @@ function gray_atmos_sw_test(
     bcs_sw = SwBCs(
         DA,
         FT,
+        zenith,
         toa_flux,
         sfc_alb_direct,
         sfc_alb_diffuse,
-        zenith,
         inc_flux_diffuse,
     )
-    fluxb_sw = nothing
-    flux_sw = FluxSWNoScat(ncol, nlay, FT, DA)
+    fluxb_sw = init_flux_sw(ncol, nlay, FT, DA, opc)
+    flux_sw = init_flux_sw(ncol, nlay, FT, DA, opc)
     println("Running shortwave test for gray atmosphere model - $(opc); ncol = $ncol; DA = $DA")
 
     slv = Solver{
@@ -237,12 +237,16 @@ function gray_atmos_sw_test(
     )
     solve_sw!(slv, max_threads = max_threads)
 
+    τ = Array(slv.op.τ)
+    zenith = Array(zenith)
+    flux_dn_dir = Array(slv.flux_sw.flux_dn_dir)
+
     # testing with exact solution
-    ot_tot = sum(slv.op.τ[:, 1]) * zenith[1]
-    exact = toa_flux[1] * zenith[1] * exp(-ot_tot)
+    ot_tot = sum(τ[:, 1]) / cos(zenith[1])
+    exact = (toa_flux[1] * cos(zenith[1])) * exp(-ot_tot)
 
     rel_toler = FT(0.001)
-    rel_error = abs(slv.flux_sw.flux_dn_dir[1] - exact) / exact
+    rel_error = abs(flux_dn_dir[1] - exact) / exact
     println("relative error = $rel_error")
     @test rel_error < rel_toler
 end

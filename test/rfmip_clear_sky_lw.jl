@@ -1,3 +1,7 @@
+using Test
+using Pkg.Artifacts
+using NCDatasets
+
 using RRTMGP
 using RRTMGP.Device: array_type, array_device
 using RRTMGP.Vmrs
@@ -9,14 +13,17 @@ using RRTMGP.BCs
 using RRTMGP.Fluxes
 using RRTMGP.AngularDiscretizations
 using RRTMGP.RTE
-using RRTMGP.GrayRTESolver
+using RRTMGP.RTESolver
 
 using CLIMAParameters
 struct EarthParameterSet <: AbstractEarthParameterSet end
 const param_set = EarthParameterSet()
+# overriding some parameters to match with RRTMGP FORTRAN code
+CLIMAParameters.Planet.grav(::EarthParameterSet) = 9.80665
+CLIMAParameters.Planet.molmass_dryair(::EarthParameterSet) = 0.028964
+CLIMAParameters.Planet.molmass_water(::EarthParameterSet) = 0.018016
 
-using NCDatasets
-
+include("reference_files.jl")
 include("read_rfmip_clear_sky.jl")
 #---------------------------------------------------------------
 function lw_rfmip(
@@ -26,13 +33,22 @@ function lw_rfmip(
     ::Type{DA},
 ) where {FT<:AbstractFloat,I<:Int,DA}
 
-    homefolder = pwd()
-    lw_file = joinpath(
-        homefolder,
-        "data",
-        "rrtmgp",
-        "data",
-        "rrtmgp-data-lw-g256-2018-12-04.nc",
+    lw_file = get_ref_filename(:lookup_tables, :clearsky, λ = :lw) # lw lookup tables
+    lw_input_file = get_ref_filename(:atmos_state, :clearsky)      # clear-sky atmos state
+    # reference data files for comparison
+    flux_up_file = get_ref_filename(
+        :comparison,
+        :clearsky,
+        λ = :lw,
+        flux_up_dn = :flux_up,
+        opc = opc,
+    )
+    flux_dn_file = get_ref_filename(
+        :comparison,
+        :clearsky,
+        λ = :lw,
+        flux_up_dn = :flux_dn,
+        opc = opc,
     )
 
     FTA1D = DA{FT,1}
@@ -46,17 +62,9 @@ function lw_rfmip(
     lookup_lw, idx_gases = LookUpLW(ds_lw, I, FT, DA)
     close(ds_lw)
     # reading rfmip data to atmospheric state
-    lw_input_file = joinpath(
-        homefolder,
-        "data",
-        "examples",
-        "rfmip-clear-sky",
-        "multiple_input4MIPs_radiation_RFMIP_UColorado-RFMIP-1-2_none.nc",
-    )
-
     ds_lw_in = Dataset(lw_input_file, "r")
 
-    as = setup_rfmip_as(
+    (as, sfc_emis, _, _, _) = setup_rfmip_as(
         ds_lw_in,
         idx_gases,
         exp_no,
@@ -69,12 +77,12 @@ function lw_rfmip(
 
     ncol, nlay, ngpt = as.ncol, as.nlay, lookup_lw.n_gpt
     nlev = nlay + 1
-    op = init_optical_props(opc, FT, DA, ncol, nlay)                     # allocating optical properties object
-    src_lw = source_func_longwave(FT, ncol, nlay, ngpt, opc, DA)        # allocating longwave source function object
-    bcs_lw = LwBCs{FT,typeof(as.sfc_emis),Nothing}(as.sfc_emis, nothing) # setting up boundary conditions
-    ang_disc = AngularDiscretization(opc, FT, n_gauss_angles, DA)        # initializing Angular discretization
-    fluxb_lw = FluxLW(ncol, nlay, FT, DA)                                # flux storage for bandwise calculations
-    flux_lw = FluxLW(ncol, nlay, FT, DA)                                 # longwave fluxes
+    op = init_optical_props(opc, FT, DA, ncol, nlay)               # allocating optical properties object
+    src_lw = source_func_longwave(FT, ncol, nlay, ngpt, opc, DA)   # allocating longwave source function object
+    bcs_lw = LwBCs{FT,typeof(sfc_emis),Nothing}(sfc_emis, nothing) # setting up boundary conditions
+    ang_disc = AngularDiscretization(opc, FT, n_gauss_angles, DA)  # initializing Angular discretization
+    fluxb_lw = FluxLW(ncol, nlay, FT, DA)                          # flux storage for bandwise calculations
+    flux_lw = FluxLW(ncol, nlay, FT, DA)                           # longwave fluxes
     # initializing RTE solver
     slv = Solver{
         FT,
@@ -112,41 +120,31 @@ function lw_rfmip(
     end
 
 
-    # reading comparison data
-
-    flux_up_comp_file = joinpath(
-        homefolder,
-        "data",
-        "examples",
-        "rfmip-clear-sky",
-        "rlu_Efx_RTE-RRTMGP-181204_rad-irf_r1i1p1f1_gn.nc",
-    )
-
-
-    flux_dn_comp_file = joinpath(
-        homefolder,
-        "data",
-        "examples",
-        "rfmip-clear-sky",
-        "rld_Efx_RTE-RRTMGP-181204_rad-irf_r1i1p1f1_gn.nc",
-    )
-
+    # comparing with data from RRTMGP FORTRAN code
     flip_ind = nlev:-1:1
 
-    ds_flux_up = Dataset(flux_up_comp_file, "r")
+    ds_flux_up = Dataset(flux_up_file, "r")
     comp_flux_up = ds_flux_up["rlu"][:][flip_ind, :, exp_no]
     close(ds_flux_up)
 
-    ds_flux_dn = Dataset(flux_dn_comp_file, "r")
+    ds_flux_dn = Dataset(flux_dn_file, "r")
     comp_flux_dn = ds_flux_dn["rld"][:][flip_ind, :, exp_no]
     close(ds_flux_dn)
 
     max_err_flux_up = maximum(abs.(slv.flux_lw.flux_up - comp_flux_up))
     max_err_flux_dn = maximum(abs.(slv.flux_lw.flux_dn - comp_flux_dn))
-    println(" $opc; max_err_flux_up = $max_err_flux_up")
-    println(" $opc; max_err_flux_dn = $max_err_flux_dn")
+
+    println("=======================================")
+    println("Clear-sky longwave test - $opc")
+    println("max_err_flux_up = $max_err_flux_up")
+    println("max_err_flux_dn = $max_err_flux_dn")
+
+    toler = 1e-4
+
+    @test max_err_flux_up ≤ toler
+    @test max_err_flux_dn ≤ toler
 end
 
 
 lw_rfmip(:OneScalar, Float64, Int, array_type())
-lw_rfmip(:TwoSream, Float64, Int, array_type())
+lw_rfmip(:TwoStream, Float64, Int, array_type())

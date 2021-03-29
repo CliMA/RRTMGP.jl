@@ -13,6 +13,6 @@ include(joinpath("optics", "GrayUtils.jl"))
 include(joinpath("optics", "BCs.jl"))
 include(joinpath("optics", "RTE.jl"))
 
-include(joinpath("rte", "GrayRTESolver.jl"))
+include(joinpath("rte", "RTESolver.jl"))
 
 end # module

@@ -23,12 +23,12 @@ struct Solver{
     I<:Int,
     FTA1D<:AbstractArray{FT,1},
     FTA2D<:AbstractArray{FT,2},
-    AS<:AbstractAtmosphericState{FT,FTA1D,FTA2D,I},
+    AS<:AbstractAtmosphericState{FT},
     OP<:AbstractOpticalProps{FT,FTA2D},
-    SL<:Union{AbstractSource{FT,FTA2D},Nothing},
-    SS<:Union{AbstractSource{FT,FTA2D},Nothing},
-    BCL<:Union{AbstractBCs{FT,FTA1D},Nothing},
-    BCS<:Union{AbstractBCs{FT,FTA1D},Nothing},
+    SL<:Union{AbstractSource{FT},Nothing},
+    SS<:Union{AbstractSource{FT},Nothing},
+    BCL<:Union{AbstractBCs{FT},Nothing},
+    BCS<:Union{AbstractBCs{FT},Nothing},
     AD<:Union{AngularDiscretization{FT,FTA1D,I},Nothing},
     FXBL<:Union{AbstractFlux{FT,FTA2D},Nothing},
     FXBS<:Union{AbstractFlux{FT,FTA2D},Nothing},
@@ -47,6 +47,7 @@ struct Solver{
     flux_lw::FXL   # fluxes for longwave problem
     flux_sw::FXS   # fluxes for longwave problem
 end
+
 Solver(
     as,
     op,
@@ -84,5 +85,6 @@ Solver(
     flux_lw,
     flux_sw,
 )
+
 Adapt.@adapt_structure Solver
 end

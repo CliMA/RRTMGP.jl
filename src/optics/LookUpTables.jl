@@ -4,7 +4,7 @@ using DocStringExtensions
 using ..Device: array_type
 using Adapt
 
-export AbstractLookUp, LookUpLW, LookUpSW
+export AbstractLookUp, LookUpLW, LookUpSW, LookUpCld
 
 abstract type AbstractLookUp{
     I,
@@ -53,6 +53,7 @@ struct LookUpLW{
     p_ref_tropo::FT
     t_ref_absrb::FT
     p_ref_absrb::FT
+    p_ref_min::FT
 
     Δ_t_ref::FT
     Δ_ln_p_ref::FT
@@ -297,6 +298,8 @@ function LookUpLW(
     t_ref = FTA1D(ds["temp_ref"][:])
     vmr_ref = FTA3D(ds["vmr_ref"][:])
 
+    p_ref_min = minimum(ds["press_ref"][:])
+
     Δ_t_ref = t_ref[2] - t_ref[1]
     Δ_ln_p_ref = log(p_ref[1]) - log(p_ref[2])
 
@@ -321,6 +324,7 @@ function LookUpLW(
             p_ref_tropo,
             t_ref_absrb,
             p_ref_absrb,
+            p_ref_min,
             Δ_t_ref,
             Δ_ln_p_ref,
             idx_gases_minor_lower,
@@ -348,7 +352,7 @@ function LookUpLW(
             minor_lower_gpt_sh,
             minor_upper_gpt_sh,
             minor_lower_scales_with_density,
-            minor_lower_scales_with_density,
+            minor_upper_scales_with_density,
             lower_scale_by_complement,
             upper_scale_by_complement,
             p_ref,
@@ -391,9 +395,12 @@ struct LookUpSW{
     p_ref_tropo::FT
     t_ref_absrb::FT
     p_ref_absrb::FT
+    p_ref_min::FT
 
     Δ_t_ref::FT
     Δ_ln_p_ref::FT
+
+    solar_src_tot::FT
 
     idx_gases_minor_lower::IA1D
     idx_gases_minor_upper::IA1D
@@ -438,7 +445,7 @@ struct LookUpSW{
 
     rayl_lower::FTA3D
     rayl_upper::FTA3D
-    solar_src::FTA1D
+    solar_src_scaled::FTA1D
 end
 Adapt.@adapt_structure LookUpSW
 
@@ -539,7 +546,6 @@ function LookUpSW(
             idx_scaling_gas_upper[igas] = idx_gases[scaling_gas_upper[igas]]
         end
     end
-
     key_species = IA3D(ds["key_species"][:])
 
     kmajor = FTA4D(ds["kmajor"][:])
@@ -619,7 +625,6 @@ function LookUpSW(
         IA1D(ds["minor_scales_with_density_lower"][:])
     minor_upper_scales_with_density =
         IA1D(ds["minor_scales_with_density_upper"][:])
-
     lower_scale_by_complement = IA1D(ds["scale_by_complement_lower"][:])
     upper_scale_by_complement = IA1D(ds["scale_by_complement_upper"][:])
 
@@ -627,12 +632,17 @@ function LookUpSW(
     t_ref = FTA1D(ds["temp_ref"][:])
     vmr_ref = FTA3D(ds["vmr_ref"][:])
 
+    p_ref_min = minimum(p_ref)
+
     Δ_t_ref = t_ref[2] - t_ref[1]
     Δ_ln_p_ref = log(p_ref[1]) - log(p_ref[2])
 
     rayl_lower = FTA3D(ds["rayl_lower"][:])
     rayl_upper = FTA3D(ds["rayl_upper"][:])
-    solar_src = FTA1D(ds["solar_source"][:])
+
+    solar_src = ds["solar_source"][:]
+    solar_src_tot = FT(sum(solar_src))
+    solar_src_scaled = FTA1D(solar_src ./ solar_src_tot)
 
     return (
         LookUpSW{I,FT,UI8,UI8A1D,IA1D,IA2D,IA3D,FTA1D,FTA2D,FTA3D,FTA4D}(
@@ -654,8 +664,10 @@ function LookUpSW(
             p_ref_tropo,
             t_ref_absrb,
             p_ref_absrb,
+            p_ref_min,
             Δ_t_ref,
             Δ_ln_p_ref,
+            solar_src_tot,
             idx_gases_minor_lower,
             idx_gases_minor_upper,
             idx_scaling_gas_lower,
@@ -678,7 +690,7 @@ function LookUpSW(
             minor_lower_gpt_sh,
             minor_upper_gpt_sh,
             minor_lower_scales_with_density,
-            minor_lower_scales_with_density,
+            minor_upper_scales_with_density,
             lower_scale_by_complement,
             upper_scale_by_complement,
             p_ref,
@@ -686,10 +698,206 @@ function LookUpSW(
             vmr_ref,
             rayl_lower,
             rayl_upper,
-            solar_src,
+            solar_src_scaled,
         ),
         idx_gases,
     )
+end
+
+"""
+    LookUpCld{
+    I,
+    FT,
+    FTA1D,
+    FTA2D,
+    FTA3D,
+    FTA4D,
+}
+    AtmosphericState{
+    FT<:AbstractFloat,
+    FTA1D<:AbstractArray{FT,1},
+    FTA2D<:AbstractArray{FT,2},
+    FTA3D<:AbstractArray{FT,3},
+    VMR<:Vmr{FT,FTA1D,FTA2D},
+    I<:Int,
+}
+
+Lookup table for cloud optics.
+
+This struct stores the tables and Pade coefficients for determing extinction coeffient, 
+single-scattering albedo, and asymmetry parameter g as a function of effective radius.
+We compute the optical depth tau (=exintinction coeff * condensed water path)
+and the products tau*ssa and tau*ssa*g for liquid and ice cloud separately.
+These are used to determine the optical properties of ice and water cloud together.
+
+
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
+struct LookUpCld{I,FT,FTA1D,FTA2D,FTA3D,FTA4D}
+    "number of bands"
+    nband::I
+    "number of ice roughness types"
+    nrghice::I
+    "number of liquid particle sizes"
+    nsize_liq::I
+    "number of ice particle sizes"
+    nsize_ice::I
+    "number of size regimes"
+    nsizereg::I
+    "number of extinction coefficients for pade approximation"
+    ncoeff_ext::I
+    "number of ssa/g coefficients for pade approximation"
+    ncoeff_ssa_g::I
+    "number of size regime boundaries for pade interpolation"
+    nbound::I
+    "pair = 2"
+    pair::I
+    "liquid particle size lower bound for LUT interpolation"
+    radliq_lwr::FT
+    "liquid particle size upper bound for LUT interpolation"
+    radliq_upr::FT
+    "factor for calculating LUT interpolation for liquid particle"
+    radliq_fac::FT
+    "ice particle size lower bound for LUT interpolation"
+    radice_lwr::FT
+    "ice particle size upper bound for LUT interpolation"
+    radice_upr::FT
+    "factor for calculating LUT interpolation for ice particle"
+    radice_fac::FT
+    "LUT liquid extinction coefficient (`nsize_liq, nbnd`) m²/g"
+    lut_extliq::FTA2D
+    "LUT liquid single scattering albedo (`nsize_liq, nbnd`)"
+    lut_ssaliq::FTA2D
+    "LUT liquid asymmetry parameter (`nsize_liq, nbnd`)"
+    lut_asyliq::FTA2D
+    "LUT ice extinction coefficient (`nsize_ice, nband, nrghice`) m²/g"
+    lut_extice::FTA3D
+    "LUT ice single scattering albedo (`nsize_ice, nband, nrghice`)"
+    lut_ssaice::FTA3D
+    "LUT ice asymmetry parameter (`nsize_ice, nband, nrghice`)"
+    lut_asyice::FTA3D
+    "pade coefficients for liquid extinction (`nband, nsizereg, ncoeff_ext`)"
+    pade_extliq::FTA3D
+    "pade coefficients for liquid single scattening albedo (`nband, nsizereg, ncoeff_ssa_g`)"
+    pade_ssaliq::FTA3D
+    "pade coefficients for liquid asymmetry paramter (`nband, nsizereg, ncoeff_ssa_g`)"
+    pade_asyliq::FTA3D
+    "pade coefficients for ice extinction (`nband, nsizereg, ncoeff_ext, nrghice`)"
+    pade_extice::FTA4D
+    "pade coefficients for ice single scattening albedo (`nband, nsizereg, ncoeff_ssa_g, nrghice`)"
+    pade_ssaice::FTA4D
+    "pade coefficients for ice asymmetry paramter (`nband, nsizereg, ncoeff_ssa_g, nrghice`)"
+    pade_asyice::FTA4D
+    "pade size regime boundaries for liquid extinction coefficient for pade interpolation (`nbound`) μm"
+    pade_sizreg_extliq::FTA1D
+    "pade size regime boundaries for liquid single scattering albedo for pade interpolation (`nbound`) μm"
+    pade_sizreg_ssaliq::FTA1D
+    "pade size regime boundaries for liquid asymmetry parameter for pade interpolation (`nbound`) μm"
+    pade_sizreg_asyliq::FTA1D
+    "pade size regime boundaries for ice extinction coefficient for pade interpolation (`nbound`) μm"
+    pade_sizreg_extice::FTA1D
+    "pade size regime boundaries for ice single scattering albedo for pade interpolation (`nbound`) μm"
+    pade_sizreg_ssaice::FTA1D
+    "pade size regime boundaries for ice asymmetry parameter for pade interpolation (`nbound`) μm"
+    pade_sizreg_asyice::FTA1D
+    "beginning and ending wavenumber for each band (`2, nband`) cm⁻¹"
+    bnd_lims_wn::FTA2D
+end
+
+function LookUpCld(
+    ds,
+    ::Type{I},
+    ::Type{FT},
+    ::Type{DA},
+) where {I<:Int,FT<:AbstractFloat,DA}
+
+    FTA1D = DA{FT,1}
+    FTA2D = DA{FT,2}
+    FTA3D = DA{FT,3}
+    FTA4D = DA{FT,4}
+
+    nband = I(ds.dim["nband"])
+    nrghice = I(ds.dim["nrghice"])
+    nsize_liq = I(ds.dim["nsize_liq"])
+    nsize_ice = I(ds.dim["nsize_ice"])
+    nsizereg = I(ds.dim["nsizereg"])
+    ncoeff_ext = I(ds.dim["ncoeff_ext"])
+    ncoeff_ssa_g = I(ds.dim["ncoeff_ssa_g"])
+    nbound = I(ds.dim["nbound"])
+    pair = I(ds.dim["pair"])
+
+    radliq_lwr = FT(ds["radliq_lwr"][:])
+    radliq_upr = FT(ds["radliq_upr"][:])
+    radliq_fac = FT(ds["radliq_fac"][:])
+
+    radice_lwr = FT(ds["radice_lwr"][:])
+    radice_upr = FT(ds["radice_upr"][:])
+    radice_fac = FT(ds["radice_fac"][:])
+
+    lut_extliq = FTA2D(ds["lut_extliq"][:])
+    lut_ssaliq = FTA2D(ds["lut_ssaliq"][:])
+    lut_asyliq = FTA2D(ds["lut_asyliq"][:])
+
+    lut_extice = FTA3D(ds["lut_extice"][:])
+    lut_ssaice = FTA3D(ds["lut_ssaice"][:])
+    lut_asyice = FTA3D(ds["lut_asyice"][:])
+
+    pade_extliq = FTA3D(ds["pade_extliq"][:])
+    pade_ssaliq = FTA3D(ds["pade_ssaliq"][:])
+    pade_asyliq = FTA3D(ds["pade_asyliq"][:])
+
+    pade_extice = FTA4D(ds["pade_extice"][:])
+    pade_ssaice = FTA4D(ds["pade_ssaice"][:])
+    pade_asyice = FTA4D(ds["pade_asyice"][:])
+
+    pade_sizreg_extliq = FTA1D(ds["pade_sizreg_extliq"][:])
+    pade_sizreg_ssaliq = FTA1D(ds["pade_sizreg_ssaliq"][:])
+    pade_sizreg_asyliq = FTA1D(ds["pade_sizreg_asyliq"][:])
+
+    pade_sizreg_extice = FTA1D(ds["pade_sizreg_extice"][:])
+    pade_sizreg_ssaice = FTA1D(ds["pade_sizreg_ssaice"][:])
+    pade_sizreg_asyice = FTA1D(ds["pade_sizreg_asyice"][:])
+
+    bnd_lims_wn = FTA2D(ds["bnd_limits_wavenumber"][:])
+
+    return (LookUpCld{I,FT,FTA1D,FTA2D,FTA3D,FTA4D}(
+        nband,
+        nrghice,
+        nsize_liq,
+        nsize_ice,
+        nsizereg,
+        ncoeff_ext,
+        ncoeff_ssa_g,
+        nbound,
+        pair,
+        radliq_lwr,
+        radliq_upr,
+        radliq_fac,
+        radice_lwr,
+        radice_upr,
+        radice_fac,
+        lut_extliq,
+        lut_ssaliq,
+        lut_asyliq,
+        lut_extice,
+        lut_ssaice,
+        lut_asyice,
+        pade_extliq,
+        pade_ssaliq,
+        pade_asyliq,
+        pade_extice,
+        pade_ssaice,
+        pade_asyice,
+        pade_sizreg_extliq,
+        pade_sizreg_ssaliq,
+        pade_sizreg_asyliq,
+        pade_sizreg_extice,
+        pade_sizreg_ssaice,
+        pade_sizreg_asyice,
+        bnd_lims_wn,
+    ))
+
 end
 
 end

@@ -9,7 +9,6 @@ using ..Device: array_type, array_device
 
 export AbstractFlux,
     FluxLW,
-    FluxSW2Str,
     FluxSWNoScat,
     FluxSW2Str,
     init_flux_sw,
@@ -55,10 +54,11 @@ end
 
 struct FluxSWNoScat{FT<:AbstractFloat,FTA2D<:AbstractArray{FT,2}} <:
        AbstractFlux{FT,FTA2D}
+    flux_up::FTA2D
     flux_dn_dir::FTA2D
 end
 FluxSWNoScat(flux_dn_dir) =
-    FluxSWNoScat{eltype(flux_dn_dir),typeof(flux_dn_dir)}(flux_dn_dir)
+    FluxSWNoScat{eltype(flux_dn_dir),typeof(flux_dn_dir)}(flux_up, flux_dn_dir)
 Adapt.@adapt_structure FluxSWNoScat
 
 function FluxSWNoScat(
@@ -67,7 +67,10 @@ function FluxSWNoScat(
     ::Type{FT},
     ::Type{DA},
 ) where {FT<:AbstractFloat,DA}
-    return FluxSWNoScat{FT,DA{FT,2}}(DA{FT}(undef, nlay + 1, ncol),)
+    return FluxSWNoScat{FT,DA{FT,2}}(
+        DA{FT}(undef, nlay + 1, ncol),
+        DA{FT}(undef, nlay + 1, ncol),
+    )
 end
 
 struct FluxSW2Str{FT<:AbstractFloat,FTA2D<:AbstractArray{FT,2}} <:
@@ -134,14 +137,14 @@ end
 function set_flux_to_zero!(
     flux::FluxSW2Str{FT,FTA2D},
 ) where {FT<:AbstractFloat,FTA2D<:AbstractArray{FT,2}}
-    flux_up .= FT(0)
-    flux_dn .= FT(0)
-    flux_net .= FT(0)
+    flux.flux_up .= FT(0)
+    flux.flux_dn .= FT(0)
+    flux.flux_net .= FT(0)
     flux.flux_dn_dir .= FT(0)
     return nothing
 end
 
-# flux1 += flux2
+# flux1 .+= flux2
 function add_to_flux!(
     flux1::FluxLW{FT,FTA2D},
     flux2::FluxLW{FT,FTA2D},

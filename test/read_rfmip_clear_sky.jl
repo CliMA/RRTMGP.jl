@@ -9,30 +9,44 @@ function setup_rfmip_as(
     DA,
     max_threads,
 )
-
+    deg2rad = FT(π) / FT(180)
     nlay = Int(ds_lw_in.dim["layer"])
     ncol = Int(ds_lw_in.dim["site"])
     nlev = nlay + 1
     ngas = lookup.n_gases
+    nbnd = lookup.n_bnd
 
     lon = DA{FT,1}(ds_lw_in["lon"][:])
     lat = DA{FT,1}(ds_lw_in["lat"][:])
 
-    sfc_emis = DA{FT,1}(ds_lw_in["surface_emissivity"][:])
-    sfc_alb = DA{FT,1}(ds_lw_in["surface_albedo"][:])
+    lon = nothing # This example skips latitude dependent gravity compution to be consistent with the
+    lat = nothing # FORTRAN RRTMGP test case.
 
-    zenith = DA{FT,1}(ds_lw_in["solar_zenith_angle"][:])
+    sfc_emis = DA(repeat(
+        reshape(Array{FT}(ds_lw_in["surface_emissivity"][:]), 1, :),
+        nbnd,
+        1,
+    )) # all bands use same emissivity
+    sfc_alb = DA(repeat(
+        reshape(Array{FT}(ds_lw_in["surface_albedo"][:]), 1, :),
+        nbnd,
+        1,
+    )) # all bands use same albedo
+
+    zenith = DA{FT,1}(deg2rad .* ds_lw_in["solar_zenith_angle"][:])
     irrad = DA{FT,1}(ds_lw_in["total_solar_irradiance"][:])
 
 
-    p_lev = ds_lw_in["pres_level"][:, 1]
+    p_lev = ds_lw_in["pres_level"][:]
 
-    lev_ind = p_lev[1] > p_lev[end] ? (1:nlev) : (nlev:-1:1)
-    lay_ind = p_lev[1] > p_lev[end] ? (1:nlay) : (nlay:-1:1)
+    lev_ind = p_lev[1, 1] > p_lev[end, 1] ? (1:nlev) : (nlev:-1:1)
+    lay_ind = p_lev[1, 1] > p_lev[end, 1] ? (1:nlay) : (nlay:-1:1)
 
-    p_lev = DA{FT,2}(ds_lw_in["pres_level"][:][lev_ind, :])
-    t_lev = DA{FT,2}(ds_lw_in["temp_level"][:][lev_ind, :, exp_no])
+    p_lev[lev_ind[end], :] .= lookup.p_ref_min
+
+    p_lev = DA{FT,2}(p_lev[lev_ind, :])
     p_lay = DA{FT,2}(ds_lw_in["pres_layer"][:][lay_ind, :])
+    t_lev = DA{FT,2}(ds_lw_in["temp_level"][:][lev_ind, :, exp_no])
     t_lay = DA{FT,2}(ds_lw_in["temp_layer"][:][lay_ind, :, exp_no])
 
     t_sfc = DA{FT,1}(ds_lw_in["surface_temperature"][:, exp_no])
@@ -113,26 +127,30 @@ function setup_rfmip_as(
     #    vmr[idx_gases["no2"]] = FT(ds_lw_in["no2_GM"][exp_no]) *                # missing from input file
     #                                         parse(FT, ds_lw_in["hfc32_GM"].attrib["units"])
 
-    compute_col_dry!(p_lev, t_lay, col_dry, param_set, vmr_h2o, lat)
+    # This example skips latitude dependent gravity compution to be consistent with the
+    # FORTRAN RRTMGP test case.
+    compute_col_dry!(p_lev, t_lay, col_dry, param_set, vmr_h2o, lat) # the example skips lat based 
 
-    vmr = Vmr(vmr_h2o, vmr_o3, DA(vmrat))
+    vmr = VmrGM(vmr_h2o, vmr_o3, DA(vmrat))
     #------------------
-    return AtmosphericState{FT,DA{FT,1},DA{FT,2},typeof(vmr),Int}(
-        lon,
-        lat,
+    return (
+        AtmosphericState{FT,DA{FT,1},typeof(lat),DA{FT,2},typeof(vmr),Int}(
+            lon,
+            lat,
+            p_lay,
+            p_lev,
+            t_lay,
+            t_lev,
+            t_sfc,
+            col_dry,
+            vmr,
+            nlay,
+            ncol,
+            ngas,
+        ),
         sfc_emis,
         sfc_alb,
         zenith,
         irrad,
-        p_lay,
-        p_lev,
-        t_lay,
-        t_lev,
-        t_sfc,
-        col_dry,
-        vmr,
-        nlay,
-        ncol,
-        ngas,
     )
 end

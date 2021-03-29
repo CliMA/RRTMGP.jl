@@ -12,7 +12,7 @@ using ..AtmosphericStates
 using ..Sources
 #---------------------------------------
 using CLIMAParameters
-using CLIMAParameters.Planet: molmass_dryair, molmass_water
+using CLIMAParameters.Planet: molmass_dryair, molmass_water, grav
 #---------------------------------------
 
 export AbstractOpticalProps,
@@ -119,6 +119,7 @@ function compute_col_dry!(
     mol_m_dry = FT(molmass_dryair(param_set))
     mol_m_h2o = FT(molmass_water(param_set))
     avogadro = FT(avogad())
+    helmert1 = FT(grav(param_set))
     #------Launching computation kernel-----------------------
     thr_y = min(32, ncol)
     thr_x = min(Int(floor(FT(max_threads / thr_y))), nlay)
@@ -137,6 +138,7 @@ function compute_col_dry!(
         mol_m_dry,
         mol_m_h2o,
         avogadro,
+        helmert1,
         vmr_h2o,
         lat,
         ndrange = ndrange,
@@ -148,12 +150,12 @@ function compute_col_dry!(
 end
 
 function compute_optical_props!(
-    as::AtmosphericState{FT,FTA1D,FTA2D,VMR,I},
+    as::AtmosphericState{FT,FTA1D,FTA1DN,FTA2D,VMR,I},
     lkp::AbstractLookUp{I,FT,UI8,UI8A1D,IA1D,IA2D,IA3D,FTA1D,FTA2D,FTA3D,FTA4D},
     op::AbstractOpticalProps{FT,FTA2D},
     igpt::Int;
     islw::Bool = true,
-    sf::Union{Nothing,AbstractSource{FT,FTA2D}} = nothing,
+    sf::Union{Nothing,AbstractSource{FT}} = nothing,
     max_threads = Int(256),
 ) where {
     I<:Int,
@@ -164,10 +166,11 @@ function compute_optical_props!(
     IA2D<:AbstractArray{I,2},
     IA3D<:AbstractArray{I,3},
     FTA1D<:AbstractArray{FT,1},
+    FTA1DN<:Union{AbstractArray{FT,1},Nothing},
     FTA2D<:AbstractArray{FT,2},
     FTA3D<:AbstractArray{FT,3},
     FTA4D<:AbstractArray{FT,4},
-    VMR<:Vmr{FT,FTA1D,FTA2D},
+    VMR<:AbstractVmr{FT},
 }
     nlay = as.nlay
     ncol = as.ncol
@@ -201,7 +204,7 @@ function compute_optical_props!(
     as::GrayAtmosphericState{FT,FTA1D,FTA2D,I},
     op::AbstractOpticalProps{FT,FTA2D};
     islw::Bool = true,
-    sf::Union{AbstractSource{FT,FTA2D},Nothing} = nothing,
+    sf::Union{AbstractSource{FT},Nothing} = nothing,
 ) where {
     FT<:AbstractFloat,
     I<:Int,
