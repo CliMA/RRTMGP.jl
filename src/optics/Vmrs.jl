@@ -42,7 +42,7 @@ function get_vmr(
     if ig == 0
         return FT(1)
     elseif vmr isa Vmr
-        return vmr.vmr[ilay, icol, igas]
+        return vmr.vmr[ilay, icol, ig]
     elseif ig == 1 # h2o / h2o_foreign / h2o_self-continua
         return vmr.vmr_h2o[ilay, icol]
     elseif ig == 3 # ozone

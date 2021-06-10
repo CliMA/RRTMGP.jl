@@ -84,23 +84,7 @@ function lw_rfmip(
     fluxb_lw = FluxLW(ncol, nlay, FT, DA)                          # flux storage for bandwise calculations
     flux_lw = FluxLW(ncol, nlay, FT, DA)                           # longwave fluxes
     # initializing RTE solver
-    slv = Solver{
-        FT,
-        I,
-        FTA1D,
-        FTA2D,
-        typeof(as),
-        typeof(op),
-        typeof(src_lw),
-        Nothing,
-        typeof(bcs_lw),
-        Nothing,
-        typeof(ang_disc),
-        typeof(fluxb_lw),
-        Nothing,
-        typeof(flux_lw),
-        Nothing,
-    }(
+    slv = Solver(
         as,
         op,
         src_lw,

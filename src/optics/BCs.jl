@@ -40,11 +40,11 @@ struct SwBCs{FT,FTA1D,FTA1DN,FTA2D} <: AbstractBCs{FT}
     zenith::FTA1D
     "top of atmosphere flux"
     toa_flux::FTA1D
-    "surface albedo for specular (direct) radiation `(nbnd, ngpt)`"
+    "surface albedo for specular (direct) radiation `(nbnd, ncol)`"
     sfc_alb_direct::FTA2D
     "incident diffuse flux at top of domain `[W/m2]` `(ncol, ngpt)`"
     inc_flux_diffuse::FTA1DN
-    "surface albedo for diffuse radiation `(nbnd, ngpt)`"
+    "surface albedo for diffuse radiation `(nbnd, ncol)`"
     sfc_alb_diffuse::FTA2D
 end
 SwBCs(zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse) =

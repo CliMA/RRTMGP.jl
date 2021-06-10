@@ -734,7 +734,7 @@ These are used to determine the optical properties of ice and water cloud togeth
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct LookUpCld{I,FT,FTA1D,FTA2D,FTA3D,FTA4D}
+struct LookUpCld{I,B,FT,FTA1D,FTA2D,FTA3D,FTA4D}
     "number of bands"
     nband::I
     "number of ice roughness types"
@@ -803,6 +803,8 @@ struct LookUpCld{I,FT,FTA1D,FTA2D,FTA3D,FTA4D}
     pade_sizreg_asyice::FTA1D
     "beginning and ending wavenumber for each band (`2, nband`) cm⁻¹"
     bnd_lims_wn::FTA2D
+    "use LUT (default) or pade interpolation"
+    use_lut::B
 end
 
 function LookUpCld(
@@ -810,6 +812,7 @@ function LookUpCld(
     ::Type{I},
     ::Type{FT},
     ::Type{DA},
+    use_lut = true,
 ) where {I<:Int,FT<:AbstractFloat,DA}
 
     FTA1D = DA{FT,1}
@@ -826,6 +829,8 @@ function LookUpCld(
     ncoeff_ssa_g = I(ds.dim["ncoeff_ssa_g"])
     nbound = I(ds.dim["nbound"])
     pair = I(ds.dim["pair"])
+
+    @assert nsizereg == 3 # RRTMGP pade approximation assumes exactly (3) size regimes
 
     radliq_lwr = FT(ds["radliq_lwr"][:])
     radliq_upr = FT(ds["radliq_upr"][:])
@@ -861,7 +866,7 @@ function LookUpCld(
 
     bnd_lims_wn = FTA2D(ds["bnd_limits_wavenumber"][:])
 
-    return (LookUpCld{I,FT,FTA1D,FTA2D,FTA3D,FTA4D}(
+    return (LookUpCld{I,Bool,FT,FTA1D,FTA2D,FTA3D,FTA4D}(
         nband,
         nrghice,
         nsize_liq,
@@ -896,6 +901,7 @@ function LookUpCld(
         pade_sizreg_ssaice,
         pade_sizreg_asyice,
         bnd_lims_wn,
+        use_lut,
     ))
 
 end

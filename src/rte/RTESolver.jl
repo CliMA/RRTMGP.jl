@@ -48,9 +48,11 @@ end
 function solve_lw!(
     slv::Solver{FT,I,FTA1D,FTA2D},
     lkp::LookUpLW{I,FT,UI8,UI8A1D,IA1D,IA2D,IA3D,FTA1D,FTA2D,FTA3D,FTA4D};
+    lkp_cld::Union{LookUpCld{I,B,FT,FTA1D,FTA2D,FTA3D,FTA4D},Nothing} = nothing,
     max_threads::I = Int(256),
 ) where {
     I<:Int,
+    B<:Bool,
     FT<:AbstractFloat,
     UI8<:UInt8,
     UI8A1D<:AbstractArray{UI8,1},
@@ -74,6 +76,7 @@ function solve_lw!(
             igpt,
             islw = true,
             sf = slv.src_lw,
+            lkp_cld = lkp_cld,
             max_threads = max_threads,
         )
         # solving radiative transfer equation
@@ -282,9 +285,11 @@ end
 function solve_sw!(
     slv::Solver{FT,I,FTA1D,FTA2D},
     lkp::LookUpSW{I,FT,UI8,UI8A1D,IA1D,IA2D,IA3D,FTA1D,FTA2D,FTA3D,FTA4D};
+    lkp_cld::Union{LookUpCld{I,B,FT,FTA1D,FTA2D,FTA3D,FTA4D},Nothing} = nothing,
     max_threads::I = Int(256),
 ) where {
     I<:Int,
+    B<:Bool,
     FT<:AbstractFloat,
     UI8<:UInt8,
     UI8A1D<:AbstractArray{UI8,1},
@@ -308,8 +313,10 @@ function solve_sw!(
             igpt,
             islw = false,
             sf = slv.src_sw,
+            lkp_cld = lkp_cld,
             max_threads = max_threads,
         )
+
         solar_frac = lkp.solar_src_scaled[igpt]
         # solving radiative transfer equation
         if typeof(slv.op) == OneScalar{FT,FTA2D}
@@ -442,6 +449,5 @@ function rte_sw_2stream_solve!(
     #--------------------------------------
     return nothing
 end
-#--------------------------------------------------------------------------------------------------
 #--------------------------------------------------------------------------------------------------
 end

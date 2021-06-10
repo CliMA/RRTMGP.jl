@@ -284,7 +284,6 @@ end
     #--------------------------------------------------------
     # From bottom to top of atmosphere --
     #   compute albedo and source of upward radiation
-
     @inbounds for ilev = 1:nlay
         denom = FT(1) / (FT(1) - Rdif[ilev, gcol] * albedo[ilev, gcol])  # Eq 10
         albedo[ilev+1, gcol] =

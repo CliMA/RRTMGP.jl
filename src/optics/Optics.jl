@@ -150,15 +150,17 @@ function compute_col_dry!(
 end
 
 function compute_optical_props!(
-    as::AtmosphericState{FT,FTA1D,FTA1DN,FTA2D,VMR,I},
+    as::AtmosphericState{FT,FTA1D,FTA1DN,FTA2D,CLDP,CLDM,VMR,I},
     lkp::AbstractLookUp{I,FT,UI8,UI8A1D,IA1D,IA2D,IA3D,FTA1D,FTA2D,FTA3D,FTA4D},
     op::AbstractOpticalProps{FT,FTA2D},
     igpt::Int;
     islw::Bool = true,
     sf::Union{Nothing,AbstractSource{FT}} = nothing,
     max_threads = Int(256),
+    lkp_cld::Union{LookUpCld{I,B,FT,FTA1D,FTA2D,FTA3D,FTA4D},Nothing} = nothing,
 ) where {
     I<:Int,
+    B<:Bool,
     FT<:AbstractFloat,
     UI8<:UInt8,
     UI8A1D<:AbstractArray{UI8,1},
@@ -168,6 +170,8 @@ function compute_optical_props!(
     FTA1D<:AbstractArray{FT,1},
     FTA1DN<:Union{AbstractArray{FT,1},Nothing},
     FTA2D<:AbstractArray{FT,2},
+    CLDP<:Union{AbstractArray{FT,2},Nothing},
+    CLDM<:Union{AbstractArray{Bool,2},Nothing},
     FTA3D<:AbstractArray{FT,3},
     FTA4D<:AbstractArray{FT,4},
     VMR<:AbstractVmr{FT},
@@ -192,6 +196,7 @@ function compute_optical_props!(
         igpt,
         islw,
         sf,
+        lkp_cld,
         ndrange = ndrange,
         dependencies = (comp_stream,),
     )

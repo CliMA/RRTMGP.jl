@@ -16,6 +16,7 @@ function get_ref_filename(
     λ = nothing,
     opc = nothing,
     flux_up_dn = nothing,
+    lut_pade = nothing,
 )
     @assert ftype ∈ (:lookup_tables, :atmos_state, :comparison) &&
             optics_type ∈ (:clearsky, :cloudysky)
@@ -28,10 +29,23 @@ function get_ref_filename(
     elseif ftype == :atmos_state
         fname *= "_as"
     else #ftype == :comparison
-        @assert opc ∈ (:OneScalar, :TwoStream) &&
-                λ ∈ (:lw, :sw) &&
-                flux_up_dn ∈ (:flux_up, :flux_dn)
-        fname *= "_" * String(λ) * "_" * String(flux_up_dn) * "_" * String(opc)
+        if λ isa Symbol
+            @assert λ ∈ (:lw, :sw)
+            fname *= "_" * String(λ)
+        end
+
+        if flux_up_dn isa Symbol
+            @assert flux_up_dn ∈ (:flux_up, :flux_dn)
+            fname *= "_" * String(flux_up_dn)
+        end
+        if opc isa Symbol
+            @assert opc ∈ (:OneScalar, :TwoStream)
+            fname *= "_" * String(opc)
+        end
+        if lut_pade isa Symbol
+            @assert lut_pade ∈ (:lut, :pade)
+            fname *= "_" * String(lut_pade)
+        end
     end
 
     return joinpath(

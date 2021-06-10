@@ -95,23 +95,7 @@ function sw_rfmip(
     fluxb_sw = init_flux_sw(ncol, nlay, FT, DA, opc) # flux storage for bandwise calculations
     flux_sw = init_flux_sw(ncol, nlay, FT, DA, opc)  # shortwave fluxes for band calculations
     # initializing RTE solver
-    slv = Solver{
-        FT,
-        I,
-        FTA1D,
-        FTA2D,
-        typeof(as),
-        typeof(op),
-        Nothing,
-        typeof(src_sw),
-        Nothing,
-        typeof(bcs_sw),
-        typeof(ang_disc),
-        Nothing,
-        typeof(fluxb_sw),
-        Nothing,
-        typeof(flux_sw),
-    }(
+    slv = Solver(
         as,
         op,
         nothing,

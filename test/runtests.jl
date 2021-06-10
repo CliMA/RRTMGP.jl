@@ -7,8 +7,9 @@ using Test
 end
 
 @testset "RRTMGP clear-sky tests" begin
+    include("clear_sky.jl")
+end
 
-    include("rfmip_clear_sky_lw.jl")
-    include("rfmip_clear_sky_sw.jl")
-
+@testset "RRTMGP clear-sky tests" begin
+    include("all_sky.jl")
 end

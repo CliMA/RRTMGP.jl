@@ -19,8 +19,8 @@ function setup_rfmip_as(
     lon = DA{FT,1}(ds_lw_in["lon"][:])
     lat = DA{FT,1}(ds_lw_in["lat"][:])
 
-    lon = nothing # This example skips latitude dependent gravity compution to be consistent with the
-    lat = nothing # FORTRAN RRTMGP test case.
+    lon = nothing # This example skips latitude dependent gravity computation
+    lat = nothing # to be consistent with the FORTRAN RRTMGP test case.
 
     sfc_emis = DA(repeat(
         reshape(Array{FT}(ds_lw_in["surface_emissivity"][:]), 1, :),
@@ -32,7 +32,6 @@ function setup_rfmip_as(
         nbnd,
         1,
     )) # all bands use same albedo
-
     zenith = DA{FT,1}(deg2rad .* ds_lw_in["solar_zenith_angle"][:])
     irrad = DA{FT,1}(ds_lw_in["total_solar_irradiance"][:])
 
@@ -132,9 +131,27 @@ function setup_rfmip_as(
     compute_col_dry!(p_lev, t_lay, col_dry, param_set, vmr_h2o, lat) # the example skips lat based 
 
     vmr = VmrGM(vmr_h2o, vmr_o3, DA(vmrat))
+
+    cld_r_eff_liq = nothing
+    cld_r_eff_ice = nothing
+    cld_path_liq = nothing
+    cld_path_ice = nothing
+    cld_mask = nothing
+    ice_rgh = 1
+    CLDP = typeof(cld_r_eff_liq)
+    CLDM = typeof(cld_mask)
     #------------------
     return (
-        AtmosphericState{FT,DA{FT,1},typeof(lat),DA{FT,2},typeof(vmr),Int}(
+        AtmosphericState{
+            FT,
+            DA{FT,1},
+            typeof(lat),
+            DA{FT,2},
+            CLDP,
+            CLDM,
+            typeof(vmr),
+            Int,
+        }(
             lon,
             lat,
             p_lay,
@@ -144,6 +161,12 @@ function setup_rfmip_as(
             t_sfc,
             col_dry,
             vmr,
+            cld_r_eff_liq,
+            cld_r_eff_ice,
+            cld_path_liq,
+            cld_path_ice,
+            cld_mask,
+            ice_rgh,
             nlay,
             ncol,
             ngas,

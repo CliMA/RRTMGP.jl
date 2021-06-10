@@ -16,7 +16,7 @@ export AbstractAtmosphericState,
        setup_gray_as_pr_grid, 
        setup_gray_as_alt_grid
 
-abstract type AbstractAtmosphericState{FT} end
+abstract type AbstractAtmosphericState{FT,I,FTA1D} end
 
 """
     AtmosphericState{
@@ -26,7 +26,7 @@ abstract type AbstractAtmosphericState{FT} end
     FTA3D<:AbstractArray{FT,3},
     VMR<:AbstractVmr{FT},
     I<:Int,
-} <: AbstractAtmosphericState{FT}
+} <: AbstractAtmosphericState{FT,I,FTA1D}
 
 Atmospheric conditions, used to compute optical properties with the gray atmosphere approximation
 
@@ -38,9 +38,11 @@ struct AtmosphericState{
     FTA1D<:AbstractArray{FT,1},
     FTA1DN<:Union{AbstractArray{FT,1},Nothing},
     FTA2D<:AbstractArray{FT,2},
+    CLDP<:Union{AbstractArray{FT,2},Nothing},
+    CLDM<:Union{AbstractArray{Bool,2},Nothing},
     VMR<:AbstractVmr{FT},
     I<:Int,
-} <: AbstractAtmosphericState{FT}
+} <: AbstractAtmosphericState{FT,I,FTA1D}
     "longitude (`ncol`)"
     lon::FTA1DN
     "latitude (`ncol`)"
@@ -59,6 +61,18 @@ struct AtmosphericState{
     col_dry::FTA2D
     "volume mixing ratio of all relevant gases"
     vmr::VMR
+    "effective radius of cloud liquid particles"
+    cld_r_eff_liq::CLDP
+    "effective radius of cloud ice particles"
+    cld_r_eff_ice::CLDP
+    "cloud water path"
+    cld_path_liq::CLDP
+    "cloud ice path"
+    cld_path_ice::CLDP
+    "cloud mask"
+    cld_mask::CLDM
+    "ice roughness, 1 = none, 2 = medium, 3 = rough"
+    ice_rgh::I
     "Number of layers."
     nlay::I
     "Number of columns."
@@ -68,50 +82,13 @@ struct AtmosphericState{
 end
 Adapt.@adapt_structure AtmosphericState
 
-function AtmosphericState(
-    nlay::Int,
-    ncol::Int,
-    ngas::Int,
-    ::Type{FT},
-    ::Type{DA},
-) where {
-    FT<:AbstractFloat,
-    DA,
-}
-    nlev     = Int(nlay + 1)
-    lon      = DA{FT}(undef,       ncol)       # longitude
-    lat      = DA{FT}(undef,       ncol)       # latitude
-    p_lay    = DA{FT}(undef, nlay, ncol)       # layer mean pressure
-    p_lev    = DA{FT}(undef, nlev, ncol)       # level pressure
-    t_lay    = DA{FT}(undef, nlay, ncol)       # layer mean temperature
-    t_lev    = DA{FT}(undef, nlev, ncol)       # level temperature
-    t_sfc    = DA{FT}(undef,       ncol)       # surface temperatures (can be different from t_lev[1,:])
-    col_dry  = DA{FT}(undef, nlay, ncol)       # col dry
-    vmr      = init_vmr(ngas, nlay, ncol, FT, DA)   # volume mixing ratios of relevant gases
-    #------------------------------------------------
-    return AtmosphericState{FT,DA{FT,1},typeof(lat),DA{FT,2},DA{FT,3},typeof(vmr),Int}(
-        lon,
-        lat,
-        p_lay,
-        p_lev,
-        t_lay,
-        t_lev,
-        t_sfc,
-        col_dry,
-        vmr,
-        nlay,
-        ncol,
-        ngas,
-    )
-end
-
 """
     GrayAtmosphericState{
     FT<:AbstractFloat,
     FTA1D<:AbstractArray{FT,1},
     FTA2D<:AbstractArray{FT,2},
     I<:Int,
-} <: AbstractAtmosphericState{FT}
+} <: AbstractAtmosphericState{FT,I,FTA1D}
 
 Atmospheric conditions, used to compute optical properties with the gray atmosphere approximation
 
@@ -123,7 +100,7 @@ struct GrayAtmosphericState{
     FTA1D<:AbstractArray{FT,1},
     FTA2D<:AbstractArray{FT,2},
     I<:Int,
-} <: AbstractAtmosphericState{FT}
+} <: AbstractAtmosphericState{FT,I,FTA1D}
     "Layer pressures `[Pa, mb]`; (`nlay,ncol`)"
     p_lay::FTA2D
     "Level pressures `[Pa, mb]`; (`nlay+1,ncol`)"
