@@ -27,12 +27,14 @@ include("reference_files.jl")
 include("read_rfmip_clear_sky.jl")
 #---------------------------------------------------------------
 function clear_sky(
-    opc::Symbol,
+    ::Type{OPC},
+    ::Type{SRC},
+    ::Type{VMR},
     ::Type{FT},
     ::Type{I},
     ::Type{DA},
-) where {FT<:AbstractFloat,I<:Int,DA}
-
+) where {FT<:AbstractFloat,I<:Int,DA,OPC,SRC,VMR}
+    opc = Symbol(OPC)
     lw_file = get_ref_filename(:lookup_tables, :clearsky, λ = :lw) # lw lookup tables for gas optics
     sw_file = get_ref_filename(:lookup_tables, :clearsky, λ = :sw) # sw lookup tables for gas optics
     input_file = get_ref_filename(:atmos_state, :clearsky)         # clear-sky atmos state
@@ -85,36 +87,35 @@ function clear_sky(
     # reading rfmip data to atmospheric state
     ds_lw_in = Dataset(input_file, "r")
 
-    (as, sfc_emis, sfc_alb_direct, zenith, toa_flux) = setup_rfmip_as(
+    (as, sfc_emis, sfc_alb_direct, zenith, toa_flux, usecol) = setup_rfmip_as(
         ds_lw_in,
         idx_gases,
         exp_no,
         lookup_lw,
         FT,
         DA,
+        VMR,
         max_threads,
     )
     close(ds_lw_in)
 
     ncol, nlay, ngpt_lw = as.ncol, as.nlay, lookup_lw.n_gpt
     nlev = nlay + 1
-    op = init_optical_props(opc, FT, DA, ncol, nlay)               # allocating optical properties object
+    op = OPC(FT, ncol, nlay, DA) # allocating optical properties object
 
     # setting up longwave problem 
     ngpt_lw = lookup_lw.n_gpt
-    src_lw = source_func_longwave(FT, ncol, nlay, ngpt_lw, opc, DA)# allocating longwave source function object
+    src_lw = source_func_longwave(FT, ncol, nlay, opc, DA)         # allocating longwave source function object
     bcs_lw = LwBCs{FT,typeof(sfc_emis),Nothing}(sfc_emis, nothing) # setting up boundary conditions
-    ang_disc = AngularDiscretization(opc, FT, n_gauss_angles, DA)  # initializing Angular discretization
+    ang_disc = nothing#AngularDiscretization(opc, FT, n_gauss_angles, DA)  # initializing Angular discretization
     fluxb_lw = FluxLW(ncol, nlay, FT, DA)                          # flux storage for bandwise calculations
     flux_lw = FluxLW(ncol, nlay, FT, DA)                           # longwave fluxes
     # setting up shortwave problem
     ngpt_sw = lookup_sw.n_gpt
     src_sw = source_func_shortwave(FT, ncol, nlay, opc, DA)        # allocating shortwave source function object
     inc_flux_diffuse = nothing
-    sfc_alb_diffuse = nothing
+    sfc_alb_diffuse = FTA2D(deepcopy(sfc_alb_direct))
     bcs_sw = SwBCs(
-        DA,
-        FT,
         zenith,
         toa_flux,
         sfc_alb_direct,
@@ -122,19 +123,8 @@ function clear_sky(
         sfc_alb_diffuse,
     )
 
-    ang_disc = nothing        # initializing Angular discretization
-    fluxb_sw = init_flux_sw(ncol, nlay, FT, DA, opc) # flux storage for bandwise calculations
-    flux_sw = init_flux_sw(ncol, nlay, FT, DA, opc)  # shortwave fluxes for band calculations
-
-    # block out coluumns with zenith > π/2 for shortwave problem
-    usecol = BitArray(undef, ncol)
-    usecol .= 1
-    for i = 1:ncol
-        if bcs_sw.zenith[i] > FT(π) / 2 - 2 * eps(FT)
-            bcs_sw.toa_flux[i] = FT(0)
-            usecol[i] = 0
-        end
-    end
+    fluxb_sw = FluxSW(ncol, nlay, FT, DA) # flux storage for bandwise calculations
+    flux_sw = FluxSW(ncol, nlay, FT, DA)  # shortwave fluxes for band calculations
     #--------------------------------------------------
     # initializing RTE solver
     slv = Solver(
@@ -144,16 +134,18 @@ function clear_sky(
         src_sw,
         bcs_lw,
         bcs_sw,
-        ang_disc,
         fluxb_lw,
         fluxb_sw,
         flux_lw,
         flux_sw,
     )
-    solve_lw!(slv, lookup_lw, max_threads = max_threads)
-    solve_sw!(slv, lookup_sw, max_threads = max_threads)
+    solve_lw!(slv, max_threads, lookup_lw)
+    solve_sw!(slv, max_threads, lookup_sw)
 
-
+    for i = 1:10
+        @time solve_lw!(slv, max_threads, lookup_lw)
+        @time solve_sw!(slv, max_threads, lookup_sw)
+    end
 
     # comparing longwave fluxes with data from RRTMGP FORTRAN code
     flip_ind = nlev:-1:1
@@ -215,4 +207,4 @@ function clear_sky(
     @test max_err_flux_dn_sw ≤ toler_sw
 end
 
-clear_sky(:TwoStream, Float64, Int, array_type())
+clear_sky(TwoStream, SourceLW2Str, VmrGM, Float64, Int, array_type())

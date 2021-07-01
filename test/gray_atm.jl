@@ -1,6 +1,5 @@
 using Test
 using RRTMGP.Device: array_type, array_device
-using KernelAbstractions
 using CUDA
 using RRTMGP
 using RRTMGP.AngularDiscretizations
@@ -27,12 +26,13 @@ DA = array_type()
 Example program to demonstrate the calculation of longwave radiative fluxes in a model gray atmosphere.
 """
 function gray_atmos_lw_equil(
-    opc::Symbol,
-    ncol::Int,
+    ::Type{OPC},
     ::Type{FT},
     ::Type{I},
     ::Type{DA},
-) where {FT<:AbstractFloat,I<:Int,DA}
+    ncol::Int,
+) where {FT<:AbstractFloat,I<:Int,DA,OPC}
+    opc = Symbol(OPC)
     nlay = 60                               # number of layers
     p0 = FT(100000)                         # surface pressure (Pa)
     pe = FT(9000)                           # TOA pressure (Pa)
@@ -59,10 +59,9 @@ function gray_atmos_lw_equil(
 
     println("Running longwave test for gray atmosphere model - $opc; ncol = $ncol; DA = $DA")
     as = setup_gray_as_pr_grid(nlay, lat, p0, pe, param_set, DA)
-    op = init_optical_props(opc, FT, DA, ncol, nlay)
-    src_lw = source_func_longwave(FT, ncol, nlay, ngpt, opc, DA)
+    op = OPC(FT, ncol, nlay, DA)
+    src_lw = source_func_longwave(FT, ncol, nlay, opc, DA)
     bcs_lw = LwBCs(DA{FT,2}(sfc_emis), inc_flux)
-    angle_disc = AngularDiscretization(opc, FT, n_gauss_angles, DA)
     fluxb_lw = nothing #FluxLW(ncol, nlay, FT, DA) 
     flux_lw = FluxLW(ncol, nlay, FT, DA)
 
@@ -77,7 +76,6 @@ function gray_atmos_lw_equil(
         Nothing,
         typeof(bcs_lw),
         Nothing,
-        typeof(angle_disc),
         typeof(fluxb_lw),
         Nothing,
         typeof(flux_lw),
@@ -89,7 +87,6 @@ function gray_atmos_lw_equil(
         nothing,
         bcs_lw,
         nothing,
-        angle_disc,
         fluxb_lw,
         nothing,
         flux_lw,
@@ -115,7 +112,7 @@ function gray_atmos_lw_equil(
 
     for i = 1:nsteps
         # calling the long wave gray radiation solver
-        solve_lw!(slv, max_threads = max_threads)
+        solve_lw!(slv, max_threads)
         # computing heating rate
         compute_gray_heating_rate!(gray_as, flux, hr_lay, param_set)
         # updating t_lay and t_lev based on heating rate
@@ -150,12 +147,13 @@ end
 #------------------------------------------------------------------------------
 
 function gray_atmos_sw_test(
-    opc::Symbol,
-    ncol::Int,
+    ::Type{OPC},
     ::Type{FT},
     ::Type{I},
     ::Type{DA},
-) where {FT<:AbstractFloat,I<:Int,DA}
+    ncol::Int,
+) where {FT<:AbstractFloat,I<:Int,DA,OPC}
+    opc = Symbol(OPC)
     nlay = 60                         # number of layers
     p0 = FT(100000)                   # surface pressure (Pa)
     pe = FT(9000)                     # TOA pressure (Pa)
@@ -172,10 +170,10 @@ function gray_atmos_sw_test(
     max_threads = Int(256)            # maximum number of threads for KA kernels
     deg2rad = FT(π) / FT(180)
 
-    zenith = Array{FT}(undef, ncol)   # solar zenith angle in radians
-    toa_flux = Array{FT}(undef, ncol) # top of atmosphere flux
-    sfc_alb_direct = Array{FT}(undef, nbnd, ncol) # surface albedo (direct)
-    sfc_alb_diffuse = nothing               # surface albedo (diffuse)
+    zenith = DA{FT,1}(undef, ncol)   # solar zenith angle in radians
+    toa_flux = DA{FT,1}(undef, ncol) # top of atmosphere flux
+    sfc_alb_direct = DA{FT,2}(undef, nbnd, ncol) # surface albedo (direct)
+    sfc_alb_diffuse = DA{FT,2}(undef, nbnd, ncol) # surface albedo (diffuse)
     inc_flux_diffuse = nothing
 
     top_at_1 = false                          # Top-of-atmos at pt# 1 (true/false)
@@ -189,21 +187,20 @@ function gray_atmos_sw_test(
     zenith .= deg2rad * 52.95 #acsc(FT(1.66))               # corresponding to ~52.95 deg zenith angle    
     toa_flux .= FT(1407.679)
     sfc_alb_direct .= FT(0.1)
+    sfc_alb_diffuse .= FT(0.1)
 
     as = setup_gray_as_pr_grid(nlay, lat, p0, pe, param_set, DA) # init gray atmos state
-    op = init_optical_props(opc, FT, DA, ncol, nlay) # init optical properties
+    op = OPC(FT, ncol, nlay, DA)
     src_sw = source_func_shortwave(FT, ncol, nlay, opc, DA)
     bcs_sw = SwBCs(
-        DA,
-        FT,
         zenith,
         toa_flux,
         sfc_alb_direct,
-        sfc_alb_diffuse,
         inc_flux_diffuse,
+        sfc_alb_diffuse,
     )
-    fluxb_sw = init_flux_sw(ncol, nlay, FT, DA, opc)
-    flux_sw = init_flux_sw(ncol, nlay, FT, DA, opc)
+    fluxb_sw = FluxSW(ncol, nlay, FT, DA)
+    flux_sw = FluxSW(ncol, nlay, FT, DA)
     println("Running shortwave test for gray atmosphere model - $(opc); ncol = $ncol; DA = $DA")
 
     slv = Solver{
@@ -218,7 +215,6 @@ function gray_atmos_sw_test(
         Nothing,
         typeof(bcs_sw),
         Nothing,
-        Nothing,
         typeof(fluxb_sw),
         Nothing,
         typeof(flux_sw),
@@ -230,12 +226,11 @@ function gray_atmos_sw_test(
         nothing,
         bcs_sw,
         nothing,
-        nothing,
         fluxb_sw,
         nothing,
         flux_sw,
     )
-    solve_sw!(slv, max_threads = max_threads)
+    solve_sw!(slv, max_threads)
 
     τ = Array(slv.op.τ)
     zenith = Array(zenith)
@@ -252,12 +247,13 @@ function gray_atmos_sw_test(
 end
 
 if DA == CuArray
-    @time gray_atmos_lw_equil(:OneScalar, Int(4096), Float64, Int, DA)
-    @time gray_atmos_lw_equil(:TwoStream, Int(4096), Float64, Int, DA)
+    @time gray_atmos_lw_equil(OneScalar, Float64, Int, DA, Int(4096))
+    @time gray_atmos_lw_equil(TwoStream, Float64, Int, DA, Int(4096))
 else
-    @time gray_atmos_lw_equil(:OneScalar, Int(9), Float64, Int, DA)
-    @time gray_atmos_lw_equil(:TwoStream, Int(9), Float64, Int, DA)
+    @time gray_atmos_lw_equil(OneScalar, Float64, Int, DA, Int(9))
+    @time gray_atmos_lw_equil(TwoStream, Float64, Int, DA, Int(9))
 end
 
-gray_atmos_sw_test(:OneScalar, Int(1), Float64, Int, DA)
-gray_atmos_sw_test(:TwoStream, Int(1), Float64, Int, DA)
+
+@time gray_atmos_sw_test(OneScalar, Float64, Int, DA, Int(1))
+@time gray_atmos_sw_test(TwoStream, Float64, Int, DA, Int(1))

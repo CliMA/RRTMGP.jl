@@ -5,10 +5,14 @@ function setup_rfmip_as(
     idx_gases,
     exp_no,
     lookup,
-    FT,
-    DA,
+    ::Type{FT},
+    ::Type{DA},
+    ::Type{VMR},
     max_threads,
-)
+) where {FT<:AbstractFloat,DA,VMR}
+    FTA1D = DA{FT,1}
+    FTA2D = DA{FT,2}
+
     deg2rad = FT(π) / FT(180)
     nlay = Int(ds_lw_in.dim["layer"])
     ncol = Int(ds_lw_in.dim["site"])
@@ -22,19 +26,32 @@ function setup_rfmip_as(
     lon = nothing # This example skips latitude dependent gravity computation
     lat = nothing # to be consistent with the FORTRAN RRTMGP test case.
 
-    sfc_emis = DA(repeat(
+    sfc_emis = DA{FT,2}(repeat(
         reshape(Array{FT}(ds_lw_in["surface_emissivity"][:]), 1, :),
         nbnd,
         1,
     )) # all bands use same emissivity
-    sfc_alb = DA(repeat(
+    sfc_alb = DA{FT,2}(repeat(
         reshape(Array{FT}(ds_lw_in["surface_albedo"][:]), 1, :),
         nbnd,
         1,
     )) # all bands use same albedo
-    zenith = DA{FT,1}(deg2rad .* ds_lw_in["solar_zenith_angle"][:])
-    irrad = DA{FT,1}(ds_lw_in["total_solar_irradiance"][:])
+    #--------------------------------------------------------------
+    zenith = Array{FT,1}(deg2rad .* ds_lw_in["solar_zenith_angle"][:])
+    irrad = Array{FT,1}(ds_lw_in["total_solar_irradiance"][:])
+    # block out coluumns with zenith > π/2
+    usecol = BitArray(undef, ncol)
+    usecol .= 1
+    for i = 1:ncol
+        if zenith[i] > FT(π) / 2 - 2 * eps(FT)
+            irrad[i] = FT(0)
+            usecol[i] = 0
+        end
+    end
 
+    zenith = DA{FT,1}(zenith)
+    irrad = DA{FT,1}(irrad)
+    #--------------------------------------------------------------
 
     p_lev = ds_lw_in["pres_level"][:]
 
@@ -49,13 +66,12 @@ function setup_rfmip_as(
     t_lay = DA{FT,2}(ds_lw_in["temp_layer"][:][lay_ind, :, exp_no])
 
     t_sfc = DA{FT,1}(ds_lw_in["surface_temperature"][:, exp_no])
-
     col_dry = DA{FT,2}(undef, nlay, ncol)
 
     # Reading volume mixing ratios 
 
-    vmr_h2o = DA{FT,2}(ds_lw_in["water_vapor"][:][lay_ind, :, exp_no]) # vmr of H2O and O3
-    vmr_o3 = DA{FT,2}(ds_lw_in["ozone"][:][lay_ind, :, exp_no])       # vary with height
+    vmr_h2o = FTA2D(ds_lw_in["water_vapor"][:][lay_ind, :, exp_no]) # vmr of H2O and O3
+    vmr_o3 = FTA2D(ds_lw_in["ozone"][:][lay_ind, :, exp_no])       # vary with height
 
     vmrat = zeros(FT, ngas)
 
@@ -128,10 +144,9 @@ function setup_rfmip_as(
 
     # This example skips latitude dependent gravity compution to be consistent with the
     # FORTRAN RRTMGP test case.
-    compute_col_dry!(p_lev, t_lay, col_dry, param_set, vmr_h2o, lat) # the example skips lat based 
+    compute_col_dry!(p_lev, col_dry, param_set, vmr_h2o, lat) # the example skips lat based gravity calculation
 
-    vmr = VmrGM(vmr_h2o, vmr_o3, DA(vmrat))
-
+    vmr = VMR{FT,FTA1D,FTA2D}(vmr_h2o, vmr_o3, FTA1D(vmrat))
     cld_r_eff_liq = nothing
     cld_r_eff_ice = nothing
     cld_path_liq = nothing
@@ -175,5 +190,37 @@ function setup_rfmip_as(
         sfc_alb,
         zenith,
         irrad,
+        usecol,
     )
+
+    #=
+    return (
+        ClearAtmosphericState{
+            FT,
+            DA{FT,1},
+            typeof(lat),
+            DA{FT,2},
+            typeof(vmr),
+            Int,
+        }(
+            lon,
+            lat,
+            p_lay,
+            p_lev,
+            t_lay,
+            t_lev,
+            t_sfc,
+            col_dry,
+            vmr,
+            nlay,
+            ncol,
+            ngas,
+        ),
+        sfc_emis,
+        sfc_alb,
+        zenith,
+        irrad,
+    )
+    =#
+
 end

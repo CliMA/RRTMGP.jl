@@ -1,15 +1,16 @@
 module Optics
 
 using DocStringExtensions
-using KernelAbstractions
 using CUDA
-using ..Device: array_type, array_device
+using ..Device: array_type, array_device, CPU, CUDADevice
 using Adapt
+using UnPack
 #---------------------------------------
 using ..Vmrs
 using ..LookUpTables
 using ..AtmosphericStates
 using ..Sources
+using ..AngularDiscretizations
 #---------------------------------------
 using CLIMAParameters
 using CLIMAParameters.Planet: molmass_dryair, molmass_water, grav
@@ -20,7 +21,8 @@ export AbstractOpticalProps,
     TwoStream,
     init_optical_props,
     compute_col_dry!,
-    compute_optical_props!
+    compute_optical_props!,
+    compute_optical_props_CPU_kernel!
 
 
 abstract type AbstractOpticalProps{FT<:AbstractFloat,FTA2D<:AbstractArray{FT,2}} end
@@ -35,10 +37,17 @@ calculations accounting for extinction and emission
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct OneScalar{FT<:AbstractFloat,FTA2D<:AbstractArray{FT,2}} <:
-       AbstractOpticalProps{FT,FTA2D}
+struct OneScalar{
+    FT<:AbstractFloat,
+    FTA1D<:AbstractArray{FT,1},
+    FTA2D<:AbstractArray{FT,2},
+    I<:Int,
+    AD<:AngularDiscretization{FT,FTA1D,I},
+} <: AbstractOpticalProps{FT,FTA2D}
     "Optical Depth"
     τ::FTA2D
+    "Angular discretization"
+    angle_disc::AD
 end
 Adapt.@adapt_structure OneScalar
 
@@ -48,7 +57,14 @@ function OneScalar(
     nlay::Int,
     ::Type{DA},
 ) where {FT<:AbstractFloat,DA}
-    return OneScalar{FT,DA{FT,2}}(DA{FT,2}(undef, nlay, ncol))
+    FTA1D = DA{FT,1}
+    FTA2D = DA{FT,2}
+    I = Int
+    AD = AngularDiscretization{FT,FTA1D,I}
+    return OneScalar{FT,FTA1D,FTA2D,I,AD}(
+        FTA2D(undef, nlay, ncol),
+        AngularDiscretization(FT, DA, I(1)),
+    )
 end
 
 """
@@ -85,166 +101,180 @@ function TwoStream(
     )
 end
 
-function init_optical_props(
-    opc::Symbol,
-    ::Type{FT},
-    ::Type{DA},
-    ncol::Int,
-    nlay::Int,
-) where {FT<:AbstractFloat,DA}
-    if opc == :OneScalar
-        return OneScalar(FT, ncol, nlay, DA)
-    else
-        return TwoStream(FT, ncol, nlay, DA)
-    end
-
-end
-
 function compute_col_dry!(
     p_lev::FTA2D,
-    t_lay::FTA2D,
     col_dry::FTA2D,
     param_set::AbstractEarthParameterSet,
     vmr_h2o::Union{FTA2D,Nothing} = nothing,
-    lat::Union{FTA1D,Nothing} = nothing,
+    lat::Union{AbstractArray{FT,1},Nothing} = nothing,
     max_threads::Int = Int(256),
-) where {
-    FT<:AbstractFloat,
-    FTA1D<:AbstractArray{FT,1},
-    FTA2D<:AbstractArray{FT,2},
-}
-    nlay = size(t_lay, 1)
-    ncol = size(t_lay, 2)
-
+) where {FT<:AbstractFloat,FTA2D<:AbstractArray{FT,2}}
+    nlay, ncol = size(col_dry)
     mol_m_dry = FT(molmass_dryair(param_set))
     mol_m_h2o = FT(molmass_water(param_set))
     avogadro = FT(avogad())
     helmert1 = FT(grav(param_set))
-    #------Launching computation kernel-----------------------
-    thr_y = min(32, ncol)
-    thr_x = min(Int(floor(FT(max_threads / thr_y))), nlay)
-
+    args = (p_lev, mol_m_dry, mol_m_h2o, avogadro, helmert1, vmr_h2o, lat)
     device = array_device(p_lev)
-    comp_stream = Event(device)
-    workgroup = (thr_x, thr_y)
-    ndrange = (nlay, ncol)
-
-    comp_stream = compute_col_dry_kernel!(device, workgroup)(
-        Val(nlay),
-        Val(ncol),
-        p_lev,
-        t_lay,
-        col_dry,
-        mol_m_dry,
-        mol_m_h2o,
-        avogadro,
-        helmert1,
-        vmr_h2o,
-        lat,
-        ndrange = ndrange,
-        dependencies = (comp_stream,),
-    )
-    wait(comp_stream)
-
-    return nothing
-end
-
-function compute_optical_props!(
-    as::AtmosphericState{FT,FTA1D,FTA1DN,FTA2D,CLDP,CLDM,VMR,I},
-    lkp::AbstractLookUp{I,FT,UI8,UI8A1D,IA1D,IA2D,IA3D,FTA1D,FTA2D,FTA3D,FTA4D},
-    op::AbstractOpticalProps{FT,FTA2D},
-    igpt::Int;
-    islw::Bool = true,
-    sf::Union{Nothing,AbstractSource{FT}} = nothing,
-    max_threads = Int(256),
-    lkp_cld::Union{LookUpCld{I,B,FT,FTA1D,FTA2D,FTA3D,FTA4D},Nothing} = nothing,
-) where {
-    I<:Int,
-    B<:Bool,
-    FT<:AbstractFloat,
-    UI8<:UInt8,
-    UI8A1D<:AbstractArray{UI8,1},
-    IA1D<:AbstractArray{I,1},
-    IA2D<:AbstractArray{I,2},
-    IA3D<:AbstractArray{I,3},
-    FTA1D<:AbstractArray{FT,1},
-    FTA1DN<:Union{AbstractArray{FT,1},Nothing},
-    FTA2D<:AbstractArray{FT,2},
-    CLDP<:Union{AbstractArray{FT,2},Nothing},
-    CLDM<:Union{AbstractArray{Bool,2},Nothing},
-    FTA3D<:AbstractArray{FT,3},
-    FTA4D<:AbstractArray{FT,4},
-    VMR<:AbstractVmr{FT},
-}
-    nlay = as.nlay
-    ncol = as.ncol
-    #------Launching computation kernel-----------------------
-    thr_y = min(32, ncol)
-    thr_x = min(Int(floor(FT(max_threads / thr_y))), nlay)
-
-    device = array_device(as.t_lay)
-    comp_stream = Event(device)
-    workgroup = (thr_x, thr_y)
-    ndrange = (nlay, ncol)
-
-    comp_stream = compute_optical_props_kernel!(device, workgroup)(
-        Val(nlay),
-        Val(ncol),
-        as,
-        lkp,
-        op,
-        igpt,
-        islw,
-        sf,
-        lkp_cld,
-        ndrange = ndrange,
-        dependencies = (comp_stream,),
-    )
-    wait(comp_stream)
-
-    return nothing
-end
-
-function compute_optical_props!(
-    as::GrayAtmosphericState{FT,FTA1D,FTA2D,I},
-    op::AbstractOpticalProps{FT,FTA2D};
-    islw::Bool = true,
-    sf::Union{AbstractSource{FT},Nothing} = nothing,
-) where {
-    FT<:AbstractFloat,
-    I<:Int,
-    FTA1D<:AbstractArray{FT,1},
-    FTA2D<:AbstractArray{FT,2},
-}
-    ncol = as.ncol
-    nlay = as.nlay
-    τ = op.τ
-    #----Launcing KA Kernel---------------------------
-    max_threads = 256
-    thr_y = min(32, ncol)
-    thr_x = min(Int(floor(FT(max_threads / thr_y))), nlay)
-
-    device = array_device(τ)
-    comp_stream = Event(device)
-    workgroup = (thr_x, thr_y)
-    ndrange = (nlay, ncol)
-    #----------------------------------
-    comp_stream = compute_optical_props_kernel!(device, workgroup)(
-        as,
-        τ,
-        islw,
-        sf,
-        Val(nlay),
-        Val(ncol),
-        ndrange = ndrange,
-        dependencies = (comp_stream,),
-    )
-    wait(comp_stream)
-    #----------------------------------
-    if typeof(op) == TwoStream{FT,FTA2D}
-        op.ssa .= FT(0)
-        op.g .= FT(0)
+    if device === CUDADevice() # launching CUDA kernel
+        tx = min(nlay * ncol, max_threads)
+        bx = cld(nlay * ncol, tx)
+        @cuda threads = (tx) blocks = (bx) compute_col_dry_CUDA!(
+            col_dry,
+            args...,
+        )
+    else # launching Julia native multithreading kernel
+        Threads.@threads for icnt = 1:(nlay*ncol)
+            glaycol =
+                ((icnt % nlay == 0) ? nlay : (icnt % nlay), cld(icnt, nlay))
+            compute_col_dry_kernel!(col_dry, args..., glaycol)
+        end
     end
+    return nothing
+end
+
+function compute_col_dry_CUDA!(col_dry, args...)
+    glx = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
+    nlay, ncol = size(col_dry)
+    if glx ≤ nlay * ncol
+        glaycol = ((glx % nlay == 0) ? nlay : (glx % nlay), cld(glx, nlay))
+        compute_col_dry_kernel!(col_dry, args..., glaycol)
+    end
+    return nothing
+end
+#-----------------------------------------------------------------------------
+function compute_optical_props_CUDA!(op, as, args...)
+    glx = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
+    nlay, ncol = size(op.τ)
+    if glx ≤ nlay * ncol
+        glaycol = ((glx % nlay == 0) ? nlay : (glx % nlay), cld(glx, nlay))
+        compute_optical_props_kernel!(op, as, glaycol, args...)
+    end
+    return nothing
+end
+#-----------------------------------------------------------------------------
+function compute_optical_props!(
+    op::AbstractOpticalProps{FT},
+    as::AtmosphericState{FT},
+    sf::AbstractSourceLW{FT},
+    igpt::I,
+    lkp::LookUpLW{I,FT},
+    lkp_cld::Union{LookUpCld,Nothing} = nothing,
+) where {I<:Int,FT<:AbstractFloat}
+    @unpack nlay, ncol = as
+    lkp_args = (lkp_cld === nothing) ? (lkp,) : (lkp, lkp_cld)
+    device = array_device(op.τ)
+    if device === CUDADevice()
+        max_threads = 256
+        tx = min(nlay * ncol, max_threads)
+        bx = cld(nlay * ncol, tx)
+        @cuda threads = (tx) blocks = (bx) compute_optical_props_CUDA!(
+            op,
+            as,
+            sf,
+            igpt,
+            lkp_args...,
+        )
+    else # using Julia native multithreading
+        Threads.@threads for icnt = 1:(ncol*nlay)
+            glaycol =
+                ((icnt % nlay == 0) ? nlay : (icnt % nlay), cld(icnt, nlay))
+            compute_optical_props_kernel!(
+                op,
+                as,
+                glaycol,
+                sf,
+                igpt,
+                lkp_args...,
+            )
+        end
+    end
+    return nothing
+end
+
+function compute_optical_props!(
+    op::AbstractOpticalProps{FT},
+    as::AtmosphericState{FT},
+    igpt::I,
+    lkp::LookUpSW{I,FT},
+    lkp_cld::Union{LookUpCld,Nothing} = nothing,
+) where {I<:Int,FT<:AbstractFloat}
+    @unpack nlay, ncol = as
+    lkp_args = (lkp_cld === nothing) ? (lkp,) : (lkp, lkp_cld)
+    device = array_device(op.τ)
+    if device === CUDADevice()
+        max_threads = 256
+        tx = min(nlay * ncol, max_threads)
+        bx = cld(nlay * ncol, tx)
+        @cuda threads = (tx) blocks = (bx) compute_optical_props_CUDA!(
+            op,
+            as,
+            igpt,
+            lkp_args...,
+        )
+    else
+        #-----using Julia native multithreading
+        Threads.@threads for icnt = 1:(ncol*nlay)
+            glaycol =
+                ((icnt % nlay == 0) ? nlay : (icnt % nlay), cld(icnt, nlay))
+            compute_optical_props_kernel!(op, as, glaycol, igpt, lkp_args...)
+        end
+    end
+
+    return nothing
+end
+#-----------------------------------------------------------------------------
+
+function compute_optical_props!(
+    op::AbstractOpticalProps{FT},
+    as::GrayAtmosphericState{FT},
+    sf::AbstractSourceLW{FT},
+    igpt::Int = 1,
+) where {FT<:AbstractFloat}
+    @unpack nlay, ncol = as
+    nlev = nlay + 1
+    device = array_device(op.τ)
+    if device === CUDADevice()
+        max_threads = 256
+        tx = min(nlay * ncol, max_threads)
+        bx = cld(nlay * ncol, tx)
+        @cuda threads = (tx) blocks = (bx) compute_optical_props_CUDA!(
+            op,
+            as,
+            sf,
+        )
+    else #-----using Julia native multithreading
+        Threads.@threads for icnt = 1:(ncol*nlay)
+            glaycol =
+                ((icnt % nlay == 0) ? nlay : (icnt % nlay), cld(icnt, nlay))
+            compute_optical_props_kernel!(op, as, glaycol, sf)
+        end
+    end
+    #----------------------------------
+    return nothing
+end
+
+function compute_optical_props!(
+    op::AbstractOpticalProps{FT},
+    as::GrayAtmosphericState{FT},
+    igpt::Int = 1,
+) where {FT<:AbstractFloat}
+    @unpack nlay, ncol = as
+    nlev = nlay + 1
+    device = array_device(op.τ)
+    if device === CUDADevice()
+        max_threads = 256
+        tx = min(nlay * ncol, max_threads)
+        bx = cld(nlay * ncol, tx)
+        @cuda threads = (tx) blocks = (bx) compute_optical_props_CUDA!(op, as)
+    else #-----using Julia native multithreading
+        Threads.@threads for icnt = 1:(ncol*nlay)
+            glaycol =
+                ((icnt % nlay == 0) ? nlay : (icnt % nlay), cld(icnt, nlay))
+            compute_optical_props_kernel!(op, as, glaycol)
+        end
+    end
+    #----------------------------------
     return nothing
 end
 

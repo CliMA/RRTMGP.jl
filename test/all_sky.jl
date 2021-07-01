@@ -28,14 +28,14 @@ include("read_all_sky.jl")
 
 DA = array_type()
 
-function clear_sky(
-    opc::Symbol,
+function all_sky(
+    ::Type{OPC},
     ::Type{FT},
     ::Type{I},
     ::Type{DA};
     use_lut::Bool = true,
-) where {FT<:AbstractFloat,I<:Int,DA}
-
+) where {FT<:AbstractFloat,I<:Int,DA,OPC}
+    opc = Symbol(OPC)
     FTA1D = DA{FT,1}
     FTA2D = DA{FT,2}
     max_threads = Int(256)
@@ -99,10 +99,9 @@ function clear_sky(
 
     # Setting up longwave problem---------------------------------------
     ngpt_lw = lookup_lw.n_gpt
-    op = init_optical_props(opc, FT, DA, ncol, nlay)                  # allocating optical properties object
-    src_lw = source_func_longwave(FT, ncol, nlay, ngpt_lw, opc, DA)   # allocating longwave source function object
+    op = OPC(FT, ncol, nlay, DA) # allocating optical properties object
+    src_lw = source_func_longwave(FT, ncol, nlay, opc, DA)   # allocating longwave source function object
     bcs_lw = LwBCs{FT,typeof(sfc_emis),Nothing}(sfc_emis, nothing)    # setting up boundary conditions
-    ang_disc = AngularDiscretization(opc, FT, n_gauss_angles, DA)     # initializing Angular discretization
     fluxb_lw = FluxLW(ncol, nlay, FT, DA)                             # flux storage for bandwise calculations
     flux_lw = FluxLW(ncol, nlay, FT, DA)                              # longwave fluxes
 
@@ -114,8 +113,6 @@ function clear_sky(
     inc_flux_diffuse = nothing
 
     bcs_sw = SwBCs(
-        DA,
-        FT,
         zenith,
         toa_flux,
         sfc_alb_direct,
@@ -123,9 +120,8 @@ function clear_sky(
         sfc_alb_diffuse,
     )
 
-    ang_disc = nothing        # initializing Angular discretization
-    fluxb_sw = init_flux_sw(ncol, nlay, FT, DA, opc) # flux storage for bandwise calculations
-    flux_sw = init_flux_sw(ncol, nlay, FT, DA, opc)  # shortwave fluxes for band calculations    
+    fluxb_sw = FluxSW(ncol, nlay, FT, DA) # flux storage for bandwise calculations
+    flux_sw = FluxSW(ncol, nlay, FT, DA)  # shortwave fluxes for band calculations    
     #-------------------------------------------------------------------
     # initializing RTE solver
     slv = Solver(
@@ -135,28 +131,22 @@ function clear_sky(
         src_sw,
         bcs_lw,
         bcs_sw,
-        ang_disc,
         fluxb_lw,
         fluxb_sw,
         flux_lw,
         flux_sw,
     )
     #------solvers
-    solve_lw!(
-        slv,
-        lookup_lw,
-        lkp_cld = lookup_lw_cld,
-        max_threads = max_threads,
-    )
-    solve_sw!(
-        slv,
-        lookup_sw,
-        lkp_cld = lookup_sw_cld,
-        max_threads = max_threads,
-    )
+    solve_lw!(slv, max_threads, lookup_lw, lookup_lw_cld)
+    solve_sw!(slv, max_threads, lookup_sw, lookup_sw_cld)
+
+    for i = 1:10
+        @time solve_lw!(slv, max_threads, lookup_lw, lookup_lw_cld)
+        @time solve_sw!(slv, max_threads, lookup_sw, lookup_sw_cld)
+    end
     #-------------
     # comparison
-    method = use_lut ? "Lookup Table Interpolation methond" : "PADE method"
+    method = use_lut ? "Lookup Table Interpolation method" : "PADE method"
     ds_comp = Dataset(flux_file, "r")
     comp_flux_up_lw =
         Array(transpose(ds_comp["lw_flux_up"][:][1:ncol, flip_ind]))
@@ -201,6 +191,7 @@ function clear_sky(
     @test max_err_flux_up_sw < toler
     @test max_err_flux_dn_sw < toler
 end
-
-clear_sky(:TwoStream, Float64, Int, DA, use_lut = true)
-clear_sky(:TwoStream, Float64, Int, DA, use_lut = false)
+println("running cloudy lookup table version")
+all_sky(TwoStream, Float64, Int, DA, use_lut = true)
+println("running cloudy pade version")
+all_sky(TwoStream, Float64, Int, DA, use_lut = false)

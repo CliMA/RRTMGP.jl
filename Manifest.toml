@@ -62,11 +62,6 @@ git-tree-sha1 = "364179416eabc34c9ca32126a6bdb431680c3bad"
 uuid = "052768ef-5323-5732-b1bb-66c8b64840ba"
 version = "3.2.1"
 
-[[Cassette]]
-git-tree-sha1 = "f80b4da0c926dc96f946628757a5926ff5a42e28"
-uuid = "7057c7e9-c182-5462-911a-8362d720325c"
-version = "0.3.6"
-
 [[ChainRulesCore]]
 deps = ["Compat", "LinearAlgebra", "SparseArrays"]
 git-tree-sha1 = "5d64be50ea9b43a89b476be773e125cef03c7cd5"
@@ -191,12 +186,6 @@ deps = ["Dates", "Mmap", "Parsers", "Unicode"]
 git-tree-sha1 = "81690084b6198a2e1da36fcfda16eeca9f9f24e4"
 uuid = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
 version = "0.21.1"
-
-[[KernelAbstractions]]
-deps = ["Adapt", "Cassette", "InteractiveUtils", "MacroTools", "SpecialFunctions", "StaticArrays", "UUIDs"]
-git-tree-sha1 = "7244ffd3549bdfc422162602f27d23b467fa0884"
-uuid = "63c18a36-062a-441e-b654-da1e3ab1ce7c"
-version = "0.6.3"
 
 [[LLVM]]
 deps = ["CEnum", "Libdl", "Printf", "Unicode"]

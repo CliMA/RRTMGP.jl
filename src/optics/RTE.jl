@@ -1,5 +1,4 @@
 module RTE
-using KernelAbstractions
 using CUDA
 using ..Device: array_type, array_device
 using Adapt
@@ -8,7 +7,6 @@ using DocStringExtensions
 import GaussQuadrature
 using ..Sources
 using ..Fluxes
-using ..AngularDiscretizations
 using ..Optics
 using ..BCs
 
@@ -25,25 +23,23 @@ struct Solver{
     FTA2D<:AbstractArray{FT,2},
     AS<:AbstractAtmosphericState{FT,I,FTA1D},
     OP<:AbstractOpticalProps{FT,FTA2D},
-    SL<:Union{AbstractSource{FT},Nothing},
-    SS<:Union{AbstractSource{FT},Nothing},
-    BCL<:Union{AbstractBCs{FT},Nothing},
-    BCS<:Union{AbstractBCs{FT},Nothing},
-    AD<:Union{AngularDiscretization{FT,FTA1D,I},Nothing},
-    FXBL<:Union{AbstractFlux{FT,FTA2D},Nothing},
-    FXBS<:Union{AbstractFlux{FT,FTA2D},Nothing},
-    FXL<:Union{AbstractFlux{FT,FTA2D},Nothing},
-    FXS<:Union{AbstractFlux{FT,FTA2D},Nothing},
+    SL<:Union{AbstractSourceLW{FT,FTA1D,FTA2D},Nothing},
+    SS<:Union{SourceSW2Str{FT,FTA1D,FTA2D},Nothing},
+    BCL<:Union{LwBCs{FT},Nothing},
+    BCS<:Union{SwBCs{FT},Nothing},
+    FXBL<:Union{FluxLW{FT,FTA2D},Nothing},
+    FXBS<:Union{FluxSW{FT,FTA2D},Nothing},
+    FXL<:Union{FluxLW{FT,FTA2D},Nothing},
+    FXS<:Union{FluxSW{FT,FTA2D},Nothing},
 }
     as::AS         # atmoshperic state
     op::OP         # optical properties
-    src_lw::SL    # source functions
-    src_sw::SS    # source functions
+    src_lw::SL     # source functions
+    src_sw::SS     # source functions
     bcs_lw::BCL    # boundary conditions
     bcs_sw::BCS    # boundary conditions
-    angle_disc::AD # angular discretization
-    fluxb_lw::FXBL  # temporay storage for bandwise calculations
-    fluxb_sw::FXBS  # temporay storage for bandwise calculations
+    fluxb_lw::FXBL # temporay storage for bandwise calculations
+    fluxb_sw::FXBS # temporay storage for bandwise calculations
     flux_lw::FXL   # fluxes for longwave problem
     flux_sw::FXS   # fluxes for longwave problem
 end
@@ -55,7 +51,6 @@ Solver(
     src_sw,
     bcs_lw,
     bcs_sw,
-    angle_disc,
     fluxb_lw,
     fluxb_sw,
     flux_lw,
@@ -71,7 +66,6 @@ Solver(
     typeof(src_sw),
     typeof(bcs_lw),
     typeof(bcs_sw),
-    typeof(angle_disc),
     typeof(fluxb_lw),
     typeof(fluxb_sw),
     typeof(flux_lw),
@@ -83,7 +77,6 @@ Solver(
     src_sw,
     bcs_lw,
     bcs_sw,
-    angle_disc,
     fluxb_lw,
     fluxb_sw,
     flux_lw,

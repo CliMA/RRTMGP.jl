@@ -26,12 +26,14 @@ include("reference_files.jl")
 include("read_rfmip_clear_sky.jl")
 #---------------------------------------------------------------
 function sw_rfmip(
-    opc::Symbol,
+    ::Type{OPC},
+    ::Type{SRC},
+    ::Type{VMR},
     ::Type{FT},
     ::Type{I},
     ::Type{DA},
-) where {FT<:AbstractFloat,I<:Int,DA}
-
+) where {FT<:AbstractFloat,I<:Int,DA,OPC,SRC,VMR}
+    opc = Symbol(OPC)
     sw_file = get_ref_filename(:lookup_tables, :clearsky, λ = :sw) # sw lookup tables
     sw_input_file = get_ref_filename(:atmos_state, :clearsky)      # clear-sky atmos state
     # reference data files for comparison
@@ -62,38 +64,36 @@ function sw_rfmip(
     # reading rfmip data to atmospheric state
     ds_sw_in = Dataset(sw_input_file, "r")
 
-    (as, _, sfc_alb_direct, zenith, toa_flux) = setup_rfmip_as(
+    (as, _, sfc_alb_direct, zenith, toa_flux, usecol) = setup_rfmip_as(
         ds_sw_in,
         idx_gases,
         exp_no,
         lookup_sw,
         FT,
         DA,
+        VMR,
         max_threads,
     )
     close(ds_sw_in)
 
     ncol, nlay, ngpt = as.ncol, as.nlay, lookup_sw.n_gpt
     nlev = nlay + 1
-    op = init_optical_props(opc, FT, DA, ncol, nlay)               # allocating optical properties object
-    src_sw = source_func_shortwave(FT, ncol, nlay, opc, DA)        # allocating longwave source function object
+    op = OPC(FT, ncol, nlay, DA)            # allocating optical properties object
+    src_sw = SRC(FT, DA, nlay, ncol)        # allocating longwave source function object
+    #src_sw = source_func_shortwave(FT, ncol, nlay, opc, DA)        # allocating longwave source function object
 
     # setting up boundary conditions
     inc_flux_diffuse = nothing
-    sfc_alb_diffuse = nothing
-    bcs_sw = SwBCs(
-        DA,
-        FT,
+    sfc_alb_diffuse = FTA2D(deepcopy(sfc_alb_direct))
+    bcs_sw = SwBCs{FT,FTA1D,Nothing,FTA2D}(
         zenith,
         toa_flux,
         sfc_alb_direct,
         inc_flux_diffuse,
         sfc_alb_diffuse,
     )
-
-    ang_disc = nothing        # initializing Angular discretization
-    fluxb_sw = init_flux_sw(ncol, nlay, FT, DA, opc) # flux storage for bandwise calculations
-    flux_sw = init_flux_sw(ncol, nlay, FT, DA, opc)  # shortwave fluxes for band calculations
+    fluxb_sw = FluxSW(ncol, nlay, FT, DA) # flux storage for bandwise calculations
+    flux_sw = FluxSW(ncol, nlay, FT, DA)  # shortwave fluxes for band calculations
     # initializing RTE solver
     slv = Solver(
         as,
@@ -102,30 +102,19 @@ function sw_rfmip(
         src_sw,
         nothing,
         bcs_sw,
-        ang_disc,
         nothing,
         fluxb_sw,
         nothing,
         flux_sw,
     )
-    # block out coluumns with zenith > π/2
-    usecol = BitArray(undef, ncol)
-    usecol .= 1
-    for i = 1:ncol
-        if bcs_sw.zenith[i] > FT(π) / 2 - 2 * eps(FT)
-            bcs_sw.toa_flux[i] = FT(0)
-            usecol[i] = 0
-        end
-    end
     #--------------------------------------------------
+    solve_sw!(slv, max_threads, lookup_sw)
 
-    solve_sw!(slv, lookup_sw, max_threads = max_threads)
     for i = 1:10
-        @time solve_sw!(slv, lookup_sw, max_threads = max_threads)
+        @time solve_sw!(slv, max_threads, lookup_sw)
     end
 
     # reading comparison data
-
     flip_ind = nlev:-1:1
 
     ds_flux_up = Dataset(flux_up_file, "r")
@@ -157,7 +146,8 @@ function sw_rfmip(
     toler = FT(0.001)
     @test maximum(abs.(flux_up .- comp_flux_up)) ≤ toler
     @test maximum(abs.(flux_dn .- comp_flux_dn)) ≤ toler
+    return nothing
 end
 
-sw_rfmip(:TwoStream, Float64, Int, array_type()) # two-stream solver should be used for the short-wave problem
-#sw_rfmip(:OneScalar, Float64, Int, array_type()) # this only computes flux_dn_dir
+sw_rfmip(TwoStream, SourceSW2Str, VmrGM, Float64, Int, array_type()) # two-stream solver should be used for the short-wave problem
+#sw_rfmip(OneScalar, VmrGM, Float64, Int, array_type()) # this only computes flux_dn_dir
