@@ -10,6 +10,11 @@ export AbstractSourceLW,
     source_func_longwave,
     source_func_shortwave
 
+"""
+    AbstractSourceLW{FT,FTA1D,FTA2D}
+
+Abstract longwave source for no-scattering and two stream longwave solvers.
+"""
 abstract type AbstractSourceLW{FT,FTA1D,FTA2D} end
 
 """
@@ -123,6 +128,17 @@ function SourceLW2Str(
     )
 end
 
+"""
+    source_func_longwave(
+        ::Type{FT},
+        ncol::I,
+        nlay::I,
+        OPC::Symbol,
+        ::Type{DA},
+    ) where {FT<:AbstractFloat,I<:Int,DA}
+
+Initializes the longwave source for one scalar and two stream simulations.
+"""
 function source_func_longwave(
     ::Type{FT},
     ncol::I,
@@ -168,21 +184,40 @@ function source_func_longwave(
     end
 end
 
+"""
+    SourceSW2Str{FT,FTA1D,FTA2D}
+
+Shortwave sources: computed at layer center, layer edges, 
+and at the surface for 2-stream calculations
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+"""
 struct SourceSW2Str{
     FT<:AbstractFloat,
     FTA1D<:AbstractArray{FT,1},
     FTA2D<:AbstractArray{FT,2},
 }
+    "surface source `(ncol)`"
     sfc_source::FTA1D
+    "albedo `(nlay + 1, ncol)`"
     albedo::FTA2D
+    "temporary storage array, used in 2 stream calculations `(nlay, ncol)`"
     src_up::FTA2D
+    "temporary storage array, used in 2 stream calculations `(nlay, ncol)`"
     src_dn::FTA2D
+    "temporary storage array, used in 2 stream calculations `(nlay, ncol)`"
     Rdif::FTA2D
+    "temporary storage array, used in 2 stream calculations `(nlay, ncol)`"
     Tdif::FTA2D
+    "temporary storage array, used in 2 stream calculations `(nlay, ncol)`"
     Rdir::FTA2D
+    "temporary storage array, used in 2 stream calculations `(nlay, ncol)`"
     Tdir::FTA2D
+    "temporary storage array, used in 2 stream calculations `(nlay, ncol)`"
     Tnoscat::FTA2D
-    "temporary storage array, used in 2 stream calculations"
+    "temporary storage array, used in 2 stream calculations `(nlay + 1, ncol)`"
     src::FTA2D
 end
 Adapt.@adapt_structure SourceSW2Str
@@ -210,6 +245,17 @@ function SourceSW2Str(
     )
 end
 
+"""
+    source_func_shortwave(
+        ::Type{FT},
+        ncol::I,
+        nlay::I,
+        opc::Symbol,
+        ::Type{DA},
+    ) where {FT<:AbstractFloat,I<:Int,DA}
+
+Initializes the shortwave source for one scalar and two stream simulations.
+"""
 function source_func_shortwave(
     ::Type{FT},
     ncol::I,
@@ -217,7 +263,6 @@ function source_func_shortwave(
     opc::Symbol,
     ::Type{DA},
 ) where {FT<:AbstractFloat,I<:Int,DA}
-
     if opc == :OneScalar
         return nothing
     else
@@ -245,6 +290,5 @@ function source_func_shortwave(
         )
     end
 end
-
 
 end

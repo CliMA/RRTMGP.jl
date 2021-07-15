@@ -85,7 +85,12 @@ function FluxSW(
     )
 end
 
-# sets components of flux struct to zero
+"""
+    set_flux_to_zero!(flux::FluxLW{FT}) where {FT<:AbstractFloat}
+
+Set longwave flux to zero
+
+"""
 function set_flux_to_zero!(flux::FluxLW{FT}) where {FT<:AbstractFloat}
     flux.flux_up .= FT(0)
     flux.flux_dn .= FT(0)
@@ -93,6 +98,12 @@ function set_flux_to_zero!(flux::FluxLW{FT}) where {FT<:AbstractFloat}
     return nothing
 end
 
+"""
+    set_flux_to_zero!(flux::FluxSW{FT}) where {FT<:AbstractFloat}
+
+Set shortwave flux to zero
+
+"""
 function set_flux_to_zero!(flux::FluxSW{FT}) where {FT<:AbstractFloat}
     flux.flux_up .= FT(0)
     flux.flux_dn .= FT(0)
@@ -101,7 +112,13 @@ function set_flux_to_zero!(flux::FluxSW{FT}) where {FT<:AbstractFloat}
     return nothing
 end
 
-# flux1 .+= flux2
+"""
+    add_to_flux!(flux1::FluxLW, flux2::FluxLW)
+
+add longwave flux2 to longwave flux1 
+flux1 .+= flux2
+
+"""
 function add_to_flux!(flux1::FluxLW, flux2::FluxLW)
     flux1.flux_up .+= flux2.flux_up
     flux1.flux_dn .+= flux2.flux_dn
@@ -109,6 +126,13 @@ function add_to_flux!(flux1::FluxLW, flux2::FluxLW)
     return nothing
 end
 
+"""
+    add_to_flux!(flux1::FluxSW, flux2::FluxSW)
+
+add shortwave flux2 to shortwave flux1 
+flux1 .+= flux2
+
+"""
 function add_to_flux!(flux1::FluxSW, flux2::FluxSW)
     flux1.flux_up .+= flux2.flux_up
     flux1.flux_dn .+= flux2.flux_dn
@@ -116,5 +140,5 @@ function add_to_flux!(flux1::FluxSW, flux2::FluxSW)
     flux1.flux_dn_dir .+= flux2.flux_dn_dir
     return nothing
 end
-#----------------------------------------------
+
 end

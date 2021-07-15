@@ -6,6 +6,6 @@ Julia implementation of Rapid and accurate Radiative Transfer Model for General 
 
 RRTMGP is fundamentally split into two parts:
 
- - **RRTMGP** Compute optical depth given atmospheric conditions (pressure, temperature, gas concentrations, grid)
- - **RTE** Compute fluxes given optical depth
+ - Optics** Computes optical depth given atmospheric conditions (pressure, temperature, gas concentrations, grid)
+ - **RTE** Computes fluxes given optical depth
 

@@ -17,19 +17,17 @@ using CLIMAParameters.Planet: molmass_dryair, molmass_water, grav
 #---------------------------------------
 
 export AbstractOpticalProps,
-    OneScalar,
-    TwoStream,
-    init_optical_props,
-    compute_col_dry!,
-    compute_optical_props!,
-    compute_optical_props_CPU_kernel!
+    OneScalar, TwoStream, compute_col_dry!, compute_optical_props!
 
+"""
+    AbstractOpticalProps{FT,FTA2D}
 
+Optical properties for one scalar and two stream calculations.
+"""
 abstract type AbstractOpticalProps{FT<:AbstractFloat,FTA2D<:AbstractArray{FT,2}} end
 
 """
-    OneScalar{FT    <: AbstractFloat,
-                  FTA2D <: AbstractArray{FT,2}} <: AbstractOpticalProps{FT,FTA2D
+    OneScalar{FT,FTA1D,FTA2D,I,AD} <: AbstractOpticalProps{FT,FTA2D}
 
 Single scalar approximation for optical depth, used in
 calculations accounting for extinction and emission
@@ -68,10 +66,9 @@ function OneScalar(
 end
 
 """
-    TwoStream{FT<:AbstractFloat,
-                     FTA2D<:AbstractArray{FT,2}} <: AbstractOpticalProps{FT,FTA2D}
+    TwoStream{FT,FTA2D} <: AbstractOpticalProps{FT,FTA2D}
 
-Two stream approximation for optical depth, used in
+Two stream approximation for optical properties, used in
 calculations accounting for extinction and emission
 
 # Fields
@@ -101,6 +98,19 @@ function TwoStream(
     )
 end
 
+"""
+    compute_col_dry!(
+        p_lev,
+        col_dry,
+        param_set,
+        vmr_h2o,
+        lat,
+        max_threads = Int(256),
+    )
+
+This function computes the column amounts of dry or moist air.
+
+"""
 function compute_col_dry!(
     p_lev::FTA2D,
     col_dry::FTA2D,
@@ -153,6 +163,18 @@ function compute_optical_props_CUDA!(op, as, args...)
     return nothing
 end
 #-----------------------------------------------------------------------------
+"""
+    compute_optical_props!(
+        op::AbstractOpticalProps{FT},
+        as::AtmosphericState{FT},
+        sf::AbstractSourceLW{FT},
+        igpt::I,
+        lkp::LookUpLW{I,FT},
+        lkp_cld::Union{LookUpCld,Nothing} = nothing,
+    ) where {I<:Int,FT<:AbstractFloat}
+
+Computes optical properties for the longwave problem.
+"""
 function compute_optical_props!(
     op::AbstractOpticalProps{FT},
     as::AtmosphericState{FT},
@@ -192,6 +214,17 @@ function compute_optical_props!(
     return nothing
 end
 
+"""
+    compute_optical_props!(
+        op::AbstractOpticalProps{FT},
+        as::AtmosphericState{FT},
+        igpt::I,
+        lkp::LookUpSW{I,FT},
+        lkp_cld::Union{LookUpCld,Nothing} = nothing,
+    ) where {I<:Int,FT<:AbstractFloat}
+
+Computes optical properties for the shortwave problem.
+"""
 function compute_optical_props!(
     op::AbstractOpticalProps{FT},
     as::AtmosphericState{FT},
@@ -224,7 +257,16 @@ function compute_optical_props!(
     return nothing
 end
 #-----------------------------------------------------------------------------
+"""
+    compute_optical_props!(
+        op::AbstractOpticalProps{FT},
+        as::GrayAtmosphericState{FT},
+        sf::AbstractSourceLW{FT},
+        igpt::Int = 1,
+    ) where {FT<:AbstractFloat}
 
+Computes optical properties for the longwave gray radiation problem.
+"""
 function compute_optical_props!(
     op::AbstractOpticalProps{FT},
     as::GrayAtmosphericState{FT},
@@ -254,6 +296,15 @@ function compute_optical_props!(
     return nothing
 end
 
+"""
+    compute_optical_props!(
+        op::AbstractOpticalProps{FT},
+        as::GrayAtmosphericState{FT},
+        igpt::Int = 1,
+    ) where {FT<:AbstractFloat}
+
+Computes optical properties for the shortwave gray radiation problem.
+"""
 function compute_optical_props!(
     op::AbstractOpticalProps{FT},
     as::GrayAtmosphericState{FT},

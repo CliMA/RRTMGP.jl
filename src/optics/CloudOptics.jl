@@ -1,8 +1,18 @@
 
-function add_cloud_optics_2stream(op::OneScalar, args...)
-    return nothing
-end
+"""
+    add_cloud_optics_2stream(
+        op::TwoStream,
+        as::AtmosphericState,
+        lkp::LookUpLW,
+        lkp_cld,
+        glaycol,
+        ibnd,
+        igpt,
+    )
 
+This function computes the longwave TwoStream clouds optics properties and adds them
+to the TwoStream longwave gas optics properties.
+"""
 function add_cloud_optics_2stream(
     op::TwoStream,
     as::AtmosphericState,
@@ -20,6 +30,20 @@ function add_cloud_optics_2stream(
     return nothing
 end
 
+"""
+    add_cloud_optics_2stream(
+        op::TwoStream,
+        as::AtmosphericState,
+        lkp::LookUpSW,
+        lkp_cld,
+        glaycol,
+        ibnd,
+        igpt,
+    )
+
+This function computes the longwave TwoStream clouds optics properties and adds them
+to the TwoStream shortwave gase optics properties.
+"""
 function add_cloud_optics_2stream(
     op::TwoStream,
     as::AtmosphericState,
@@ -37,7 +61,20 @@ function add_cloud_optics_2stream(
     end
     return nothing
 end
+"""
+    add_cloud_optics_2stream(op::OneScalar, args...)
 
+Cloud optics is currently only supported for the TwoStream solver.
+"""
+function add_cloud_optics_2stream(op::OneScalar, args...)
+    return nothing
+end
+"""
+    compute_cld_props(lkp_cld, as, glay, gcol, ibnd, igpt)
+
+This function computed the TwoSteam cloud optics properties using either the 
+lookup table method or pade method.
+"""
 function compute_cld_props(lkp_cld, as, glay, gcol, ibnd, igpt)
     use_lut = lkp_cld.use_lut
     cld_mask = as.cld_mask[glay, gcol]
@@ -241,6 +278,19 @@ function compute_cld_props(lkp_cld, as, glay, gcol, ibnd, igpt)
     return (τ, τ_ssa, τ_ssag)
 end
 
+"""
+    pade_eval(
+        ibnd,
+        re,
+        irad,
+        m,
+        n,
+        pade_coeffs,
+        irgh::Union{Int,Nothing} = nothing,
+    )
+
+Evaluate Pade approximant of order [m/n]
+"""
 function pade_eval(
     ibnd,
     re,

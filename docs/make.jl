@@ -1,6 +1,7 @@
-Base.HOME_PROJECT[] = abspath(Base.HOME_PROJECT[]) # JuliaLang/julia/pull/28625
-
-using RRTMGP, Documenter, LaTeXStrings
+pushfirst!(LOAD_PATH, joinpath(@__DIR__, ".."))
+using Documenter
+using LaTeXStrings
+using RRTMGP
 
 makedocs(
     sitename = "RRTMGP.jl",
@@ -20,25 +21,19 @@ makedocs(
     pages = Any[
         "Home"=>"index.md",
         "Mathematical Formulation"=>"MathFormulation.md",
-        "RRTMGP"=>Any[
-            "Gas Concentrations" => "RRTMGP/GasConcs.md"
-            "Gases" => "RRTMGP/Gases.md"
-            "Gas Optics" => "RRTMGP/GasOptics.md"
-            "References States" => "RRTMGP/ReferenceStates.md"
-            "Source Functions" => "RRTMGP/SourceFunctions.md"
-            "K-Distribution" => "RRTMGP/KDistribution.md"
-            "Mesh Orientation" => "MeshOrientation.md"
-            "Atmospheric States" => "RRTMGP/AtmosphericStates.md"
-            "Optical Properties" => "OpticalProps.md"
+        "Optics"=>Any[
+            "Angular Discretization" => "optics/AngularDiscretizations.md"
+            "Atmospheric State" => "optics/AtmosphericStates.md"
+            "Boundary Conditions" => "optics/BCs.md"
+            "Fluxes" => "optics/Fluxes.md"
+            "Utilities for gray radiation simulation" => "optics/GrayUtils.md"
+            "Lookup Tables" => "optics/LookUpTables.md"
+            "Optics" => "optics/Optics.md"
+            "Solver struct" => "optics/RTE.md"
+            "Source Functions" => "optics/Sources.md"
+            "Volume Mixing Ratios" => "optics/Vmrs.md"
         ],
-        "RTE"=>Any[
-            "Optical Properties" => "OpticalProps.md"
-            "Fluxes" => "RTE/Fluxes.md"
-            "Boundary Conditions" => "RTE/BoundaryConditions.md"
-            "Angular Discretizations" => "RTE/AngularDiscretizations.md"
-            "RTE Solver" => "RTE/RTESolver.md"
-            "Solar Zenith Angle" => "RTE/SolarZenithAngle.md"
-        ],
+        "RTE"=>Any["RTE Solver"=>"rte/RTESolver.md"],
         "References"=>"References.md",
     ],
 )

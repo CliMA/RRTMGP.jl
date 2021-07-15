@@ -1,5 +1,5 @@
 using Test
-using RRTMGP.Device: array_type, array_device
+using RRTMGP.Device: array_type, array_device, CPU, CUDADevice
 using CUDA
 using RRTMGP
 using RRTMGP.AngularDiscretizations
@@ -57,7 +57,6 @@ function gray_atmos_lw_equil(
         lat = DA{FT}(range(FT(-π / 2), FT(π / 2), length = ncol)) # latitude
     end
 
-    println("Running longwave test for gray atmosphere model - $opc; ncol = $ncol; DA = $DA")
     as = setup_gray_as_pr_grid(nlay, lat, p0, pe, param_set, DA)
     op = OPC(FT, ncol, nlay, DA)
     src_lw = source_func_longwave(FT, ncol, nlay, opc, DA)
@@ -109,16 +108,25 @@ function gray_atmos_lw_equil(
     T_ex_lev = DA{FT}(undef, nlev, ncol)
     flux_grad = DA{FT}(undef, nlay, ncol)
     flux_grad_err = FT(0)
-
     for i = 1:nsteps
         # calling the long wave gray radiation solver
         solve_lw!(slv, max_threads)
         # computing heating rate
-        compute_gray_heating_rate!(gray_as, flux, hr_lay, param_set)
+        compute_gray_heating_rate!(
+            hr_lay,
+            p_lev,
+            ncol,
+            nlay,
+            flux_net,
+            param_set,
+            FT,
+        )
         # updating t_lay and t_lev based on heating rate
         update_profile_lw!(
-            gray_as,
-            flux,
+            t_lay,
+            t_lev,
+            flux_dn,
+            flux_net,
             hr_lay,
             flux_grad,
             T_ex_lev,
@@ -126,6 +134,7 @@ function gray_atmos_lw_equil(
             nlay,
             nlev,
             ncol,
+            FT,
         )
         #----------------------------------------
         flux_grad_err = maximum(flux_grad)
@@ -137,9 +146,9 @@ function gray_atmos_lw_equil(
 
     t_error = maximum(abs.(T_ex_lev .- gray_as.t_lev))
     println("*************************************************")
+    println("Longwave test for gray atmosphere model - $opc; ncol = $ncol; DA = $DA")
     println("Integration time = $(FT(nsteps)/FT(24.0/tstep) / FT(365.0)) years")
     println("t_error = $(t_error); flux_grad_err = $(flux_grad_err)")
-    println("*************************************************")
 
     @test maximum(t_error) < temp_toler
     #--------------------------------------------------------
@@ -201,7 +210,6 @@ function gray_atmos_sw_test(
     )
     fluxb_sw = FluxSW(ncol, nlay, FT, DA)
     flux_sw = FluxSW(ncol, nlay, FT, DA)
-    println("Running shortwave test for gray atmosphere model - $(opc); ncol = $ncol; DA = $DA")
 
     slv = Solver{
         FT,
@@ -242,18 +250,20 @@ function gray_atmos_sw_test(
 
     rel_toler = FT(0.001)
     rel_error = abs(flux_dn_dir[1] - exact) / exact
+    println("*************************************************")
+    println("Running shortwave test for gray atmosphere model - $(opc); ncol = $ncol; DA = $DA")
     println("relative error = $rel_error")
     @test rel_error < rel_toler
 end
 
 if DA == CuArray
-    @time gray_atmos_lw_equil(OneScalar, Float64, Int, DA, Int(4096))
-    @time gray_atmos_lw_equil(TwoStream, Float64, Int, DA, Int(4096))
+    gray_atmos_lw_equil(OneScalar, Float64, Int, DA, Int(4096))
+    gray_atmos_lw_equil(TwoStream, Float64, Int, DA, Int(4096))
 else
-    @time gray_atmos_lw_equil(OneScalar, Float64, Int, DA, Int(9))
-    @time gray_atmos_lw_equil(TwoStream, Float64, Int, DA, Int(9))
+    gray_atmos_lw_equil(OneScalar, Float64, Int, DA, Int(9))
+    gray_atmos_lw_equil(TwoStream, Float64, Int, DA, Int(9))
 end
 
 
-@time gray_atmos_sw_test(OneScalar, Float64, Int, DA, Int(1))
-@time gray_atmos_sw_test(TwoStream, Float64, Int, DA, Int(1))
+gray_atmos_sw_test(OneScalar, Float64, Int, DA, Int(1))
+gray_atmos_sw_test(TwoStream, Float64, Int, DA, Int(1))

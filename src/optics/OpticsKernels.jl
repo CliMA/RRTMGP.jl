@@ -63,7 +63,7 @@ function compute_optical_props_kernel!(
     p_lay = as.p_lay[glaycol...]
     t_lay = as.t_lay[glaycol...]
     ibnd = lkp.major_gpt2bnd[igpt]
-    τ, ssa = compute_τ_ssa_lw_src(
+    τ, ssa = compute_τ_ssa_lw_src!(
         lkp,
         vmr,
         col_dry,
@@ -97,7 +97,7 @@ function compute_optical_props_kernel!(
     p_lay = as.p_lay[glaycol...]
     t_lay = as.t_lay[glaycol...]
     ibnd = lkp.major_gpt2bnd[igpt]
-    τ, ssa = compute_τ_ssa_lw_src(
+    τ, ssa = compute_τ_ssa_lw_src!(
         lkp,
         vmr,
         col_dry,

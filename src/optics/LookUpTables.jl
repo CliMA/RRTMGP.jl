@@ -5,10 +5,16 @@ using Adapt
 
 export AbstractLookUp, LookUpLW, LookUpSW, LookUpCld
 
+"""
+    AbstractLookUp{I,FT}
+
+Abstract lookup table for longwave and shortwave problems.
+"""
 abstract type AbstractLookUp{I,FT} end
 
 """
-    LookUpLW{I,FT,UI8,UI8A1D,IA1D,IA2D,IA3D,FTA1D,FTA2D,FTA3D,FTA4D} <: AbstractLookUp{I,FT}
+    LookUpLW{I,FT,UI8,UI8A1D,IA1D,IA2D,IA3D,FTA1D,FTA2D,FTA3D,FTA4D} <: 
+        AbstractLookUp{I,FT}
 
 Longwave lookup tables, used to compute optical properties. 
 
@@ -32,7 +38,7 @@ struct LookUpLW{
     n_gases::I
     "number of longwave bands"
     n_bnd::I
-    "number of g-points"
+    "number of `g-points`"
     n_gpt::I
     "number of atmospheric layers (=2, lower and upper atmospheres)"
     n_atmos_layers::I
@@ -95,27 +101,27 @@ struct LookUpLW{
     t_planck::FTA1D
     "total Planck source for each band `(n_t_plnk, n_bnd)`"
     totplnk::FTA2D
-    "map from g-point to band"
+    "map from `g-point` to band"
     major_gpt2bnd::UI8A1D
-    "starting and ending g-point for each band `(2, n_bnd)`"
+    "starting and ending `g-point` for each band `(2, n_bnd)`"
     bnd_lims_gpt::IA2D
     "starting and ending wavenumber for each band `(2, n_bnd)`"
     bnd_lims_wn::FTA2D
-    "g-point limits for minor contributors in lower atmosphere `(2, n_contrib_lower)`"
+    "`g-point` limits for minor contributors in lower atmosphere `(2, n_contrib_lower)`"
     minor_lower_gpt_lims::IA2D
-    "g-point limits for minor contributors in upper atmosphere `(2, n_contrib_upper)`"
+    "`g-point` limits for minor contributors in upper atmosphere `(2, n_contrib_upper)`"
     minor_upper_gpt_lims::IA2D
     "band number for minor contributor in the lower atmosphere `(n_contrib_lower)`"
     minor_lower_bnd::UI8A1D
     "band number for minor contributor in the upper atmosphere `(n_contrib_upper)`"
     minor_upper_bnd::UI8A1D
-    "starting index to idx_gases_minor_lower for each band `(n_bnd)`"
+    "starting index to `idx_gases_minor_lower` for each band `(n_bnd)`"
     minor_lower_bnd_st::UI8A1D
-    "starting index to idx_gases_minor_upper for each band `(n_bnd)`"
+    "starting index to `idx_gases_minor_upper` for each band `(n_bnd)`"
     minor_upper_bnd_st::UI8A1D
-    "shift in kminor_lower for each band `(n_min_absrb_lower)`"
+    "shift in `kminor_lower` for each band `(n_min_absrb_lower)`"
     minor_lower_gpt_sh::IA1D
-    "shift in kminor_upper for each band `(n_min_absrb_upper)`"
+    "shift in `kminor_upper` for each band `(n_min_absrb_upper)`"
     minor_upper_gpt_sh::IA1D
     "minor gas (lower atmosphere) scales with density? `(n_min_absrb_lower)`"
     minor_lower_scales_with_density::IA1D
@@ -403,7 +409,8 @@ function LookUpLW(
 end
 
 """
-    LookUpSW{I,FT,UI8,UI8A1D,IA1D,IA2D,IA3D,FTA1D,FTA2D,FTA3D,FTA4D}<: AbstractLookUp{I,FT}
+    LookUpSW{I,FT,UI8,UI8A1D,IA1D,IA2D,IA3D,FTA1D,FTA2D,FTA3D,FTA4D} <:
+        AbstractLookUp{I,FT}
 
 Shortwave lookup tables, used to compute optical properties. 
 
@@ -427,7 +434,7 @@ struct LookUpSW{
     n_gases::I
     "number of shortwave bands"
     n_bnd::I
-    "number of g-points"
+    "number of `g-points`"
     n_gpt::I
     "number of atmospheric layers (=2, lower and upper atmospheres)"
     n_atmos_layers::I
@@ -486,25 +493,25 @@ struct LookUpSW{
     kminor_start_upper::IA1D # not currently used
     "map from g-point to band"
     major_gpt2bnd::UI8A1D
-    "starting and ending g-point for each band `(2, n_bnd)`"
+    "starting and ending `g-point` for each band `(2, n_bnd)`"
     bnd_lims_gpt::IA2D
     "starting and ending wavenumber for each band `(2, n_bnd)`"
     bnd_lims_wn::FTA2D
-    "g-point limits for minor contributors in lower atmosphere `(2, n_contrib_lower)`"
+    "`g-point` limits for minor contributors in lower atmosphere `(2, n_contrib_lower)`"
     minor_lower_gpt_lims::IA2D
-    "g-point limits for minor contributors in upper atmosphere `(2, n_contrib_upper)`"
+    "`g-point` limits for minor contributors in upper atmosphere `(2, n_contrib_upper)`"
     minor_upper_gpt_lims::IA2D
     "band number for minor contributor in the lower atmosphere `(n_contrib_lower)`"
     minor_lower_bnd::UI8A1D
     "band number for minor contributor in the upper atmosphere `(n_contrib_upper)`"
     minor_upper_bnd::UI8A1D
-    "starting index to idx_gases_minor_lower for each band"
+    "starting index to `idx_gases_minor_lower` for each band"
     minor_lower_bnd_st::UI8A1D
-    "starting index to idx_gases_minor_upper for each band"
+    "starting index to `idx_gases_minor_upper` for each band"
     minor_upper_bnd_st::UI8A1D
-    "shift in kminor_lower for each band `(n_min_absrb_lower)`"
+    "shift in `kminor_lower` for each band `(n_min_absrb_lower)`"
     minor_lower_gpt_sh::IA1D
-    "shift in kminor_upper for each band `(n_min_absrb_upper)`"
+    "shift in `kminor_upper` for each band `(n_min_absrb_upper)`"
     minor_upper_gpt_sh::IA1D
     "minor gas (lower atmosphere) scales with density? `(n_min_absrb_lower)`"
     minor_lower_scales_with_density::IA1D
@@ -524,7 +531,7 @@ struct LookUpSW{
     rayl_lower::FTA3D
     "Rayleigh absorption coefficient for upper atmosphere `(n_gpt, n_η, n_t_ref)`"
     rayl_upper::FTA3D
-    "relative solar source contribution from each g-point `(n_gpt)`"
+    "relative solar source contribution from each `g-point` `(n_gpt)`"
     solar_src_scaled::FTA1D
 end
 Adapt.@adapt_structure LookUpSW
@@ -796,22 +803,7 @@ function LookUpSW(
 end
 
 """
-    LookUpCld{
-    I,
-    FT,
-    FTA1D,
-    FTA2D,
-    FTA3D,
-    FTA4D,
-}
-    AtmosphericState{
-    FT<:AbstractFloat,
-    FTA1D<:AbstractArray{FT,1},
-    FTA2D<:AbstractArray{FT,2},
-    FTA3D<:AbstractArray{FT,3},
-    VMR<:Vmr{FT,FTA1D,FTA2D},
-    I<:Int,
-}
+    LookUpCld{I,FT,FTA1D,FTA2D,FTA3D,FTA4D}
 
 Lookup table for cloud optics.
 
@@ -820,7 +812,6 @@ single-scattering albedo, and asymmetry parameter g as a function of effective r
 We compute the optical depth tau (=exintinction coeff * condensed water path)
 and the products tau*ssa and tau*ssa*g for liquid and ice cloud separately.
 These are used to determine the optical properties of ice and water cloud together.
-
 
 # Fields
 $(DocStringExtensions.FIELDS)

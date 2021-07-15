@@ -1,7 +1,15 @@
 
-# Compute LW source function for upward and downward emission at levels using linear-in-tau assumption
-# See Clough et al., 1992, doi: 10.1029/92JD01419, Eq 13
+"""
+    rte_lw_noscat_source!(
+        src_lw::SourceLWNoScat{FT},
+        op::OneScalar{FT},
+        gcol,
+        nlay,
+    ) where {FT<:AbstractFloat}
 
+Compute LW source function for upward and downward emission at levels using linear-in-tau assumption
+See Clough et al., 1992, doi: 10.1029/92JD01419, Eq 13
+"""
 function rte_lw_noscat_source!(
     src_lw::SourceLWNoScat{FT},
     op::OneScalar{FT},
@@ -39,6 +47,21 @@ function rte_lw_noscat_source!(
     end
 end
 
+"""
+    rte_lw_noscat_transport!(
+        src_lw::SourceLWNoScat{FT},
+        bcs_lw::LwBCs{FT},
+        op::OneScalar{FT},
+        gcol,
+        flux::FluxLW{FT},
+        igpt,
+        ibnd,
+        nlay,
+        nlev,
+    ) where {FT<:AbstractFloat}
+
+Transport for no-scattering longwave problem.
+"""
 function rte_lw_noscat_transport!(
     src_lw::SourceLWNoScat{FT},
     bcs_lw::LwBCs{FT},
@@ -50,7 +73,6 @@ function rte_lw_noscat_transport!(
     nlay,
     nlev,
 ) where {FT<:AbstractFloat}
-    #    gcol = @index(Global, Linear) # global col ids
     # setting references
     @unpack src_up, src_dn, sfc_source = src_lw
     @unpack sfc_emis, inc_flux = bcs_lw
@@ -99,10 +121,13 @@ function rte_lw_noscat_transport!(
     end
 end
 
+"""
+    rte_lw_2stream_combine_sources!(src::SourceLW2Str, gcol, nlev, ncol)
+
+RRTMGP provides source functions at each level using the spectral mapping
+of each adjacent layer. This function combines these for two-stream calculations.
+"""
 function rte_lw_2stream_combine_sources!(src::SourceLW2Str, gcol, nlev, ncol)
-    # RRTMGP provides source functions at each level using the spectral mapping
-    # of each adjacent layer. Combine these for two-stream calculations
-    # lw combine sources
     @inbounds src.lev_source[1, gcol] = src.lev_source_dec[1, gcol] # glev == 1
     @inbounds src.lev_source[nlev, gcol] = src.lev_source_inc[nlev-1, gcol] # glev == nlev
     @inbounds for glev = 2:nlev-1
@@ -112,6 +137,19 @@ function rte_lw_2stream_combine_sources!(src::SourceLW2Str, gcol, nlev, ncol)
     end
 end
 
+"""
+    rte_lw_2stream_source!(
+        op::TwoStream{FT},
+        src_lw::SourceLW2Str{FT},
+        gcol,
+        nlay,
+        ncol,
+    ) where {FT<:AbstractFloat}
+
+This function combines RRTMGP-specific sources at levels,
+computes layer reflectance, transmittance, and
+total source function at levels using linear-in-tau approximation.
+"""
 function rte_lw_2stream_source!(
     op::TwoStream{FT},
     src_lw::SourceLW2Str{FT},
@@ -187,23 +225,31 @@ function rte_lw_2stream_source!(
     end
 end
 
-# ---------------------------------------------------------------
-#
-# Transport of diffuse radiation through a vertically layered atmosphere.
-#   Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
-#   This routine is shared by longwave and shortwave
-#
-# ---------------------------------------------------------------
+"""
+    adding_lw!(
+        flux::FluxLW{FT},
+        src_lw::SL,
+        bcs_lw::BCL,
+        gcol,
+        igpt,
+        ibnd,
+        nlev,
+        ncol,
+    ) where {FT<:AbstractFloat,SL<:SourceLW2Str{FT},BCL<:LwBCs{FT}}
+
+Transport of diffuse radiation through a vertically layered atmosphere, for the longwave problem.
+Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
+"""
 function adding_lw!(
     flux::FluxLW{FT},
     src_lw::SL,
     bcs_lw::BCL,
-    gcol::I,
-    igpt::I,
-    ibnd::I,
-    nlev::I,
-    ncol::I,
-) where {FT<:AbstractFloat,I<:Int,SL<:SourceLW2Str{FT},BCL<:LwBCs{FT}}
+    gcol,
+    igpt,
+    ibnd,
+    nlev,
+    ncol,
+) where {FT<:AbstractFloat,SL<:SourceLW2Str{FT},BCL<:LwBCs{FT}}
     nlay = nlev - 1
     # setting references
     @unpack flux_up, flux_dn, flux_net = flux
@@ -271,15 +317,27 @@ function adding_lw!(
     end
 end
 # ---------------------------------------------------------------
-# Extinction-only i.e. solar direct beam
+"""
+    rte_sw_noscat_solve_kernel!(
+        flux::FluxSW{FT},
+        op::OneScalar{FT},
+        bcs_sw::SwBCs{FT},
+        solar_frac::FT,
+        gcol,
+        nlev,
+    ) where {FT<:AbstractFloat}
+
+No-scattering solver for the shortwave problem.
+(Extinction-only i.e. solar direct beam)
+"""
 function rte_sw_noscat_solve_kernel!(
     flux::FluxSW{FT},
     op::OneScalar{FT},
     bcs_sw::SwBCs{FT},
     solar_frac::FT,
-    gcol::I,
-    nlev::I,
-) where {FT<:AbstractFloat,I<:Int}
+    gcol,
+    nlev,
+) where {FT<:AbstractFloat}
     @unpack toa_flux, zenith = bcs_sw
     τ = op.τ
     flux_dn_dir = flux.flux_dn_dir
@@ -290,15 +348,24 @@ function rte_sw_noscat_solve_kernel!(
             flux_dn_dir[ilev+1, gcol] * exp(-τ[ilev, gcol] / cos(zenith[gcol]))
     end
 end
-#-------------------------------------------------------------------------------------------------
-#
-# Two-stream solutions to direct and diffuse reflectance and transmittance for a layer
-# with optical depth tau, single scattering albedo w0, and asymmetery parameter g.
-# 
-# Equations are developed in Meador and Weaver, 1980,
-# doi:10.1175/1520-0469(1980)037<0630:TSATRT>2.0.CO;2
-#
-#-------------------------------------------------------------------------------------------------
+
+"""
+    sw_two_stream!(
+        op::TwoStream{FT},
+        src_sw::SourceSW2Str{FT},
+        bcs_sw::SwBCs{FT},
+        gcol,
+        nlay,
+    ) where {FT<:AbstractFloat}
+
+Computes cell properties (transmittance and reflectance) for direct and diffuse radiation
+
+Two-stream solutions to direct and diffuse reflectance and transmittance for a layer
+with optical depth tau, single scattering albedo w0, and asymmetery parameter g.
+ 
+Equations are developed in Meador and Weaver, 1980,
+doi:10.1175/1520-0469(1980)037<0630:TSATRT>2.0.CO;2
+"""
 function sw_two_stream!(
     op::TwoStream{FT},
     src_sw::SourceSW2Str{FT},
@@ -373,6 +440,19 @@ function sw_two_stream!(
     end
 end
 
+"""
+    sw_source_2str!(
+        src_sw::SourceSW2Str{FT},
+        bcs_sw::SwBCs{FT},
+        gcol,
+        flux::FluxSW{FT},
+        solar_frac::FT,
+        ibnd,
+        nlay,
+    ) where {FT<:AbstractFloat}
+
+Direct-beam and source for diffuse radiation
+"""
 function sw_source_2str!(
     src_sw::SourceSW2Str{FT},
     bcs_sw::SwBCs{FT},
@@ -398,12 +478,22 @@ function sw_source_2str!(
     sfc_source[gcol] = flux_dn_dir[1, gcol] * sfc_alb_direct[ibnd, gcol]
 end
 
-# ---------------------------------------------------------------
-#
-# Transport of diffuse radiation through a vertically layered atmosphere.
-#   Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
-#
-# ---------------------------------------------------------------
+"""
+    adding_sw!(
+        src_sw::SourceSW2Str{FT},
+        bcs_sw::SwBCs{FT},
+        gcol,
+        flux::FluxSW{FT},
+        igpt,
+        ibnd,
+        nlev,
+    ) where {FT<:AbstractFloat}
+
+Transport for the two stream shortwave problem.
+
+Transport of diffuse radiation through a vertically layered atmosphere.
+Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
+"""
 function adding_sw!(
     src_sw::SourceSW2Str{FT},
     bcs_sw::SwBCs{FT},

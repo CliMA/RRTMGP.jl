@@ -18,11 +18,17 @@ using ..LookUpTables
 
 export solve_lw!, solve_sw!
 
-
 include("RTESolverKernels.jl")
-# -------------------------------------------------------------------------------------------------
-# Solver for the longwave radiation problem
-# -------------------------------------------------------------------------------------------------
+
+"""
+    solve_lw!(
+        slv::Solver{FT,I},
+        max_threads::I,
+        lkp_args...,
+    ) where {I<:Int,FT<:AbstractFloat}
+
+Solver for the longwave radiation problem
+"""
 function solve_lw!(
     slv::Solver{FT,I},
     max_threads::I,
@@ -85,24 +91,36 @@ function solve_lw!(
     flux_lw.flux_net .= flux_lw.flux_up .- flux_lw.flux_dn
     return nothing
 end
-# -------------------------------------------------------------------------------------------------
-#
-# LW fluxes, no scattering, mu (cosine of integration angle) specified by column
-# Does radiation calculation at user-supplied angles; converts radiances to flux
-# using user-supplied weights
-#
-# ---------------------------------------------------------------    
+
+"""
+    rte_lw_noscat_solve!(
+        flux::FluxLW{FT},
+        src_lw::SourceLWNoScat{FT},
+        bcs_lw::LwBCs{FT},
+        op::OneScalar{FT},
+        nlay,
+        ncol,
+        igpt,
+        ibnd,
+        max_threads,
+    ) where {FT<:AbstractFloat}
+
+No scattering solver for the longwave problem.
+LW fluxes, no scattering, mu (cosine of integration angle) specified by column
+Does radiation calculation at user-supplied angles; converts radiances to flux
+using user-supplied weights. Currently, only n_gauss_angles = 1 supported.
+"""
 function rte_lw_noscat_solve!(
     flux::FluxLW{FT},
     src_lw::SourceLWNoScat{FT},
     bcs_lw::LwBCs{FT},
     op::OneScalar{FT},
-    nlay::I,
-    ncol::I,
-    igpt::I,
-    ibnd::I,
-    max_threads::I,
-) where {FT<:AbstractFloat,I<:Int}
+    nlay,
+    ncol,
+    igpt,
+    ibnd,
+    max_threads,
+) where {FT<:AbstractFloat}
     nlev = nlay + 1
     device = array_device(op.τ)
     if device === CUDADevice() # launch CUDA kernel
@@ -135,11 +153,11 @@ function rte_lw_noscat_solve_CUDA!(
     src_lw::SourceLWNoScat{FT},
     bcs_lw::LwBCs{FT},
     op::OneScalar{FT},
-    nlay::I,
-    ncol::I,
-    igpt::I,
-    ibnd::I,
-) where {FT<:AbstractFloat,I<:Int}
+    nlay,
+    ncol,
+    igpt,
+    ibnd,
+) where {FT<:AbstractFloat}
     gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
     nlev = nlay + 1
     if gcol ≤ ncol
@@ -158,27 +176,41 @@ function rte_lw_noscat_solve_CUDA!(
     end
     return nothing
 end
-#-------------------------------------------------------------------------------------------------
-# Longwave two-stream calculation:
-# RRTMGP provides source functions at each level using the spectral mapping
-# of each adjacent layer. Combine these for two-stream calculations
-# lw combine sources (rte_lw_2stream_combine_sources!)
-# combine RRTMGP-specific sources at levels
-# compute layer reflectance, transmittance
-# compute total source function at levels using linear-in-tau (rte_lw_2stream_source!)
-# transport (adding_lw!)
-#-------------------------------------------------------------------------------------------------
+
+"""
+    rte_lw_2stream_solve!(
+        flux::FluxLW{FT},
+        src_lw::SourceLW2Str{FT},
+        bcs_lw::LwBCs{FT},
+        op::TwoStream{FT},
+        nlay,
+        ncol,
+        igpt,
+        ibnd,
+        max_threads,
+    ) where {FT<:AbstractFloat}
+
+Two stream solver for the longwave problem.
+
+RRTMGP provides source functions at each level using the spectral mapping
+of each adjacent layer. Combine these for two-stream calculations
+lw combine sources (rte_lw_2stream_combine_sources!)
+combine RRTMGP-specific sources at levels
+compute layer reflectance, transmittance
+compute total source function at levels using linear-in-tau (rte_lw_2stream_source!)
+transport (adding_lw!)
+"""
 function rte_lw_2stream_solve!(
     flux::FluxLW{FT},
     src_lw::SourceLW2Str{FT},
     bcs_lw::LwBCs{FT},
     op::TwoStream{FT},
-    nlay::I,
-    ncol::I,
-    igpt::I,
-    ibnd::I,
-    max_threads::I,
-) where {FT<:AbstractFloat,I<:Int}
+    nlay,
+    ncol,
+    igpt,
+    ibnd,
+    max_threads,
+) where {FT<:AbstractFloat}
     nlev = nlay + 1
     device = array_device(op.τ)
     if device === CUDADevice() # launch CUDA kernel
@@ -202,11 +234,11 @@ function rte_lw_2stream_solve_CUDA!(
     src_lw::SourceLW2Str{FT},
     bcs_lw::LwBCs{FT},
     op::TwoStream{FT},
-    nlay::I,
-    ncol::I,
-    igpt::I,
-    ibnd::I,
-) where {FT<:AbstractFloat,I<:Int}
+    nlay,
+    ncol,
+    igpt,
+    ibnd,
+) where {FT<:AbstractFloat}
     gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
     nlev = nlay + 1
     if gcol ≤ ncol
@@ -215,9 +247,16 @@ function rte_lw_2stream_solve_CUDA!(
         adding_lw!(flux, src_lw, bcs_lw, gcol, igpt, ibnd, nlev, ncol)
     end
 end
-# -------------------------------------------------------------------------------------------------
-# Solver for the shortwave radiation problem
-# -------------------------------------------------------------------------------------------------
+
+"""
+    solve_sw!(
+        slv::Solver{FT,I},
+        max_threads::I,
+        lkp_args...,
+    ) where {I<:Int,FT<:AbstractFloat}
+
+Solver for the shortwave radiation problem
+"""
 function solve_sw!(
     slv::Solver{FT,I},
     max_threads::I,
@@ -286,19 +325,34 @@ function solve_sw!(
 
     return nothing
 end
-#--------------------------------------------------------------------------------------------------
-# Extinction-only i.e. solar direct beam
+
+"""
+    rte_sw_noscat_solve!(
+        flux::FluxSW{FT},
+        op::OneScalar{FT},
+        bcs_sw::SwBCs{FT},
+        nlay,
+        ncol,
+        igpt,
+        ibnd,
+        solar_frac::FT,
+        max_threads,
+    ) where {FT<:AbstractFloat}
+
+No-scattering solver for the shortwave problem.
+(Extinction-only i.e. solar direct beam)
+"""
 function rte_sw_noscat_solve!(
     flux::FluxSW{FT},
     op::OneScalar{FT},
     bcs_sw::SwBCs{FT},
-    nlay::I,
-    ncol::I,
-    igpt::I,
-    ibnd::I,
+    nlay,
+    ncol,
+    igpt,
+    ibnd,
     solar_frac::FT,
-    max_threads::I,
-) where {FT<:AbstractFloat,I<:Int}
+    max_threads,
+) where {FT<:AbstractFloat}
     nlev = nlay + 1
     device = array_device(op.τ)
     if device === CUDADevice() # launching CUDA kernel
@@ -326,12 +380,12 @@ function rte_sw_noscat_solve_CUDA!(
     flux::FluxSW{FT},
     op::OneScalar{FT},
     bcs_sw::SwBCs{FT},
-    nlay::I,
-    ncol::I,
-    igpt::I,
-    ibnd::I,
+    nlay,
+    ncol,
+    igpt,
+    ibnd,
     solar_frac::FT,
-) where {FT<:AbstractFloat,I<:Int}
+) where {FT<:AbstractFloat}
     gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
     nlev = nlay + 1
     if gcol ≤ ncol
@@ -340,18 +394,34 @@ function rte_sw_noscat_solve_CUDA!(
     return nothing
 end
 #--------------------------------------------------------------------------------------------------
+"""
+    rte_sw_2stream_solve!(
+        flux::FluxSW{FT},
+        op::TwoStream{FT},
+        bcs_sw::SwBCs{FT},
+        src_sw::SourceSW2Str{FT},
+        nlay,
+        ncol,
+        igpt,
+        ibnd,
+        solar_frac::FT,
+        max_threads,
+    ) where {FT<:AbstractFloat}
+
+Two stream solver for the shortwave problem.
+"""
 function rte_sw_2stream_solve!(
     flux::FluxSW{FT},
     op::TwoStream{FT},
     bcs_sw::SwBCs{FT},
     src_sw::SourceSW2Str{FT},
-    nlay::I,
-    ncol::I,
-    igpt::I,
-    ibnd::I,
+    nlay,
+    ncol,
+    igpt,
+    ibnd,
     solar_frac::FT,
-    max_threads::I,
-) where {FT<:AbstractFloat,I<:Int}
+    max_threads,
+) where {FT<:AbstractFloat}
     nlev = nlay + 1
     device = array_device(op.τ)
     if device === CUDADevice()
@@ -375,12 +445,12 @@ function rte_sw_2stream_solve_CUDA!(
     op::TwoStream{FT},
     bcs_sw::SwBCs{FT},
     src_sw::SourceSW2Str{FT},
-    nlay::I,
-    ncol::I,
-    igpt::I,
-    ibnd::I,
+    nlay,
+    ncol,
+    igpt,
+    ibnd,
     solar_frac::FT,
-) where {FT<:AbstractFloat,I<:Int}
+) where {FT<:AbstractFloat}
     gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
     nlev = nlay + 1
     if gcol ≤ ncol

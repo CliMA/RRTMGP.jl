@@ -1,6 +1,5 @@
 module RTE
 using CUDA
-using ..Device: array_type, array_device
 using Adapt
 using ..AtmosphericStates
 using DocStringExtensions
@@ -13,9 +12,33 @@ using ..BCs
 using CLIMAParameters
 using CLIMAParameters.Planet: grav, R_d, cp_d
 
-export gas_optics_gray_atmos!,
-    update_profile_lw_kernel!, Solver, compute_gray_heating_rate!
+export Solver
 
+"""
+    struct Solver{
+        FT,
+        I,
+        FTA1D,
+        FTA2D,
+        AS,
+        OP,
+        SL,
+        SS,
+        BCL,
+        BCS,
+        FXBL,
+        FXBS,
+        FXL,
+        FXS,
+    }
+
+The high-level RRTMGP data structure storing the atmospheric state, 
+optical properties, sources, boundary conditions and fluxes configurations
+for a given simulation.
+
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
 struct Solver{
     FT<:AbstractFloat,
     I<:Int,
@@ -32,7 +55,7 @@ struct Solver{
     FXL<:Union{FluxLW{FT,FTA2D},Nothing},
     FXS<:Union{FluxSW{FT,FTA2D},Nothing},
 }
-    as::AS         # atmoshperic state
+    as::AS         # atmospheric state
     op::OP         # optical properties
     src_lw::SL     # source functions
     src_sw::SS     # source functions

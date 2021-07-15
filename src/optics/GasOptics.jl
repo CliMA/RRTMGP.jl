@@ -1,4 +1,18 @@
+"""
+    compute_col_dry_kernel!(
+        col_dry,
+        p_lev,
+        mol_m_dry,
+        mol_m_h2o,
+        avogadro
+        helmert1,
+        vmr_h2o
+        lat,
+        glaycol,
+    )
 
+This function computes the column amounts of dry or moist air.
+"""
 function compute_col_dry_kernel!(
     col_dry::AbstractArray{FT,2},
     p_lev::AbstractArray{FT,2},
@@ -29,7 +43,19 @@ function compute_col_dry_kernel!(
         col_dry[glay, gcol] = (Δp * avogadro / (m2_to_cm2 * mol_m_air * g0)) # molecules/cm^2
     end
 end
+"""
+    compute_interp_fractions(
+        lkp::AbstractLookUp{I,FT},
+        vmr,
+        p_lay,
+        t_lay,
+        tropo,
+        ibnd,
+        glaycol,
+    ) where {I<:Int,FT<:AbstractFloat}
 
+compute interpolation fractions for binary species parameter, pressure and temperature.
+"""
 @inline function compute_interp_fractions(
     lkp::AbstractLookUp{I,FT},
     vmr,
@@ -46,6 +72,16 @@ end
     return (jftemp, jfpress, jfη, col_mix)
 end
 
+"""
+    compute_interp_frac_temp(
+        lkp::AbstractLookUp{I,FT},
+        t_lay,
+        glay,
+        gcol,
+    ) where {I<:Int,FT<:AbstractFloat}
+
+compute interpolation fraction for temperature.
+"""
 @inline function compute_interp_frac_temp(
     lkp::AbstractLookUp{I,FT},
     t_lay,
@@ -60,6 +96,17 @@ end
     return (jtemp, ftemp)
 end
 
+"""
+    compute_interp_frac_press(
+        lkp::AbstractLookUp,
+        p_lay,
+        tropo,
+        glay,
+        gcol,
+    )
+
+Compute interpolation fraction for pressure.
+"""
 @inline function compute_interp_frac_press(
     lkp::AbstractLookUp,
     p_lay,
@@ -82,6 +129,19 @@ end
     return (jpress, fpress)
 end
 
+"""
+    compute_interp_frac_η(
+        lkp::AbstractLookUp{I,FT},
+        vmr,
+        tropo,
+        jtemp,
+        ibnd,
+        glay,
+        gcol,
+    ) where {FT<:AbstractFloat,I<:Int}
+
+Compute interpolation fraction for binary species parameter.
+"""
 @inline function compute_interp_frac_η(
     lkp::AbstractLookUp{I,FT},
     vmr,
@@ -124,7 +184,23 @@ end
     return ((jη1, jη2, fη1, fη2), (col_mix1, col_mix2))#nothing
 end
 
-@inline function compute_τ_ssa_lw_src(
+"""
+    compute_τ_ssa_lw_src!(
+        lkp::AbstractLookUp{I,FT},
+        vmr,
+        col_dry,
+        igpt,
+        ibnd,
+        p_lay::FT,
+        t_lay,
+        glaycol,
+        src_args...,
+    ) where {FT<:AbstractFloat,I<:Int}
+
+Compute optical thickness, single scattering albedo, asymmetry parameter 
+and longwave sources whenever applicable.
+"""
+@inline function compute_τ_ssa_lw_src!(
     lkp::AbstractLookUp{I,FT},
     vmr,
     col_dry,
@@ -192,6 +268,29 @@ end
     return (τ, ssa)
 end
 
+"""
+    compute_τ_minor(
+        lkp::AbstractLookUp,
+        tropo::I,
+        vmr,
+        vmr_h2o::FT,
+        col_dry,
+        p_lay::FT,
+        t_lay::FT,
+        jtemp::I,
+        ftemp::FT,
+        jη1::I,
+        jη2::I,
+        fη1::FT,
+        fη2::FT,
+        igpt,
+        ibnd,
+        glay,
+        gcol,
+    ) where {FT<:AbstractFloat,I<:Int}
+
+Compute optical thickness contributions from minor gases.
+"""
 @inline function compute_τ_minor(
     lkp::AbstractLookUp,
     tropo::I,
@@ -263,6 +362,23 @@ end
     return τ_minor
 end
 
+"""
+    compute_τ_rayleigh(
+        lkp::LookUpSW,
+        tropo::I,
+        col_dry::FT,
+        vmr_h2o::FT,
+        jtemp::I,
+        ftemp::FT,
+        jη1::I,
+        jη2::I,
+        fη1::FT,
+        fη2::FT,
+        igpt::I,
+    ) where {FT<:AbstractFloat,I<:Int}
+
+Compute Rayleigh scattering optical depths for shortwave problem
+"""
 @inline function compute_τ_rayleigh(
     lkp::LookUpSW,
     tropo::I,
@@ -298,6 +414,30 @@ end
     return FT(0)
 end
 
+"""
+    compute_lw_planck_src!(
+        lkp::LookUpLW,
+        jη1,
+        jη2,
+        fη1,
+        fη2,
+        jpresst,
+        fpress,
+        jtemp,
+        ftemp,
+        t_lay,
+        igpt,
+        ibnd,
+        glay,
+        gcol,
+        sf,
+        t_lev,
+        t_sfc,
+    )
+
+Computes Planck sources for the longwave problem.
+
+"""
 @inline function compute_lw_planck_src!(
     lkp::LookUpLW,
     jη1,

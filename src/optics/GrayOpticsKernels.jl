@@ -3,7 +3,17 @@
 # and lapse rate for a gray atmosphere. 
 # See Schneider 2004, J. Atmos. Sci. (2004) 61 (12): 1317–1340.
 # https://doi.org/10.1175/1520-0469(2004)061<1317:TTATTS>2.0.CO;2
+"""
+    compute_optical_props_kernel!(
+        op::AbstractOpticalProps{FT},
+        as::GrayAtmosphericState{FT},
+        glaycol,
+        source::AbstractSourceLW{FT},
+    ) where {FT<:AbstractFloat}
 
+This function computes the optical properties using the gray atmosphere assumption
+for the longwave solver.
+"""
 function compute_optical_props_kernel!(
     op::AbstractOpticalProps{FT},
     as::GrayAtmosphericState{FT},
@@ -15,6 +25,17 @@ function compute_optical_props_kernel!(
     compute_sources_gray_kernel!(source, as, glaycol) # computing Planck sources
 end
 
+"""
+    compute_optical_props_kernel!(
+        op::AbstractOpticalProps{FT},
+        as::GrayAtmosphericState{FT},
+        glaycol,
+    ) where {FT<:AbstractFloat}
+
+
+This function computes the optical properties using the gray atmosphere assumption
+for the shortwave solver.
+"""
 function compute_optical_props_kernel!(
     op::AbstractOpticalProps{FT},
     as::GrayAtmosphericState{FT},
@@ -34,7 +55,15 @@ function compute_optical_props_kernel!(
         op.g[glaycol...] = FT(0)
     end
 end
+"""
+    compute_sources_gray_kernel!(
+        source::AbstractSourceLW{FT},
+        as::GrayAtmosphericState{FT},
+        glaycol,
+    ) where {FT<:AbstractFloat}
 
+This function computes the Planck sources for the gray longwave solver.
+"""
 function compute_sources_gray_kernel!(
     source::AbstractSourceLW{FT},
     as::GrayAtmosphericState{FT},

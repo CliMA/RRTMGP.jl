@@ -1,13 +1,24 @@
 module Vmrs
 using CUDA
-using ..Device: array_type, array_device
 using DocStringExtensions
 using Adapt
 
-export AbstractVmr, Vmr, VmrGM, init_vmr, get_vmr, get_vmr!
+export AbstractVmr, Vmr, VmrGM, init_vmr, get_vmr
 
+"""
+    AbstractVmr{FT}
+"""
 abstract type AbstractVmr{FT<:AbstractFloat} end
+"""
+    VmrGM{FT,FTA1D,FTA2D} <: AbstractVmr{FT}
 
+Volume mixing ratios for various gases in the atmosphere. This struct can be used
+when only H₂O and O₃ concentrations vary spatially and a global mean is used 
+for all other gases.
+
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
 struct VmrGM{
     FT<:AbstractFloat,
     FTA1D<:AbstractArray{FT,1},
@@ -37,86 +48,82 @@ function VmrGM(
     return VmrGM{FT,typeof(vmr),typeof(vmr_h2o)}(vmr_h2o, vmr_o3, vmr)
 end
 
+"""
+    Vmr{FT,FTA3D} <: AbstractVmr{FT}
+
+Volume mixing ratios for various gases in the atmosphere. This struct can be used
+when concentrations vary spatially for all gases.
+
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
 struct Vmr{FT<:AbstractFloat,FTA3D<:AbstractArray{FT,3}} <: AbstractVmr{FT}
     "volume mixing ratio of all gases as a function of location and column"
     vmr::FTA3D
 end
 Adapt.@adapt_structure Vmr
+"""
+    get_vmr(
+        vmr::VmrGM{FT},
+        ig::Int,
+        ilay::Int,
+        icol::Int,
+    ) where {FT<:AbstractFloat}
 
+Obtain volume mixing ratio of gas `ig` for layer `ilay` of column `icol`.
+"""
 @inline function get_vmr(
-    vmr::VmrGM{FT,FTA1D,FTA2D},
+    vmr::VmrGM{FT},
     ig::Int,
     ilay::Int,
     icol::Int,
-) where {
-    FT<:AbstractFloat,
-    FTA1D<:AbstractArray{FT,1},
-    FTA2D<:AbstractArray{FT,2},
-}
+) where {FT<:AbstractFloat}
     if ig == 0
         return FT(1)
     elseif ig == 1 # h2o / h2o_foreign / h2o_self-continua
         return @inbounds vmr.vmr_h2o[ilay, icol]
     elseif ig == 3 # ozone
         return @inbounds vmr.vmr_o3[ilay, icol]
-    else
+    else # other gases
         return @inbounds vmr.vmr[ig]
     end
 end
 
+"""
+    get_vmr(
+        vmr::Vmr{FT},
+        ig::Int,
+        ilay::Int,
+        icol::Int,
+    ) where {FT<:AbstractFloat}
+
+Obtain volume mixing ratio of gas `ig` for layer `ilay` of column `icol`.
+"""
 @inline function get_vmr(
-    vmr::Vmr{FT,FTA3D},
+    vmr::Vmr{FT},
     ig::Int,
     ilay::Int,
     icol::Int,
-) where {FT<:AbstractFloat,FTA3D<:AbstractArray{FT,3}}
+) where {FT<:AbstractFloat}
     if ig == 0
         return FT(1)
     else
-        vmr isa Vmr
         return @inbounds vmr.vmr[ilay, icol, ig]
     end
 end
 
-@inline function get_vmr!(
-    vmr::VmrGM{FT,FTA1D,FTA2D},
-    ig::Int,
-    ilay::Int,
-    icol::Int,
-    res::FT,
-) where {
-    FT<:AbstractFloat,
-    FTA1D<:AbstractArray{FT,1},
-    FTA2D<:AbstractArray{FT,2},
-}
-    if ig == 0
-        res = FT(1)
-    elseif ig == 1 # h2o / h2o_foreign / h2o_self-continua
-        @inbounds res = vmr.vmr_h2o[ilay, icol]
-    elseif ig == 3 # ozone
-        @inbounds res = vmr.vmr_o3[ilay, icol]
-    else
-        @inbounds res = vmr.vmr[ig]
-    end
-    return res
-end
+"""
+    init_vmr(
+        ngas,
+        nlay,
+        ncol,
+        ::Type{FT},
+        ::Type{DA};
+        gm::Bool = true,
+    ) where {FT<:AbstractFloat,DA}
 
-@inline function get_vmr!(
-    vmr::Vmr{FT,FTA3D},
-    ig::Int,
-    ilay::Int,
-    icol::Int,
-    res::FT,
-) where {FT<:AbstractFloat,FTA3D<:AbstractArray{FT,3}}
-    if ig == 0
-        res = FT(1)
-    else
-        vmr isa Vmr
-        @inbounds res = vmr.vmr[ilay, icol, ig]
-    end
-    return res
-end
-
+Initialize the Vmr struct.
+"""
 function init_vmr(
     ngas::Int,
     nlay::Int,

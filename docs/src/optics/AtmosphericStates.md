@@ -6,13 +6,5 @@ CurrentModule = RRTMGP.AtmosphericStates
 
 ```@docs
 AtmosphericState
-AtmosphericStatePGP
+GrayAtmosphericState
 ```
-
-```@docs
-get_col_dry
-extrap_lower
-extrap_upper
-interpolate_var
-```
-

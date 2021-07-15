@@ -74,18 +74,18 @@ Here, ``\F = \sum_i F_i``, with ``F_j = \FR{net} = \FR{+} - \FR{-}`` for some ``
 
 To solve for ``\FR{net}``, one must choose an approximation for optical properties. In `RRTMGP.jl`, choices include
 
- - [`OneScalar`](@ref OpticalProps.OneScalar): optical depth (``\τ{}``) only
- - [`TwoStream`](@ref OpticalProps.TwoStream): optical depth (``\τ{}``), single scattering albedo (``\SSA``), asymmetry factor (``\ASY``)
+ - [`OneScalar`](@ref Optics.OneScalar): optical depth (``\τ{}``) only
+ - [`TwoStream`](@ref Optics.TwoStream): optical depth (``\τ{}``), single scattering albedo (``\SSA``), asymmetry factor (``\ASY``)
 
-To compute either set of optical properties, one must call [`gas_optics!`](@ref GasOptics.gas_optics!) with the following arguments:
+To compute either set of optical properties, one must call [`compute_optical_props!`](@ref Optics.compute_optical_props!) with the following arguments:
 
- - A [K-Distribution](@ref) ``\KD``, `KDistributionLongwave` or `KDistributionShortwave`: typically read from [Data files](@ref)
- - An [`AtmosphericState`](@ref AtmosphericStates.AtmosphericState) ``\AS``, defined by: temperature ``\temperature``, pressure ``\pressure``, set of gas concentrations ([`AbstractGas`](@ref Gases.AbstractGas))
- - [optionally] An [`AbstractSourceFunc`](@ref SourceFunctions.AbstractSourceFunc) ``\FS``, `SourceFuncLongWave` or `SourceFuncShortWave`: source functions
+ - A K-distribution ``\KD``, [`LookUpLW`](@ref LookUpTables.LookUpLW) or [`LookUpSW`](@ref LookUpTables.LookUpSW): typically read from [Data files](@ref)
+ - An [`AtmosphericState`](@ref AtmosphericStates.AtmosphericState) ``\AS``, defined by: temperature ``\temperature``, pressure ``\pressure``, set of gas volume mixing ratios ([`AbstractVmr`](@ref Vmrs.AbstractVmr))
+ - [optionally] A source function ``\FS``, [`SourceLWNoScat`](@ref Sources.SourceLWNoScat), [`SourceLW2Str`](@ref Sources.SourceLW2Str) or [`SourceSW2Str`](@ref Sources.SourceSW2Str): source functions
 
-Calling `GasOptics.gas_optics!` computes the optical depths via a 3D interpolation routine in the following simplified steps:
+Calling `Optics.compute_optical_props!` computes the optical depths via a 3D interpolation routine in the following simplified steps:
 
- - Initialize and compute [`InterpolationCoefficients`](@ref GasOptics.InterpolationCoefficients)
+ - Initialize and compute [`InterpolationCoefficients`](@ref Optics.compute_interp_fractions)
  - Compute absorption optical depth ``\τ{absorption}`` for major and minor gas species (which has binary variation as a function of height `itropo=1,2`)
  - Compute Rayleigh scattering optical depth ``\τ{Rayleigh}``
  - Compute total optical depth: ``\τ{total} = \τ{absorption}+\τ{Rayleigh}``
@@ -101,7 +101,7 @@ Mathematically, let's write this entire computation as a map (a spectral map, si
 \end{align}
 ```
 
-In addition, `GasOptics.gas_optics!` computes radiative sources (currently Planck sources), which are computed the same regardless of the type of optical properties:
+In addition, `Optics.compute_optical_props!` computes radiative sources (currently Planck sources), which are computed the same regardless of the type of optical properties:
 
 ```math
 \begin{align}

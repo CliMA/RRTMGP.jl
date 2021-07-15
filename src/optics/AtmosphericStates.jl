@@ -21,7 +21,8 @@ abstract type AbstractAtmosphericState{FT,I,FTA1D} end
 include("GrayAtmosphericStates.jl")
 
 """
-    AtmosphericState{FT,FTA1D,FTA1DN,FTA2D,CLDP,CLDM,VMR,I} <: AbstractAtmosphericState{FT,I,FTA1D}
+    AtmosphericState{FT,FTA1D,FTA1DN,FTA2D,CLDP,CLDM,VMR,I} <:
+        AbstractAtmosphericState{FT,I,FTA1D}
 
 Atmospheric conditions, used to compute optical properties. 
 

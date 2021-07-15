@@ -1,6 +1,7 @@
 
 """
-    GrayAtmosphericState{FT,FTA1D,FTA2D,I} <: AbstractAtmosphericState{FT,I,FTA1D}
+    GrayAtmosphericState{FT,FTA1D,FTA2D,I} <: 
+        AbstractAtmosphericState{FT,I,FTA1D}
 
 Atmospheric conditions, used to compute optical properties with the gray atmosphere approximation
 

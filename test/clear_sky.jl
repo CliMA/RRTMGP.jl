@@ -142,10 +142,10 @@ function clear_sky(
     solve_lw!(slv, max_threads, lookup_lw)
     solve_sw!(slv, max_threads, lookup_sw)
 
-    for i = 1:10
-        @time solve_lw!(slv, max_threads, lookup_lw)
-        @time solve_sw!(slv, max_threads, lookup_sw)
-    end
+    #    for i = 1:10
+    #        @time solve_lw!(slv, max_threads, lookup_lw)
+    #        @time solve_sw!(slv, max_threads, lookup_sw)
+    #    end
 
     # comparing longwave fluxes with data from RRTMGP FORTRAN code
     flip_ind = nlev:-1:1
@@ -193,10 +193,10 @@ function clear_sky(
     max_err_flux_up_sw = maximum(abs.(flux_up_sw .- comp_flux_up_sw))
     max_err_flux_dn_sw = maximum(abs.(flux_dn_sw .- comp_flux_dn_sw))
 
-    println("=======================================")
     println("Clear-sky shortwave test, opc  = $opc")
     println("max_err_flux_up_sw = $max_err_flux_up_sw")
     println("max_err_flux_dn_sw = $max_err_flux_dn_sw")
+    println("=======================================")
 
 
     toler_sw = FT(0.001)
