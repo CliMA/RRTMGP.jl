@@ -1,7 +1,7 @@
 # Angular Discretizations
 
 ```@meta
-CurrentModule = RRTMGP.AngularDiscretizations
+CurrentModule = RRTMGP.GrayAngularDiscretizations
 ```
 
 ```@docs
