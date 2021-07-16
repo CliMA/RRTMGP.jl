@@ -45,6 +45,7 @@ function solve_lw!(
             @assert lkp_args[2] isa LookUpCld
         end
         n_gpt = lkp_args[1].n_gpt
+        major_gpt2bnd = Array{I,1}(lkp_args[1].major_gpt2bnd) #TODO temp fix to avoid scalar indexing
         flux = fluxb_lw
     else
         n_gpt = 1
@@ -55,7 +56,7 @@ function solve_lw!(
 
     for igpt = 1:n_gpt
         if nargs > 0 && lkp_args[1] isa LookUpLW
-            ibnd = I(lkp_args[1].major_gpt2bnd[igpt])
+            ibnd = major_gpt2bnd[igpt]
         end
         # computing optical properties
         compute_optical_props!(op, as, src_lw, igpt, lkp_args...)
@@ -273,6 +274,8 @@ function solve_sw!(
             @assert lkp_args[2] isa LookUpCld
         end
         n_gpt = lkp_args[1].n_gpt
+        major_gpt2bnd = Array{I,1}(lkp_args[1].major_gpt2bnd)#TODO temp fix to avoid scalar indexing
+        solar_src_scaled = Array{FT,1}(lkp_args[1].solar_src_scaled)
         flux = fluxb_sw
     else
         n_gpt = 1
@@ -283,8 +286,8 @@ function solve_sw!(
     set_flux_to_zero!(slv.flux_sw)
     for igpt = 1:n_gpt
         if nargs > 0 && lkp_args[1] isa LookUpSW
-            ibnd = I(lkp_args[1].major_gpt2bnd[igpt])
-            solar_frac = lkp_args[1].solar_src_scaled[igpt]
+            ibnd = major_gpt2bnd[igpt]
+            solar_frac = solar_src_scaled[igpt]
         end
         # computing optical properties
         compute_optical_props!(op, as, igpt, lkp_args...)

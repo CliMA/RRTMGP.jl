@@ -1,7 +1,6 @@
 name = "RRTMGP"
 uuid = "a01a1ee8-cea4-48fc-987c-fc7878d79da1"
-authors = ["Charles Kawczynski <kawczynski.charles@gmail.com>",
-           "Sriharsha Kandala <sriharsha.kvs@gmail.com>"]
+authors = ["Charles Kawczynski <kawczynski.charles@gmail.com>", "Sriharsha Kandala <sriharsha.kvs@gmail.com>"]
 version = "0.1.0"
 
 [deps]
@@ -11,10 +10,7 @@ CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 Compat = "34da2185-b29b-5c13-b0c7-acf172513d20"
 Coverage = "a2441757-f6aa-5fb2-8edb-039e3f45d037"
 DocStringExtensions = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
-DocumenterMarkdown = "997ab1e6-3595-5248-9280-8efb232c3433"
-DocumenterTools = "35a29f4d-8980-5a13-9543-d66fff28ecb8"
 GaussQuadrature = "d54b0c1a-921d-58e0-8e36-89d8069c0969"
-InteractiveUtils = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
 NCDatasets = "85f8d34a-cbdd-5861-8df4-14fed0d494ab"
 Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 Profile = "9abbd945-dff8-562f-b5e8-e1ebf5ef1b79"

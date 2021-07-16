@@ -261,7 +261,7 @@ function LookUpLW(
     t_planck = FTA1D(ds["temperature_Planck"][:])
 
     totplnk = FTA2D(ds["totplnk"][:])
-    bnd_lims_gpt = IA2D(ds["bnd_limits_gpt"][:])
+    bnd_lims_gpt = Array{I,2}(ds["bnd_limits_gpt"][:])
     bnd_lims_wn = FTA2D(ds["bnd_limits_wavenumber"][:])
     #-----------------------
     major_gpt2bnd = Array{UI8,1}(undef, n_gpt)
@@ -269,8 +269,9 @@ function LookUpLW(
         major_gpt2bnd[bnd_lims_gpt[1, i]:bnd_lims_gpt[2, i]] .= UI8(i)
     end
     #-----------------------
-    minor_lower_gpt_lims = IA2D(ds["minor_limits_gpt_lower"][:])
-    minor_upper_gpt_lims = IA2D(ds["minor_limits_gpt_upper"][:])
+    bnd_lims_gpt = IA2D(bnd_lims_gpt)
+    minor_lower_gpt_lims = Array{I,2}(ds["minor_limits_gpt_lower"][:])
+    minor_upper_gpt_lims = Array{I,2}(ds["minor_limits_gpt_upper"][:])
     #-----------------------
     minor_lower_bnd = zeros(UI8, n_min_absrb_lower)
     minor_upper_bnd = zeros(UI8, n_min_absrb_upper)
@@ -327,6 +328,8 @@ function LookUpLW(
     minor_upper_bnd_st = DA(minor_upper_bnd_st)
     minor_lower_gpt_sh = DA(minor_lower_gpt_sh)
     minor_upper_gpt_sh = DA(minor_upper_gpt_sh)
+    minor_lower_gpt_lims = IA2D(minor_lower_gpt_lims)
+    minor_upper_gpt_lims = IA2D(minor_upper_gpt_lims)
     #-----------------------
 
     minor_lower_scales_with_density =
@@ -337,14 +340,17 @@ function LookUpLW(
     lower_scale_by_complement = IA1D(ds["scale_by_complement_lower"][:])
     upper_scale_by_complement = IA1D(ds["scale_by_complement_upper"][:])
 
-    p_ref = FTA1D(ds["press_ref"][:])
-    t_ref = FTA1D(ds["temp_ref"][:])
-    vmr_ref = FTA3D(ds["vmr_ref"][:])
+    p_ref = Array{FT,1}(ds["press_ref"][:])
+    t_ref = Array{FT,1}(ds["temp_ref"][:])
 
-    p_ref_min = minimum(ds["press_ref"][:])
+    p_ref_min = minimum(p_ref)
 
     Δ_t_ref = t_ref[2] - t_ref[1]
     Δ_ln_p_ref = log(p_ref[1]) - log(p_ref[2])
+
+    p_ref = FTA1D(p_ref)
+    t_ref = FTA1D(t_ref)
+    vmr_ref = FTA3D(ds["vmr_ref"][:])
 
     n_η = size(kmajor, 2)
 
@@ -650,7 +656,7 @@ function LookUpSW(
     kminor_start_lower = IA1D(ds["kminor_start_lower"][:])
     kminor_start_upper = IA1D(ds["kminor_start_upper"][:])
 
-    bnd_lims_gpt = IA2D(ds["bnd_limits_gpt"][:])
+    bnd_lims_gpt = Array{I,2}(ds["bnd_limits_gpt"][:])
     bnd_lims_wn = FTA2D(ds["bnd_limits_wavenumber"][:])
     #-----------------------
     major_gpt2bnd = Array{UI8,1}(undef, n_gpt)
@@ -658,8 +664,9 @@ function LookUpSW(
         major_gpt2bnd[bnd_lims_gpt[1, i]:bnd_lims_gpt[2, i]] .= UI8(i)
     end
     #-----------------------
-    minor_lower_gpt_lims = IA2D(ds["minor_limits_gpt_lower"][:])
-    minor_upper_gpt_lims = IA2D(ds["minor_limits_gpt_upper"][:])
+    bnd_lims_gpt = IA2D(bnd_lims_gpt)
+    minor_lower_gpt_lims = Array{I,2}(ds["minor_limits_gpt_lower"][:])
+    minor_upper_gpt_lims = Array{I,2}(ds["minor_limits_gpt_upper"][:])
     #-----------------------
     minor_lower_bnd = zeros(UI8, n_min_absrb_lower)
     minor_upper_bnd = zeros(UI8, n_min_absrb_upper)
@@ -716,6 +723,8 @@ function LookUpSW(
     minor_upper_bnd_st = DA(minor_upper_bnd_st)
     minor_lower_gpt_sh = DA(minor_lower_gpt_sh)
     minor_upper_gpt_sh = DA(minor_upper_gpt_sh)
+    minor_lower_gpt_lims = IA2D(minor_lower_gpt_lims)
+    minor_upper_gpt_lims = IA2D(minor_upper_gpt_lims)
     #-----------------------    
     minor_lower_scales_with_density =
         IA1D(ds["minor_scales_with_density_lower"][:])
@@ -724,14 +733,17 @@ function LookUpSW(
     lower_scale_by_complement = IA1D(ds["scale_by_complement_lower"][:])
     upper_scale_by_complement = IA1D(ds["scale_by_complement_upper"][:])
 
-    p_ref = FTA1D(ds["press_ref"][:])
-    t_ref = FTA1D(ds["temp_ref"][:])
-    vmr_ref = FTA3D(ds["vmr_ref"][:])
+    p_ref = Array{FT,1}(ds["press_ref"][:])
+    t_ref = Array{FT,1}(ds["temp_ref"][:])
 
     p_ref_min = minimum(p_ref)
 
     Δ_t_ref = t_ref[2] - t_ref[1]
     Δ_ln_p_ref = log(p_ref[1]) - log(p_ref[2])
+
+    p_ref = FTA1D(p_ref)
+    t_ref = FTA1D(t_ref)
+    vmr_ref = FTA3D(ds["vmr_ref"][:])
 
     n_η = size(kmajor, 2)
 

@@ -140,10 +140,10 @@ function all_sky(
     solve_lw!(slv, max_threads, lookup_lw, lookup_lw_cld)
     solve_sw!(slv, max_threads, lookup_sw, lookup_sw_cld)
 
-    #    for i = 1:10
-    #        @time solve_lw!(slv, max_threads, lookup_lw, lookup_lw_cld)
-    #        @time solve_sw!(slv, max_threads, lookup_sw, lookup_sw_cld)
-    #    end
+    #for i = 1:10
+    #    @time solve_lw!(slv, max_threads, lookup_lw, lookup_lw_cld)
+    #    @time solve_sw!(slv, max_threads, lookup_sw, lookup_sw_cld)
+    #end
     #-------------
     # comparison
     method = use_lut ? "Lookup Table Interpolation method" : "PADE method"

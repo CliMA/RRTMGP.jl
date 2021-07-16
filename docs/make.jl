@@ -16,8 +16,8 @@ makedocs(
             ),
         )),
     ),
-    clean = false,
-    modules = [Documenter, RRTMGP],
+    clean = true,
+    modules = [RRTMGP],
     pages = Any[
         "Home"=>"index.md",
         "Mathematical Formulation"=>"MathFormulation.md",
@@ -33,7 +33,7 @@ makedocs(
             "Source Functions" => "optics/Sources.md"
             "Volume Mixing Ratios" => "optics/Vmrs.md"
         ],
-        "RTE"=>Any["RTE Solver"=>"rte/RTESolver.md"],
+        "RTE Solver"=>"RTESolver.md",
         "References"=>"References.md",
     ],
 )

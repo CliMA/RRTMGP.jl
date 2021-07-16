@@ -89,8 +89,10 @@ function setup_allsky_as(
         r_eff_liq = (lkp_lw_cld.radliq_lwr + lkp_lw_cld.radliq_upr) / FT(2)
         r_eff_ice = (lkp_lw_cld.radice_lwr + lkp_lw_cld.radice_upr) / FT(2)
     else
-        r_eff_liq = sum(extrema(lkp_lw_cld.pade_sizreg_extliq)) / FT(2)
-        r_eff_ice = sum(extrema(lkp_lw_cld.pade_sizreg_extice)) / FT(2)
+        pade_sizreg_extliq = Array(lkp_lw_cld.pade_sizreg_extliq) # TODO temp fix to avoid scalar indexing on GPU
+        pade_sizreg_extice = Array(lkp_lw_cld.pade_sizreg_extice)
+        r_eff_liq = sum(extrema(pade_sizreg_extliq)) / FT(2)
+        r_eff_ice = sum(extrema(pade_sizreg_extice)) / FT(2)
     end
     # Restrict clouds to troposphere (> 100 hPa = 100*100 Pa)
     # and not very close to the ground (< 900 hPa), and

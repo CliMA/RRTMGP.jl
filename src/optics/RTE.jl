@@ -61,10 +61,10 @@ struct Solver{
     src_sw::SS     # source functions
     bcs_lw::BCL    # boundary conditions
     bcs_sw::BCS    # boundary conditions
-    fluxb_lw::FXBL # temporay storage for bandwise calculations
-    fluxb_sw::FXBS # temporay storage for bandwise calculations
+    fluxb_lw::FXBL # temporary storage for bandwise calculations
+    fluxb_sw::FXBS # temporary storage for bandwise calculations
     flux_lw::FXL   # fluxes for longwave problem
-    flux_sw::FXS   # fluxes for longwave problem
+    flux_sw::FXS   # fluxes for shortwave problem
 end
 
 Solver(

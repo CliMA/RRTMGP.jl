@@ -269,12 +269,7 @@ function adding_lw!(
     @inbounds albedo[1, gcol] = FT(1) - sfc_emis[ibnd, gcol]
     # ... and source of diffuse radiation is surface emission
     @inbounds src[1, gcol] = FT(π) * sfc_emis[ibnd, gcol] * sfc_source[gcol]
-    #--------------------------------------------------------------------------------------
-    #    # Albedo of lowest level is the surface albedo...
-    #    albedo[1, gcol] = FT(1) - sfc_emis[gcol]
-    #    # ... and source of diffuse radiation is surface emission
-    #    src[1, gcol] = FT(π) * sfc_emis[gcol] * sfc_source[gcol]
-    #--------------------------------------------------------
+
     # From bottom to top of atmosphere --
     #   compute albedo and source of upward radiation
     @inbounds for ilev = 1:nlay
@@ -519,12 +514,6 @@ function adding_sw!(
     @inbounds albedo[1, gcol] = bcs_sw.sfc_alb_diffuse[ibnd, gcol]
     # ... and source of diffuse radiation is surface emission
     @inbounds src[1, gcol] = sfc_source[gcol]
-    #--------------------------------------------------------------------------------------
-    #    # Albedo of lowest level is the surface albedo...
-    #    albedo[1, gcol] = FT(1) - sfc_emis[gcol]
-    #    # ... and source of diffuse radiation is surface emission
-    #    src[1, gcol] = FT(π) * sfc_emis[gcol] * sfc_source[gcol]
-    #--------------------------------------------------------
     # From bottom to top of atmosphere --
     #   compute albedo and source of upward radiation
     @inbounds for ilev = 1:nlay

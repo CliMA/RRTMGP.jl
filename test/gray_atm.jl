@@ -61,7 +61,7 @@ function gray_atmos_lw_equil(
     op = OPC(FT, ncol, nlay, DA)
     src_lw = source_func_longwave(FT, ncol, nlay, opc, DA)
     bcs_lw = LwBCs(DA{FT,2}(sfc_emis), inc_flux)
-    fluxb_lw = nothing #FluxLW(ncol, nlay, FT, DA) 
+    fluxb_lw = nothing
     flux_lw = FluxLW(ncol, nlay, FT, DA)
 
     slv = Solver{
@@ -243,6 +243,7 @@ function gray_atmos_sw_test(
     τ = Array(slv.op.τ)
     zenith = Array(zenith)
     flux_dn_dir = Array(slv.flux_sw.flux_dn_dir)
+    toa_flux = Array(toa_flux)
 
     # testing with exact solution
     ot_tot = sum(τ[:, 1]) / cos(zenith[1])
@@ -263,7 +264,6 @@ else
     gray_atmos_lw_equil(OneScalar, Float64, Int, DA, Int(9))
     gray_atmos_lw_equil(TwoStream, Float64, Int, DA, Int(9))
 end
-
 
 gray_atmos_sw_test(OneScalar, Float64, Int, DA, Int(1))
 gray_atmos_sw_test(TwoStream, Float64, Int, DA, Int(1))

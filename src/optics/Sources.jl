@@ -38,7 +38,7 @@ struct SourceLWNoScat{
     lev_source_inc::FTA2D
     "Planck source at layer edge in decreasing ilay direction `[W/m2]` `(nlay, ncol)`, includes spectral weighting that accounts for state-dependent frequency to g-space mapping"
     lev_source_dec::FTA2D
-    "Surface source `(ncol)`"
+    "Surface source `[W/m2]` `(ncol)`"
     sfc_source::FTA1D
     "temporary storage array used in no scattering GPU calculations `(nlay, ncol)`"
     src_up::FTA2D
@@ -86,7 +86,7 @@ struct SourceLW2Str{
     lev_source_inc::FTA2D
     "Planck source at layer edge in decreasing ilay direction `[W/m2]` `(nlay, ncol)`, includes spectral weighting that accounts for state-dependent frequency to g-space mapping"
     lev_source_dec::FTA2D
-    "Surface source `(ncol)`"
+    "Surface source `[W/m2]` `(ncol)`"
     sfc_source::FTA1D
     "level source `[W/m2]` `(nlay+1, ncol)`, used in 2 stream calculations"
     lev_source::FTA2D
