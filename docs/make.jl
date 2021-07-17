@@ -1,9 +1,12 @@
-using RRTMGP, Documenter, LaTeXStrings
+pushfirst!(LOAD_PATH, joinpath(@__DIR__, ".."))
+using Documenter
+using LaTeXStrings
+using RRTMGP
 
 makedocs(
     sitename = "RRTMGP.jl",
     doctest = false,
-    strict = true,
+    strict = false,
     format = Documenter.HTML(
         prettyurls = get(ENV, "CI", nothing) == "true",
         mathengine = MathJax(Dict(
@@ -18,23 +21,19 @@ makedocs(
     pages = Any[
         "Home"=>"index.md",
         "Mathematical Formulation"=>"MathFormulation.md",
-        "RRTMGP"=>Any[
-            "Gas Concentrations" => "RRTMGP/GasConcs.md"
-            "Gases" => "RRTMGP/Gases.md"
-            "Gas Optics" => "RRTMGP/GasOptics.md"
-            "References States" => "RRTMGP/ReferenceStates.md"
-            "Source Functions" => "RRTMGP/SourceFunctions.md"
-            "K-Distribution" => "RRTMGP/KDistribution.md"
-            "Atmospheric States" => "RRTMGP/AtmosphericStates.md"
-            "Optical Properties" => "OpticalProps.md"
+        "Optics"=>Any[
+            "Angular Discretization" => "optics/AngularDiscretizations.md"
+            "Atmospheric State" => "optics/AtmosphericStates.md"
+            "Boundary Conditions" => "optics/BCs.md"
+            "Fluxes" => "optics/Fluxes.md"
+            "Utilities for gray radiation simulation" => "optics/GrayUtils.md"
+            "Lookup Tables" => "optics/LookUpTables.md"
+            "Optics" => "optics/Optics.md"
+            "Solver struct" => "optics/RTE.md"
+            "Source Functions" => "optics/Sources.md"
+            "Volume Mixing Ratios" => "optics/Vmrs.md"
         ],
-        "RTE"=>Any[
-            "Optical Properties" => "OpticalProps.md"
-            "Fluxes" => "RTE/Fluxes.md"
-            "Boundary Conditions" => "RTE/BoundaryConditions.md"
-            "Angular Discretizations" => "RTE/AngularDiscretizations.md"
-            "RTE Solver" => "RTE/RTESolver.md"
-        ],
+        "RTE Solver"=>"RTESolver.md",
         "References"=>"References.md",
     ],
 )

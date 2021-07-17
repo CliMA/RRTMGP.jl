@@ -1,4 +1,15 @@
 using Test
-ENV["DATADEPS_ALWAYS_ACCEPT"] = true
 
-include("gray_atm.jl")
+@testset "RRTMGP gray radiation tests" begin
+
+    include("gray_atm.jl")
+
+end
+
+@testset "RRTMGP clear-sky tests" begin
+    include("clear_sky.jl")
+end
+
+@testset "RRTMGP clear-sky tests" begin
+    include("all_sky.jl")
+end

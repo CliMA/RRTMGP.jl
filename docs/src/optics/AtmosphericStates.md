@@ -1,9 +1,10 @@
 # Atmospheric State
 
 ```@meta
-CurrentModule = RRTMGP.GrayAtmosphericStates
+CurrentModule = RRTMGP.AtmosphericStates
 ```
 
 ```@docs
+AtmosphericState
 GrayAtmosphericState
 ```

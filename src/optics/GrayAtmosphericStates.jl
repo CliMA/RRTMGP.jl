@@ -1,17 +1,7 @@
-module GrayAtmosphericStates
-using KernelAbstractions
-using CUDA
-using ..Device: array_type, array_device
-using DocStringExtensions
-using Adapt
-using GaussQuadrature
-using CLIMAParameters
-using CLIMAParameters.Planet: grav, R_d
-
-export GrayAtmosphericState, setup_gray_as_pr_grid, setup_gray_as_alt_grid
 
 """
-    GrayAtmosphericState{FT}
+    GrayAtmosphericState{FT,FTA1D,FTA2D,I} <: 
+        AbstractAtmosphericState{FT,I,FTA1D}
 
 Atmospheric conditions, used to compute optical properties with the gray atmosphere approximation
 
@@ -23,18 +13,18 @@ struct GrayAtmosphericState{
     FTA1D<:AbstractArray{FT,1},
     FTA2D<:AbstractArray{FT,2},
     I<:Int,
-}
-    "Layer pressures `[Pa, mb]`; (`nlay,ncol`)"
+} <: AbstractAtmosphericState{FT,I,FTA1D}
+    "Layer pressures `[Pa, mb]`; `(nlay, ncol)`"
     p_lay::FTA2D
-    "Level pressures `[Pa, mb]`; (`nlay+1,ncol`)"
+    "Level pressures `[Pa, mb]`; `(nlay+1, ncol)`"
     p_lev::FTA2D
-    "Layer temperatures `[K]`; (`nlay,ncol`)"
+    "Layer temperatures `[K]`; `(nlay, ncol)`"
     t_lay::FTA2D
-    "Level temperatures `[K]`; (`nlay+1,ncol`)"
+    "Level temperatures `[K]`; `(nlay+1,ncol)`"
     t_lev::FTA2D
-    "Level Altitude `[m]`; (`nlay+1,ncol`)"
+    "Level Altitude `[m]`; `(nlay+1,ncol)`"
     z_lev::FTA2D
-    "Surface temperatures `[K]`; (`ncol`)"
+    "Surface temperatures `[K]`; `(ncol)`"
     t_sfc::FTA1D
     "lapse rate"
     α::FT
@@ -45,25 +35,8 @@ struct GrayAtmosphericState{
     "Number of columns."
     ncol::I
 end
-
-function Adapt.adapt_structure(to, x::GrayAtmosphericState)
-    FT = eltype(x.p_lay)
-    I = eltype(x.nlay)
-    FTA1D = typeof(adapt(to, x.t_sfc))
-    FTA2D = typeof(adapt(to, x.p_lay))
-    GrayAtmosphericState{FT,FTA1D,FTA2D,I}(
-        adapt(to, x.p_lay),
-        adapt(to, x.p_lev),
-        adapt(to, x.t_lay),
-        adapt(to, x.t_lev),
-        adapt(to, x.z_lev),
-        adapt(to, x.t_sfc),
-        x.α,
-        adapt(to, x.d0),
-        x.nlay,
-        x.ncol,
-    )
-end
+Adapt.@adapt_structure GrayAtmosphericState
+#---------------------------------------------------------------
 
 # This functions sets up a model temperature and pressure 
 # distributions for a gray atmosphere based on a pressure grid
@@ -96,16 +69,7 @@ function setup_gray_as_pr_grid(
     α = FT(3.5)                   # lapse rate of radiative equillibrium
     r_d = FT(R_d(param_set))
     grav_ = FT((grav(param_set)))
-    #----launcing KA kernel
-    thr_x = 256
-
-    device = array_device(p_lay)
-    workgroup = (thr_x)
-    ndrange = (ncol)
-
-    kernel = setup_gray_as_pr_grid_kernel!(device, workgroup)
-
-    event = kernel(
+    args = (
         p_lev,
         p_lay,
         t_lev,
@@ -124,11 +88,22 @@ function setup_gray_as_pr_grid(
         α,
         r_d,
         grav_,
-        Val(nlay),
-        Val(ncol),
-        ndrange = ndrange,
+        nlay,
     )
-    wait(event)
+    device = array_device(p_lev)
+    if device === CUDADevice()
+        max_threads = 256
+        tx = min(ncol, max_threads)
+        bx = cld(ncol, tx)
+        @cuda threads = (tx) blocks = (bx) setup_gray_as_pr_grid_CUDA!(
+            ncol,
+            args...,
+        )
+    else # launcing Julia native multithreading kernel
+        Threads.@threads for gcol = 1:ncol
+            setup_gray_as_pr_grid_kernel!(args..., gcol)
+        end
+    end
     #------------------------------------------------
     return GrayAtmosphericState{FT,DA{FT,1},DA{FT,2},Int}(
         p_lay,
@@ -144,6 +119,13 @@ function setup_gray_as_pr_grid(
     )
 end
 
+function setup_gray_as_pr_grid_CUDA!(ncol, args...)
+    gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
+    if gcol ≤ ncol
+        setup_gray_as_pr_grid_kernel!(args..., gcol)
+    end
+    return nothing
+end
 # This functions sets up a model temperature and pressure 
 # distributions for a gray atmosphere based on an altitude grid
 # with internal GLL point distribution within each cell
@@ -230,7 +212,7 @@ function setup_gray_as_alt_grid(
 end
 
 #-------------------------------------------------------------------------
-@kernel function setup_gray_as_pr_grid_kernel!(
+function setup_gray_as_pr_grid_kernel!(
     p_lev::FTA2D,
     p_lay::FTA2D,
     t_lev::FTA2D,
@@ -249,17 +231,13 @@ end
     α::FT,
     r_d::FT,
     grav_::FT,
-    ::Val{nlay},
-    ::Val{ncol},
+    nlay::Int,
+    gcol::Int,
 ) where {
     FT<:AbstractFloat,
     FTA1D<:AbstractArray{FT,1},
     FTA2D<:AbstractArray{FT,2},
-    nlay,
-    ncol,
 }
-    gcol = @index(Global, Linear)  # global col & lay ids
-
     ts = te + Δt * (FT(1) / FT(3) - sin(lat[gcol])^2) # surface temp at a given latitude (K)
     d0[gcol] = FT((ts / tt)^FT(4) - FT(1)) # optical depth
     nlev = nlay + 1
@@ -289,8 +267,5 @@ end
     t_sfc[gcol] = t_lev[1, gcol]
 
     #---------------------------------
-
 end
 #-------------------------------------------------------------------------
-
-end

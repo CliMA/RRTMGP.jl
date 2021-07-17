@@ -1,3 +1,0 @@
-# Gas Optics
-
-To be added back in...

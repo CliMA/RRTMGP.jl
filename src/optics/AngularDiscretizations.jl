@@ -1,19 +1,19 @@
-module GrayAngularDiscretizations
+module AngularDiscretizations
 
-using ..Device: array_type
+using DocStringExtensions
 using Adapt
 
 export AngularDiscretization
 
 """
-    AngularDiscretization{FT    <: AbstractFloat, 
-                             FTA1D <: AbstractArray{FT,1}, 
-                             I     <: Int}
+    AngularDiscretization{FT,FTA1D,I}
 
 Weights and angle secants for first order (k=1) Gaussian quadrature.
 Values from Table 2, Clough et al, 1992, doi:10.1029/92JD01419
 after Abramowitz & Stegun 1972, page 921
 
+# Fields
+$(DocStringExtensions.FIELDS)
 """
 struct AngularDiscretization{
     FT<:AbstractFloat,
@@ -27,22 +27,12 @@ struct AngularDiscretization{
     "quadrature weights"
     gauss_wts::FTA1D
 end
-
-function Adapt.adapt_structure(to, x::AngularDiscretization)
-    I = eltype(x.n_gauss_angles)
-    FT = eltype(x.gauss_Ds)
-    FTA1D = typeof(adapt(to, x.gauss_Ds))
-    AngularDiscretization{FT,FTA1D,I}(
-        x.n_gauss_angles,
-        adapt(to, x.gauss_Ds),
-        adapt(to, x.gauss_wts),
-    )
-end
+Adapt.@adapt_structure AngularDiscretization
 
 function AngularDiscretization(
     ::Type{FT},
-    n_gauss_angles::I,
     ::Type{DA},
+    n_gauss_angles::I,
 ) where {FT<:AbstractFloat,I<:Int,DA}
     max_gauss_pts = I(4)
     @assert 1 ≤ n_gauss_angles ≤ max_gauss_pts
