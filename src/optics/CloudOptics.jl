@@ -22,7 +22,7 @@ function add_cloud_optics_2stream(
     ibnd,
     igpt,
 )
-    if as.cld_mask isa AbstractArray
+    if as.cld_mask isa AbstractArray && as.cld_mask[glaycol...]
         τ_cl, τ_cl_ssa, τ_cl_ssag =
             compute_cld_props(lkp_cld, as, glaycol..., ibnd, igpt)
         increment!(op, τ_cl, τ_cl_ssa, τ_cl_ssag, glaycol..., igpt)
@@ -53,7 +53,7 @@ function add_cloud_optics_2stream(
     ibnd,
     igpt,
 )
-    if as.cld_mask isa AbstractArray
+    if as.cld_mask isa AbstractArray && as.cld_mask[glaycol...]
         τ_cl, τ_cl_ssa, τ_cl_ssag =
             compute_cld_props(lkp_cld, as, glaycol..., ibnd, igpt)
         τ_cl, τ_cl_ssa, τ_cl_ssag = delta_scale(τ_cl, τ_cl_ssa, τ_cl_ssag)
