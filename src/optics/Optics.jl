@@ -37,10 +37,8 @@ $(DocStringExtensions.FIELDS)
 """
 struct OneScalar{
     FT<:AbstractFloat,
-    FTA1D<:AbstractArray{FT,1},
     FTA2D<:AbstractArray{FT,2},
-    I<:Int,
-    AD<:AngularDiscretization{FT,FTA1D,I},
+    AD<:AngularDiscretization,
 } <: AbstractOpticalProps{FT,FTA2D}
     "Optical Depth"
     τ::FTA2D
@@ -55,14 +53,11 @@ function OneScalar(
     nlay::Int,
     ::Type{DA},
 ) where {FT<:AbstractFloat,DA}
-    FTA1D = DA{FT,1}
-    FTA2D = DA{FT,2}
     I = Int
-    AD = AngularDiscretization{FT,FTA1D,I}
-    return OneScalar{FT,FTA1D,FTA2D,I,AD}(
-        FTA2D(undef, nlay, ncol),
-        AngularDiscretization(FT, DA, I(1)),
-    )
+    τ = DA{FT,2}(undef, nlay, ncol)
+    ad = AngularDiscretization(FT, DA, I(1))
+
+    return OneScalar{eltype(τ),typeof(τ),typeof(ad)}(τ, ad)
 end
 
 """
@@ -91,11 +86,10 @@ function TwoStream(
     nlay::Int,
     ::Type{DA},
 ) where {FT<:AbstractFloat,DA}
-    return TwoStream{FT,DA{FT,2}}(
-        DA{FT,2}(zeros(nlay, ncol)),
-        DA{FT,2}(zeros(nlay, ncol)),
-        DA{FT,2}(zeros(nlay, ncol)),
-    )
+    τ = DA{FT,2}(zeros(nlay, ncol))
+    ssa = DA{FT,2}(zeros(nlay, ncol))
+    g = DA{FT,2}(zeros(nlay, ncol))
+    return TwoStream{eltype(τ),typeof(τ)}(τ, ssa, g)
 end
 
 """
@@ -115,7 +109,7 @@ function compute_col_dry!(
     p_lev::FTA2D,
     col_dry::FTA2D,
     param_set::AbstractEarthParameterSet,
-    vmr_h2o::Union{FTA2D,Nothing} = nothing,
+    vmr_h2o::Union{AbstractArray{FT,2},Nothing} = nothing,
     lat::Union{AbstractArray{FT,1},Nothing} = nothing,
     max_threads::Int = Int(256),
 ) where {FT<:AbstractFloat,FTA2D<:AbstractArray{FT,2}}

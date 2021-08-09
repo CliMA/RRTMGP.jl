@@ -82,9 +82,10 @@ function lw_rfmip(
     nlev = nlay + 1
     op = OPC(FT, ncol, nlay, DA)                                   # allocating optical properties object
     src_lw = SRC(FT, DA, nlay, ncol)                               # allocating longwave source function object
-    bcs_lw = LwBCs{FT,FTA2D,Nothing}(sfc_emis, nothing)            # setting up boundary conditions
+    bcs_lw = LwBCs{FT,typeof(sfc_emis),Nothing}(sfc_emis, nothing)            # setting up boundary conditions
     fluxb_lw = FluxLW(ncol, nlay, FT, DA)                          # flux storage for bandwise calculations
     flux_lw = FluxLW(ncol, nlay, FT, DA)                           # longwave fluxes
+
     # initializing RTE solver
     slv = Solver(
         as,
@@ -98,6 +99,7 @@ function lw_rfmip(
         flux_lw,
         nothing,
     )
+
     solve_lw!(slv, max_threads, lookup_lw)
     println("Timing ==================================================")
     for i = 1:5

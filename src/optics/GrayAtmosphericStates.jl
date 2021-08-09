@@ -105,7 +105,7 @@ function setup_gray_as_pr_grid(
         end
     end
     #------------------------------------------------
-    return GrayAtmosphericState{FT,DA{FT,1},DA{FT,2},Int}(
+    return GrayAtmosphericState{eltype(t_sfc),typeof(t_sfc),typeof(p_lev),Int}(
         p_lay,
         p_lev,
         t_lay,

@@ -64,22 +64,7 @@ function gray_atmos_lw_equil(
     fluxb_lw = nothing
     flux_lw = FluxLW(ncol, nlay, FT, DA)
 
-    slv = Solver{
-        FT,
-        I,
-        DA{FT,1},
-        DA{FT,2},
-        typeof(as),
-        typeof(op),
-        typeof(src_lw),
-        Nothing,
-        typeof(bcs_lw),
-        Nothing,
-        typeof(fluxb_lw),
-        Nothing,
-        typeof(flux_lw),
-        Nothing,
-    }(
+    slv = Solver(
         as,
         op,
         src_lw,
@@ -211,22 +196,7 @@ function gray_atmos_sw_test(
     fluxb_sw = FluxSW(ncol, nlay, FT, DA)
     flux_sw = FluxSW(ncol, nlay, FT, DA)
 
-    slv = Solver{
-        FT,
-        I,
-        DA{FT,1},
-        DA{FT,2},
-        typeof(as),
-        typeof(op),
-        Nothing,
-        typeof(src_sw),
-        Nothing,
-        typeof(bcs_sw),
-        Nothing,
-        typeof(fluxb_sw),
-        Nothing,
-        typeof(flux_sw),
-    }(
+    slv = Solver(
         as,
         op,
         nothing,

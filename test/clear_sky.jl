@@ -139,6 +139,7 @@ function clear_sky(
         flux_lw,
         flux_sw,
     )
+
     solve_lw!(slv, max_threads, lookup_lw)
     solve_sw!(slv, max_threads, lookup_sw)
 

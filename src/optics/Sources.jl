@@ -55,13 +55,25 @@ function SourceLWNoScat(
 ) where {FT<:AbstractFloat,I<:Int,DA}
     FTA1D = DA{FT,1}
     FTA2D = DA{FT,2}
-    return SourceLWNoScat{FT,FTA1D,FTA2D}(
-        FTA2D(undef, nlay, ncol), # lay_source
-        FTA2D(undef, nlay, ncol), # lev_source_inc
-        FTA2D(undef, nlay, ncol), # lev_source_dec
-        FTA1D(undef, ncol),       # sfc_source
-        FTA2D(undef, nlay, ncol), # src_up
-        FTA2D(undef, nlay, ncol), # src_dn
+
+    lay_source = FTA2D(undef, nlay, ncol) # lay_source
+    lev_source_inc = FTA2D(undef, nlay, ncol) # lev_source_inc
+    lev_source_dec = FTA2D(undef, nlay, ncol) # lev_source_dec
+    sfc_source = FTA1D(undef, ncol)       # sfc_source
+    src_up = FTA2D(undef, nlay, ncol) # src_up
+    src_dn = FTA2D(undef, nlay, ncol) # src_dn
+
+    return SourceLWNoScat{
+        eltype(lay_source),
+        typeof(sfc_source),
+        typeof(lay_source),
+    }(
+        lay_source,
+        lev_source_inc,
+        lev_source_dec,
+        sfc_source,
+        src_up,
+        src_dn,
     )
 end
 
@@ -113,18 +125,35 @@ function SourceLW2Str(
 ) where {FT<:AbstractFloat,I<:Int,DA}
     FTA1D = DA{FT,1}
     FTA2D = DA{FT,2}
-    return SourceLW2Str{FT,FTA1D,FTA2D}(
-        FTA2D(undef, nlay, ncol), # lay_source
-        FTA2D(undef, nlay, ncol), # lev_source_inc
-        FTA2D(undef, nlay, ncol), # lev_source_dec
-        FTA1D(undef, ncol), # sfc_source
-        FTA2D(undef, nlay + 1, ncol), # lev_source
-        FTA2D(undef, nlay, ncol), # src_up
-        FTA2D(undef, nlay, ncol), # src_dn
-        FTA2D(undef, nlay, ncol), # Rdif
-        FTA2D(undef, nlay, ncol), # Tdif
-        FTA2D(undef, nlay + 1, ncol), # albedo
-        FTA2D(undef, nlay + 1, ncol), # src
+
+    lay_source = FTA2D(undef, nlay, ncol) # lay_source
+    lev_source_inc = FTA2D(undef, nlay, ncol) # lev_source_inc
+    lev_source_dec = FTA2D(undef, nlay, ncol) # lev_source_dec
+    sfc_source = FTA1D(undef, ncol) # sfc_source
+    lev_source = FTA2D(undef, nlay + 1, ncol) # lev_source
+    src_up = FTA2D(undef, nlay, ncol) # src_up
+    src_dn = FTA2D(undef, nlay, ncol) # src_dn
+    Rdif = FTA2D(undef, nlay, ncol) # Rdif
+    Tdif = FTA2D(undef, nlay, ncol) # Tdif
+    albedo = FTA2D(undef, nlay + 1, ncol) # albedo
+    src = FTA2D(undef, nlay + 1, ncol) # src
+
+    return SourceLW2Str{
+        eltype(lay_source),
+        typeof(sfc_source),
+        typeof(lay_source),
+    }(
+        lay_source,
+        lev_source_inc,
+        lev_source_dec,
+        sfc_source,
+        lev_source,
+        src_up,
+        src_dn,
+        Rdif,
+        Tdif,
+        albedo,
+        src,
     )
 end
 
@@ -154,7 +183,11 @@ function source_func_longwave(
     src_dn = DA{FT,2}(undef, nlay, ncol)
 
     if OPC === :OneScalar
-        return SourceLWNoScat{eltype(lay_source),typeof(sfc_source),DA{FT,2}}(
+        return SourceLWNoScat{
+            eltype(lay_source),
+            typeof(sfc_source),
+            typeof(src_up),
+        }(
             lay_source,
             lev_source_inc,
             lev_source_dec,
@@ -168,7 +201,7 @@ function source_func_longwave(
         Tdif = DA{FT,2}(undef, nlay, ncol)
         albedo = DA{FT,2}(undef, nlay + 1, ncol)
         src = DA{FT,2}(undef, nlay + 1, ncol)
-        return SourceLW2Str{FT,typeof(sfc_source),DA{FT,2}}(
+        return SourceLW2Str{FT,typeof(sfc_source),typeof(src_up)}(
             lay_source,
             lev_source_inc,
             lev_source_dec,
@@ -231,17 +264,28 @@ function SourceSW2Str(
     FTA1D = DA{FT,1}
     FTA2D = DA{FT,2}
 
-    return SourceSW2Str{FT,FTA1D,FTA2D}(
-        FTA1D(undef, ncol),
-        FTA2D(undef, nlay + 1, ncol),
-        FTA2D(undef, nlay, ncol),
-        FTA2D(undef, nlay, ncol),
-        FTA2D(undef, nlay, ncol),
-        FTA2D(undef, nlay, ncol),
-        FTA2D(undef, nlay, ncol),
-        FTA2D(undef, nlay, ncol),
-        FTA2D(undef, nlay, ncol),
-        FTA2D(undef, nlay + 1, ncol),
+    sfc_source = FTA1D(undef, ncol)
+    albedo = FTA2D(undef, nlay + 1, ncol)
+    src_up = FTA2D(undef, nlay, ncol)
+    src_dn = FTA2D(undef, nlay, ncol)
+    Rdif = FTA2D(undef, nlay, ncol)
+    Tdif = FTA2D(undef, nlay, ncol)
+    Rdir = FTA2D(undef, nlay, ncol)
+    Tdir = FTA2D(undef, nlay, ncol)
+    Tnoscat = FTA2D(undef, nlay, ncol)
+    src = FTA2D(undef, nlay + 1, ncol)
+
+    return SourceSW2Str{eltype(sfc_source),typeof(sfc_source),typeof(albedo)}(
+        sfc_source,
+        albedo,
+        src_up,
+        src_dn,
+        Rdif,
+        Tdif,
+        Rdir,
+        Tdir,
+        Tnoscat,
+        src,
     )
 end
 
