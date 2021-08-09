@@ -115,7 +115,7 @@ function compute_col_dry!(
     p_lev::FTA2D,
     col_dry::FTA2D,
     param_set::AbstractEarthParameterSet,
-    vmr_h2o::Union{FTA2D,Nothing} = nothing,
+    vmr_h2o::Union{AbstractArray{FT,2},Nothing} = nothing,
     lat::Union{AbstractArray{FT,1},Nothing} = nothing,
     max_threads::Int = Int(256),
 ) where {FT<:AbstractFloat,FTA2D<:AbstractArray{FT,2}}

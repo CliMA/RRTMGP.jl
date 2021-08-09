@@ -77,7 +77,7 @@ function setup_allsky_as(
     end
     vmr = Vmr(DA(vmrat))
     col_dry = DA{FT,2}(undef, nlay, ncol)
-    vmr_h2o = DA(vmrat[:, :, idx_gases["h2o"]])
+    vmr_h2o = view(vmr.vmr, :, :, idx_gases["h2o"])
 
     cld_mask = zeros(Bool, nlay, ncol)
     cld_r_eff_liq = zeros(FT, nlay, ncol)
