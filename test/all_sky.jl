@@ -143,6 +143,7 @@ function all_sky(
     #for i = 1:10
     #    @time solve_lw!(slv, max_threads, lookup_lw, lookup_lw_cld)
     #    @time solve_sw!(slv, max_threads, lookup_sw, lookup_sw_cld)
+    #    println("------------------------------------------------")
     #end
     #-------------
     # comparison
