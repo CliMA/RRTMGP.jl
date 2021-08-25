@@ -37,34 +37,32 @@ function AngularDiscretization(
     max_gauss_pts = I(4)
     @assert 1 ≤ n_gauss_angles ≤ max_gauss_pts
     if n_gauss_angles == 1
-        return AngularDiscretization{FT,DA{FT,1},I}(
-            n_gauss_angles,
-            DA{FT}([1.660000000000]), # Diffusivity angle, not Gaussian angle
-            DA{FT}([0.500000000000]),
-        )
+        gauss_Ds = DA{FT}([1.660000000000])
+        gauss_wts = DA{FT}([0.500000000000])
     elseif n_gauss_angles == 2
-        return AngularDiscretization{FT,DA{FT,1},I}(
-            n_gauss_angles,
-            DA{FT}(FT[1.183503430000 2.816496550000]),
-            DA{FT}([0.318041381700 0.181958618300]),
-        )
+        gauss_Ds = DA{FT}(FT[1.183503430000 2.816496550000])
+        gauss_wts = DA{FT}([0.318041381700 0.181958618300])
     elseif n_gauss_angles == 3
-        return AngularDiscretization{FT,DA{FT,1},I}(
-            n_gauss_angles,
-            DA{FT}([1.097198580000 1.693385070000 4.709416300000]),
-            DA{FT}([0.200931913700 0.229241106400 0.069826979900]),
-        )
+        gauss_Ds = DA{FT}([1.097198580000 1.693385070000 4.709416300000])
+        gauss_wts = DA{FT}([0.200931913700 0.229241106400 0.069826979900])
     else
-        return AngularDiscretization{FT,DA{FT,1},I}(
-            n_gauss_angles,
-            DA{FT}(
-                [1.060562570000 1.382825600000 2.401481790000 7.155130240000],
-            ),
-            DA{FT}(
-                [0.135506913400 0.203464568000 0.129847547600 0.031180971000],
-            ),
+        gauss_Ds = DA{FT}(
+            [1.060562570000 1.382825600000 2.401481790000 7.155130240000],
+        )
+        gauss_wts = DA{FT}(
+            [0.135506913400 0.203464568000 0.129847547600 0.031180971000],
         )
     end
+
+    return AngularDiscretization{
+        eltype(gauss_Ds),
+        typeof(gauss_Ds),
+        eltype(n_gauss_angles),
+    }(
+        n_gauss_angles,
+        gauss_Ds, # Diffusivity angle, not Gaussian angle
+        gauss_wts,
+    )
 end
 
 end #module

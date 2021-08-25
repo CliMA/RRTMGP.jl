@@ -31,6 +31,8 @@ struct VmrGM{
     "volume mixing ratio of all other gases, which are independent of location and column"
     vmr::FTA1D
 end
+VmrGM(vmr_h2o, vmr_o3, vmr) =
+    VmrGM{eltype(vmr_h2o),typeof(vmr),typeof(vmr_h2o)}(vmr_h2o, vmr_o3, vmr)
 Adapt.@adapt_structure VmrGM
 
 function VmrGM(
@@ -61,6 +63,7 @@ struct Vmr{FT<:AbstractFloat,FTA3D<:AbstractArray{FT,3}} <: AbstractVmr{FT}
     "volume mixing ratio of all gases as a function of location and column"
     vmr::FTA3D
 end
+Vmr(vmr) = Vmr{eltype(vmr),typeof(vmr)}(vmr)
 Adapt.@adapt_structure Vmr
 """
     get_vmr(

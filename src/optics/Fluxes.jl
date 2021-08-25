@@ -36,11 +36,10 @@ function FluxLW(
     ::Type{FT},
     ::Type{DA},
 ) where {FT<:AbstractFloat,DA}
-    return FluxLW{FT,DA{FT,2}}(
-        DA{FT}(undef, nlay + 1, ncol),
-        DA{FT}(undef, nlay + 1, ncol),
-        DA{FT}(undef, nlay + 1, ncol),
-    )
+    flux_up = DA{FT}(undef, nlay + 1, ncol)
+    flux_dn = DA{FT}(undef, nlay + 1, ncol)
+    flux_net = DA{FT}(undef, nlay + 1, ncol)
+    return FluxLW{FT,typeof(flux_net)}(flux_up, flux_dn, flux_net)
 end
 
 """
@@ -77,12 +76,11 @@ function FluxSW(
     ::Type{FT},
     ::Type{DA},
 ) where {FT<:AbstractFloat,DA}
-    return FluxSW{FT,DA{FT,2}}(
-        DA{FT}(undef, nlay + 1, ncol),
-        DA{FT}(undef, nlay + 1, ncol),
-        DA{FT}(undef, nlay + 1, ncol),
-        DA{FT}(undef, nlay + 1, ncol),
-    )
+    flux_up = DA{FT}(undef, nlay + 1, ncol)
+    flux_dn = DA{FT}(undef, nlay + 1, ncol)
+    flux_net = DA{FT}(undef, nlay + 1, ncol)
+    flux_dn_dir = DA{FT}(undef, nlay + 1, ncol)
+    return FluxSW{FT,typeof(flux_net)}(flux_up, flux_dn, flux_net, flux_dn_dir)
 end
 
 """

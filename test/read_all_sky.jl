@@ -120,7 +120,6 @@ function setup_allsky_as(
     t_lay = DA(t_lay)
     t_lev = DA(t_lev)
 
-    #compute_col_dry!(p_lev, t_lay, col_dry, param_set, vmr_h2o, lat)
     compute_col_dry!(p_lev, col_dry, param_set, vmr_h2o, lat) # the example skips lat based gravity calculation
 
     t_sfc = DA(t_sfc)
@@ -132,17 +131,14 @@ function setup_allsky_as(
     cld_path_ice = DA(cld_path_ice)
     ice_rgh = 2 # medium ice roughness
 
-    CLDP = typeof(cld_r_eff_liq)
-    CLDM = typeof(cld_mask)
-
     return (
         AtmosphericState{
             FT,
-            DA{FT,1},
+            typeof(t_sfc),
             typeof(lat),
-            DA{FT,2},
-            CLDP,
-            CLDM,
+            typeof(p_lev),
+            typeof(cld_r_eff_liq),
+            typeof(cld_mask),
             typeof(vmr),
             Int,
         }(

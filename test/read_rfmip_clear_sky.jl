@@ -146,24 +146,22 @@ function setup_rfmip_as(
     # FORTRAN RRTMGP test case.
     compute_col_dry!(p_lev, col_dry, param_set, vmr_h2o, lat) # the example skips lat based gravity calculation
 
-    vmr = VMR{FT,FTA1D,FTA2D}(vmr_h2o, vmr_o3, FTA1D(vmrat))
+    vmr = VMR(vmr_h2o, vmr_o3, FTA1D(vmrat))
     cld_r_eff_liq = nothing
     cld_r_eff_ice = nothing
     cld_path_liq = nothing
     cld_path_ice = nothing
     cld_mask = nothing
     ice_rgh = 1
-    CLDP = typeof(cld_r_eff_liq)
-    CLDM = typeof(cld_mask)
     #------------------
     return (
         AtmosphericState{
             FT,
-            DA{FT,1},
+            typeof(t_sfc),
             typeof(lat),
-            DA{FT,2},
-            CLDP,
-            CLDM,
+            typeof(p_lev),
+            typeof(cld_r_eff_liq),
+            typeof(cld_mask),
             typeof(vmr),
             Int,
         }(
