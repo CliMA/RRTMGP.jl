@@ -1,7 +1,7 @@
 name = "RRTMGP"
 uuid = "a01a1ee8-cea4-48fc-987c-fc7878d79da1"
-authors = ["Charles Kawczynski <kawczynski.charles@gmail.com>", "Sriharsha Kandala <sriharsha.kvs@gmail.com>"]
-version = "0.1.0"
+authors = ["Climate Modeling Alliance"]
+version = "0.2.0"
 
 [deps]
 Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
@@ -21,6 +21,7 @@ TimerOutputs = "a759f4b9-e2f1-59dc-863e-4aeb61b1ea8f"
 UnPack = "3a884ed6-31ef-47d7-9d2a-63182c4928ed"
 
 [compat]
+julia = "1.6"
 CLIMAParameters = "0.1"
 Compat = "3.5.0"
 Coverage = "1.0.0"
