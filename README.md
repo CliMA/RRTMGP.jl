@@ -42,4 +42,4 @@ julia> using RRTMGP
 # Acknowledgments
 
  - [Robert Pincus](https://github.com/RobertPincus) for his invaluable help (and developing RRTMGP in the first place).
- - NASA for images of the sun (for our [logo](https://climate-machine.github.io/RRTMGP.jl/latest/assets/logo.png))
+ - NASA for images of the sun (for our [logo](https://clima.github.io/RRTMGP.jl/latest/assets/logo.png))
