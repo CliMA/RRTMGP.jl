@@ -1,7 +1,6 @@
 module GrayUtils
 
 using CUDA
-using UnPack
 using ..Device: array_type, array_device, CUDADevice, CPU
 using ..AtmosphericStates
 using ..Fluxes

@@ -3,7 +3,6 @@ module RTESolver
 using StaticArrays
 using CUDA
 using Adapt
-using UnPack
 
 using ..Device: array_type, array_device, CUDADevice, CPU
 using ..AngularDiscretizations
@@ -34,8 +33,8 @@ function solve_lw!(
     max_threads::I,
     lkp_args...,
 ) where {I<:Int,FT<:AbstractFloat}
-    @unpack as, op, bcs_lw, src_lw, flux_lw, fluxb_lw = slv
-    @unpack nlay, ncol = as
+    (; as, op, bcs_lw, src_lw, flux_lw, fluxb_lw) = slv
+    (; nlay, ncol) = as
 
     nargs = length(lkp_args)
     @assert nargs < 3
@@ -263,8 +262,8 @@ function solve_sw!(
     max_threads::I,
     lkp_args...,
 ) where {I<:Int,FT<:AbstractFloat}
-    @unpack as, op, bcs_sw, src_sw, flux_sw, fluxb_sw = slv
-    @unpack nlay, ncol = as
+    (; as, op, bcs_sw, src_sw, flux_sw, fluxb_sw) = slv
+    (; nlay, ncol) = as
 
     nargs = length(lkp_args)
     @assert nargs < 3

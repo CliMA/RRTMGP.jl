@@ -4,7 +4,6 @@ using DocStringExtensions
 using CUDA
 using ..Device: array_type, array_device, CPU, CUDADevice
 using Adapt
-using UnPack
 #---------------------------------------
 using ..Vmrs
 using ..LookUpTables
@@ -177,7 +176,7 @@ function compute_optical_props!(
     lkp::LookUpLW{I,FT},
     lkp_cld::Union{LookUpCld,Nothing} = nothing,
 ) where {I<:Int,FT<:AbstractFloat}
-    @unpack nlay, ncol = as
+    (; nlay, ncol) = as
     lkp_args = (lkp_cld === nothing) ? (lkp,) : (lkp, lkp_cld)
     device = array_device(op.τ)
     if device === CUDADevice()
@@ -226,7 +225,7 @@ function compute_optical_props!(
     lkp::LookUpSW{I,FT},
     lkp_cld::Union{LookUpCld,Nothing} = nothing,
 ) where {I<:Int,FT<:AbstractFloat}
-    @unpack nlay, ncol = as
+    (; nlay, ncol) = as
     lkp_args = (lkp_cld === nothing) ? (lkp,) : (lkp, lkp_cld)
     device = array_device(op.τ)
     if device === CUDADevice()
@@ -267,7 +266,7 @@ function compute_optical_props!(
     sf::AbstractSourceLW{FT},
     igpt::Int = 1,
 ) where {FT<:AbstractFloat}
-    @unpack nlay, ncol = as
+    (; nlay, ncol) = as
     nlev = nlay + 1
     device = array_device(op.τ)
     if device === CUDADevice()
@@ -304,7 +303,7 @@ function compute_optical_props!(
     as::GrayAtmosphericState{FT},
     igpt::Int = 1,
 ) where {FT<:AbstractFloat}
-    @unpack nlay, ncol = as
+    (; nlay, ncol) = as
     nlev = nlay + 1
     device = array_device(op.τ)
     if device === CUDADevice()

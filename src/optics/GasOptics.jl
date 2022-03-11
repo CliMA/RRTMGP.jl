@@ -88,7 +88,7 @@ compute interpolation fraction for temperature.
     glay,
     gcol,
 ) where {I<:Int,FT<:AbstractFloat}
-    @unpack Δ_t_ref, n_t_ref, t_ref = lkp
+    (; Δ_t_ref, n_t_ref, t_ref) = lkp
 
     @inbounds jtemp = loc_lower(t_lay, Δ_t_ref, n_t_ref, t_ref)
     @inbounds ftemp = (t_lay - t_ref[jtemp]) / Δ_t_ref
@@ -114,7 +114,7 @@ Compute interpolation fraction for pressure.
     glay,
     gcol,
 )
-    @unpack Δ_ln_p_ref, p_ref, n_p_ref = lkp
+    (; Δ_ln_p_ref, p_ref, n_p_ref) = lkp
 
     @inbounds jpress = Int(
         min(
@@ -151,7 +151,7 @@ Compute interpolation fraction for binary species parameter.
     glay,
     gcol,
 ) where {FT<:AbstractFloat,I<:Int}
-    @unpack n_η, key_species, vmr_ref = lkp
+    (; n_η, key_species, vmr_ref) = lkp
     ig = view(key_species, :, tropo, ibnd)
 
     vmr1 = get_vmr(vmr, ig[1], glay, gcol)
@@ -457,8 +457,8 @@ Computes Planck sources for the longwave problem.
     t_lev,
     t_sfc,
 )
-    @unpack planck_fraction, t_planck, n_t_plnk, totplnk = lkp
-    @unpack lay_source, lev_source_inc, lev_source_dec, sfc_source = sf
+    (; planck_fraction, t_planck, n_t_plnk, totplnk) = lkp
+    (; lay_source, lev_source_inc, lev_source_dec, sfc_source) = sf
     # compute Planck fraction
     p_frac = interp3d(
         jη1,
