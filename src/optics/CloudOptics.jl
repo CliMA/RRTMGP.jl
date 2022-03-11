@@ -87,18 +87,20 @@ function compute_cld_props(lkp_cld, as, glay, gcol, ibnd, igpt)
     τl, τl_ssa, τl_ssag = FT(0), FT(0), FT(0)
     τi, τi_ssa, τi_ssag = FT(0), FT(0), FT(0)
     if use_lut # use LUT interpolation
-        @unpack lut_extliq,
-        lut_ssaliq,
-        lut_asyliq,
-        lut_extice,
-        lut_ssaice,
-        lut_asyice,
-        radliq_lwr,
-        radliq_upr,
-        radice_lwr,
-        radice_upr,
-        nsize_liq,
-        nsize_ice = lkp_cld
+        (;
+            lut_extliq,
+            lut_ssaliq,
+            lut_asyliq,
+            lut_extice,
+            lut_ssaice,
+            lut_asyice,
+            radliq_lwr,
+            radliq_upr,
+            radice_lwr,
+            radice_upr,
+            nsize_liq,
+            nsize_ice,
+        ) = lkp_cld
         Δr_liq = (radliq_upr - radliq_lwr) / FT(nsize_liq - 1)
         Δr_ice = (radice_upr - radice_lwr) / FT(nsize_ice - 1)
         # cloud liquid particles
@@ -150,18 +152,20 @@ function compute_cld_props(lkp_cld, as, glay, gcol, ibnd, igpt)
                 ) * τi_ssa
         end
     else # use pade interpolation
-        @unpack pade_extliq,
-        pade_ssaliq,
-        pade_asyliq,
-        pade_extice,
-        pade_ssaice,
-        pade_asyice,
-        pade_sizreg_extliq,
-        pade_sizreg_ssaliq,
-        pade_sizreg_asyliq,
-        pade_sizreg_extice,
-        pade_sizreg_ssaice,
-        pade_sizreg_asyice = lkp_cld
+        (;
+            pade_extliq,
+            pade_ssaliq,
+            pade_asyliq,
+            pade_extice,
+            pade_ssaice,
+            pade_asyice,
+            pade_sizreg_extliq,
+            pade_sizreg_ssaliq,
+            pade_sizreg_asyliq,
+            pade_sizreg_extice,
+            pade_sizreg_ssaice,
+            pade_sizreg_asyice,
+        ) = lkp_cld
         m_ext, m_ssa_g = 3, 3
         n_ext, n_ssa_g = 3, 2
         # Finds index into size regime table

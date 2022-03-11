@@ -17,8 +17,7 @@ function rte_lw_noscat_source!(
     nlay,
 ) where {FT<:AbstractFloat}
     # setting references
-    @unpack src_up, src_dn, lev_source_inc, lev_source_dec, lay_source = src_lw
-    #    @unpack nlay = slv.as
+    (; src_up, src_dn, lev_source_inc, lev_source_dec, lay_source) = src_lw
     Ds = op.angle_disc.gauss_Ds
     τ = op.τ
 
@@ -74,9 +73,9 @@ function rte_lw_noscat_transport!(
     nlev,
 ) where {FT<:AbstractFloat}
     # setting references
-    @unpack src_up, src_dn, sfc_source = src_lw
-    @unpack sfc_emis, inc_flux = bcs_lw
-    @unpack flux_up, flux_dn, flux_net = flux
+    (; src_up, src_dn, sfc_source) = src_lw
+    (; sfc_emis, inc_flux) = bcs_lw
+    (; flux_up, flux_dn, flux_net) = flux
 
     Ds = op.angle_disc.gauss_Ds
     w_μ = op.angle_disc.gauss_wts
@@ -169,8 +168,8 @@ function rte_lw_2stream_source!(
     #
     # -------------------------------------------------------------------------------------------------    
     # setting references
-    @unpack τ, ssa, g = op
-    @unpack Rdif, Tdif, lev_source, src_up, src_dn = src_lw
+    (; τ, ssa, g) = op
+    (; Rdif, Tdif, lev_source, src_up, src_dn) = src_lw
 
     lw_diff_sec = FT(1.66)
 
@@ -252,10 +251,10 @@ function adding_lw!(
 ) where {FT<:AbstractFloat,SL<:SourceLW2Str{FT},BCL<:LwBCs{FT}}
     nlay = nlev - 1
     # setting references
-    @unpack flux_up, flux_dn, flux_net = flux
+    (; flux_up, flux_dn, flux_net) = flux
 
-    @unpack albedo, sfc_source, Rdif, Tdif, src_up, src_dn, src = src_lw
-    @unpack inc_flux, sfc_emis = bcs_lw
+    (; albedo, sfc_source, Rdif, Tdif, src_up, src_dn, src) = src_lw
+    (; inc_flux, sfc_emis) = bcs_lw
 
     @inbounds for ilev = 1:nlev
         flux_dn[ilev, gcol] = FT(0)
@@ -333,7 +332,7 @@ function rte_sw_noscat_solve_kernel!(
     gcol,
     nlev,
 ) where {FT<:AbstractFloat}
-    @unpack toa_flux, zenith = bcs_sw
+    (; toa_flux, zenith) = bcs_sw
     τ = op.τ
     flux_dn_dir = flux.flux_dn_dir
     # downward propagation
@@ -369,8 +368,8 @@ function sw_two_stream!(
     nlay,
 ) where {FT<:AbstractFloat}
     zenith = bcs_sw.zenith
-    @unpack τ, ssa, g = op
-    @unpack Rdif, Tdif, Rdir, Tdir, Tnoscat = src_sw
+    (; τ, ssa, g) = op
+    (; Rdif, Tdif, Rdir, Tdir, Tnoscat) = src_sw
 
     @inbounds for glay = 1:nlay
         # Zdunkowski Practical Improved Flux Method "PIFM"
@@ -457,8 +456,8 @@ function sw_source_2str!(
     ibnd,
     nlay,
 ) where {FT<:AbstractFloat}
-    @unpack toa_flux, zenith, sfc_alb_direct = bcs_sw
-    @unpack Rdir, Tdir, Tnoscat, src_up, src_dn, sfc_source = src_sw
+    (; toa_flux, zenith, sfc_alb_direct) = bcs_sw
+    (; Rdir, Tdir, Tnoscat, src_up, src_dn, sfc_source) = src_sw
     flux_dn_dir = flux.flux_dn_dir
 
     # layer index = level index
@@ -500,10 +499,10 @@ function adding_sw!(
 ) where {FT<:AbstractFloat}
     nlay = nlev - 1
     # setting references
-    @unpack flux_up, flux_dn, flux_net = flux
+    (; flux_up, flux_dn, flux_net) = flux
 
 
-    @unpack albedo, sfc_source, Rdif, Tdif, src_up, src_dn, src = src_sw
+    (; albedo, sfc_source, Rdif, Tdif, src_up, src_dn, src) = src_sw
 
     @inbounds for ilev = 1:nlev
         flux_dn[ilev, gcol] = FT(0)

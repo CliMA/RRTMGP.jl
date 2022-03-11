@@ -43,7 +43,7 @@ function compute_optical_props_kernel!(
 ) where {FT<:AbstractFloat}
     # setting references
     glay, gcol = glaycol
-    @unpack p_lay, p_lev, d0, α = as
+    (; p_lay, p_lev, d0, α) = as
     @inbounds p0 = p_lev[1, gcol]
 
     @inbounds op.τ[glaycol...] = abs(
@@ -71,8 +71,8 @@ function compute_sources_gray_kernel!(
 ) where {FT<:AbstractFloat}
     # computing Planck sources
     glay, gcol = glaycol
-    @unpack t_lay, t_lev = as
-    @unpack lay_source, lev_source_inc, lev_source_dec, sfc_source = source
+    (; t_lay, t_lev) = as
+    (; lay_source, lev_source_inc, lev_source_dec, sfc_source) = source
 
     sbc = FT(Stefan())
     @inbounds lay_source[glaycol...] = sbc * t_lay[glaycol...]^FT(4) / FT(π)   # computing lay_source
