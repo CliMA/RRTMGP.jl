@@ -1,5 +1,5 @@
 env:
-  JULIA_VERSION: "1.6.0"
+  JULIA_VERSION: "1.7.2"
   CUDA_VERSION: "11.2"
 
 steps:
