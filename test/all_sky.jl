@@ -136,15 +136,9 @@ function all_sky(
         flux_lw,
         flux_sw,
     )
-    #------solvers
+    #------calling solvers
     solve_lw!(slv, max_threads, lookup_lw, lookup_lw_cld)
     solve_sw!(slv, max_threads, lookup_sw, lookup_sw_cld)
-
-    #for i = 1:10
-    #    @time solve_lw!(slv, max_threads, lookup_lw, lookup_lw_cld)
-    #    @time solve_sw!(slv, max_threads, lookup_sw, lookup_sw_cld)
-    #    println("------------------------------------------------")
-    #end
     #-------------
     # comparison
     method = use_lut ? "Lookup Table Interpolation method" : "PADE method"
@@ -193,6 +187,6 @@ function all_sky(
     @test max_err_flux_dn_sw < toler
 end
 println("running cloudy lookup table version")
-all_sky(TwoStream, Float64, Int, DA, use_lut = true)
+@time all_sky(TwoStream, Float64, Int, DA, use_lut = true)
 println("running cloudy pade version")
-all_sky(TwoStream, Float64, Int, DA, use_lut = false)
+@time all_sky(TwoStream, Float64, Int, DA, use_lut = false)

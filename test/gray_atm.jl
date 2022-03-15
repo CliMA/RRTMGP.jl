@@ -228,12 +228,12 @@ function gray_atmos_sw_test(
 end
 
 if DA == CuArray
-    gray_atmos_lw_equil(OneScalar, Float64, Int, DA, Int(4096))
-    gray_atmos_lw_equil(TwoStream, Float64, Int, DA, Int(4096))
+    @time gray_atmos_lw_equil(OneScalar, Float64, Int, DA, Int(4096))
+    @time gray_atmos_lw_equil(TwoStream, Float64, Int, DA, Int(4096))
 else
-    gray_atmos_lw_equil(OneScalar, Float64, Int, DA, Int(9))
-    gray_atmos_lw_equil(TwoStream, Float64, Int, DA, Int(9))
+    @time gray_atmos_lw_equil(OneScalar, Float64, Int, DA, Int(9))
+    @time gray_atmos_lw_equil(TwoStream, Float64, Int, DA, Int(9))
 end
 
-gray_atmos_sw_test(OneScalar, Float64, Int, DA, Int(1))
-gray_atmos_sw_test(TwoStream, Float64, Int, DA, Int(1))
+@time gray_atmos_sw_test(OneScalar, Float64, Int, DA, Int(1))
+@time gray_atmos_sw_test(TwoStream, Float64, Int, DA, Int(1))
