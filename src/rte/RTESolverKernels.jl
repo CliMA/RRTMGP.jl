@@ -334,14 +334,15 @@ function rte_sw_noscat_solve_kernel!(
     solar_src_scaled::AbstractArray{FT,1},
     gcol::I,
     nlev::I,
-) where {FT<:AbstractFloat, I<:Int}
+) where {FT<:AbstractFloat,I<:Int}
     solar_frac = solar_src_scaled[igpt]
     (; toa_flux, zenith) = bcs_sw
     n_gpt = length(solar_src_scaled)
     τ = op.τ
     (; flux_dn_dir, flux_net) = flux
     # downward propagation
-    @inbounds flux_dn_dir[nlev, gcol] = toa_flux[gcol] * solar_frac * cos(zenith[gcol])
+    @inbounds flux_dn_dir[nlev, gcol] =
+        toa_flux[gcol] * solar_frac * cos(zenith[gcol])
     @inbounds for ilev = nlev-1:-1:1
         flux_dn_dir[ilev, gcol] =
             flux_dn_dir[ilev+1, gcol] * exp(-τ[ilev, gcol] / cos(zenith[gcol]))
@@ -471,14 +472,16 @@ function sw_source_2str!(
 
     # layer index = level index
     # previous level is up (+1)
-    @inbounds flux_dn_dir[nlay+1, gcol] = toa_flux[gcol] * solar_frac * cos(zenith[gcol])
+    @inbounds flux_dn_dir[nlay+1, gcol] =
+        toa_flux[gcol] * solar_frac * cos(zenith[gcol])
     @inbounds for ilev = nlay:-1:1
         src_up[ilev, gcol] = Rdir[ilev, gcol] * flux_dn_dir[ilev+1, gcol]
         src_dn[ilev, gcol] = Tdir[ilev, gcol] * flux_dn_dir[ilev+1, gcol]
         flux_dn_dir[ilev, gcol] =
             Tnoscat[ilev, gcol] * flux_dn_dir[ilev+1, gcol]
     end
-    @inbounds sfc_source[gcol] = flux_dn_dir[1, gcol] * sfc_alb_direct[ibnd, gcol]
+    @inbounds sfc_source[gcol] =
+        flux_dn_dir[1, gcol] * sfc_alb_direct[ibnd, gcol]
 end
 
 """

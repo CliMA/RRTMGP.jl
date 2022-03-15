@@ -122,7 +122,8 @@ function rte_lw_noscat_solve!(
     if device === CUDADevice() # launch CUDA kernel
         tx = min(ncol, max_threads)
         bx = cld(ncol, tx)
-        args = (flux, flux_lw, src_lw, bcs_lw, op, nlay, ncol, igpt, major_gpt2bnd)
+        args =
+            (flux, flux_lw, src_lw, bcs_lw, op, nlay, ncol, igpt, major_gpt2bnd)
         @cuda threads = (tx) blocks = (bx) rte_lw_noscat_solve_CUDA!(args...)
     else # use Julia native multithreading
         @inbounds Threads.@threads for gcol = 1:ncol
@@ -221,14 +222,24 @@ function rte_lw_2stream_solve!(
     if device === CUDADevice() # launch CUDA kernel
         tx = min(ncol, max_threads)
         bx = cld(ncol, tx)
-        args = (flux, flux_lw, src_lw, bcs_lw, op, nlay, ncol, igpt, major_gpt2bnd)
+        args =
+            (flux, flux_lw, src_lw, bcs_lw, op, nlay, ncol, igpt, major_gpt2bnd)
         @cuda threads = (tx) blocks = (bx) rte_lw_2stream_solve_CUDA!(args...)
     else # use Julia native multithreading
         Threads.@threads for gcol = 1:ncol
             igpt == 1 && set_flux_to_zero!(flux_lw, gcol)
             rte_lw_2stream_combine_sources!(src_lw, gcol, nlev, ncol)
             rte_lw_2stream_source!(op, src_lw, gcol, nlay, ncol)
-            adding_lw!(flux, src_lw, bcs_lw, gcol, igpt, major_gpt2bnd, nlev, ncol)
+            adding_lw!(
+                flux,
+                src_lw,
+                bcs_lw,
+                gcol,
+                igpt,
+                major_gpt2bnd,
+                nlev,
+                ncol,
+            )
             n_gpt > 1 && add_to_flux!(flux_lw, flux, gcol)
         end
     end
@@ -397,7 +408,15 @@ function rte_sw_noscat_solve_CUDA!(
     # setting references for flux_sw
     if gcol ≤ ncol
         igpt == 1 && set_flux_to_zero!(flux_sw, gcol)
-        rte_sw_noscat_solve_kernel!(flux, op, bcs_sw, igpt, solar_src_scaled, gcol, nlev)
+        rte_sw_noscat_solve_kernel!(
+            flux,
+            op,
+            bcs_sw,
+            igpt,
+            solar_src_scaled,
+            gcol,
+            nlev,
+        )
         n_gpt > 1 && add_to_flux!(flux_sw, flux, gcol)
     end
     return nothing
@@ -439,14 +458,34 @@ function rte_sw_2stream_solve!(
     if device === CUDADevice()
         tx = min(ncol, max_threads)
         bx = cld(ncol, tx)
-        args = (flux, flux_sw, op, bcs_sw, src_sw, nlay, ncol, igpt, major_gpt2bnd, solar_src_scaled)
+        args = (
+            flux,
+            flux_sw,
+            op,
+            bcs_sw,
+            src_sw,
+            nlay,
+            ncol,
+            igpt,
+            major_gpt2bnd,
+            solar_src_scaled,
+        )
         @cuda threads = (tx) blocks = (bx) rte_sw_2stream_solve_CUDA!(args...)
     else # launch julia native multithreading
         # setting references for flux_sw
         @inbounds Threads.@threads for gcol = 1:ncol
             igpt == 1 && set_flux_to_zero!(flux_sw, gcol)
             sw_two_stream!(op, src_sw, bcs_sw, gcol, nlay) # Cell properties: transmittance and reflectance for direct and diffuse radiation
-            sw_source_2str!(src_sw, bcs_sw, gcol, flux, igpt, solar_src_scaled, major_gpt2bnd, nlay) # Direct-beam and source for diffuse radiation
+            sw_source_2str!(
+                src_sw,
+                bcs_sw,
+                gcol,
+                flux,
+                igpt,
+                solar_src_scaled,
+                major_gpt2bnd,
+                nlay,
+            ) # Direct-beam and source for diffuse radiation
             adding_sw!(src_sw, bcs_sw, gcol, flux, igpt, major_gpt2bnd, nlev) # Transport
             n_gpt > 1 && add_to_flux!(flux_sw, flux, gcol)
         end
@@ -472,7 +511,16 @@ function rte_sw_2stream_solve_CUDA!(
     if gcol ≤ ncol
         igpt == 1 && set_flux_to_zero!(flux_sw, gcol)
         sw_two_stream!(op, src_sw, bcs_sw, gcol, nlay) # Cell properties: transmittance and reflectance for direct and diffuse radiation
-        sw_source_2str!(src_sw, bcs_sw, gcol, flux, igpt, solar_src_scaled, major_gpt2bnd, nlay) # Direct-beam and source for diffuse radiation
+        sw_source_2str!(
+            src_sw,
+            bcs_sw,
+            gcol,
+            flux,
+            igpt,
+            solar_src_scaled,
+            major_gpt2bnd,
+            nlay,
+        ) # Direct-beam and source for diffuse radiation
         adding_sw!(src_sw, bcs_sw, gcol, flux, igpt, major_gpt2bnd, nlev) # Transport
         n_gpt > 1 && add_to_flux!(flux_sw, flux, gcol)
     end
