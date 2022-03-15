@@ -68,10 +68,11 @@ function rte_lw_noscat_transport!(
     gcol,
     flux::FluxLW{FT},
     igpt,
-    ibnd,
+    major_gpt2bnd::AbstractArray{UInt8,1},
     nlay,
     nlev,
 ) where {FT<:AbstractFloat}
+    ibnd = major_gpt2bnd[igpt]
     # setting references
     (; src_up, src_dn, sfc_source) = src_lw
     (; sfc_emis, inc_flux) = bcs_lw
@@ -245,11 +246,12 @@ function adding_lw!(
     bcs_lw::BCL,
     gcol,
     igpt,
-    ibnd,
+    major_gpt2bnd::AbstractArray{UInt8,1},
     nlev,
     ncol,
 ) where {FT<:AbstractFloat,SL<:SourceLW2Str{FT},BCL<:LwBCs{FT}}
     nlay = nlev - 1
+    ibnd = major_gpt2bnd[igpt]
     # setting references
     (; flux_up, flux_dn, flux_net) = flux
 
@@ -328,18 +330,23 @@ function rte_sw_noscat_solve_kernel!(
     flux::FluxSW{FT},
     op::OneScalar{FT},
     bcs_sw::SwBCs{FT},
-    solar_frac::FT,
-    gcol,
-    nlev,
-) where {FT<:AbstractFloat}
+    igpt::I,
+    solar_src_scaled::AbstractArray{FT,1},
+    gcol::I,
+    nlev::I,
+) where {FT<:AbstractFloat,I<:Int}
+    solar_frac = solar_src_scaled[igpt]
     (; toa_flux, zenith) = bcs_sw
+    n_gpt = length(solar_src_scaled)
     τ = op.τ
-    flux_dn_dir = flux.flux_dn_dir
+    (; flux_dn_dir, flux_net) = flux
     # downward propagation
-    flux_dn_dir[nlev, gcol] = toa_flux[gcol] * solar_frac * cos(zenith[gcol])
-    for ilev = nlev-1:-1:1
+    @inbounds flux_dn_dir[nlev, gcol] =
+        toa_flux[gcol] * solar_frac * cos(zenith[gcol])
+    @inbounds for ilev = nlev-1:-1:1
         flux_dn_dir[ilev, gcol] =
             flux_dn_dir[ilev+1, gcol] * exp(-τ[ilev, gcol] / cos(zenith[gcol]))
+        flux_net[ilev, gcol] = -flux_dn_dir[ilev, gcol]
     end
 end
 
@@ -364,9 +371,9 @@ function sw_two_stream!(
     op::TwoStream{FT},
     src_sw::SourceSW2Str{FT},
     bcs_sw::SwBCs{FT},
-    gcol,
-    nlay,
-) where {FT<:AbstractFloat}
+    gcol::I,
+    nlay::I,
+) where {FT<:AbstractFloat,I<:Int}
     zenith = bcs_sw.zenith
     (; τ, ssa, g) = op
     (; Rdif, Tdif, Rdir, Tdir, Tnoscat) = src_sw
@@ -392,11 +399,11 @@ function sw_two_stream!(
             FT(1) /
             (k * (FT(1) + exp_minus2ktau) + γ1 * (FT(1) - exp_minus2ktau))
 
-        Rdif[glay, gcol] = RT_term * γ2 * (FT(1) - exp_minus2ktau) # Eqn. 25
-        Tdif[glay, gcol] = RT_term * FT(2) * k * exp_minusktau     # Eqn. 26
+        @inbounds Rdif[glay, gcol] = RT_term * γ2 * (FT(1) - exp_minus2ktau) # Eqn. 25
+        @inbounds Tdif[glay, gcol] = RT_term * FT(2) * k * exp_minusktau     # Eqn. 26
 
         # Transmittance of direct, unscattered beam. Also used below
-        Tnoscat[glay, gcol] = exp(-τ[glay, gcol] / cos(zenith[gcol]))
+        @inbounds Tnoscat[glay, gcol] = exp(-τ[glay, gcol] / cos(zenith[gcol]))
 
         # Direct reflect and transmission
         k_μ = k * cos(zenith[gcol])
@@ -411,7 +418,7 @@ function sw_two_stream!(
             RT_term = ssa[glay, gcol] * RT_term / eps(FT)
         end
 
-        Rdir[glay, gcol] =
+        @inbounds Rdir[glay, gcol] =
             RT_term * (
                 (FT(1) - k_μ) * (α2 + k_γ3) -
                 (FT(1) + k_μ) * (α2 - k_γ3) * exp_minus2ktau -
@@ -423,7 +430,7 @@ function sw_two_stream!(
         #   prefer underflow to overflow
         # Omitting direct transmittance
         #
-        Tdir[glay, gcol] =
+        @inbounds Tdir[glay, gcol] =
             -RT_term * (
                 (FT(1) + k_μ) * (α1 + k_γ4) * Tnoscat[glay, gcol] -
                 (FT(1) - k_μ) *
@@ -450,26 +457,31 @@ Direct-beam and source for diffuse radiation
 function sw_source_2str!(
     src_sw::SourceSW2Str{FT},
     bcs_sw::SwBCs{FT},
-    gcol,
+    gcol::I,
     flux::FluxSW{FT},
-    solar_frac::FT,
-    ibnd,
-    nlay,
-) where {FT<:AbstractFloat}
+    igpt::I,
+    solar_src_scaled::AbstractArray{FT,1},
+    major_gpt2bnd::AbstractArray{UInt8,1},
+    nlay::I,
+) where {FT<:AbstractFloat,I<:Int}
+    ibnd = major_gpt2bnd[igpt]
+    solar_frac = solar_src_scaled[igpt]
     (; toa_flux, zenith, sfc_alb_direct) = bcs_sw
     (; Rdir, Tdir, Tnoscat, src_up, src_dn, sfc_source) = src_sw
     flux_dn_dir = flux.flux_dn_dir
 
     # layer index = level index
     # previous level is up (+1)
-    flux_dn_dir[nlay+1, gcol] = toa_flux[gcol] * solar_frac * cos(zenith[gcol])
-    for ilev = nlay:-1:1
+    @inbounds flux_dn_dir[nlay+1, gcol] =
+        toa_flux[gcol] * solar_frac * cos(zenith[gcol])
+    @inbounds for ilev = nlay:-1:1
         src_up[ilev, gcol] = Rdir[ilev, gcol] * flux_dn_dir[ilev+1, gcol]
         src_dn[ilev, gcol] = Tdir[ilev, gcol] * flux_dn_dir[ilev+1, gcol]
         flux_dn_dir[ilev, gcol] =
             Tnoscat[ilev, gcol] * flux_dn_dir[ilev+1, gcol]
     end
-    sfc_source[gcol] = flux_dn_dir[1, gcol] * sfc_alb_direct[ibnd, gcol]
+    @inbounds sfc_source[gcol] =
+        flux_dn_dir[1, gcol] * sfc_alb_direct[ibnd, gcol]
 end
 
 """
@@ -491,17 +503,17 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
 function adding_sw!(
     src_sw::SourceSW2Str{FT},
     bcs_sw::SwBCs{FT},
-    gcol,
+    gcol::I,
     flux::FluxSW{FT},
-    igpt,
-    ibnd,
-    nlev,
-) where {FT<:AbstractFloat}
+    igpt::I,
+    major_gpt2bnd::AbstractArray{UInt8,1},
+    nlev::I,
+) where {FT<:AbstractFloat,I<:Int}
+    ibnd = major_gpt2bnd[igpt]
     nlay = nlev - 1
-    # setting references
-    (; flux_up, flux_dn, flux_net) = flux
-
-
+    n_gpt = length(major_gpt2bnd)
+    # destructuring
+    (; flux_up, flux_dn, flux_dn_dir, flux_net) = flux
     (; albedo, sfc_source, Rdif, Tdif, src_up, src_dn, src) = src_sw
 
     @inbounds for ilev = 1:nlev
@@ -532,7 +544,7 @@ function adding_sw!(
     end
 
     # Eq 12, at the top of the domain upwelling diffuse is due to ...
-    flux_up[nlev, gcol] =
+    @inbounds flux_up[nlev, gcol] =
         flux_dn[nlev, gcol] * albedo[nlev, gcol] + # ... reflection of incident diffuse and
         src[nlev, gcol]                          # scattering by the direct beam below
 
@@ -551,6 +563,7 @@ function adding_sw!(
     end
 
     @inbounds for ilev = 1:nlev
+        flux_dn[ilev, gcol] += flux_dn_dir[ilev, gcol]
         flux_net[ilev, gcol] = flux_up[ilev, gcol] - flux_dn[ilev, gcol]
     end
 end
