@@ -53,17 +53,17 @@ function solve_lw!(
 
     if op isa OneScalar
         rte_lw_noscat_solve!(
-        flux,
-        flux_lw,
-        src_lw,
-        bcs_lw,
-        op,
-        nlay,
-        ncol,
-        major_gpt2bnd,
-        max_threads,
-        as,
-        lkp_args...,
+            flux,
+            flux_lw,
+            src_lw,
+            bcs_lw,
+            op,
+            nlay,
+            ncol,
+            major_gpt2bnd,
+            max_threads,
+            as,
+            lkp_args...,
         ) # no-scattering solver
     else
         rte_lw_2stream_solve!(
@@ -122,11 +122,21 @@ function rte_lw_noscat_solve!(
     if device === CUDADevice() # launch CUDA kernel
         tx = min(ncol, max_threads)
         bx = cld(ncol, tx)
-        args =
-            (flux, flux_lw, src_lw, bcs_lw, op, nlay, ncol, major_gpt2bnd, as, lkp_args...)
+        args = (
+            flux,
+            flux_lw,
+            src_lw,
+            bcs_lw,
+            op,
+            nlay,
+            ncol,
+            major_gpt2bnd,
+            as,
+            lkp_args...,
+        )
         @cuda threads = (tx) blocks = (bx) rte_lw_noscat_solve_CUDA!(args...)
     else # use Julia native multithreading
-        for igpt in 1:n_gpt
+        for igpt = 1:n_gpt
             @inbounds Threads.@threads for gcol = 1:ncol
                 igpt == 1 && set_flux_to_zero!(flux_lw, gcol)
                 compute_optical_props!(op, as, src_lw, gcol, igpt, lkp_args...)
@@ -166,7 +176,7 @@ function rte_lw_noscat_solve_CUDA!(
     nlev = nlay + 1
     n_gpt = length(major_gpt2bnd)
     if gcol ≤ ncol
-        for igpt in 1:n_gpt
+        for igpt = 1:n_gpt
             igpt == 1 && set_flux_to_zero!(flux_lw, gcol)
             compute_optical_props!(op, as, src_lw, gcol, igpt, lkp_args...)
             rte_lw_noscat_source!(src_lw, op, gcol, nlay)
@@ -231,11 +241,21 @@ function rte_lw_2stream_solve!(
     if device === CUDADevice() # launch CUDA kernel
         tx = min(ncol, max_threads)
         bx = cld(ncol, tx)
-        args =
-            (flux, flux_lw, src_lw, bcs_lw, op, nlay, ncol, major_gpt2bnd, as, lkp_args...)
+        args = (
+            flux,
+            flux_lw,
+            src_lw,
+            bcs_lw,
+            op,
+            nlay,
+            ncol,
+            major_gpt2bnd,
+            as,
+            lkp_args...,
+        )
         @cuda threads = (tx) blocks = (bx) rte_lw_2stream_solve_CUDA!(args...)
     else # use Julia native multithreading
-        for igpt in 1:n_gpt
+        for igpt = 1:n_gpt
             Threads.@threads for gcol = 1:ncol
                 igpt == 1 && set_flux_to_zero!(flux_lw, gcol)
                 compute_optical_props!(op, as, src_lw, gcol, igpt, lkp_args...)
@@ -274,12 +294,21 @@ function rte_lw_2stream_solve_CUDA!(
     nlev = nlay + 1
     n_gpt = length(major_gpt2bnd)
     if gcol ≤ ncol
-        for igpt in 1:n_gpt
+        for igpt = 1:n_gpt
             igpt == 1 && set_flux_to_zero!(flux_lw, gcol)
             compute_optical_props!(op, as, src_lw, gcol, igpt, lkp_args...)
             rte_lw_2stream_combine_sources!(src_lw, gcol, nlev, ncol)
             rte_lw_2stream_source!(op, src_lw, gcol, nlay, ncol)
-            adding_lw!(flux, src_lw, bcs_lw, gcol, igpt, major_gpt2bnd, nlev, ncol)
+            adding_lw!(
+                flux,
+                src_lw,
+                bcs_lw,
+                gcol,
+                igpt,
+                major_gpt2bnd,
+                nlev,
+                ncol,
+            )
             n_gpt > 1 && add_to_flux!(flux_lw, flux, gcol)
         end
     end
@@ -387,10 +416,20 @@ function rte_sw_noscat_solve!(
     if device === CUDADevice() # launching CUDA kernel
         tx = min(ncol, max_threads)
         bx = cld(ncol, tx)
-        args = (flux, flux_sw, op, bcs_sw, nlay, ncol, solar_src_scaled, as, lkp_args...)
+        args = (
+            flux,
+            flux_sw,
+            op,
+            bcs_sw,
+            nlay,
+            ncol,
+            solar_src_scaled,
+            as,
+            lkp_args...,
+        )
         @cuda threads = (tx) blocks = (bx) rte_sw_noscat_solve_CUDA!(args...)
     else # launch juila native multithreading
-        for igpt in 1:n_gpt
+        for igpt = 1:n_gpt
             @inbounds Threads.@threads for gcol = 1:ncol
                 igpt == 1 && set_flux_to_zero!(flux_sw, gcol)
                 compute_optical_props!(op, as, gcol, igpt, lkp_args...)
@@ -427,7 +466,7 @@ function rte_sw_noscat_solve_CUDA!(
     n_gpt = length(solar_src_scaled)
     # setting references for flux_sw
     if gcol ≤ ncol
-        for igpt in 1:n_gpt
+        for igpt = 1:n_gpt
             igpt == 1 && set_flux_to_zero!(flux_sw, gcol)
             compute_optical_props!(op, as, gcol, igpt, lkp_args...)
             rte_sw_noscat_solve_kernel!(
@@ -499,7 +538,7 @@ function rte_sw_2stream_solve!(
         @cuda threads = (tx) blocks = (bx) rte_sw_2stream_solve_CUDA!(args...)
     else # launch julia native multithreading
         # setting references for flux_sw
-        for igpt in 1:n_gpt
+        for igpt = 1:n_gpt
             @inbounds Threads.@threads for gcol = 1:ncol
                 igpt == 1 && set_flux_to_zero!(flux_sw, gcol)
                 compute_optical_props!(op, as, gcol, igpt, lkp_args...)
@@ -514,7 +553,15 @@ function rte_sw_2stream_solve!(
                     major_gpt2bnd,
                     nlay,
                 ) # Direct-beam and source for diffuse radiation
-                adding_sw!(src_sw, bcs_sw, gcol, flux, igpt, major_gpt2bnd, nlev) # Transport
+                adding_sw!(
+                    src_sw,
+                    bcs_sw,
+                    gcol,
+                    flux,
+                    igpt,
+                    major_gpt2bnd,
+                    nlev,
+                ) # Transport
                 n_gpt > 1 && add_to_flux!(flux_sw, flux, gcol)
             end
         end
@@ -539,7 +586,7 @@ function rte_sw_2stream_solve_CUDA!(
     nlev = nlay + 1
     n_gpt = length(major_gpt2bnd)
     if gcol ≤ ncol
-        for igpt in 1:n_gpt
+        for igpt = 1:n_gpt
             igpt == 1 && set_flux_to_zero!(flux_sw, gcol)
             compute_optical_props!(op, as, gcol, igpt, lkp_args...)
             sw_two_stream!(op, src_sw, bcs_sw, gcol, nlay) # Cell properties: transmittance and reflectance for direct and diffuse radiation

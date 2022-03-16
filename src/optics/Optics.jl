@@ -180,16 +180,9 @@ function compute_optical_props!(
 ) where {I<:Int,FT<:AbstractFloat}
     nlay = as.nlay
     lkp_args = (lkp_cld === nothing) ? (lkp,) : (lkp, lkp_cld)
-    for ilay in 1:nlay
+    for ilay = 1:nlay
         glaycol = (ilay, gcol)
-        compute_optical_props_kernel!(
-            op,
-            as,
-            glaycol,
-            sf,
-            igpt,
-            lkp_args...,
-        )
+        compute_optical_props_kernel!(op, as, glaycol, sf, igpt, lkp_args...)
     end
     return nothing
 end
@@ -216,7 +209,7 @@ function compute_optical_props!(
 ) where {I<:Int,FT<:AbstractFloat}
     nlay = as.nlay
     lkp_args = (lkp_cld === nothing) ? (lkp,) : (lkp, lkp_cld)
-    for ilay in 1:nlay
+    for ilay = 1:nlay
         glaycol = (ilay, gcol)
         compute_optical_props_kernel!(op, as, glaycol, igpt, lkp_args...)
     end
@@ -242,7 +235,7 @@ function compute_optical_props!(
     igpt::I = 1,
 ) where {FT<:AbstractFloat,I<:Int}
     nlay = as.nlay
-    for ilay in 1:nlay
+    for ilay = 1:nlay
         glaycol = (ilay, gcol)
         compute_optical_props_kernel!(op, as, glaycol, sf)
     end
@@ -266,7 +259,7 @@ function compute_optical_props!(
     igpt::I = 1,
 ) where {FT<:AbstractFloat,I<:Int}
     nlay = as.nlay
-    for ilay in 1:nlay
+    for ilay = 1:nlay
         glaycol = (ilay, gcol)
         compute_optical_props_kernel!(op, as, glaycol)
     end
