@@ -51,36 +51,34 @@ function solve_lw!(
         flux = flux_lw
     end
 
-    for igpt = 1:n_gpt
-        # computing optical properties
-        compute_optical_props!(op, as, src_lw, igpt, lkp_args...)
-        if op isa OneScalar
-            rte_lw_noscat_solve!(
-                flux,
-                flux_lw,
-                src_lw,
-                bcs_lw,
-                op,
-                nlay,
-                ncol,
-                igpt,
-                major_gpt2bnd,
-                max_threads,
-            ) # no-scattering solver
-        else
-            rte_lw_2stream_solve!(
-                flux,
-                flux_lw,
-                src_lw,
-                bcs_lw,
-                op,
-                nlay,
-                ncol,
-                igpt,
-                major_gpt2bnd,
-                max_threads,
-            ) # 2-stream solver
-        end
+    if op isa OneScalar
+        rte_lw_noscat_solve!(
+        flux,
+        flux_lw,
+        src_lw,
+        bcs_lw,
+        op,
+        nlay,
+        ncol,
+        major_gpt2bnd,
+        max_threads,
+        as,
+        lkp_args...,
+        ) # no-scattering solver
+    else
+        rte_lw_2stream_solve!(
+            flux,
+            flux_lw,
+            src_lw,
+            bcs_lw,
+            op,
+            nlay,
+            ncol,
+            major_gpt2bnd,
+            max_threads,
+            as,
+            lkp_args...,
+        ) # 2-stream solver
     end
     return nothing
 end
@@ -94,9 +92,10 @@ end
         op::OneScalar{FT},
         nlay,
         ncol,
-        igpt,
         major_gpt2bnd::AbstractArray{UInt8,1},
         max_threads,
+        as::AbstractAtmosphericState{FT},
+        lkp_args...,
     ) where {FT<:AbstractFloat}
 
 No scattering solver for the longwave problem.
@@ -112,9 +111,10 @@ function rte_lw_noscat_solve!(
     op::OneScalar{FT},
     nlay,
     ncol,
-    igpt,
     major_gpt2bnd::AbstractArray{UInt8,1},
     max_threads,
+    as::AbstractAtmosphericState{FT},
+    lkp_args...,
 ) where {FT<:AbstractFloat}
     nlev = nlay + 1
     n_gpt = length(major_gpt2bnd)
@@ -123,11 +123,52 @@ function rte_lw_noscat_solve!(
         tx = min(ncol, max_threads)
         bx = cld(ncol, tx)
         args =
-            (flux, flux_lw, src_lw, bcs_lw, op, nlay, ncol, igpt, major_gpt2bnd)
+            (flux, flux_lw, src_lw, bcs_lw, op, nlay, ncol, major_gpt2bnd, as, lkp_args...)
         @cuda threads = (tx) blocks = (bx) rte_lw_noscat_solve_CUDA!(args...)
     else # use Julia native multithreading
-        @inbounds Threads.@threads for gcol = 1:ncol
+        for igpt in 1:n_gpt
+            @inbounds Threads.@threads for gcol = 1:ncol
+                igpt == 1 && set_flux_to_zero!(flux_lw, gcol)
+                compute_optical_props!(op, as, src_lw, gcol, igpt, lkp_args...)
+                rte_lw_noscat_source!(src_lw, op, gcol, nlay)
+                rte_lw_noscat_transport!(
+                    src_lw,
+                    bcs_lw,
+                    op,
+                    gcol,
+                    flux,
+                    igpt,
+                    major_gpt2bnd,
+                    nlay,
+                    nlev,
+                )
+                n_gpt > 1 && add_to_flux!(flux_lw, flux, gcol)
+            end
+        end
+    end
+    #------------------------------------------------
+    return nothing
+end
+# ---------------------------------------------------------------    
+function rte_lw_noscat_solve_CUDA!(
+    flux::FluxLW{FT},
+    flux_lw::FluxLW{FT},
+    src_lw::SourceLWNoScat{FT},
+    bcs_lw::LwBCs{FT},
+    op::OneScalar{FT},
+    nlay,
+    ncol,
+    major_gpt2bnd,
+    as::AbstractAtmosphericState{FT},
+    lkp_args...,
+) where {FT<:AbstractFloat}
+    gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
+    nlev = nlay + 1
+    n_gpt = length(major_gpt2bnd)
+    if gcol ≤ ncol
+        for igpt in 1:n_gpt
             igpt == 1 && set_flux_to_zero!(flux_lw, gcol)
+            compute_optical_props!(op, as, src_lw, gcol, igpt, lkp_args...)
             rte_lw_noscat_source!(src_lw, op, gcol, nlay)
             rte_lw_noscat_transport!(
                 src_lw,
@@ -143,40 +184,6 @@ function rte_lw_noscat_solve!(
             n_gpt > 1 && add_to_flux!(flux_lw, flux, gcol)
         end
     end
-    #------------------------------------------------
-    return nothing
-end
-# ---------------------------------------------------------------    
-function rte_lw_noscat_solve_CUDA!(
-    flux::FluxLW{FT},
-    flux_lw::FluxLW{FT},
-    src_lw::SourceLWNoScat{FT},
-    bcs_lw::LwBCs{FT},
-    op::OneScalar{FT},
-    nlay,
-    ncol,
-    igpt,
-    major_gpt2bnd,
-) where {FT<:AbstractFloat}
-    gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
-    nlev = nlay + 1
-    n_gpt = length(major_gpt2bnd)
-    if gcol ≤ ncol
-        igpt == 1 && set_flux_to_zero!(flux_lw, gcol)
-        rte_lw_noscat_source!(src_lw, op, gcol, nlay)
-        rte_lw_noscat_transport!(
-            src_lw,
-            bcs_lw,
-            op,
-            gcol,
-            flux,
-            igpt,
-            major_gpt2bnd,
-            nlay,
-            nlev,
-        )
-        n_gpt > 1 && add_to_flux!(flux_lw, flux, gcol)
-    end
     return nothing
 end
 
@@ -189,9 +196,10 @@ end
         op::TwoStream{FT},
         nlay,
         ncol,
-        igpt,
         major_gpt2bnd::AbstractArray{UInt8,1},
         max_threads,
+        as::AbstractAtmosphericState{FT},
+        lkp_args...,
     ) where {FT<:AbstractFloat}
 
 Two stream solver for the longwave problem.
@@ -212,9 +220,10 @@ function rte_lw_2stream_solve!(
     op::TwoStream{FT},
     nlay,
     ncol,
-    igpt,
     major_gpt2bnd::AbstractArray{UInt8,1},
     max_threads,
+    as::AbstractAtmosphericState{FT},
+    lkp_args...,
 ) where {FT<:AbstractFloat}
     nlev = nlay + 1
     n_gpt = length(major_gpt2bnd)
@@ -223,24 +232,27 @@ function rte_lw_2stream_solve!(
         tx = min(ncol, max_threads)
         bx = cld(ncol, tx)
         args =
-            (flux, flux_lw, src_lw, bcs_lw, op, nlay, ncol, igpt, major_gpt2bnd)
+            (flux, flux_lw, src_lw, bcs_lw, op, nlay, ncol, major_gpt2bnd, as, lkp_args...)
         @cuda threads = (tx) blocks = (bx) rte_lw_2stream_solve_CUDA!(args...)
     else # use Julia native multithreading
-        Threads.@threads for gcol = 1:ncol
-            igpt == 1 && set_flux_to_zero!(flux_lw, gcol)
-            rte_lw_2stream_combine_sources!(src_lw, gcol, nlev, ncol)
-            rte_lw_2stream_source!(op, src_lw, gcol, nlay, ncol)
-            adding_lw!(
-                flux,
-                src_lw,
-                bcs_lw,
-                gcol,
-                igpt,
-                major_gpt2bnd,
-                nlev,
-                ncol,
-            )
-            n_gpt > 1 && add_to_flux!(flux_lw, flux, gcol)
+        for igpt in 1:n_gpt
+            Threads.@threads for gcol = 1:ncol
+                igpt == 1 && set_flux_to_zero!(flux_lw, gcol)
+                compute_optical_props!(op, as, src_lw, gcol, igpt, lkp_args...)
+                rte_lw_2stream_combine_sources!(src_lw, gcol, nlev, ncol)
+                rte_lw_2stream_source!(op, src_lw, gcol, nlay, ncol)
+                adding_lw!(
+                    flux,
+                    src_lw,
+                    bcs_lw,
+                    gcol,
+                    igpt,
+                    major_gpt2bnd,
+                    nlev,
+                    ncol,
+                )
+                n_gpt > 1 && add_to_flux!(flux_lw, flux, gcol)
+            end
         end
     end
     return nothing
@@ -254,18 +266,22 @@ function rte_lw_2stream_solve_CUDA!(
     op::TwoStream{FT},
     nlay,
     ncol,
-    igpt,
     major_gpt2bnd::AbstractArray{UInt8,1},
+    as::AbstractAtmosphericState{FT},
+    lkp_args...,
 ) where {FT<:AbstractFloat}
     gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
     nlev = nlay + 1
     n_gpt = length(major_gpt2bnd)
     if gcol ≤ ncol
-        igpt == 1 && set_flux_to_zero!(flux_lw, gcol)
-        rte_lw_2stream_combine_sources!(src_lw, gcol, nlev, ncol)
-        rte_lw_2stream_source!(op, src_lw, gcol, nlay, ncol)
-        adding_lw!(flux, src_lw, bcs_lw, gcol, igpt, major_gpt2bnd, nlev, ncol)
-        n_gpt > 1 && add_to_flux!(flux_lw, flux, gcol)
+        for igpt in 1:n_gpt
+            igpt == 1 && set_flux_to_zero!(flux_lw, gcol)
+            compute_optical_props!(op, as, src_lw, gcol, igpt, lkp_args...)
+            rte_lw_2stream_combine_sources!(src_lw, gcol, nlev, ncol)
+            rte_lw_2stream_source!(op, src_lw, gcol, nlay, ncol)
+            adding_lw!(flux, src_lw, bcs_lw, gcol, igpt, major_gpt2bnd, nlev, ncol)
+            n_gpt > 1 && add_to_flux!(flux_lw, flux, gcol)
+        end
     end
     return nothing
 end
@@ -302,37 +318,35 @@ function solve_sw!(
         solar_src_scaled = DA(FT[1])
         flux = flux_sw
     end
-    for igpt = 1:n_gpt
-        # computing optical properties
-        compute_optical_props!(op, as, igpt, lkp_args...)
-        # solving radiative transfer equation
-        if slv.op isa OneScalar
-            rte_sw_noscat_solve!(
-                flux,
-                flux_sw,
-                op,
-                bcs_sw,
-                nlay,
-                ncol,
-                igpt,
-                solar_src_scaled,
-                max_threads,
-            ) # no-scattering solver
-        else
-            rte_sw_2stream_solve!(
-                flux,
-                flux_sw,
-                op,
-                bcs_sw,
-                src_sw,
-                nlay,
-                ncol,
-                igpt,
-                major_gpt2bnd,
-                solar_src_scaled,
-                max_threads,
-            ) # 2-stream solver
-        end
+    # solving radiative transfer equation
+    if slv.op isa OneScalar
+        rte_sw_noscat_solve!(
+            flux,
+            flux_sw,
+            op,
+            bcs_sw,
+            nlay,
+            ncol,
+            solar_src_scaled,
+            max_threads,
+            as,
+            lkp_args...,
+        ) # no-scattering solver
+    else
+        rte_sw_2stream_solve!(
+            flux,
+            flux_sw,
+            op,
+            bcs_sw,
+            src_sw,
+            nlay,
+            ncol,
+            major_gpt2bnd,
+            solar_src_scaled,
+            max_threads,
+            as,
+            lkp_args...,
+        ) # 2-stream solver
     end
     return nothing
 end
@@ -345,9 +359,10 @@ end
         bcs_sw::SwBCs{FT},
         nlay,
         ncol,
-        igpt,
         solar_src_scaled::AbstractArray{FT,1},
         max_threads,
+        as::AbstractAtmosphericState{FT},
+        lkp_args...,
     ) where {FT<:AbstractFloat}
 
 No-scattering solver for the shortwave problem.
@@ -360,9 +375,10 @@ function rte_sw_noscat_solve!(
     bcs_sw::SwBCs{FT},
     nlay,
     ncol,
-    igpt,
     solar_src_scaled::AbstractArray{FT,1},
     max_threads,
+    as::AbstractAtmosphericState{FT},
+    lkp_args...,
 ) where {FT<:AbstractFloat}
     nlev = nlay + 1
     n_gpt = length(solar_src_scaled)
@@ -371,21 +387,24 @@ function rte_sw_noscat_solve!(
     if device === CUDADevice() # launching CUDA kernel
         tx = min(ncol, max_threads)
         bx = cld(ncol, tx)
-        args = (flux, flux_sw, op, bcs_sw, nlay, ncol, igpt, solar_src_scaled)
+        args = (flux, flux_sw, op, bcs_sw, nlay, ncol, solar_src_scaled, as, lkp_args...)
         @cuda threads = (tx) blocks = (bx) rte_sw_noscat_solve_CUDA!(args...)
     else # launch juila native multithreading
-        @inbounds Threads.@threads for gcol = 1:ncol
-            igpt == 1 && set_flux_to_zero!(flux_sw, gcol)
-            rte_sw_noscat_solve_kernel!(
-                flux,
-                op,
-                bcs_sw,
-                igpt,
-                solar_src_scaled,
-                gcol,
-                nlev,
-            )
-            n_gpt > 1 && add_to_flux!(flux_sw, flux, gcol)
+        for igpt in 1:n_gpt
+            @inbounds Threads.@threads for gcol = 1:ncol
+                igpt == 1 && set_flux_to_zero!(flux_sw, gcol)
+                compute_optical_props!(op, as, gcol, igpt, lkp_args...)
+                rte_sw_noscat_solve_kernel!(
+                    flux,
+                    op,
+                    bcs_sw,
+                    igpt,
+                    solar_src_scaled,
+                    gcol,
+                    nlev,
+                )
+                n_gpt > 1 && add_to_flux!(flux_sw, flux, gcol)
+            end
         end
     end
     #-----------------------------------------------------------------------------------
@@ -399,25 +418,29 @@ function rte_sw_noscat_solve_CUDA!(
     bcs_sw::SwBCs{FT},
     nlay,
     ncol,
-    igpt,
     solar_src_scaled::AbstractArray{FT,1},
+    as::AbstractAtmosphericState{FT},
+    lkp_args...,
 ) where {FT<:AbstractFloat}
     gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
     nlev = nlay + 1
     n_gpt = length(solar_src_scaled)
     # setting references for flux_sw
     if gcol ≤ ncol
-        igpt == 1 && set_flux_to_zero!(flux_sw, gcol)
-        rte_sw_noscat_solve_kernel!(
-            flux,
-            op,
-            bcs_sw,
-            igpt,
-            solar_src_scaled,
-            gcol,
-            nlev,
-        )
-        n_gpt > 1 && add_to_flux!(flux_sw, flux, gcol)
+        for igpt in 1:n_gpt
+            igpt == 1 && set_flux_to_zero!(flux_sw, gcol)
+            compute_optical_props!(op, as, gcol, igpt, lkp_args...)
+            rte_sw_noscat_solve_kernel!(
+                flux,
+                op,
+                bcs_sw,
+                igpt,
+                solar_src_scaled,
+                gcol,
+                nlev,
+            )
+            n_gpt > 1 && add_to_flux!(flux_sw, flux, gcol)
+        end
     end
     return nothing
 end
@@ -431,10 +454,11 @@ end
         src_sw::SourceSW2Str{FT},
         nlay,
         ncol,
-        igpt,
         major_gpt2bnd::AbstractArray{UInt8,1},
         solar_src_scaled::AbstractArray{FT,1},
         max_threads,
+        as::AbstractAtmosphericState{FT},
+        lkp_args...,
     ) where {FT<:AbstractFloat}
 
 Two stream solver for the shortwave problem.
@@ -447,10 +471,11 @@ function rte_sw_2stream_solve!(
     src_sw::SourceSW2Str{FT},
     nlay,
     ncol,
-    igpt,
     major_gpt2bnd::AbstractArray{UInt8,1},
     solar_src_scaled::AbstractArray{FT,1},
     max_threads,
+    as::AbstractAtmosphericState{FT},
+    lkp_args...,
 ) where {FT<:AbstractFloat}
     nlev = nlay + 1
     n_gpt = length(major_gpt2bnd)
@@ -466,15 +491,57 @@ function rte_sw_2stream_solve!(
             src_sw,
             nlay,
             ncol,
-            igpt,
             major_gpt2bnd,
             solar_src_scaled,
+            as,
+            lkp_args...,
         )
         @cuda threads = (tx) blocks = (bx) rte_sw_2stream_solve_CUDA!(args...)
     else # launch julia native multithreading
         # setting references for flux_sw
-        @inbounds Threads.@threads for gcol = 1:ncol
+        for igpt in 1:n_gpt
+            @inbounds Threads.@threads for gcol = 1:ncol
+                igpt == 1 && set_flux_to_zero!(flux_sw, gcol)
+                compute_optical_props!(op, as, gcol, igpt, lkp_args...)
+                sw_two_stream!(op, src_sw, bcs_sw, gcol, nlay) # Cell properties: transmittance and reflectance for direct and diffuse radiation
+                sw_source_2str!(
+                    src_sw,
+                    bcs_sw,
+                    gcol,
+                    flux,
+                    igpt,
+                    solar_src_scaled,
+                    major_gpt2bnd,
+                    nlay,
+                ) # Direct-beam and source for diffuse radiation
+                adding_sw!(src_sw, bcs_sw, gcol, flux, igpt, major_gpt2bnd, nlev) # Transport
+                n_gpt > 1 && add_to_flux!(flux_sw, flux, gcol)
+            end
+        end
+    end
+    return nothing
+end
+#--------------------------------------------------------------------------------------------------
+function rte_sw_2stream_solve_CUDA!(
+    flux::FluxSW{FT},
+    flux_sw::FluxSW{FT},
+    op::TwoStream{FT},
+    bcs_sw::SwBCs{FT},
+    src_sw::SourceSW2Str{FT},
+    nlay,
+    ncol,
+    major_gpt2bnd::AbstractArray{UInt8,1},
+    solar_src_scaled::AbstractArray{FT,1},
+    as::AbstractAtmosphericState{FT},
+    lkp_args...,
+) where {FT<:AbstractFloat}
+    gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
+    nlev = nlay + 1
+    n_gpt = length(major_gpt2bnd)
+    if gcol ≤ ncol
+        for igpt in 1:n_gpt
             igpt == 1 && set_flux_to_zero!(flux_sw, gcol)
+            compute_optical_props!(op, as, gcol, igpt, lkp_args...)
             sw_two_stream!(op, src_sw, bcs_sw, gcol, nlay) # Cell properties: transmittance and reflectance for direct and diffuse radiation
             sw_source_2str!(
                 src_sw,
@@ -489,40 +556,6 @@ function rte_sw_2stream_solve!(
             adding_sw!(src_sw, bcs_sw, gcol, flux, igpt, major_gpt2bnd, nlev) # Transport
             n_gpt > 1 && add_to_flux!(flux_sw, flux, gcol)
         end
-    end
-    return nothing
-end
-#--------------------------------------------------------------------------------------------------
-function rte_sw_2stream_solve_CUDA!(
-    flux::FluxSW{FT},
-    flux_sw::FluxSW{FT},
-    op::TwoStream{FT},
-    bcs_sw::SwBCs{FT},
-    src_sw::SourceSW2Str{FT},
-    nlay,
-    ncol,
-    igpt,
-    major_gpt2bnd::AbstractArray{UInt8,1},
-    solar_src_scaled::AbstractArray{FT,1},
-) where {FT<:AbstractFloat}
-    gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
-    nlev = nlay + 1
-    n_gpt = length(major_gpt2bnd)
-    if gcol ≤ ncol
-        igpt == 1 && set_flux_to_zero!(flux_sw, gcol)
-        sw_two_stream!(op, src_sw, bcs_sw, gcol, nlay) # Cell properties: transmittance and reflectance for direct and diffuse radiation
-        sw_source_2str!(
-            src_sw,
-            bcs_sw,
-            gcol,
-            flux,
-            igpt,
-            solar_src_scaled,
-            major_gpt2bnd,
-            nlay,
-        ) # Direct-beam and source for diffuse radiation
-        adding_sw!(src_sw, bcs_sw, gcol, flux, igpt, major_gpt2bnd, nlev) # Transport
-        n_gpt > 1 && add_to_flux!(flux_sw, flux, gcol)
     end
     return nothing
 end

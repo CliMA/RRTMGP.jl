@@ -161,6 +161,7 @@ end
         op::AbstractOpticalProps{FT},
         as::AtmosphericState{FT},
         sf::AbstractSourceLW{FT},
+        gcol::I,
         igpt::I,
         lkp::LookUpLW{I,FT},
         lkp_cld::Union{LookUpCld,Nothing} = nothing,
@@ -172,37 +173,23 @@ function compute_optical_props!(
     op::AbstractOpticalProps{FT},
     as::AtmosphericState{FT},
     sf::AbstractSourceLW{FT},
+    gcol::I,
     igpt::I,
     lkp::LookUpLW{I,FT},
     lkp_cld::Union{LookUpCld,Nothing} = nothing,
 ) where {I<:Int,FT<:AbstractFloat}
-    (; nlay, ncol) = as
+    nlay = as.nlay
     lkp_args = (lkp_cld === nothing) ? (lkp,) : (lkp, lkp_cld)
-    device = array_device(op.τ)
-    if device === CUDADevice()
-        max_threads = 256
-        tx = min(nlay * ncol, max_threads)
-        bx = cld(nlay * ncol, tx)
-        @cuda threads = (tx) blocks = (bx) compute_optical_props_CUDA!(
+    for ilay in 1:nlay
+        glaycol = (ilay, gcol)
+        compute_optical_props_kernel!(
             op,
             as,
+            glaycol,
             sf,
             igpt,
             lkp_args...,
         )
-    else # using Julia native multithreading
-        Threads.@threads for icnt = 1:(ncol*nlay)
-            glaycol =
-                ((icnt % nlay == 0) ? nlay : (icnt % nlay), cld(icnt, nlay))
-            compute_optical_props_kernel!(
-                op,
-                as,
-                glaycol,
-                sf,
-                igpt,
-                lkp_args...,
-            )
-        end
     end
     return nothing
 end
@@ -211,6 +198,7 @@ end
     compute_optical_props!(
         op::AbstractOpticalProps{FT},
         as::AtmosphericState{FT},
+        gcol::I,
         igpt::I,
         lkp::LookUpSW{I,FT},
         lkp_cld::Union{LookUpCld,Nothing} = nothing,
@@ -221,32 +209,17 @@ Computes optical properties for the shortwave problem.
 function compute_optical_props!(
     op::AbstractOpticalProps{FT},
     as::AtmosphericState{FT},
+    gcol::I,
     igpt::I,
     lkp::LookUpSW{I,FT},
     lkp_cld::Union{LookUpCld,Nothing} = nothing,
 ) where {I<:Int,FT<:AbstractFloat}
-    (; nlay, ncol) = as
+    nlay = as.nlay
     lkp_args = (lkp_cld === nothing) ? (lkp,) : (lkp, lkp_cld)
-    device = array_device(op.τ)
-    if device === CUDADevice()
-        max_threads = 256
-        tx = min(nlay * ncol, max_threads)
-        bx = cld(nlay * ncol, tx)
-        @cuda threads = (tx) blocks = (bx) compute_optical_props_CUDA!(
-            op,
-            as,
-            igpt,
-            lkp_args...,
-        )
-    else
-        #-----using Julia native multithreading
-        Threads.@threads for icnt = 1:(ncol*nlay)
-            glaycol =
-                ((icnt % nlay == 0) ? nlay : (icnt % nlay), cld(icnt, nlay))
-            compute_optical_props_kernel!(op, as, glaycol, igpt, lkp_args...)
-        end
+    for ilay in 1:nlay
+        glaycol = (ilay, gcol)
+        compute_optical_props_kernel!(op, as, glaycol, igpt, lkp_args...)
     end
-
     return nothing
 end
 #-----------------------------------------------------------------------------
@@ -255,7 +228,8 @@ end
         op::AbstractOpticalProps{FT},
         as::GrayAtmosphericState{FT},
         sf::AbstractSourceLW{FT},
-        igpt::Int = 1,
+        gcol::I,
+        igpt::I = 1,
     ) where {FT<:AbstractFloat}
 
 Computes optical properties for the longwave gray radiation problem.
@@ -264,28 +238,14 @@ function compute_optical_props!(
     op::AbstractOpticalProps{FT},
     as::GrayAtmosphericState{FT},
     sf::AbstractSourceLW{FT},
-    igpt::Int = 1,
-) where {FT<:AbstractFloat}
-    (; nlay, ncol) = as
-    nlev = nlay + 1
-    device = array_device(op.τ)
-    if device === CUDADevice()
-        max_threads = 256
-        tx = min(nlay * ncol, max_threads)
-        bx = cld(nlay * ncol, tx)
-        @cuda threads = (tx) blocks = (bx) compute_optical_props_CUDA!(
-            op,
-            as,
-            sf,
-        )
-    else #-----using Julia native multithreading
-        Threads.@threads for icnt = 1:(ncol*nlay)
-            glaycol =
-                ((icnt % nlay == 0) ? nlay : (icnt % nlay), cld(icnt, nlay))
-            compute_optical_props_kernel!(op, as, glaycol, sf)
-        end
+    gcol::I,
+    igpt::I = 1,
+) where {FT<:AbstractFloat,I<:Int}
+    nlay = as.nlay
+    for ilay in 1:nlay
+        glaycol = (ilay, gcol)
+        compute_optical_props_kernel!(op, as, glaycol, sf)
     end
-    #----------------------------------
     return nothing
 end
 
@@ -293,7 +253,8 @@ end
     compute_optical_props!(
         op::AbstractOpticalProps{FT},
         as::GrayAtmosphericState{FT},
-        igpt::Int = 1,
+        gcol::I,
+        igpt::I = 1,
     ) where {FT<:AbstractFloat}
 
 Computes optical properties for the shortwave gray radiation problem.
@@ -301,24 +262,14 @@ Computes optical properties for the shortwave gray radiation problem.
 function compute_optical_props!(
     op::AbstractOpticalProps{FT},
     as::GrayAtmosphericState{FT},
-    igpt::Int = 1,
-) where {FT<:AbstractFloat}
-    (; nlay, ncol) = as
-    nlev = nlay + 1
-    device = array_device(op.τ)
-    if device === CUDADevice()
-        max_threads = 256
-        tx = min(nlay * ncol, max_threads)
-        bx = cld(nlay * ncol, tx)
-        @cuda threads = (tx) blocks = (bx) compute_optical_props_CUDA!(op, as)
-    else #-----using Julia native multithreading
-        Threads.@threads for icnt = 1:(ncol*nlay)
-            glaycol =
-                ((icnt % nlay == 0) ? nlay : (icnt % nlay), cld(icnt, nlay))
-            compute_optical_props_kernel!(op, as, glaycol)
-        end
+    gcol::I,
+    igpt::I = 1,
+) where {FT<:AbstractFloat,I<:Int}
+    nlay = as.nlay
+    for ilay in 1:nlay
+        glaycol = (ilay, gcol)
+        compute_optical_props_kernel!(op, as, glaycol)
     end
-    #----------------------------------
     return nothing
 end
 
