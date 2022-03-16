@@ -139,8 +139,10 @@ function clear_sky(
         flux_lw,
         flux_sw,
     )
-    solve_lw!(slv, max_threads, lookup_lw)
-    solve_sw!(slv, max_threads, lookup_sw)
+    println("calling longwave solver; ncol = $ncol")
+    @time solve_lw!(slv, max_threads, lookup_lw)
+    println("calling shortwave solver; ncol = $ncol")
+    @time solve_sw!(slv, max_threads, lookup_sw)
     # comparing longwave fluxes with data from RRTMGP FORTRAN code
     flip_ind = nlev:-1:1
 
@@ -200,5 +202,6 @@ function clear_sky(
     @test max_err_flux_up_sw ≤ toler_sw
     @test max_err_flux_dn_sw ≤ toler_sw
 end
-
+println("running clear sky 2 stream solver")
 @time clear_sky(TwoStream, SourceLW2Str, VmrGM, Float64, Int, array_type())
+println("*********************************************")
