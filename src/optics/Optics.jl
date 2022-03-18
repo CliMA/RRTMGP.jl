@@ -2,7 +2,7 @@ module Optics
 
 using DocStringExtensions
 using CUDA
-using ..Device: array_type, array_device, CPU, CUDADevice
+using ..Device: array_device, CPU, CUDADevice
 using Adapt
 #---------------------------------------
 using ..Vmrs

@@ -1,8 +1,6 @@
 module Device
 using CUDA
 
-export array_type, array_device, CPU, CUDADevice
-
 struct CPU end
 struct CUDADevice end
 
