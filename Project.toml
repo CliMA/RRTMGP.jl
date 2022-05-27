@@ -1,7 +1,7 @@
 name = "RRTMGP"
 uuid = "a01a1ee8-cea4-48fc-987c-fc7878d79da1"
 authors = ["Climate Modeling Alliance"]
-version = "0.3.1"
+version = "0.3.2"
 
 [deps]
 Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
@@ -19,7 +19,7 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [compat]
 Adapt = "3.3"
-CLIMAParameters = "0.1, 0.2, 0.3, 0.4"
+CLIMAParameters = "0.1, 0.2, 0.3, 0.4, 0.5, 0.6"
 CUDA = "3.8"
 Compat = "3.42"
 Coverage = "1.4"
