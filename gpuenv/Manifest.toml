@@ -321,8 +321,8 @@ deps = ["InteractiveUtils", "Markdown", "Sockets", "Unicode"]
 uuid = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
 
 [[deps.RRTMGP]]
-deps = ["Adapt", "CLIMAParameters", "CUDA", "Compat", "Coverage", "DocStringExtensions", "GaussQuadrature", "NCDatasets", "Pkg", "Profile", "StaticArrays", "Test"]
-git-tree-sha1 = "e4a0e82f4ba27864a0d1bca3cf816cb5a5c74d2d"
+deps = ["Adapt", "CLIMAParameters", "CUDA", "DocStringExtensions", "GaussQuadrature", "NCDatasets", "StaticArrays"]
+path = ".."
 uuid = "a01a1ee8-cea4-48fc-987c-fc7878d79da1"
 version = "0.3.2"
 
