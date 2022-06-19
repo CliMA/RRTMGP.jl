@@ -15,13 +15,11 @@ using RRTMGP.AngularDiscretizations
 using RRTMGP.RTE
 using RRTMGP.RTESolver
 
-using CLIMAParameters
-struct EarthParameterSet <: AbstractEarthParameterSet end
-const param_set = EarthParameterSet()
+import CLIMAParameters as CP
+include(joinpath(pkgdir(RRTMGP), "parameters", "create_parameters.jl"))
 # overriding some parameters to match with RRTMGP FORTRAN code
-CLIMAParameters.Planet.grav(::EarthParameterSet) = 9.80665
-CLIMAParameters.Planet.molmass_dryair(::EarthParameterSet) = 0.028964
-CLIMAParameters.Planet.molmass_water(::EarthParameterSet) = 0.018016
+overrides = (; grav = 9.80665, molmass_dryair = 0.028964, molmass_water = 0.018016)
+param_set = create_insolation_parameters(FT, overrides)
 
 include("reference_files.jl")
 include("read_rfmip_clear_sky.jl")

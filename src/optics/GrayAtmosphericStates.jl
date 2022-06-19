@@ -48,7 +48,7 @@ function setup_gray_as_pr_grid(
     lat::FTA1D,
     p0::FT,
     pe::FT,
-    param_set::AbstractEarthParameterSet,
+    param_set::RP.ARP,
     ::Type{DA},
     step = "linear",
 ) where {FT <: AbstractFloat, FTA1D <: AbstractArray{FT, 1}, DA}
@@ -67,8 +67,8 @@ function setup_gray_as_pr_grid(
     tt = FT(200)                   # skin temp at top of atmosphere (K)
     Δt = FT(60)
     α = FT(3.5)                   # lapse rate of radiative equillibrium
-    r_d = FT(R_d(param_set))
-    grav_ = FT((grav(param_set)))
+    r_d = RP.R_d(param_set)
+    grav_ = RP.grav(param_set)
     args = (p_lev, p_lay, t_lev, t_lay, z_lev, t_sfc, lat, d0, efac, p0, pe, Δp, te, tt, Δt, α, r_d, grav_, nlay)
     device = array_device(p_lev)
     if device === CUDADevice()
@@ -115,7 +115,7 @@ function setup_gray_as_alt_grid(
     zend::FT,
     ncls::Int,
     poly_order::Int,
-    param_set::AbstractEarthParameterSet,
+    param_set::RP.ARP,
     ::Type{DA},
 ) where {FT <: AbstractFloat, FTA1D <: AbstractArray{FT, 1}, DA}
     ncol = length(lat)
@@ -160,7 +160,7 @@ function setup_gray_as_alt_grid(
         t_lev[1, icol] = tt * (1 + d0[icol] * (p_lev[icol, 1] / p0)^α)^FT(0.25)
 
         for ilay in 1:nlay
-            H = FT(R_d(param_set)) * t_lev[ilay, icol] / FT(grav(param_set))
+            H = RP.R_d(param_set) * t_lev[ilay, icol] / RP.grav(param_set)
             Δz_lay = abs(z_lev[ilay + 1, icol] - z_lev[ilay, icol])
             p_lev[ilay + 1, icol] = p_lev[ilay, icol] * exp(-Δz_lay / H)
             t_lev[ilay + 1, icol] = tt * (1 + d0[icol] * (p_lev[ilay + 1, icol] / p0)^α)^FT(0.25)

@@ -5,13 +5,13 @@ using ..Device: array_type, array_device, CUDADevice, CPU
 using ..AtmosphericStates
 using ..Fluxes
 
-using CLIMAParameters
-using CLIMAParameters.Planet: grav, cp_d
+import ..Parameters as RP
 
 export update_profile_lw!, compute_gray_heating_rate!
 
 """
     update_profile_lw!(
+        param_set,
         t_lay,
         t_lev,
         flux_dn,
@@ -29,6 +29,7 @@ export update_profile_lw!, compute_gray_heating_rate!
 Updates t_lay and t_lev based on heating rate.
 """
 function update_profile_lw!(
+    param_set,
     t_lay,
     t_lev,
     flux_dn,
@@ -49,25 +50,26 @@ function update_profile_lw!(
         max_threads = 256
         tx = min(ncol, max_threads)
         bx = cld(ncol, tx)
-        @cuda threads = (tx) blocks = (bx) update_profile_lw_CUDA!(ncol, args...)
+        @cuda threads = (tx) blocks = (bx) update_profile_lw_CUDA!(param_set, ncol, args...)
     else
         # using julia native multithreading
         Threads.@threads for gcol in 1:ncol
-            update_profile_lw_kernel!(args..., gcol)
+            update_profile_lw_kernel!(param_set, args..., gcol)
         end
     end
     #----------------------------------------
 end
 
-function update_profile_lw_CUDA!(ncol, args...)
+function update_profile_lw_CUDA!(param_set::RP.ARP, ncol, args...)
     gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
     if gcol ≤ ncol
-        update_profile_lw_kernel!(args..., gcol)
+        update_profile_lw_kernel!(param_set, args..., gcol)
     end
     return nothing
 end
 
 function update_profile_lw_kernel!(
+    param_set::RP.ARP,
     t_lay,
     t_lev,
     hr_lay,
@@ -97,7 +99,7 @@ function update_profile_lw_kernel!(
 
     @inbounds t_lev[nlay + 1, gcol] = FT(2) * t_lay[nlay, gcol] - t_lev[nlay, gcol]
     #-----------------------------------------------------------------------
-    sbc = FT(Stefan())
+    sbc = FT(RP.Stefan(param_set))
     for glev in 1:nlev
         @inbounds T_ex_lev[glev, gcol] = ((flux_dn[glev, gcol] + (flux_net[glev, gcol] / FT(2))) / sbc)^FT(0.25)
     end
@@ -122,8 +124,8 @@ end
 Computes the heating rate for the gray radiation simulation.
 """
 function compute_gray_heating_rate!(hr_lay, p_lev, ncol, nlay, flux_net, param_set, ::Type{FT}) where {FT}
-    cp_d_ = FT(cp_d(param_set))
-    grav_ = FT(grav(param_set))
+    cp_d_ = FT(RP.cp_d(param_set))
+    grav_ = FT(RP.grav(param_set))
     args = (hr_lay, flux_net, p_lev, grav_, cp_d_, nlay)
     device = array_device(p_lev)
     if device === CUDADevice()
