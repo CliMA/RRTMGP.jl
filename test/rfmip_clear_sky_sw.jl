@@ -32,28 +32,16 @@ function sw_rfmip(
     ::Type{FT},
     ::Type{I},
     ::Type{DA},
-) where {FT<:AbstractFloat,I<:Int,DA,OPC,SRC,VMR}
+) where {FT <: AbstractFloat, I <: Int, DA, OPC, SRC, VMR}
     opc = Symbol(OPC)
     sw_file = get_ref_filename(:lookup_tables, :clearsky, λ = :sw) # sw lookup tables
     sw_input_file = get_ref_filename(:atmos_state, :clearsky)      # clear-sky atmos state
     # reference data files for comparison
-    flux_up_file = get_ref_filename(
-        :comparison,
-        :clearsky,
-        λ = :sw,
-        flux_up_dn = :flux_up,
-        opc = :TwoStream,
-    )
-    flux_dn_file = get_ref_filename(
-        :comparison,
-        :clearsky,
-        λ = :sw,
-        flux_up_dn = :flux_dn,
-        opc = :TwoStream,
-    )
+    flux_up_file = get_ref_filename(:comparison, :clearsky, λ = :sw, flux_up_dn = :flux_up, opc = :TwoStream)
+    flux_dn_file = get_ref_filename(:comparison, :clearsky, λ = :sw, flux_up_dn = :flux_dn, opc = :TwoStream)
 
-    FTA1D = DA{FT,1}
-    FTA2D = DA{FT,2}
+    FTA1D = DA{FT, 1}
+    FTA2D = DA{FT, 2}
     max_threads = Int(256)
     exp_no = 1
 
@@ -64,16 +52,8 @@ function sw_rfmip(
     # reading rfmip data to atmospheric state
     ds_sw_in = Dataset(sw_input_file, "r")
 
-    (as, _, sfc_alb_direct, zenith, toa_flux, usecol) = setup_rfmip_as(
-        ds_sw_in,
-        idx_gases,
-        exp_no,
-        lookup_sw,
-        FT,
-        DA,
-        VMR,
-        max_threads,
-    )
+    (as, _, sfc_alb_direct, zenith, toa_flux, usecol) =
+        setup_rfmip_as(ds_sw_in, idx_gases, exp_no, lookup_sw, FT, DA, VMR, max_threads)
     close(ds_sw_in)
 
     ncol, nlay, ngpt = as.ncol, as.nlay, lookup_sw.n_gpt
@@ -85,33 +65,16 @@ function sw_rfmip(
     # setting up boundary conditions
     inc_flux_diffuse = nothing
     sfc_alb_diffuse = FTA2D(deepcopy(sfc_alb_direct))
-    bcs_sw = SwBCs{FT,FTA1D,Nothing,FTA2D}(
-        zenith,
-        toa_flux,
-        sfc_alb_direct,
-        inc_flux_diffuse,
-        sfc_alb_diffuse,
-    )
+    bcs_sw = SwBCs{FT, FTA1D, Nothing, FTA2D}(zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse)
     fluxb_sw = FluxSW(ncol, nlay, FT, DA) # flux storage for bandwise calculations
     flux_sw = FluxSW(ncol, nlay, FT, DA)  # shortwave fluxes for band calculations
 
     # initializing RTE solver
-    slv = Solver(
-        as,
-        op,
-        nothing,
-        src_sw,
-        nothing,
-        bcs_sw,
-        nothing,
-        fluxb_sw,
-        nothing,
-        flux_sw,
-    )
+    slv = Solver(as, op, nothing, src_sw, nothing, bcs_sw, nothing, fluxb_sw, nothing, flux_sw)
     #--------------------------------------------------
     solve_sw!(slv, max_threads, lookup_sw)
 
-    for i = 1:10
+    for i in 1:10
         @time solve_sw!(slv, max_threads, lookup_sw)
     end
 
@@ -129,7 +92,7 @@ function sw_rfmip(
     flux_up = Array(slv.flux_sw.flux_up)
     flux_dn = Array(slv.flux_sw.flux_dn)
 
-    for i = 1:ncol
+    for i in 1:ncol
         if usecol[i] == 0
             flux_up[:, i] .= FT(0)
             flux_dn[:, i] .= FT(0)

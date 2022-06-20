@@ -14,16 +14,16 @@
 This function computes the column amounts of dry or moist air.
 """
 function compute_col_dry_kernel!(
-    col_dry::AbstractArray{FT,2},
-    p_lev::AbstractArray{FT,2},
+    col_dry::AbstractArray{FT, 2},
+    p_lev::AbstractArray{FT, 2},
     mol_m_dry::FT,
     mol_m_h2o::FT,
     avogadro::FT,
     helmert1::FT,
-    vmr_h2o::Union{AbstractArray{FT,2},Nothing},
-    lat::Union{AbstractArray{FT,1},Nothing},
-    glaycol::Tuple{Int,Int},
-) where {FT<:AbstractFloat}
+    vmr_h2o::Union{AbstractArray{FT, 2}, Nothing},
+    lat::Union{AbstractArray{FT, 1}, Nothing},
+    glaycol::Tuple{Int, Int},
+) where {FT <: AbstractFloat}
     glay, gcol = glaycol[1], glaycol[2]  # global col & lay ids
     helmert2 = FT(0.02586)  # second constant of Helmert formula
     m2_to_cm2 = FT(100 * 100) # m^2 to cm^2
@@ -32,7 +32,7 @@ function compute_col_dry_kernel!(
     else
         g0 = helmert1
     end
-    Δp = p_lev[glay, gcol] - p_lev[glay+1, gcol]
+    Δp = p_lev[glay, gcol] - p_lev[glay + 1, gcol]
     if vmr_h2o isa AbstractArray
         fact = FT(1) / (FT(1) + vmr_h2o[glay, gcol])
         # Get average mass of moist air per mole of moist air
@@ -57,18 +57,17 @@ end
 compute interpolation fractions for binary species parameter, pressure and temperature.
 """
 @inline function compute_interp_fractions(
-    lkp::AbstractLookUp{I,FT},
+    lkp::AbstractLookUp{I, FT},
     vmr,
     p_lay,
     t_lay,
     tropo,
     ibnd,
     glaycol,
-) where {I<:Int,FT<:AbstractFloat}
+) where {I <: Int, FT <: AbstractFloat}
     jftemp = compute_interp_frac_temp(lkp, t_lay, glaycol...)
     jfpress = compute_interp_frac_press(lkp, p_lay, tropo, glaycol...)
-    jfη, col_mix =
-        compute_interp_frac_η(lkp, vmr, tropo, jftemp[1], ibnd, glaycol...)
+    jfη, col_mix = compute_interp_frac_η(lkp, vmr, tropo, jftemp[1], ibnd, glaycol...)
     return (jftemp, jfpress, jfη, col_mix)
 end
 
@@ -83,11 +82,11 @@ end
 compute interpolation fraction for temperature.
 """
 @inline function compute_interp_frac_temp(
-    lkp::AbstractLookUp{I,FT},
+    lkp::AbstractLookUp{I, FT},
     t_lay,
     glay,
     gcol,
-) where {I<:Int,FT<:AbstractFloat}
+) where {I <: Int, FT <: AbstractFloat}
     (; Δ_t_ref, n_t_ref, t_ref) = lkp
 
     @inbounds jtemp = loc_lower(t_lay, Δ_t_ref, n_t_ref, t_ref)
@@ -107,23 +106,12 @@ end
 
 Compute interpolation fraction for pressure.
 """
-@inline function compute_interp_frac_press(
-    lkp::AbstractLookUp,
-    p_lay,
-    tropo,
-    glay,
-    gcol,
-)
+@inline function compute_interp_frac_press(lkp::AbstractLookUp, p_lay, tropo, glay, gcol)
     (; Δ_ln_p_ref, p_ref, n_p_ref) = lkp
 
-    @inbounds jpress = Int(
-        min(
-            max(fld(log(p_ref[1]) - log(p_lay), Δ_ln_p_ref) + 1, 1),
-            n_p_ref - 1,
-        ) + 1,
-    )
+    @inbounds jpress = Int(min(max(fld(log(p_ref[1]) - log(p_lay), Δ_ln_p_ref) + 1, 1), n_p_ref - 1) + 1)
 
-    @inbounds fpress = (log(p_ref[jpress-1]) - log(p_lay)) / Δ_ln_p_ref
+    @inbounds fpress = (log(p_ref[jpress - 1]) - log(p_lay)) / Δ_ln_p_ref
     jpress = jpress + tropo - 1
 
     return (jpress, fpress)
@@ -143,14 +131,14 @@ end
 Compute interpolation fraction for binary species parameter.
 """
 @inline function compute_interp_frac_η(
-    lkp::AbstractLookUp{I,FT},
+    lkp::AbstractLookUp{I, FT},
     vmr,
     tropo,
     jtemp,
     ibnd,
     glay,
     gcol,
-) where {FT<:AbstractFloat,I<:Int}
+) where {FT <: AbstractFloat, I <: Int}
     (; n_η, key_species, vmr_ref) = lkp
     ig = view(key_species, :, tropo, ibnd)
 
@@ -158,9 +146,7 @@ Compute interpolation fraction for binary species parameter.
     vmr2 = get_vmr(vmr, ig[2], glay, gcol)
 
     itemp = 1
-    @inbounds η_half =
-        vmr_ref[tropo, ig[1]+1, jtemp+itemp-1] /
-        vmr_ref[tropo, ig[2]+1, jtemp+itemp-1]
+    @inbounds η_half = vmr_ref[tropo, ig[1] + 1, jtemp + itemp - 1] / vmr_ref[tropo, ig[2] + 1, jtemp + itemp - 1]
     col_mix1 = vmr1 + η_half * vmr2
     η = col_mix1 ≥ eps(FT) * 2 ? vmr1 / col_mix1 : FT(0.5)
     loc_η = FT(η * (n_η - 1))
@@ -170,9 +156,7 @@ Compute interpolation fraction for binary species parameter.
     fη1 = loc_η - fld(loc_η, FT(1))
 
     itemp = 2
-    @inbounds η_half =
-        vmr_ref[tropo, ig[1]+1, jtemp+itemp-1] /
-        vmr_ref[tropo, ig[2]+1, jtemp+itemp-1]
+    @inbounds η_half = vmr_ref[tropo, ig[1] + 1, jtemp + itemp - 1] / vmr_ref[tropo, ig[2] + 1, jtemp + itemp - 1]
     col_mix2 = vmr1 + η_half * vmr2
     η = col_mix2 ≥ eps(FT) * 2 ? vmr1 / col_mix2 : FT(0.5)
     loc_η = FT(η * (n_η - 1))
@@ -201,7 +185,7 @@ Compute optical thickness, single scattering albedo, asymmetry parameter
 and longwave sources whenever applicable.
 """
 @inline function compute_τ_ssa_lw_src!(
-    lkp::AbstractLookUp{I,FT},
+    lkp::AbstractLookUp{I, FT},
     vmr,
     col_dry,
     igpt,
@@ -210,61 +194,28 @@ and longwave sources whenever applicable.
     t_lay,
     glaycol,
     src_args...,
-) where {FT<:AbstractFloat,I<:Int}
+) where {FT <: AbstractFloat, I <: Int}
     # upper/lower troposphere
     tropo = p_lay > lkp.p_ref_tropo ? 1 : 2
     # volume mixing ration of h2o
     vmr_h2o = get_vmr(vmr, lkp.idx_h2o, glaycol...)
 
-    jftemp, jfpress, jfη, col_mix =
-        compute_interp_fractions(lkp, vmr, p_lay, t_lay, tropo, ibnd, glaycol)
+    jftemp, jfpress, jfη, col_mix = compute_interp_fractions(lkp, vmr, p_lay, t_lay, tropo, ibnd, glaycol)
 
     # computing τ_major
-    τ_major =
-        interp3d(jfη..., jftemp..., jfpress..., lkp.kmajor, igpt, col_mix...) *
-        col_dry
+    τ_major = interp3d(jfη..., jftemp..., jfpress..., lkp.kmajor, igpt, col_mix...) * col_dry
     # computing τ_minor
-    τ_minor = compute_τ_minor(
-        lkp,
-        tropo,
-        vmr,
-        vmr_h2o,
-        col_dry,
-        p_lay,
-        t_lay,
-        jftemp...,
-        jfη...,
-        igpt,
-        ibnd,
-        glaycol...,
-    )
+    τ_minor =
+        compute_τ_minor(lkp, tropo, vmr, vmr_h2o, col_dry, p_lay, t_lay, jftemp..., jfη..., igpt, ibnd, glaycol...)
     # compute τ_Rayleigh
-    τ_ray = compute_τ_rayleigh(
-        lkp,
-        tropo,
-        col_dry,
-        vmr_h2o,
-        jftemp...,
-        jfη...,
-        igpt,
-    )
+    τ_ray = compute_τ_rayleigh(lkp, tropo, col_dry, vmr_h2o, jftemp..., jfη..., igpt)
     τ = τ_major + τ_minor + τ_ray
     ssa = FT(0)
     if τ > 2 * eps(FT) # single scattering albedo
         ssa = τ_ray / τ
     end
     # computing Planck sources for longwave problem
-    compute_lw_planck_src!(
-        lkp,
-        jfη...,
-        jfpress...,
-        jftemp...,
-        t_lay,
-        igpt,
-        ibnd,
-        glaycol...,
-        src_args...,
-    )
+    compute_lw_planck_src!(lkp, jfη..., jfpress..., jftemp..., t_lay, igpt, ibnd, glaycol..., src_args...)
     return (τ, ssa)
 end
 
@@ -309,7 +260,7 @@ Compute optical thickness contributions from minor gases.
     ibnd,
     glay,
     gcol,
-) where {FT<:AbstractFloat,I<:Int}
+) where {FT <: AbstractFloat, I <: Int}
 
     if tropo == 1 # in lower atmosphere
         minor_bnd_st = lkp.minor_lower_bnd_st
@@ -335,7 +286,7 @@ Compute optical thickness contributions from minor gases.
 
     @inbounds loc_in_bnd = igpt - (lkp.bnd_lims_gpt[1, ibnd] - 1)
 
-    @inbounds for i = minor_bnd_st[ibnd]:minor_bnd_st[ibnd+1]-1
+    @inbounds for i in minor_bnd_st[ibnd]:(minor_bnd_st[ibnd + 1] - 1)
         vmr_imnr = get_vmr(vmr, idx_gases_minor[i], glay, gcol)
         if vmr_imnr > eps(FT) * 2
             scaling = vmr_imnr * col_dry
@@ -345,17 +296,14 @@ Compute optical thickness contributions from minor gases.
                 sgas = idx_scaling_gas[i]
                 if sgas > 0
                     if scale_by_complement[i] == 1
-                        scaling *=
-                            (FT(1) - get_vmr(vmr, sgas, glay, gcol) * dry_fact)
+                        scaling *= (FT(1) - get_vmr(vmr, sgas, glay, gcol) * dry_fact)
                     else
                         scaling *= get_vmr(vmr, sgas, glay, gcol) * dry_fact
                     end
                 end
             end
             k_loc = minor_gpt_sh[i] + loc_in_bnd
-            τ_minor +=
-                interp2d(fη1, fη2, ftemp, kminor, k_loc, jη1, jη2, jtemp) *
-                scaling
+            τ_minor += interp2d(fη1, fη2, ftemp, kminor, k_loc, jη1, jη2, jtemp) * scaling
         end
     end
 
@@ -391,26 +339,17 @@ Compute Rayleigh scattering optical depths for shortwave problem
     fη1::FT,
     fη2::FT,
     igpt::I,
-) where {FT<:AbstractFloat,I<:Int}
+) where {FT <: AbstractFloat, I <: Int}
     if tropo == 1
-        τ_ray =
-            interp2d(fη1, fη2, ftemp, lkp.rayl_lower, igpt, jη1, jη2, jtemp) *
-            (vmr_h2o + FT(1)) *
-            col_dry
+        τ_ray = interp2d(fη1, fη2, ftemp, lkp.rayl_lower, igpt, jη1, jη2, jtemp) * (vmr_h2o + FT(1)) * col_dry
     else
-        τ_ray =
-            interp2d(fη1, fη2, ftemp, lkp.rayl_upper, igpt, jη1, jη2, jtemp) *
-            (vmr_h2o + FT(1)) *
-            col_dry
+        τ_ray = interp2d(fη1, fη2, ftemp, lkp.rayl_upper, igpt, jη1, jη2, jtemp) * (vmr_h2o + FT(1)) * col_dry
     end
 
     return τ_ray
 end
 
-@inline function compute_τ_rayleigh(
-    lkp::LookUpLW{I,FT},
-    args...,
-) where {FT<:AbstractFloat,I<:Int}
+@inline function compute_τ_rayleigh(lkp::LookUpLW{I, FT}, args...) where {FT <: AbstractFloat, I <: Int}
     return FT(0)
 end
 
@@ -460,28 +399,15 @@ Computes Planck sources for the longwave problem.
     (; planck_fraction, t_planck, n_t_plnk, totplnk) = lkp
     (; lay_source, lev_source_inc, lev_source_dec, sfc_source) = sf
     # compute Planck fraction
-    p_frac = interp3d(
-        jη1,
-        jη2,
-        fη1,
-        fη2,
-        jtemp,
-        ftemp,
-        jpresst,
-        fpress,
-        planck_fraction,
-        igpt,
-    )
+    p_frac = interp3d(jη1, jη2, fη1, fη2, jtemp, ftemp, jpresst, fpress, planck_fraction, igpt)
 
     planck_args = (t_planck, totplnk, ibnd)
     # computing lay_source
     @inbounds lay_source[glay, gcol] = interp1d(t_lay, planck_args...) * p_frac
     # computing lev_source_inc
-    @inbounds lev_source_inc[glay, gcol] =
-        interp1d(t_lev[glay+1, gcol], planck_args...) * p_frac
+    @inbounds lev_source_inc[glay, gcol] = interp1d(t_lev[glay + 1, gcol], planck_args...) * p_frac
     # computing lev_source_dec
-    @inbounds lev_source_dec[glay, gcol] =
-        interp1d(t_lev[glay, gcol], planck_args...) * p_frac
+    @inbounds lev_source_dec[glay, gcol] = interp1d(t_lev[glay, gcol], planck_args...) * p_frac
     if glay == 1 # computing sfc_source
         @inbounds sfc_source[gcol] = interp1d(t_sfc, planck_args...) * p_frac
     end

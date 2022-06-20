@@ -31,7 +31,7 @@ function gray_atmos_lw_equil(
     ::Type{I},
     ::Type{DA},
     ncol::Int,
-) where {FT<:AbstractFloat,I<:Int,DA,OPC}
+) where {FT <: AbstractFloat, I <: Int, DA, OPC}
     opc = Symbol(OPC)
     nlay = 60                               # number of layers
     p0 = FT(100000)                         # surface pressure (Pa)
@@ -60,22 +60,11 @@ function gray_atmos_lw_equil(
     as = setup_gray_as_pr_grid(nlay, lat, p0, pe, param_set, DA)
     op = OPC(FT, ncol, nlay, DA)
     src_lw = source_func_longwave(FT, ncol, nlay, opc, DA)
-    bcs_lw = LwBCs(DA{FT,2}(sfc_emis), inc_flux)
+    bcs_lw = LwBCs(DA{FT, 2}(sfc_emis), inc_flux)
     fluxb_lw = nothing
     flux_lw = FluxLW(ncol, nlay, FT, DA)
 
-    slv = Solver(
-        as,
-        op,
-        src_lw,
-        nothing,
-        bcs_lw,
-        nothing,
-        fluxb_lw,
-        nothing,
-        flux_lw,
-        nothing,
-    )
+    slv = Solver(as, op, src_lw, nothing, bcs_lw, nothing, fluxb_lw, nothing, flux_lw, nothing)
 
     flux = slv.flux_lw
     flux_up = slv.flux_lw.flux_up
@@ -93,34 +82,13 @@ function gray_atmos_lw_equil(
     T_ex_lev = DA{FT}(undef, nlev, ncol)
     flux_grad = DA{FT}(undef, nlay, ncol)
     flux_grad_err = FT(0)
-    for i = 1:nsteps
+    for i in 1:nsteps
         # calling the long wave gray radiation solver
         solve_lw!(slv, max_threads)
         # computing heating rate
-        compute_gray_heating_rate!(
-            hr_lay,
-            p_lev,
-            ncol,
-            nlay,
-            flux_net,
-            param_set,
-            FT,
-        )
+        compute_gray_heating_rate!(hr_lay, p_lev, ncol, nlay, flux_net, param_set, FT)
         # updating t_lay and t_lev based on heating rate
-        update_profile_lw!(
-            t_lay,
-            t_lev,
-            flux_dn,
-            flux_net,
-            hr_lay,
-            flux_grad,
-            T_ex_lev,
-            Δt,
-            nlay,
-            nlev,
-            ncol,
-            FT,
-        )
+        update_profile_lw!(t_lay, t_lev, flux_dn, flux_net, hr_lay, flux_grad, T_ex_lev, Δt, nlay, nlev, ncol, FT)
         #----------------------------------------
         flux_grad_err = maximum(flux_grad)
         if flux_grad_err < flux_grad_toler
@@ -146,7 +114,7 @@ function gray_atmos_sw_test(
     ::Type{I},
     ::Type{DA},
     ncol::Int,
-) where {FT<:AbstractFloat,I<:Int,DA,OPC}
+) where {FT <: AbstractFloat, I <: Int, DA, OPC}
     opc = Symbol(OPC)
     nlay = 60                         # number of layers
     p0 = FT(100000)                   # surface pressure (Pa)
@@ -164,10 +132,10 @@ function gray_atmos_sw_test(
     max_threads = Int(256)            # maximum number of threads for KA kernels
     deg2rad = FT(π) / FT(180)
 
-    zenith = DA{FT,1}(undef, ncol)   # solar zenith angle in radians
-    toa_flux = DA{FT,1}(undef, ncol) # top of atmosphere flux
-    sfc_alb_direct = DA{FT,2}(undef, nbnd, ncol) # surface albedo (direct)
-    sfc_alb_diffuse = DA{FT,2}(undef, nbnd, ncol) # surface albedo (diffuse)
+    zenith = DA{FT, 1}(undef, ncol)   # solar zenith angle in radians
+    toa_flux = DA{FT, 1}(undef, ncol) # top of atmosphere flux
+    sfc_alb_direct = DA{FT, 2}(undef, nbnd, ncol) # surface albedo (direct)
+    sfc_alb_diffuse = DA{FT, 2}(undef, nbnd, ncol) # surface albedo (diffuse)
     inc_flux_diffuse = nothing
 
     top_at_1 = false                          # Top-of-atmos at pt# 1 (true/false)
@@ -186,28 +154,11 @@ function gray_atmos_sw_test(
     as = setup_gray_as_pr_grid(nlay, lat, p0, pe, param_set, DA) # init gray atmos state
     op = OPC(FT, ncol, nlay, DA)
     src_sw = source_func_shortwave(FT, ncol, nlay, opc, DA)
-    bcs_sw = SwBCs(
-        zenith,
-        toa_flux,
-        sfc_alb_direct,
-        inc_flux_diffuse,
-        sfc_alb_diffuse,
-    )
+    bcs_sw = SwBCs(zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse)
     fluxb_sw = FluxSW(ncol, nlay, FT, DA)
     flux_sw = FluxSW(ncol, nlay, FT, DA)
 
-    slv = Solver(
-        as,
-        op,
-        nothing,
-        src_sw,
-        nothing,
-        bcs_sw,
-        nothing,
-        fluxb_sw,
-        nothing,
-        flux_sw,
-    )
+    slv = Solver(as, op, nothing, src_sw, nothing, bcs_sw, nothing, fluxb_sw, nothing, flux_sw)
     solve_sw!(slv, max_threads)
 
     τ = Array(slv.op.τ)

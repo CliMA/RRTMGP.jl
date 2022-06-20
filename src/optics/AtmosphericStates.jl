@@ -10,13 +10,9 @@ using CLIMAParameters.Planet: grav, R_d
 using ..Vmrs
 
 export AbstractAtmosphericState,
-    AtmosphericState,
-    ClearAtmosphericState,
-    GrayAtmosphericState,
-    setup_gray_as_pr_grid,
-    setup_gray_as_alt_grid
+    AtmosphericState, ClearAtmosphericState, GrayAtmosphericState, setup_gray_as_pr_grid, setup_gray_as_alt_grid
 
-abstract type AbstractAtmosphericState{FT,I,FTA1D} end
+abstract type AbstractAtmosphericState{FT, I, FTA1D} end
 
 include("GrayAtmosphericStates.jl")
 
@@ -30,15 +26,15 @@ Atmospheric conditions, used to compute optical properties.
 $(DocStringExtensions.FIELDS)
 """
 struct AtmosphericState{
-    FT<:AbstractFloat,
-    FTA1D<:AbstractArray{FT,1},
-    FTA1DN<:Union{AbstractArray{FT,1},Nothing},
-    FTA2D<:AbstractArray{FT,2},
-    CLDP<:Union{AbstractArray{FT,2},Nothing},
-    CLDM<:Union{AbstractArray{Bool,2},Nothing},
-    VMR<:AbstractVmr{FT},
-    I<:Int,
-} <: AbstractAtmosphericState{FT,I,FTA1D}
+    FT <: AbstractFloat,
+    FTA1D <: AbstractArray{FT, 1},
+    FTA1DN <: Union{AbstractArray{FT, 1}, Nothing},
+    FTA2D <: AbstractArray{FT, 2},
+    CLDP <: Union{AbstractArray{FT, 2}, Nothing},
+    CLDM <: Union{AbstractArray{Bool, 2}, Nothing},
+    VMR <: AbstractVmr{FT},
+    I <: Int,
+} <: AbstractAtmosphericState{FT, I, FTA1D}
     "longitude (`ncol`), optional"
     lon::FTA1DN
     "latitude (`ncol`), optional"

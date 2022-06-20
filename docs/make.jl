@@ -9,19 +9,14 @@ makedocs(
     strict = false,
     format = Documenter.HTML(
         prettyurls = get(ENV, "CI", nothing) == "true",
-        mathengine = MathJax(Dict(
-            :TeX => Dict(
-                :equationNumbers => Dict(:autoNumber => "AMS"),
-                :Macros => Dict(),
-            ),
-        )),
+        mathengine = MathJax(Dict(:TeX => Dict(:equationNumbers => Dict(:autoNumber => "AMS"), :Macros => Dict()))),
     ),
     clean = true,
     modules = [RRTMGP],
     pages = Any[
-        "Home"=>"index.md",
-        "Mathematical Formulation"=>"MathFormulation.md",
-        "Optics"=>Any[
+        "Home" => "index.md",
+        "Mathematical Formulation" => "MathFormulation.md",
+        "Optics" => Any[
             "Angular Discretization" => "optics/AngularDiscretizations.md"
             "Atmospheric State" => "optics/AtmosphericStates.md"
             "Boundary Conditions" => "optics/BCs.md"
@@ -33,8 +28,8 @@ makedocs(
             "Source Functions" => "optics/Sources.md"
             "Volume Mixing Ratios" => "optics/Vmrs.md"
         ],
-        "RTE Solver"=>"RTESolver.md",
-        "References"=>"References.md",
+        "RTE Solver" => "RTESolver.md",
+        "References" => "References.md",
     ],
 )
 

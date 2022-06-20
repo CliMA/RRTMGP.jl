@@ -10,16 +10,8 @@
 # λ ∈ (:lw, :sw, nothing)
 # flux_up_dn ∈ (:flux_up, :flux_dn, nothing)
 
-function get_ref_filename(
-    ftype,
-    optics_type;
-    λ = nothing,
-    opc = nothing,
-    flux_up_dn = nothing,
-    lut_pade = nothing,
-)
-    @assert ftype ∈ (:lookup_tables, :atmos_state, :comparison) &&
-            optics_type ∈ (:clearsky, :cloudysky)
+function get_ref_filename(ftype, optics_type; λ = nothing, opc = nothing, flux_up_dn = nothing, lut_pade = nothing)
+    @assert ftype ∈ (:lookup_tables, :atmos_state, :comparison) && optics_type ∈ (:clearsky, :cloudysky)
 
     fname = String(optics_type)
 
@@ -48,10 +40,5 @@ function get_ref_filename(
         end
     end
 
-    return joinpath(
-        artifact"RRTMGPReferenceData",
-        "RRTMGPReferenceData",
-        String(ftype),
-        fname * ".nc",
-    )
+    return joinpath(artifact"RRTMGPReferenceData", "RRTMGPReferenceData", String(ftype), fname * ".nc")
 end

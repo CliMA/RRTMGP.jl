@@ -40,20 +40,20 @@ for a given simulation.
 $(DocStringExtensions.FIELDS)
 """
 struct Solver{
-    FT<:AbstractFloat,
-    I<:Int,
-    FTA1D<:AbstractArray{FT,1},
-    FTA2D<:AbstractArray{FT,2},
-    AS<:AbstractAtmosphericState{FT,I,FTA1D},
-    OP<:AbstractOpticalProps{FT,FTA2D},
-    SL<:Union{AbstractSourceLW{FT,FTA1D,FTA2D},Nothing},
-    SS<:Union{SourceSW2Str{FT,FTA1D,FTA2D},Nothing},
-    BCL<:Union{LwBCs{FT},Nothing},
-    BCS<:Union{SwBCs{FT},Nothing},
-    FXBL<:Union{FluxLW{FT,FTA2D},Nothing},
-    FXBS<:Union{FluxSW{FT,FTA2D},Nothing},
-    FXL<:Union{FluxLW{FT,FTA2D},Nothing},
-    FXS<:Union{FluxSW{FT,FTA2D},Nothing},
+    FT <: AbstractFloat,
+    I <: Int,
+    FTA1D <: AbstractArray{FT, 1},
+    FTA2D <: AbstractArray{FT, 2},
+    AS <: AbstractAtmosphericState{FT, I, FTA1D},
+    OP <: AbstractOpticalProps{FT, FTA2D},
+    SL <: Union{AbstractSourceLW{FT, FTA1D, FTA2D}, Nothing},
+    SS <: Union{SourceSW2Str{FT, FTA1D, FTA2D}, Nothing},
+    BCL <: Union{LwBCs{FT}, Nothing},
+    BCS <: Union{SwBCs{FT}, Nothing},
+    FXBL <: Union{FluxLW{FT, FTA2D}, Nothing},
+    FXBS <: Union{FluxSW{FT, FTA2D}, Nothing},
+    FXL <: Union{FluxLW{FT, FTA2D}, Nothing},
+    FXS <: Union{FluxSW{FT, FTA2D}, Nothing},
 }
     as::AS         # atmospheric state
     op::OP         # optical properties
@@ -67,18 +67,7 @@ struct Solver{
     flux_sw::FXS   # fluxes for shortwave problem
 end
 
-Solver(
-    as,
-    op,
-    src_lw,
-    src_sw,
-    bcs_lw,
-    bcs_sw,
-    fluxb_lw,
-    fluxb_sw,
-    flux_lw,
-    flux_sw,
-) = Solver{
+Solver(as, op, src_lw, src_sw, bcs_lw, bcs_sw, fluxb_lw, fluxb_sw, flux_lw, flux_sw) = Solver{
     eltype(as.p_lev),
     typeof(as.ncol),
     typeof(as.t_sfc),

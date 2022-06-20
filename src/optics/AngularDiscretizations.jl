@@ -15,11 +15,7 @@ after Abramowitz & Stegun 1972, page 921
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct AngularDiscretization{
-    FT<:AbstractFloat,
-    FTA1D<:AbstractArray{FT,1},
-    I<:Int,
-}
+struct AngularDiscretization{FT <: AbstractFloat, FTA1D <: AbstractArray{FT, 1}, I <: Int}
     "number of quadrature angles"
     n_gauss_angles::I
     "quadrature secants / secant of propagation angle"
@@ -29,11 +25,7 @@ struct AngularDiscretization{
 end
 Adapt.@adapt_structure AngularDiscretization
 
-function AngularDiscretization(
-    ::Type{FT},
-    ::Type{DA},
-    n_gauss_angles::I,
-) where {FT<:AbstractFloat,I<:Int,DA}
+function AngularDiscretization(::Type{FT}, ::Type{DA}, n_gauss_angles::I) where {FT <: AbstractFloat, I <: Int, DA}
     max_gauss_pts = I(4)
     @assert 1 ≤ n_gauss_angles ≤ max_gauss_pts
     if n_gauss_angles == 1
@@ -46,19 +38,11 @@ function AngularDiscretization(
         gauss_Ds = DA{FT}([1.097198580000 1.693385070000 4.709416300000])
         gauss_wts = DA{FT}([0.200931913700 0.229241106400 0.069826979900])
     else
-        gauss_Ds = DA{FT}(
-            [1.060562570000 1.382825600000 2.401481790000 7.155130240000],
-        )
-        gauss_wts = DA{FT}(
-            [0.135506913400 0.203464568000 0.129847547600 0.031180971000],
-        )
+        gauss_Ds = DA{FT}([1.060562570000 1.382825600000 2.401481790000 7.155130240000])
+        gauss_wts = DA{FT}([0.135506913400 0.203464568000 0.129847547600 0.031180971000])
     end
 
-    return AngularDiscretization{
-        eltype(gauss_Ds),
-        typeof(gauss_Ds),
-        eltype(n_gauss_angles),
-    }(
+    return AngularDiscretization{eltype(gauss_Ds), typeof(gauss_Ds), eltype(n_gauss_angles)}(
         n_gauss_angles,
         gauss_Ds, # Diffusivity angle, not Gaussian angle
         gauss_wts,

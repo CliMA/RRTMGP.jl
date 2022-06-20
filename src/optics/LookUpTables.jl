@@ -10,7 +10,7 @@ export AbstractLookUp, LookUpLW, LookUpSW, LookUpCld
 
 Abstract lookup table for longwave and shortwave problems.
 """
-abstract type AbstractLookUp{I,FT} end
+abstract type AbstractLookUp{I, FT} end
 
 """
     LookUpLW{I,FT,UI8,UI8A1D,IA1D,IA2D,IA3D,FTA1D,FTA2D,FTA3D,FTA4D} <: 
@@ -22,18 +22,18 @@ Longwave lookup tables, used to compute optical properties.
 $(DocStringExtensions.FIELDS)
 """
 struct LookUpLW{
-    I<:Int,
-    FT<:AbstractFloat,
-    UI8<:UInt8,
-    UI8A1D<:AbstractArray{UI8,1},
-    IA1D<:AbstractArray{I,1},
-    IA2D<:AbstractArray{I,2},
-    IA3D<:AbstractArray{I,3},
-    FTA1D<:AbstractArray{FT,1},
-    FTA2D<:AbstractArray{FT,2},
-    FTA3D<:AbstractArray{FT,3},
-    FTA4D<:AbstractArray{FT,4},
-} <: AbstractLookUp{I,FT}
+    I <: Int,
+    FT <: AbstractFloat,
+    UI8 <: UInt8,
+    UI8A1D <: AbstractArray{UI8, 1},
+    IA1D <: AbstractArray{I, 1},
+    IA2D <: AbstractArray{I, 2},
+    IA3D <: AbstractArray{I, 3},
+    FTA1D <: AbstractArray{FT, 1},
+    FTA2D <: AbstractArray{FT, 2},
+    FTA3D <: AbstractArray{FT, 3},
+    FTA4D <: AbstractArray{FT, 4},
+} <: AbstractLookUp{I, FT}
     "number of gases used in the lookup table"
     n_gases::I
     "number of longwave bands"
@@ -140,24 +140,19 @@ struct LookUpLW{
 end
 Adapt.@adapt_structure LookUpLW
 
-function LookUpLW(
-    ds,
-    ::Type{I},
-    ::Type{FT},
-    ::Type{DA},
-) where {I<:Int,FT<:AbstractFloat,DA}
+function LookUpLW(ds, ::Type{I}, ::Type{FT}, ::Type{DA}) where {I <: Int, FT <: AbstractFloat, DA}
 
     UI8 = UInt8
-    UI8A1D = DA{UInt8,1}
-    STA = Array{String,1}
-    IA1D = DA{I,1}
-    IA2D = DA{I,2}
-    IA3D = DA{I,3}
-    FTA1D = DA{FT,1}
-    FTA2D = DA{FT,2}
-    FTA3D = DA{FT,3}
-    FTA4D = DA{FT,4}
-    DSTAI = Dict{String,I}
+    UI8A1D = DA{UInt8, 1}
+    STA = Array{String, 1}
+    IA1D = DA{I, 1}
+    IA2D = DA{I, 2}
+    IA3D = DA{I, 3}
+    FTA1D = DA{FT, 1}
+    FTA2D = DA{FT, 2}
+    FTA3D = DA{FT, 3}
+    FTA4D = DA{FT, 4}
+    DSTAI = Dict{String, I}
 
     n_bnd = I(ds.dim["bnd"])
     n_gpt = I(ds.dim["gpt"])
@@ -193,7 +188,7 @@ function LookUpLW(
     idx_scaling_gas_lower = zeros(I, n_min_absrb_lower)
     idx_scaling_gas_upper = zeros(I, n_min_absrb_upper)
 
-    for igas = 1:n_maj_absrb
+    for igas in 1:n_maj_absrb
         gases_major[igas] = strip(String(ds["gas_names"][:, igas]))
         idx_gases[gases_major[igas]] = I(igas)
     end
@@ -205,16 +200,14 @@ function LookUpLW(
 
     n_gases = n_maj_absrb
 
-    for igas = 1:n_min_absrb
+    for igas in 1:n_min_absrb
         gases_minor[igas] = strip(String(ds["gas_minor"][:, igas]))
         id_minor[igas] = strip(String(ds["identifier_minor"][:, igas]))
     end
 
-    for igas = 1:n_min_absrb_lower
-        gases_minor_lower[igas] =
-            strip(String(ds["minor_gases_lower"][:, igas]))
-        scaling_gas_lower[igas] =
-            strip(String(ds["scaling_gas_lower"][:, igas]))
+    for igas in 1:n_min_absrb_lower
+        gases_minor_lower[igas] = strip(String(ds["minor_gases_lower"][:, igas]))
+        scaling_gas_lower[igas] = strip(String(ds["scaling_gas_lower"][:, igas]))
         if ~isempty(gases_minor_lower[igas])
             idx_gases_minor_lower[igas] = idx_gases[gases_minor_lower[igas]]
         end
@@ -225,11 +218,9 @@ function LookUpLW(
     idx_gases_minor_lower = DA(idx_gases_minor_lower)
     idx_scaling_gas_lower = DA(idx_scaling_gas_lower)
 
-    for igas = 1:n_min_absrb_upper
-        gases_minor_upper[igas] =
-            strip(String(ds["minor_gases_upper"][:, igas]))
-        scaling_gas_upper[igas] =
-            strip(String(ds["scaling_gas_upper"][:, igas]))
+    for igas in 1:n_min_absrb_upper
+        gases_minor_upper[igas] = strip(String(ds["minor_gases_upper"][:, igas]))
+        scaling_gas_upper[igas] = strip(String(ds["scaling_gas_upper"][:, igas]))
         if ~isempty(gases_minor_upper[igas])
             idx_gases_minor_upper[igas] = idx_gases[gases_minor_upper[igas]]
         end
@@ -241,8 +232,8 @@ function LookUpLW(
     idx_scaling_gas_upper = DA(idx_scaling_gas_upper)
 
     key_species = ds["key_species"][:]
-    for j = 1:size(key_species, 3)
-        for i = 1:size(key_species, 2)
+    for j in 1:size(key_species, 3)
+        for i in 1:size(key_species, 2)
             if key_species[1, i, j] == 0 && key_species[2, i, j] == 0
                 key_species[1:2, i, j] .= 2
             end
@@ -261,61 +252,59 @@ function LookUpLW(
     t_planck = FTA1D(ds["temperature_Planck"][:])
 
     totplnk = FTA2D(ds["totplnk"][:])
-    bnd_lims_gpt = Array{I,2}(ds["bnd_limits_gpt"][:])
+    bnd_lims_gpt = Array{I, 2}(ds["bnd_limits_gpt"][:])
     bnd_lims_wn = FTA2D(ds["bnd_limits_wavenumber"][:])
     #-----------------------
-    major_gpt2bnd = Array{UI8,1}(undef, n_gpt)
-    for i = 1:n_bnd
+    major_gpt2bnd = Array{UI8, 1}(undef, n_gpt)
+    for i in 1:n_bnd
         major_gpt2bnd[bnd_lims_gpt[1, i]:bnd_lims_gpt[2, i]] .= UI8(i)
     end
     #-----------------------
     bnd_lims_gpt = IA2D(bnd_lims_gpt)
-    minor_lower_gpt_lims = Array{I,2}(ds["minor_limits_gpt_lower"][:])
-    minor_upper_gpt_lims = Array{I,2}(ds["minor_limits_gpt_upper"][:])
+    minor_lower_gpt_lims = Array{I, 2}(ds["minor_limits_gpt_lower"][:])
+    minor_upper_gpt_lims = Array{I, 2}(ds["minor_limits_gpt_upper"][:])
     #-----------------------
     minor_lower_bnd = zeros(UI8, n_min_absrb_lower)
     minor_upper_bnd = zeros(UI8, n_min_absrb_upper)
 
-    minor_lower_bnd_st = Array{UI8,1}(undef, n_bnd + 1)
-    minor_upper_bnd_st = Array{UI8,1}(undef, n_bnd + 1)
+    minor_lower_bnd_st = Array{UI8, 1}(undef, n_bnd + 1)
+    minor_upper_bnd_st = Array{UI8, 1}(undef, n_bnd + 1)
 
-    minor_lower_gpt_sh = Array{Int,1}(undef, n_min_absrb_lower)
-    minor_upper_gpt_sh = Array{Int,1}(undef, n_min_absrb_upper)
+    minor_lower_gpt_sh = Array{Int, 1}(undef, n_min_absrb_lower)
+    minor_upper_gpt_sh = Array{Int, 1}(undef, n_min_absrb_upper)
 
     minor_lower_gpt_sh[1] = 0
-    for i = 1:n_min_absrb_lower
+    for i in 1:n_min_absrb_lower
         minor_lower_bnd[i] = major_gpt2bnd[minor_lower_gpt_lims[1, i]]
         if i > 1
             minor_lower_gpt_sh[i] =
-                minor_lower_gpt_sh[i-1] + minor_lower_gpt_lims[2, i-1] -
-                minor_lower_gpt_lims[1, i-1] + 1
+                minor_lower_gpt_sh[i - 1] + minor_lower_gpt_lims[2, i - 1] - minor_lower_gpt_lims[1, i - 1] + 1
         end
     end
 
     minor_upper_gpt_sh[1] = 0
-    for i = 1:n_min_absrb_upper
+    for i in 1:n_min_absrb_upper
         minor_upper_bnd[i] = major_gpt2bnd[minor_upper_gpt_lims[1, i]]
         if i > 1
             minor_upper_gpt_sh[i] =
-                minor_upper_gpt_sh[i-1] + minor_upper_gpt_lims[2, i-1] -
-                minor_upper_gpt_lims[1, i-1] + 1
+                minor_upper_gpt_sh[i - 1] + minor_upper_gpt_lims[2, i - 1] - minor_upper_gpt_lims[1, i - 1] + 1
         end
     end
     #-----------------------
     minor_lower_bnd_st[1] = 1
     minor_upper_bnd_st[1] = 1
 
-    for ibnd = 2:n_bnd+1
+    for ibnd in 2:(n_bnd + 1)
         loc_low = findlast(isequal(UI8(ibnd - 1)), minor_lower_bnd)
         loc_upp = findlast(isequal(UI8(ibnd - 1)), minor_upper_bnd)
         if isnothing(loc_low)
-            minor_lower_bnd_st[ibnd] = minor_lower_bnd_st[ibnd-1]
+            minor_lower_bnd_st[ibnd] = minor_lower_bnd_st[ibnd - 1]
         else
             minor_lower_bnd_st[ibnd] = UI8(loc_low + 1)
         end
 
         if isnothing(loc_upp)
-            minor_upper_bnd_st[ibnd] = minor_upper_bnd_st[ibnd-1]
+            minor_upper_bnd_st[ibnd] = minor_upper_bnd_st[ibnd - 1]
         else
             minor_upper_bnd_st[ibnd] = UI8(loc_upp + 1)
         end
@@ -332,16 +321,14 @@ function LookUpLW(
     minor_upper_gpt_lims = IA2D(minor_upper_gpt_lims)
     #-----------------------
 
-    minor_lower_scales_with_density =
-        IA1D(ds["minor_scales_with_density_lower"][:])
-    minor_upper_scales_with_density =
-        IA1D(ds["minor_scales_with_density_upper"][:])
+    minor_lower_scales_with_density = IA1D(ds["minor_scales_with_density_lower"][:])
+    minor_upper_scales_with_density = IA1D(ds["minor_scales_with_density_upper"][:])
 
     lower_scale_by_complement = IA1D(ds["scale_by_complement_lower"][:])
     upper_scale_by_complement = IA1D(ds["scale_by_complement_upper"][:])
 
-    p_ref = Array{FT,1}(ds["press_ref"][:])
-    t_ref = Array{FT,1}(ds["temp_ref"][:])
+    p_ref = Array{FT, 1}(ds["press_ref"][:])
+    t_ref = Array{FT, 1}(ds["temp_ref"][:])
 
     p_ref_min = minimum(p_ref)
 
@@ -355,7 +342,7 @@ function LookUpLW(
     n_η = size(kmajor, 2)
 
     return (
-        LookUpLW{I,FT,UI8,UI8A1D,IA1D,IA2D,IA3D,FTA1D,FTA2D,FTA3D,FTA4D}(
+        LookUpLW{I, FT, UI8, UI8A1D, IA1D, IA2D, IA3D, FTA1D, FTA2D, FTA3D, FTA4D}(
             n_gases,
             n_bnd,
             n_gpt,
@@ -424,18 +411,18 @@ Shortwave lookup tables, used to compute optical properties.
 $(DocStringExtensions.FIELDS)
 """
 struct LookUpSW{
-    I<:Int,
-    FT<:AbstractFloat,
-    UI8<:UInt8,
-    UI8A1D<:AbstractArray{UI8,1},
-    IA1D<:AbstractArray{I,1},
-    IA2D<:AbstractArray{I,2},
-    IA3D<:AbstractArray{I,3},
-    FTA1D<:AbstractArray{FT,1},
-    FTA2D<:AbstractArray{FT,2},
-    FTA3D<:AbstractArray{FT,3},
-    FTA4D<:AbstractArray{FT,4},
-} <: AbstractLookUp{I,FT}
+    I <: Int,
+    FT <: AbstractFloat,
+    UI8 <: UInt8,
+    UI8A1D <: AbstractArray{UI8, 1},
+    IA1D <: AbstractArray{I, 1},
+    IA2D <: AbstractArray{I, 2},
+    IA3D <: AbstractArray{I, 3},
+    FTA1D <: AbstractArray{FT, 1},
+    FTA2D <: AbstractArray{FT, 2},
+    FTA3D <: AbstractArray{FT, 3},
+    FTA4D <: AbstractArray{FT, 4},
+} <: AbstractLookUp{I, FT}
     "number of gases used in the lookup table"
     n_gases::I
     "number of shortwave bands"
@@ -543,24 +530,19 @@ end
 Adapt.@adapt_structure LookUpSW
 
 
-function LookUpSW(
-    ds,
-    ::Type{I},
-    ::Type{FT},
-    ::Type{DA},
-) where {I<:Int,FT<:AbstractFloat,DA}
+function LookUpSW(ds, ::Type{I}, ::Type{FT}, ::Type{DA}) where {I <: Int, FT <: AbstractFloat, DA}
 
     UI8 = UInt8
-    UI8A1D = DA{UInt8,1}
-    STA = Array{String,1}
-    IA1D = DA{I,1}
-    IA2D = DA{I,2}
-    IA3D = DA{I,3}
-    FTA1D = DA{FT,1}
-    FTA2D = DA{FT,2}
-    FTA3D = DA{FT,3}
-    FTA4D = DA{FT,4}
-    DSTAI = Dict{String,I}
+    UI8A1D = DA{UInt8, 1}
+    STA = Array{String, 1}
+    IA1D = DA{I, 1}
+    IA2D = DA{I, 2}
+    IA3D = DA{I, 3}
+    FTA1D = DA{FT, 1}
+    FTA2D = DA{FT, 2}
+    FTA3D = DA{FT, 3}
+    FTA4D = DA{FT, 4}
+    DSTAI = Dict{String, I}
 
     n_bnd = I(ds.dim["bnd"])
     n_gpt = I(ds.dim["gpt"])
@@ -597,7 +579,7 @@ function LookUpSW(
     idx_scaling_gas_lower = zeros(I, n_min_absrb_lower)
     idx_scaling_gas_upper = zeros(I, n_min_absrb_upper)
 
-    for igas = 1:n_maj_absrb
+    for igas in 1:n_maj_absrb
         gases_major[igas] = strip(String(ds["gas_names"][:, igas]))
         idx_gases[gases_major[igas]] = I(igas)
     end
@@ -608,16 +590,14 @@ function LookUpSW(
 
     n_gases = n_maj_absrb
 
-    for igas = 1:n_min_absrb
+    for igas in 1:n_min_absrb
         gases_minor[igas] = strip(String(ds["gas_minor"][:, igas]))
         id_minor[igas] = strip(String(ds["identifier_minor"][:, igas]))
     end
 
-    for igas = 1:n_min_absrb_lower
-        gases_minor_lower[igas] =
-            strip(String(ds["minor_gases_lower"][:, igas]))
-        scaling_gas_lower[igas] =
-            strip(String(ds["scaling_gas_lower"][:, igas]))
+    for igas in 1:n_min_absrb_lower
+        gases_minor_lower[igas] = strip(String(ds["minor_gases_lower"][:, igas]))
+        scaling_gas_lower[igas] = strip(String(ds["scaling_gas_lower"][:, igas]))
         if ~isempty(gases_minor_lower[igas])
             idx_gases_minor_lower[igas] = idx_gases[gases_minor_lower[igas]]
         end
@@ -626,11 +606,9 @@ function LookUpSW(
         end
     end
 
-    for igas = 1:n_min_absrb_upper
-        gases_minor_upper[igas] =
-            strip(String(ds["minor_gases_upper"][:, igas]))
-        scaling_gas_upper[igas] =
-            strip(String(ds["scaling_gas_upper"][:, igas]))
+    for igas in 1:n_min_absrb_upper
+        gases_minor_upper[igas] = strip(String(ds["minor_gases_upper"][:, igas]))
+        scaling_gas_upper[igas] = strip(String(ds["scaling_gas_upper"][:, igas]))
         if ~isempty(gases_minor_upper[igas])
             idx_gases_minor_upper[igas] = idx_gases[gases_minor_upper[igas]]
         end
@@ -640,8 +618,8 @@ function LookUpSW(
     end
 
     key_species = ds["key_species"][:]
-    for j = 1:size(key_species, 3)
-        for i = 1:size(key_species, 2)
+    for j in 1:size(key_species, 3)
+        for i in 1:size(key_species, 2)
             if key_species[1, i, j] == 0 && key_species[2, i, j] == 0
                 key_species[1:2, i, j] .= 2
             end
@@ -656,61 +634,59 @@ function LookUpSW(
     kminor_start_lower = IA1D(ds["kminor_start_lower"][:])
     kminor_start_upper = IA1D(ds["kminor_start_upper"][:])
 
-    bnd_lims_gpt = Array{I,2}(ds["bnd_limits_gpt"][:])
+    bnd_lims_gpt = Array{I, 2}(ds["bnd_limits_gpt"][:])
     bnd_lims_wn = FTA2D(ds["bnd_limits_wavenumber"][:])
     #-----------------------
-    major_gpt2bnd = Array{UI8,1}(undef, n_gpt)
-    for i = 1:n_bnd
+    major_gpt2bnd = Array{UI8, 1}(undef, n_gpt)
+    for i in 1:n_bnd
         major_gpt2bnd[bnd_lims_gpt[1, i]:bnd_lims_gpt[2, i]] .= UI8(i)
     end
     #-----------------------
     bnd_lims_gpt = IA2D(bnd_lims_gpt)
-    minor_lower_gpt_lims = Array{I,2}(ds["minor_limits_gpt_lower"][:])
-    minor_upper_gpt_lims = Array{I,2}(ds["minor_limits_gpt_upper"][:])
+    minor_lower_gpt_lims = Array{I, 2}(ds["minor_limits_gpt_lower"][:])
+    minor_upper_gpt_lims = Array{I, 2}(ds["minor_limits_gpt_upper"][:])
     #-----------------------
     minor_lower_bnd = zeros(UI8, n_min_absrb_lower)
     minor_upper_bnd = zeros(UI8, n_min_absrb_upper)
 
-    minor_lower_bnd_st = Array{UI8,1}(undef, n_bnd + 1)
-    minor_upper_bnd_st = Array{UI8,1}(undef, n_bnd + 1)
+    minor_lower_bnd_st = Array{UI8, 1}(undef, n_bnd + 1)
+    minor_upper_bnd_st = Array{UI8, 1}(undef, n_bnd + 1)
 
-    minor_lower_gpt_sh = Array{Int,1}(undef, n_min_absrb_lower)
-    minor_upper_gpt_sh = Array{Int,1}(undef, n_min_absrb_upper)
+    minor_lower_gpt_sh = Array{Int, 1}(undef, n_min_absrb_lower)
+    minor_upper_gpt_sh = Array{Int, 1}(undef, n_min_absrb_upper)
 
     minor_lower_gpt_sh[1] = 0
-    for i = 1:n_min_absrb_lower
+    for i in 1:n_min_absrb_lower
         minor_lower_bnd[i] = major_gpt2bnd[minor_lower_gpt_lims[1, i]]
         if i > 1
             minor_lower_gpt_sh[i] =
-                minor_lower_gpt_sh[i-1] + minor_lower_gpt_lims[2, i-1] -
-                minor_lower_gpt_lims[1, i-1] + 1
+                minor_lower_gpt_sh[i - 1] + minor_lower_gpt_lims[2, i - 1] - minor_lower_gpt_lims[1, i - 1] + 1
         end
     end
 
     minor_upper_gpt_sh[1] = 0
-    for i = 1:n_min_absrb_upper
+    for i in 1:n_min_absrb_upper
         minor_upper_bnd[i] = major_gpt2bnd[minor_upper_gpt_lims[1, i]]
         if i > 1
             minor_upper_gpt_sh[i] =
-                minor_upper_gpt_sh[i-1] + minor_upper_gpt_lims[2, i-1] -
-                minor_upper_gpt_lims[1, i-1] + 1
+                minor_upper_gpt_sh[i - 1] + minor_upper_gpt_lims[2, i - 1] - minor_upper_gpt_lims[1, i - 1] + 1
         end
     end
     #-----------------------
     minor_lower_bnd_st[1] = 1
     minor_upper_bnd_st[1] = 1
 
-    for ibnd = 2:n_bnd+1
+    for ibnd in 2:(n_bnd + 1)
         loc_low = findlast(isequal(UI8(ibnd - 1)), minor_lower_bnd)
         loc_upp = findlast(isequal(UI8(ibnd - 1)), minor_upper_bnd)
         if isnothing(loc_low)
-            minor_lower_bnd_st[ibnd] = minor_lower_bnd_st[ibnd-1]
+            minor_lower_bnd_st[ibnd] = minor_lower_bnd_st[ibnd - 1]
         else
             minor_lower_bnd_st[ibnd] = UI8(loc_low + 1)
         end
 
         if isnothing(loc_upp)
-            minor_upper_bnd_st[ibnd] = minor_upper_bnd_st[ibnd-1]
+            minor_upper_bnd_st[ibnd] = minor_upper_bnd_st[ibnd - 1]
         else
             minor_upper_bnd_st[ibnd] = UI8(loc_upp + 1)
         end
@@ -726,15 +702,13 @@ function LookUpSW(
     minor_lower_gpt_lims = IA2D(minor_lower_gpt_lims)
     minor_upper_gpt_lims = IA2D(minor_upper_gpt_lims)
     #-----------------------    
-    minor_lower_scales_with_density =
-        IA1D(ds["minor_scales_with_density_lower"][:])
-    minor_upper_scales_with_density =
-        IA1D(ds["minor_scales_with_density_upper"][:])
+    minor_lower_scales_with_density = IA1D(ds["minor_scales_with_density_lower"][:])
+    minor_upper_scales_with_density = IA1D(ds["minor_scales_with_density_upper"][:])
     lower_scale_by_complement = IA1D(ds["scale_by_complement_lower"][:])
     upper_scale_by_complement = IA1D(ds["scale_by_complement_upper"][:])
 
-    p_ref = Array{FT,1}(ds["press_ref"][:])
-    t_ref = Array{FT,1}(ds["temp_ref"][:])
+    p_ref = Array{FT, 1}(ds["press_ref"][:])
+    t_ref = Array{FT, 1}(ds["temp_ref"][:])
 
     p_ref_min = minimum(p_ref)
 
@@ -755,7 +729,7 @@ function LookUpSW(
     solar_src_scaled = FTA1D(solar_src ./ solar_src_tot)
 
     return (
-        LookUpSW{I,FT,UI8,UI8A1D,IA1D,IA2D,IA3D,FTA1D,FTA2D,FTA3D,FTA4D}(
+        LookUpSW{I, FT, UI8, UI8A1D, IA1D, IA2D, IA3D, FTA1D, FTA2D, FTA3D, FTA4D}(
             n_gases,
             n_bnd,
             n_gpt,
@@ -828,7 +802,7 @@ These are used to determine the optical properties of ice and water cloud togeth
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct LookUpCld{I,B,FT,FTA1D,FTA2D,FTA3D,FTA4D}
+struct LookUpCld{I, B, FT, FTA1D, FTA2D, FTA3D, FTA4D}
     "number of bands"
     nband::I
     "number of ice roughness types"
@@ -908,12 +882,12 @@ function LookUpCld(
     ::Type{FT},
     ::Type{DA},
     use_lut::Bool = true,
-) where {I<:Int,FT<:AbstractFloat,DA}
+) where {I <: Int, FT <: AbstractFloat, DA}
 
-    FTA1D = DA{FT,1}
-    FTA2D = DA{FT,2}
-    FTA3D = DA{FT,3}
-    FTA4D = DA{FT,4}
+    FTA1D = DA{FT, 1}
+    FTA2D = DA{FT, 2}
+    FTA3D = DA{FT, 3}
+    FTA4D = DA{FT, 4}
 
     nband = I(ds.dim["nband"])
     nrghice = I(ds.dim["nrghice"])
@@ -961,7 +935,7 @@ function LookUpCld(
 
     bnd_lims_wn = FTA2D(ds["bnd_limits_wavenumber"][:])
 
-    return (LookUpCld{I,Bool,FT,FTA1D,FTA2D,FTA3D,FTA4D}(
+    return (LookUpCld{I, Bool, FT, FTA1D, FTA2D, FTA3D, FTA4D}(
         nband,
         nrghice,
         nsize_liq,
