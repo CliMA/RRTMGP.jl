@@ -3,7 +3,7 @@ name: CodeCov
 on:
   push:
     branches:
-      - master
+      - main
       - trying
       - staging
     tags: '*'

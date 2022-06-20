@@ -33,4 +33,10 @@ makedocs(
     ],
 )
 
-deploydocs(repo = "github.com/CliMA/RRTMGP.jl.git", target = "build")
+deploydocs(
+    repo = "github.com/CliMA/RRTMGP.jl.git",
+    target = "build",
+    push_preview = true,
+    devbranch = "main",
+    forcepush = true,
+)
