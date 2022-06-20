@@ -1,17 +1,5 @@
 
-function setup_allsky_as(
-    ds_in,
-    idx_gases,
-    lkp_lw,
-    lkp_sw,
-    lkp_lw_cld,
-    lkp_sw_cld,
-    use_lut,
-    ncol,
-    FT,
-    DA,
-    max_threads,
-)
+function setup_allsky_as(ds_in, idx_gases, lkp_lw, lkp_sw, lkp_lw_cld, lkp_sw_cld, use_lut, ncol, FT, DA, max_threads)
 
     deg2rad = FT(π) / FT(180)
     nlay = Int(ds_in.dim["lay"])
@@ -27,11 +15,11 @@ function setup_allsky_as(
     # The example only reads the first column and 
     # replicates it ncol times.
 
-    sfc_emis = DA{FT,2}(undef, nbnd_lw, ncol)
-    sfc_alb_direct = DA{FT,2}(undef, nbnd_sw, ncol)
-    sfc_alb_diffuse = DA{FT,2}(undef, nbnd_sw, ncol)
-    zenith = DA{FT,1}(undef, ncol)
-    irrad = DA{FT,1}(undef, ncol)
+    sfc_emis = DA{FT, 2}(undef, nbnd_lw, ncol)
+    sfc_alb_direct = DA{FT, 2}(undef, nbnd_sw, ncol)
+    sfc_alb_diffuse = DA{FT, 2}(undef, nbnd_sw, ncol)
+    zenith = DA{FT, 1}(undef, ncol)
+    irrad = DA{FT, 1}(undef, ncol)
     # these values are taken from the example
     sfc_emis .= FT(0.98)
     sfc_alb_direct .= FT(0.06)
@@ -72,11 +60,11 @@ function setup_allsky_as(
     vmrat[:, 1, idx_gases["o2"]] .= Array{FT}(ds_in["vmr_o2"][:][1, lay_ind])
     vmrat[:, 1, idx_gases["n2"]] .= Array{FT}(ds_in["vmr_n2"][:][1, lay_ind])
 
-    for icol = 2:ncol
+    for icol in 2:ncol
         vmrat[:, icol, :] .= vmrat[:, 1, :]
     end
     vmr = Vmr(DA(vmrat))
-    col_dry = DA{FT,2}(undef, nlay, ncol)
+    col_dry = DA{FT, 2}(undef, nlay, ncol)
     vmr_h2o = view(vmr.vmr, :, :, idx_gases["h2o"])
 
     cld_mask = zeros(Bool, nlay, ncol)
@@ -98,10 +86,8 @@ function setup_allsky_as(
     # and not very close to the ground (< 900 hPa), and
     # put them in 2/3 of the columns since that's roughly the
     # total cloudiness of earth
-    for icol = 1:ncol, ilay = 1:nlay
-        if p_lay[ilay, icol] > FT(10000) &&
-           p_lay[ilay, icol] < FT(90000) &&
-           icol % 3 ≠ 0
+    for icol in 1:ncol, ilay in 1:nlay
+        if p_lay[ilay, icol] > FT(10000) && p_lay[ilay, icol] < FT(90000) && icol % 3 ≠ 0
             cld_mask[ilay, icol] = true
             if t_lay[ilay, icol] > FT(263)
                 cld_path_liq[ilay, icol] = FT(10)

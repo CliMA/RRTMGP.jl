@@ -22,7 +22,7 @@ export PadeMethod, LookUpTable
 export CloudOpticsLUT
 export CloudOpticsPade
 
-abstract type AbstractInterpolationMethod{FT<:AbstractFloat} end
+abstract type AbstractInterpolationMethod{FT <: AbstractFloat} end
 
 """
     PadeMethod{FT} <: AbstractInterpolationMethod{FT}
@@ -81,16 +81,7 @@ struct PadeMethod{FT} <: AbstractInterpolationMethod{FT}
         @assert !any([sizreg_ssa[1], sizreg_asy[1]] .< rad_lwr)
         @assert !any([sizreg_ssa[nbound], sizreg_asy[nbound]] .> rad_upr)
 
-        return new{FT}(
-            ext,
-            ssa,
-            asy,
-            sizreg_ext,
-            sizreg_ssa,
-            sizreg_asy,
-            rad_lwr,
-            rad_upr,
-        )
+        return new{FT}(ext, ssa, asy, sizreg_ext, sizreg_ssa, sizreg_asy, rad_lwr, rad_upr)
     end
 end
 
@@ -102,7 +93,7 @@ Lookup table interpolation constants and coefficients
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct LookUpTable{FT,I<:Int} <: AbstractInterpolationMethod{FT}
+struct LookUpTable{FT, I <: Int} <: AbstractInterpolationMethod{FT}
     "particle size lower bound for interpolation"
     rad_lwr::FT
     "particle size upper bound for interpolation"
@@ -126,7 +117,7 @@ struct LookUpTable{FT,I<:Int} <: AbstractInterpolationMethod{FT}
         ext::Array{FT},
         ssa::Array{FT},
         asy::Array{FT},
-    ) where {FT<:AbstractFloat}
+    ) where {FT <: AbstractFloat}
 
         # Error checking
         # LUT coefficient dimensions
@@ -147,16 +138,7 @@ struct LookUpTable{FT,I<:Int} <: AbstractInterpolationMethod{FT}
         nsteps = size(ext, 1)
         step_size = (rad_upr - rad_lwr) / FT(nsteps - 1)
 
-        return new{FT,Int}(
-            rad_lwr,
-            rad_upr,
-            rad_fac,
-            nsteps,
-            step_size,
-            ext,
-            ssa,
-            asy,
-        )
+        return new{FT, Int}(rad_lwr, rad_upr, rad_fac, nsteps, step_size, ext, ssa, asy)
     end
 end
 get_min_radius(aim::AbstractInterpolationMethod) = aim.rad_lwr
@@ -171,14 +153,14 @@ get_num_roughness_types(this::LookUpTable) = size(this.ext, 3)
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct CloudOpticsLUT{FT,I} <: AbstractOpticalProps{FT,I}
-    base::OpticalPropsBase{FT,I}
+struct CloudOpticsLUT{FT, I} <: AbstractOpticalProps{FT, I}
+    base::OpticalPropsBase{FT, I}
     "Ice surface roughness category - needed for Yang (2013) ice optics parameterization"
     icergh::I
     "Interpolation method for liquid properties"
-    liq::LookUpTable{FT,I}
+    liq::LookUpTable{FT, I}
     "Interpolation method for ice properties"
-    ice::LookUpTable{FT,I}
+    ice::LookUpTable{FT, I}
 end
 
 """
@@ -187,9 +169,9 @@ end
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct CloudOpticsPade{FT,I} <: AbstractOpticalProps{FT,I}
+struct CloudOpticsPade{FT, I} <: AbstractOpticalProps{FT, I}
     "Base optical properties"
-    base::OpticalPropsBase{FT,I}
+    base::OpticalPropsBase{FT, I}
     "Ice surface roughness category - needed for Yang (2013) ice optics parameterization"
     icergh::I
     "Interpolation method for liquid properties"
@@ -207,14 +189,13 @@ averaged optical properties
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct CloudOpticalProps{FT<:AbstractFloat}
+struct CloudOpticalProps{FT <: AbstractFloat}
     "Water path"
     wp::Array{FT}
     "Effective radius"
     re::Array{FT}
 end
-CloudOpticalProps(FT, ncol, nlay) =
-    CloudOpticalProps{FT}(zeros(FT, ncol, nlay), zeros(FT, ncol, nlay))
+CloudOpticalProps(FT, ncol, nlay) = CloudOpticalProps{FT}(zeros(FT, ncol, nlay), zeros(FT, ncol, nlay))
 
 """
     CloudOpticalPropsPGP{FT<:AbstractFloat}
@@ -225,7 +206,7 @@ averaged optical properties per grid point
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-mutable struct CloudOpticalPropsPGP{FT<:AbstractFloat}
+mutable struct CloudOpticalPropsPGP{FT <: AbstractFloat}
     "Water path"
     wp::FT
     "Effective radius"
@@ -233,24 +214,16 @@ mutable struct CloudOpticalPropsPGP{FT<:AbstractFloat}
 end
 CloudOpticalPropsPGP(FT) = CloudOpticalPropsPGP{FT}(FT(0), FT(0))
 
-function Base.convert(
-    ::Type{CloudOpticalProps},
-    data::Array{CloudOpticalPropsPGP{FT}},
-) where {FT}
+function Base.convert(::Type{CloudOpticalProps}, data::Array{CloudOpticalPropsPGP{FT}}) where {FT}
     s = size(data)
     return CloudOpticalProps{FT}(
-        Array{FT}([data[i, j].wp for i = 1:s[1], j = 1:s[2]]),
-        Array{FT}([data[i, j].re for i = 1:s[1], j = 1:s[2]]),
+        Array{FT}([data[i, j].wp for i in 1:s[1], j in 1:s[2]]),
+        Array{FT}([data[i, j].re for i in 1:s[1], j in 1:s[2]]),
     )
 end
 
-Base.convert(
-    ::Type{Array{CloudOpticalPropsPGP}},
-    data::CloudOpticalProps{FT},
-) where {FT} = [
-    CloudOpticalPropsPGP{FT}(data.wp[i, j], data.re[i, j])
-    for i = 1:size(data.wp, 1), j = 1:size(data.wp, 2)
-]
+Base.convert(::Type{Array{CloudOpticalPropsPGP}}, data::CloudOpticalProps{FT}) where {FT} =
+    [CloudOpticalPropsPGP{FT}(data.wp[i, j], data.re[i, j]) for i in 1:size(data.wp, 1), j in 1:size(data.wp, 2)]
 
 
 #####
@@ -263,20 +236,12 @@ Base.convert(
 Combine liquid and ice contributions into total cloud optical properties
    See also the `increment!` routines in `OpticalProps_kernels`
 """
-function combine_optical_props!(
-    op::OneScalar{FT},
-    liq::TwoStream{FT},
-    ice::TwoStream{FT},
-) where {FT<:AbstractFloat}
+function combine_optical_props!(op::OneScalar{FT}, liq::TwoStream{FT}, ice::TwoStream{FT}) where {FT <: AbstractFloat}
     # Absorption optical depth  = (1-ssa) * τ = τ - τssa
     nbnd = size(liq.τ, 3)
     op.τ[:, :, 1:nbnd] .= (liq.τ .- liq.ssa) + (ice.τ .- ice.ssa)
 end
-function combine_optical_props!(
-    op::TwoStream{FT},
-    liq::TwoStream{FT},
-    ice::TwoStream{FT},
-) where {FT<:AbstractFloat}
+function combine_optical_props!(op::TwoStream{FT}, liq::TwoStream{FT}, ice::TwoStream{FT}) where {FT <: AbstractFloat}
     nbnd = size(liq.τ, 3)
     τ = liq.τ + ice.τ
     ssa = liq.ssa + ice.ssa
@@ -288,7 +253,7 @@ function combine_optical_props!(
     op::OneScalarPGP{FT},
     liq::TwoStreamPGP{FT},
     ice::TwoStreamPGP{FT},
-) where {FT<:AbstractFloat}
+) where {FT <: AbstractFloat}
     # Absorption optical depth  = (1-ssa) * τ = τ - τssa
     nbnd = size(liq.τ, 1)
     op.τ[1:nbnd] .= (liq.τ .- liq.ssa) + (ice.τ .- ice.ssa)
@@ -297,7 +262,7 @@ function combine_optical_props!(
     op::TwoStreamPGP{FT},
     liq::TwoStreamPGP{FT},
     ice::TwoStreamPGP{FT},
-) where {FT<:AbstractFloat}
+) where {FT <: AbstractFloat}
     nbnd = size(liq.τ, 1)
     τ = liq.τ + ice.τ
     ssa = liq.ssa + ice.ssa
@@ -317,21 +282,9 @@ function validate_cloud_optics!(
     # Error checking
     @assert bands_are_equal(this, optical_props)
     @assert get_nband(optical_props) == get_ngpt(optical_props)
-    @assert !(
-        this.icergh < 1 || this.icergh > get_num_roughness_types(this.ice)
-    )
-    @assert !any_vals_outside(
-        liq.re,
-        liqmsk,
-        this.liq.rad_lwr,
-        this.liq.rad_upr,
-    )
-    @assert !any_vals_outside(
-        ice.re,
-        icemsk,
-        this.ice.rad_lwr,
-        this.ice.rad_upr,
-    )
+    @assert !(this.icergh < 1 || this.icergh > get_num_roughness_types(this.ice))
+    @assert !any_vals_outside(liq.re, liqmsk, this.liq.rad_lwr, this.liq.rad_upr)
+    @assert !any_vals_outside(ice.re, icemsk, this.ice.rad_lwr, this.ice.rad_upr)
     any(liqmsk) && @assert !any_vals_less_than(liq.wp, liqmsk, FT(0))
     any(icemsk) && @assert !any_vals_less_than(ice.wp, icemsk, FT(0))
     return nothing
@@ -347,21 +300,9 @@ function validate_cloud_optics!(
     # Error checking
     @assert bands_are_equal(this, optical_props)
     @assert get_nband(optical_props) == get_ngpt(optical_props)
-    @assert !(
-        this.icergh < 1 || this.icergh > get_num_roughness_types(this.ice)
-    )
-    @assert !any_vals_outside(
-        liq.re,
-        liqmsk,
-        this.liq.rad_lwr,
-        this.liq.rad_upr,
-    )
-    @assert !any_vals_outside(
-        ice.re,
-        icemsk,
-        this.ice.rad_lwr,
-        this.ice.rad_upr,
-    )
+    @assert !(this.icergh < 1 || this.icergh > get_num_roughness_types(this.ice))
+    @assert !any_vals_outside(liq.re, liqmsk, this.liq.rad_lwr, this.liq.rad_upr)
+    @assert !any_vals_outside(ice.re, icemsk, this.ice.rad_lwr, this.ice.rad_upr)
     liqmsk && @assert !any_vals_less_than(liq.wp, liqmsk, FT(0))
     icemsk && @assert !any_vals_less_than(ice.wp, icemsk, FT(0))
     return nothing
@@ -388,7 +329,7 @@ function cloud_optics!(
     clouds_liq::CloudOpticalProps{FT},
     clouds_ice::CloudOpticalProps{FT},
     optical_props::AbstractOpticalPropsArry{FT},
-) where {FT<:AbstractFloat}
+) where {FT <: AbstractFloat}
 
     nbnd = get_nband(this)
 
@@ -434,7 +375,7 @@ function cloud_optics!(
     clouds_liq::CloudOpticalPropsPGP{FT},
     clouds_ice::CloudOpticalPropsPGP{FT},
     optical_props::AbstractOpticalPropsPGP{FT},
-) where {FT<:AbstractFloat}
+) where {FT <: AbstractFloat}
 
     nbnd = get_nband(this)
 
@@ -500,10 +441,10 @@ The table's second dimension is band. Returns 0 where `clouds.wp ≤ 0`.
 function compute_all_from_table!(
     nbnd::I,
     clouds::CloudOpticalProps{FT},
-    lut::LookUpTable{FT,I},
-    op::TwoStream{FT,I},
-    icergh::Union{Nothing,I} = nothing,
-) where {FT<:AbstractFloat,I<:Int}
+    lut::LookUpTable{FT, I},
+    op::TwoStream{FT, I},
+    icergh::Union{Nothing, I} = nothing,
+) where {FT <: AbstractFloat, I <: Int}
 
     ncol, nlay = size(clouds.re)
 
@@ -513,41 +454,19 @@ function compute_all_from_table!(
     ssa_table = icergh ≠ nothing ? lut.ssa[:, :, icergh] : lut.ssa
     asy_table = icergh ≠ nothing ? lut.asy[:, :, icergh] : lut.asy
 
-    @inbounds for ibnd = 1:nbnd
-        @inbounds for ilay = 1:nlay
-            @inbounds for icol = 1:ncol
+    @inbounds for ibnd in 1:nbnd
+        @inbounds for ilay in 1:nlay
+            @inbounds for icol in 1:ncol
                 if clouds.wp[icol, ilay] > FT(0)
-                    index = convert(
-                        Int,
-                        min(
-                            floor(
-                                (clouds.re[icol, ilay] - offset) /
-                                lut.step_size,
-                            ) + 1,
-                            lut.nsteps - 1,
-                        ),
-                    )
-                    fint =
-                        (clouds.re[icol, ilay] - offset) / lut.step_size -
-                        (index - 1)
+                    index =
+                        convert(Int, min(floor((clouds.re[icol, ilay] - offset) / lut.step_size) + 1, lut.nsteps - 1))
+                    fint = (clouds.re[icol, ilay] - offset) / lut.step_size - (index - 1)
                     τ =
-                        clouds.wp[icol, ilay] * (
-                            τ_table[index, ibnd] +
-                            fint *
-                            (τ_table[index+1, ibnd] - τ_table[index, ibnd])
-                        )
-                    τs =
-                        τ * (
-                            ssa_table[index, ibnd] +
-                            fint *
-                            (ssa_table[index+1, ibnd] - ssa_table[index, ibnd])
-                        )
+                        clouds.wp[icol, ilay] *
+                        (τ_table[index, ibnd] + fint * (τ_table[index + 1, ibnd] - τ_table[index, ibnd]))
+                    τs = τ * (ssa_table[index, ibnd] + fint * (ssa_table[index + 1, ibnd] - ssa_table[index, ibnd]))
                     op.g[icol, ilay, ibnd] =
-                        τs * (
-                            asy_table[index, ibnd] +
-                            fint *
-                            (asy_table[index+1, ibnd] - asy_table[index, ibnd])
-                        )
+                        τs * (asy_table[index, ibnd] + fint * (asy_table[index + 1, ibnd] - asy_table[index, ibnd]))
                     op.ssa[icol, ilay, ibnd] = τs
                     op.τ[icol, ilay, ibnd] = τ
                 else
@@ -562,10 +481,10 @@ end
 function compute_all_from_table!(
     nbnd::I,
     clouds::CloudOpticalPropsPGP{FT},
-    lut::LookUpTable{FT,I},
-    op::TwoStreamPGP{FT,I},
-    icergh::Union{Nothing,I} = nothing,
-) where {FT<:AbstractFloat,I<:Int}
+    lut::LookUpTable{FT, I},
+    op::TwoStreamPGP{FT, I},
+    icergh::Union{Nothing, I} = nothing,
+) where {FT <: AbstractFloat, I <: Int}
 
     offset = lut.rad_lwr
 
@@ -573,31 +492,13 @@ function compute_all_from_table!(
     ssa_table = icergh ≠ nothing ? lut.ssa[:, :, icergh] : lut.ssa
     asy_table = icergh ≠ nothing ? lut.asy[:, :, icergh] : lut.asy
 
-    @inbounds for ibnd = 1:nbnd
+    @inbounds for ibnd in 1:nbnd
         if clouds.wp > FT(0)
-            index = convert(
-                Int,
-                min(
-                    floor((clouds.re - offset) / lut.step_size) + 1,
-                    lut.nsteps - 1,
-                ),
-            )
+            index = convert(Int, min(floor((clouds.re - offset) / lut.step_size) + 1, lut.nsteps - 1))
             fint = (clouds.re - offset) / lut.step_size - (index - 1)
-            τ =
-                clouds.wp * (
-                    τ_table[index, ibnd] +
-                    fint * (τ_table[index+1, ibnd] - τ_table[index, ibnd])
-                )
-            τs =
-                τ * (
-                    ssa_table[index, ibnd] +
-                    fint * (ssa_table[index+1, ibnd] - ssa_table[index, ibnd])
-                )
-            op.g[ibnd] =
-                τs * (
-                    asy_table[index, ibnd] +
-                    fint * (asy_table[index+1, ibnd] - asy_table[index, ibnd])
-                )
+            τ = clouds.wp * (τ_table[index, ibnd] + fint * (τ_table[index + 1, ibnd] - τ_table[index, ibnd]))
+            τs = τ * (ssa_table[index, ibnd] + fint * (ssa_table[index + 1, ibnd] - ssa_table[index, ibnd]))
+            op.g[ibnd] = τs * (asy_table[index, ibnd] + fint * (asy_table[index + 1, ibnd] - asy_table[index, ibnd]))
             op.ssa[ibnd] = τs
             op.τ[ibnd] = τ
         else
@@ -629,9 +530,9 @@ function compute_all_from_pade!(
     nbnd::I,
     clouds::CloudOpticalProps{FT},
     pm::PadeMethod{FT},
-    op::TwoStream{FT,I},
-    icergh::Union{Nothing,I} = nothing,
-) where {FT<:AbstractFloat,I<:Int}
+    op::TwoStream{FT, I},
+    icergh::Union{Nothing, I} = nothing,
+) where {FT <: AbstractFloat, I <: Int}
 
     nsizes = size(pm.ext, 2)
     # Cloud optical properties from Pade coefficient method
@@ -645,9 +546,9 @@ function compute_all_from_pade!(
     coeffs_asy = icergh ≠ nothing ? pm.asy[:, :, :, icergh] : pm.asy
 
     ncol, nlay = size(clouds.re)
-    @inbounds for ibnd = 1:nbnd
-        @inbounds for ilay = 1:nlay
-            @inbounds for icol = 1:ncol
+    @inbounds for ibnd in 1:nbnd
+        @inbounds for ilay in 1:nlay
+            @inbounds for icol in 1:ncol
                 if clouds.wp[icol, ilay] > FT(0)
                     re = clouds.re[icol, ilay]
                     #
@@ -655,67 +556,14 @@ function compute_all_from_pade!(
                     # This works only if there are precisely three size regimes (four bounds) and it's
                     #   previously guaranteed that size_bounds(1) <= size <= size_bounds(4)
                     #
-                    irad = convert(
-                        Int,
-                        min(
-                            floor((re - pm.sizreg_ext[2]) / pm.sizreg_ext[3]) + 2,
-                            3,
-                        ),
-                    )
-                    τ =
-                        clouds.wp[icol, ilay] * pade_eval(
-                            ibnd,
-                            nbnd,
-                            nsizes,
-                            m_ext,
-                            n_ext,
-                            irad,
-                            re,
-                            coeffs_ext,
-                        )
+                    irad = convert(Int, min(floor((re - pm.sizreg_ext[2]) / pm.sizreg_ext[3]) + 2, 3))
+                    τ = clouds.wp[icol, ilay] * pade_eval(ibnd, nbnd, nsizes, m_ext, n_ext, irad, re, coeffs_ext)
 
-                    irad = convert(
-                        Int,
-                        min(
-                            floor((re - pm.sizreg_ssa[2]) / pm.sizreg_ssa[3]) + 2,
-                            3,
-                        ),
-                    )
+                    irad = convert(Int, min(floor((re - pm.sizreg_ssa[2]) / pm.sizreg_ssa[3]) + 2, 3))
                     # Pade approximants for co-albedo can sometimes be negative
-                    τs =
-                        τ * (
-                            FT(1) - max(
-                                FT(0),
-                                pade_eval(
-                                    ibnd,
-                                    nbnd,
-                                    nsizes,
-                                    m_ssa,
-                                    n_ssa,
-                                    irad,
-                                    re,
-                                    coeffs_ssa,
-                                ),
-                            )
-                        )
-                    irad = convert(
-                        Int,
-                        min(
-                            floor((re - pm.sizreg_asy[2]) / pm.sizreg_asy[3]) + 2,
-                            3,
-                        ),
-                    )
-                    op.g[icol, ilay, ibnd] =
-                        τs * pade_eval(
-                            ibnd,
-                            nbnd,
-                            nsizes,
-                            m_asy,
-                            n_asy,
-                            irad,
-                            re,
-                            coeffs_asy,
-                        )
+                    τs = τ * (FT(1) - max(FT(0), pade_eval(ibnd, nbnd, nsizes, m_ssa, n_ssa, irad, re, coeffs_ssa)))
+                    irad = convert(Int, min(floor((re - pm.sizreg_asy[2]) / pm.sizreg_asy[3]) + 2, 3))
+                    op.g[icol, ilay, ibnd] = τs * pade_eval(ibnd, nbnd, nsizes, m_asy, n_asy, irad, re, coeffs_asy)
                     op.ssa[icol, ilay, ibnd] = τs
                     op.τ[icol, ilay, ibnd] = τ
                 else
@@ -731,9 +579,9 @@ function compute_all_from_pade!(
     nbnd::I,
     clouds::CloudOpticalPropsPGP{FT},
     pm::PadeMethod{FT},
-    op::TwoStreamPGP{FT,I},
-    icergh::Union{Nothing,I} = nothing,
-) where {FT<:AbstractFloat,I<:Int}
+    op::TwoStreamPGP{FT, I},
+    icergh::Union{Nothing, I} = nothing,
+) where {FT <: AbstractFloat, I <: Int}
 
     nsizes = size(pm.ext, 2)
     # Cloud optical properties from Pade coefficient method
@@ -746,7 +594,7 @@ function compute_all_from_pade!(
     coeffs_ssa = icergh ≠ nothing ? pm.ssa[:, :, :, icergh] : pm.ssa
     coeffs_asy = icergh ≠ nothing ? pm.asy[:, :, :, icergh] : pm.asy
 
-    @inbounds for ibnd = 1:nbnd
+    @inbounds for ibnd in 1:nbnd
         if clouds.wp > FT(0)
             re = clouds.re
             #
@@ -754,58 +602,14 @@ function compute_all_from_pade!(
             # This works only if there are precisely three size regimes (four bounds) and it's
             #   previously guaranteed that size_bounds(1) <= size <= size_bounds(4)
             #
-            irad = convert(
-                Int,
-                min(floor((re - pm.sizreg_ext[2]) / pm.sizreg_ext[3]) + 2, 3),
-            )
-            τ =
-                clouds.wp * pade_eval(
-                    ibnd,
-                    nbnd,
-                    nsizes,
-                    m_ext,
-                    n_ext,
-                    irad,
-                    re,
-                    coeffs_ext,
-                )
+            irad = convert(Int, min(floor((re - pm.sizreg_ext[2]) / pm.sizreg_ext[3]) + 2, 3))
+            τ = clouds.wp * pade_eval(ibnd, nbnd, nsizes, m_ext, n_ext, irad, re, coeffs_ext)
 
-            irad = convert(
-                Int,
-                min(floor((re - pm.sizreg_ssa[2]) / pm.sizreg_ssa[3]) + 2, 3),
-            )
+            irad = convert(Int, min(floor((re - pm.sizreg_ssa[2]) / pm.sizreg_ssa[3]) + 2, 3))
             # Pade approximants for co-albedo can sometimes be negative
-            τs =
-                τ * (
-                    FT(1) - max(
-                        FT(0),
-                        pade_eval(
-                            ibnd,
-                            nbnd,
-                            nsizes,
-                            m_ssa,
-                            n_ssa,
-                            irad,
-                            re,
-                            coeffs_ssa,
-                        ),
-                    )
-                )
-            irad = convert(
-                Int,
-                min(floor((re - pm.sizreg_asy[2]) / pm.sizreg_asy[3]) + 2, 3),
-            )
-            op.g[ibnd] =
-                τs * pade_eval(
-                    ibnd,
-                    nbnd,
-                    nsizes,
-                    m_asy,
-                    n_asy,
-                    irad,
-                    re,
-                    coeffs_asy,
-                )
+            τs = τ * (FT(1) - max(FT(0), pade_eval(ibnd, nbnd, nsizes, m_ssa, n_ssa, irad, re, coeffs_ssa)))
+            irad = convert(Int, min(floor((re - pm.sizreg_asy[2]) / pm.sizreg_asy[3]) + 2, 3))
+            op.g[ibnd] = τs * pade_eval(ibnd, nbnd, nsizes, m_asy, n_asy, irad, re, coeffs_asy)
             op.ssa[ibnd] = τs
             op.τ[ibnd] = τ
         else
@@ -843,17 +647,17 @@ function pade_eval(
     irad::I,
     re::FT,
     pade_coeffs::AbstractArray{FT},
-) where {FT<:AbstractFloat,I<:Int}
+) where {FT <: AbstractFloat, I <: Int}
 
-    denom = pade_coeffs[iband, irad, n+m+1]
-    @inbounds for i = n-1+m:-1:1+m
-        denom = pade_coeffs[iband, irad, i+1] + re * denom
+    denom = pade_coeffs[iband, irad, n + m + 1]
+    @inbounds for i in (n - 1 + m):-1:(1 + m)
+        denom = pade_coeffs[iband, irad, i + 1] + re * denom
     end
     denom = 1 + re * denom
 
-    numer = pade_coeffs[iband, irad, m+1]
-    @inbounds for i = m-1:-1:1
-        numer = pade_coeffs[iband, irad, i+1] + re * numer
+    numer = pade_coeffs[iband, irad, m + 1]
+    @inbounds for i in (m - 1):-1:1
+        numer = pade_coeffs[iband, irad, i + 1] + re * numer
     end
     numer = pade_coeffs[iband, irad, 1] + re * numer
 

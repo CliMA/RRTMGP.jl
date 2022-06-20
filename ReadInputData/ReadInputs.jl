@@ -70,14 +70,12 @@ function read_atmos(ds, FT, I, gases_prescribed)
         no2(),
     ]
 
-    gases_in_database =
-        filter(ug -> haskey(ds, "vmr_" * chem_name(ug)), gases_to_look_for)
+    gases_in_database = filter(ug -> haskey(ds, "vmr_" * chem_name(ug)), gases_to_look_for)
 
-    gas_concs =
-        GasConcs(FT, I, gases_prescribed, ncol, nlay, length(gases_in_database))
+    gas_concs = GasConcs(FT, I, gases_prescribed, ncol, nlay, length(gases_in_database))
 
     for eg in gases_in_database
-        set_vmr!(gas_concs, eg, Array{FT}(ds["vmr_"*chem_name(eg)][:]))
+        set_vmr!(gas_concs, eg, Array{FT}(ds["vmr_" * chem_name(eg)][:]))
     end
 
     # col_dry has unchanged allocation status on return if the variable isn't present in the netCDF file
@@ -138,8 +136,7 @@ function read_spectral_disc!(ds, spectral_disc::AbstractOpticalProps)
     @assert ds.dim["pair"] == 2
     band_lims_wvn = ds["band_lims_wvn"][:]
     band_lims_gpt = ds["band_lims_gpt"][:]
-    spectral_disc.base =
-        OpticalPropsBase("read_spectral_disc!", band_lims_wvn, band_lims_gpt)
+    spectral_disc.base = OpticalPropsBase("read_spectral_disc!", band_lims_wvn, band_lims_gpt)
 end
 
 """
@@ -182,8 +179,7 @@ function read_lw_Planck_sources!(ds, sources::SourceFuncLongWave{FT}) where {FT}
     band_lims_wvn = ds["band_lims_wvn"][:]
     band_lims_gpt = ds["band_lims_gpt"][:]
 
-    sources.optical_props =
-        OpticalPropsBase("SourceFuncLongWave", band_lims_wvn, band_lims_gpt)
+    sources.optical_props = OpticalPropsBase("SourceFuncLongWave", band_lims_wvn, band_lims_gpt)
     sources.τ .= Array{FT}(undef, ncol, nlay)
 
     sources.lay_source .= ds["lay_src"][:]
@@ -221,11 +217,8 @@ end
 
 g-point fluxes
 """
-read_gpt_fluxes(ds) = (
-    ds["gpt_flux_up"][:],
-    ds["gpt_flux_dn"][:],
-    haskey(ds, "gpt_flux_dn_dir") ? ds["gpt_flux_dn_dir"][:] : nothing,
-)
+read_gpt_fluxes(ds) =
+    (ds["gpt_flux_up"][:], ds["gpt_flux_dn"][:], haskey(ds, "gpt_flux_dn_dir") ? ds["gpt_flux_dn_dir"][:] : nothing)
 
 """
     read_size(ds)
@@ -256,20 +249,10 @@ function read_and_block_pt(ds)
     @assert !any([ncol_l, nlay_l, nexp_l] .== 0)
 
     # Read p, T data; reshape to suit RRTMGP dimensions
-    p_lay =
-        Array(transpose(kron(ones(1, nexp_l), Array{FT}(ds["pres_layer"][:]))))
-    p_lev =
-        Array(transpose(kron(ones(1, nexp_l), Array{FT}(ds["pres_level"][:]))))
-    t_lay = Array(transpose(reshape(
-        Array{FT}(ds["temp_layer"][:]),
-        nlay_l,
-        ncol_l * nexp_l,
-    )))
-    t_lev = Array(transpose(reshape(
-        Array{FT}(ds["temp_level"][:]),
-        nlay_l + 1,
-        ncol_l * nexp_l,
-    )))
+    p_lay = Array(transpose(kron(ones(1, nexp_l), Array{FT}(ds["pres_layer"][:]))))
+    p_lev = Array(transpose(kron(ones(1, nexp_l), Array{FT}(ds["pres_level"][:]))))
+    t_lay = Array(transpose(reshape(Array{FT}(ds["temp_layer"][:]), nlay_l, ncol_l * nexp_l)))
+    t_lev = Array(transpose(reshape(Array{FT}(ds["temp_level"][:]), nlay_l + 1, ncol_l * nexp_l)))
 
     return p_lay, p_lev, t_lay, t_lev
 end
@@ -291,8 +274,7 @@ function read_and_block_sw_bc(ds)
 
     # Check that output arrays are sized correctly : blocksize, nlay, (ncol * nexp)/blocksize
     surface_albedo = repeat(Array{FT}(ds["surface_albedo"][:]), nexp_l)
-    total_solar_irradiance =
-        repeat(Array{FT}(ds["total_solar_irradiance"][:]), nexp_l)
+    total_solar_irradiance = repeat(Array{FT}(ds["total_solar_irradiance"][:]), nexp_l)
     solar_zenith_angle = repeat(Array{FT}(ds["solar_zenith_angle"][:]), nexp_l)
     return surface_albedo, total_solar_irradiance, solar_zenith_angle
 end
@@ -311,12 +293,8 @@ function read_and_block_lw_bc(ds)
     ncols = ncol_l * nexp_l
     @assert !any([ncol_l, nlay_l, nexp_l] .== 0)
 
-    surface_emissivity = Array{FT}(reshape(
-        repeat(ds["surface_emissivity"][:], 1, nexp_l),
-        ncols,
-    ))
-    surface_temperature =
-        Array{FT}(reshape(ds["surface_temperature"][:], ncols)) # alternate version
+    surface_emissivity = Array{FT}(reshape(repeat(ds["surface_emissivity"][:], 1, nexp_l), ncols))
+    surface_temperature = Array{FT}(reshape(ds["surface_temperature"][:], ncols)) # alternate version
 
     return surface_emissivity, surface_temperature
 end
@@ -358,10 +336,7 @@ end
 
 Read the names of the gases known to the k-distribution
 """
-read_kdist_gas_names(ds) =
-    lowercase.(strip.(String[
-        join(ds["gas_names"][:][:, i]) for i = 1:ds.dim["absorber"]
-    ]))
+read_kdist_gas_names(ds) = lowercase.(strip.(String[join(ds["gas_names"][:][:, i]) for i in 1:ds.dim["absorber"]]))
 
 """
     read_and_block_gases_ty(ds, gas_names)
@@ -412,7 +387,7 @@ function read_and_block_gases_ty(ds, gas_names::Vector{AbstractGas})
 
         # Read the values as a function of experiment
         gas_conc_scaling = read_scaling(ds, FT, rfmip_name(gas) * "_GM")
-        gas_conc_temp_1d = ds[rfmip_name(gas)*"_GM"][:] * gas_conc_scaling
+        gas_conc_temp_1d = ds[rfmip_name(gas) * "_GM"][:] * gas_conc_scaling
 
         # Does every value in this block belong to the same experiment?
         if all(exp_num[2:end] .- exp_num[1] .== 0)
@@ -420,11 +395,7 @@ function read_and_block_gases_ty(ds, gas_names::Vector{AbstractGas})
             set_vmr!(gas_conc_array, gas, gas_conc_temp_1d[exp_num[1]])
         else
             # Create 2D field, ncols x nlay, with scalar values from each experiment
-            set_vmr!(
-                gas_conc_array,
-                gas,
-                repeat(gas_conc_temp_1d[exp_num[:]], 1, nlay_l),
-            )
+            set_vmr!(gas_conc_array, gas, repeat(gas_conc_temp_1d[exp_num[:]], 1, nlay_l))
         end
     end
     return gas_conc_array

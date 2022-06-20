@@ -33,43 +33,19 @@ function clear_sky(
     ::Type{FT},
     ::Type{I},
     ::Type{DA},
-) where {FT<:AbstractFloat,I<:Int,DA,OPC,SRC,VMR}
+) where {FT <: AbstractFloat, I <: Int, DA, OPC, SRC, VMR}
     opc = Symbol(OPC)
     lw_file = get_ref_filename(:lookup_tables, :clearsky, λ = :lw) # lw lookup tables for gas optics
     sw_file = get_ref_filename(:lookup_tables, :clearsky, λ = :sw) # sw lookup tables for gas optics
     input_file = get_ref_filename(:atmos_state, :clearsky)         # clear-sky atmos state
     # reference data files for comparison
-    flux_up_file_lw = get_ref_filename(
-        :comparison,
-        :clearsky,
-        λ = :lw,
-        flux_up_dn = :flux_up,
-        opc = opc,
-    )
-    flux_dn_file_lw = get_ref_filename(
-        :comparison,
-        :clearsky,
-        λ = :lw,
-        flux_up_dn = :flux_dn,
-        opc = opc,
-    )
-    flux_up_file_sw = get_ref_filename(
-        :comparison,
-        :clearsky,
-        λ = :sw,
-        flux_up_dn = :flux_up,
-        opc = opc,
-    )
-    flux_dn_file_sw = get_ref_filename(
-        :comparison,
-        :clearsky,
-        λ = :sw,
-        flux_up_dn = :flux_dn,
-        opc = opc,
-    )
+    flux_up_file_lw = get_ref_filename(:comparison, :clearsky, λ = :lw, flux_up_dn = :flux_up, opc = opc)
+    flux_dn_file_lw = get_ref_filename(:comparison, :clearsky, λ = :lw, flux_up_dn = :flux_dn, opc = opc)
+    flux_up_file_sw = get_ref_filename(:comparison, :clearsky, λ = :sw, flux_up_dn = :flux_up, opc = opc)
+    flux_dn_file_sw = get_ref_filename(:comparison, :clearsky, λ = :sw, flux_up_dn = :flux_dn, opc = opc)
 
-    FTA1D = DA{FT,1}
-    FTA2D = DA{FT,2}
+    FTA1D = DA{FT, 1}
+    FTA2D = DA{FT, 2}
     max_threads = Int(256)
     exp_no = 1
     n_gauss_angles = 1
@@ -87,16 +63,8 @@ function clear_sky(
     # reading rfmip data to atmospheric state
     ds_lw_in = Dataset(input_file, "r")
 
-    (as, sfc_emis, sfc_alb_direct, zenith, toa_flux, usecol) = setup_rfmip_as(
-        ds_lw_in,
-        idx_gases,
-        exp_no,
-        lookup_lw,
-        FT,
-        DA,
-        VMR,
-        max_threads,
-    )
+    (as, sfc_emis, sfc_alb_direct, zenith, toa_flux, usecol) =
+        setup_rfmip_as(ds_lw_in, idx_gases, exp_no, lookup_lw, FT, DA, VMR, max_threads)
     close(ds_lw_in)
 
     ncol, nlay, ngpt_lw = as.ncol, as.nlay, lookup_lw.n_gpt
@@ -106,7 +74,7 @@ function clear_sky(
     # setting up longwave problem 
     ngpt_lw = lookup_lw.n_gpt
     src_lw = source_func_longwave(FT, ncol, nlay, opc, DA)         # allocating longwave source function object
-    bcs_lw = LwBCs{FT,typeof(sfc_emis),Nothing}(sfc_emis, nothing) # setting up boundary conditions
+    bcs_lw = LwBCs{FT, typeof(sfc_emis), Nothing}(sfc_emis, nothing) # setting up boundary conditions
     ang_disc = nothing#AngularDiscretization(opc, FT, n_gauss_angles, DA)  # initializing Angular discretization
     fluxb_lw = FluxLW(ncol, nlay, FT, DA)                          # flux storage for bandwise calculations
     flux_lw = FluxLW(ncol, nlay, FT, DA)                           # longwave fluxes
@@ -115,30 +83,13 @@ function clear_sky(
     src_sw = source_func_shortwave(FT, ncol, nlay, opc, DA)        # allocating shortwave source function object
     inc_flux_diffuse = nothing
     sfc_alb_diffuse = FTA2D(deepcopy(sfc_alb_direct))
-    bcs_sw = SwBCs(
-        zenith,
-        toa_flux,
-        sfc_alb_direct,
-        inc_flux_diffuse,
-        sfc_alb_diffuse,
-    )
+    bcs_sw = SwBCs(zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse)
 
     fluxb_sw = FluxSW(ncol, nlay, FT, DA) # flux storage for bandwise calculations
     flux_sw = FluxSW(ncol, nlay, FT, DA)  # shortwave fluxes for band calculations
     #--------------------------------------------------
     # initializing RTE solver
-    slv = Solver(
-        as,
-        op,
-        src_lw,
-        src_sw,
-        bcs_lw,
-        bcs_sw,
-        fluxb_lw,
-        fluxb_sw,
-        flux_lw,
-        flux_sw,
-    )
+    slv = Solver(as, op, src_lw, src_sw, bcs_lw, bcs_sw, fluxb_lw, fluxb_sw, flux_lw, flux_sw)
     println("calling longwave solver; ncol = $ncol")
     @time solve_lw!(slv, max_threads, lookup_lw)
     println("calling shortwave solver; ncol = $ncol")
@@ -179,7 +130,7 @@ function clear_sky(
     flux_up_sw = Array(slv.flux_sw.flux_up)
     flux_dn_sw = Array(slv.flux_sw.flux_dn)
 
-    for i = 1:ncol
+    for i in 1:ncol
         if usecol[i] == 0
             flux_up_sw[:, i] .= FT(0)
             flux_dn_sw[:, i] .= FT(0)

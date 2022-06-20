@@ -34,10 +34,10 @@ function all_sky(
     ::Type{I},
     ::Type{DA};
     use_lut::Bool = true,
-) where {FT<:AbstractFloat,I<:Int,DA,OPC}
+) where {FT <: AbstractFloat, I <: Int, DA, OPC}
     opc = Symbol(OPC)
-    FTA1D = DA{FT,1}
-    FTA2D = DA{FT,2}
+    FTA1D = DA{FT, 1}
+    FTA2D = DA{FT, 2}
     max_threads = Int(256)
     n_gauss_angles = 1
     ncol = 128 # repeats col#1 128 time per RRTMGP example
@@ -73,20 +73,19 @@ function all_sky(
     # reading input file 
     ds_in = Dataset(input_file, "r")
 
-    as, sfc_emis, sfc_alb_direct, sfc_alb_diffuse, zenith, toa_flux, bot_at_1 =
-        setup_allsky_as(
-            ds_in,
-            idx_gases,
-            lookup_lw,
-            lookup_sw,
-            lookup_lw_cld,
-            lookup_sw_cld,
-            use_lut,
-            ncol,
-            FT,
-            DA,
-            max_threads,
-        )
+    as, sfc_emis, sfc_alb_direct, sfc_alb_diffuse, zenith, toa_flux, bot_at_1 = setup_allsky_as(
+        ds_in,
+        idx_gases,
+        lookup_lw,
+        lookup_sw,
+        lookup_lw_cld,
+        lookup_sw_cld,
+        use_lut,
+        ncol,
+        FT,
+        DA,
+        max_threads,
+    )
     close(ds_in)
     ncol, nlay = as.ncol, as.nlay
     nlev = nlay + 1
@@ -101,7 +100,7 @@ function all_sky(
     ngpt_lw = lookup_lw.n_gpt
     op = OPC(FT, ncol, nlay, DA) # allocating optical properties object
     src_lw = source_func_longwave(FT, ncol, nlay, opc, DA)   # allocating longwave source function object
-    bcs_lw = LwBCs{FT,typeof(sfc_emis),Nothing}(sfc_emis, nothing)    # setting up boundary conditions
+    bcs_lw = LwBCs{FT, typeof(sfc_emis), Nothing}(sfc_emis, nothing)    # setting up boundary conditions
     fluxb_lw = FluxLW(ncol, nlay, FT, DA)                             # flux storage for bandwise calculations
     flux_lw = FluxLW(ncol, nlay, FT, DA)                              # longwave fluxes
 
@@ -112,30 +111,13 @@ function all_sky(
     # setting up boundary conditions
     inc_flux_diffuse = nothing
 
-    bcs_sw = SwBCs(
-        zenith,
-        toa_flux,
-        sfc_alb_direct,
-        inc_flux_diffuse,
-        sfc_alb_diffuse,
-    )
+    bcs_sw = SwBCs(zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse)
 
     fluxb_sw = FluxSW(ncol, nlay, FT, DA) # flux storage for bandwise calculations
     flux_sw = FluxSW(ncol, nlay, FT, DA)  # shortwave fluxes for band calculations    
     #-------------------------------------------------------------------
     # initializing RTE solver
-    slv = Solver(
-        as,
-        op,
-        src_lw,
-        src_sw,
-        bcs_lw,
-        bcs_sw,
-        fluxb_lw,
-        fluxb_sw,
-        flux_lw,
-        flux_sw,
-    )
+    slv = Solver(as, op, src_lw, src_sw, bcs_lw, bcs_sw, fluxb_lw, fluxb_sw, flux_lw, flux_sw)
     #------calling solvers
     println("calling longwave solver; ncol = $ncol")
     @time solve_lw!(slv, max_threads, lookup_lw, lookup_lw_cld)
@@ -145,14 +127,10 @@ function all_sky(
     # comparison
     method = use_lut ? "Lookup Table Interpolation method" : "PADE method"
     ds_comp = Dataset(flux_file, "r")
-    comp_flux_up_lw =
-        Array(transpose(ds_comp["lw_flux_up"][:][1:ncol, flip_ind]))
-    comp_flux_dn_lw =
-        Array(transpose(ds_comp["lw_flux_dn"][:][1:ncol, flip_ind]))
-    comp_flux_up_sw =
-        Array(transpose(ds_comp["sw_flux_up"][:][1:ncol, flip_ind]))
-    comp_flux_dn_sw =
-        Array(transpose(ds_comp["sw_flux_dn"][:][1:ncol, flip_ind]))
+    comp_flux_up_lw = Array(transpose(ds_comp["lw_flux_up"][:][1:ncol, flip_ind]))
+    comp_flux_dn_lw = Array(transpose(ds_comp["lw_flux_dn"][:][1:ncol, flip_ind]))
+    comp_flux_up_sw = Array(transpose(ds_comp["sw_flux_up"][:][1:ncol, flip_ind]))
+    comp_flux_dn_sw = Array(transpose(ds_comp["sw_flux_dn"][:][1:ncol, flip_ind]))
     close(ds_comp)
 
     flux_up_lw = Array(slv.flux_lw.flux_up)

@@ -19,7 +19,7 @@ function compute_optical_props_kernel!(
     as::GrayAtmosphericState{FT},
     glaycol,
     source::AbstractSourceLW{FT},
-) where {FT<:AbstractFloat}
+) where {FT <: AbstractFloat}
 
     compute_optical_props_kernel!(op, as, glaycol)     # computing optical thickness
     compute_sources_gray_kernel!(source, as, glaycol) # computing Planck sources
@@ -40,14 +40,15 @@ function compute_optical_props_kernel!(
     op::AbstractOpticalProps{FT},
     as::GrayAtmosphericState{FT},
     glaycol,
-) where {FT<:AbstractFloat}
+) where {FT <: AbstractFloat}
     # setting references
     glay, gcol = glaycol
     (; p_lay, p_lev, d0, α) = as
     @inbounds p0 = p_lev[1, gcol]
 
     @inbounds op.τ[glaycol...] = abs(
-        (α * d0[gcol] * (p_lay[glaycol...] ./ p0) .^ α ./ p_lay[glaycol...]) * (p_lev[glay+1, gcol] - p_lev[glaycol...]),
+        (α * d0[gcol] * (p_lay[glaycol...] ./ p0) .^ α ./ p_lay[glaycol...]) *
+        (p_lev[glay + 1, gcol] - p_lev[glaycol...]),
     )
 
     if op isa TwoStream
@@ -68,7 +69,7 @@ function compute_sources_gray_kernel!(
     source::AbstractSourceLW{FT},
     as::GrayAtmosphericState{FT},
     glaycol,
-) where {FT<:AbstractFloat}
+) where {FT <: AbstractFloat}
     # computing Planck sources
     glay, gcol = glaycol
     (; t_lay, t_lev) = as
@@ -76,8 +77,7 @@ function compute_sources_gray_kernel!(
 
     sbc = FT(Stefan())
     @inbounds lay_source[glaycol...] = sbc * t_lay[glaycol...]^FT(4) / FT(π)   # computing lay_source
-    @inbounds lev_source_inc[glaycol...] =
-        sbc * t_lev[glay+1, gcol]^FT(4) / FT(π)
+    @inbounds lev_source_inc[glaycol...] = sbc * t_lev[glay + 1, gcol]^FT(4) / FT(π)
     @inbounds lev_source_dec[glaycol...] = sbc * t_lev[glaycol...]^FT(4) / FT(π)
     if glay == 1
         @inbounds sfc_source[gcol] = sbc * as.t_sfc[gcol]^FT(4) / FT(π)   # computing sfc_source

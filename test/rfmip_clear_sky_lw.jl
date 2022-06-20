@@ -33,28 +33,16 @@ function lw_rfmip(
     ::Type{FT},
     ::Type{I},
     ::Type{DA},
-) where {FT<:AbstractFloat,I<:Int,OPC,SRC,VMR,DA}
+) where {FT <: AbstractFloat, I <: Int, OPC, SRC, VMR, DA}
     opc = Symbol(OPC)
     lw_file = get_ref_filename(:lookup_tables, :clearsky, λ = :lw) # lw lookup tables
     lw_input_file = get_ref_filename(:atmos_state, :clearsky)      # clear-sky atmos state
     # reference data files for comparison
-    flux_up_file = get_ref_filename(
-        :comparison,
-        :clearsky,
-        λ = :lw,
-        flux_up_dn = :flux_up,
-        opc = opc,
-    )
-    flux_dn_file = get_ref_filename(
-        :comparison,
-        :clearsky,
-        λ = :lw,
-        flux_up_dn = :flux_dn,
-        opc = opc,
-    )
+    flux_up_file = get_ref_filename(:comparison, :clearsky, λ = :lw, flux_up_dn = :flux_up, opc = opc)
+    flux_dn_file = get_ref_filename(:comparison, :clearsky, λ = :lw, flux_up_dn = :flux_dn, opc = opc)
 
-    FTA1D = DA{FT,1}
-    FTA2D = DA{FT,2}
+    FTA1D = DA{FT, 1}
+    FTA2D = DA{FT, 2}
     max_threads = Int(256)
     exp_no = 1
     n_gauss_angles = 1
@@ -66,43 +54,23 @@ function lw_rfmip(
     # reading rfmip data to atmospheric state
     ds_lw_in = Dataset(lw_input_file, "r")
 
-    (as, sfc_emis, _, _, _) = setup_rfmip_as(
-        ds_lw_in,
-        idx_gases,
-        exp_no,
-        lookup_lw,
-        FT,
-        DA,
-        VMR,
-        max_threads,
-    )
+    (as, sfc_emis, _, _, _) = setup_rfmip_as(ds_lw_in, idx_gases, exp_no, lookup_lw, FT, DA, VMR, max_threads)
     close(ds_lw_in)
 
     ncol, nlay, ngpt = as.ncol, as.nlay, lookup_lw.n_gpt
     nlev = nlay + 1
     op = OPC(FT, ncol, nlay, DA)                                   # allocating optical properties object
     src_lw = SRC(FT, DA, nlay, ncol)                               # allocating longwave source function object
-    bcs_lw = LwBCs{FT,typeof(sfc_emis),Nothing}(sfc_emis, nothing)            # setting up boundary conditions
+    bcs_lw = LwBCs{FT, typeof(sfc_emis), Nothing}(sfc_emis, nothing)            # setting up boundary conditions
     fluxb_lw = FluxLW(ncol, nlay, FT, DA)                          # flux storage for bandwise calculations
     flux_lw = FluxLW(ncol, nlay, FT, DA)                           # longwave fluxes
 
     # initializing RTE solver
-    slv = Solver(
-        as,
-        op,
-        src_lw,
-        nothing,
-        bcs_lw,
-        nothing,
-        fluxb_lw,
-        nothing,
-        flux_lw,
-        nothing,
-    )
+    slv = Solver(as, op, src_lw, nothing, bcs_lw, nothing, fluxb_lw, nothing, flux_lw, nothing)
 
     solve_lw!(slv, max_threads, lookup_lw)
     println("Timing ==================================================")
-    for i = 1:5
+    for i in 1:5
         @time solve_lw!(slv, max_threads, lookup_lw)
         println("*************************************************")
     end
@@ -117,10 +85,8 @@ function lw_rfmip(
     comp_flux_dn = Array{FT}(ds_flux_dn["rld"][:][flip_ind, :, exp_no])
     close(ds_flux_dn)
 
-    max_err_flux_up =
-        FT(maximum(abs.(Array(slv.flux_lw.flux_up) .- comp_flux_up)))
-    max_err_flux_dn =
-        FT(maximum(abs.(Array(slv.flux_lw.flux_dn) .- comp_flux_dn)))
+    max_err_flux_up = FT(maximum(abs.(Array(slv.flux_lw.flux_up) .- comp_flux_up)))
+    max_err_flux_dn = FT(maximum(abs.(Array(slv.flux_lw.flux_dn) .- comp_flux_dn)))
 
     println("=======================================")
     println("Clear-sky longwave test - $opc")

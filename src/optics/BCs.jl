@@ -13,17 +13,13 @@ Longwave boundary conditions
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct LwBCs{FT,FTA2D,FTA2DN}
+struct LwBCs{FT, FTA2D, FTA2DN}
     "Surface emissivity `[W/m²]` `(nbnd, ncol)`"
     sfc_emis::FTA2D
     "incident flux at top of atmosphere `[W/m²]` `(ncol, ngpt)`"
     inc_flux::FTA2DN
 end
-LwBCs(sfc_emis, inc_flux) =
-    LwBCs{eltype(sfc_emis),typeof(sfc_emis),typeof(inc_flux)}(
-        sfc_emis,
-        inc_flux,
-    )
+LwBCs(sfc_emis, inc_flux) = LwBCs{eltype(sfc_emis), typeof(sfc_emis), typeof(inc_flux)}(sfc_emis, inc_flux)
 Adapt.@adapt_structure LwBCs
 
 """
@@ -32,7 +28,7 @@ Shortwave boundary conditions
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct SwBCs{FT,FTA1D,FTA1DN,FTA2D}
+struct SwBCs{FT, FTA1D, FTA1DN, FTA2D}
     "zenith angle `(ncol)`"
     zenith::FTA1D
     "top of atmosphere flux `(ncol)`"
@@ -45,12 +41,7 @@ struct SwBCs{FT,FTA1D,FTA1DN,FTA2D}
     sfc_alb_diffuse::FTA2D
 end
 SwBCs(zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse) =
-    SwBCs{
-        eltype(zenith),
-        typeof(zenith),
-        typeof(inc_flux_diffuse),
-        typeof(sfc_alb_direct),
-    }(
+    SwBCs{eltype(zenith), typeof(zenith), typeof(inc_flux_diffuse), typeof(sfc_alb_direct)}(
         zenith,
         toa_flux,
         sfc_alb_direct,

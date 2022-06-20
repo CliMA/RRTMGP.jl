@@ -9,11 +9,11 @@ Atmospheric conditions, used to compute optical properties with the gray atmosph
 $(DocStringExtensions.FIELDS)
 """
 struct GrayAtmosphericState{
-    FT<:AbstractFloat,
-    FTA1D<:AbstractArray{FT,1},
-    FTA2D<:AbstractArray{FT,2},
-    I<:Int,
-} <: AbstractAtmosphericState{FT,I,FTA1D}
+    FT <: AbstractFloat,
+    FTA1D <: AbstractArray{FT, 1},
+    FTA2D <: AbstractArray{FT, 2},
+    I <: Int,
+} <: AbstractAtmosphericState{FT, I, FTA1D}
     "Layer pressures `[Pa, mb]`; `(nlay, ncol)`"
     p_lay::FTA2D
     "Level pressures `[Pa, mb]`; `(nlay+1, ncol)`"
@@ -51,7 +51,7 @@ function setup_gray_as_pr_grid(
     param_set::AbstractEarthParameterSet,
     ::Type{DA},
     step = "linear",
-) where {FT<:AbstractFloat,FTA1D<:AbstractArray{FT,1},DA}
+) where {FT <: AbstractFloat, FTA1D <: AbstractArray{FT, 1}, DA}
     nlev = Int(nlay + 1)
     ncol = length(lat)
     p_lay = DA{FT}(undef, nlay, ncol) # layer mean pressure
@@ -69,43 +69,20 @@ function setup_gray_as_pr_grid(
     α = FT(3.5)                   # lapse rate of radiative equillibrium
     r_d = FT(R_d(param_set))
     grav_ = FT((grav(param_set)))
-    args = (
-        p_lev,
-        p_lay,
-        t_lev,
-        t_lay,
-        z_lev,
-        t_sfc,
-        lat,
-        d0,
-        efac,
-        p0,
-        pe,
-        Δp,
-        te,
-        tt,
-        Δt,
-        α,
-        r_d,
-        grav_,
-        nlay,
-    )
+    args = (p_lev, p_lay, t_lev, t_lay, z_lev, t_sfc, lat, d0, efac, p0, pe, Δp, te, tt, Δt, α, r_d, grav_, nlay)
     device = array_device(p_lev)
     if device === CUDADevice()
         max_threads = 256
         tx = min(ncol, max_threads)
         bx = cld(ncol, tx)
-        @cuda threads = (tx) blocks = (bx) setup_gray_as_pr_grid_CUDA!(
-            ncol,
-            args...,
-        )
+        @cuda threads = (tx) blocks = (bx) setup_gray_as_pr_grid_CUDA!(ncol, args...)
     else # launcing Julia native multithreading kernel
-        Threads.@threads for gcol = 1:ncol
+        Threads.@threads for gcol in 1:ncol
             setup_gray_as_pr_grid_kernel!(args..., gcol)
         end
     end
     #------------------------------------------------
-    return GrayAtmosphericState{eltype(t_sfc),typeof(t_sfc),typeof(p_lev),Int}(
+    return GrayAtmosphericState{eltype(t_sfc), typeof(t_sfc), typeof(p_lev), Int}(
         p_lay,
         p_lev,
         t_lay,
@@ -140,7 +117,7 @@ function setup_gray_as_alt_grid(
     poly_order::Int,
     param_set::AbstractEarthParameterSet,
     ::Type{DA},
-) where {FT<:AbstractFloat,FTA1D<:AbstractArray{FT,1},DA}
+) where {FT <: AbstractFloat, FTA1D <: AbstractArray{FT, 1}, DA}
     ncol = length(lat)
     nlev = Int(ncls + 1 + (poly_order - 1) * ncls)
     nlay = Int(nlev - 1)
@@ -163,17 +140,17 @@ function setup_gray_as_alt_grid(
     pts = (pts .+ FT(1)) ./ FT(2)
     Δz_cell = zend / ncls
 
-    for icol = 1:ncol
+    for icol in 1:ncol
         #---------bot_at_1---------------------------------------
         z_lev[1, icol] = zst
         z_lev[nlev, icol] = zend
 
-        for icls = 1:ncls
-            for j = 1:poly_order-1
-                z_lev[(icls - 1) * poly_order+1+j, icol] =
-                    z_lev[(icls-1)*poly_order+1, icol] + pts[1+j] * Δz_cell
+        for icls in 1:ncls
+            for j in 1:(poly_order - 1)
+                z_lev[(icls - 1) * poly_order + 1 + j, icol] =
+                    z_lev[(icls - 1) * poly_order + 1, icol] + pts[1 + j] * Δz_cell
             end
-            z_lev[icls*poly_order+1, icol] = zst + icls * Δz_cell
+            z_lev[icls * poly_order + 1, icol] = zst + icls * Δz_cell
         end
 
         ts = te + Δt * (FT(1 / 3) - sin(lat[icol])^2) # surface temp at a given latitude (K)
@@ -182,22 +159,19 @@ function setup_gray_as_alt_grid(
         p_lev[1, icol] = p0
         t_lev[1, icol] = tt * (1 + d0[icol] * (p_lev[icol, 1] / p0)^α)^FT(0.25)
 
-        for ilay = 1:nlay
+        for ilay in 1:nlay
             H = FT(R_d(param_set)) * t_lev[ilay, icol] / FT(grav(param_set))
-            Δz_lay = abs(z_lev[ilay+1, icol] - z_lev[ilay, icol])
-            p_lev[ilay+1, icol] = p_lev[ilay, icol] * exp(-Δz_lay / H)
-            t_lev[ilay+1, icol] =
-                tt * (1 + d0[icol] * (p_lev[ilay+1, icol] / p0)^α)^FT(0.25)
+            Δz_lay = abs(z_lev[ilay + 1, icol] - z_lev[ilay, icol])
+            p_lev[ilay + 1, icol] = p_lev[ilay, icol] * exp(-Δz_lay / H)
+            t_lev[ilay + 1, icol] = tt * (1 + d0[icol] * (p_lev[ilay + 1, icol] / p0)^α)^FT(0.25)
 
-            t_lay[ilay, icol] =
-                FT(0.5) * (t_lev[ilay, icol] + t_lev[ilay+1, icol])
-            p_lay[ilay, icol] =
-                FT(0.5) * (p_lev[ilay, icol] + p_lev[ilay+1, icol])
+            t_lay[ilay, icol] = FT(0.5) * (t_lev[ilay, icol] + t_lev[ilay + 1, icol])
+            p_lay[ilay, icol] = FT(0.5) * (p_lev[ilay, icol] + p_lev[ilay + 1, icol])
         end
         #--------------------------------------------------------
         t_sfc[icol] = t_lev[1, icol]
     end
-    return GrayAtmosphericState{FT,DA{FT,1},DA{FT,2},Int}(
+    return GrayAtmosphericState{FT, DA{FT, 1}, DA{FT, 2}, Int}(
         p_lay,
         p_lev,
         t_lay,
@@ -233,11 +207,7 @@ function setup_gray_as_pr_grid_kernel!(
     grav_::FT,
     nlay::Int,
     gcol::Int,
-) where {
-    FT<:AbstractFloat,
-    FTA1D<:AbstractArray{FT,1},
-    FTA2D<:AbstractArray{FT,2},
-}
+) where {FT <: AbstractFloat, FTA1D <: AbstractArray{FT, 1}, FTA2D <: AbstractArray{FT, 2}}
     ts = te + Δt * (FT(1) / FT(3) - sin(lat[gcol])^2) # surface temp at a given latitude (K)
     d0[gcol] = FT((ts / tt)^FT(4) - FT(1)) # optical depth
     nlev = nlay + 1
@@ -247,22 +217,20 @@ function setup_gray_as_pr_grid_kernel!(
     t_lev[1, gcol] = tt * (FT(1) + d0[gcol] * (p_lev[1, gcol] / p0)^α)^FT(0.25)
     z_lev[1, gcol] = FT(0)
 
-    for ilay = 1:nlay
+    for ilay in 1:nlay
         #                if step == "linear"
-        p_lev[ilay+1, gcol] = p_lev[ilay, gcol] - Δp
+        p_lev[ilay + 1, gcol] = p_lev[ilay, gcol] - Δp
         #                else
         #                    p_lev[ilay+1, gcol] = p_lev[ilay, gcol] * exp(-efac)
         #                end
-        p_lay[ilay, gcol] = (p_lev[ilay, gcol] + p_lev[ilay+1, gcol]) * FT(0.5)
+        p_lay[ilay, gcol] = (p_lev[ilay, gcol] + p_lev[ilay + 1, gcol]) * FT(0.5)
 
-        t_lev[ilay+1, gcol] =
-            tt * (FT(1) + d0[gcol] * (p_lev[ilay+1, gcol] / p0)^α)^FT(0.25)
-        t_lay[ilay, gcol] =
-            tt * (FT(1) + d0[gcol] * (p_lay[ilay, gcol] / p0)^α)^FT(0.25)
+        t_lev[ilay + 1, gcol] = tt * (FT(1) + d0[gcol] * (p_lev[ilay + 1, gcol] / p0)^α)^FT(0.25)
+        t_lay[ilay, gcol] = tt * (FT(1) + d0[gcol] * (p_lay[ilay, gcol] / p0)^α)^FT(0.25)
 
         H = r_d * t_lay[ilay, gcol] / grav_
-        Δz_lay = H * log(p_lev[ilay, gcol] / p_lev[ilay+1, gcol])
-        z_lev[ilay+1, gcol] = Δz_lay + z_lev[ilay, gcol]
+        Δz_lay = H * log(p_lev[ilay, gcol] / p_lev[ilay + 1, gcol])
+        z_lev[ilay + 1, gcol] = Δz_lay + z_lev[ilay, gcol]
     end
     t_sfc[gcol] = t_lev[1, gcol]
 

@@ -15,15 +15,14 @@ using CLIMAParameters
 using CLIMAParameters.Planet: molmass_dryair, molmass_water, grav
 #---------------------------------------
 
-export AbstractOpticalProps,
-    OneScalar, TwoStream, compute_col_dry!, compute_optical_props!
+export AbstractOpticalProps, OneScalar, TwoStream, compute_col_dry!, compute_optical_props!
 
 """
     AbstractOpticalProps{FT,FTA2D}
 
 Optical properties for one scalar and two stream calculations.
 """
-abstract type AbstractOpticalProps{FT<:AbstractFloat,FTA2D<:AbstractArray{FT,2}} end
+abstract type AbstractOpticalProps{FT <: AbstractFloat, FTA2D <: AbstractArray{FT, 2}} end
 
 """
     OneScalar{FT,FTA1D,FTA2D,I,AD} <: AbstractOpticalProps{FT,FTA2D}
@@ -34,11 +33,8 @@ calculations accounting for extinction and emission
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct OneScalar{
-    FT<:AbstractFloat,
-    FTA2D<:AbstractArray{FT,2},
-    AD<:AngularDiscretization,
-} <: AbstractOpticalProps{FT,FTA2D}
+struct OneScalar{FT <: AbstractFloat, FTA2D <: AbstractArray{FT, 2}, AD <: AngularDiscretization} <:
+       AbstractOpticalProps{FT, FTA2D}
     "Optical Depth"
     τ::FTA2D
     "Angular discretization"
@@ -46,17 +42,12 @@ struct OneScalar{
 end
 Adapt.@adapt_structure OneScalar
 
-function OneScalar(
-    ::Type{FT},
-    ncol::Int,
-    nlay::Int,
-    ::Type{DA},
-) where {FT<:AbstractFloat,DA}
+function OneScalar(::Type{FT}, ncol::Int, nlay::Int, ::Type{DA}) where {FT <: AbstractFloat, DA}
     I = Int
-    τ = DA{FT,2}(undef, nlay, ncol)
+    τ = DA{FT, 2}(undef, nlay, ncol)
     ad = AngularDiscretization(FT, DA, I(1))
 
-    return OneScalar{eltype(τ),typeof(τ),typeof(ad)}(τ, ad)
+    return OneScalar{eltype(τ), typeof(τ), typeof(ad)}(τ, ad)
 end
 
 """
@@ -68,8 +59,7 @@ calculations accounting for extinction and emission
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct TwoStream{FT<:AbstractFloat,FTA2D<:AbstractArray{FT,2}} <:
-       AbstractOpticalProps{FT,FTA2D}
+struct TwoStream{FT <: AbstractFloat, FTA2D <: AbstractArray{FT, 2}} <: AbstractOpticalProps{FT, FTA2D}
     "Optical depth"
     τ::FTA2D
     "Single-scattering albedo"
@@ -79,16 +69,11 @@ struct TwoStream{FT<:AbstractFloat,FTA2D<:AbstractArray{FT,2}} <:
 end
 Adapt.@adapt_structure TwoStream
 
-function TwoStream(
-    ::Type{FT},
-    ncol::Int,
-    nlay::Int,
-    ::Type{DA},
-) where {FT<:AbstractFloat,DA}
-    τ = DA{FT,2}(zeros(nlay, ncol))
-    ssa = DA{FT,2}(zeros(nlay, ncol))
-    g = DA{FT,2}(zeros(nlay, ncol))
-    return TwoStream{eltype(τ),typeof(τ)}(τ, ssa, g)
+function TwoStream(::Type{FT}, ncol::Int, nlay::Int, ::Type{DA}) where {FT <: AbstractFloat, DA}
+    τ = DA{FT, 2}(zeros(nlay, ncol))
+    ssa = DA{FT, 2}(zeros(nlay, ncol))
+    g = DA{FT, 2}(zeros(nlay, ncol))
+    return TwoStream{eltype(τ), typeof(τ)}(τ, ssa, g)
 end
 
 """
@@ -108,10 +93,10 @@ function compute_col_dry!(
     p_lev::FTA2D,
     col_dry::FTA2D,
     param_set::AbstractEarthParameterSet,
-    vmr_h2o::Union{AbstractArray{FT,2},Nothing} = nothing,
-    lat::Union{AbstractArray{FT,1},Nothing} = nothing,
+    vmr_h2o::Union{AbstractArray{FT, 2}, Nothing} = nothing,
+    lat::Union{AbstractArray{FT, 1}, Nothing} = nothing,
     max_threads::Int = Int(256),
-) where {FT<:AbstractFloat,FTA2D<:AbstractArray{FT,2}}
+) where {FT <: AbstractFloat, FTA2D <: AbstractArray{FT, 2}}
     nlay, ncol = size(col_dry)
     mol_m_dry = FT(molmass_dryair(param_set))
     mol_m_h2o = FT(molmass_water(param_set))
@@ -122,14 +107,10 @@ function compute_col_dry!(
     if device === CUDADevice() # launching CUDA kernel
         tx = min(nlay * ncol, max_threads)
         bx = cld(nlay * ncol, tx)
-        @cuda threads = (tx) blocks = (bx) compute_col_dry_CUDA!(
-            col_dry,
-            args...,
-        )
+        @cuda threads = (tx) blocks = (bx) compute_col_dry_CUDA!(col_dry, args...)
     else # launching Julia native multithreading kernel
-        Threads.@threads for icnt = 1:(nlay*ncol)
-            glaycol =
-                ((icnt % nlay == 0) ? nlay : (icnt % nlay), cld(icnt, nlay))
+        Threads.@threads for icnt in 1:(nlay * ncol)
+            glaycol = ((icnt % nlay == 0) ? nlay : (icnt % nlay), cld(icnt, nlay))
             compute_col_dry_kernel!(col_dry, args..., glaycol)
         end
     end
@@ -175,12 +156,12 @@ function compute_optical_props!(
     sf::AbstractSourceLW{FT},
     gcol::I,
     igpt::I,
-    lkp::LookUpLW{I,FT},
-    lkp_cld::Union{LookUpCld,Nothing} = nothing,
-) where {I<:Int,FT<:AbstractFloat}
+    lkp::LookUpLW{I, FT},
+    lkp_cld::Union{LookUpCld, Nothing} = nothing,
+) where {I <: Int, FT <: AbstractFloat}
     nlay = as.nlay
     lkp_args = (lkp_cld === nothing) ? (lkp,) : (lkp, lkp_cld)
-    for ilay = 1:nlay
+    for ilay in 1:nlay
         glaycol = (ilay, gcol)
         compute_optical_props_kernel!(op, as, glaycol, sf, igpt, lkp_args...)
     end
@@ -204,12 +185,12 @@ function compute_optical_props!(
     as::AtmosphericState{FT},
     gcol::I,
     igpt::I,
-    lkp::LookUpSW{I,FT},
-    lkp_cld::Union{LookUpCld,Nothing} = nothing,
-) where {I<:Int,FT<:AbstractFloat}
+    lkp::LookUpSW{I, FT},
+    lkp_cld::Union{LookUpCld, Nothing} = nothing,
+) where {I <: Int, FT <: AbstractFloat}
     nlay = as.nlay
     lkp_args = (lkp_cld === nothing) ? (lkp,) : (lkp, lkp_cld)
-    for ilay = 1:nlay
+    for ilay in 1:nlay
         glaycol = (ilay, gcol)
         compute_optical_props_kernel!(op, as, glaycol, igpt, lkp_args...)
     end
@@ -233,9 +214,9 @@ function compute_optical_props!(
     sf::AbstractSourceLW{FT},
     gcol::I,
     igpt::I = 1,
-) where {FT<:AbstractFloat,I<:Int}
+) where {FT <: AbstractFloat, I <: Int}
     nlay = as.nlay
-    for ilay = 1:nlay
+    for ilay in 1:nlay
         glaycol = (ilay, gcol)
         compute_optical_props_kernel!(op, as, glaycol, sf)
     end
@@ -257,9 +238,9 @@ function compute_optical_props!(
     as::GrayAtmosphericState{FT},
     gcol::I,
     igpt::I = 1,
-) where {FT<:AbstractFloat,I<:Int}
+) where {FT <: AbstractFloat, I <: Int}
     nlay = as.nlay
-    for ilay = 1:nlay
+    for ilay in 1:nlay
         glaycol = (ilay, gcol)
         compute_optical_props_kernel!(op, as, glaycol)
     end
