@@ -15,13 +15,12 @@ using RRTMGP.AngularDiscretizations
 using RRTMGP.RTE
 using RRTMGP.RTESolver
 
-using CLIMAParameters
-struct EarthParameterSet <: AbstractEarthParameterSet end
-const param_set = EarthParameterSet()
+import CLIMAParameters as CP
+
+include(joinpath(pkgdir(RRTMGP), "parameters", "create_parameters.jl"))
 # overriding some parameters to match with RRTMGP FORTRAN code
-CLIMAParameters.Planet.grav(::EarthParameterSet) = 9.80665
-CLIMAParameters.Planet.molmass_dryair(::EarthParameterSet) = 0.028964
-CLIMAParameters.Planet.molmass_water(::EarthParameterSet) = 0.018016
+overrides = (; grav = 9.80665, molmass_dryair = 0.028964, molmass_water = 0.018016)
+param_set = create_insolation_parameters(Float64, overrides)
 
 include("reference_files.jl")
 include("read_rfmip_clear_sky.jl")
@@ -71,9 +70,9 @@ function clear_sky(
     nlev = nlay + 1
     op = OPC(FT, ncol, nlay, DA) # allocating optical properties object
 
-    # setting up longwave problem 
+    # setting up longwave problem
     ngpt_lw = lookup_lw.n_gpt
-    src_lw = source_func_longwave(FT, ncol, nlay, opc, DA)         # allocating longwave source function object
+    src_lw = source_func_longwave(param_set, FT, ncol, nlay, opc, DA)         # allocating longwave source function object
     bcs_lw = LwBCs{FT, typeof(sfc_emis), Nothing}(sfc_emis, nothing) # setting up boundary conditions
     ang_disc = nothing#AngularDiscretization(opc, FT, n_gauss_angles, DA)  # initializing Angular discretization
     fluxb_lw = FluxLW(ncol, nlay, FT, DA)                          # flux storage for bandwise calculations

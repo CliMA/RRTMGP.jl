@@ -10,9 +10,7 @@ using ..LookUpTables
 using ..AtmosphericStates
 using ..Sources
 using ..AngularDiscretizations
-#---------------------------------------
-using CLIMAParameters
-using CLIMAParameters.Planet: molmass_dryair, molmass_water, grav
+import ..Parameters as RP
 #---------------------------------------
 
 export AbstractOpticalProps, OneScalar, TwoStream, compute_col_dry!, compute_optical_props!
@@ -92,16 +90,16 @@ This function computes the column amounts of dry or moist air.
 function compute_col_dry!(
     p_lev::FTA2D,
     col_dry::FTA2D,
-    param_set::AbstractEarthParameterSet,
+    param_set::RP.ARP,
     vmr_h2o::Union{AbstractArray{FT, 2}, Nothing} = nothing,
     lat::Union{AbstractArray{FT, 1}, Nothing} = nothing,
     max_threads::Int = Int(256),
 ) where {FT <: AbstractFloat, FTA2D <: AbstractArray{FT, 2}}
     nlay, ncol = size(col_dry)
-    mol_m_dry = FT(molmass_dryair(param_set))
-    mol_m_h2o = FT(molmass_water(param_set))
-    avogadro = FT(avogad())
-    helmert1 = FT(grav(param_set))
+    mol_m_dry = FT(RP.molmass_dryair(param_set))
+    mol_m_h2o = FT(RP.molmass_water(param_set))
+    avogadro = FT(RP.avogad(param_set))
+    helmert1 = FT(RP.grav(param_set))
     args = (p_lev, mol_m_dry, mol_m_h2o, avogadro, helmert1, vmr_h2o, lat)
     device = array_device(p_lev)
     if device === CUDADevice() # launching CUDA kernel

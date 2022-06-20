@@ -4,8 +4,7 @@ using ..Device: array_type, array_device, CUDADevice, CPU
 using DocStringExtensions
 using Adapt
 using GaussQuadrature
-using CLIMAParameters
-using CLIMAParameters.Planet: grav, R_d
+import ..Parameters as RP
 
 using ..Vmrs
 

@@ -9,8 +9,7 @@ using ..Fluxes
 using ..Optics
 using ..BCs
 
-using CLIMAParameters
-using CLIMAParameters.Planet: grav, R_d, cp_d
+import ..Parameters as RP
 
 export Solver
 

@@ -1,11 +1,10 @@
 name = "RRTMGP"
 uuid = "a01a1ee8-cea4-48fc-987c-fc7878d79da1"
 authors = ["Climate Modeling Alliance"]
-version = "0.3.2"
+version = "0.4.0"
 
 [deps]
 Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
-CLIMAParameters = "6eacf6c3-8458-43b9-ae03-caf5306d3d53"
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 DocStringExtensions = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
 GaussQuadrature = "d54b0c1a-921d-58e0-8e36-89d8069c0969"
@@ -13,7 +12,6 @@ StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [compat]
 Adapt = "3.3"
-CLIMAParameters = "0.1, 0.2, 0.3, 0.4, 0.5, 0.6"
 CUDA = "3.8"
 DocStringExtensions = "0.8"
 GaussQuadrature = "0.5"

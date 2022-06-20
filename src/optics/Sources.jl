@@ -3,6 +3,8 @@ module Sources
 using Adapt
 using DocStringExtensions
 
+import ..Parameters as RP
+
 export AbstractSourceLW, SourceLWNoScat, SourceLW2Str, SourceSW2Str, source_func_longwave, source_func_shortwave
 
 """
@@ -22,8 +24,14 @@ and at the surface for no scattering calculations
 
 $(DocStringExtensions.FIELDS)
 """
-struct SourceLWNoScat{FT <: AbstractFloat, FTA1D <: AbstractArray{FT, 1}, FTA2D <: AbstractArray{FT, 2}} <:
-       AbstractSourceLW{FT, FTA1D, FTA2D}
+struct SourceLWNoScat{
+    FT <: AbstractFloat,
+    FTA1D <: AbstractArray{FT, 1},
+    FTA2D <: AbstractArray{FT, 2},
+    PS <: RP.ARP,
+} <: AbstractSourceLW{FT, FTA1D, FTA2D}
+    "Parameter set"
+    param_set::PS
     "Planck source at layer average temperature `[W/m2]` `(nlay, ncol)`"
     lay_source::FTA2D
     "Planck source at layer edge in increasing ilay direction `[W/m2]` `(nlay, ncol)`, includes spectral weighting that accounts for state-dependent frequency to g-space mapping"
@@ -39,7 +47,7 @@ struct SourceLWNoScat{FT <: AbstractFloat, FTA1D <: AbstractArray{FT, 1}, FTA2D 
 end
 Adapt.@adapt_structure SourceLWNoScat
 
-function SourceLWNoScat(::Type{FT}, ::Type{DA}, nlay::I, ncol::I) where {FT <: AbstractFloat, I <: Int, DA}
+function SourceLWNoScat(param_set::RP.ARP, ::Type{FT}, ::Type{DA}, nlay::Int, ncol::Int) where {FT <: AbstractFloat, DA}
     FTA1D = DA{FT, 1}
     FTA2D = DA{FT, 2}
 
@@ -50,7 +58,8 @@ function SourceLWNoScat(::Type{FT}, ::Type{DA}, nlay::I, ncol::I) where {FT <: A
     src_up = FTA2D(undef, nlay, ncol) # src_up
     src_dn = FTA2D(undef, nlay, ncol) # src_dn
 
-    return SourceLWNoScat{eltype(lay_source), typeof(sfc_source), typeof(lay_source)}(
+    return SourceLWNoScat{eltype(lay_source), typeof(sfc_source), typeof(lay_source), typeof(param_set)}(
+        param_set,
         lay_source,
         lev_source_inc,
         lev_source_dec,
@@ -70,8 +79,10 @@ and at the surface for 2-stream calculations
 
 $(DocStringExtensions.FIELDS)
 """
-struct SourceLW2Str{FT <: AbstractFloat, FTA1D <: AbstractArray{FT, 1}, FTA2D <: AbstractArray{FT, 2}} <:
+struct SourceLW2Str{FT <: AbstractFloat, FTA1D <: AbstractArray{FT, 1}, FTA2D <: AbstractArray{FT, 2}, PS <: RP.ARP} <:
        AbstractSourceLW{FT, FTA1D, FTA2D}
+    "Parameter set"
+    param_set::PS
     "Planck source at layer average temperature `[W/m2]` `(nlay, ncol)`"
     lay_source::FTA2D
     "Planck source at layer edge in increasing ilay direction `[W/m2]` `(nlay, ncol)`, includes spectral weighting that accounts for state-dependent frequency to g-space mapping"
@@ -97,7 +108,7 @@ struct SourceLW2Str{FT <: AbstractFloat, FTA1D <: AbstractArray{FT, 1}, FTA2D <:
 end
 Adapt.@adapt_structure SourceLW2Str
 
-function SourceLW2Str(::Type{FT}, ::Type{DA}, nlay::I, ncol::I) where {FT <: AbstractFloat, I <: Int, DA}
+function SourceLW2Str(param_set::RP.ARP, ::Type{FT}, ::Type{DA}, nlay::Int, ncol::Int) where {FT <: AbstractFloat, DA}
     FTA1D = DA{FT, 1}
     FTA2D = DA{FT, 2}
 
@@ -113,7 +124,8 @@ function SourceLW2Str(::Type{FT}, ::Type{DA}, nlay::I, ncol::I) where {FT <: Abs
     albedo = FTA2D(undef, nlay + 1, ncol) # albedo
     src = FTA2D(undef, nlay + 1, ncol) # src
 
-    return SourceLW2Str{eltype(lay_source), typeof(sfc_source), typeof(lay_source)}(
+    return SourceLW2Str{eltype(lay_source), typeof(sfc_source), typeof(lay_source), typeof(param_set)}(
+        param_set,
         lay_source,
         lev_source_inc,
         lev_source_dec,
@@ -130,19 +142,21 @@ end
 
 """
     source_func_longwave(
+        param_set,
         ::Type{FT},
-        ncol::I,
-        nlay::I,
+        ncol::Int,
+        nlay::Int,
         OPC::Symbol,
         ::Type{DA},
-    ) where {FT<:AbstractFloat,I<:Int,DA}
+    ) where {FT<:AbstractFloat,DA}
 
 Initializes the longwave source for one scalar and two stream simulations.
 """
 function source_func_longwave(
+    param_set::RP.ARP,
     ::Type{FT},
-    ncol::I,
-    nlay::I,
+    ncol::Int,
+    nlay::Int,
     OPC::Symbol,
     ::Type{DA},
 ) where {FT <: AbstractFloat, I <: Int, DA}
@@ -154,7 +168,8 @@ function source_func_longwave(
     src_dn = DA{FT, 2}(undef, nlay, ncol)
 
     if OPC === :OneScalar
-        return SourceLWNoScat{eltype(lay_source), typeof(sfc_source), typeof(src_up)}(
+        return SourceLWNoScat{eltype(lay_source), typeof(sfc_source), typeof(src_up), typeof(param_set)}(
+            param_set,
             lay_source,
             lev_source_inc,
             lev_source_dec,
@@ -163,12 +178,14 @@ function source_func_longwave(
             src_dn,
         )
     else
+        PS = typeof(param_set)
         lev_source = DA{FT, 2}(undef, nlay + 1, ncol)
         Rdif = DA{FT, 2}(undef, nlay, ncol)
         Tdif = DA{FT, 2}(undef, nlay, ncol)
         albedo = DA{FT, 2}(undef, nlay + 1, ncol)
         src = DA{FT, 2}(undef, nlay + 1, ncol)
-        return SourceLW2Str{FT, typeof(sfc_source), typeof(src_up)}(
+        return SourceLW2Str{FT, typeof(sfc_source), typeof(src_up), PS}(
+            param_set,
             lay_source,
             lev_source_inc,
             lev_source_dec,

@@ -12,10 +12,11 @@ using RRTMGP.AtmosphericStates
 using RRTMGP.Sources
 using RRTMGP.BCs
 
-using CLIMAParameters
-import CLIMAParameters.Planet: cp_d, grav, R_d
-struct EarthParameterSet <: AbstractEarthParameterSet end
-const param_set = EarthParameterSet()
+import CLIMAParameters as CP
+
+include(joinpath(pkgdir(RRTMGP), "parameters", "create_parameters.jl"))
+param_set = create_insolation_parameters(Float64)
+
 # overriding CLIMAParameters as different precision is needed by RRTMGP
 
 #using Plots
@@ -59,7 +60,7 @@ function gray_atmos_lw_equil(
 
     as = setup_gray_as_pr_grid(nlay, lat, p0, pe, param_set, DA)
     op = OPC(FT, ncol, nlay, DA)
-    src_lw = source_func_longwave(FT, ncol, nlay, opc, DA)
+    src_lw = source_func_longwave(param_set, FT, ncol, nlay, opc, DA)
     bcs_lw = LwBCs(DA{FT, 2}(sfc_emis), inc_flux)
     fluxb_lw = nothing
     flux_lw = FluxLW(ncol, nlay, FT, DA)
@@ -88,7 +89,21 @@ function gray_atmos_lw_equil(
         # computing heating rate
         compute_gray_heating_rate!(hr_lay, p_lev, ncol, nlay, flux_net, param_set, FT)
         # updating t_lay and t_lev based on heating rate
-        update_profile_lw!(t_lay, t_lev, flux_dn, flux_net, hr_lay, flux_grad, T_ex_lev, Δt, nlay, nlev, ncol, FT)
+        update_profile_lw!(
+            param_set,
+            t_lay,
+            t_lev,
+            flux_dn,
+            flux_net,
+            hr_lay,
+            flux_grad,
+            T_ex_lev,
+            Δt,
+            nlay,
+            nlev,
+            ncol,
+            FT,
+        )
         #----------------------------------------
         flux_grad_err = maximum(flux_grad)
         if flux_grad_err < flux_grad_toler

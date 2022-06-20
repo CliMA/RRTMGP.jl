@@ -75,7 +75,7 @@ function compute_sources_gray_kernel!(
     (; t_lay, t_lev) = as
     (; lay_source, lev_source_inc, lev_source_dec, sfc_source) = source
 
-    sbc = FT(Stefan())
+    sbc = FT(RP.Stefan(source.param_set))
     @inbounds lay_source[glaycol...] = sbc * t_lay[glaycol...]^FT(4) / FT(π)   # computing lay_source
     @inbounds lev_source_inc[glaycol...] = sbc * t_lev[glay + 1, gcol]^FT(4) / FT(π)
     @inbounds lev_source_dec[glaycol...] = sbc * t_lev[glaycol...]^FT(4) / FT(π)
