@@ -68,6 +68,7 @@ function setup_allsky_as(ds_in, idx_gases, lkp_lw, lkp_sw, lkp_lw_cld, lkp_sw_cl
     col_dry = DA{FT, 2}(undef, nlay, ncol)
     vmr_h2o = view(vmr.vmr, :, :, idx_gases["h2o"])
 
+    cld_frac = zeros(FT, nlay, ncol)
     cld_mask_lw = zeros(Bool, nlay, ncol, ngpt_lw)
     cld_mask_sw = zeros(Bool, nlay, ncol, ngpt_sw)
     cld_r_eff_liq = zeros(FT, nlay, ncol)
@@ -92,6 +93,7 @@ function setup_allsky_as(ds_in, idx_gases, lkp_lw, lkp_sw, lkp_lw_cld, lkp_sw_cl
         if p_lay[ilay, icol] > FT(10000) && p_lay[ilay, icol] < FT(90000) && icol % 3 ≠ 0
             cld_mask_lw[ilay, icol, :] .= true
             cld_mask_sw[ilay, icol, :] .= true
+            cld_frac[ilay, icol] = FT(1)
             if t_lay[ilay, icol] > FT(263)
                 cld_path_liq[ilay, icol] = FT(10)
                 cld_r_eff_liq[ilay, icol] = r_eff_liq
@@ -113,6 +115,7 @@ function setup_allsky_as(ds_in, idx_gases, lkp_lw, lkp_sw, lkp_lw_cld, lkp_sw_cl
 
     t_sfc = DA(t_sfc)
 
+    cld_frac = DA(cld_frac)
     cld_mask_lw = DA(cld_mask_lw)
     cld_mask_sw = DA(cld_mask_sw)
     cld_r_eff_liq = DA(cld_r_eff_liq)
@@ -145,6 +148,7 @@ function setup_allsky_as(ds_in, idx_gases, lkp_lw, lkp_sw, lkp_lw_cld, lkp_sw_cl
             cld_r_eff_ice,
             cld_path_liq,
             cld_path_ice,
+            cld_frac,
             cld_mask_lw,
             cld_mask_sw,
             ice_rgh,

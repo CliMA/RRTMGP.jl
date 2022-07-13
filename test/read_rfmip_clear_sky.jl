@@ -114,6 +114,7 @@ function setup_rfmip_as(
     cld_r_eff_ice = nothing
     cld_path_liq = nothing
     cld_path_ice = nothing
+    cld_frac = nothing
     cld_mask_lw = nothing
     cld_mask_sw = nothing
     ice_rgh = 1
@@ -142,6 +143,7 @@ function setup_rfmip_as(
             cld_r_eff_ice,
             cld_path_liq,
             cld_path_ice,
+            cld_frac,
             cld_mask_lw,
             cld_mask_sw,
             ice_rgh,
