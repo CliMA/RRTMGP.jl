@@ -8,11 +8,23 @@ import ..Parameters as RP
 
 using ..Vmrs
 
-export AbstractAtmosphericState, AtmosphericState, GrayAtmosphericState, setup_gray_as_pr_grid, setup_gray_as_alt_grid
+export AbstractAtmosphericState,
+    AtmosphericState,
+    GrayAtmosphericState,
+    setup_gray_as_pr_grid,
+    setup_gray_as_alt_grid,
+    MaxRandomOverlap,
+    ExpRandomOverlap,
+    AbstractCloudMask
 
 abstract type AbstractAtmosphericState{FT, I, FTA1D} end
 
 include("GrayAtmosphericStates.jl")
+
+abstract type AbstractCloudMask end
+
+struct MaxRandomOverlap <: AbstractCloudMask end
+Adapt.@adapt_structure MaxRandomOverlap
 
 """
     AtmosphericState{FT,FTA1D,FTA1DN,FTA2D,CLDP,CLDM,VMR,I} <:
@@ -30,6 +42,8 @@ struct AtmosphericState{
     FTA2D <: AbstractArray{FT, 2},
     CLDP <: Union{AbstractArray{FT, 2}, Nothing},
     CLDM <: Union{AbstractArray{Bool, 3}, Nothing},
+    RND <: Union{AbstractArray{FT, 2}, Nothing},
+    CMASK <: Union{AbstractCloudMask, Nothing},
     VMR <: AbstractVmr{FT},
     I <: Int,
 } <: AbstractAtmosphericState{FT, I, FTA1D}
@@ -61,10 +75,16 @@ struct AtmosphericState{
     cld_path_ice::CLDP
     "cloud fraction"
     cld_frac::CLDP
+    "random number storage for longwave bands"
+    random_lw::RND
+    "random number storage for shortwave bands"
+    random_sw::RND
     "cloud mask (longwave), = true if clouds are present"
     cld_mask_lw::CLDM
     "cloud mask (shortwave), = true if clouds are present"
     cld_mask_sw::CLDM
+    "cloud mask type"
+    cld_mask_type::CMASK
     "ice roughness, 1 = none, 2 = medium, 3 = rough"
     ice_rgh::I
     "Number of layers."

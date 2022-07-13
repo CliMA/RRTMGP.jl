@@ -163,6 +163,7 @@ function all_sky(
     @test max_err_flux_up_sw < toler
     @test max_err_flux_dn_sw < toler
 end
+
 @testset "Cloudy (all-sky, Two-stream calculations using lookup table method" begin
     @time all_sky(TwoStream, Float64, Int, DA, use_lut = true)
 end

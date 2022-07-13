@@ -197,6 +197,11 @@ function rte_lw_2stream_solve!(
         args = (flux, flux_lw, src_lw, bcs_lw, op, nlay, ncol, major_gpt2bnd, as, lkp_args...)
         @cuda threads = (tx) blocks = (bx) rte_lw_2stream_solve_CUDA!(args...)
     else # use Julia native multithreading
+        if as isa AtmosphericState && as.cld_mask_type isa AbstractCloudMask
+            Threads.@threads for gcol in 1:ncol
+                Optics.build_cloud_mask!(as.cld_mask_lw, as.cld_frac, as.random_lw, gcol, as.cld_mask_type)
+            end
+        end
         for igpt in 1:n_gpt
             Threads.@threads for gcol in 1:ncol
                 igpt == 1 && set_flux_to_zero!(flux_lw, gcol)
@@ -227,6 +232,9 @@ function rte_lw_2stream_solve_CUDA!(
     nlev = nlay + 1
     n_gpt = length(major_gpt2bnd)
     if gcol ≤ ncol
+        if as isa AtmosphericState && as.cld_mask_type isa AbstractCloudMask
+            Optics.build_cloud_mask!(as.cld_mask_lw, as.cld_frac, as.random_lw, gcol, as.cld_mask_type)
+        end
         for igpt in 1:n_gpt
             igpt == 1 && set_flux_to_zero!(flux_lw, gcol)
             compute_optical_props!(op, as, src_lw, gcol, igpt, lkp_args...)
@@ -408,6 +416,11 @@ function rte_sw_2stream_solve!(
         args = (flux, flux_sw, op, bcs_sw, src_sw, nlay, ncol, major_gpt2bnd, solar_src_scaled, as, lkp_args...)
         @cuda threads = (tx) blocks = (bx) rte_sw_2stream_solve_CUDA!(args...)
     else # launch julia native multithreading
+        if as isa AtmosphericState && as.cld_mask_type isa AbstractCloudMask
+            Threads.@threads for gcol in 1:ncol
+                Optics.build_cloud_mask!(as.cld_mask_sw, as.cld_frac, as.random_sw, gcol, as.cld_mask_type)
+            end
+        end
         # setting references for flux_sw
         for igpt in 1:n_gpt
             @inbounds Threads.@threads for gcol in 1:ncol
@@ -440,6 +453,9 @@ function rte_sw_2stream_solve_CUDA!(
     nlev = nlay + 1
     n_gpt = length(major_gpt2bnd)
     if gcol ≤ ncol
+        if as isa AtmosphericState && as.cld_mask_type isa AbstractCloudMask
+            Optics.build_cloud_mask!(as.cld_mask_sw, as.cld_frac, as.random_sw, gcol, as.cld_mask_type)
+        end
         for igpt in 1:n_gpt
             igpt == 1 && set_flux_to_zero!(flux_sw, gcol)
             compute_optical_props!(op, as, gcol, igpt, lkp_args...)

@@ -15,7 +15,7 @@ to the TwoStream longwave gas optics properties.
 """
 function add_cloud_optics_2stream(op::TwoStream, as::AtmosphericState, lkp::LookUpLW, lkp_cld, glaycol, ibnd, igpt)
     if as.cld_mask_lw isa AbstractArray
-        cld_mask = as.cld_mask_lw[glaycol..., igpt]
+        cld_mask = as.cld_mask_lw[igpt, glaycol...]
         if cld_mask
             τ_cl, τ_cl_ssa, τ_cl_ssag = compute_cld_props(lkp_cld, as, cld_mask, glaycol..., ibnd, igpt)
             increment!(op, τ_cl, τ_cl_ssa, τ_cl_ssag, glaycol..., igpt)
@@ -40,7 +40,7 @@ to the TwoStream shortwave gase optics properties.
 """
 function add_cloud_optics_2stream(op::TwoStream, as::AtmosphericState, lkp::LookUpSW, lkp_cld, glaycol, ibnd, igpt)
     if as.cld_mask_sw isa AbstractArray
-        cld_mask = as.cld_mask_sw[glaycol..., igpt]
+        cld_mask = as.cld_mask_sw[igpt, glaycol...]
         if cld_mask
             τ_cl, τ_cl_ssa, τ_cl_ssag = compute_cld_props(lkp_cld, as, cld_mask, glaycol..., ibnd, igpt)
             τ_cl, τ_cl_ssa, τ_cl_ssag = delta_scale(τ_cl, τ_cl_ssa, τ_cl_ssag)
@@ -195,4 +195,66 @@ function pade_eval(ibnd, re, irad, m, n, pade_coeffs, irgh::Union{Int, Nothing} 
     numer = coeffs[ibnd, irad, 1] + re * numer
 
     return (numer / denom)
+end
+
+"""
+    build_cloud_mask!(cld_mask, cld_frac, random_arr, gcol, ::MaxRandomOverlap)
+
+Builds McICA-sampled cloud mask from cloud fraction data for maximum-random overlap
+"""
+function build_cloud_mask!(cld_mask, cld_frac, random_arr, gcol, ::MaxRandomOverlap)
+
+    FT = eltype(cld_frac)
+    local_rand = view(random_arr, :, gcol)
+    local_cld_frac = view(cld_frac, :, gcol)
+    local_cld_mask = view(cld_mask, :, :, gcol)
+    ngpt, nlay = length(local_rand), length(local_cld_frac)
+    start = 0
+    for ilay in 1:nlay # for GPU compatibility (start = findfirst(local_cld_frac .> FT(0)))
+        if local_cld_frac[ilay] > FT(0)
+            start = ilay
+            break
+        end
+    end
+
+    if start == 0 # no clouds in entire column
+        for ilay in 1:nlay, igpt in 1:ngpt
+            local_cld_mask[igpt, ilay] = false
+        end
+    else
+        # finish = findlast(local_cld_frac .> FT(0)) # for GPU compatibility
+        finish = start
+        for ilay in nlay:-1:(start + 1)
+            if local_cld_frac[ilay] > FT(0)
+                finish = ilay
+                break
+            end
+        end
+        # set cloud mask for non-cloudy layers
+        for ilay in 1:(start - 1), igpt in 1:ngpt
+            local_cld_mask[igpt, ilay] = false
+        end
+        for ilay in (finish + 1):nlay, igpt in 1:ngpt
+            local_cld_mask[igpt, ilay] = false
+        end
+        # set cloud mask for cloudy layers
+        Random.rand!(local_rand)
+        # first layer
+        for igpt in 1:ngpt
+            local_cld_mask[igpt, start] = local_rand[igpt] ≤ local_cld_frac[start]
+        end
+        for ilay in (start + 1):finish
+            if local_cld_frac[ilay] > FT(0)
+                local_cld_frac[ilay - 1] == FT(0) && (Random.rand!(local_rand)) # regenerate random numbers if layer below is not cloudy
+                for igpt in 1:ngpt
+                    local_cld_mask[igpt, ilay] = local_rand[igpt] ≤ local_cld_frac[ilay]
+                end
+            else
+                for igpt in 1:ngpt
+                    local_cld_mask[igpt, ilay] = false
+                end
+            end
+        end
+    end
+    return nothing
 end
