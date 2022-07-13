@@ -59,6 +59,8 @@ struct AtmosphericState{
     cld_path_liq::CLDP
     "cloud ice path"
     cld_path_ice::CLDP
+    "cloud fraction"
+    cld_frac::CLDP
     "cloud mask (longwave), = true if clouds are present"
     cld_mask_lw::CLDM
     "cloud mask (shortwave), = true if clouds are present"
