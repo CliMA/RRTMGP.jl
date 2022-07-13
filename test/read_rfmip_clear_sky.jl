@@ -4,7 +4,7 @@ function setup_rfmip_as(
     ds_lw_in,
     idx_gases,
     exp_no,
-    lookup,
+    lookup_lw,
     ::Type{FT},
     ::Type{DA},
     ::Type{VMR},
@@ -17,17 +17,16 @@ function setup_rfmip_as(
     nlay = Int(ds_lw_in.dim["layer"])
     ncol = Int(ds_lw_in.dim["site"])
     nlev = nlay + 1
-    ngas = lookup.n_gases
-    nbnd = lookup.n_bnd
-
+    ngas = lookup_lw.n_gases
+    nbnd_lw = lookup_lw.n_bnd
     lon = DA{FT, 1}(ds_lw_in["lon"][:])
     lat = DA{FT, 1}(ds_lw_in["lat"][:])
 
     lon = nothing # This example skips latitude dependent gravity computation
     lat = nothing # to be consistent with the FORTRAN RRTMGP test case.
 
-    sfc_emis = DA{FT, 2}(repeat(reshape(Array{FT}(ds_lw_in["surface_emissivity"][:]), 1, :), nbnd, 1)) # all bands use same emissivity
-    sfc_alb = DA{FT, 2}(repeat(reshape(Array{FT}(ds_lw_in["surface_albedo"][:]), 1, :), nbnd, 1)) # all bands use same albedo
+    sfc_emis = DA{FT, 2}(repeat(reshape(Array{FT}(ds_lw_in["surface_emissivity"][:]), 1, :), nbnd_lw, 1)) # all bands use same emissivity
+    sfc_alb = DA{FT, 2}(repeat(reshape(Array{FT}(ds_lw_in["surface_albedo"][:]), 1, :), nbnd_lw, 1)) # all bands use same albedo
     #--------------------------------------------------------------
     zenith = Array{FT, 1}(deg2rad .* ds_lw_in["solar_zenith_angle"][:])
     irrad = Array{FT, 1}(ds_lw_in["total_solar_irradiance"][:])
@@ -50,7 +49,7 @@ function setup_rfmip_as(
     lev_ind = p_lev[1, 1] > p_lev[end, 1] ? (1:nlev) : (nlev:-1:1)
     lay_ind = p_lev[1, 1] > p_lev[end, 1] ? (1:nlay) : (nlay:-1:1)
 
-    p_lev[lev_ind[end], :] .= lookup.p_ref_min
+    p_lev[lev_ind[end], :] .= lookup_lw.p_ref_min
 
     p_lev = DA{FT, 2}(p_lev[lev_ind, :])
     p_lay = DA{FT, 2}(ds_lw_in["pres_layer"][:][lay_ind, :])
@@ -115,7 +114,8 @@ function setup_rfmip_as(
     cld_r_eff_ice = nothing
     cld_path_liq = nothing
     cld_path_ice = nothing
-    cld_mask = nothing
+    cld_mask_lw = nothing
+    cld_mask_sw = nothing
     ice_rgh = 1
     #------------------
     return (
@@ -125,7 +125,7 @@ function setup_rfmip_as(
             typeof(lat),
             typeof(p_lev),
             typeof(cld_r_eff_liq),
-            typeof(cld_mask),
+            typeof(cld_mask_lw),
             typeof(vmr),
             Int,
         }(
@@ -142,7 +142,8 @@ function setup_rfmip_as(
             cld_r_eff_ice,
             cld_path_liq,
             cld_path_ice,
-            cld_mask,
+            cld_mask_lw,
+            cld_mask_sw,
             ice_rgh,
             nlay,
             ncol,

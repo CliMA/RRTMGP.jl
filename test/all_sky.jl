@@ -70,7 +70,6 @@ function all_sky(
     close(ds_sw_cld)
     # reading input file 
     ds_in = Dataset(input_file, "r")
-
     as, sfc_emis, sfc_alb_direct, sfc_alb_diffuse, zenith, toa_flux, bot_at_1 = setup_allsky_as(
         ds_in,
         idx_gases,
@@ -164,9 +163,9 @@ function all_sky(
     @test max_err_flux_up_sw < toler
     @test max_err_flux_dn_sw < toler
 end
-println("running cloudy lookup table version")
-@time all_sky(TwoStream, Float64, Int, DA, use_lut = true)
-println("-----------------------------------------------")
-println("running cloudy pade version")
-@time all_sky(TwoStream, Float64, Int, DA, use_lut = false)
-println("-----------------------------------------------")
+@testset "Cloudy (all-sky, Two-stream calculations using lookup table method" begin
+    @time all_sky(TwoStream, Float64, Int, DA, use_lut = true)
+end
+@testset "Cloudy (all-sky), Two-stream calculations using Pade method" begin
+    @time all_sky(TwoStream, Float64, Int, DA, use_lut = false)
+end
