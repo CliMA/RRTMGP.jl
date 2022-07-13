@@ -152,6 +152,6 @@ function clear_sky(
     @test max_err_flux_up_sw ≤ toler_sw
     @test max_err_flux_dn_sw ≤ toler_sw
 end
-println("running clear sky 2 stream solver")
-@time clear_sky(TwoStream, SourceLW2Str, VmrGM, Float64, Int, array_type())
-println("*********************************************")
+@testset "testing clear sky 2-stream solver" begin
+    @time clear_sky(TwoStream, SourceLW2Str, VmrGM, Float64, Int, array_type())
+end

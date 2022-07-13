@@ -8,8 +8,7 @@ import ..Parameters as RP
 
 using ..Vmrs
 
-export AbstractAtmosphericState,
-    AtmosphericState, ClearAtmosphericState, GrayAtmosphericState, setup_gray_as_pr_grid, setup_gray_as_alt_grid
+export AbstractAtmosphericState, AtmosphericState, GrayAtmosphericState, setup_gray_as_pr_grid, setup_gray_as_alt_grid
 
 abstract type AbstractAtmosphericState{FT, I, FTA1D} end
 
@@ -30,7 +29,7 @@ struct AtmosphericState{
     FTA1DN <: Union{AbstractArray{FT, 1}, Nothing},
     FTA2D <: AbstractArray{FT, 2},
     CLDP <: Union{AbstractArray{FT, 2}, Nothing},
-    CLDM <: Union{AbstractArray{Bool, 2}, Nothing},
+    CLDM <: Union{AbstractArray{Bool, 3}, Nothing},
     VMR <: AbstractVmr{FT},
     I <: Int,
 } <: AbstractAtmosphericState{FT, I, FTA1D}
@@ -60,8 +59,10 @@ struct AtmosphericState{
     cld_path_liq::CLDP
     "cloud ice path"
     cld_path_ice::CLDP
-    "cloud mask"
-    cld_mask::CLDM
+    "cloud mask (longwave), = true if clouds are present"
+    cld_mask_lw::CLDM
+    "cloud mask (shortwave), = true if clouds are present"
+    cld_mask_sw::CLDM
     "ice roughness, 1 = none, 2 = medium, 3 = rough"
     ice_rgh::I
     "Number of layers."

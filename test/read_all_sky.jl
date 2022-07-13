@@ -8,7 +8,8 @@ function setup_allsky_as(ds_in, idx_gases, lkp_lw, lkp_sw, lkp_lw_cld, lkp_sw_cl
     ngas = lkp_lw.n_gases
     nbnd_lw = lkp_lw.n_bnd
     nbnd_sw = lkp_sw.n_bnd
-
+    ngpt_lw = lkp_lw.n_gpt
+    ngpt_sw = lkp_sw.n_gpt
     #---no lat / long information for this
     lon = nothing
     lat = nothing
@@ -67,7 +68,8 @@ function setup_allsky_as(ds_in, idx_gases, lkp_lw, lkp_sw, lkp_lw_cld, lkp_sw_cl
     col_dry = DA{FT, 2}(undef, nlay, ncol)
     vmr_h2o = view(vmr.vmr, :, :, idx_gases["h2o"])
 
-    cld_mask = zeros(Bool, nlay, ncol)
+    cld_mask_lw = zeros(Bool, nlay, ncol, ngpt_lw)
+    cld_mask_sw = zeros(Bool, nlay, ncol, ngpt_sw)
     cld_r_eff_liq = zeros(FT, nlay, ncol)
     cld_r_eff_ice = zeros(FT, nlay, ncol)
     cld_path_liq = zeros(FT, nlay, ncol)
@@ -88,7 +90,8 @@ function setup_allsky_as(ds_in, idx_gases, lkp_lw, lkp_sw, lkp_lw_cld, lkp_sw_cl
     # total cloudiness of earth
     for icol in 1:ncol, ilay in 1:nlay
         if p_lay[ilay, icol] > FT(10000) && p_lay[ilay, icol] < FT(90000) && icol % 3 ≠ 0
-            cld_mask[ilay, icol] = true
+            cld_mask_lw[ilay, icol, :] .= true
+            cld_mask_sw[ilay, icol, :] .= true
             if t_lay[ilay, icol] > FT(263)
                 cld_path_liq[ilay, icol] = FT(10)
                 cld_r_eff_liq[ilay, icol] = r_eff_liq
@@ -110,7 +113,8 @@ function setup_allsky_as(ds_in, idx_gases, lkp_lw, lkp_sw, lkp_lw_cld, lkp_sw_cl
 
     t_sfc = DA(t_sfc)
 
-    cld_mask = DA(cld_mask)
+    cld_mask_lw = DA(cld_mask_lw)
+    cld_mask_sw = DA(cld_mask_sw)
     cld_r_eff_liq = DA(cld_r_eff_liq)
     cld_r_eff_ice = DA(cld_r_eff_ice)
     cld_path_liq = DA(cld_path_liq)
@@ -124,7 +128,7 @@ function setup_allsky_as(ds_in, idx_gases, lkp_lw, lkp_sw, lkp_lw_cld, lkp_sw_cl
             typeof(lat),
             typeof(p_lev),
             typeof(cld_r_eff_liq),
-            typeof(cld_mask),
+            typeof(cld_mask_lw),
             typeof(vmr),
             Int,
         }(
@@ -141,7 +145,8 @@ function setup_allsky_as(ds_in, idx_gases, lkp_lw, lkp_sw, lkp_lw_cld, lkp_sw_cl
             cld_r_eff_ice,
             cld_path_liq,
             cld_path_ice,
-            cld_mask,
+            cld_mask_lw,
+            cld_mask_sw,
             ice_rgh,
             nlay,
             ncol,

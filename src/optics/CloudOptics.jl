@@ -14,9 +14,12 @@ This function computes the longwave TwoStream clouds optics properties and adds 
 to the TwoStream longwave gas optics properties.
 """
 function add_cloud_optics_2stream(op::TwoStream, as::AtmosphericState, lkp::LookUpLW, lkp_cld, glaycol, ibnd, igpt)
-    if as.cld_mask isa AbstractArray && as.cld_mask[glaycol...]
-        τ_cl, τ_cl_ssa, τ_cl_ssag = compute_cld_props(lkp_cld, as, glaycol..., ibnd, igpt)
-        increment!(op, τ_cl, τ_cl_ssa, τ_cl_ssag, glaycol..., igpt)
+    if as.cld_mask_lw isa AbstractArray
+        cld_mask = as.cld_mask_lw[glaycol..., igpt]
+        if cld_mask
+            τ_cl, τ_cl_ssa, τ_cl_ssag = compute_cld_props(lkp_cld, as, cld_mask, glaycol..., ibnd, igpt)
+            increment!(op, τ_cl, τ_cl_ssa, τ_cl_ssag, glaycol..., igpt)
+        end
     end
     return nothing
 end
@@ -36,10 +39,13 @@ This function computes the longwave TwoStream clouds optics properties and adds 
 to the TwoStream shortwave gase optics properties.
 """
 function add_cloud_optics_2stream(op::TwoStream, as::AtmosphericState, lkp::LookUpSW, lkp_cld, glaycol, ibnd, igpt)
-    if as.cld_mask isa AbstractArray && as.cld_mask[glaycol...]
-        τ_cl, τ_cl_ssa, τ_cl_ssag = compute_cld_props(lkp_cld, as, glaycol..., ibnd, igpt)
-        τ_cl, τ_cl_ssa, τ_cl_ssag = delta_scale(τ_cl, τ_cl_ssa, τ_cl_ssag)
-        increment!(op, τ_cl, τ_cl_ssa, τ_cl_ssag, glaycol..., igpt)
+    if as.cld_mask_sw isa AbstractArray
+        cld_mask = as.cld_mask_sw[glaycol..., igpt]
+        if cld_mask
+            τ_cl, τ_cl_ssa, τ_cl_ssag = compute_cld_props(lkp_cld, as, cld_mask, glaycol..., ibnd, igpt)
+            τ_cl, τ_cl_ssa, τ_cl_ssag = delta_scale(τ_cl, τ_cl_ssa, τ_cl_ssag)
+            increment!(op, τ_cl, τ_cl_ssa, τ_cl_ssag, glaycol..., igpt)
+        end
     end
     return nothing
 end
@@ -57,9 +63,8 @@ end
 This function computed the TwoSteam cloud optics properties using either the 
 lookup table method or pade method.
 """
-function compute_cld_props(lkp_cld, as, glay, gcol, ibnd, igpt)
+function compute_cld_props(lkp_cld, as, cld_mask, glay, gcol, ibnd, igpt)
     use_lut = lkp_cld.use_lut
-    cld_mask = as.cld_mask[glay, gcol]
     re_liq = as.cld_r_eff_liq[glay, gcol]
     re_ice = as.cld_r_eff_ice[glay, gcol]
     ice_rgh = as.ice_rgh
