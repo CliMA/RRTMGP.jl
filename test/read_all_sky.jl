@@ -69,8 +69,10 @@ function setup_allsky_as(ds_in, idx_gases, lkp_lw, lkp_sw, lkp_lw_cld, lkp_sw_cl
     vmr_h2o = view(vmr.vmr, :, :, idx_gases["h2o"])
 
     cld_frac = zeros(FT, nlay, ncol)
-    cld_mask_lw = zeros(Bool, nlay, ncol, ngpt_lw)
-    cld_mask_sw = zeros(Bool, nlay, ncol, ngpt_sw)
+    random_lw = DA{FT}(undef, ngpt_lw, ncol)
+    random_sw = DA{FT}(undef, ngpt_sw, ncol)
+    cld_mask_lw = zeros(Bool, ngpt_lw, nlay, ncol)
+    cld_mask_sw = zeros(Bool, ngpt_lw, nlay, ncol)
     cld_r_eff_liq = zeros(FT, nlay, ncol)
     cld_r_eff_ice = zeros(FT, nlay, ncol)
     cld_path_liq = zeros(FT, nlay, ncol)
@@ -91,8 +93,6 @@ function setup_allsky_as(ds_in, idx_gases, lkp_lw, lkp_sw, lkp_lw_cld, lkp_sw_cl
     # total cloudiness of earth
     for icol in 1:ncol, ilay in 1:nlay
         if p_lay[ilay, icol] > FT(10000) && p_lay[ilay, icol] < FT(90000) && icol % 3 ≠ 0
-            cld_mask_lw[ilay, icol, :] .= true
-            cld_mask_sw[ilay, icol, :] .= true
             cld_frac[ilay, icol] = FT(1)
             if t_lay[ilay, icol] > FT(263)
                 cld_path_liq[ilay, icol] = FT(10)
@@ -132,6 +132,8 @@ function setup_allsky_as(ds_in, idx_gases, lkp_lw, lkp_sw, lkp_lw_cld, lkp_sw_cl
             typeof(p_lev),
             typeof(cld_r_eff_liq),
             typeof(cld_mask_lw),
+            typeof(random_lw),
+            MaxRandomOverlap,
             typeof(vmr),
             Int,
         }(
@@ -149,8 +151,11 @@ function setup_allsky_as(ds_in, idx_gases, lkp_lw, lkp_sw, lkp_lw_cld, lkp_sw_cl
             cld_path_liq,
             cld_path_ice,
             cld_frac,
+            random_lw,
+            random_sw,
             cld_mask_lw,
             cld_mask_sw,
+            MaxRandomOverlap(),
             ice_rgh,
             nlay,
             ncol,

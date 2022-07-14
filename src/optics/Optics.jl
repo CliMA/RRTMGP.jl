@@ -4,6 +4,7 @@ using DocStringExtensions
 using CUDA
 using ..Device: array_device, CPU, CUDADevice
 using Adapt
+using Random
 #---------------------------------------
 using ..Vmrs
 using ..LookUpTables
