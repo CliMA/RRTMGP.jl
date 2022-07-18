@@ -21,8 +21,6 @@ steps:
     # env:
     #   JULIA_NUM_PRECOMPILE_TASKS: 8
 
-  - wait
-
   - label: "init gpu environments :computer:"
     key: "init_gpu_env"
     command:
