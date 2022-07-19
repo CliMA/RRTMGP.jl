@@ -1,9 +1,9 @@
 # Artifacts file for RRTMGP.jl
 
 [RRTMGPReferenceData]
-git-tree-sha1 = "f9cf4d95c9a5d45144166ca237ca7195edc0d5fe"
+git-tree-sha1 = "c1a57ba6e9720b22e8c7bf328b7ebd478cd55191"
 lazy = true
 
     [[RRTMGPReferenceData.download]]
-    url = "https://caltech.box.com/shared/static/vaz7fwnotqpj2lkka0fbix14r4i6aps1.gz"
-    sha256 = "7b4f5dd649f8c34c727dcd17251789cf0d559d1cdf93d7869dd9e1bd71dee8df"
+    url = "https://caltech.box.com/shared/static/jxuj8c0632yqrhjialqa5zs1rrf4kxu9.gz"
+    sha256 = "c9320f9fc89fb0c3e5e92164072842b4043184464136be259e527ee01ff833e6"
