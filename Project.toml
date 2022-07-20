@@ -1,7 +1,7 @@
 name = "RRTMGP"
 uuid = "a01a1ee8-cea4-48fc-987c-fc7878d79da1"
 authors = ["Climate Modeling Alliance"]
-version = "0.4.0"
+version = "0.5.0"
 
 [deps]
 Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
