@@ -1,5 +1,18 @@
 
-function setup_allsky_as(ds_in, idx_gases, lkp_lw, lkp_sw, lkp_lw_cld, lkp_sw_cld, cldfrac, use_lut, ncol, FT, DA, max_threads)
+function setup_allsky_as(
+    ds_in,
+    idx_gases,
+    lkp_lw,
+    lkp_sw,
+    lkp_lw_cld,
+    lkp_sw_cld,
+    cldfrac,
+    use_lut,
+    ncol,
+    FT,
+    DA,
+    max_threads,
+)
 
     deg2rad = FT(π) / FT(180)
     nlay = Int(ds_in.dim["lay"])
