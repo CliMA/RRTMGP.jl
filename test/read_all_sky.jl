@@ -1,5 +1,18 @@
 
-function setup_allsky_as(ds_in, idx_gases, lkp_lw, lkp_sw, lkp_lw_cld, lkp_sw_cld, use_lut, ncol, FT, DA, max_threads)
+function setup_allsky_as(
+    ds_in,
+    idx_gases,
+    lkp_lw,
+    lkp_sw,
+    lkp_lw_cld,
+    lkp_sw_cld,
+    cldfrac,
+    use_lut,
+    ncol,
+    FT,
+    DA,
+    max_threads,
+)
 
     deg2rad = FT(π) / FT(180)
     nlay = Int(ds_in.dim["lay"])
@@ -93,7 +106,7 @@ function setup_allsky_as(ds_in, idx_gases, lkp_lw, lkp_sw, lkp_lw_cld, lkp_sw_cl
     # total cloudiness of earth
     for icol in 1:ncol, ilay in 1:nlay
         if p_lay[ilay, icol] > FT(10000) && p_lay[ilay, icol] < FT(90000) && icol % 3 ≠ 0
-            cld_frac[ilay, icol] = FT(1)
+            cld_frac[ilay, icol] = cldfrac
             if t_lay[ilay, icol] > FT(263)
                 cld_path_liq[ilay, icol] = FT(10)
                 cld_r_eff_liq[ilay, icol] = r_eff_liq

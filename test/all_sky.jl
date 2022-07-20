@@ -32,6 +32,7 @@ function all_sky(
     ::Type{I},
     ::Type{DA};
     use_lut::Bool = true,
+    cldfrac = FT(1),
 ) where {FT <: AbstractFloat, I <: Int, DA, OPC}
     opc = Symbol(OPC)
     FTA1D = DA{FT, 1}
@@ -77,6 +78,7 @@ function all_sky(
         lookup_sw,
         lookup_lw_cld,
         lookup_sw_cld,
+        cldfrac,
         use_lut,
         ncol,
         FT,
@@ -135,7 +137,6 @@ function all_sky(
 
     max_err_flux_up_lw = maximum(abs.(flux_up_lw .- comp_flux_up_lw))
     max_err_flux_dn_lw = maximum(abs.(flux_dn_lw .- comp_flux_dn_lw))
-
     println("=======================================")
     println("Cloudy-sky longwave test - $opc")
     println(method)
@@ -154,7 +155,6 @@ function all_sky(
     println("max_err_flux_up_sw = $max_err_flux_up_sw")
     println("max_err_flux_dn_sw = $max_err_flux_dn_sw")
     println("=======================================")
-
     toler = FT(1e-5)
 
     @test max_err_flux_up_lw < toler
@@ -165,8 +165,8 @@ function all_sky(
 end
 
 @testset "Cloudy (all-sky, Two-stream calculations using lookup table method" begin
-    @time all_sky(TwoStream, Float64, Int, DA, use_lut = true)
+    @time all_sky(TwoStream, Float64, Int, DA, use_lut = true, cldfrac = Float64(1))
 end
 @testset "Cloudy (all-sky), Two-stream calculations using Pade method" begin
-    @time all_sky(TwoStream, Float64, Int, DA, use_lut = false)
+    @time all_sky(TwoStream, Float64, Int, DA, use_lut = false, cldfrac = Float64(1))
 end
