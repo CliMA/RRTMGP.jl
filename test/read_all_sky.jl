@@ -82,8 +82,8 @@ function setup_allsky_as(
     vmr_h2o = view(vmr.vmr, :, :, idx_gases["h2o"])
 
     cld_frac = zeros(FT, nlay, ncol)
-    random_lw = DA{FT}(undef, ngpt_lw, ncol)
-    random_sw = DA{FT}(undef, ngpt_sw, ncol)
+    random_lw = DA{FT}(undef, ngpt_lw, nlay, ncol)
+    random_sw = DA{FT}(undef, ngpt_sw, nlay, ncol)
     cld_mask_lw = zeros(Bool, ngpt_lw, nlay, ncol)
     cld_mask_sw = zeros(Bool, ngpt_lw, nlay, ncol)
     cld_r_eff_liq = zeros(FT, nlay, ncol)
