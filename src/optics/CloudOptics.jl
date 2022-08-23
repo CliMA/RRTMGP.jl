@@ -201,14 +201,18 @@ end
     build_cloud_mask!(cld_mask, cld_frac, random_arr, gcol, ::MaxRandomOverlap)
 
 Builds McICA-sampled cloud mask from cloud fraction data for maximum-random overlap
+
+Reference: https://github.com/AER-RC/RRTMG_SW/
 """
 function build_cloud_mask!(cld_mask, cld_frac, random_arr, gcol, ::MaxRandomOverlap)
 
     FT = eltype(cld_frac)
-    local_rand = view(random_arr, :, gcol)
+    local_rand = view(random_arr, :, :, gcol)
     local_cld_frac = view(cld_frac, :, gcol)
     local_cld_mask = view(cld_mask, :, :, gcol)
-    ngpt, nlay = length(local_rand), length(local_cld_frac)
+    ngpt, nlay = size(local_rand)
+
+    Random.rand!(local_rand)
     start = 0
     for ilay in 1:nlay # for GPU compatibility (start = findfirst(local_cld_frac .> FT(0)))
         if local_cld_frac[ilay] > FT(0)
@@ -238,16 +242,19 @@ function build_cloud_mask!(cld_mask, cld_frac, random_arr, gcol, ::MaxRandomOver
             local_cld_mask[igpt, ilay] = false
         end
         # set cloud mask for cloudy layers
-        Random.rand!(local_rand)
-        # first layer
+        # last layer
         for igpt in 1:ngpt
-            local_cld_mask[igpt, start] = local_rand[igpt] ≤ local_cld_frac[start]
+            local_cld_mask[igpt, finish] = local_rand[igpt, finish] > (FT(1) - local_cld_frac[finish])
         end
-        for ilay in (start + 1):finish
+        for ilay in (finish - 1):-1:start
             if local_cld_frac[ilay] > FT(0)
-                local_cld_frac[ilay - 1] == FT(0) && (Random.rand!(local_rand)) # regenerate random numbers if layer below is not cloudy
                 for igpt in 1:ngpt
-                    local_cld_mask[igpt, ilay] = local_rand[igpt] ≤ local_cld_frac[ilay]
+                    if local_cld_mask[igpt, ilay + 1]
+                        local_rand[igpt, ilay] = local_rand[igpt, ilay + 1] # use same random number from the layer above if layer above is cloudy
+                    else
+                        local_rand[igpt, ilay] *= (FT(1) - local_cld_frac[ilay + 1]) # update random numbers if layer above is not cloudy
+                    end
+                    local_cld_mask[igpt, ilay] = local_rand[igpt, ilay] > (FT(1) - local_cld_frac[ilay])
                 end
             else
                 for igpt in 1:ngpt
