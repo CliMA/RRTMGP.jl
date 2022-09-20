@@ -243,8 +243,9 @@ function build_cloud_mask!(cld_mask, cld_frac, random_arr, gcol, ::MaxRandomOver
         end
         # set cloud mask for cloudy layers
         # last layer
+        # RRTMG uses local_rand[igpt, finish] > (FT(1) - local_cld_frac[finish]), we change > to >= to address edge cases
         for igpt in 1:ngpt
-            local_cld_mask[igpt, finish] = local_rand[igpt, finish] > (FT(1) - local_cld_frac[finish])
+            local_cld_mask[igpt, finish] = local_rand[igpt, finish] >= (FT(1) - local_cld_frac[finish])
         end
         for ilay in (finish - 1):-1:start
             if local_cld_frac[ilay] > FT(0)
@@ -254,7 +255,8 @@ function build_cloud_mask!(cld_mask, cld_frac, random_arr, gcol, ::MaxRandomOver
                     else
                         local_rand[igpt, ilay] *= (FT(1) - local_cld_frac[ilay + 1]) # update random numbers if layer above is not cloudy
                     end
-                    local_cld_mask[igpt, ilay] = local_rand[igpt, ilay] > (FT(1) - local_cld_frac[ilay])
+                    # RRTMG uses local_rand[igpt, ilay] > (FT(1) - local_cld_frac[ilay]), we change > to >= to address edge cases
+                    local_cld_mask[igpt, ilay] = local_rand[igpt, ilay] >= (FT(1) - local_cld_frac[ilay])
                 end
             else
                 for igpt in 1:ngpt
