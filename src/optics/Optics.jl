@@ -5,6 +5,7 @@ using CUDA
 using ..Device: array_device, CPU, CUDADevice
 using Adapt
 using Random
+Random.seed!(1234)
 #---------------------------------------
 using ..Vmrs
 using ..LookUpTables
