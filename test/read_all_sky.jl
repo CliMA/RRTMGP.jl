@@ -105,7 +105,18 @@ function setup_allsky_as(
     # put them in 2/3 of the columns since that's roughly the
     # total cloudiness of earth
     for icol in 1:ncol, ilay in 1:nlay
-        if p_lay[ilay, icol] > FT(10000) && p_lay[ilay, icol] < FT(90000) && icol % 3 ≠ 0
+        if p_lay[ilay, icol] > FT(80000) && p_lay[ilay, icol] < FT(90000) && icol % 3 ≠ 0
+            cld_frac[ilay, icol] = cldfrac
+            if t_lay[ilay, icol] > FT(263)
+                cld_path_liq[ilay, icol] = FT(10)
+                cld_r_eff_liq[ilay, icol] = r_eff_liq
+            end
+            if t_lay[ilay, icol] < FT(273)
+                cld_path_ice[ilay, icol] = FT(10)
+                cld_r_eff_ice[ilay, icol] = r_eff_ice
+            end
+        end
+        if p_lay[ilay, icol] > FT(20000) && p_lay[ilay, icol] < FT(40000) && icol % 3 ≠ 0
             cld_frac[ilay, icol] = cldfrac
             if t_lay[ilay, icol] > FT(263)
                 cld_path_liq[ilay, icol] = FT(10)
