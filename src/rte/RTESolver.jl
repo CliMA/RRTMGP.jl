@@ -199,7 +199,7 @@ function rte_lw_2stream_solve!(
     else # use Julia native multithreading
         if as isa AtmosphericState && as.cld_mask_type isa AbstractCloudMask
             Threads.@threads for gcol in 1:ncol
-                Optics.build_cloud_mask!(as.cld_mask_lw, as.cld_frac, as.random_lw, gcol, as.cld_mask_type)
+                Optics.build_cloud_mask!(as.cld_mask_lw, as.cld_frac, as.random_lw, as.rng[gcol], gcol, as.cld_mask_type)
             end
         end
         for igpt in 1:n_gpt
@@ -233,7 +233,7 @@ function rte_lw_2stream_solve_CUDA!(
     n_gpt = length(major_gpt2bnd)
     if gcol ≤ ncol
         if as isa AtmosphericState && as.cld_mask_type isa AbstractCloudMask
-            Optics.build_cloud_mask!(as.cld_mask_lw, as.cld_frac, as.random_lw, gcol, as.cld_mask_type)
+            Optics.build_cloud_mask!(as.cld_mask_lw, as.cld_frac, as.random_lw, as.rng[gcol], gcol, as.cld_mask_type)
         end
         for igpt in 1:n_gpt
             igpt == 1 && set_flux_to_zero!(flux_lw, gcol)
@@ -418,7 +418,7 @@ function rte_sw_2stream_solve!(
     else # launch julia native multithreading
         if as isa AtmosphericState && as.cld_mask_type isa AbstractCloudMask
             Threads.@threads for gcol in 1:ncol
-                Optics.build_cloud_mask!(as.cld_mask_sw, as.cld_frac, as.random_sw, gcol, as.cld_mask_type)
+                Optics.build_cloud_mask!(as.cld_mask_sw, as.cld_frac, as.random_sw, as.rng[gcol], gcol, as.cld_mask_type)
             end
         end
         # setting references for flux_sw
@@ -454,7 +454,7 @@ function rte_sw_2stream_solve_CUDA!(
     n_gpt = length(major_gpt2bnd)
     if gcol ≤ ncol
         if as isa AtmosphericState && as.cld_mask_type isa AbstractCloudMask
-            Optics.build_cloud_mask!(as.cld_mask_sw, as.cld_frac, as.random_sw, gcol, as.cld_mask_type)
+            Optics.build_cloud_mask!(as.cld_mask_sw, as.cld_frac, as.random_sw, as.rng[gcol], gcol, as.cld_mask_type)
         end
         for igpt in 1:n_gpt
             igpt == 1 && set_flux_to_zero!(flux_sw, gcol)

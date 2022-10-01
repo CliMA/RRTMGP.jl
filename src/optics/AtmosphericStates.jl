@@ -78,6 +78,8 @@ struct AtmosphericState{
     random_lw::RND
     "random number storage for shortwave bands `(ngpt, nlay, ncol)`"
     random_sw::RND
+    "random number seed (`ncol`)"
+    rng::FTA1DN
     "cloud mask (longwave), = true if clouds are present"
     cld_mask_lw::CLDM
     "cloud mask (shortwave), = true if clouds are present"

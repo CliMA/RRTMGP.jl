@@ -204,7 +204,7 @@ Builds McICA-sampled cloud mask from cloud fraction data for maximum-random over
 
 Reference: https://github.com/AER-RC/RRTMG_SW/
 """
-function build_cloud_mask!(cld_mask, cld_frac, random_arr, gcol, ::MaxRandomOverlap)
+function build_cloud_mask!(cld_mask, cld_frac, random_arr, rng, gcol, ::MaxRandomOverlap)
 
     FT = eltype(cld_frac)
     local_rand = view(random_arr, :, :, gcol)
@@ -212,7 +212,7 @@ function build_cloud_mask!(cld_mask, cld_frac, random_arr, gcol, ::MaxRandomOver
     local_cld_mask = view(cld_mask, :, :, gcol)
     ngpt, nlay = size(local_rand)
 
-    Random.rand!(local_rand)
+    Random.rand!(rng, local_rand)
     start = 0
     for ilay in 1:nlay # for GPU compatibility (start = findfirst(local_cld_frac .> FT(0)))
         if local_cld_frac[ilay] > FT(0)
