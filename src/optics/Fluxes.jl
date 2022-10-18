@@ -3,7 +3,7 @@ module Fluxes
 using Adapt
 using DocStringExtensions
 
-export AbstractFlux, FluxLW, FluxSW, init_flux_sw, set_flux_to_zero!, add_to_flux!
+export AbstractFlux, FluxLW, FluxSW, set_flux_to_zero!, add_to_flux!
 
 abstract type AbstractFlux{FT <: AbstractFloat, FTA2D <: AbstractArray{FT, 2}} end
 
