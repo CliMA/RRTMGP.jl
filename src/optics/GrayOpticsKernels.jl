@@ -21,9 +21,52 @@ function compute_optical_props_kernel!(
     source::AbstractSourceLW{FT},
 ) where {FT <: AbstractFloat}
 
-    compute_optical_props_kernel!(op, as, glaycol)     # computing optical thickness
+    compute_optical_props_kernel_lw!(op, as, glaycol)     # computing optical thickness
     compute_sources_gray_kernel!(source, as, glaycol) # computing Planck sources
 end
+
+"""
+    τ_lw_gray(p, pꜜ, pꜛ, p₀, τ₀, f)
+
+Optical depth for longwave GrayRadiation.
+Reference:
+ - TODO: add reference
+"""
+function τ_lw_gray(p, pꜜ, pꜛ, p₀, τ₀, f)
+    FT = eltype(p)
+    return τ₀ * (f / p₀ + 4 * (1 - f) / p₀ * (p / p₀)^3) * (pꜜ - pꜛ)
+end
+
+function compute_optical_props_kernel_lw!(
+    op::AbstractOpticalProps{FT},
+    as::GrayAtmosphericState{FT},
+    glaycol,
+) where {FT <: AbstractFloat}
+    glay, gcol = glaycol
+    (; p_lay, p_lev, d0) = as
+    (; f) = TODO_some_struct
+    @inbounds op.τ[glay, gcol] = τ_lw_gray(
+        p_lay[glay, gcol],
+        p_lev[glay, gcol],
+        p_lev[glay + 1, gcol],
+        p_lev[1, gcol],
+        d0[gcol],
+        f, # = FT(0.2)
+    )
+    if op isa TwoStream
+        op.ssa[glaycol...] = FT(0)
+        op.g[glaycol...] = FT(0)
+    end
+end
+
+"""
+    τ_sw_gray(p, pꜜ, pꜛ, p₀, τ₀)
+
+Optical depth for shortwave GrayRadiation.
+Reference:
+ - TODO: add reference
+"""
+τ_sw_gray(p, pꜜ, pꜛ, p₀, τ₀) = 2 * τ₀ * (p / p₀) / p₀ * (pꜜ - pꜛ)
 
 """
     compute_optical_props_kernel!(
@@ -45,10 +88,13 @@ function compute_optical_props_kernel!(
     glay, gcol = glaycol
     (; p_lay, p_lev, d0, α) = as
     @inbounds p0 = p_lev[1, gcol]
-
-    @inbounds op.τ[glaycol...] = abs(
-        (α * d0[gcol] * (p_lay[glaycol...] ./ p0) .^ α ./ p_lay[glaycol...]) *
-        (p_lev[glay + 1, gcol] - p_lev[glaycol...]),
+    (; f, τ₀) = TODO_some_struct # TODO: where should this be unpacked from ? `Y` vs `Yₜ`
+    @inbounds op.τ[glay, gcol] = τ_sw_gray(
+        p_lay[glay, gcol],
+        p_lev[glay, gcol],
+        p_lev[glay + 1, gcol],
+        p_lev[1, gcol],
+        τ₀, # = FT(0.22) hardcode the value of τ₀ for shortwave gray radiation
     )
 
     if op isa TwoStream
