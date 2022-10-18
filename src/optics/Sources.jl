@@ -159,7 +159,7 @@ function source_func_longwave(
     nlay::Int,
     OPC::Symbol,
     ::Type{DA},
-) where {FT <: AbstractFloat, I <: Int, DA}
+) where {FT <: AbstractFloat, DA}
     lay_source = DA{FT, 2}(undef, nlay, ncol)
     lev_source_inc = DA{FT, 2}(undef, nlay, ncol)
     lev_source_dec = DA{FT, 2}(undef, nlay, ncol)
