@@ -21,7 +21,7 @@ function compute_optical_props_kernel!(
     source::AbstractSourceLW{FT},
 ) where {FT <: AbstractFloat}
 
-    compute_optical_props_kernel!(op, as, glaycol)     # computing optical thickness
+    compute_optical_props_kernel_lw!(op, as, glaycol)     # computing optical thickness
     compute_sources_gray_kernel!(source, as, glaycol) # computing Planck sources
 end
 
@@ -34,9 +34,9 @@ end
 
 
 This function computes the optical properties using the gray atmosphere assumption
-for the shortwave solver.
+for the longwave solver.
 """
-function compute_optical_props_kernel!(
+function compute_optical_props_kernel_lw!(
     op::AbstractOpticalProps{FT},
     as::GrayAtmosphericState{FT},
     glaycol,
@@ -47,14 +47,8 @@ function compute_optical_props_kernel!(
     @inbounds p0 = p_lev[1, gcol]
 
     @inbounds op.τ[glaycol...] = abs(
-        (α * d0[gcol] * (p_lay[glaycol...] ./ p0) .^ α ./ p_lay[glaycol...]) *
-        (p_lev[glay + 1, gcol] - p_lev[glaycol...]),
+        (α * d0[gcol] * (p_lay[glaycol...] / p0)^α / p_lay[glaycol...]) * (p_lev[glay + 1, gcol] - p_lev[glaycol...]),
     )
-
-    if op isa TwoStream
-        op.ssa[glaycol...] = FT(0)
-        op.g[glaycol...] = FT(0)
-    end
 end
 """
     compute_sources_gray_kernel!(
@@ -81,5 +75,31 @@ function compute_sources_gray_kernel!(
     @inbounds lev_source_dec[glaycol...] = sbc * t_lev[glaycol...]^FT(4) / FT(π)
     if glay == 1
         @inbounds sfc_source[gcol] = sbc * as.t_sfc[gcol]^FT(4) / FT(π)   # computing sfc_source
+    end
+end
+
+"""
+    compute_optical_props_kernel!(
+        op::AbstractOpticalProps{FT},
+        as::GrayAtmosphericState{FT},
+        glaycol,
+    ) where {FT<:AbstractFloat}
+This function computes the optical properties using the gray atmosphere assumption
+for the shortwave solver.
+"""
+function compute_optical_props_kernel!(
+    op::AbstractOpticalProps{FT},
+    as::GrayAtmosphericState{FT},
+    glaycol,
+) where {FT <: AbstractFloat}
+    # setting references
+    glay, gcol = glaycol
+    (; p_lay, p_lev, d0, τ₀) = as
+    @inbounds p0 = p_lev[1, gcol]
+    @inbounds op.τ[glay, gcol] = 2 * τ₀ * (p_lay[glaycol...] / p0) / p0 * (p_lev[glaycol...] - p_lev[glay + 1, gcol])
+
+    if op isa TwoStream
+        op.ssa[glaycol...] = FT(0)
+        op.g[glaycol...] = FT(0)
     end
 end
