@@ -21,7 +21,7 @@ function compute_optical_props_kernel!(
     source::AbstractSourceLW{FT},
 ) where {FT <: AbstractFloat}
 
-    compute_optical_props_kernel_lw!(op, as, glaycol)     # computing optical thickness
+    compute_optical_props_kernel_lw!(op, as, glaycol) # computing optical thickness for LW
     compute_sources_gray_kernel!(source, as, glaycol) # computing Planck sources
 end
 
@@ -30,7 +30,7 @@ end
 
 Optical depth for longwave GrayRadiation.
 Reference:
- - TODO: add reference
+O'Gorman and Schneider 2008: https://journals.ametsoc.org/view/journals/clim/21/15/2007jcli2065.1.xml
 """
 function τ_lw_gray(p, pꜜ, pꜛ, p₀, τ₀, f)
     FT = eltype(p)
@@ -43,8 +43,7 @@ function compute_optical_props_kernel_lw!(
     glaycol,
 ) where {FT <: AbstractFloat}
     glay, gcol = glaycol
-    (; p_lay, p_lev, d0) = as
-    (; f) = TODO_some_struct
+    (; p_lay, p_lev, d0, f) = as
     @inbounds op.τ[glay, gcol] = τ_lw_gray(
         p_lay[glay, gcol],
         p_lev[glay, gcol],
@@ -53,10 +52,6 @@ function compute_optical_props_kernel_lw!(
         d0[gcol],
         f, # = FT(0.2)
     )
-    if op isa TwoStream
-        op.ssa[glaycol...] = FT(0)
-        op.g[glaycol...] = FT(0)
-    end
 end
 
 """
@@ -64,7 +59,7 @@ end
 
 Optical depth for shortwave GrayRadiation.
 Reference:
- - TODO: add reference
+O'Gorman and Schneider 2008: https://journals.ametsoc.org/view/journals/clim/21/15/2007jcli2065.1.xml
 """
 τ_sw_gray(p, pꜜ, pꜛ, p₀, τ₀) = 2 * τ₀ * (p / p₀) / p₀ * (pꜜ - pꜛ)
 
@@ -86,9 +81,8 @@ function compute_optical_props_kernel!(
 ) where {FT <: AbstractFloat}
     # setting references
     glay, gcol = glaycol
-    (; p_lay, p_lev, d0, α) = as
+    (; p_lay, p_lev, d0, τ₀) = as
     @inbounds p0 = p_lev[1, gcol]
-    (; f, τ₀) = TODO_some_struct # TODO: where should this be unpacked from ? `Y` vs `Yₜ`
     @inbounds op.τ[glay, gcol] = τ_sw_gray(
         p_lay[glay, gcol],
         p_lev[glay, gcol],

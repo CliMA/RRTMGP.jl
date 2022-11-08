@@ -26,8 +26,10 @@ struct GrayAtmosphericState{
     z_lev::FTA2D
     "Surface temperatures `[K]`; `(ncol)`"
     t_sfc::FTA1D
-    "lapse rate"
-    α::FT
+    "weight of linear term in longwave optical depth"
+    f::FT
+    "shortwave optical depth"
+    τ₀::FT
     "optical thickness parameter"
     d0::FTA1D
     "Number of layers."
@@ -66,7 +68,9 @@ function setup_gray_as_pr_grid(
     te = FT(300)                   # global mean surface temperature (K)
     tt = FT(200)                   # skin temp at top of atmosphere (K)
     Δt = FT(60)
-    α = FT(3.5)                   # lapse rate of radiative equillibrium
+    α = FT(3.5)
+    f = FT(0.2)
+    τ₀ = FT(0.22)
     r_d = RP.R_d(param_set)
     grav_ = RP.grav(param_set)
     args = (p_lev, p_lay, t_lev, t_lay, z_lev, t_sfc, lat, d0, efac, p0, pe, Δp, te, tt, Δt, α, r_d, grav_, nlay)
@@ -90,6 +94,8 @@ function setup_gray_as_pr_grid(
         z_lev,
         t_sfc,
         α,
+        f,
+        τ₀,
         d0,
         nlay,
         ncol,
