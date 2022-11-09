@@ -28,6 +28,8 @@ struct GrayAtmosphericState{
     t_sfc::FTA1D
     "lapse rate"
     α::FT
+    "shortwave optical depth"
+    τ₀::FT
     "optical thickness parameter"
     d0::FTA1D
     "Number of layers."
@@ -67,9 +69,10 @@ function setup_gray_as_pr_grid(
     tt = FT(200)                   # skin temp at top of atmosphere (K)
     Δt = FT(60)
     α = FT(3.5)                   # lapse rate of radiative equillibrium
+    τ₀ = FT(0.22)
     r_d = RP.R_d(param_set)
     grav_ = RP.grav(param_set)
-    args = (p_lev, p_lay, t_lev, t_lay, z_lev, t_sfc, lat, d0, efac, p0, pe, Δp, te, tt, Δt, α, r_d, grav_, nlay)
+    args = (p_lev, p_lay, t_lev, t_lay, z_lev, t_sfc, lat, d0, efac, p0, pe, Δp, te, tt, Δt, α, τ₀, r_d, grav_, nlay)
     device = array_device(p_lev)
     if device === CUDADevice()
         max_threads = 256
@@ -90,6 +93,7 @@ function setup_gray_as_pr_grid(
         z_lev,
         t_sfc,
         α,
+        τ₀,
         d0,
         nlay,
         ncol,
@@ -127,6 +131,7 @@ function setup_gray_as_alt_grid(
     tt = FT(200)                   # skin temp at top of atmosphere (K)
     Δt = FT(60)
     α = FT(3.5)           # lapse rate of radiative equillibrium
+    τ₀ = FT(0.22)
 
     p_lay = DA{FT}(undef, nlay, ncol)
     p_lev = DA{FT}(undef, nlev, ncol)
@@ -179,6 +184,7 @@ function setup_gray_as_alt_grid(
         z_lev,
         t_sfc,
         α,
+        τ₀,
         d0,
         nlay,
         ncol,
@@ -203,6 +209,7 @@ function setup_gray_as_pr_grid_kernel!(
     tt::FT,
     Δt::FT,
     α::FT,
+    τ₀::FT,
     r_d::FT,
     grav_::FT,
     nlay::Int,
