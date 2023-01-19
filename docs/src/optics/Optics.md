@@ -25,6 +25,7 @@ compute_lw_planck_src!
 ```
 
 ```@docs
+build_cloud_mask!
 add_cloud_optics_2stream
 compute_cld_props
 pade_eval
@@ -32,6 +33,7 @@ pade_eval
 
 ```@docs
 compute_optical_props_kernel!
+compute_optical_props_kernel_lw!
 compute_sources_gray_kernel!
 ```
 
