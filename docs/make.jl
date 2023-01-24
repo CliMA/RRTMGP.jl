@@ -2,8 +2,10 @@ pushfirst!(LOAD_PATH, joinpath(@__DIR__, ".."))
 using Documenter
 using LaTeXStrings
 using RRTMGP
+using DocumenterCitations
 
 makedocs(
+    CitationBibliography(joinpath(@__DIR__, "bibliography.bib")),
     sitename = "RRTMGP.jl",
     doctest = false,
     strict = true,
@@ -15,6 +17,7 @@ makedocs(
     modules = [RRTMGP],
     pages = Any[
         "Home" => "index.md",
+        "RTE" => "RTE.md",
         "Mathematical Formulation" => "MathFormulation.md",
         "Optics" => Any[
             "Angular Discretization" => "optics/AngularDiscretizations.md"
