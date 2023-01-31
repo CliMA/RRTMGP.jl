@@ -9,7 +9,6 @@
 
 ```math
 \newcommand{\dir}{\dag}                               % Direct
-\newcommand{\dif}{\star}                              % Diffuse
 \newcommand{\SFC}{\mathrm{sfc}}                       % Surface
 \newcommand{\TOA}{\mathrm{TOA}}                       % Top of atmosphere
 \newcommand{\F}{\mathcal F}                           % Generic fluxes in thermal energy equation
@@ -54,21 +53,6 @@
 ```@meta
 CurrentModule = RRTMGP
 ```
-
-# Radiation in the context of the thermal energy equation
-
-Radiative fluxes enter the thermal energy equation as follows:
-
-```math
-\begin{align}
-\PD_t (\rho e) = - \DIV \F + \SV
-\end{align}
-```
-
-Here, ``\F = \sum_i F_i``, with ``F_j = \FR{net} = \FR{+} - \FR{-}`` for some ``j``. Note that ``\FR{+}`` and ``\FR{-}`` denote the sum of diffuse (``\dif``) and direct (``\dir``) upward and downward fluxes respectively.
-
-!!! note
-    There are two implementations in `RRTMGP.jl`: one that operates on 1) all layers and multiple columns and 2) a single grid point.
 
 # Map atmospheric state to optical properties
 
@@ -117,44 +101,6 @@ Using the denoting notation:
 - &= \quad \text{downward}
 \end{align}
 ```
-
-
-# Computing fluxes given optical depth
-
-!!! note
-    This section is under development
-
-The radiative transfer equation under Thermodynamic Equilibrium (TE) in differential form is
-
-```math
-\begin{align}
-d \frac{d\RAD{}_{\ν}}{\ρ k(\ν) ds} = - \RAD{}_{\ν} + J_{\ν} \\
-\end{align}
-```
-here ``\RAD{}_{\ν}`` is monochromatic intensity, ``J`` is the source function and ``k(\ν) = \ka(\ν)+\ks(\ν)``. Define the single scattering albedo and the normalized phase function as below:
-```math
-\begin{align}
-\SSA(\nu) = \frac{\ks(\nu)}{k(\nu)}\\
-\frac{1}{4\pi}\int \SpectralPhaseFun{\Omega}{\Omega^{'}} d\Omega^{'}=1
-\end{align}
-```
-
-The phase function tells the fraction of radiation scattering by an individual particle from ``\Omega^{'}`` to ``\Omega``, the direction of ``I_{\nu}``. Then ``J`` can be written as
-```math
-\begin{align}
-    J_{\nu} = (1-\SSA_{\nu})\SpecPlanckF{T} + \frac{\SSA_{\nu}}{4\pi}\int_{4\pi} I_{\nu}(\Omega^{'})\SpectralPhaseFun{\Omega}{\Omega^{'}}d\Omega^{'}
-\end{align}
-```
-If we define the optical depth ``d\τ{}`` as opposite to ``ds``, i.e., ``d\τ{} = -\rho k(\nu)ds``. Therefore, the radiative transfer equation is equivalent to
-```math
-\begin{align}
-    \frac{d\RAD{}_{\nu}(\Omega)}{d\τ{}} = \RAD{}_{\nu}(\Omega) -
-    (1-\SSA_{\nu})\SpecPlanckF{T} -
-    \frac{\SSA_{\nu}}{4\pi}\int_{4\pi}
-    \RAD{}_{\nu}(\Omega^{'}) \SpectralPhaseFun{\Omega}{\Omega^{'}} d\Omega^{'}
-\end{align}
-```
-The terms of right hand side is the attenuation by absorption and scattering, emission, and scattering, respectively.
 
 # Equations derived from code
 
