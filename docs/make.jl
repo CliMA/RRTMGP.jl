@@ -18,8 +18,9 @@ makedocs(
     pages = Any[
         "Home" => "index.md",
         "RTE" => "RTE.md",
+        "Optics" => "Optics.md",
         "Mathematical Formulation" => "MathFormulation.md",
-        "Optics" => Any[
+        "API" => Any[
             "Angular Discretization" => "optics/AngularDiscretizations.md"
             "Atmospheric State" => "optics/AtmosphericStates.md"
             "Boundary Conditions" => "optics/BCs.md"
@@ -30,8 +31,8 @@ makedocs(
             "Solver struct" => "optics/RTE.md"
             "Source Functions" => "optics/Sources.md"
             "Volume Mixing Ratios" => "optics/Vmrs.md"
+            "RTE Solver" => "RTESolver.md"
         ],
-        "RTE Solver" => "RTESolver.md",
         "References" => "References.md",
     ],
 )
