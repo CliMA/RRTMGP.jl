@@ -197,7 +197,7 @@ and longwave sources whenever applicable.
 ) where {FT <: AbstractFloat, I <: Int}
     # upper/lower troposphere
     tropo = p_lay > lkp.p_ref_tropo ? 1 : 2
-    # volume mixing ration of h2o
+    # volume mixing ratio of h2o
     vmr_h2o = get_vmr(vmr, lkp.idx_h2o, glaycol...)
 
     jftemp, jfpress, jfη, col_mix = compute_interp_fractions(lkp, vmr, p_lay, t_lay, tropo, ibnd, glaycol)
