@@ -35,7 +35,7 @@ end
         igpt,
     )
 
-This function computes the longwave TwoStream clouds optics properties and adds them
+This function computes the shortwave TwoStream clouds optics properties and adds them
 to the TwoStream shortwave gase optics properties.
 """
 function add_cloud_optics_2stream(op::TwoStream, as::AtmosphericState, lkp::LookUpSW, lkp_cld, glaycol, ibnd, igpt)
