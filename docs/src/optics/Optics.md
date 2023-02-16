@@ -35,6 +35,8 @@ pade_eval
 compute_optical_props_kernel!
 compute_optical_props_kernel_lw!
 compute_sources_gray_kernel!
+compute_gray_optical_thickness_lw
+compute_gray_optical_thickness_sw
 ```
 
 ```@docs
