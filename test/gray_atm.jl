@@ -58,7 +58,8 @@ function gray_atmos_lw_equil(
         lat = DA{FT}(range(FT(-π / 2), FT(π / 2), length = ncol)) # latitude
     end
 
-    as = setup_gray_as_pr_grid(nlay, lat, p0, pe, param_set, DA)
+    otp = GrayOpticalThicknessSchneider2004(FT) # optical thickness parameters
+    as = setup_gray_as_pr_grid(nlay, lat, p0, pe, otp, param_set, DA)
     op = OPC(FT, ncol, nlay, DA)
     src_lw = source_func_longwave(param_set, FT, ncol, nlay, opc, DA)
     bcs_lw = LwBCs(DA{FT, 2}(sfc_emis), inc_flux)
@@ -152,6 +153,7 @@ function gray_atmos_sw_test(
     sfc_alb_direct = DA{FT, 2}(undef, nbnd, ncol) # surface albedo (direct)
     sfc_alb_diffuse = DA{FT, 2}(undef, nbnd, ncol) # surface albedo (diffuse)
     inc_flux_diffuse = nothing
+    otp = GrayOpticalThicknessOGorman2008(FT) # optical thickness parameters
 
     top_at_1 = false                          # Top-of-atmos at pt# 1 (true/false)
 
@@ -166,7 +168,7 @@ function gray_atmos_sw_test(
     sfc_alb_direct .= FT(0.1)
     sfc_alb_diffuse .= FT(0.1)
 
-    as = setup_gray_as_pr_grid(nlay, lat, p0, pe, param_set, DA) # init gray atmos state
+    as = setup_gray_as_pr_grid(nlay, lat, p0, pe, otp, param_set, DA) # init gray atmos state
     op = OPC(FT, ncol, nlay, DA)
     src_sw = source_func_shortwave(FT, ncol, nlay, opc, DA)
     bcs_sw = SwBCs(zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse)

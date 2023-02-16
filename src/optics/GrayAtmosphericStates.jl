@@ -1,4 +1,57 @@
 
+abstract type AbstractGrayOpticalThickness end
+
+"""
+    GrayOpticalThicknessSchneider2004{FT} <: AbstractGrayOpticalThickness
+
+Optical thickness function parameters from Schneider 2004, J. Atmos. Sci. (2004) 61 (12): 1317–1340.
+DOI: https://doi.org/10.1175/1520-0469(2004)061<1317:TTATTS>2.0.CO;2
+
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
+struct GrayOpticalThicknessSchneider2004{FT} <: AbstractGrayOpticalThickness
+    "scaling height ratio"
+    α::FT
+    "global mean surface temperature (K)"
+    te::FT
+    "temp at top of atmosphere (K)"
+    tt::FT
+    "Δt (K)"
+    Δt::FT
+end
+Adapt.@adapt_structure GrayOpticalThicknessSchneider2004
+
+GrayOpticalThicknessSchneider2004(::Type{FT}) where {FT} =
+    GrayOpticalThicknessSchneider2004{FT}(FT(3.5), FT(300), FT(200), FT(60))
+
+"""
+    GrayOpticalThicknessOGorman2008{FT} <: AbstractGrayOpticalThickness
+
+Optical thickness function parameters from O'Gorman 2008, Journal of Climate Vol 21, Page(s): 3815–3832.
+DOI: https://doi.org/10.1175/2007JCLI2065.1
+
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
+struct GrayOpticalThicknessOGorman2008{FT} <: AbstractGrayOpticalThickness
+    "scaling factor"
+    α::FT
+    "fₗ"
+    fₗ::FT
+    "longwave optical thickness at equator"
+    τₑ::FT
+    "longwave optical thickness at poles"
+    τₚ::FT
+    "optical thickness for shortwave radiation"
+    τ₀::FT
+end
+Adapt.@adapt_structure GrayOpticalThicknessOGorman2008
+
+GrayOpticalThicknessOGorman2008(::Type{FT}) where {FT <: AbstractFloat} =
+    GrayOpticalThicknessOGorman2008{FT}(FT(1.0), FT(0.2), FT(7.2), FT(1.8), FT(0.22))
+
+
 """
     GrayAtmosphericState{FT,FTA1D,FTA2D,I} <: 
         AbstractAtmosphericState{FT,I,FTA1D}
@@ -13,7 +66,10 @@ struct GrayAtmosphericState{
     FTA1D <: AbstractArray{FT, 1},
     FTA2D <: AbstractArray{FT, 2},
     I <: Int,
+    OTP <: AbstractGrayOpticalThickness,
 } <: AbstractAtmosphericState{FT, I, FTA1D}
+    "latitude, in radians, for each column; `(ncol,)`"
+    lat::FTA1D
     "Layer pressures `[Pa, mb]`; `(nlay, ncol)`"
     p_lay::FTA2D
     "Level pressures `[Pa, mb]`; `(nlay+1, ncol)`"
@@ -26,12 +82,8 @@ struct GrayAtmosphericState{
     z_lev::FTA2D
     "Surface temperatures `[K]`; `(ncol)`"
     t_sfc::FTA1D
-    "lapse rate"
-    α::FT
-    "shortwave optical depth"
-    τ₀::FT
-    "optical thickness parameter"
-    d0::FTA1D
+    "optical thickness parameters"
+    otp::OTP
     "Number of layers."
     nlay::I
     "Number of columns."
@@ -39,7 +91,6 @@ struct GrayAtmosphericState{
 end
 Adapt.@adapt_structure GrayAtmosphericState
 #---------------------------------------------------------------
-
 # This functions sets up a model temperature and pressure 
 # distributions for a gray atmosphere based on a pressure grid
 # see Schneider 2004, J. Atmos. Sci. (2004) 61 (12): 1317–1340.
@@ -50,6 +101,7 @@ function setup_gray_as_pr_grid(
     lat::FTA1D,
     p0::FT,
     pe::FT,
+    otp::AbstractGrayOpticalThickness,
     param_set::RP.ARP,
     ::Type{DA},
     step = "linear",
@@ -85,16 +137,15 @@ function setup_gray_as_pr_grid(
         end
     end
     #------------------------------------------------
-    return GrayAtmosphericState{eltype(t_sfc), typeof(t_sfc), typeof(p_lev), Int}(
+    return GrayAtmosphericState{eltype(t_sfc), typeof(t_sfc), typeof(p_lev), Int, typeof(otp)}(
+        lat,
         p_lay,
         p_lev,
         t_lay,
         t_lev,
         z_lev,
         t_sfc,
-        α,
-        τ₀,
-        d0,
+        otp,
         nlay,
         ncol,
     )

@@ -14,7 +14,10 @@ export AbstractAtmosphericState,
     setup_gray_as_pr_grid,
     setup_gray_as_alt_grid,
     MaxRandomOverlap,
-    AbstractCloudMask
+    AbstractCloudMask,
+    GrayOpticalThicknessSchneider2004,
+    GrayOpticalThicknessOGorman2008,
+    AbstractGrayOpticalThickness
 
 abstract type AbstractAtmosphericState{FT, I, FTA1D} end
 
