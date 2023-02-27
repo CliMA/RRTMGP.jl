@@ -19,7 +19,7 @@ makedocs(
         "Home" => "index.md",
         "RTE" => "RTE.md",
         "Optics" => "Optics.md",
-        "Mathematical Formulation" => "MathFormulation.md",
+        "Example" => "Example.md",
         "API" => Any[
             "Angular Discretization" => "optics/AngularDiscretizations.md"
             "Atmospheric State" => "optics/AtmosphericStates.md"
