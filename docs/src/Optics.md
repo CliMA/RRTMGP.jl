@@ -7,8 +7,7 @@
 The gray atmosphere (more precisely, semi-gray atmosphere) approximates the radiative properties of the atmosphere by taking the optical properties to be independent of wavelength, separately in the longwave and shortwave bands. 
 
 ### Longwave
-Two options are currently supported for computing the optical depth for longwave radiation.
-The optical depth (``d``) for longwave radiation, with the "GrayOpticalThicknessSchneider2004" option, follows [schneider2004](@cite):
+Two options are currently supported for computing the optical depth for longwave radiation. The optical depth (``d``) for longwave radiation, with the "GrayOpticalThicknessSchneider2004" option, follows [schneider2004](@cite):
 
 ```math
 \begin{align}
@@ -43,10 +42,10 @@ d(\phi, p) = \alpha \left[f_l \sigma + (1 - f_l) \sigma^4 \right] \left[ \tau_e 
 \end{align}
 ```
 
-where $f_l = 0.2$, $\sigma = \frac{p}{p_0}$ is pressure p normalized by
-surface pressure $p_0$, $\phi$ is latitude, and the longwave optical thicknesses at the equator and at the pole are  $\tau_e = 7.2$ and $\tau_p = 1.8$, respectively. $\alpha$ is a scaling factor. 
+where ``f_l = 0.2``, ``\sigma = p / p_0`` is pressure p normalized by
+surface pressure ``p_0``, ``\phi`` is latitude, and the longwave optical thicknesses at the equator and at the pole are  $\tau_e = 7.2$ and $\tau_p = 1.8$, respectively. $\alpha$ is a scaling factor. 
 
-The optical thickness of an atmosphere layer (the differential optical depth) of pressure thickness $\Delta 𝑝$ is
+The optical thickness of an atmosphere layer (the differential optical depth) of pressure thickness ``\Delta p`` is
 ```math
 \begin{align}
 \tau(\phi, p) = (\alpha * \frac{\Delta p}{p}) \left[f_l \sigma + 4 (1 - f_l) \sigma^4 \right] \left[ \tau_e + (\tau_p - \tau_e) \sin^2\phi \right]
@@ -57,7 +56,9 @@ The source function for longwave radiation is calculated as ``S = \sigma T^4 / \
 
 ### Shortwave
 
-The optical depth (``d``) for shortwave radiation follows [frierson2007](@cite) and [ogorman2008](@cite):
+Two options are currently supported for computing the optical depth for shortwave radiation. The optical depth (``d``) for shortwave radiation, with the "GrayOpticalThicknessSchneider2004" option, is 0.
+
+The optical depth (``d``) for shortwave radiation, with the "GrayOpticalThicknessOGorman2008" option, follows [frierson2007](@cite) and [ogorman2008](@cite):
 
 ```math
 \begin{align}
