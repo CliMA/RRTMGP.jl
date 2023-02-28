@@ -39,7 +39,7 @@ The optical depth (``d``) for longwave radiation, with the "GrayOpticalThickness
 
 ```math
 \begin{align}
-d(\phi, p) = \alpha \left[f_l \sigma + (1 - f_l) \sigma^4 \right] \left[ \tau_e + (\tau_p - \tau_e) sin^2\phi \right]
+d(\phi, p) = \alpha \left[f_l \sigma + (1 - f_l) \sigma^4 \right] \left[ \tau_e + (\tau_p - \tau_e) \sin^2\phi \right]
 \end{align}
 ```
 
@@ -49,7 +49,7 @@ surface pressure $p_0$, $\phi$ is latitude, and the longwave optical thicknesses
 The optical thickness of an atmosphere layer (the differential optical depth) of pressure thickness $\Delta 𝑝$ is
 ```math
 \begin{align}
-\tau(\phi, p) = (\alpha * \frac{\Delta p}{p}) \left[f_l \sigma + 4 (1 - f_l) \sigma^4 \right] \left[ \tau_e + (\tau_p - \tau_e) sin^2\phi \right]
+\tau(\phi, p) = (\alpha * \frac{\Delta p}{p}) \left[f_l \sigma + 4 (1 - f_l) \sigma^4 \right] \left[ \tau_e + (\tau_p - \tau_e) \sin^2\phi \right]
 \end{align}
 ```
 
@@ -88,4 +88,32 @@ For the major species, the absorption coefficient is computed by linearly interp
 For longwave bands, the Planck fraction (defined as the fraction of the band-integrated Planck energy associated with each g-point) is computed by linearly interpolating the tabulated values in ``\log(p)``, ``T``, and ``\eta``. The band-integrated Planck function is uniquely determined by temperature, and is computed by linearly interpolating the tabulated values in ``T``. The shortwave source function for each g-point is assumed to be constant.
 
 ### Lookup tables
-The lookup tables for the spectral map between ``\nu`` and ``g`` are stored in netcdf files [here](https://caltech.box.com/shared/static/wbtrwp44dyn08g7mozjf4fcyrexwbe6a.gz). Longwave and shortwave lookup tables are stored in `clearsky_lw.nc` and `clearsky_sw.nc`, respectively. `LookUpLW` and `LookUpSW` read the lookup tables. The tabulated information includes the spectral distretization (bands), the major and minor gases considered in each band, and tabulated data of absorption coefficients, Planck fraction, and band-integrated Planck function. The absorption coefficients and Planck fraction are computed at pressures ``1 \mathrm{Pa} ≤ p ≤ 109663 \mathrm{Pa}`` in increments of ``\log(p/1 \mathrm{Pa}) = 0.2``, temperatures ``160 \mathrm{K} ≤ T ≤ 355 \mathrm{K}`` in ``15 \mathrm{K}`` increments, and ``0 ≤ \eta ≤ 1`` in ``1/8`` increments. The band-integrated Plack function is computed at temperatures ``160 \mathrm{K} ≤ T ≤ 355 \mathrm{K}`` in ``1 \mathrm{K}`` increments. A more detailed description of the spectral structure of the lookup tables can be found in `Appendix A` in [pincus2019](@cite).
+The lookup tables for the spectral map between ``\nu`` and ``g`` are stored in netcdf files [here](https://caltech.box.com/shared/static/wbtrwp44dyn08g7mozjf4fcyrexwbe6a.gz). Longwave and shortwave lookup tables are stored in `clearsky_lw.nc` and `clearsky_sw.nc`, respectively. `LookUpLW` and `LookUpSW` read the lookup tables. The tabulated information includes the spectral discretization (bands), the major and minor gases considered in each band, and tabulated data of absorption coefficients, Planck fraction, and band-integrated Planck function. The absorption coefficients and Planck fraction are computed at pressures ``1 \mathrm{Pa} ≤ p ≤ 109663 \mathrm{Pa}`` in increments of ``\log(p/1 \mathrm{Pa}) = 0.2``, temperatures ``160 \mathrm{K} ≤ T ≤ 355 \mathrm{K}`` in ``15 \mathrm{K}`` increments, and ``0 ≤ \eta ≤ 1`` in ``1/8`` increments. The band-integrated Plack function is computed at temperatures ``160 \mathrm{K} ≤ T ≤ 355 \mathrm{K}`` in ``1 \mathrm{K}`` increments. A more detailed description of the spectral structure of the lookup tables can be found in `Appendix A` in [pincus2019](@cite).
+
+!!! note
+    Absorption by both major and minor species is treated separately in the upper and lower atmosphere, defined as pressures above and below the pressure defined in `press_ref_trop` in the lookup tables (~9948 Pa). This corresponds to element 13 in array `press_ref`. There is a single large table of absorption coefficients. Table elements 1:13 in the pressure dimension correspond to pressures >= `press_ref_trop`, while table elements 14:60 correspond to pressures <= `press_ref_trop`. Elements 13 and 14 refer to the same pressure but for the lower and upper atmosphere, respectively. This is why the the absorption coefficients lookup table has a pressure dimension of 60, but there are only 59 reference pressure levels in `press_ref`.
+
+## Cloud optics
+
+!!! note
+    Cloud optics can be calculated using either lookup tables or Pade approximations. Only the lookup table method is documented here.
+
+`compute_cld_props` computes the optical properties of clouds, which is a combination of contributions from liquid and ice particles. The optical thickness (``\tau``), single scattering albedo (``\omega_0``), and asymmetry parameter (``g``) for clouds are:
+
+```math
+\begin{align}
+\tau_c &= \tau_l + \tau_i \\
+\omega_{0c} &= \frac{\tau_l \omega_{0l} + \tau_i \omega_{0i}}{\tau_l + \tau_i} \\
+g_c &= \frac{\tau_l \omega_{0l} g_l + \tau_i \omega_{0i} g_i}{\tau_l \omega_{0l} + \tau_i \omega_{0i}} \\
+\end{align}
+```
+
+where subscripts c, l, and i indicate cloud, liquid, and ice, respectively. The liquid cloud and ice cloud optical thicknesses are calculated by multiplying the cloud liquid and ice extinction coefficients (``\mu``) by the cloud liquid (lwp) and ice water paths (iwp), respectively. That is, ``\tau_l = \mu_l \mathrm{lwp}`` and ``\tau_i = \mu_i \mathrm{iwp}``. The extinction coefficient, single scattering albedo, and asymmetry parameter are computed by linearly interpolating the tabulated values in the liquid and ice particle effective radius. For ice partices, the optical properties also depend on the surface roughness, following [yang2013](@cite). The optical properties for shortwave bands are delta-scaled to reduce the biases in calculating radiative fluxes for highly asymmetric phase functions ([joseph1976](@cite)).
+
+`add_cloud_optics_2stream` adds cloud optics to the gas optics for each g-point that sees cloud (the cloud mask is described below).
+
+### Lookup tables
+The lookup tables for cloud optics are stored in netcdf files [here](https://caltech.box.com/shared/static/wbtrwp44dyn08g7mozjf4fcyrexwbe6a.gz). Longwave and shortwave lookup tables are stored in `cloudysky_lw.nc` and `cloudysky_sw.nc`, respectively. `LookUpCld` reads the lookup tables. The tabulated information includes tabulated data of extinction coefficients, single scattering albedo, and asymmetry parameter for liquid and ice particles. The optical properties for liquid particles are computed at radius ``2.5 \mathrm{\mu m} ≤ r_l ≤ 21.5 \mathrm{\mu m}`` in increments of ``1 \mathrm{\mu m}``. The optical properties for ice particles are computed at radius ``10 \mathrm{\mu m} ≤ r_i ≤ 180 \mathrm{\mu m}`` in increments of ``10 \mathrm{\mu m}``.
+
+### Cloud overlap method
+Climate models predict grid-mean cloud fraction and cloud condensates, and the vertical structure of clouds needs to be prescribed using some overlap assumptions for calculating radiative fluxes. The Monte Carlo independent column approximation (McICA) allows us to have fractional cloud areas, by randomly assigning some wavelengths to see cloud and other wavelengths to see no cloud. `build_cloud_mask!` builds McICA-sampled cloud masks from cloud fraction. We use the maximum-random overlap method, which maximizes the cloud overlap between adjacent layers but randomly distributes clouds at different altitudes separated by clear sky. The random numbers are generated for each layer and each g-point. For a certain layer (layer 1), the g-points that have been assigned a random number larger than one minus the cloud fraction see cloud, and the other g-points see clear-sky. The random numbers are recalculated for the layer below (layer 2). If the g-point sees cloud in layer 1, its random number in layer 2 is changed to the one in layer 1. If the g-point sees clear-sky in layer 1, its random number in layer 2 is multiplied by one minus the cloud fraction of layer 1. This ensures that the random numbers in layer 2 are randomly distributed in the range [0, 1].
