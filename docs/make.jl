@@ -31,7 +31,7 @@ makedocs(
             "Solver struct" => "optics/RTE.md"
             "Source Functions" => "optics/Sources.md"
             "Volume Mixing Ratios" => "optics/Vmrs.md"
-            "RTE Solver" => "RTESolver.md"
+            "RTE Solver" => "rte/RTESolver.md"
         ],
         "References" => "References.md",
     ],
