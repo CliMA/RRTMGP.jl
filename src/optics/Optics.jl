@@ -14,7 +14,7 @@ using ..AngularDiscretizations
 import ..Parameters as RP
 #---------------------------------------
 
-export AbstractOpticalProps, OneScalar, TwoStream, compute_col_dry!, compute_optical_props!
+export AbstractOpticalProps, OneScalar, TwoStream, compute_col_gas!, compute_optical_props!
 
 """
     AbstractOpticalProps{FT,FTA2D}
@@ -76,7 +76,7 @@ function TwoStream(::Type{FT}, ncol::Int, nlay::Int, ::Type{DA}) where {FT <: Ab
 end
 
 """
-    compute_col_dry!(
+    compute_col_gas!(
         p_lev,
         col_dry,
         param_set,
@@ -88,7 +88,7 @@ end
 This function computes the column amounts of dry or moist air.
 
 """
-function compute_col_dry!(
+function compute_col_gas!(
     p_lev::FTA2D,
     col_dry::FTA2D,
     param_set::RP.ARP,
@@ -106,22 +106,22 @@ function compute_col_dry!(
     if device === CUDADevice() # launching CUDA kernel
         tx = min(nlay * ncol, max_threads)
         bx = cld(nlay * ncol, tx)
-        @cuda threads = (tx) blocks = (bx) compute_col_dry_CUDA!(col_dry, args...)
+        @cuda threads = (tx) blocks = (bx) compute_col_gas_CUDA!(col_dry, args...)
     else # launching Julia native multithreading kernel
         Threads.@threads for icnt in 1:(nlay * ncol)
             glaycol = ((icnt % nlay == 0) ? nlay : (icnt % nlay), cld(icnt, nlay))
-            compute_col_dry_kernel!(col_dry, args..., glaycol)
+            compute_col_gas_kernel!(col_dry, args..., glaycol)
         end
     end
     return nothing
 end
 
-function compute_col_dry_CUDA!(col_dry, args...)
+function compute_col_gas_CUDA!(col_dry, args...)
     glx = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
     nlay, ncol = size(col_dry)
     if glx ≤ nlay * ncol
         glaycol = ((glx % nlay == 0) ? nlay : (glx % nlay), cld(glx, nlay))
-        compute_col_dry_kernel!(col_dry, args..., glaycol)
+        compute_col_gas_kernel!(col_dry, args..., glaycol)
     end
     return nothing
 end

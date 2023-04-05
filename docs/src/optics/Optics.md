@@ -8,12 +8,12 @@ CurrentModule = RRTMGP.Optics
 AbstractOpticalProps
 OneScalar
 TwoStream
-compute_col_dry!
+compute_col_gas!
 compute_optical_props!
 ```
 
 ```@docs
-compute_col_dry_kernel!
+compute_col_gas_kernel!
 compute_interp_fractions
 compute_interp_frac_temp
 compute_interp_frac_press
