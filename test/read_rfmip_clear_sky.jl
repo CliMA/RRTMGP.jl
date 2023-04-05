@@ -107,7 +107,7 @@ function setup_rfmip_as(
 
     # This example skips latitude dependent gravity compution to be consistent with the
     # FORTRAN RRTMGP test case.
-    compute_col_dry!(p_lev, col_dry, param_set, vmr_h2o, lat) # the example skips lat based gravity calculation
+    compute_col_gas!(p_lev, col_dry, param_set, vmr_h2o, lat) # the example skips lat based gravity calculation
 
     vmr = VMR(vmr_h2o, vmr_o3, FTA1D(vmrat))
     cld_r_eff_liq = nothing
