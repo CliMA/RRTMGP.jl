@@ -1,42 +1,32 @@
 """
-    compute_col_gas_kernel!(
-        col_gas,
-        p_lev,
-        mol_m_dry,
-        mol_m_h2o,
-        avogadro
-        helmert1,
-        vmr_h2o
-        lat,
-        glaycol,
-    )
+    compute_col_gas(
+        Δp::FT,
+        mol_m_dry::FT,
+        mol_m_h2o::FT,
+        avogadro::FT,
+        helmert::AbstractArray{FT, 1},
+        vmr_h2o::FT,
+        lat::FT,
+    ) where {FT <: AbstractFloat}
 
 This function computes the column amounts of dry or moist air.
 """
-function compute_col_gas_kernel!(
-    col_gas::AbstractArray{FT, 2},
-    p_lev::AbstractArray{FT, 2},
+function compute_col_gas(
+    Δp::FT,
     mol_m_dry::FT,
     mol_m_h2o::FT,
     avogadro::FT,
     helmert1::FT,
-    vmr_h2o::Union{AbstractArray{FT, 2}, Nothing},
-    lat::Union{AbstractArray{FT, 1}, Nothing},
-    glaycol::Tuple{Int, Int},
+    helmert2::FT,
+    vmr_h2o::FT,
+    lat::FT,
 ) where {FT <: AbstractFloat}
-    glay, gcol = glaycol[1], glaycol[2]  # global col & lay ids
-    helmert2 = FT(0.02586)  # second constant of Helmert formula
     m2_to_cm2 = FT(100 * 100) # m^2 to cm^2
-    g0 =
-        lat isa AbstractArray ? helmert1 - helmert2 * cos(FT(2) * FT(π) * lat[gcol] / FT(180)) : # acceleration due to gravity [m/s^2]
-        helmert1
-    Δp = p_lev[glay, gcol] - p_lev[glay + 1, gcol]
-    vmr_h2o_glaygcol = vmr_h2o isa AbstractArray ? vmr_h2o[glay, gcol] : FT(0)
-    fact = FT(1) / (FT(1) + vmr_h2o_glaygcol)
-    # Get average mass of moist air per mole of moist air
-    m_air = (mol_m_dry + mol_m_h2o * vmr_h2o_glaygcol) * fact
+    g0 = helmert1 - helmert2 * cos(FT(2) * FT(π) * lat / FT(180)) # acceleration due to gravity [m/s^2]
+    # Get average mass of moist air per mole of moist air (fact = FT(1) / (FT(1) + vmr_h2o)) cancels out
+    m_air = (mol_m_dry + mol_m_h2o * vmr_h2o)
     # Hydrostatic equation
-    col_gas[glay, gcol] = (Δp * avogadro / (m2_to_cm2 * m_air * g0)) * fact # molecules/cm^2
+    return (Δp * avogadro / (m2_to_cm2 * m_air * g0)) # molecules/cm^2
 end
 """
     compute_interp_fractions(

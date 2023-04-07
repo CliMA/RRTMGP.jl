@@ -78,7 +78,7 @@ end
 """
     compute_col_gas!(
         p_lev,
-        col_dry,
+        col_gas,
         param_set,
         vmr_h2o,
         lat,
@@ -90,38 +90,68 @@ This function computes the column amounts of dry or moist air.
 """
 function compute_col_gas!(
     p_lev::FTA2D,
-    col_dry::FTA2D,
+    col_gas::FTA2D,
     param_set::RP.ARP,
     vmr_h2o::Union{AbstractArray{FT, 2}, Nothing} = nothing,
     lat::Union{AbstractArray{FT, 1}, Nothing} = nothing,
     max_threads::Int = Int(256),
 ) where {FT <: AbstractFloat, FTA2D <: AbstractArray{FT, 2}}
-    nlay, ncol = size(col_dry)
+    nlay, ncol = size(col_gas)
     mol_m_dry = FT(RP.molmass_dryair(param_set))
     mol_m_h2o = FT(RP.molmass_water(param_set))
     avogadro = FT(RP.avogad(param_set))
-    helmert1 = FT(RP.grav(param_set))
-    args = (p_lev, mol_m_dry, mol_m_h2o, avogadro, helmert1, vmr_h2o, lat)
     device = array_device(p_lev)
+    helmert1 = FT(RP.grav(param_set))
+    helmert2 = FT(0.02586) # contants for Helmert formula for gravity
     if device === CUDADevice() # launching CUDA kernel
         tx = min(nlay * ncol, max_threads)
         bx = cld(nlay * ncol, tx)
-        @cuda threads = (tx) blocks = (bx) compute_col_gas_CUDA!(col_dry, args...)
+        @cuda threads = (tx) blocks = (bx) compute_col_gas_CUDA!(
+            col_gas,
+            p_lev,
+            mol_m_dry,
+            mol_m_h2o,
+            avogadro,
+            helmert1,
+            helmert2,
+            vmr_h2o,
+            lat,
+        )
     else # launching Julia native multithreading kernel
         Threads.@threads for icnt in 1:(nlay * ncol)
-            glaycol = ((icnt % nlay == 0) ? nlay : (icnt % nlay), cld(icnt, nlay))
-            compute_col_gas_kernel!(col_dry, args..., glaycol)
+            glay = (icnt % nlay == 0) ? nlay : (icnt % nlay)
+            gcol = cld(icnt, nlay)
+            Δp = p_lev[glay, gcol] - p_lev[glay + 1, gcol]
+            vmr_h2o_glaygcol = vmr_h2o isa AbstractArray ? vmr_h2o[glay, gcol] : FT(0)
+            lat_glaygcol = lat isa AbstractArray ? lat[gcol] : FT(45)
+            col_gas[glay, gcol] =
+                compute_col_gas(Δp, mol_m_dry, mol_m_h2o, avogadro, helmert1, helmert2, vmr_h2o_glaygcol, lat_glaygcol)
         end
     end
     return nothing
 end
 
-function compute_col_gas_CUDA!(col_dry, args...)
+function compute_col_gas_CUDA!(
+    col_gas::AbstractArray{FT, 2},
+    p_lev::AbstractArray{FT, 2},
+    mol_m_dry::FT,
+    mol_m_h2o::FT,
+    avogadro::FT,
+    helmert1::FT,
+    helmert2::FT,
+    vmr_h2o::Union{AbstractArray{FT, 2}, Nothing} = nothing,
+    lat::Union{AbstractArray{FT, 1}, Nothing} = nothing,
+) where {FT <: AbstractFloat}
     glx = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
-    nlay, ncol = size(col_dry)
+    nlay, ncol = size(col_gas)
     if glx ≤ nlay * ncol
-        glaycol = ((glx % nlay == 0) ? nlay : (glx % nlay), cld(glx, nlay))
-        compute_col_gas_kernel!(col_dry, args..., glaycol)
+        glay = (glx % nlay == 0) ? nlay : (glx % nlay)
+        gcol = cld(glx, nlay)
+        Δp = p_lev[glay, gcol] - p_lev[glay + 1, gcol]
+        vmr_h2o_glaygcol = vmr_h2o isa AbstractArray ? vmr_h2o[glay, gcol] : FT(0)
+        lat_glaygcol = lat isa AbstractArray ? lat[gcol] : FT(45)
+        col_gas[glay, gcol] =
+            compute_col_gas(Δp, mol_m_dry, mol_m_h2o, avogadro, helmert1, helmert2, vmr_h2o_glaygcol, lat_glaygcol)
     end
     return nothing
 end
