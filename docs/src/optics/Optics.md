@@ -13,7 +13,7 @@ compute_optical_props!
 ```
 
 ```@docs
-compute_col_gas_kernel!
+compute_col_gas
 compute_interp_fractions
 compute_interp_frac_temp
 compute_interp_frac_press
