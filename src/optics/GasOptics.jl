@@ -32,11 +32,10 @@ function compute_col_gas_kernel!(
         helmert1
     Δp = p_lev[glay, gcol] - p_lev[glay + 1, gcol]
     vmr_h2o_glaygcol = vmr_h2o isa AbstractArray ? vmr_h2o[glay, gcol] : FT(0)
-    fact = FT(1) / (FT(1) + vmr_h2o_glaygcol)
     # Get average mass of moist air per mole of moist air
-    m_air = (mol_m_dry + mol_m_h2o * vmr_h2o_glaygcol) * fact
+    m_air = (mol_m_dry + mol_m_h2o * vmr_h2o_glaygcol)
     # Hydrostatic equation
-    col_gas[glay, gcol] = (Δp * avogadro / (m2_to_cm2 * m_air * g0)) * fact # molecules/cm^2
+    col_gas[glay, gcol] = (Δp * avogadro / (m2_to_cm2 * m_air * g0)) # molecules/cm^2
 end
 """
     compute_interp_fractions(
