@@ -14,85 +14,70 @@ import ..Parameters as RP
 export Solver
 
 """
-    struct Solver{
-        FT,
-        I,
-        FTA1D,
-        FTA2D,
-        AS,
-        OP,
-        SL,
-        SS,
-        BCL,
-        BCS,
-        FXBL,
-        FXBS,
-        FXL,
-        FXS,
-    }
+    Solver(
+        as,
+        op,
+        src_lw,
+        src_sw,
+        bcs_lw,
+        bcs_sw,
+        fluxb_lw,
+        fluxb_sw,
+        flux_lw,
+        flux_sw
+    )
 
-The high-level RRTMGP data structure storing the atmospheric state, 
-optical properties, sources, boundary conditions and fluxes configurations
-for a given simulation.
+The high-level RRTMGP data structure storing
+the atmospheric state, optical properties,
+sources, boundary conditions and fluxes
+configurations for a given simulation.
 
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct Solver{
-    FT <: AbstractFloat,
-    I <: Int,
-    FTA1D <: AbstractArray{FT, 1},
-    FTA2D <: AbstractArray{FT, 2},
-    AS <: AbstractAtmosphericState{FT, I, FTA1D},
-    OP <: AbstractOpticalProps{FT, FTA2D},
-    SL <: Union{AbstractSourceLW{FT, FTA1D, FTA2D}, Nothing},
-    SS <: Union{SourceSW2Str{FT, FTA1D, FTA2D}, Nothing},
-    BCL <: Union{LwBCs{FT}, Nothing},
-    BCS <: Union{SwBCs{FT}, Nothing},
-    FXBL <: Union{FluxLW{FT, FTA2D}, Nothing},
-    FXBS <: Union{FluxSW{FT, FTA2D}, Nothing},
-    FXL <: Union{FluxLW{FT, FTA2D}, Nothing},
-    FXS <: Union{FluxSW{FT, FTA2D}, Nothing},
-}
-    as::AS         # atmospheric state
-    op::OP         # optical properties
-    src_lw::SL     # source functions
-    src_sw::SS     # source functions
-    bcs_lw::BCL    # boundary conditions
-    bcs_sw::BCS    # boundary conditions
-    fluxb_lw::FXBL # temporary storage for bandwise calculations
-    fluxb_sw::FXBS # temporary storage for bandwise calculations
-    flux_lw::FXL   # fluxes for longwave problem
-    flux_sw::FXS   # fluxes for shortwave problem
+struct Solver{AS, OP, SL, SS, BCL, BCS, FXBL, FXBS, FXL, FXS}
+    "atmospheric state"
+    as::AS
+    "optical properties"
+    op::OP
+    "source functions"
+    src_lw::SL
+    "source functions"
+    src_sw::SS
+    "boundary conditions"
+    bcs_lw::BCL
+    "boundary conditions"
+    bcs_sw::BCS
+    "temporary storage for bandwise calculations"
+    fluxb_lw::FXBL
+    "temporary storage for bandwise calculations"
+    fluxb_sw::FXBS
+    "fluxes for longwave problem"
+    flux_lw::FXL
+    "fluxes for shortwave problem"
+    flux_sw::FXS
+    function Solver(as, op, src_lw, src_sw, bcs_lw, bcs_sw, fluxb_lw, fluxb_sw, flux_lw, flux_sw)
+        args = (as, op, src_lw, src_sw, bcs_lw, bcs_sw, fluxb_lw, fluxb_sw, flux_lw, flux_sw)
+        targs = typeof.(args)
+        FT = eltype(as.p_lev)
+        FTA1D = typeof(as.t_sfc)
+        FTA2D = typeof(as.p_lev)
+        @assert targs[1] <: AbstractAtmosphericState{FT, Int, FTA1D}
+        @assert targs[2] <: AbstractOpticalProps{FT, FTA2D}
+        @assert targs[3] <: Union{AbstractSourceLW{FT, FTA1D, FTA2D}, Nothing}
+        @assert targs[4] <: Union{SourceSW2Str{FT, FTA1D, FTA2D}, Nothing}
+        @assert targs[5] <: Union{LwBCs{FT}, Nothing}
+        @assert targs[6] <: Union{SwBCs{FT}, Nothing}
+        @assert targs[7] <: Union{FluxLW{FT, FTA2D}, Nothing}
+        @assert targs[8] <: Union{FluxSW{FT, FTA2D}, Nothing}
+        @assert targs[9] <: Union{FluxLW{FT, FTA2D}, Nothing}
+        @assert targs[10] <: Union{FluxSW{FT, FTA2D}, Nothing}
+        return new{targs...}(args...)
+    end
 end
 
-Solver(as, op, src_lw, src_sw, bcs_lw, bcs_sw, fluxb_lw, fluxb_sw, flux_lw, flux_sw) = Solver{
-    eltype(as.p_lev),
-    typeof(as.ncol),
-    typeof(as.t_sfc),
-    typeof(as.p_lev),
-    typeof(as),
-    typeof(op),
-    typeof(src_lw),
-    typeof(src_sw),
-    typeof(bcs_lw),
-    typeof(bcs_sw),
-    typeof(fluxb_lw),
-    typeof(fluxb_sw),
-    typeof(flux_lw),
-    typeof(flux_sw),
-}(
-    as,
-    op,
-    src_lw,
-    src_sw,
-    bcs_lw,
-    bcs_sw,
-    fluxb_lw,
-    fluxb_sw,
-    flux_lw,
-    flux_sw,
-)
+float_type(s::Solver) = eltype(s.as.p_lev)
+
 
 Adapt.@adapt_structure Solver
 end

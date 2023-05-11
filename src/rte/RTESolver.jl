@@ -21,14 +21,14 @@ include("RTESolverKernels.jl")
 
 """
     solve_lw!(
-        slv::Solver{FT,I},
-        max_threads::I,
-        lkp_args...,
-    ) where {I<:Int,FT<:AbstractFloat}
+        slv::Solver,
+        max_threads::Int,
+        lkp_args...
+    )
 
 Solver for the longwave radiation problem
 """
-function solve_lw!(slv::Solver{FT, I}, max_threads::I, lkp_args...) where {I <: Int, FT <: AbstractFloat}
+function solve_lw!(slv::Solver, max_threads::Int, lkp_args...)
     (; as, op, bcs_lw, src_lw, flux_lw, fluxb_lw) = slv
     (; nlay, ncol) = as
     DA = array_type()
@@ -249,16 +249,17 @@ end
 
 """
     solve_sw!(
-        slv::Solver{FT,I},
-        max_threads::I,
+        slv::Solver,
+        max_threads::Int,
         lkp_args...,
-    ) where {I<:Int,FT<:AbstractFloat}
+    )
 
 Solver for the shortwave radiation problem
 """
-function solve_sw!(slv::Solver{FT, I}, max_threads::I, lkp_args...) where {I <: Int, FT <: AbstractFloat}
+function solve_sw!(slv::Solver, max_threads::Int, lkp_args...)
     (; as, op, bcs_sw, src_sw, flux_sw, fluxb_sw) = slv
     (; nlay, ncol) = as
+    FT = RTE.float_type(slv)
     DA = array_type()
     nargs = length(lkp_args)
     @assert nargs < 3
