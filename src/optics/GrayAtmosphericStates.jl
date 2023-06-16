@@ -68,7 +68,7 @@ struct GrayAtmosphericState{
     I <: Int,
     OTP <: AbstractGrayOpticalThickness,
 } <: AbstractAtmosphericState{FT, I, FTA1D}
-    "latitude, in radians, for each column; `(ncol,)`"
+    "latitude, in degrees, for each column; `(ncol,)`"
     lat::FTA1D
     "Layer pressures `[Pa, mb]`; `(nlay, ncol)`"
     p_lay::FTA2D
@@ -209,7 +209,7 @@ function setup_gray_as_alt_grid(
             z_lev[icls * poly_order + 1, icol] = zst + icls * Δz_cell
         end
 
-        ts = te + Δt * (FT(1 / 3) - sin(lat[icol])^2) # surface temp at a given latitude (K)
+        ts = te + Δt * (FT(1 / 3) - sin(lat[icol] / FT(180) * FT(π))^2) # surface temp at a given latitude (K)
         d0[icol] = FT((ts / tt)^4 - 1) # optical depth
 
         p_lev[1, icol] = p0
@@ -266,7 +266,7 @@ function setup_gray_as_pr_grid_kernel!(
     nlay::Int,
     gcol::Int,
 ) where {FT <: AbstractFloat, FTA1D <: AbstractArray{FT, 1}, FTA2D <: AbstractArray{FT, 2}}
-    ts = te + Δt * (FT(1) / FT(3) - sin(lat[gcol])^2) # surface temp at a given latitude (K)
+    ts = te + Δt * (FT(1) / FT(3) - sin(lat[gcol] / FT(180) * FT(π))^2) # surface temp at a given latitude (K)
     d0[gcol] = FT((ts / tt)^FT(4) - FT(1)) # optical depth
     nlev = nlay + 1
 

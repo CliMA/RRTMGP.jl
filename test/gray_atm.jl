@@ -55,7 +55,7 @@ function gray_atmos_lw_equil(
     if ncol == 1
         lat = DA{FT}([0])                   # latitude
     else
-        lat = DA{FT}(range(FT(-π / 2), FT(π / 2), length = ncol)) # latitude
+        lat = DA{FT}(range(FT(-90), FT(90), length = ncol)) # latitude
     end
 
     otp = GrayOpticalThicknessSchneider2004(FT) # optical thickness parameters
@@ -160,7 +160,7 @@ function gray_atmos_sw_test(
     if ncol == 1
         lat = DA{FT}([0])                     # latitude
     else
-        lat = DA{FT}(range(FT(-π / 2), FT(π / 2), length = ncol)) # latitude
+        lat = DA{FT}(range(FT(-90), FT(90), length = ncol)) # latitude
     end
 
     zenith .= deg2rad * 52.95 #acsc(FT(1.66))               # corresponding to ~52.95 deg zenith angle    
