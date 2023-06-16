@@ -133,7 +133,7 @@ function compute_gray_optical_thickness_lw(
 ) where {FT <: AbstractFloat}
     (; α, te, tt, Δt) = params
     glay, gcol = glaycol
-    ts = te + Δt * (FT(1) / FT(3) - sin(lat)^2) # surface temp at a given latitude (K)
+    ts = te + Δt * (FT(1) / FT(3) - sin(lat / FT(180) * FT(π))^2) # surface temp at a given latitude (K)
     d0 = FT((ts / tt)^FT(4) - FT(1)) # optical depth
     @inbounds τ = (α * d0 * (p / p0)^α / p) * Δp
     return abs(τ)
@@ -168,7 +168,7 @@ function compute_gray_optical_thickness_lw(
     glay, gcol = glaycol
     σ = p / p0
 
-    @inbounds τ = (α * Δp / p) * (fₗ * σ + (1 - fₗ) * 4 * σ^4) * (τₑ + (τₚ - τₑ) * sin(lat)^2)
+    @inbounds τ = (α * Δp / p) * (fₗ * σ + (1 - fₗ) * 4 * σ^4) * (τₑ + (τₚ - τₑ) * sin(lat / FT(180) * FT(π))^2)
 
     return abs(τ)
 end

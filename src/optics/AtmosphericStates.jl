@@ -49,9 +49,9 @@ struct AtmosphericState{
     VMR <: AbstractVmr{FT},
     I <: Int,
 } <: AbstractAtmosphericState{FT, I, FTA1D}
-    "longitude (`ncol`), optional"
+    "longitude, in degrees (`ncol`), optional"
     lon::FTA1DN
-    "latitude (`ncol`), optional"
+    "latitude, in degrees (`ncol`), optional"
     lat::FTA1DN
     "Layer pressures `[Pa, mb]`; `(nlay,ncol)`"
     p_lay::FTA2D
