@@ -10,9 +10,9 @@ function compute_optical_props_kernel!(
     glaycol,
     sf::AbstractSourceLW{FT},
     igpt,
-    lkp::LookUpLW{I, FT},
+    lkp::LookUpLW{FT},
     lkp_cld::LookUpCld,
-) where {I <: Int, FT <: AbstractFloat}
+) where {FT <: AbstractFloat}
     ibnd = lkp.major_gpt2bnd[igpt]
 
     compute_optical_props_kernel!(op, as, glaycol, sf, igpt, lkp) # longwave gas optics
@@ -26,8 +26,8 @@ function compute_optical_props_kernel!(
     glaycol,
     sf::AbstractSourceLW{FT},
     igpt,
-    lkp::LookUpLW{I, FT},
-) where {I <: Int, FT <: AbstractFloat}
+    lkp::LookUpLW{FT},
+) where {FT <: AbstractFloat}
     t_sfc = as.t_sfc[glaycol[2]]
     t_lev = as.t_lev
     compute_optical_props_kernel!(op, as, glaycol, igpt, lkp, sf, t_lev, t_sfc)
@@ -39,9 +39,9 @@ function compute_optical_props_kernel!(
     as::AtmosphericState{FT},
     glaycol,
     igpt,
-    lkp::LookUpSW{I, FT},
+    lkp::LookUpSW{FT},
     lkp_cld::LookUpCld,
-) where {I <: Int, FT <: AbstractFloat}
+) where {FT <: AbstractFloat}
     ibnd = lkp.major_gpt2bnd[igpt]
 
     compute_optical_props_kernel!(op, as, glaycol, igpt, lkp) # shortwave gas optics
@@ -52,11 +52,11 @@ end
 function compute_optical_props_kernel!(
     op::AbstractOpticalProps{FT},
     as::AtmosphericState{FT},
-    glaycol::Tuple{I, I},
-    igpt::I,
-    lkp::LookUpLW{I, FT},
+    glaycol::Tuple{Int, Int},
+    igpt::Int,
+    lkp::LookUpLW{FT},
     src_args...,
-) where {I <: Int, FT <: AbstractFloat}
+) where {FT <: AbstractFloat}
 
     vmr = as.vmr
     col_dry = as.col_dry[glaycol...]
@@ -77,10 +77,10 @@ end
 function compute_optical_props_kernel!(
     op::AbstractOpticalProps{FT},
     as::AtmosphericState{FT},
-    glaycol::Tuple{I, I},
-    igpt::I,
-    lkp::LookUpSW{I, FT},
-) where {I <: Int, FT <: AbstractFloat}
+    glaycol::Tuple{Int, Int},
+    igpt::Int,
+    lkp::LookUpSW{FT},
+) where {FT <: AbstractFloat}
 
     vmr = as.vmr
     col_dry = as.col_dry[glaycol...]

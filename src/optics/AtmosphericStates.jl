@@ -19,7 +19,7 @@ export AbstractAtmosphericState,
     GrayOpticalThicknessOGorman2008,
     AbstractGrayOpticalThickness
 
-abstract type AbstractAtmosphericState{FT, I, FTA1D} end
+abstract type AbstractAtmosphericState{FT, FTA1D} end
 
 include("GrayAtmosphericStates.jl")
 
@@ -29,8 +29,8 @@ struct MaxRandomOverlap <: AbstractCloudMask end
 Adapt.@adapt_structure MaxRandomOverlap
 
 """
-    AtmosphericState{FT,FTA1D,FTA1DN,FTA2D,CLDP,CLDM,VMR,I} <:
-        AbstractAtmosphericState{FT,I,FTA1D}
+    AtmosphericState{FT,FTA1D,FTA1DN,FTA2D,CLDP,CLDM,VMR} <:
+        AbstractAtmosphericState{FT,FTA1D}
 
 Atmospheric conditions, used to compute optical properties. 
 
@@ -47,8 +47,7 @@ struct AtmosphericState{
     RND <: Union{AbstractArray{FT, 3}, Nothing},
     CMASK <: Union{AbstractCloudMask, Nothing},
     VMR <: AbstractVmr{FT},
-    I <: Int,
-} <: AbstractAtmosphericState{FT, I, FTA1D}
+} <: AbstractAtmosphericState{FT, FTA1D}
     "longitude, in degrees (`ncol`), optional"
     lon::FTA1DN
     "latitude, in degrees (`ncol`), optional"
@@ -88,13 +87,13 @@ struct AtmosphericState{
     "cloud mask type"
     cld_mask_type::CMASK
     "ice roughness, 1 = none, 2 = medium, 3 = rough"
-    ice_rgh::I
+    ice_rgh::Int
     "Number of layers."
-    nlay::I
+    nlay::Int
     "Number of columns."
-    ncol::I
+    ncol::Int
     "Number of gases."
-    ngas::I
+    ngas::Int
 end
 Adapt.@adapt_structure AtmosphericState
 end

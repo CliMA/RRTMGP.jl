@@ -30,9 +30,8 @@ function clear_sky(
     ::Type{SRC},
     ::Type{VMR},
     ::Type{FT},
-    ::Type{I},
     ::Type{DA},
-) where {FT <: AbstractFloat, I <: Int, DA, OPC, SRC, VMR}
+) where {FT <: AbstractFloat, DA, OPC, SRC, VMR}
     opc = Symbol(OPC)
     lw_file = get_ref_filename(:lookup_tables, :clearsky, λ = :lw) # lw lookup tables for gas optics
     sw_file = get_ref_filename(:lookup_tables, :clearsky, λ = :sw) # sw lookup tables for gas optics
@@ -45,18 +44,18 @@ function clear_sky(
 
     FTA1D = DA{FT, 1}
     FTA2D = DA{FT, 2}
-    max_threads = Int(256)
+    max_threads = 256
     exp_no = 1
     n_gauss_angles = 1
 
     # reading longwave lookup data
     ds_lw = Dataset(lw_file, "r")
-    lookup_lw, idx_gases = LookUpLW(ds_lw, I, FT, DA)
+    lookup_lw, idx_gases = LookUpLW(ds_lw, FT, DA)
     close(ds_lw)
 
     # reading shortwave lookup data
     ds_sw = Dataset(sw_file, "r")
-    lookup_sw, idx_gases = LookUpSW(ds_sw, I, FT, DA)
+    lookup_sw, idx_gases = LookUpSW(ds_sw, FT, DA)
     close(ds_sw)
 
     # reading rfmip data to atmospheric state
@@ -153,5 +152,5 @@ function clear_sky(
     @test max_err_flux_dn_sw ≤ toler_sw
 end
 @testset "testing clear sky 2-stream solver" begin
-    @time clear_sky(TwoStream, SourceLW2Str, VmrGM, Float64, Int, array_type())
+    @time clear_sky(TwoStream, SourceLW2Str, VmrGM, Float64, array_type())
 end

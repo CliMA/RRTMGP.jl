@@ -62,7 +62,7 @@ struct Solver{AS, OP, SL, SS, BCL, BCS, FXBL, FXBS, FXL, FXS}
         FT = eltype(as.p_lev)
         FTA1D = typeof(as.t_sfc)
         FTA2D = typeof(as.p_lev)
-        @assert targs[1] <: AbstractAtmosphericState{FT, Int, FTA1D}
+        @assert targs[1] <: AbstractAtmosphericState{FT, FTA1D}
         @assert targs[2] <: AbstractOpticalProps{FT, FTA2D}
         @assert targs[3] <: Union{AbstractSourceLW{FT, FTA1D, FTA2D}, Nothing}
         @assert targs[4] <: Union{SourceSW2Str{FT, FTA1D, FTA2D}, Nothing}

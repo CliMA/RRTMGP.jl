@@ -29,9 +29,8 @@ function lw_rfmip(
     ::Type{SRC},
     ::Type{VMR},
     ::Type{FT},
-    ::Type{I},
     ::Type{DA},
-) where {FT <: AbstractFloat, I <: Int, OPC, SRC, VMR, DA}
+) where {FT <: AbstractFloat, OPC, SRC, VMR, DA}
     opc = Symbol(OPC)
     lw_file = get_ref_filename(:lookup_tables, :clearsky, λ = :lw) # lw lookup tables
     lw_input_file = get_ref_filename(:atmos_state, :clearsky)      # clear-sky atmos state
@@ -47,7 +46,7 @@ function lw_rfmip(
 
     # reading longwave lookup data
     ds_lw = Dataset(lw_file, "r")
-    lookup_lw, idx_gases = LookUpLW(ds_lw, I, FT, DA)
+    lookup_lw, idx_gases = LookUpLW(ds_lw, FT, DA)
     close(ds_lw)
     # reading rfmip data to atmospheric state
     ds_lw_in = Dataset(lw_input_file, "r")

@@ -26,13 +26,7 @@ DA = array_type()
 """
 Example program to demonstrate the calculation of longwave radiative fluxes in a model gray atmosphere.
 """
-function gray_atmos_lw_equil(
-    ::Type{OPC},
-    ::Type{FT},
-    ::Type{I},
-    ::Type{DA},
-    ncol::Int,
-) where {FT <: AbstractFloat, I <: Int, DA, OPC}
+function gray_atmos_lw_equil(::Type{OPC}, ::Type{FT}, ::Type{DA}, ncol::Int) where {FT <: AbstractFloat, DA, OPC}
     opc = Symbol(OPC)
     nlay = 60                               # number of layers
     p0 = FT(100000)                         # surface pressure (Pa)
@@ -46,11 +40,11 @@ function gray_atmos_lw_equil(
     nsteps = ndays * (24 / tstep)           # number of timesteps
     temp_toler = FT(0.1)                    # tolerance for temperature (Kelvin)
     flux_grad_toler = FT(1e-5)              # tolerance for flux gradient
-    n_gauss_angles = I(1)                   # for non-scattering calculation
+    n_gauss_angles = 1                   # for non-scattering calculation
     sfc_emis = Array{FT}(undef, nbnd, ncol) # surface emissivity
     sfc_emis .= FT(1.0)
     inc_flux = nothing                      # incoming flux
-    max_threads = Int(256)                  # maximum number of threads for KA kernels
+    max_threads = 256                  # maximum number of threads for KA kernels
 
     if ncol == 1
         lat = DA{FT}([0])                   # latitude
@@ -124,13 +118,7 @@ function gray_atmos_lw_equil(
 end
 #------------------------------------------------------------------------------
 
-function gray_atmos_sw_test(
-    ::Type{OPC},
-    ::Type{FT},
-    ::Type{I},
-    ::Type{DA},
-    ncol::Int,
-) where {FT <: AbstractFloat, I <: Int, DA, OPC}
+function gray_atmos_sw_test(::Type{OPC}, ::Type{FT}, ::Type{DA}, ncol::Int) where {FT <: AbstractFloat, DA, OPC}
     opc = Symbol(OPC)
     nlay = 60                         # number of layers
     p0 = FT(100000)                   # surface pressure (Pa)
@@ -142,10 +130,10 @@ function gray_atmos_sw_test(
     Δt = FT(60 * 60 * tstep)          # timestep in seconds
     ndays = 365 * 40                  # # of simulation days
     nsteps = ndays * (24 / tstep)     # number of timesteps
-    n_gauss_angles = I(1)             # for non-scattering calculation
+    n_gauss_angles = 1             # for non-scattering calculation
     sfc_emis = Array{FT}(undef, nbnd, ncol) # surface emissivity
     sfc_emis .= FT(1.0)
-    max_threads = Int(256)            # maximum number of threads for KA kernels
+    max_threads = 256            # maximum number of threads for KA kernels
     deg2rad = FT(π) / FT(180)
 
     zenith = DA{FT, 1}(undef, ncol)   # solar zenith angle in radians
@@ -196,12 +184,12 @@ function gray_atmos_sw_test(
 end
 
 if DA == CuArray
-    @time gray_atmos_lw_equil(OneScalar, Float64, Int, DA, Int(4096))
-    @time gray_atmos_lw_equil(TwoStream, Float64, Int, DA, Int(4096))
+    @time gray_atmos_lw_equil(OneScalar, Float64, DA, 4096)
+    @time gray_atmos_lw_equil(TwoStream, Float64, DA, 4096)
 else
-    @time gray_atmos_lw_equil(OneScalar, Float64, Int, DA, Int(9))
-    @time gray_atmos_lw_equil(TwoStream, Float64, Int, DA, Int(9))
+    @time gray_atmos_lw_equil(OneScalar, Float64, DA, 9)
+    @time gray_atmos_lw_equil(TwoStream, Float64, DA, 9)
 end
 
-@time gray_atmos_sw_test(OneScalar, Float64, Int, DA, Int(1))
-@time gray_atmos_sw_test(TwoStream, Float64, Int, DA, Int(1))
+@time gray_atmos_sw_test(OneScalar, Float64, DA, 1)
+@time gray_atmos_sw_test(TwoStream, Float64, DA, 1)

@@ -24,7 +24,7 @@ Optical properties for one scalar and two stream calculations.
 abstract type AbstractOpticalProps{FT <: AbstractFloat, FTA2D <: AbstractArray{FT, 2}} end
 
 """
-    OneScalar{FT,FTA1D,FTA2D,I,AD} <: AbstractOpticalProps{FT,FTA2D}
+    OneScalar{FT,FTA1D,FTA2D,AD} <: AbstractOpticalProps{FT,FTA2D}
 
 Single scalar approximation for optical depth, used in
 calculations accounting for extinction and emission
@@ -42,9 +42,8 @@ end
 Adapt.@adapt_structure OneScalar
 
 function OneScalar(::Type{FT}, ncol::Int, nlay::Int, ::Type{DA}) where {FT <: AbstractFloat, DA}
-    I = Int
     τ = DA{FT, 2}(undef, nlay, ncol)
-    ad = AngularDiscretization(FT, DA, I(1))
+    ad = AngularDiscretization(FT, DA, 1)
 
     return OneScalar{eltype(τ), typeof(τ), typeof(ad)}(τ, ad)
 end
@@ -141,11 +140,11 @@ end
         op::AbstractOpticalProps{FT},
         as::AtmosphericState{FT},
         sf::AbstractSourceLW{FT},
-        gcol::I,
-        igpt::I,
-        lkp::LookUpLW{I,FT},
+        gcol::Int,
+        igpt::Int,
+        lkp::LookUpLW{FT},
         lkp_cld::Union{LookUpCld,Nothing} = nothing,
-    ) where {I<:Int,FT<:AbstractFloat}
+    ) where {FT<:AbstractFloat}
 
 Computes optical properties for the longwave problem.
 """
@@ -153,11 +152,11 @@ function compute_optical_props!(
     op::AbstractOpticalProps{FT},
     as::AtmosphericState{FT},
     sf::AbstractSourceLW{FT},
-    gcol::I,
-    igpt::I,
-    lkp::LookUpLW{I, FT},
+    gcol::Int,
+    igpt::Int,
+    lkp::LookUpLW{FT},
     lkp_cld::Union{LookUpCld, Nothing} = nothing,
-) where {I <: Int, FT <: AbstractFloat}
+) where {FT <: AbstractFloat}
     nlay = as.nlay
     lkp_args = (lkp_cld === nothing) ? (lkp,) : (lkp, lkp_cld)
     for ilay in 1:nlay
@@ -171,22 +170,22 @@ end
     compute_optical_props!(
         op::AbstractOpticalProps{FT},
         as::AtmosphericState{FT},
-        gcol::I,
-        igpt::I,
-        lkp::LookUpSW{I,FT},
+        gcol::Int,
+        igpt::Int,
+        lkp::LookUpSW{FT},
         lkp_cld::Union{LookUpCld,Nothing} = nothing,
-    ) where {I<:Int,FT<:AbstractFloat}
+    ) where {FT<:AbstractFloat}
 
 Computes optical properties for the shortwave problem.
 """
 function compute_optical_props!(
     op::AbstractOpticalProps{FT},
     as::AtmosphericState{FT},
-    gcol::I,
-    igpt::I,
-    lkp::LookUpSW{I, FT},
+    gcol::Int,
+    igpt::Int,
+    lkp::LookUpSW{FT},
     lkp_cld::Union{LookUpCld, Nothing} = nothing,
-) where {I <: Int, FT <: AbstractFloat}
+) where {FT <: AbstractFloat}
     nlay = as.nlay
     lkp_args = (lkp_cld === nothing) ? (lkp,) : (lkp, lkp_cld)
     for ilay in 1:nlay
@@ -201,8 +200,8 @@ end
         op::AbstractOpticalProps{FT},
         as::GrayAtmosphericState{FT},
         sf::AbstractSourceLW{FT},
-        gcol::I,
-        igpt::I = 1,
+        gcol::Int,
+        igpt::Int = 1,
     ) where {FT<:AbstractFloat}
 
 Computes optical properties for the longwave gray radiation problem.
@@ -211,9 +210,9 @@ function compute_optical_props!(
     op::AbstractOpticalProps{FT},
     as::GrayAtmosphericState{FT},
     sf::AbstractSourceLW{FT},
-    gcol::I,
-    igpt::I = 1,
-) where {FT <: AbstractFloat, I <: Int}
+    gcol::Int,
+    igpt::Int = 1,
+) where {FT <: AbstractFloat}
     nlay = as.nlay
     for ilay in 1:nlay
         glaycol = (ilay, gcol)
@@ -226,8 +225,8 @@ end
     compute_optical_props!(
         op::AbstractOpticalProps{FT},
         as::GrayAtmosphericState{FT},
-        gcol::I,
-        igpt::I = 1,
+        gcol::Int,
+        igpt::Int = 1,
     ) where {FT<:AbstractFloat}
 
 Computes optical properties for the shortwave gray radiation problem.
@@ -235,9 +234,9 @@ Computes optical properties for the shortwave gray radiation problem.
 function compute_optical_props!(
     op::AbstractOpticalProps{FT},
     as::GrayAtmosphericState{FT},
-    gcol::I,
-    igpt::I = 1,
-) where {FT <: AbstractFloat, I <: Int}
+    gcol::Int,
+    igpt::Int = 1,
+) where {FT <: AbstractFloat}
     nlay = as.nlay
     for ilay in 1:nlay
         glaycol = (ilay, gcol)

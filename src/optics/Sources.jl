@@ -235,7 +235,7 @@ struct SourceSW2Str{FT <: AbstractFloat, FTA1D <: AbstractArray{FT, 1}, FTA2D <:
 end
 Adapt.@adapt_structure SourceSW2Str
 
-function SourceSW2Str(::Type{FT}, ::Type{DA}, nlay::I, ncol::I) where {FT <: AbstractFloat, I <: Int, DA}
+function SourceSW2Str(::Type{FT}, ::Type{DA}, nlay::Int, ncol::Int) where {FT <: AbstractFloat, DA}
     FTA1D = DA{FT, 1}
     FTA2D = DA{FT, 2}
 
@@ -267,21 +267,21 @@ end
 """
     source_func_shortwave(
         ::Type{FT},
-        ncol::I,
-        nlay::I,
+        ncol::Int,
+        nlay::Int,
         opc::Symbol,
         ::Type{DA},
-    ) where {FT<:AbstractFloat,I<:Int,DA}
+    ) where {FT<:AbstractFloat,DA}
 
 Initializes the shortwave source for one scalar and two stream simulations.
 """
 function source_func_shortwave(
     ::Type{FT},
-    ncol::I,
-    nlay::I,
+    ncol::Int,
+    nlay::Int,
     opc::Symbol,
     ::Type{DA},
-) where {FT <: AbstractFloat, I <: Int, DA}
+) where {FT <: AbstractFloat, DA}
     if opc == :OneScalar
         return nothing
     else
