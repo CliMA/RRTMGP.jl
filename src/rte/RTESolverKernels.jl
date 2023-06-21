@@ -299,11 +299,11 @@ function rte_sw_noscat_solve_kernel!(
     flux::FluxSW{FT},
     op::OneScalar{FT},
     bcs_sw::SwBCs{FT},
-    igpt::I,
+    igpt::Int,
     solar_src_scaled::AbstractArray{FT, 1},
-    gcol::I,
-    nlev::I,
-) where {FT <: AbstractFloat, I <: Int}
+    gcol::Int,
+    nlev::Int,
+) where {FT <: AbstractFloat}
     solar_frac = solar_src_scaled[igpt]
     (; toa_flux, zenith) = bcs_sw
     n_gpt = length(solar_src_scaled)
@@ -338,9 +338,9 @@ function sw_two_stream!(
     op::TwoStream{FT},
     src_sw::SourceSW2Str{FT},
     bcs_sw::SwBCs{FT},
-    gcol::I,
-    nlay::I,
-) where {FT <: AbstractFloat, I <: Int}
+    gcol::Int,
+    nlay::Int,
+) where {FT <: AbstractFloat}
     zenith = bcs_sw.zenith
     (; τ, ssa, g) = op
     (; Rdif, Tdif, Rdir, Tdir, Tnoscat) = src_sw
@@ -417,13 +417,13 @@ Direct-beam and source for diffuse radiation
 function sw_source_2str!(
     src_sw::SourceSW2Str{FT},
     bcs_sw::SwBCs{FT},
-    gcol::I,
+    gcol::Int,
     flux::FluxSW{FT},
-    igpt::I,
+    igpt::Int,
     solar_src_scaled::AbstractArray{FT, 1},
     major_gpt2bnd::AbstractArray{UInt8, 1},
-    nlay::I,
-) where {FT <: AbstractFloat, I <: Int}
+    nlay::Int,
+) where {FT <: AbstractFloat}
     ibnd = major_gpt2bnd[igpt]
     solar_frac = solar_src_scaled[igpt]
     (; toa_flux, zenith, sfc_alb_direct) = bcs_sw
@@ -460,12 +460,12 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
 function adding_sw!(
     src_sw::SourceSW2Str{FT},
     bcs_sw::SwBCs{FT},
-    gcol::I,
+    gcol::Int,
     flux::FluxSW{FT},
-    igpt::I,
+    igpt::Int,
     major_gpt2bnd::AbstractArray{UInt8, 1},
-    nlev::I,
-) where {FT <: AbstractFloat, I <: Int}
+    nlev::Int,
+) where {FT <: AbstractFloat}
     ibnd = major_gpt2bnd[igpt]
     nlay = nlev - 1
     n_gpt = length(major_gpt2bnd)

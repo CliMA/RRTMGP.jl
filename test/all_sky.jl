@@ -29,15 +29,14 @@ DA = array_type()
 function all_sky(
     ::Type{OPC},
     ::Type{FT},
-    ::Type{I},
     ::Type{DA};
     use_lut::Bool = true,
     cldfrac = FT(1),
-) where {FT <: AbstractFloat, I <: Int, DA, OPC}
+) where {FT <: AbstractFloat, DA, OPC}
     opc = Symbol(OPC)
     FTA1D = DA{FT, 1}
     FTA2D = DA{FT, 2}
-    max_threads = Int(256)
+    max_threads = 256
     n_gauss_angles = 1
     ncol = 128 # repeats col#1 128 time per RRTMGP example
 
@@ -55,19 +54,19 @@ function all_sky(
 
     #reading longwave gas optics lookup data
     ds_lw = Dataset(lw_file, "r")
-    lookup_lw, idx_gases = LookUpLW(ds_lw, I, FT, DA)
+    lookup_lw, idx_gases = LookUpLW(ds_lw, FT, DA)
     close(ds_lw)
     # reading longwave cloud lookup data
     ds_lw_cld = Dataset(lw_cld_file, "r")
-    lookup_lw_cld = LookUpCld(ds_lw_cld, I, FT, DA, use_lut)
+    lookup_lw_cld = LookUpCld(ds_lw_cld, FT, DA, use_lut)
     close(ds_lw_cld)
     #reading shortwave gas optics lookup data
     ds_sw = Dataset(sw_file, "r")
-    lookup_sw, idx_gases = LookUpSW(ds_sw, I, FT, DA)
+    lookup_sw, idx_gases = LookUpSW(ds_sw, FT, DA)
     close(ds_sw)
     # reading longwave cloud lookup data
     ds_sw_cld = Dataset(sw_cld_file, "r")
-    lookup_sw_cld = LookUpCld(ds_sw_cld, I, FT, DA, use_lut)
+    lookup_sw_cld = LookUpCld(ds_sw_cld, FT, DA, use_lut)
     close(ds_sw_cld)
     # reading input file 
     ds_in = Dataset(input_file, "r")
@@ -165,8 +164,8 @@ function all_sky(
 end
 
 @testset "Cloudy (all-sky, Two-stream calculations using lookup table method" begin
-    @time all_sky(TwoStream, Float64, Int, DA, use_lut = true, cldfrac = Float64(1))
+    @time all_sky(TwoStream, Float64, DA, use_lut = true, cldfrac = Float64(1))
 end
 @testset "Cloudy (all-sky), Two-stream calculations using Pade method" begin
-    @time all_sky(TwoStream, Float64, Int, DA, use_lut = false, cldfrac = Float64(1))
+    @time all_sky(TwoStream, Float64, DA, use_lut = false, cldfrac = Float64(1))
 end

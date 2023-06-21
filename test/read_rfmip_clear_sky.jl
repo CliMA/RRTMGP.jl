@@ -132,7 +132,6 @@ function setup_rfmip_as(
             typeof(random_lw),
             Nothing,
             typeof(vmr),
-            Int,
         }(
             lon,
             lat,

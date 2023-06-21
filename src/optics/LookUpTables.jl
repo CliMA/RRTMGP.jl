@@ -6,15 +6,15 @@ using Adapt
 export AbstractLookUp, LookUpLW, LookUpSW, LookUpCld
 
 """
-    AbstractLookUp{I,FT}
+    AbstractLookUp{FT}
 
 Abstract lookup table for longwave and shortwave problems.
 """
-abstract type AbstractLookUp{I, FT} end
+abstract type AbstractLookUp{FT} end
 
 """
-    LookUpLW{I,FT,UI8,UI8A1D,IA1D,IA2D,IA3D,FTA1D,FTA2D,FTA3D,FTA4D} <: 
-        AbstractLookUp{I,FT}
+    LookUpLW{FT,UI8A1D,IA1D,IA2D,IA3D,FTA1D,FTA2D,FTA3D,FTA4D} <: 
+        AbstractLookUp{FT}
 
 Longwave lookup tables, used to compute optical properties. 
 
@@ -22,49 +22,47 @@ Longwave lookup tables, used to compute optical properties.
 $(DocStringExtensions.FIELDS)
 """
 struct LookUpLW{
-    I <: Int,
     FT <: AbstractFloat,
-    UI8 <: UInt8,
-    UI8A1D <: AbstractArray{UI8, 1},
-    IA1D <: AbstractArray{I, 1},
-    IA2D <: AbstractArray{I, 2},
-    IA3D <: AbstractArray{I, 3},
+    UI8A1D <: AbstractArray{UInt8, 1},
+    IA1D <: AbstractArray{Int, 1},
+    IA2D <: AbstractArray{Int, 2},
+    IA3D <: AbstractArray{Int, 3},
     FTA1D <: AbstractArray{FT, 1},
     FTA2D <: AbstractArray{FT, 2},
     FTA3D <: AbstractArray{FT, 3},
     FTA4D <: AbstractArray{FT, 4},
-} <: AbstractLookUp{I, FT}
+} <: AbstractLookUp{FT}
     "number of gases used in the lookup table"
-    n_gases::I
+    n_gases::Int
     "number of longwave bands"
-    n_bnd::I
+    n_bnd::Int
     "number of `g-points`"
-    n_gpt::I
+    n_gpt::Int
     "number of atmospheric layers (=2, lower and upper atmospheres)"
-    n_atmos_layers::I
+    n_atmos_layers::Int
     "number of reference temperatures for absorption coefficient lookup table"
-    n_t_ref::I
+    n_t_ref::Int
     "number of reference pressures for absorption lookup table"
-    n_p_ref::I
+    n_p_ref::Int
     "number of reference binary mixing fractions, for absorption coefficient lookup table"
-    n_η::I
+    n_η::Int
     "number of reference temperatures, for Planck source calculations"
-    n_t_plnk::I
+    n_t_plnk::Int
     "number of major absorbing gases"
-    n_maj_absrb::I
+    n_maj_absrb::Int
     "number of minor absorbing gases"
-    n_min_absrb::I
+    n_min_absrb::Int
     "number of minor absorbers in lower atmosphere"
-    n_min_absrb_lower::I
+    n_min_absrb_lower::Int
     "number of minor absorbers in upper atmosphere"
-    n_min_absrb_upper::I
-    n_absrb_ext::I # not used
+    n_min_absrb_upper::Int
+    n_absrb_ext::Int # not used
     "number of minor contributors in the lower atmosphere"
-    n_contrib_lower::I
+    n_contrib_lower::Int
     "number of minor contributors in the upper atmosphere"
-    n_contrib_upper::I
+    n_contrib_upper::Int
     "vmr array index for h2o"
-    idx_h2o::I
+    idx_h2o::Int
     "Reference pressure separating upper and lower atmosphere"
     p_ref_tropo::FT
     "Reference temperature"
@@ -140,34 +138,34 @@ struct LookUpLW{
 end
 Adapt.@adapt_structure LookUpLW
 
-function LookUpLW(ds, ::Type{I}, ::Type{FT}, ::Type{DA}) where {I <: Int, FT <: AbstractFloat, DA}
+function LookUpLW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
 
     UI8 = UInt8
     UI8A1D = DA{UInt8, 1}
     STA = Array{String, 1}
-    IA1D = DA{I, 1}
-    IA2D = DA{I, 2}
-    IA3D = DA{I, 3}
+    IA1D = DA{Int, 1}
+    IA2D = DA{Int, 2}
+    IA3D = DA{Int, 3}
     FTA1D = DA{FT, 1}
     FTA2D = DA{FT, 2}
     FTA3D = DA{FT, 3}
     FTA4D = DA{FT, 4}
-    DSTAI = Dict{String, I}
+    DSTAI = Dict{String, Int}
 
-    n_bnd = I(ds.dim["bnd"])
-    n_gpt = I(ds.dim["gpt"])
-    n_atmos_layers = I(ds.dim["atmos_layer"])
-    n_t_ref = I(ds.dim["temperature"])
-    n_p_ref = I(ds.dim["pressure"])
-    n_t_plnk = I(ds.dim["temperature_Planck"])
-    n_maj_absrb = I(ds.dim["absorber"])
-    n_min_absrb = I(ds.dim["minor_absorber"])
-    n_min_absrb_lower = I(ds.dim["minor_absorber_intervals_lower"])
-    n_min_absrb_upper = I(ds.dim["minor_absorber_intervals_upper"])
+    n_bnd = Int(ds.dim["bnd"])
+    n_gpt = Int(ds.dim["gpt"])
+    n_atmos_layers = Int(ds.dim["atmos_layer"])
+    n_t_ref = Int(ds.dim["temperature"])
+    n_p_ref = Int(ds.dim["pressure"])
+    n_t_plnk = Int(ds.dim["temperature_Planck"])
+    n_maj_absrb = Int(ds.dim["absorber"])
+    n_min_absrb = Int(ds.dim["minor_absorber"])
+    n_min_absrb_lower = Int(ds.dim["minor_absorber_intervals_lower"])
+    n_min_absrb_upper = Int(ds.dim["minor_absorber_intervals_upper"])
 
-    n_absrb_ext = I(ds.dim["absorber_ext"])
-    n_contrib_lower = I(ds.dim["contributors_lower"])
-    n_contrib_upper = I(ds.dim["contributors_upper"])
+    n_absrb_ext = Int(ds.dim["absorber_ext"])
+    n_contrib_lower = Int(ds.dim["contributors_lower"])
+    n_contrib_upper = Int(ds.dim["contributors_upper"])
 
     p_ref_tropo = FT(ds["press_ref_trop"][:][1])
     t_ref_absrb = FT(ds["absorption_coefficient_ref_T"][:][1])
@@ -182,15 +180,15 @@ function LookUpLW(ds, ::Type{I}, ::Type{FT}, ::Type{DA}) where {I <: Int, FT <: 
     scaling_gas_upper = STA(undef, n_min_absrb_upper)
     idx_gases = DSTAI()
 
-    idx_gases_minor_lower = zeros(I, n_min_absrb_lower)
-    idx_gases_minor_upper = zeros(I, n_min_absrb_upper)
+    idx_gases_minor_lower = zeros(Int, n_min_absrb_lower)
+    idx_gases_minor_upper = zeros(Int, n_min_absrb_upper)
 
-    idx_scaling_gas_lower = zeros(I, n_min_absrb_lower)
-    idx_scaling_gas_upper = zeros(I, n_min_absrb_upper)
+    idx_scaling_gas_lower = zeros(Int, n_min_absrb_lower)
+    idx_scaling_gas_upper = zeros(Int, n_min_absrb_upper)
 
     for igas in 1:n_maj_absrb
         gases_major[igas] = strip(String(ds["gas_names"][:, igas]))
-        idx_gases[gases_major[igas]] = I(igas)
+        idx_gases[gases_major[igas]] = Int(igas)
     end
 
     idx_h2o = idx_gases["h2o"]
@@ -252,7 +250,7 @@ function LookUpLW(ds, ::Type{I}, ::Type{FT}, ::Type{DA}) where {I <: Int, FT <: 
     t_planck = FTA1D(ds["temperature_Planck"][:])
 
     totplnk = FTA2D(ds["totplnk"][:])
-    bnd_lims_gpt = Array{I, 2}(ds["bnd_limits_gpt"][:])
+    bnd_lims_gpt = Array{Int, 2}(ds["bnd_limits_gpt"][:])
     bnd_lims_wn = FTA2D(ds["bnd_limits_wavenumber"][:])
     #-----------------------
     major_gpt2bnd = Array{UI8, 1}(undef, n_gpt)
@@ -261,8 +259,8 @@ function LookUpLW(ds, ::Type{I}, ::Type{FT}, ::Type{DA}) where {I <: Int, FT <: 
     end
     #-----------------------
     bnd_lims_gpt = IA2D(bnd_lims_gpt)
-    minor_lower_gpt_lims = Array{I, 2}(ds["minor_limits_gpt_lower"][:])
-    minor_upper_gpt_lims = Array{I, 2}(ds["minor_limits_gpt_upper"][:])
+    minor_lower_gpt_lims = Array{Int, 2}(ds["minor_limits_gpt_lower"][:])
+    minor_upper_gpt_lims = Array{Int, 2}(ds["minor_limits_gpt_upper"][:])
     #-----------------------
     minor_lower_bnd = zeros(UI8, n_min_absrb_lower)
     minor_upper_bnd = zeros(UI8, n_min_absrb_upper)
@@ -342,7 +340,7 @@ function LookUpLW(ds, ::Type{I}, ::Type{FT}, ::Type{DA}) where {I <: Int, FT <: 
     n_η = size(kmajor, 2)
 
     return (
-        LookUpLW{I, FT, UI8, UI8A1D, IA1D, IA2D, IA3D, FTA1D, FTA2D, FTA3D, FTA4D}(
+        LookUpLW{FT, UI8A1D, IA1D, IA2D, IA3D, FTA1D, FTA2D, FTA3D, FTA4D}(
             n_gases,
             n_bnd,
             n_gpt,
@@ -402,8 +400,8 @@ function LookUpLW(ds, ::Type{I}, ::Type{FT}, ::Type{DA}) where {I <: Int, FT <: 
 end
 
 """
-    LookUpSW{I,FT,UI8,UI8A1D,IA1D,IA2D,IA3D,FTA1D,FTA2D,FTA3D,FTA4D} <:
-        AbstractLookUp{I,FT}
+    LookUpSW{FT,UI8A1D,IA1D,IA2D,IA3D,FTA1D,FTA2D,FTA3D,FTA4D} <:
+        AbstractLookUp{FT}
 
 Shortwave lookup tables, used to compute optical properties. 
 
@@ -411,47 +409,45 @@ Shortwave lookup tables, used to compute optical properties.
 $(DocStringExtensions.FIELDS)
 """
 struct LookUpSW{
-    I <: Int,
     FT <: AbstractFloat,
-    UI8 <: UInt8,
-    UI8A1D <: AbstractArray{UI8, 1},
-    IA1D <: AbstractArray{I, 1},
-    IA2D <: AbstractArray{I, 2},
-    IA3D <: AbstractArray{I, 3},
+    UI8A1D <: AbstractArray{UInt8, 1},
+    IA1D <: AbstractArray{Int, 1},
+    IA2D <: AbstractArray{Int, 2},
+    IA3D <: AbstractArray{Int, 3},
     FTA1D <: AbstractArray{FT, 1},
     FTA2D <: AbstractArray{FT, 2},
     FTA3D <: AbstractArray{FT, 3},
     FTA4D <: AbstractArray{FT, 4},
-} <: AbstractLookUp{I, FT}
+} <: AbstractLookUp{FT}
     "number of gases used in the lookup table"
-    n_gases::I
+    n_gases::Int
     "number of shortwave bands"
-    n_bnd::I
+    n_bnd::Int
     "number of `g-points`"
-    n_gpt::I
+    n_gpt::Int
     "number of atmospheric layers (=2, lower and upper atmospheres)"
-    n_atmos_layers::I
+    n_atmos_layers::Int
     "number of reference temperatures for absorption coefficient lookup table"
-    n_t_ref::I
+    n_t_ref::Int
     "number of reference pressures for absorption lookup table"
-    n_p_ref::I
+    n_p_ref::Int
     "number of reference binary mixing fractions, for absorption coefficient lookup table"
-    n_η::I
+    n_η::Int
     "number of major absorbing gases"
-    n_maj_absrb::I
+    n_maj_absrb::Int
     "number of minor absorbing gases"
-    n_min_absrb::I
+    n_min_absrb::Int
     "number of minor absorbers in lower atmosphere"
-    n_min_absrb_lower::I
+    n_min_absrb_lower::Int
     "number of minor absorbers in upper atmosphere"
-    n_min_absrb_upper::I
-    n_absrb_ext::I # not used
+    n_min_absrb_upper::Int
+    n_absrb_ext::Int # not used
     "number of minor contributors in the lower atmosphere"
-    n_contrib_lower::I
+    n_contrib_lower::Int
     "number of minor contributors in the upper atmosphere"
-    n_contrib_upper::I
+    n_contrib_upper::Int
     "vmr array index for h2o"
-    idx_h2o::I
+    idx_h2o::Int
     "Reference pressure separating upper and lower atmosphere"
     p_ref_tropo::FT
     "Reference temperature"
@@ -530,35 +526,35 @@ end
 Adapt.@adapt_structure LookUpSW
 
 
-function LookUpSW(ds, ::Type{I}, ::Type{FT}, ::Type{DA}) where {I <: Int, FT <: AbstractFloat, DA}
+function LookUpSW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
 
     UI8 = UInt8
     UI8A1D = DA{UInt8, 1}
     STA = Array{String, 1}
-    IA1D = DA{I, 1}
-    IA2D = DA{I, 2}
-    IA3D = DA{I, 3}
+    IA1D = DA{Int, 1}
+    IA2D = DA{Int, 2}
+    IA3D = DA{Int, 3}
     FTA1D = DA{FT, 1}
     FTA2D = DA{FT, 2}
     FTA3D = DA{FT, 3}
     FTA4D = DA{FT, 4}
-    DSTAI = Dict{String, I}
+    DSTAI = Dict{String, Int}
 
-    n_bnd = I(ds.dim["bnd"])
-    n_gpt = I(ds.dim["gpt"])
-    n_atmos_layers = I(ds.dim["atmos_layer"])
-    n_t_ref = I(ds.dim["temperature"])
-    n_p_ref = I(ds.dim["pressure"])
+    n_bnd = Int(ds.dim["bnd"])
+    n_gpt = Int(ds.dim["gpt"])
+    n_atmos_layers = Int(ds.dim["atmos_layer"])
+    n_t_ref = Int(ds.dim["temperature"])
+    n_p_ref = Int(ds.dim["pressure"])
 
-    n_maj_absrb = I(ds.dim["absorber"])
-    n_min_absrb = I(ds.dim["minor_absorber"])
+    n_maj_absrb = Int(ds.dim["absorber"])
+    n_min_absrb = Int(ds.dim["minor_absorber"])
 
-    n_min_absrb_lower = I(ds.dim["minor_absorber_intervals_lower"])
-    n_min_absrb_upper = I(ds.dim["minor_absorber_intervals_upper"])
-    n_absrb_ext = I(ds.dim["absorber_ext"])
+    n_min_absrb_lower = Int(ds.dim["minor_absorber_intervals_lower"])
+    n_min_absrb_upper = Int(ds.dim["minor_absorber_intervals_upper"])
+    n_absrb_ext = Int(ds.dim["absorber_ext"])
 
-    n_contrib_lower = I(ds.dim["contributors_lower"])
-    n_contrib_upper = I(ds.dim["contributors_upper"])
+    n_contrib_lower = Int(ds.dim["contributors_lower"])
+    n_contrib_upper = Int(ds.dim["contributors_upper"])
 
     p_ref_tropo = FT(ds["press_ref_trop"][:][1])
     t_ref_absrb = FT(ds["absorption_coefficient_ref_T"][:][1])
@@ -573,15 +569,15 @@ function LookUpSW(ds, ::Type{I}, ::Type{FT}, ::Type{DA}) where {I <: Int, FT <: 
     scaling_gas_upper = STA(undef, n_min_absrb_upper)
     idx_gases = DSTAI()
 
-    idx_gases_minor_lower = zeros(I, n_min_absrb_lower)
-    idx_gases_minor_upper = zeros(I, n_min_absrb_upper)
+    idx_gases_minor_lower = zeros(Int, n_min_absrb_lower)
+    idx_gases_minor_upper = zeros(Int, n_min_absrb_upper)
 
-    idx_scaling_gas_lower = zeros(I, n_min_absrb_lower)
-    idx_scaling_gas_upper = zeros(I, n_min_absrb_upper)
+    idx_scaling_gas_lower = zeros(Int, n_min_absrb_lower)
+    idx_scaling_gas_upper = zeros(Int, n_min_absrb_upper)
 
     for igas in 1:n_maj_absrb
         gases_major[igas] = strip(String(ds["gas_names"][:, igas]))
-        idx_gases[gases_major[igas]] = I(igas)
+        idx_gases[gases_major[igas]] = Int(igas)
     end
 
     idx_h2o = idx_gases["h2o"]
@@ -634,7 +630,7 @@ function LookUpSW(ds, ::Type{I}, ::Type{FT}, ::Type{DA}) where {I <: Int, FT <: 
     kminor_start_lower = IA1D(ds["kminor_start_lower"][:])
     kminor_start_upper = IA1D(ds["kminor_start_upper"][:])
 
-    bnd_lims_gpt = Array{I, 2}(ds["bnd_limits_gpt"][:])
+    bnd_lims_gpt = Array{Int, 2}(ds["bnd_limits_gpt"][:])
     bnd_lims_wn = FTA2D(ds["bnd_limits_wavenumber"][:])
     #-----------------------
     major_gpt2bnd = Array{UI8, 1}(undef, n_gpt)
@@ -643,8 +639,8 @@ function LookUpSW(ds, ::Type{I}, ::Type{FT}, ::Type{DA}) where {I <: Int, FT <: 
     end
     #-----------------------
     bnd_lims_gpt = IA2D(bnd_lims_gpt)
-    minor_lower_gpt_lims = Array{I, 2}(ds["minor_limits_gpt_lower"][:])
-    minor_upper_gpt_lims = Array{I, 2}(ds["minor_limits_gpt_upper"][:])
+    minor_lower_gpt_lims = Array{Int, 2}(ds["minor_limits_gpt_lower"][:])
+    minor_upper_gpt_lims = Array{Int, 2}(ds["minor_limits_gpt_upper"][:])
     #-----------------------
     minor_lower_bnd = zeros(UI8, n_min_absrb_lower)
     minor_upper_bnd = zeros(UI8, n_min_absrb_upper)
@@ -729,7 +725,7 @@ function LookUpSW(ds, ::Type{I}, ::Type{FT}, ::Type{DA}) where {I <: Int, FT <: 
     solar_src_scaled = FTA1D(solar_src ./ solar_src_tot)
 
     return (
-        LookUpSW{I, FT, UI8, UI8A1D, IA1D, IA2D, IA3D, FTA1D, FTA2D, FTA3D, FTA4D}(
+        LookUpSW{FT, UI8A1D, IA1D, IA2D, IA3D, FTA1D, FTA2D, FTA3D, FTA4D}(
             n_gases,
             n_bnd,
             n_gpt,
@@ -789,7 +785,7 @@ function LookUpSW(ds, ::Type{I}, ::Type{FT}, ::Type{DA}) where {I <: Int, FT <: 
 end
 
 """
-    LookUpCld{I,FT,FTA1D,FTA2D,FTA3D,FTA4D}
+    LookUpCld{FT,FTA1D,FTA2D,FTA3D,FTA4D}
 
 Lookup table for cloud optics.
 
@@ -802,25 +798,25 @@ These are used to determine the optical properties of ice and water cloud togeth
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct LookUpCld{I, B, FT, FTA1D, FTA2D, FTA3D, FTA4D}
+struct LookUpCld{B, FT, FTA1D, FTA2D, FTA3D, FTA4D}
     "number of bands"
-    nband::I
+    nband::Int
     "number of ice roughness types"
-    nrghice::I
+    nrghice::Int
     "number of liquid particle sizes"
-    nsize_liq::I
+    nsize_liq::Int
     "number of ice particle sizes"
-    nsize_ice::I
+    nsize_ice::Int
     "number of size regimes"
-    nsizereg::I
+    nsizereg::Int
     "number of extinction coefficients for pade approximation"
-    ncoeff_ext::I
+    ncoeff_ext::Int
     "number of ssa/g coefficients for pade approximation"
-    ncoeff_ssa_g::I
+    ncoeff_ssa_g::Int
     "number of size regime boundaries for pade interpolation"
-    nbound::I
+    nbound::Int
     "pair = 2"
-    pair::I
+    pair::Int
     "liquid particle size lower bound for LUT interpolation"
     radliq_lwr::FT
     "liquid particle size upper bound for LUT interpolation"
@@ -876,28 +872,22 @@ struct LookUpCld{I, B, FT, FTA1D, FTA2D, FTA3D, FTA4D}
 end
 Adapt.@adapt_structure LookUpCld
 
-function LookUpCld(
-    ds,
-    ::Type{I},
-    ::Type{FT},
-    ::Type{DA},
-    use_lut::Bool = true,
-) where {I <: Int, FT <: AbstractFloat, DA}
+function LookUpCld(ds, ::Type{FT}, ::Type{DA}, use_lut::Bool = true) where {FT <: AbstractFloat, DA}
 
     FTA1D = DA{FT, 1}
     FTA2D = DA{FT, 2}
     FTA3D = DA{FT, 3}
     FTA4D = DA{FT, 4}
 
-    nband = I(ds.dim["nband"])
-    nrghice = I(ds.dim["nrghice"])
-    nsize_liq = I(ds.dim["nsize_liq"])
-    nsize_ice = I(ds.dim["nsize_ice"])
-    nsizereg = I(ds.dim["nsizereg"])
-    ncoeff_ext = I(ds.dim["ncoeff_ext"])
-    ncoeff_ssa_g = I(ds.dim["ncoeff_ssa_g"])
-    nbound = I(ds.dim["nbound"])
-    pair = I(ds.dim["pair"])
+    nband = Int(ds.dim["nband"])
+    nrghice = Int(ds.dim["nrghice"])
+    nsize_liq = Int(ds.dim["nsize_liq"])
+    nsize_ice = Int(ds.dim["nsize_ice"])
+    nsizereg = Int(ds.dim["nsizereg"])
+    ncoeff_ext = Int(ds.dim["ncoeff_ext"])
+    ncoeff_ssa_g = Int(ds.dim["ncoeff_ssa_g"])
+    nbound = Int(ds.dim["nbound"])
+    pair = Int(ds.dim["pair"])
 
     @assert nsizereg == 3 # RRTMGP pade approximation assumes exactly (3) size regimes
 
@@ -935,7 +925,7 @@ function LookUpCld(
 
     bnd_lims_wn = FTA2D(ds["bnd_limits_wavenumber"][:])
 
-    return (LookUpCld{I, Bool, FT, FTA1D, FTA2D, FTA3D, FTA4D}(
+    return (LookUpCld{Bool, FT, FTA1D, FTA2D, FTA3D, FTA4D}(
         nband,
         nrghice,
         nsize_liq,

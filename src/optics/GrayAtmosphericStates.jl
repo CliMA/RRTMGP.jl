@@ -53,8 +53,8 @@ GrayOpticalThicknessOGorman2008(::Type{FT}) where {FT <: AbstractFloat} =
 
 
 """
-    GrayAtmosphericState{FT,FTA1D,FTA2D,I} <: 
-        AbstractAtmosphericState{FT,I,FTA1D}
+    GrayAtmosphericState{FT,FTA1D,FTA2D} <: 
+        AbstractAtmosphericState{FT,FTA1D}
 
 Atmospheric conditions, used to compute optical properties with the gray atmosphere approximation
 
@@ -65,9 +65,8 @@ struct GrayAtmosphericState{
     FT <: AbstractFloat,
     FTA1D <: AbstractArray{FT, 1},
     FTA2D <: AbstractArray{FT, 2},
-    I <: Int,
     OTP <: AbstractGrayOpticalThickness,
-} <: AbstractAtmosphericState{FT, I, FTA1D}
+} <: AbstractAtmosphericState{FT, FTA1D}
     "latitude, in degrees, for each column; `(ncol,)`"
     lat::FTA1D
     "Layer pressures `[Pa, mb]`; `(nlay, ncol)`"
@@ -85,9 +84,9 @@ struct GrayAtmosphericState{
     "optical thickness parameters"
     otp::OTP
     "Number of layers."
-    nlay::I
+    nlay::Int
     "Number of columns."
-    ncol::I
+    ncol::Int
 end
 Adapt.@adapt_structure GrayAtmosphericState
 #---------------------------------------------------------------
@@ -137,7 +136,7 @@ function setup_gray_as_pr_grid(
         end
     end
     #------------------------------------------------
-    return GrayAtmosphericState{eltype(t_sfc), typeof(t_sfc), typeof(p_lev), Int, typeof(otp)}(
+    return GrayAtmosphericState{eltype(t_sfc), typeof(t_sfc), typeof(p_lev), typeof(otp)}(
         lat,
         p_lay,
         p_lev,
@@ -227,7 +226,7 @@ function setup_gray_as_alt_grid(
         #--------------------------------------------------------
         t_sfc[icol] = t_lev[1, icol]
     end
-    return GrayAtmosphericState{FT, DA{FT, 1}, DA{FT, 2}, Int}(
+    return GrayAtmosphericState{FT, DA{FT, 1}, DA{FT, 2}}(
         p_lay,
         p_lev,
         t_lay,

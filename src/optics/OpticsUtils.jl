@@ -20,11 +20,11 @@ end
         fη2::FT,
         ftemp::FT,
         coeff::FTA3D,
-        igpt::I,
-        jη1::I,
-        jη2::I,
-        jtemp::I,
-    ) where {FT<:AbstractFloat,FTA3D<:AbstractArray{FT,3},I<:Int}
+        igpt::Int,
+        jη1::Int,
+        jη2::Int,
+        jtemp::Int,
+    ) where {FT<:AbstractFloat,FTA3D<:AbstractArray{FT,3}}
 
 Perform 2D linear interpolation.
 
@@ -41,11 +41,11 @@ Perform 2D linear interpolation.
     fη2::FT,
     ftemp::FT,
     coeff::FTA3D,
-    igpt::I,
-    jη1::I,
-    jη2::I,
-    jtemp::I,
-) where {FT <: AbstractFloat, FTA3D <: AbstractArray{FT, 3}, I <: Int}
+    igpt::Int,
+    jη1::Int,
+    jη2::Int,
+    jtemp::Int,
+) where {FT <: AbstractFloat, FTA3D <: AbstractArray{FT, 3}}
     return @inbounds (FT(1) - fη1) * (1 - ftemp) * coeff[igpt, jη1, jtemp] +
                      fη1 * (1 - ftemp) * coeff[igpt, jη1 + 1, jtemp] +
                      (FT(1) - fη2) * ftemp * coeff[igpt, jη2, jtemp + 1] +
@@ -54,19 +54,19 @@ end
 
 """
     interp3d(
-        jη1::I,
-        jη2::I,
+        jη1::Int,
+        jη2::Int,
         fη1::FT,
         fη2::FT,
-        jtemp::I,
+        jtemp::Int,
         ftemp::FT,
-        jpresst::I,
+        jpresst::Int,
         fpress::FT,
         coeff::FTA4D,
-        igpt::I,
+        igpt::Int,
         s1::FT = FT(1),
         s2::FT = FT(1),
-    ) where {FT<:AbstractFloat,FTA4D<:AbstractArray{FT,4},I<:Int}
+    ) where {FT<:AbstractFloat,FTA4D<:AbstractArray{FT,4}}
 
 Perform 3D linear interpolation.
 
@@ -90,19 +90,19 @@ where,
 
 """
 @inline function interp3d(
-    jη1::I,
-    jη2::I,
+    jη1::Int,
+    jη2::Int,
     fη1::FT,
     fη2::FT,
-    jtemp::I,
+    jtemp::Int,
     ftemp::FT,
-    jpresst::I,
+    jpresst::Int,
     fpress::FT,
     coeff::FTA4D,
-    igpt::I,
+    igpt::Int,
     s1::FT = FT(1),
     s2::FT = FT(1),
-) where {FT <: AbstractFloat, FTA4D <: AbstractArray{FT, 4}, I <: Int}
+) where {FT <: AbstractFloat, FTA4D <: AbstractArray{FT, 4}}
     omftemp = FT(1) - ftemp
     omfpress = FT(1) - fpress
     omfη1 = FT(1) - fη1

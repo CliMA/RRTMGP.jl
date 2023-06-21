@@ -29,9 +29,8 @@ function sw_rfmip(
     ::Type{SRC},
     ::Type{VMR},
     ::Type{FT},
-    ::Type{I},
     ::Type{DA},
-) where {FT <: AbstractFloat, I <: Int, DA, OPC, SRC, VMR}
+) where {FT <: AbstractFloat, DA, OPC, SRC, VMR}
     opc = Symbol(OPC)
     sw_file = get_ref_filename(:lookup_tables, :clearsky, λ = :sw) # sw lookup tables
     sw_input_file = get_ref_filename(:atmos_state, :clearsky)      # clear-sky atmos state
@@ -46,7 +45,7 @@ function sw_rfmip(
 
     # reading shortwave lookup data
     ds_sw = Dataset(sw_file, "r")
-    lookup_sw, idx_gases = LookUpSW(ds_sw, I, FT, DA)
+    lookup_sw, idx_gases = LookUpSW(ds_sw, FT, DA)
     close(ds_sw)
     # reading rfmip data to atmospheric state
     ds_sw_in = Dataset(sw_input_file, "r")

@@ -148,7 +148,6 @@ function setup_allsky_as(
             typeof(random_lw),
             MaxRandomOverlap,
             typeof(vmr),
-            Int,
         }(
             lon,
             lat,
