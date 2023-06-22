@@ -52,6 +52,14 @@ steps:
           slurm_ntasks: 1
           slurm_mem_per_cpu: 6G
 
+      - label: "Threaded CPU unit tests"
+        command: "julia --threads 8 --color=yes --project=examples test/runtests.jl"
+        agents:
+          config: cpu
+          queue: central
+          slurm_cpus_per_task: 8
+          slurm_mem_per_cpu: 6G
+
       - label: "GPU unit tests"
         command: "julia --color=yes --project=gpuenv test/runtests_gpu.jl"
         agents:

@@ -1,10 +1,11 @@
 module RTESolver
 
 using StaticArrays
+import ClimaComms
 using CUDA
 using Adapt
 
-using ..Device: array_type, array_device, CUDADevice, CPU
+import ...@threaded
 using ..AngularDiscretizations
 using ..Vmrs
 using ..AtmosphericStates
@@ -31,7 +32,8 @@ Solver for the longwave radiation problem
 function solve_lw!(slv::Solver, max_threads::Int, lkp_args...)
     (; as, op, bcs_lw, src_lw, flux_lw, fluxb_lw) = slv
     (; nlay, ncol) = as
-    DA = array_type()
+    context = RTE.context(slv)
+    DA = RTE.array_type(slv)
     nargs = length(lkp_args)
     @assert nargs < 3
     if nargs > 0
@@ -48,9 +50,23 @@ function solve_lw!(slv::Solver, max_threads::Int, lkp_args...)
     end
 
     if op isa OneScalar
-        rte_lw_noscat_solve!(flux, flux_lw, src_lw, bcs_lw, op, nlay, ncol, major_gpt2bnd, max_threads, as, lkp_args...) # no-scattering solver
+        rte_lw_noscat_solve!(
+            context,
+            flux,
+            flux_lw,
+            src_lw,
+            bcs_lw,
+            op,
+            nlay,
+            ncol,
+            major_gpt2bnd,
+            max_threads,
+            as,
+            lkp_args...,
+        ) # no-scattering solver
     else
         rte_lw_2stream_solve!(
+            context,
             flux,
             flux_lw,
             src_lw,
@@ -69,6 +85,7 @@ end
 
 """
     rte_lw_noscat_solve!(
+        context,
         flux::FluxLW{FT},
         flux_lw::FluxLW{FT},
         src_lw::SourceLWNoScat{FT},
@@ -88,6 +105,7 @@ Does radiation calculation at user-supplied angles; converts radiances to flux
 using user-supplied weights. Currently, only n_gauss_angles = 1 supported.
 """
 function rte_lw_noscat_solve!(
+    context,
     flux::FluxLW{FT},
     flux_lw::FluxLW{FT},
     src_lw::SourceLWNoScat{FT},
@@ -102,20 +120,22 @@ function rte_lw_noscat_solve!(
 ) where {FT <: AbstractFloat}
     nlev = nlay + 1
     n_gpt = length(major_gpt2bnd)
-    device = array_device(op.τ)
-    if device === CUDADevice() # launch CUDA kernel
+    device = ClimaComms.device(context)
+    if device isa ClimaComms.CUDADevice
         tx = min(ncol, max_threads)
         bx = cld(ncol, tx)
         args = (flux, flux_lw, src_lw, bcs_lw, op, nlay, ncol, major_gpt2bnd, as, lkp_args...)
         @cuda threads = (tx) blocks = (bx) rte_lw_noscat_solve_CUDA!(args...)
-    else # use Julia native multithreading
-        for igpt in 1:n_gpt
-            @inbounds Threads.@threads for gcol in 1:ncol
-                igpt == 1 && set_flux_to_zero!(flux_lw, gcol)
-                compute_optical_props!(op, as, src_lw, gcol, igpt, lkp_args...)
-                rte_lw_noscat_source!(src_lw, op, gcol, nlay)
-                rte_lw_noscat_transport!(src_lw, bcs_lw, op, gcol, flux, igpt, major_gpt2bnd, nlay, nlev)
-                n_gpt > 1 && add_to_flux!(flux_lw, flux, gcol)
+    else
+        @inbounds begin
+            for igpt in 1:n_gpt
+                @threaded device for gcol in 1:ncol
+                    igpt == 1 && set_flux_to_zero!(flux_lw, gcol)
+                    compute_optical_props!(op, as, src_lw, gcol, igpt, lkp_args...)
+                    rte_lw_noscat_source!(src_lw, op, gcol, nlay)
+                    rte_lw_noscat_transport!(src_lw, bcs_lw, op, gcol, flux, igpt, major_gpt2bnd, nlay, nlev)
+                    n_gpt > 1 && add_to_flux!(flux_lw, flux, gcol)
+                end
             end
         end
     end
@@ -152,6 +172,7 @@ end
 
 """
     rte_lw_2stream_solve!(
+        context,
         flux::FluxLW{FT},
         flux_lw::FluxLW{FT},
         src_lw::SourceLW2Str{FT},
@@ -176,6 +197,7 @@ compute total source function at levels using linear-in-tau (rte_lw_2stream_sour
 transport (adding_lw!)
 """
 function rte_lw_2stream_solve!(
+    context,
     flux::FluxLW{FT},
     flux_lw::FluxLW{FT},
     src_lw::SourceLW2Str{FT},
@@ -190,26 +212,30 @@ function rte_lw_2stream_solve!(
 ) where {FT <: AbstractFloat}
     nlev = nlay + 1
     n_gpt = length(major_gpt2bnd)
-    device = array_device(op.τ)
-    if device === CUDADevice() # launch CUDA kernel
+    device = ClimaComms.device(context)
+    if device isa ClimaComms.CUDADevice
         tx = min(ncol, max_threads)
         bx = cld(ncol, tx)
         args = (flux, flux_lw, src_lw, bcs_lw, op, nlay, ncol, major_gpt2bnd, as, lkp_args...)
         @cuda threads = (tx) blocks = (bx) rte_lw_2stream_solve_CUDA!(args...)
-    else # use Julia native multithreading
+    else
         if as isa AtmosphericState && as.cld_mask_type isa AbstractCloudMask
-            Threads.@threads for gcol in 1:ncol
-                Optics.build_cloud_mask!(as.cld_mask_lw, as.cld_frac, as.random_lw, gcol, as.cld_mask_type)
+            @inbounds begin
+                @threaded device for gcol in 1:ncol
+                    Optics.build_cloud_mask!(as.cld_mask_lw, as.cld_frac, as.random_lw, gcol, as.cld_mask_type)
+                end
             end
         end
-        for igpt in 1:n_gpt
-            Threads.@threads for gcol in 1:ncol
-                igpt == 1 && set_flux_to_zero!(flux_lw, gcol)
-                compute_optical_props!(op, as, src_lw, gcol, igpt, lkp_args...)
-                rte_lw_2stream_combine_sources!(src_lw, gcol, nlev, ncol)
-                rte_lw_2stream_source!(op, src_lw, gcol, nlay, ncol)
-                adding_lw!(flux, src_lw, bcs_lw, gcol, igpt, major_gpt2bnd, nlev, ncol)
-                n_gpt > 1 && add_to_flux!(flux_lw, flux, gcol)
+        @inbounds begin
+            for igpt in 1:n_gpt
+                @threaded device for gcol in 1:ncol
+                    igpt == 1 && set_flux_to_zero!(flux_lw, gcol)
+                    compute_optical_props!(op, as, src_lw, gcol, igpt, lkp_args...)
+                    rte_lw_2stream_combine_sources!(src_lw, gcol, nlev, ncol)
+                    rte_lw_2stream_source!(op, src_lw, gcol, nlay, ncol)
+                    adding_lw!(flux, src_lw, bcs_lw, gcol, igpt, major_gpt2bnd, nlev, ncol)
+                    n_gpt > 1 && add_to_flux!(flux_lw, flux, gcol)
+                end
             end
         end
     end
@@ -259,8 +285,9 @@ Solver for the shortwave radiation problem
 function solve_sw!(slv::Solver, max_threads::Int, lkp_args...)
     (; as, op, bcs_sw, src_sw, flux_sw, fluxb_sw) = slv
     (; nlay, ncol) = as
+    context = RTE.context(slv)
     FT = RTE.float_type(slv)
-    DA = array_type()
+    DA = RTE.array_type(slv)
     nargs = length(lkp_args)
     @assert nargs < 3
     if nargs > 0
@@ -278,9 +305,22 @@ function solve_sw!(slv::Solver, max_threads::Int, lkp_args...)
     end
     # solving radiative transfer equation
     if slv.op isa OneScalar
-        rte_sw_noscat_solve!(flux, flux_sw, op, bcs_sw, nlay, ncol, solar_src_scaled, max_threads, as, lkp_args...) # no-scattering solver
+        rte_sw_noscat_solve!(
+            context,
+            flux,
+            flux_sw,
+            op,
+            bcs_sw,
+            nlay,
+            ncol,
+            solar_src_scaled,
+            max_threads,
+            as,
+            lkp_args...,
+        ) # no-scattering solver
     else
         rte_sw_2stream_solve!(
+            context,
             flux,
             flux_sw,
             op,
@@ -300,6 +340,7 @@ end
 
 """
     rte_sw_noscat_solve!(
+        context,
         flux::FluxSW{FT},
         flux_sw::FluxSW{FT},
         op::OneScalar{FT},
@@ -316,6 +357,7 @@ No-scattering solver for the shortwave problem.
 (Extinction-only i.e. solar direct beam)
 """
 function rte_sw_noscat_solve!(
+    context,
     flux::FluxSW{FT},
     flux_sw::FluxSW{FT},
     op::OneScalar{FT},
@@ -329,20 +371,22 @@ function rte_sw_noscat_solve!(
 ) where {FT <: AbstractFloat}
     nlev = nlay + 1
     n_gpt = length(solar_src_scaled)
-    device = array_device(op.τ)
+    device = ClimaComms.device(context)
     # setting references for flux_sw
-    if device === CUDADevice() # launching CUDA kernel
+    if device isa ClimaComms.CUDADevice
         tx = min(ncol, max_threads)
         bx = cld(ncol, tx)
         args = (flux, flux_sw, op, bcs_sw, nlay, ncol, solar_src_scaled, as, lkp_args...)
         @cuda threads = (tx) blocks = (bx) rte_sw_noscat_solve_CUDA!(args...)
-    else # launch juila native multithreading
-        for igpt in 1:n_gpt
-            @inbounds Threads.@threads for gcol in 1:ncol
-                igpt == 1 && set_flux_to_zero!(flux_sw, gcol)
-                compute_optical_props!(op, as, gcol, igpt, lkp_args...)
-                rte_sw_noscat_solve_kernel!(flux, op, bcs_sw, igpt, solar_src_scaled, gcol, nlev)
-                n_gpt > 1 && add_to_flux!(flux_sw, flux, gcol)
+    else
+        @inbounds begin
+            for igpt in 1:n_gpt
+                @threaded device for gcol in 1:ncol
+                    igpt == 1 && set_flux_to_zero!(flux_sw, gcol)
+                    compute_optical_props!(op, as, gcol, igpt, lkp_args...)
+                    rte_sw_noscat_solve_kernel!(flux, op, bcs_sw, igpt, solar_src_scaled, gcol, nlev)
+                    n_gpt > 1 && add_to_flux!(flux_sw, flux, gcol)
+                end
             end
         end
     end
@@ -378,6 +422,7 @@ end
 #--------------------------------------------------------------------------------------------------
 """
     rte_sw_2stream_solve!(
+        context,
         flux::FluxSW{FT},
         flux_sw::FluxSW{FT},
         op::TwoStream{FT},
@@ -395,6 +440,7 @@ end
 Two stream solver for the shortwave problem.
 """
 function rte_sw_2stream_solve!(
+    context,
     flux::FluxSW{FT},
     flux_sw::FluxSW{FT},
     op::TwoStream{FT},
@@ -410,27 +456,29 @@ function rte_sw_2stream_solve!(
 ) where {FT <: AbstractFloat}
     nlev = nlay + 1
     n_gpt = length(major_gpt2bnd)
-    device = array_device(op.τ)
-    if device === CUDADevice()
+    device = ClimaComms.device(context)
+    if device isa ClimaComms.CUDADevice
         tx = min(ncol, max_threads)
         bx = cld(ncol, tx)
         args = (flux, flux_sw, op, bcs_sw, src_sw, nlay, ncol, major_gpt2bnd, solar_src_scaled, as, lkp_args...)
         @cuda threads = (tx) blocks = (bx) rte_sw_2stream_solve_CUDA!(args...)
-    else # launch julia native multithreading
-        if as isa AtmosphericState && as.cld_mask_type isa AbstractCloudMask
-            Threads.@threads for gcol in 1:ncol
-                Optics.build_cloud_mask!(as.cld_mask_sw, as.cld_frac, as.random_sw, gcol, as.cld_mask_type)
+    else
+        @inbounds begin
+            if as isa AtmosphericState && as.cld_mask_type isa AbstractCloudMask
+                @threaded device for gcol in 1:ncol
+                    Optics.build_cloud_mask!(as.cld_mask_sw, as.cld_frac, as.random_sw, gcol, as.cld_mask_type)
+                end
             end
-        end
-        # setting references for flux_sw
-        for igpt in 1:n_gpt
-            @inbounds Threads.@threads for gcol in 1:ncol
-                igpt == 1 && set_flux_to_zero!(flux_sw, gcol)
-                compute_optical_props!(op, as, gcol, igpt, lkp_args...)
-                sw_two_stream!(op, src_sw, bcs_sw, gcol, nlay) # Cell properties: transmittance and reflectance for direct and diffuse radiation
-                sw_source_2str!(src_sw, bcs_sw, gcol, flux, igpt, solar_src_scaled, major_gpt2bnd, nlay) # Direct-beam and source for diffuse radiation
-                adding_sw!(src_sw, bcs_sw, gcol, flux, igpt, major_gpt2bnd, nlev) # Transport
-                n_gpt > 1 && add_to_flux!(flux_sw, flux, gcol)
+            # setting references for flux_sw
+            for igpt in 1:n_gpt
+                @threaded device for gcol in 1:ncol
+                    igpt == 1 && set_flux_to_zero!(flux_sw, gcol)
+                    compute_optical_props!(op, as, gcol, igpt, lkp_args...)
+                    sw_two_stream!(op, src_sw, bcs_sw, gcol, nlay) # Cell properties: transmittance and reflectance for direct and diffuse radiation
+                    sw_source_2str!(src_sw, bcs_sw, gcol, flux, igpt, solar_src_scaled, major_gpt2bnd, nlay) # Direct-beam and source for diffuse radiation
+                    adding_sw!(src_sw, bcs_sw, gcol, flux, igpt, major_gpt2bnd, nlev) # Transport
+                    n_gpt > 1 && add_to_flux!(flux_sw, flux, gcol)
+                end
             end
         end
     end

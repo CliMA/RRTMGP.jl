@@ -3,7 +3,6 @@ using Pkg.Artifacts
 using NCDatasets
 
 using RRTMGP
-using RRTMGP.Device: array_type, array_device
 using RRTMGP.Vmrs
 using RRTMGP.LookUpTables
 using RRTMGP.AtmosphericStates
@@ -51,7 +50,7 @@ function lw_rfmip(
     # reading rfmip data to atmospheric state
     ds_lw_in = Dataset(lw_input_file, "r")
 
-    (as, sfc_emis, _, _, _) = setup_rfmip_as(ds_lw_in, idx_gases, exp_no, lookup_lw, FT, DA, VMR, max_threads)
+    (as, sfc_emis, _, _, _) = setup_rfmip_as(context, ds_lw_in, idx_gases, exp_no, lookup_lw, FT, VMR, max_threads)
     close(ds_lw_in)
 
     ncol, nlay, ngpt = as.ncol, as.nlay, lookup_lw.n_gpt

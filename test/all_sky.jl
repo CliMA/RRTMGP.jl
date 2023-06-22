@@ -3,7 +3,6 @@ using Pkg.Artifacts
 using NCDatasets
 
 using RRTMGP
-using RRTMGP.Device: array_type, array_device
 using RRTMGP.Vmrs
 using RRTMGP.LookUpTables
 using RRTMGP.AtmosphericStates
@@ -24,16 +23,16 @@ param_set = create_insolation_parameters(Float64, overrides)
 include("reference_files.jl")
 include("read_all_sky.jl")
 
-DA = array_type()
-
 function all_sky(
+    context,
     ::Type{OPC},
-    ::Type{FT},
-    ::Type{DA};
+    ::Type{FT};
     use_lut::Bool = true,
     cldfrac = FT(1),
-) where {FT <: AbstractFloat, DA, OPC}
+) where {FT <: AbstractFloat, OPC}
     opc = Symbol(OPC)
+    device = ClimaComms.device(context)
+    DA = ClimaComms.array_type(device)
     FTA1D = DA{FT, 1}
     FTA2D = DA{FT, 2}
     max_threads = 256
@@ -71,6 +70,7 @@ function all_sky(
     # reading input file 
     ds_in = Dataset(input_file, "r")
     as, sfc_emis, sfc_alb_direct, sfc_alb_diffuse, zenith, toa_flux, bot_at_1 = setup_allsky_as(
+        context,
         ds_in,
         idx_gases,
         lookup_lw,
@@ -81,7 +81,6 @@ function all_sky(
         use_lut,
         ncol,
         FT,
-        DA,
         max_threads,
     )
     close(ds_in)
@@ -115,7 +114,7 @@ function all_sky(
     flux_sw = FluxSW(ncol, nlay, FT, DA)  # shortwave fluxes for band calculations    
     #-------------------------------------------------------------------
     # initializing RTE solver
-    slv = Solver(as, op, src_lw, src_sw, bcs_lw, bcs_sw, fluxb_lw, fluxb_sw, flux_lw, flux_sw)
+    slv = Solver(context, as, op, src_lw, src_sw, bcs_lw, bcs_sw, fluxb_lw, fluxb_sw, flux_lw, flux_sw)
     #------calling solvers
     println("calling longwave solver; ncol = $ncol")
     @time solve_lw!(slv, max_threads, lookup_lw, lookup_lw_cld)
@@ -163,9 +162,10 @@ function all_sky(
     @test max_err_flux_dn_sw < toler
 end
 
+context = ClimaComms.context()
 @testset "Cloudy (all-sky, Two-stream calculations using lookup table method" begin
-    @time all_sky(TwoStream, Float64, DA, use_lut = true, cldfrac = Float64(1))
+    @time all_sky(context, TwoStream, Float64, use_lut = true, cldfrac = Float64(1))
 end
 @testset "Cloudy (all-sky), Two-stream calculations using Pade method" begin
-    @time all_sky(TwoStream, Float64, DA, use_lut = false, cldfrac = Float64(1))
+    @time all_sky(context, TwoStream, Float64, use_lut = false, cldfrac = Float64(1))
 end

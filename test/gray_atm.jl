@@ -1,6 +1,6 @@
 using Test
-using RRTMGP.Device: array_type, array_device, CPU, CUDADevice
 using CUDA
+import ClimaComms
 using RRTMGP
 using RRTMGP.AngularDiscretizations
 using RRTMGP.Fluxes
@@ -21,12 +21,17 @@ param_set = create_insolation_parameters(Float64)
 
 #using Plots
 
-DA = array_type()
-
 """
 Example program to demonstrate the calculation of longwave radiative fluxes in a model gray atmosphere.
 """
-function gray_atmos_lw_equil(::Type{OPC}, ::Type{FT}, ::Type{DA}, ncol::Int) where {FT <: AbstractFloat, DA, OPC}
+function gray_atmos_lw_equil(context, ::Type{OPC}, ::Type{FT}) where {FT <: AbstractFloat, OPC}
+    device = ClimaComms.device(context)
+    ncol = if device isa ClimaComms.CUDADevice
+        4096
+    else
+        9
+    end
+    DA = ClimaComms.array_type(device)
     opc = Symbol(OPC)
     nlay = 60                               # number of layers
     p0 = FT(100000)                         # surface pressure (Pa)
@@ -53,14 +58,14 @@ function gray_atmos_lw_equil(::Type{OPC}, ::Type{FT}, ::Type{DA}, ncol::Int) whe
     end
 
     otp = GrayOpticalThicknessSchneider2004(FT) # optical thickness parameters
-    as = setup_gray_as_pr_grid(nlay, lat, p0, pe, otp, param_set, DA)
+    as = setup_gray_as_pr_grid(context, nlay, lat, p0, pe, otp, param_set, DA)
     op = OPC(FT, ncol, nlay, DA)
     src_lw = source_func_longwave(param_set, FT, ncol, nlay, opc, DA)
     bcs_lw = LwBCs(DA{FT, 2}(sfc_emis), inc_flux)
     fluxb_lw = nothing
     flux_lw = FluxLW(ncol, nlay, FT, DA)
 
-    slv = Solver(as, op, src_lw, nothing, bcs_lw, nothing, fluxb_lw, nothing, flux_lw, nothing)
+    slv = Solver(context, as, op, src_lw, nothing, bcs_lw, nothing, fluxb_lw, nothing, flux_lw, nothing)
 
     flux = slv.flux_lw
     flux_up = slv.flux_lw.flux_up
@@ -82,9 +87,10 @@ function gray_atmos_lw_equil(::Type{OPC}, ::Type{FT}, ::Type{DA}, ncol::Int) whe
         # calling the long wave gray radiation solver
         solve_lw!(slv, max_threads)
         # computing heating rate
-        compute_gray_heating_rate!(hr_lay, p_lev, ncol, nlay, flux_net, param_set, FT)
+        compute_gray_heating_rate!(context, hr_lay, p_lev, ncol, nlay, flux_net, param_set, FT)
         # updating t_lay and t_lev based on heating rate
         update_profile_lw!(
+            context,
             param_set,
             t_lay,
             t_lev,
@@ -109,7 +115,7 @@ function gray_atmos_lw_equil(::Type{OPC}, ::Type{FT}, ::Type{DA}, ncol::Int) whe
 
     t_error = maximum(abs.(T_ex_lev .- gray_as.t_lev))
     println("*************************************************")
-    println("Longwave test for gray atmosphere model - $opc; ncol = $ncol; DA = $DA")
+    println("Longwave test for gray atmosphere model - $opc; ncol = $ncol; context = $context")
     println("Integration time = $(FT(nsteps)/FT(24.0/tstep) / FT(365.0)) years")
     println("t_error = $(t_error); flux_grad_err = $(flux_grad_err)")
 
@@ -118,7 +124,9 @@ function gray_atmos_lw_equil(::Type{OPC}, ::Type{FT}, ::Type{DA}, ncol::Int) whe
 end
 #------------------------------------------------------------------------------
 
-function gray_atmos_sw_test(::Type{OPC}, ::Type{FT}, ::Type{DA}, ncol::Int) where {FT <: AbstractFloat, DA, OPC}
+function gray_atmos_sw_test(context, ::Type{OPC}, ::Type{FT}, ncol::Int) where {FT <: AbstractFloat, OPC}
+    device = ClimaComms.device(context)
+    DA = ClimaComms.array_type(device)
     opc = Symbol(OPC)
     nlay = 60                         # number of layers
     p0 = FT(100000)                   # surface pressure (Pa)
@@ -156,14 +164,14 @@ function gray_atmos_sw_test(::Type{OPC}, ::Type{FT}, ::Type{DA}, ncol::Int) wher
     sfc_alb_direct .= FT(0.1)
     sfc_alb_diffuse .= FT(0.1)
 
-    as = setup_gray_as_pr_grid(nlay, lat, p0, pe, otp, param_set, DA) # init gray atmos state
+    as = setup_gray_as_pr_grid(context, nlay, lat, p0, pe, otp, param_set, DA) # init gray atmos state
     op = OPC(FT, ncol, nlay, DA)
     src_sw = source_func_shortwave(FT, ncol, nlay, opc, DA)
     bcs_sw = SwBCs(zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse)
     fluxb_sw = FluxSW(ncol, nlay, FT, DA)
     flux_sw = FluxSW(ncol, nlay, FT, DA)
 
-    slv = Solver(as, op, nothing, src_sw, nothing, bcs_sw, nothing, fluxb_sw, nothing, flux_sw)
+    slv = Solver(context, as, op, nothing, src_sw, nothing, bcs_sw, nothing, fluxb_sw, nothing, flux_sw)
     solve_sw!(slv, max_threads)
 
     τ = Array(slv.op.τ)
@@ -178,18 +186,14 @@ function gray_atmos_sw_test(::Type{OPC}, ::Type{FT}, ::Type{DA}, ncol::Int) wher
     rel_toler = FT(0.001)
     rel_error = abs(flux_dn_dir[1] - exact) / exact
     println("*************************************************")
-    println("Running shortwave test for gray atmosphere model - $(opc); ncol = $ncol; DA = $DA")
+    println("Running shortwave test for gray atmosphere model - $(opc); ncol = $ncol; context = $context")
     println("relative error = $rel_error")
     @test rel_error < rel_toler
 end
 
-if DA == CuArray
-    @time gray_atmos_lw_equil(OneScalar, Float64, DA, 4096)
-    @time gray_atmos_lw_equil(TwoStream, Float64, DA, 4096)
-else
-    @time gray_atmos_lw_equil(OneScalar, Float64, DA, 9)
-    @time gray_atmos_lw_equil(TwoStream, Float64, DA, 9)
-end
+context = ClimaComms.context()
+@time gray_atmos_lw_equil(context, OneScalar, Float64)
+@time gray_atmos_lw_equil(context, TwoStream, Float64)
 
-@time gray_atmos_sw_test(OneScalar, Float64, DA, 1)
-@time gray_atmos_sw_test(TwoStream, Float64, DA, 1)
+@time gray_atmos_sw_test(context, OneScalar, Float64, 1)
+@time gray_atmos_sw_test(context, TwoStream, Float64, 1)

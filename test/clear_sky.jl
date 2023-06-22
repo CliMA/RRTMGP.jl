@@ -3,7 +3,6 @@ using Pkg.Artifacts
 using NCDatasets
 
 using RRTMGP
-using RRTMGP.Device: array_type, array_device
 using RRTMGP.Vmrs
 using RRTMGP.LookUpTables
 using RRTMGP.AtmosphericStates
@@ -26,12 +25,14 @@ include("reference_files.jl")
 include("read_rfmip_clear_sky.jl")
 #---------------------------------------------------------------
 function clear_sky(
+    context,
     ::Type{OPC},
     ::Type{SRC},
     ::Type{VMR},
     ::Type{FT},
-    ::Type{DA},
-) where {FT <: AbstractFloat, DA, OPC, SRC, VMR}
+) where {FT <: AbstractFloat, OPC, SRC, VMR}
+    device = ClimaComms.device(context)
+    DA = ClimaComms.array_type(device)
     opc = Symbol(OPC)
     lw_file = get_ref_filename(:lookup_tables, :clearsky, λ = :lw) # lw lookup tables for gas optics
     sw_file = get_ref_filename(:lookup_tables, :clearsky, λ = :sw) # sw lookup tables for gas optics
@@ -62,7 +63,7 @@ function clear_sky(
     ds_lw_in = Dataset(input_file, "r")
 
     (as, sfc_emis, sfc_alb_direct, zenith, toa_flux, usecol) =
-        setup_rfmip_as(ds_lw_in, idx_gases, exp_no, lookup_lw, FT, DA, VMR, max_threads)
+        setup_rfmip_as(context, ds_lw_in, idx_gases, exp_no, lookup_lw, FT, VMR, max_threads)
     close(ds_lw_in)
 
     ncol, nlay, ngpt_lw = as.ncol, as.nlay, lookup_lw.n_gpt
@@ -87,7 +88,7 @@ function clear_sky(
     flux_sw = FluxSW(ncol, nlay, FT, DA)  # shortwave fluxes for band calculations
     #--------------------------------------------------
     # initializing RTE solver
-    slv = Solver(as, op, src_lw, src_sw, bcs_lw, bcs_sw, fluxb_lw, fluxb_sw, flux_lw, flux_sw)
+    slv = Solver(context, as, op, src_lw, src_sw, bcs_lw, bcs_sw, fluxb_lw, fluxb_sw, flux_lw, flux_sw)
     println("calling longwave solver; ncol = $ncol")
     @time solve_lw!(slv, max_threads, lookup_lw)
     println("calling shortwave solver; ncol = $ncol")
@@ -151,6 +152,8 @@ function clear_sky(
     @test max_err_flux_up_sw ≤ toler_sw
     @test max_err_flux_dn_sw ≤ toler_sw
 end
+
+context = ClimaComms.context()
 @testset "testing clear sky 2-stream solver" begin
-    @time clear_sky(TwoStream, SourceLW2Str, VmrGM, Float64, array_type())
+    @time clear_sky(context, TwoStream, SourceLW2Str, VmrGM, Float64)
 end

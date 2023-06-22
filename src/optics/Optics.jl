@@ -2,11 +2,12 @@ module Optics
 
 using DocStringExtensions
 using CUDA
-using ..Device: array_device, CPU, CUDADevice
 using Adapt
 using Random
+import ClimaComms
 #---------------------------------------
 using ..Vmrs
+import ...@threaded
 using ..LookUpTables
 using ..AtmosphericStates
 using ..Sources
@@ -76,6 +77,7 @@ end
 
 """
     compute_col_gas!(
+        context,
         p_lev,
         col_dry,
         param_set,
@@ -88,6 +90,7 @@ This function computes the column amounts of dry or moist air.
 
 """
 function compute_col_gas!(
+    context,
     p_lev::FTA2D,
     col_dry::FTA2D,
     param_set::RP.ARP,
@@ -101,15 +104,17 @@ function compute_col_gas!(
     avogadro = FT(RP.avogad(param_set))
     helmert1 = FT(RP.grav(param_set))
     args = (p_lev, mol_m_dry, mol_m_h2o, avogadro, helmert1, vmr_h2o, lat)
-    device = array_device(p_lev)
-    if device === CUDADevice() # launching CUDA kernel
+    device = ClimaComms.device(context)
+    if device isa ClimaComms.CUDADevice
         tx = min(nlay * ncol, max_threads)
         bx = cld(nlay * ncol, tx)
         @cuda threads = (tx) blocks = (bx) compute_col_gas_CUDA!(col_dry, args...)
-    else # launching Julia native multithreading kernel
-        Threads.@threads for icnt in 1:(nlay * ncol)
-            glaycol = ((icnt % nlay == 0) ? nlay : (icnt % nlay), cld(icnt, nlay))
-            compute_col_gas_kernel!(col_dry, args..., glaycol)
+    else
+        @inbounds begin
+            @threaded device for icnt in 1:(nlay * ncol)
+                glaycol = ((icnt % nlay == 0) ? nlay : (icnt % nlay), cld(icnt, nlay))
+                compute_col_gas_kernel!(col_dry, args..., glaycol)
+            end
         end
     end
     return nothing
