@@ -1,9 +1,9 @@
 using Test
 using Pkg.Artifacts
 using NCDatasets
+import ClimaComms
 
 using RRTMGP
-using RRTMGP.Device: array_type, array_device
 using RRTMGP.LookUpTables
 using RRTMGP.Vmrs
 using RRTMGP.AtmosphericStates
@@ -24,13 +24,9 @@ param_set = create_insolation_parameters(FT, overrides)
 include("reference_files.jl")
 include("read_rfmip_clear_sky.jl")
 #---------------------------------------------------------------
-function sw_rfmip(
-    ::Type{OPC},
-    ::Type{SRC},
-    ::Type{VMR},
-    ::Type{FT},
-    ::Type{DA},
-) where {FT <: AbstractFloat, DA, OPC, SRC, VMR}
+function sw_rfmip(context, ::Type{OPC}, ::Type{SRC}, ::Type{VMR}, ::Type{FT}) where {FT <: AbstractFloat, OPC, SRC, VMR}
+    device = ClimaComms.device(context)
+    DA = ClimaComms.array_type(device)
     opc = Symbol(OPC)
     sw_file = get_ref_filename(:lookup_tables, :clearsky, λ = :sw) # sw lookup tables
     sw_input_file = get_ref_filename(:atmos_state, :clearsky)      # clear-sky atmos state
@@ -51,7 +47,7 @@ function sw_rfmip(
     ds_sw_in = Dataset(sw_input_file, "r")
 
     (as, _, sfc_alb_direct, zenith, toa_flux, usecol) =
-        setup_rfmip_as(ds_sw_in, idx_gases, exp_no, lookup_sw, FT, DA, VMR, max_threads)
+        setup_rfmip_as(context, ds_sw_in, idx_gases, exp_no, lookup_sw, FT, VMR, max_threads)
     close(ds_sw_in)
 
     ncol, nlay, ngpt = as.ncol, as.nlay, lookup_sw.n_gpt
@@ -68,7 +64,7 @@ function sw_rfmip(
     flux_sw = FluxSW(ncol, nlay, FT, DA)  # shortwave fluxes for band calculations
 
     # initializing RTE solver
-    slv = Solver(as, op, nothing, src_sw, nothing, bcs_sw, nothing, fluxb_sw, nothing, flux_sw)
+    slv = Solver(context, as, op, nothing, src_sw, nothing, bcs_sw, nothing, fluxb_sw, nothing, flux_sw)
     #--------------------------------------------------
     solve_sw!(slv, max_threads, lookup_sw)
 
@@ -111,5 +107,6 @@ function sw_rfmip(
     return nothing
 end
 
-sw_rfmip(TwoStream, SourceSW2Str, VmrGM, Float64, Int, array_type()) # two-stream solver should be used for the short-wave problem
+context = ClimaComms.context()
+sw_rfmip(context, TwoStream, SourceSW2Str, VmrGM, Float64) # two-stream solver should be used for the short-wave problem
 #sw_rfmip(OneScalar, VmrGM, Float64, Int, array_type()) # this only computes flux_dn_dir

@@ -1,15 +1,17 @@
 
 
 function setup_rfmip_as(
+    context,
     ds_lw_in,
     idx_gases,
     exp_no,
     lookup_lw,
     ::Type{FT},
-    ::Type{DA},
     ::Type{VMR},
     max_threads,
-) where {FT <: AbstractFloat, DA, VMR}
+) where {FT <: AbstractFloat, VMR}
+    device = ClimaComms.device(context)
+    DA = ClimaComms.array_type(device)
     FTA1D = DA{FT, 1}
     FTA2D = DA{FT, 2}
 
@@ -107,7 +109,7 @@ function setup_rfmip_as(
 
     # This example skips latitude dependent gravity compution to be consistent with the
     # FORTRAN RRTMGP test case.
-    compute_col_gas!(p_lev, col_dry, param_set, vmr_h2o, lat) # the example skips lat based gravity calculation
+    compute_col_gas!(context, p_lev, col_dry, param_set, vmr_h2o, lat) # the example skips lat based gravity calculation
 
     vmr = VMR(vmr_h2o, vmr_o3, FTA1D(vmrat))
     cld_r_eff_liq = nothing

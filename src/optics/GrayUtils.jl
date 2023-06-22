@@ -1,10 +1,11 @@
 module GrayUtils
 
 using CUDA
-using ..Device: array_type, array_device, CUDADevice, CPU
+import ClimaComms
 using ..AtmosphericStates
 using ..Fluxes
 
+import ...@threaded
 import ..Parameters as RP
 
 export update_profile_lw!, compute_gray_heating_rate!
@@ -29,6 +30,7 @@ export update_profile_lw!, compute_gray_heating_rate!
 Updates t_lay and t_lev based on heating rate.
 """
 function update_profile_lw!(
+    context,
     param_set,
     t_lay,
     t_lev,
@@ -45,16 +47,17 @@ function update_profile_lw!(
 ) where {FT <: AbstractFloat}
     # updating t_lay and t_lev based on heating rate
     args = (t_lay, t_lev, hr_lay, flux_dn, flux_net, flux_grad, T_ex_lev, Δt, nlay, nlev)
-    device = array_device(t_lev)
-    if device === CUDADevice()
+    device = ClimaComms.device(context)
+    if device isa ClimaComms.CUDADevice
         max_threads = 256
         tx = min(ncol, max_threads)
         bx = cld(ncol, tx)
         @cuda threads = (tx) blocks = (bx) update_profile_lw_CUDA!(param_set, ncol, args...)
     else
-        # using julia native multithreading
-        Threads.@threads for gcol in 1:ncol
-            update_profile_lw_kernel!(param_set, args..., gcol)
+        @inbounds begin
+            @threaded device for gcol in 1:ncol
+                update_profile_lw_kernel!(param_set, args..., gcol)
+            end
         end
     end
     #----------------------------------------
@@ -112,6 +115,7 @@ end
 
 """
     compute_gray_heating_rate!(
+        context,
         hr_lay,
         p_lev,
         ncol,
@@ -123,20 +127,21 @@ end
 
 Computes the heating rate for the gray radiation simulation.
 """
-function compute_gray_heating_rate!(hr_lay, p_lev, ncol, nlay, flux_net, param_set, ::Type{FT}) where {FT}
+function compute_gray_heating_rate!(context, hr_lay, p_lev, ncol, nlay, flux_net, param_set, ::Type{FT}) where {FT}
     cp_d_ = FT(RP.cp_d(param_set))
     grav_ = FT(RP.grav(param_set))
     args = (hr_lay, flux_net, p_lev, grav_, cp_d_, nlay)
-    device = array_device(p_lev)
-    if device === CUDADevice()
+    device = ClimaComms.device(context)
+    if device isa ClimaComms.CUDADevice
         max_threads = 256
         tx = min(ncol, max_threads)
         bx = cld(ncol, tx)
         @cuda threads = (tx) blocks = (bx) compute_gray_heating_rate_CUDA!(ncol, args...)
     else
-        # Launcing native Julia multithreading Kernel
-        Threads.@threads for gcol in 1:ncol
-            compute_gray_heating_rate_kernel!(args..., gcol)
+        @inbounds begin
+            @threaded device for gcol in 1:ncol
+                compute_gray_heating_rate_kernel!(args..., gcol)
+            end
         end
     end
     return nothing

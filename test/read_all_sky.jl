@@ -1,5 +1,6 @@
 
 function setup_allsky_as(
+    context,
     ds_in,
     idx_gases,
     lkp_lw,
@@ -10,10 +11,11 @@ function setup_allsky_as(
     use_lut,
     ncol,
     FT,
-    DA,
     max_threads,
 )
 
+    device = ClimaComms.device(context)
+    DA = ClimaComms.array_type(device)
     deg2rad = FT(π) / FT(180)
     nlay = Int(ds_in.dim["lay"])
     #ncol = Int(ds_in.dim["col"]) # col#1 repeated 128 times, per RRTMGP example
@@ -124,7 +126,7 @@ function setup_allsky_as(
     t_lay = DA(t_lay)
     t_lev = DA(t_lev)
 
-    compute_col_gas!(p_lev, col_dry, param_set, vmr_h2o, lat) # the example skips lat based gravity calculation
+    compute_col_gas!(context, p_lev, col_dry, param_set, vmr_h2o, lat) # the example skips lat based gravity calculation
 
     t_sfc = DA(t_sfc)
 

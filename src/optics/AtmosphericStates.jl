@@ -1,10 +1,11 @@
 module AtmosphericStates
 using CUDA
-using ..Device: array_type, array_device, CUDADevice, CPU
+import ClimaComms
 using DocStringExtensions
 using Adapt
 using GaussQuadrature
 import ..Parameters as RP
+import ...@threaded
 
 using ..Vmrs
 

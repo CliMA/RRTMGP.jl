@@ -96,6 +96,7 @@ Adapt.@adapt_structure GrayAtmosphericState
 # https://doi.org/10.1175/1520-0469(2004)061<1317:TTATTS>2.0.CO;2
 
 function setup_gray_as_pr_grid(
+    context::ClimaComms.AbstractCommsContext,
     nlay::Int,
     lat::FTA1D,
     p0::FT,
@@ -124,15 +125,17 @@ function setup_gray_as_pr_grid(
     r_d = RP.R_d(param_set)
     grav_ = RP.grav(param_set)
     args = (p_lev, p_lay, t_lev, t_lay, z_lev, t_sfc, lat, d0, efac, p0, pe, Δp, te, tt, Δt, α, τ₀, r_d, grav_, nlay)
-    device = array_device(p_lev)
-    if device === CUDADevice()
+    device = ClimaComms.device(context)
+    if device isa ClimaComms.CUDADevice
         max_threads = 256
         tx = min(ncol, max_threads)
         bx = cld(ncol, tx)
         @cuda threads = (tx) blocks = (bx) setup_gray_as_pr_grid_CUDA!(ncol, args...)
-    else # launcing Julia native multithreading kernel
-        Threads.@threads for gcol in 1:ncol
-            setup_gray_as_pr_grid_kernel!(args..., gcol)
+    else
+        @inbounds begin
+            @threaded device for gcol in 1:ncol
+                setup_gray_as_pr_grid_kernel!(args..., gcol)
+            end
         end
     end
     #------------------------------------------------
