@@ -118,8 +118,19 @@ function all_sky(
     #------calling solvers
     println("calling longwave solver; ncol = $ncol")
     @time solve_lw!(slv, max_threads, lookup_lw, lookup_lw_cld)
+    if device isa ClimaComms.CPUSingleThreaded
+        JET.@test_opt solve_lw!(slv, max_threads, lookup_lw, lookup_lw_cld)
+        @test_broken (@allocated solve_lw!(slv, max_threads, lookup_lw, lookup_lw_cld)) == 0
+        @test (@allocated solve_lw!(slv, max_threads, lookup_lw, lookup_lw_cld)) ≤ 48238336
+    end
+
     println("calling shortwave solver; ncol = $ncol")
     @time solve_sw!(slv, max_threads, lookup_sw, lookup_sw_cld)
+    if device isa ClimaComms.CPUSingleThreaded
+        JET.@test_opt solve_sw!(slv, max_threads, lookup_sw, lookup_sw_cld)
+        @test_broken (@allocated solve_sw!(slv, max_threads, lookup_sw, lookup_sw_cld)) == 0
+        @test (@allocated solve_sw!(slv, max_threads, lookup_sw, lookup_sw_cld)) ≤ 33033984
+    end
     #-------------
     # comparison
     method = use_lut ? "Lookup Table Interpolation method" : "PADE method"

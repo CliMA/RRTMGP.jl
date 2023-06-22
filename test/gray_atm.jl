@@ -1,6 +1,7 @@
 using Test
 using CUDA
 import ClimaComms
+import JET
 using RRTMGP
 using RRTMGP.AngularDiscretizations
 using RRTMGP.Fluxes
@@ -120,6 +121,11 @@ function gray_atmos_lw_equil(context, ::Type{OPC}, ::Type{FT}) where {FT <: Abst
     println("t_error = $(t_error); flux_grad_err = $(flux_grad_err)")
 
     @test maximum(t_error) < temp_toler
+    if device isa ClimaComms.CPUSingleThreaded
+        JET.@test_opt solve_lw!(slv, max_threads)
+        @test_broken (@allocated solve_lw!(slv, max_threads)) == 0
+        @test (@allocated solve_lw!(slv, max_threads)) ≤ 128
+    end
     #--------------------------------------------------------
 end
 #------------------------------------------------------------------------------
@@ -189,6 +195,12 @@ function gray_atmos_sw_test(context, ::Type{OPC}, ::Type{FT}, ncol::Int) where {
     println("Running shortwave test for gray atmosphere model - $(opc); ncol = $ncol; context = $context")
     println("relative error = $rel_error")
     @test rel_error < rel_toler
+
+    if device isa ClimaComms.CPUSingleThreaded
+        JET.@test_opt solve_sw!(slv, max_threads)
+        @test_broken (@allocated solve_sw!(slv, max_threads)) == 0
+        @test (@allocated solve_sw!(slv, max_threads)) ≤ 256
+    end
 end
 
 context = ClimaComms.context()

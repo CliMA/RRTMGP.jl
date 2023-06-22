@@ -3,6 +3,7 @@ using Pkg.Artifacts
 using NCDatasets
 
 using RRTMGP
+import JET
 using RRTMGP.Vmrs
 using RRTMGP.LookUpTables
 using RRTMGP.AtmosphericStates
@@ -89,10 +90,23 @@ function clear_sky(
     #--------------------------------------------------
     # initializing RTE solver
     slv = Solver(context, as, op, src_lw, src_sw, bcs_lw, bcs_sw, fluxb_lw, fluxb_sw, flux_lw, flux_sw)
+
     println("calling longwave solver; ncol = $ncol")
     @time solve_lw!(slv, max_threads, lookup_lw)
+    if device isa ClimaComms.CPUSingleThreaded
+        JET.@test_opt solve_lw!(slv, max_threads, lookup_lw)
+        @test_broken (@allocated solve_lw!(slv, max_threads, lookup_lw)) == 0
+        @test (@allocated solve_lw!(slv, max_threads, lookup_lw)) ≤ 448
+    end
+
     println("calling shortwave solver; ncol = $ncol")
     @time solve_sw!(slv, max_threads, lookup_sw)
+    if device isa ClimaComms.CPUSingleThreaded
+        JET.@test_opt solve_sw!(slv, max_threads, lookup_sw)
+        @test_broken (@allocated solve_sw!(slv, max_threads, lookup_sw)) == 0
+        @test (@allocated solve_sw!(slv, max_threads, lookup_sw)) ≤ 448
+    end
+
     # comparing longwave fluxes with data from RRTMGP FORTRAN code
     flip_ind = nlev:-1:1
 
