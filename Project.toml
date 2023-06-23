@@ -15,7 +15,7 @@ StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 [compat]
 Adapt = "3.3"
 CUDA = "4"
-ClimaComms = "0.5"
+ClimaComms = "0.5.1"
 DocStringExtensions = "0.8, 0.9"
 GaussQuadrature = "0.5"
 StaticArrays = "1.4"
