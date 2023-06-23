@@ -5,7 +5,6 @@ import ClimaComms
 using CUDA
 using Adapt
 
-import ...@threaded
 using ..AngularDiscretizations
 using ..Vmrs
 using ..AtmosphericStates
@@ -129,7 +128,7 @@ function rte_lw_noscat_solve!(
     else
         @inbounds begin
             for igpt in 1:n_gpt
-                @threaded device for gcol in 1:ncol
+                ClimaComms.@threaded device for gcol in 1:ncol
                     igpt == 1 && set_flux_to_zero!(flux_lw, gcol)
                     compute_optical_props!(op, as, src_lw, gcol, igpt, lkp_args...)
                     rte_lw_noscat_source!(src_lw, op, gcol, nlay)
@@ -221,14 +220,14 @@ function rte_lw_2stream_solve!(
     else
         if as isa AtmosphericState && as.cld_mask_type isa AbstractCloudMask
             @inbounds begin
-                @threaded device for gcol in 1:ncol
+                ClimaComms.@threaded device for gcol in 1:ncol
                     Optics.build_cloud_mask!(as.cld_mask_lw, as.cld_frac, as.random_lw, gcol, as.cld_mask_type)
                 end
             end
         end
         @inbounds begin
             for igpt in 1:n_gpt
-                @threaded device for gcol in 1:ncol
+                ClimaComms.@threaded device for gcol in 1:ncol
                     igpt == 1 && set_flux_to_zero!(flux_lw, gcol)
                     compute_optical_props!(op, as, src_lw, gcol, igpt, lkp_args...)
                     rte_lw_2stream_combine_sources!(src_lw, gcol, nlev, ncol)
@@ -381,7 +380,7 @@ function rte_sw_noscat_solve!(
     else
         @inbounds begin
             for igpt in 1:n_gpt
-                @threaded device for gcol in 1:ncol
+                ClimaComms.@threaded device for gcol in 1:ncol
                     igpt == 1 && set_flux_to_zero!(flux_sw, gcol)
                     compute_optical_props!(op, as, gcol, igpt, lkp_args...)
                     rte_sw_noscat_solve_kernel!(flux, op, bcs_sw, igpt, solar_src_scaled, gcol, nlev)
@@ -465,13 +464,13 @@ function rte_sw_2stream_solve!(
     else
         @inbounds begin
             if as isa AtmosphericState && as.cld_mask_type isa AbstractCloudMask
-                @threaded device for gcol in 1:ncol
+                ClimaComms.@threaded device for gcol in 1:ncol
                     Optics.build_cloud_mask!(as.cld_mask_sw, as.cld_frac, as.random_sw, gcol, as.cld_mask_type)
                 end
             end
             # setting references for flux_sw
             for igpt in 1:n_gpt
-                @threaded device for gcol in 1:ncol
+                ClimaComms.@threaded device for gcol in 1:ncol
                     igpt == 1 && set_flux_to_zero!(flux_sw, gcol)
                     compute_optical_props!(op, as, gcol, igpt, lkp_args...)
                     sw_two_stream!(op, src_sw, bcs_sw, gcol, nlay) # Cell properties: transmittance and reflectance for direct and diffuse radiation

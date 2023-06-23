@@ -7,7 +7,6 @@ using Random
 import ClimaComms
 #---------------------------------------
 using ..Vmrs
-import ...@threaded
 using ..LookUpTables
 using ..AtmosphericStates
 using ..Sources
@@ -111,7 +110,7 @@ function compute_col_gas!(
         @cuda threads = (tx) blocks = (bx) compute_col_gas_CUDA!(col_dry, args...)
     else
         @inbounds begin
-            @threaded device for icnt in 1:(nlay * ncol)
+            ClimaComms.@threaded device for icnt in 1:(nlay * ncol)
                 glaycol = ((icnt % nlay == 0) ? nlay : (icnt % nlay), cld(icnt, nlay))
                 compute_col_gas_kernel!(col_dry, args..., glaycol)
             end

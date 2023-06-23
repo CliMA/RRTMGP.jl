@@ -133,7 +133,7 @@ function setup_gray_as_pr_grid(
         @cuda threads = (tx) blocks = (bx) setup_gray_as_pr_grid_CUDA!(ncol, args...)
     else
         @inbounds begin
-            @threaded device for gcol in 1:ncol
+            ClimaComms.@threaded device for gcol in 1:ncol
                 setup_gray_as_pr_grid_kernel!(args..., gcol)
             end
         end

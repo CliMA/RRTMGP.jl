@@ -5,7 +5,6 @@ import ClimaComms
 using ..AtmosphericStates
 using ..Fluxes
 
-import ...@threaded
 import ..Parameters as RP
 
 export update_profile_lw!, compute_gray_heating_rate!
@@ -55,7 +54,7 @@ function update_profile_lw!(
         @cuda threads = (tx) blocks = (bx) update_profile_lw_CUDA!(param_set, ncol, args...)
     else
         @inbounds begin
-            @threaded device for gcol in 1:ncol
+            ClimaComms.@threaded device for gcol in 1:ncol
                 update_profile_lw_kernel!(param_set, args..., gcol)
             end
         end
@@ -139,7 +138,7 @@ function compute_gray_heating_rate!(context, hr_lay, p_lev, ncol, nlay, flux_net
         @cuda threads = (tx) blocks = (bx) compute_gray_heating_rate_CUDA!(ncol, args...)
     else
         @inbounds begin
-            @threaded device for gcol in 1:ncol
+            ClimaComms.@threaded device for gcol in 1:ncol
                 compute_gray_heating_rate_kernel!(args..., gcol)
             end
         end
