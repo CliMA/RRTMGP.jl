@@ -5,7 +5,6 @@ using DocStringExtensions
 using Adapt
 using GaussQuadrature
 import ..Parameters as RP
-import ...@threaded
 
 using ..Vmrs
 
