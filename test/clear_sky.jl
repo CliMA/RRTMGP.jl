@@ -1,9 +1,10 @@
 using Test
 using Pkg.Artifacts
 using NCDatasets
+import JET
+import ClimaComms
 
 using RRTMGP
-import JET
 using RRTMGP.Vmrs
 using RRTMGP.LookUpTables
 using RRTMGP.AtmosphericStates
