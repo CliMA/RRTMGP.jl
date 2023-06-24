@@ -111,8 +111,9 @@ function compute_col_gas!(
     else
         @inbounds begin
             ClimaComms.@threaded device for icnt in 1:(nlay * ncol)
-                glaycol = ((icnt % nlay == 0) ? nlay : (icnt % nlay), cld(icnt, nlay))
-                compute_col_gas_kernel!(col_dry, args..., glaycol)
+                gcol = cld(icnt, nlay)
+                glay = (icnt % nlay == 0) ? nlay : (icnt % nlay)
+                compute_col_gas_kernel!(col_dry, args..., glay, gcol)
             end
         end
     end
@@ -123,8 +124,9 @@ function compute_col_gas_CUDA!(col_dry, args...)
     glx = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
     nlay, ncol = size(col_dry)
     if glx ≤ nlay * ncol
-        glaycol = ((glx % nlay == 0) ? nlay : (glx % nlay), cld(glx, nlay))
-        compute_col_gas_kernel!(col_dry, args..., glaycol)
+        glay = (glx % nlay == 0) ? nlay : (glx % nlay)
+        gcol = cld(glx, nlay)
+        compute_col_gas_kernel!(col_dry, args..., glay, gcol)
     end
     return nothing
 end
@@ -133,8 +135,9 @@ function compute_optical_props_CUDA!(op, as, args...)
     glx = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
     nlay, ncol = size(op.τ)
     if glx ≤ nlay * ncol
-        glaycol = ((glx % nlay == 0) ? nlay : (glx % nlay), cld(glx, nlay))
-        compute_optical_props_kernel!(op, as, glaycol, args...)
+        glay = (glx % nlay == 0) ? nlay : (glx % nlay)
+        gcol = cld(glx, nlay)
+        compute_optical_props_kernel!(op, as, glay, gcol, args...)
     end
     return nothing
 end
@@ -164,8 +167,7 @@ function compute_optical_props!(
     nlay = as.nlay
     lkp_args = (lkp_cld === nothing) ? (lkp,) : (lkp, lkp_cld)
     for ilay in 1:nlay
-        glaycol = (ilay, gcol)
-        compute_optical_props_kernel!(op, as, glaycol, sf, igpt, lkp_args...)
+        compute_optical_props_kernel!(op, as, ilay, gcol, sf, igpt, lkp_args...)
     end
     return nothing
 end
@@ -193,8 +195,7 @@ function compute_optical_props!(
     nlay = as.nlay
     lkp_args = (lkp_cld === nothing) ? (lkp,) : (lkp, lkp_cld)
     for ilay in 1:nlay
-        glaycol = (ilay, gcol)
-        compute_optical_props_kernel!(op, as, glaycol, igpt, lkp_args...)
+        compute_optical_props_kernel!(op, as, ilay, gcol, igpt, lkp_args...)
     end
     return nothing
 end
@@ -219,8 +220,7 @@ function compute_optical_props!(
 ) where {FT <: AbstractFloat}
     nlay = as.nlay
     for ilay in 1:nlay
-        glaycol = (ilay, gcol)
-        compute_optical_props_kernel!(op, as, glaycol, sf)
+        compute_optical_props_kernel!(op, as, ilay, gcol, sf)
     end
     return nothing
 end
@@ -243,8 +243,7 @@ function compute_optical_props!(
 ) where {FT <: AbstractFloat}
     nlay = as.nlay
     for ilay in 1:nlay
-        glaycol = (ilay, gcol)
-        compute_optical_props_kernel!(op, as, glaycol)
+        compute_optical_props_kernel!(op, as, ilay, gcol)
     end
     return nothing
 end
