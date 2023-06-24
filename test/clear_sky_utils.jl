@@ -167,8 +167,3 @@ function clear_sky(
     @test max_err_flux_up_sw ≤ toler_sw
     @test max_err_flux_dn_sw ≤ toler_sw
 end
-
-context = ClimaComms.context()
-@testset "testing clear sky 2-stream solver" begin
-    @time clear_sky(context, TwoStream, SourceLW2Str, VmrGM, Float64)
-end

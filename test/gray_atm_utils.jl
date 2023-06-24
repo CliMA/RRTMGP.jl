@@ -202,10 +202,3 @@ function gray_atmos_sw_test(context, ::Type{OPC}, ::Type{FT}, ncol::Int) where {
         @test (@allocated solve_sw!(slv, max_threads)) ≤ 256
     end
 end
-
-context = ClimaComms.context()
-@time gray_atmos_lw_equil(context, OneScalar, Float64)
-@time gray_atmos_lw_equil(context, TwoStream, Float64)
-
-@time gray_atmos_sw_test(context, OneScalar, Float64, 1)
-@time gray_atmos_sw_test(context, TwoStream, Float64, 1)

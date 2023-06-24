@@ -175,10 +175,3 @@ function all_sky(
     @test max_err_flux_dn_sw < toler
 end
 
-context = ClimaComms.context()
-@testset "Cloudy (all-sky, Two-stream calculations using lookup table method" begin
-    @time all_sky(context, TwoStream, Float64, use_lut = true, cldfrac = Float64(1))
-end
-@testset "Cloudy (all-sky), Two-stream calculations using Pade method" begin
-    @time all_sky(context, TwoStream, Float64, use_lut = false, cldfrac = Float64(1))
-end
