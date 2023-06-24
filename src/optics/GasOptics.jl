@@ -98,9 +98,10 @@ Compute interpolation fraction for pressure.
 @inline function compute_interp_frac_press(lkp::AbstractLookUp, p_lay, tropo, glay, gcol)
     (; Δ_ln_p_ref, p_ref, n_p_ref) = lkp
 
-    @inbounds jpress = Int(min(max(fld(log(p_ref[1]) - log(p_lay), Δ_ln_p_ref) + 1, 1), n_p_ref - 1) + 1)
+    log_p_lay = log(p_lay)
+    @inbounds jpress = Int(min(max(fld(log(p_ref[1]) - log_p_lay, Δ_ln_p_ref) + 1, 1), n_p_ref - 1) + 1)
 
-    @inbounds fpress = (log(p_ref[jpress - 1]) - log(p_lay)) / Δ_ln_p_ref
+    @inbounds fpress = (log(p_ref[jpress - 1]) - log_p_lay) / Δ_ln_p_ref
     jpress = jpress + tropo - 1
 
     return (jpress, fpress)
