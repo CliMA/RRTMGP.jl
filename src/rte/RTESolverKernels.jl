@@ -221,11 +221,11 @@ function adding_lw!(
     flux::FluxLW{FT},
     src_lw::SL,
     bcs_lw::BCL,
-    gcol,
-    igpt,
+    gcol::Int,
+    igpt::Int,
     major_gpt2bnd::AbstractArray{UInt8, 1},
-    nlev,
-    ncol,
+    nlev::Int,
+    ncol::Int,
 ) where {FT <: AbstractFloat, SL <: SourceLW2Str{FT}, BCL <: LwBCs{FT}}
     nlay = nlev - 1
     ibnd = major_gpt2bnd[igpt]

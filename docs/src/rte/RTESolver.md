@@ -6,8 +6,7 @@ CurrentModule = RRTMGP.RTESolver
 
 ```@docs
 solve_lw!
-rte_lw_noscat_solve!
-rte_lw_2stream_solve!
+rte_lw_solve!
 solve_sw!
 rte_sw_noscat_solve!
 rte_sw_2stream_solve!

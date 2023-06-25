@@ -1,6 +1,8 @@
 #=
 julia --project=examples
 julia --project=examples perf/flame.jl gray_atm.jl
+julia --project=examples perf/flame.jl clear_sky.jl
+julia --project=examples perf/flame.jl all_sky.jl
 ```
 include(joinpath("perf", "flame.jl"))
 ```
