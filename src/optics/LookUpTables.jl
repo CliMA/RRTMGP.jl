@@ -798,7 +798,7 @@ These are used to determine the optical properties of ice and water cloud togeth
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct LookUpCld{B, FT, FTA1D, FTA2D, FTA3D, FTA4D}
+struct LookUpCld{B, FT, FTA1D, FTA2D, FTA3D, FTA4D} <: AbstractLookUp{FT}
     "number of bands"
     nband::Int
     "number of ice roughness types"

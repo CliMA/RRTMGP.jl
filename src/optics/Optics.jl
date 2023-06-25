@@ -162,13 +162,16 @@ function compute_optical_props!(
     sf::AbstractSourceLW{FT},
     gcol::Int,
     igpt::Int,
-    lkp::LookUpLW{FT},
-    lkp_cld::Union{LookUpCld, Nothing} = nothing,
+    lkp::Union{AbstractLookUp, Nothing} = nothing,
+    lkp_cld::Union{AbstractLookUp, Nothing} = nothing,
 ) where {FT <: AbstractFloat}
     nlay = as.nlay
-    lkp_args = (lkp_cld === nothing) ? (lkp,) : (lkp, lkp_cld)
     for ilay in 1:nlay
-        compute_optical_props_kernel!(op, as, ilay, gcol, sf, igpt, lkp_args...)
+        if lkp_cld isa Nothing
+            compute_optical_props_kernel!(op, as, ilay, gcol, sf, igpt, lkp)
+        else
+            compute_optical_props_kernel!(op, as, ilay, gcol, sf, igpt, lkp, lkp_cld)
+        end
     end
     return nothing
 end
@@ -190,13 +193,16 @@ function compute_optical_props!(
     as::AtmosphericState{FT},
     gcol::Int,
     igpt::Int,
-    lkp::LookUpSW{FT},
-    lkp_cld::Union{LookUpCld, Nothing} = nothing,
+    lkp::Union{AbstractLookUp, Nothing} = nothing,
+    lkp_cld::Union{AbstractLookUp, Nothing} = nothing,
 ) where {FT <: AbstractFloat}
     nlay = as.nlay
-    lkp_args = (lkp_cld === nothing) ? (lkp,) : (lkp, lkp_cld)
     for ilay in 1:nlay
-        compute_optical_props_kernel!(op, as, ilay, gcol, igpt, lkp_args...)
+        if lkp_cld isa Nothing
+            compute_optical_props_kernel!(op, as, ilay, gcol, igpt, lkp)
+        else
+            compute_optical_props_kernel!(op, as, ilay, gcol, igpt, lkp, lkp_cld)
+        end
     end
     return nothing
 end
@@ -218,6 +224,8 @@ function compute_optical_props!(
     sf::AbstractSourceLW{FT},
     gcol::Int,
     igpt::Int = 1,
+    lkp::Union{AbstractLookUp, Nothing} = nothing,
+    lkp_cld::Union{AbstractLookUp, Nothing} = nothing,
 ) where {FT <: AbstractFloat}
     nlay = as.nlay
     for ilay in 1:nlay
@@ -241,6 +249,8 @@ function compute_optical_props!(
     as::GrayAtmosphericState{FT},
     gcol::Int,
     igpt::Int = 1,
+    lkp::Union{AbstractLookUp, Nothing} = nothing,
+    lkp_cld::Union{AbstractLookUp, Nothing} = nothing,
 ) where {FT <: AbstractFloat}
     nlay = as.nlay
     for ilay in 1:nlay
