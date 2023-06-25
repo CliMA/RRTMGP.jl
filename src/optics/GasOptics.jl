@@ -8,7 +8,7 @@
         helmert1,
         vmr_h2o
         lat,
-        glaycol,
+        glay, gcol,
     )
 
 This function computes the column amounts of dry or moist air.
@@ -22,9 +22,9 @@ function compute_col_gas_kernel!(
     helmert1::FT,
     vmr_h2o::Union{AbstractArray{FT, 2}, Nothing},
     lat::Union{AbstractArray{FT, 1}, Nothing},
-    glaycol::Tuple{Int, Int},
+    glay::Int, # global lay id
+    gcol::Int, # global col id
 ) where {FT <: AbstractFloat}
-    glay, gcol = glaycol[1], glaycol[2]  # global col & lay ids
     helmert2 = FT(0.02586)  # second constant of Helmert formula
     m2_to_cm2 = FT(100 * 100) # m^2 to cm^2
     g0 =
@@ -45,7 +45,7 @@ end
         t_lay,
         tropo,
         ibnd,
-        glaycol,
+        glay, gcol,
     ) where {FT<:AbstractFloat}
 
 compute interpolation fractions for binary species parameter, pressure and temperature.
@@ -57,11 +57,12 @@ compute interpolation fractions for binary species parameter, pressure and tempe
     t_lay,
     tropo,
     ibnd,
-    glaycol,
+    glay,
+    gcol,
 ) where {FT <: AbstractFloat}
-    jftemp = compute_interp_frac_temp(lkp, t_lay, glaycol...)
-    jfpress = compute_interp_frac_press(lkp, p_lay, tropo, glaycol...)
-    jfη, col_mix = compute_interp_frac_η(lkp, vmr, tropo, jftemp[1], ibnd, glaycol...)
+    jftemp = compute_interp_frac_temp(lkp, t_lay, glay, gcol)
+    jfpress = compute_interp_frac_press(lkp, p_lay, tropo, glay, gcol)
+    jfη, col_mix = compute_interp_frac_η(lkp, vmr, tropo, jftemp[1], ibnd, glay, gcol)
     return (jftemp, jfpress, jfη, col_mix)
 end
 
@@ -166,7 +167,7 @@ end
         ibnd,
         p_lay::FT,
         t_lay,
-        glaycol,
+        glay, gcol,
         src_args...,
     ) where {FT<:AbstractFloat}
 
@@ -181,21 +182,22 @@ and longwave sources whenever applicable.
     ibnd,
     p_lay::FT,
     t_lay,
-    glaycol,
+    glay,
+    gcol,
     src_args...,
 ) where {FT <: AbstractFloat}
     # upper/lower troposphere
     tropo = p_lay > lkp.p_ref_tropo ? 1 : 2
     # volume mixing ratio of h2o
-    vmr_h2o = get_vmr(vmr, lkp.idx_h2o, glaycol...)
+    vmr_h2o = get_vmr(vmr, lkp.idx_h2o, glay, gcol)
 
-    jftemp, jfpress, jfη, col_mix = compute_interp_fractions(lkp, vmr, p_lay, t_lay, tropo, ibnd, glaycol)
+    jftemp, jfpress, jfη, col_mix = compute_interp_fractions(lkp, vmr, p_lay, t_lay, tropo, ibnd, glay, gcol)
 
     # computing τ_major
     τ_major = interp3d(jfη..., jftemp..., jfpress..., lkp.kmajor, igpt, col_mix...) * col_dry
     # computing τ_minor
     τ_minor =
-        compute_τ_minor(lkp, tropo, vmr, vmr_h2o, col_dry, p_lay, t_lay, jftemp..., jfη..., igpt, ibnd, glaycol...)
+        compute_τ_minor(lkp, tropo, vmr, vmr_h2o, col_dry, p_lay, t_lay, jftemp..., jfη..., igpt, ibnd, glay, gcol)
     # compute τ_Rayleigh
     τ_ray = compute_τ_rayleigh(lkp, tropo, col_dry, vmr_h2o, jftemp..., jfη..., igpt)
     τ = τ_major + τ_minor + τ_ray
@@ -204,7 +206,7 @@ and longwave sources whenever applicable.
         ssa = τ_ray / τ
     end
     # computing Planck sources for longwave problem
-    compute_lw_planck_src!(lkp, jfη..., jfpress..., jftemp..., t_lay, igpt, ibnd, glaycol..., src_args...)
+    compute_lw_planck_src!(lkp, jfη..., jfpress..., jftemp..., t_lay, igpt, ibnd, glay, gcol, src_args...)
     return (τ, ssa)
 end
 

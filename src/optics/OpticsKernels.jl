@@ -7,7 +7,8 @@ include("GrayOpticsKernels.jl")
 function compute_optical_props_kernel!(
     op::AbstractOpticalProps{FT},
     as::AtmosphericState{FT},
-    glaycol,
+    glay,
+    gcol,
     sf::AbstractSourceLW{FT},
     igpt,
     lkp::LookUpLW{FT},
@@ -15,61 +16,64 @@ function compute_optical_props_kernel!(
 ) where {FT <: AbstractFloat}
     ibnd = lkp.major_gpt2bnd[igpt]
 
-    compute_optical_props_kernel!(op, as, glaycol, sf, igpt, lkp) # longwave gas optics
-    add_cloud_optics_2stream(op, as, lkp, lkp_cld, glaycol, ibnd, igpt) # add cloud optics
+    compute_optical_props_kernel!(op, as, glay, gcol, sf, igpt, lkp) # longwave gas optics
+    add_cloud_optics_2stream(op, as, lkp, lkp_cld, glay, gcol, ibnd, igpt) # add cloud optics
     return nothing
 end
 
 function compute_optical_props_kernel!(
     op::AbstractOpticalProps{FT},
     as::AtmosphericState{FT},
-    glaycol,
+    glay,
+    gcol,
     sf::AbstractSourceLW{FT},
     igpt,
     lkp::LookUpLW{FT},
 ) where {FT <: AbstractFloat}
-    t_sfc = as.t_sfc[glaycol[2]]
+    t_sfc = as.t_sfc[gcol]
     t_lev = as.t_lev
-    compute_optical_props_kernel!(op, as, glaycol, igpt, lkp, sf, t_lev, t_sfc)
+    compute_optical_props_kernel!(op, as, glay, gcol, igpt, lkp, sf, t_lev, t_sfc)
     return nothing
 end
 
 function compute_optical_props_kernel!(
     op::AbstractOpticalProps{FT},
     as::AtmosphericState{FT},
-    glaycol,
+    glay,
+    gcol,
     igpt,
     lkp::LookUpSW{FT},
     lkp_cld::LookUpCld,
 ) where {FT <: AbstractFloat}
     ibnd = lkp.major_gpt2bnd[igpt]
 
-    compute_optical_props_kernel!(op, as, glaycol, igpt, lkp) # shortwave gas optics
-    add_cloud_optics_2stream(op, as, lkp, lkp_cld, glaycol, ibnd, igpt) # add cloud optics
+    compute_optical_props_kernel!(op, as, glay, gcol, igpt, lkp) # shortwave gas optics
+    add_cloud_optics_2stream(op, as, lkp, lkp_cld, glay, gcol, ibnd, igpt) # add cloud optics
     return nothing
 end
 
 function compute_optical_props_kernel!(
     op::AbstractOpticalProps{FT},
     as::AtmosphericState{FT},
-    glaycol::Tuple{Int, Int},
+    glay,
+    gcol,
     igpt::Int,
     lkp::LookUpLW{FT},
     src_args...,
 ) where {FT <: AbstractFloat}
 
     vmr = as.vmr
-    col_dry = as.col_dry[glaycol...]
-    p_lay = as.p_lay[glaycol...]
-    t_lay = as.t_lay[glaycol...]
+    col_dry = as.col_dry[glay, gcol]
+    p_lay = as.p_lay[glay, gcol]
+    t_lay = as.t_lay[glay, gcol]
     ibnd = lkp.major_gpt2bnd[igpt]
-    τ, ssa = compute_τ_ssa_lw_src!(lkp, vmr, col_dry, igpt, ibnd, p_lay, t_lay, glaycol, src_args...)
+    τ, ssa = compute_τ_ssa_lw_src!(lkp, vmr, col_dry, igpt, ibnd, p_lay, t_lay, glay, gcol, src_args...)
 
-    @inbounds op.τ[glaycol...] = τ
+    @inbounds op.τ[glay, gcol] = τ
 
     if op isa TwoStream
-        @inbounds op.ssa[glaycol...] = ssa
-        @inbounds op.g[glaycol...] = FT(0) # initializing asymmetry parameter
+        @inbounds op.ssa[glay, gcol] = ssa
+        @inbounds op.g[glay, gcol] = FT(0) # initializing asymmetry parameter
     end
     return nothing
 end
@@ -77,23 +81,24 @@ end
 function compute_optical_props_kernel!(
     op::AbstractOpticalProps{FT},
     as::AtmosphericState{FT},
-    glaycol::Tuple{Int, Int},
+    glay,
+    gcol,
     igpt::Int,
     lkp::LookUpSW{FT},
 ) where {FT <: AbstractFloat}
 
     vmr = as.vmr
-    col_dry = as.col_dry[glaycol...]
-    p_lay = as.p_lay[glaycol...]
-    t_lay = as.t_lay[glaycol...]
+    col_dry = as.col_dry[glay, gcol]
+    p_lay = as.p_lay[glay, gcol]
+    t_lay = as.t_lay[glay, gcol]
     ibnd = lkp.major_gpt2bnd[igpt]
-    τ, ssa = compute_τ_ssa_lw_src!(lkp, vmr, col_dry, igpt, ibnd, p_lay, t_lay, glaycol)
+    τ, ssa = compute_τ_ssa_lw_src!(lkp, vmr, col_dry, igpt, ibnd, p_lay, t_lay, glay, gcol)
 
-    @inbounds op.τ[glaycol...] = τ
+    @inbounds op.τ[glay, gcol] = τ
 
     if op isa TwoStream
-        @inbounds op.ssa[glaycol...] = ssa
-        @inbounds op.g[glaycol...] = FT(0) # initializing asymmetry parameter
+        @inbounds op.ssa[glay, gcol] = ssa
+        @inbounds op.g[glay, gcol] = FT(0) # initializing asymmetry parameter
     end
     return nothing
 end
