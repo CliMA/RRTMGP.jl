@@ -3,6 +3,7 @@ using Pkg.Artifacts
 using NCDatasets
 import JET
 import ClimaComms
+import Infiltrator
 
 using RRTMGP
 using RRTMGP.Vmrs
@@ -31,7 +32,8 @@ function clear_sky(
     ::Type{OPC},
     ::Type{SRC},
     ::Type{VMR},
-    ::Type{FT},
+    ::Type{FT};
+    exfiltrate = false,
 ) where {FT <: AbstractFloat, OPC, SRC, VMR}
     device = ClimaComms.device(context)
     DA = ClimaComms.array_type(device)
@@ -91,7 +93,7 @@ function clear_sky(
     #--------------------------------------------------
     # initializing RTE solver
     slv = Solver(context, as, op, src_lw, src_sw, bcs_lw, bcs_sw, fluxb_lw, fluxb_sw, flux_lw, flux_sw)
-
+    exfiltrate && Infiltrator.@exfiltrate
     println("calling longwave solver; ncol = $ncol")
     @time solve_lw!(slv, max_threads, lookup_lw)
     if device isa ClimaComms.CPUSingleThreaded

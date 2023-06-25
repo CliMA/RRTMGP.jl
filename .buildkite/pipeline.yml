@@ -97,3 +97,11 @@ steps:
           queue: central
           slurm_ntasks: 1
           slurm_mem_per_cpu: 6G
+  
+      - label: "Benchmarks"
+        command: "julia --color=yes --project=examples perf/benchmark.jl"
+        agents:
+          config: cpu
+          queue: central
+          slurm_ntasks: 1
+          slurm_mem_per_cpu: 6G

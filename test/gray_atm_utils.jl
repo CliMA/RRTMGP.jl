@@ -2,6 +2,7 @@ using Test
 using CUDA
 import ClimaComms
 import JET
+import Infiltrator
 using RRTMGP
 using RRTMGP.AngularDiscretizations
 using RRTMGP.Fluxes
@@ -25,7 +26,7 @@ param_set = create_insolation_parameters(Float64)
 """
 Example program to demonstrate the calculation of longwave radiative fluxes in a model gray atmosphere.
 """
-function gray_atmos_lw_equil(context, ::Type{OPC}, ::Type{FT}) where {FT <: AbstractFloat, OPC}
+function gray_atmos_lw_equil(context, ::Type{OPC}, ::Type{FT}; exfiltrate = false) where {FT <: AbstractFloat, OPC}
     device = ClimaComms.device(context)
     ncol = if device isa ClimaComms.CUDADevice
         4096
@@ -84,6 +85,7 @@ function gray_atmos_lw_equil(context, ::Type{OPC}, ::Type{FT}) where {FT <: Abst
     T_ex_lev = DA{FT}(undef, nlev, ncol)
     flux_grad = DA{FT}(undef, nlay, ncol)
     flux_grad_err = FT(0)
+    exfiltrate && Infiltrator.@exfiltrate
     for i in 1:nsteps
         # calling the long wave gray radiation solver
         solve_lw!(slv, max_threads)
@@ -130,7 +132,13 @@ function gray_atmos_lw_equil(context, ::Type{OPC}, ::Type{FT}) where {FT <: Abst
 end
 #------------------------------------------------------------------------------
 
-function gray_atmos_sw_test(context, ::Type{OPC}, ::Type{FT}, ncol::Int) where {FT <: AbstractFloat, OPC}
+function gray_atmos_sw_test(
+    context,
+    ::Type{OPC},
+    ::Type{FT},
+    ncol::Int;
+    exfiltrate = false,
+) where {FT <: AbstractFloat, OPC}
     device = ClimaComms.device(context)
     DA = ClimaComms.array_type(device)
     opc = Symbol(OPC)
@@ -178,6 +186,7 @@ function gray_atmos_sw_test(context, ::Type{OPC}, ::Type{FT}, ncol::Int) where {
     flux_sw = FluxSW(ncol, nlay, FT, DA)
 
     slv = Solver(context, as, op, nothing, src_sw, nothing, bcs_sw, nothing, fluxb_sw, nothing, flux_sw)
+    exfiltrate && Infiltrator.@exfiltrate
     solve_sw!(slv, max_threads)
 
     τ = Array(slv.op.τ)
