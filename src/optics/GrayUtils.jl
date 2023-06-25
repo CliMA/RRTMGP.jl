@@ -5,6 +5,7 @@ import ClimaComms
 using ..AtmosphericStates
 using ..Fluxes
 
+import ..pow_fast
 import ..Parameters as RP
 
 export update_profile_lw!, compute_gray_heating_rate!
@@ -103,7 +104,8 @@ function update_profile_lw_kernel!(
     #-----------------------------------------------------------------------
     sbc = FT(RP.Stefan(param_set))
     for glev in 1:nlev
-        @inbounds T_ex_lev[glev, gcol] = ((flux_dn[glev, gcol] + (flux_net[glev, gcol] / FT(2))) / sbc)^FT(0.25)
+        @inbounds T_ex_lev[glev, gcol] =
+            pow_fast((flux_dn[glev, gcol] + (flux_net[glev, gcol] / FT(2))) / sbc, FT(0.25))
     end
 
     for glev in 2:nlev

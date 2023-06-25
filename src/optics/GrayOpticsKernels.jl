@@ -136,7 +136,7 @@ function compute_gray_optical_thickness_lw(
     (; α, te, tt, Δt) = params
     ts = te + Δt * (FT(1) / FT(3) - sin(lat / FT(180) * FT(π))^2) # surface temp at a given latitude (K)
     d0 = FT((ts / tt)^FT(4) - FT(1)) # optical depth
-    @inbounds τ = (α * d0 * (p / p0)^α / p) * Δp
+    @inbounds τ = (α * d0 * pow_fast(p / p0, α) / p) * Δp
     return abs(τ)
 end
 
