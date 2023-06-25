@@ -169,10 +169,11 @@ function rte_lw_2stream_source!(
         γ2 = lw_diff_sec * FT(0.5) * ssa[glay, gcol] * (1 - g[glay, gcol])
         k = sqrt(max((γ1 + γ2) * (γ1 - γ2), FT(1e-12)))
 
+        coeff = exp(-2 * τ[glay, gcol] * k)
         # Refactored to avoid rounding errors when k, gamma1 are of very different magnitudes
-        RT_term = 1 / (k * (1 + exp(-2 * τ[glay, gcol] * k)) + γ1 * (1 - exp(-2 * τ[glay, gcol] * k)))
+        RT_term = 1 / (k * (1 + coeff) + γ1 * (1 - coeff))
 
-        @inbounds Rdif[glay, gcol] = RT_term * γ2 * (1 - exp(-2 * τ[glay, gcol] * k)) # Equation 25
+        @inbounds Rdif[glay, gcol] = RT_term * γ2 * (1 - coeff) # Equation 25
         @inbounds Tdif[glay, gcol] = RT_term * 2 * k * exp(-τ[glay, gcol] * k) # Equation 26
 
         # Source function for diffuse radiation
