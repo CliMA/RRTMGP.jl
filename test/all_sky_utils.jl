@@ -3,6 +3,7 @@ using Pkg.Artifacts
 using NCDatasets
 
 import JET
+import Infiltrator
 import ClimaComms
 using RRTMGP
 using RRTMGP.Vmrs
@@ -31,6 +32,7 @@ function all_sky(
     ::Type{FT};
     use_lut::Bool = true,
     cldfrac = FT(1),
+    exfiltrate = false,
 ) where {FT <: AbstractFloat, OPC}
     opc = Symbol(OPC)
     device = ClimaComms.device(context)
@@ -127,6 +129,7 @@ function all_sky(
     end
 
     println("calling shortwave solver; ncol = $ncol")
+    exfiltrate && Infiltrator.@exfiltrate
     @time solve_sw!(slv, max_threads, lookup_sw, lookup_sw_cld)
     if device isa ClimaComms.CPUSingleThreaded
         JET.@test_opt solve_sw!(slv, max_threads, lookup_sw, lookup_sw_cld)
@@ -174,4 +177,3 @@ function all_sky(
     @test max_err_flux_up_sw < toler
     @test max_err_flux_dn_sw < toler
 end
-
