@@ -7,6 +7,7 @@ using Random
 import ClimaComms
 #---------------------------------------
 using ..Vmrs
+import ..pow_fast
 using ..LookUpTables
 using ..AtmosphericStates
 using ..Sources

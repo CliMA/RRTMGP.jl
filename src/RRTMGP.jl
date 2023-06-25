@@ -1,5 +1,9 @@
 module RRTMGP
 
+# we may be hitting a slow path:
+# https://stackoverflow.com/questions/14687665/very-slow-stdpow-for-bases-very-close-to-1
+pow_fast(x, y) = exp(y * log(x))
+
 import ClimaComms
 include("Parameters.jl")
 import .Parameters as RP
