@@ -132,7 +132,7 @@ function compute_col_gas_CUDA!(col_dry, args...)
     return nothing
 end
 #-----------------------------------------------------------------------------
-function compute_optical_props_CUDA!(op, as, args...)
+Base.@propagate_inbounds function compute_optical_props_CUDA!(op, as, args...)
     glx = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
     nlay, ncol = size(op.τ)
     if glx ≤ nlay * ncol
@@ -156,7 +156,7 @@ end
 
 Computes optical properties for the longwave problem.
 """
-function compute_optical_props!(
+Base.@propagate_inbounds function compute_optical_props!(
     op::AbstractOpticalProps{FT},
     as::AtmosphericState{FT},
     sf::AbstractSourceLW{FT},
@@ -166,7 +166,7 @@ function compute_optical_props!(
     lkp_cld::Union{AbstractLookUp, Nothing} = nothing,
 ) where {FT <: AbstractFloat}
     nlay = as.nlay
-    for ilay in 1:nlay
+    @inbounds for ilay in 1:nlay
         if lkp_cld isa Nothing
             compute_optical_props_kernel!(op, as, ilay, gcol, sf, igpt, lkp)
         else
@@ -188,7 +188,7 @@ end
 
 Computes optical properties for the shortwave problem.
 """
-function compute_optical_props!(
+Base.@propagate_inbounds function compute_optical_props!(
     op::AbstractOpticalProps{FT},
     as::AtmosphericState{FT},
     gcol::Int,
@@ -197,7 +197,7 @@ function compute_optical_props!(
     lkp_cld::Union{AbstractLookUp, Nothing} = nothing,
 ) where {FT <: AbstractFloat}
     nlay = as.nlay
-    for ilay in 1:nlay
+    @inbounds for ilay in 1:nlay
         if lkp_cld isa Nothing
             compute_optical_props_kernel!(op, as, ilay, gcol, igpt, lkp)
         else
@@ -218,7 +218,7 @@ end
 
 Computes optical properties for the longwave gray radiation problem.
 """
-function compute_optical_props!(
+Base.@propagate_inbounds function compute_optical_props!(
     op::AbstractOpticalProps{FT},
     as::GrayAtmosphericState{FT},
     sf::AbstractSourceLW{FT},
@@ -228,7 +228,7 @@ function compute_optical_props!(
     lkp_cld::Union{AbstractLookUp, Nothing} = nothing,
 ) where {FT <: AbstractFloat}
     nlay = as.nlay
-    for ilay in 1:nlay
+    @inbounds for ilay in 1:nlay
         compute_optical_props_kernel!(op, as, ilay, gcol, sf)
     end
     return nothing
@@ -244,7 +244,7 @@ end
 
 Computes optical properties for the shortwave gray radiation problem.
 """
-function compute_optical_props!(
+Base.@propagate_inbounds function compute_optical_props!(
     op::AbstractOpticalProps{FT},
     as::GrayAtmosphericState{FT},
     gcol::Int,
@@ -253,7 +253,7 @@ function compute_optical_props!(
     lkp_cld::Union{AbstractLookUp, Nothing} = nothing,
 ) where {FT <: AbstractFloat}
     nlay = as.nlay
-    for ilay in 1:nlay
+    @inbounds for ilay in 1:nlay
         compute_optical_props_kernel!(op, as, ilay, gcol)
     end
     return nothing

@@ -13,7 +13,16 @@
 This function computes the longwave TwoStream clouds optics properties and adds them
 to the TwoStream longwave gas optics properties.
 """
-function add_cloud_optics_2stream(op::TwoStream, as::AtmosphericState, lkp::LookUpLW, lkp_cld, glay, gcol, ibnd, igpt)
+Base.@propagate_inbounds function add_cloud_optics_2stream(
+    op::TwoStream,
+    as::AtmosphericState,
+    lkp::LookUpLW,
+    lkp_cld,
+    glay,
+    gcol,
+    ibnd,
+    igpt,
+)
     if as.cld_mask_lw isa AbstractArray
         cld_mask = as.cld_mask_lw[igpt, glay, gcol]
         if cld_mask
@@ -38,7 +47,16 @@ end
 This function computes the shortwave TwoStream clouds optics properties and adds them
 to the TwoStream shortwave gase optics properties.
 """
-function add_cloud_optics_2stream(op::TwoStream, as::AtmosphericState, lkp::LookUpSW, lkp_cld, glay, gcol, ibnd, igpt)
+Base.@propagate_inbounds function add_cloud_optics_2stream(
+    op::TwoStream,
+    as::AtmosphericState,
+    lkp::LookUpSW,
+    lkp_cld,
+    glay,
+    gcol,
+    ibnd,
+    igpt,
+)
     if as.cld_mask_sw isa AbstractArray
         cld_mask = as.cld_mask_sw[igpt, glay, gcol]
         if cld_mask
@@ -54,7 +72,7 @@ end
 
 Cloud optics is currently only supported for the TwoStream solver.
 """
-function add_cloud_optics_2stream(op::OneScalar, args...)
+@inline function add_cloud_optics_2stream(op::OneScalar, args...)
     return nothing
 end
 """
@@ -63,7 +81,7 @@ end
 This function computed the TwoSteam cloud optics properties using either the 
 lookup table method or pade method.
 """
-function compute_cld_props(lkp_cld, as, cld_mask, glay, gcol, ibnd, igpt)
+Base.@propagate_inbounds function compute_cld_props(lkp_cld, as, cld_mask, glay, gcol, ibnd, igpt)
     use_lut = lkp_cld.use_lut
     re_liq = as.cld_r_eff_liq[glay, gcol]
     re_ice = as.cld_r_eff_ice[glay, gcol]
@@ -183,13 +201,13 @@ function pade_eval(ibnd, re, irad, m, n, pade_coeffs, irgh::Union{Int, Nothing} 
     end
 
     denom = coeffs[ibnd, irad, n + m]
-    for i in (n + m - 1):-1:(1 + m)
+    @inbounds for i in (n + m - 1):-1:(1 + m)
         denom = coeffs[ibnd, irad, i] + re * denom
     end
     denom = FT(1) + re * denom
 
     numer = coeffs[ibnd, irad, m]
-    for i in (m - 1):-1:2
+    @inbounds for i in (m - 1):-1:2
         numer = coeffs[ibnd, irad, i] + re * numer
     end
     numer = coeffs[ibnd, irad, 1] + re * numer
@@ -214,7 +232,7 @@ function build_cloud_mask!(cld_mask, cld_frac, random_arr, gcol, ::MaxRandomOver
 
     Random.rand!(local_rand)
     start = 0
-    for ilay in 1:nlay # for GPU compatibility (start = findfirst(local_cld_frac .> FT(0)))
+    @inbounds for ilay in 1:nlay # for GPU compatibility (start = findfirst(local_cld_frac .> FT(0)))
         if local_cld_frac[ilay] > FT(0)
             start = ilay
             break
@@ -222,32 +240,32 @@ function build_cloud_mask!(cld_mask, cld_frac, random_arr, gcol, ::MaxRandomOver
     end
 
     if start == 0 # no clouds in entire column
-        for ilay in 1:nlay, igpt in 1:ngpt
+        @inbounds for ilay in 1:nlay, igpt in 1:ngpt
             local_cld_mask[igpt, ilay] = false
         end
     else
         # finish = findlast(local_cld_frac .> FT(0)) # for GPU compatibility
         finish = start
-        for ilay in nlay:-1:(start + 1)
+        @inbounds for ilay in nlay:-1:(start + 1)
             if local_cld_frac[ilay] > FT(0)
                 finish = ilay
                 break
             end
         end
         # set cloud mask for non-cloudy layers
-        for ilay in 1:(start - 1), igpt in 1:ngpt
+        @inbounds for ilay in 1:(start - 1), igpt in 1:ngpt
             local_cld_mask[igpt, ilay] = false
         end
-        for ilay in (finish + 1):nlay, igpt in 1:ngpt
+        @inbounds for ilay in (finish + 1):nlay, igpt in 1:ngpt
             local_cld_mask[igpt, ilay] = false
         end
         # set cloud mask for cloudy layers
         # last layer
         # RRTMG uses local_rand[igpt, finish] > (FT(1) - local_cld_frac[finish]), we change > to >= to address edge cases
-        for igpt in 1:ngpt
+        @inbounds for igpt in 1:ngpt
             local_cld_mask[igpt, finish] = local_rand[igpt, finish] >= (FT(1) - local_cld_frac[finish])
         end
-        for ilay in (finish - 1):-1:start
+        @inbounds for ilay in (finish - 1):-1:start
             if local_cld_frac[ilay] > FT(0)
                 for igpt in 1:ngpt
                     if local_cld_mask[igpt, ilay + 1]

@@ -1,12 +1,12 @@
 
-@inline loc_lower(xi, Δx, n, x) = @inbounds max(min(unsafe_trunc(Int, (xi - x[1]) / Δx) + 1, n - 1), 1)
+Base.@propagate_inbounds loc_lower(xi, Δx, n, x) = @inbounds max(min(unsafe_trunc(Int, (xi - x[1]) / Δx) + 1, n - 1), 1)
 
 """
     interp1d(xi::FT, x, y, col) where {FT<:AbstractFloat}
 
 perform 1D linear interpolation.
 """
-@inline function interp1d(xi::FT, x, y, col) where {FT <: AbstractFloat}
+Base.@propagate_inbounds function interp1d(xi::FT, x, y, col) where {FT <: AbstractFloat}
     @inbounds Δx = x[2] - x[1]
     n = length(x)
     loc = loc_lower(xi, Δx, n, x)
@@ -36,7 +36,7 @@ Perform 2D linear interpolation.
 
 `fminor[2, 2] = fη2 * ftemp`
 """
-@inline function interp2d(
+Base.@propagate_inbounds function interp2d(
     fη1::FT,
     fη2::FT,
     ftemp::FT,
@@ -89,7 +89,7 @@ where,
 `fminor[2, itemp=2] = fη2 * ftemp`
 
 """
-@inline function interp3d(
+Base.@propagate_inbounds function interp3d(
     jη1::Int,
     jη2::Int,
     fη1::FT,
@@ -136,7 +136,15 @@ Increment TwoStream optical properties `op` for layer `glay`
 and column `gcol` with optical thickness `τ2`, single scattering
 albedo `ssa2` and symmetry parameter `g2`.
 """
-function increment!(op::TwoStream{FT}, τ2, ssa2, g2, glay, gcol, igpt) where {FT <: AbstractFloat}
+Base.@propagate_inbounds function increment!(
+    op::TwoStream{FT},
+    τ2,
+    ssa2,
+    g2,
+    glay,
+    gcol,
+    igpt,
+) where {FT <: AbstractFloat}
     τ1, ssa1, g1 = op.τ[glay, gcol], op.ssa[glay, gcol], op.g[glay, gcol]
     τ = τ1 + τ2
     ssa = τ1 * ssa1 + τ2 * ssa2

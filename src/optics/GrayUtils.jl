@@ -86,12 +86,12 @@ function update_profile_lw_kernel!(
     gcol,
 ) where {FT <: AbstractFloat}
     # updating t_lay based on heating rate
-    for glay in 1:nlay
-        @inbounds t_lay[glay, gcol] += Δt * hr_lay[glay, gcol]
+    @inbounds for glay in 1:nlay
+        t_lay[glay, gcol] += Δt * hr_lay[glay, gcol]
     end
     #--------compute t_lev from t_lay--------------------------------------
-    for glev in 2:(nlay - 1)
-        @inbounds t_lev[glev, gcol] =
+    @inbounds for glev in 2:(nlay - 1)
+        t_lev[glev, gcol] =
             FT(1 / 3) * t_lay[glev - 1, gcol] + FT(5 / 6) * t_lay[glev, gcol] - FT(1 / 6) * t_lay[glev + 1, gcol]
     end
 
@@ -103,13 +103,12 @@ function update_profile_lw_kernel!(
     @inbounds t_lev[nlay + 1, gcol] = FT(2) * t_lay[nlay, gcol] - t_lev[nlay, gcol]
     #-----------------------------------------------------------------------
     sbc = FT(RP.Stefan(param_set))
-    for glev in 1:nlev
-        @inbounds T_ex_lev[glev, gcol] =
-            pow_fast((flux_dn[glev, gcol] + (flux_net[glev, gcol] / FT(2))) / sbc, FT(0.25))
+    @inbounds for glev in 1:nlev
+        T_ex_lev[glev, gcol] = pow_fast((flux_dn[glev, gcol] + (flux_net[glev, gcol] / FT(2))) / sbc, FT(0.25))
     end
 
-    for glev in 2:nlev
-        @inbounds flux_grad[glev - 1, gcol] = abs(flux_net[glev, gcol] - flux_net[glev - 1, gcol])
+    @inbounds for glev in 2:nlev
+        flux_grad[glev - 1, gcol] = abs(flux_net[glev, gcol] - flux_net[glev - 1, gcol])
     end
     #-----------------------------------------------------------------------
 end
@@ -157,8 +156,8 @@ function compute_gray_heating_rate_CUDA!(ncol, args...)
 end
 
 function compute_gray_heating_rate_kernel!(hr_lay, flux_net, p_lev, grav_, cp_d_, nlay, gcol)
-    for ilay in 1:nlay
-        @inbounds hr_lay[ilay, gcol] =
+    @inbounds for ilay in 1:nlay
+        hr_lay[ilay, gcol] =
             grav_ * (flux_net[ilay + 1, gcol] - flux_net[ilay, gcol]) / (p_lev[ilay + 1, gcol] - p_lev[ilay, gcol]) /
             cp_d_
     end

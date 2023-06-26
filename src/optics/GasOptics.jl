@@ -50,7 +50,7 @@ end
 
 compute interpolation fractions for binary species parameter, pressure and temperature.
 """
-@inline function compute_interp_fractions(
+Base.@propagate_inbounds function compute_interp_fractions(
     lkp::AbstractLookUp{FT},
     vmr,
     p_lay,
@@ -76,7 +76,12 @@ end
 
 compute interpolation fraction for temperature.
 """
-@inline function compute_interp_frac_temp(lkp::AbstractLookUp{FT}, t_lay, glay, gcol) where {FT <: AbstractFloat}
+Base.@propagate_inbounds function compute_interp_frac_temp(
+    lkp::AbstractLookUp{FT},
+    t_lay,
+    glay,
+    gcol,
+) where {FT <: AbstractFloat}
     (; Δ_t_ref, n_t_ref, t_ref) = lkp
 
     @inbounds jtemp = loc_lower(t_lay, Δ_t_ref, n_t_ref, t_ref)
@@ -96,7 +101,7 @@ end
 
 Compute interpolation fraction for pressure.
 """
-@inline function compute_interp_frac_press(lkp::AbstractLookUp, p_lay, tropo, glay, gcol)
+Base.@propagate_inbounds function compute_interp_frac_press(lkp::AbstractLookUp, p_lay, tropo, glay, gcol)
     (; Δ_ln_p_ref, p_ref, n_p_ref) = lkp
 
     log_p_lay = log(p_lay)
@@ -121,7 +126,7 @@ end
 
 Compute interpolation fraction for binary species parameter.
 """
-@inline function compute_interp_frac_η(
+Base.@propagate_inbounds function compute_interp_frac_η(
     lkp::AbstractLookUp{FT},
     vmr,
     tropo,
@@ -175,7 +180,7 @@ end
 Compute optical thickness, single scattering albedo, asymmetry parameter 
 and longwave sources whenever applicable.
 """
-@inline function compute_τ_ssa_lw_src!(
+Base.@propagate_inbounds function compute_τ_ssa_lw_src!(
     lkp::AbstractLookUp{FT},
     vmr,
     col_dry,
@@ -234,7 +239,7 @@ end
 
 Compute optical thickness contributions from minor gases.
 """
-@inline function compute_τ_minor(
+Base.@propagate_inbounds function compute_τ_minor(
     lkp::AbstractLookUp,
     tropo::Int,
     vmr,
@@ -319,7 +324,7 @@ end
 
 Compute Rayleigh scattering optical depths for shortwave problem
 """
-@inline function compute_τ_rayleigh(
+Base.@propagate_inbounds function compute_τ_rayleigh(
     lkp::LookUpSW,
     tropo::Int,
     col_dry::FT,
@@ -369,7 +374,7 @@ end
 Computes Planck sources for the longwave problem.
 
 """
-@inline function compute_lw_planck_src!(
+Base.@propagate_inbounds function compute_lw_planck_src!(
     lkp::LookUpLW,
     jη1,
     jη2,

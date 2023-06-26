@@ -4,7 +4,7 @@ include("GasOptics.jl")
 include("CloudOptics.jl")
 include("GrayOpticsKernels.jl")
 
-function compute_optical_props_kernel!(
+Base.@propagate_inbounds function compute_optical_props_kernel!(
     op::AbstractOpticalProps{FT},
     as::AtmosphericState{FT},
     glay,
@@ -21,7 +21,7 @@ function compute_optical_props_kernel!(
     return nothing
 end
 
-function compute_optical_props_kernel!(
+Base.@propagate_inbounds function compute_optical_props_kernel!(
     op::AbstractOpticalProps{FT},
     as::AtmosphericState{FT},
     glay,
@@ -36,7 +36,7 @@ function compute_optical_props_kernel!(
     return nothing
 end
 
-function compute_optical_props_kernel!(
+Base.@propagate_inbounds function compute_optical_props_kernel!(
     op::AbstractOpticalProps{FT},
     as::AtmosphericState{FT},
     glay,
@@ -52,7 +52,7 @@ function compute_optical_props_kernel!(
     return nothing
 end
 
-function compute_optical_props_kernel!(
+Base.@propagate_inbounds function compute_optical_props_kernel!(
     op::AbstractOpticalProps{FT},
     as::AtmosphericState{FT},
     glay,
@@ -78,7 +78,7 @@ function compute_optical_props_kernel!(
     return nothing
 end
 
-function compute_optical_props_kernel!(
+Base.@propagate_inbounds function compute_optical_props_kernel!(
     op::AbstractOpticalProps{FT},
     as::AtmosphericState{FT},
     glay,

@@ -198,7 +198,7 @@ function setup_gray_as_alt_grid(
     pts = (pts .+ FT(1)) ./ FT(2)
     Δz_cell = zend / ncls
 
-    for icol in 1:ncol
+    @inbounds for icol in 1:ncol
         #---------bot_at_1---------------------------------------
         z_lev[1, icol] = zst
         z_lev[nlev, icol] = zend
@@ -277,7 +277,7 @@ function setup_gray_as_pr_grid_kernel!(
     t_lev[1, gcol] = tt * (FT(1) + d0[gcol] * (p_lev[1, gcol] / p0)^α)^FT(0.25)
     z_lev[1, gcol] = FT(0)
 
-    for ilay in 1:nlay
+    @inbounds for ilay in 1:nlay
         #                if step == "linear"
         p_lev[ilay + 1, gcol] = p_lev[ilay, gcol] - Δp
         #                else
