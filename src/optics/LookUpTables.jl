@@ -186,7 +186,7 @@ function LookUpLW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     idx_scaling_gas_lower = zeros(Int, n_min_absrb_lower)
     idx_scaling_gas_upper = zeros(Int, n_min_absrb_upper)
 
-    for igas in 1:n_maj_absrb
+    @inbounds for igas in 1:n_maj_absrb
         gases_major[igas] = strip(String(ds["gas_names"][:, igas]))
         idx_gases[gases_major[igas]] = Int(igas)
     end
@@ -198,12 +198,12 @@ function LookUpLW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
 
     n_gases = n_maj_absrb
 
-    for igas in 1:n_min_absrb
+    @inbounds for igas in 1:n_min_absrb
         gases_minor[igas] = strip(String(ds["gas_minor"][:, igas]))
         id_minor[igas] = strip(String(ds["identifier_minor"][:, igas]))
     end
 
-    for igas in 1:n_min_absrb_lower
+    @inbounds for igas in 1:n_min_absrb_lower
         gases_minor_lower[igas] = strip(String(ds["minor_gases_lower"][:, igas]))
         scaling_gas_lower[igas] = strip(String(ds["scaling_gas_lower"][:, igas]))
         if ~isempty(gases_minor_lower[igas])
@@ -216,7 +216,7 @@ function LookUpLW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     idx_gases_minor_lower = DA(idx_gases_minor_lower)
     idx_scaling_gas_lower = DA(idx_scaling_gas_lower)
 
-    for igas in 1:n_min_absrb_upper
+    @inbounds for igas in 1:n_min_absrb_upper
         gases_minor_upper[igas] = strip(String(ds["minor_gases_upper"][:, igas]))
         scaling_gas_upper[igas] = strip(String(ds["scaling_gas_upper"][:, igas]))
         if ~isempty(gases_minor_upper[igas])
@@ -230,7 +230,7 @@ function LookUpLW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     idx_scaling_gas_upper = DA(idx_scaling_gas_upper)
 
     key_species = ds["key_species"][:]
-    for j in 1:size(key_species, 3)
+    @inbounds for j in 1:size(key_species, 3)
         for i in 1:size(key_species, 2)
             if key_species[1, i, j] == 0 && key_species[2, i, j] == 0
                 key_species[1:2, i, j] .= 2
@@ -254,7 +254,7 @@ function LookUpLW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     bnd_lims_wn = FTA2D(ds["bnd_limits_wavenumber"][:])
     #-----------------------
     major_gpt2bnd = Array{UI8, 1}(undef, n_gpt)
-    for i in 1:n_bnd
+    @inbounds for i in 1:n_bnd
         major_gpt2bnd[bnd_lims_gpt[1, i]:bnd_lims_gpt[2, i]] .= UI8(i)
     end
     #-----------------------
@@ -272,7 +272,7 @@ function LookUpLW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     minor_upper_gpt_sh = Array{Int, 1}(undef, n_min_absrb_upper)
 
     minor_lower_gpt_sh[1] = 0
-    for i in 1:n_min_absrb_lower
+    @inbounds for i in 1:n_min_absrb_lower
         minor_lower_bnd[i] = major_gpt2bnd[minor_lower_gpt_lims[1, i]]
         if i > 1
             minor_lower_gpt_sh[i] =
@@ -281,7 +281,7 @@ function LookUpLW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     end
 
     minor_upper_gpt_sh[1] = 0
-    for i in 1:n_min_absrb_upper
+    @inbounds for i in 1:n_min_absrb_upper
         minor_upper_bnd[i] = major_gpt2bnd[minor_upper_gpt_lims[1, i]]
         if i > 1
             minor_upper_gpt_sh[i] =
@@ -292,7 +292,7 @@ function LookUpLW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     minor_lower_bnd_st[1] = 1
     minor_upper_bnd_st[1] = 1
 
-    for ibnd in 2:(n_bnd + 1)
+    @inbounds for ibnd in 2:(n_bnd + 1)
         loc_low = findlast(isequal(UI8(ibnd - 1)), minor_lower_bnd)
         loc_upp = findlast(isequal(UI8(ibnd - 1)), minor_upper_bnd)
         if isnothing(loc_low)
@@ -575,7 +575,7 @@ function LookUpSW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     idx_scaling_gas_lower = zeros(Int, n_min_absrb_lower)
     idx_scaling_gas_upper = zeros(Int, n_min_absrb_upper)
 
-    for igas in 1:n_maj_absrb
+    @inbounds for igas in 1:n_maj_absrb
         gases_major[igas] = strip(String(ds["gas_names"][:, igas]))
         idx_gases[gases_major[igas]] = Int(igas)
     end
@@ -586,12 +586,12 @@ function LookUpSW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
 
     n_gases = n_maj_absrb
 
-    for igas in 1:n_min_absrb
+    @inbounds for igas in 1:n_min_absrb
         gases_minor[igas] = strip(String(ds["gas_minor"][:, igas]))
         id_minor[igas] = strip(String(ds["identifier_minor"][:, igas]))
     end
 
-    for igas in 1:n_min_absrb_lower
+    @inbounds for igas in 1:n_min_absrb_lower
         gases_minor_lower[igas] = strip(String(ds["minor_gases_lower"][:, igas]))
         scaling_gas_lower[igas] = strip(String(ds["scaling_gas_lower"][:, igas]))
         if ~isempty(gases_minor_lower[igas])
@@ -602,7 +602,7 @@ function LookUpSW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
         end
     end
 
-    for igas in 1:n_min_absrb_upper
+    @inbounds for igas in 1:n_min_absrb_upper
         gases_minor_upper[igas] = strip(String(ds["minor_gases_upper"][:, igas]))
         scaling_gas_upper[igas] = strip(String(ds["scaling_gas_upper"][:, igas]))
         if ~isempty(gases_minor_upper[igas])
@@ -614,7 +614,7 @@ function LookUpSW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     end
 
     key_species = ds["key_species"][:]
-    for j in 1:size(key_species, 3)
+    @inbounds for j in 1:size(key_species, 3)
         for i in 1:size(key_species, 2)
             if key_species[1, i, j] == 0 && key_species[2, i, j] == 0
                 key_species[1:2, i, j] .= 2
@@ -634,7 +634,7 @@ function LookUpSW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     bnd_lims_wn = FTA2D(ds["bnd_limits_wavenumber"][:])
     #-----------------------
     major_gpt2bnd = Array{UI8, 1}(undef, n_gpt)
-    for i in 1:n_bnd
+    @inbounds for i in 1:n_bnd
         major_gpt2bnd[bnd_lims_gpt[1, i]:bnd_lims_gpt[2, i]] .= UI8(i)
     end
     #-----------------------
@@ -652,7 +652,7 @@ function LookUpSW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     minor_upper_gpt_sh = Array{Int, 1}(undef, n_min_absrb_upper)
 
     minor_lower_gpt_sh[1] = 0
-    for i in 1:n_min_absrb_lower
+    @inbounds for i in 1:n_min_absrb_lower
         minor_lower_bnd[i] = major_gpt2bnd[minor_lower_gpt_lims[1, i]]
         if i > 1
             minor_lower_gpt_sh[i] =
@@ -661,7 +661,7 @@ function LookUpSW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     end
 
     minor_upper_gpt_sh[1] = 0
-    for i in 1:n_min_absrb_upper
+    @inbounds for i in 1:n_min_absrb_upper
         minor_upper_bnd[i] = major_gpt2bnd[minor_upper_gpt_lims[1, i]]
         if i > 1
             minor_upper_gpt_sh[i] =
@@ -672,7 +672,7 @@ function LookUpSW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     minor_lower_bnd_st[1] = 1
     minor_upper_bnd_st[1] = 1
 
-    for ibnd in 2:(n_bnd + 1)
+    @inbounds for ibnd in 2:(n_bnd + 1)
         loc_low = findlast(isequal(UI8(ibnd - 1)), minor_lower_bnd)
         loc_upp = findlast(isequal(UI8(ibnd - 1)), minor_upper_bnd)
         if isnothing(loc_low)
