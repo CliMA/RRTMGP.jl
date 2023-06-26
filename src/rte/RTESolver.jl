@@ -127,7 +127,7 @@ function rte_lw_noscat_solve_CUDA!(
     nlev = nlay + 1
     n_gpt = length(major_gpt2bnd)
     if gcol ≤ ncol
-        for igpt in 1:n_gpt
+        @inbounds for igpt in 1:n_gpt
             igpt == 1 && set_flux_to_zero!(flux_lw, gcol)
             compute_optical_props!(op, as, src_lw, gcol, igpt, lookup_lw, lookup_lw_cld)
             rte_lw_noscat_source!(src_lw, op, gcol, nlay)
@@ -229,7 +229,7 @@ function rte_lw_2stream_solve_CUDA!(
         if as isa AtmosphericState && as.cld_mask_type isa AbstractCloudMask
             Optics.build_cloud_mask!(as.cld_mask_lw, as.cld_frac, as.random_lw, gcol, as.cld_mask_type)
         end
-        for igpt in 1:n_gpt
+        @inbounds for igpt in 1:n_gpt
             igpt == 1 && set_flux_to_zero!(flux_lw, gcol)
             compute_optical_props!(op, as, src_lw, gcol, igpt, lookup_lw, lookup_lw_cld)
             rte_lw_2stream_combine_sources!(src_lw, gcol, nlev, ncol)
@@ -377,7 +377,7 @@ function rte_sw_noscat_solve_CUDA!(
     n_gpt = length(solar_src_scaled)
     # setting references for flux_sw
     if gcol ≤ ncol
-        for igpt in 1:n_gpt
+        @inbounds for igpt in 1:n_gpt
             igpt == 1 && set_flux_to_zero!(flux_sw, gcol)
             compute_optical_props!(op, as, gcol, igpt, lookup_sw, lookup_sw_cld)
             rte_sw_noscat_solve_kernel!(flux, op, bcs_sw, igpt, solar_src_scaled, gcol, nlev)
@@ -485,7 +485,7 @@ function rte_sw_2stream_solve_CUDA!(
         if as isa AtmosphericState && as.cld_mask_type isa AbstractCloudMask
             Optics.build_cloud_mask!(as.cld_mask_sw, as.cld_frac, as.random_sw, gcol, as.cld_mask_type)
         end
-        for igpt in 1:n_gpt
+        @inbounds for igpt in 1:n_gpt
             igpt == 1 && set_flux_to_zero!(flux_sw, gcol)
             compute_optical_props!(op, as, gcol, igpt, lookup_sw, lookup_sw_cld)
             sw_two_stream!(op, src_sw, bcs_sw, gcol, nlay) # Cell properties: transmittance and reflectance for direct and diffuse radiation

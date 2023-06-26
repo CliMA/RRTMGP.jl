@@ -166,7 +166,7 @@ function compute_optical_props!(
     lkp_cld::Union{AbstractLookUp, Nothing} = nothing,
 ) where {FT <: AbstractFloat}
     nlay = as.nlay
-    for ilay in 1:nlay
+    @inbounds for ilay in 1:nlay
         if lkp_cld isa Nothing
             compute_optical_props_kernel!(op, as, ilay, gcol, sf, igpt, lkp)
         else
@@ -197,7 +197,7 @@ function compute_optical_props!(
     lkp_cld::Union{AbstractLookUp, Nothing} = nothing,
 ) where {FT <: AbstractFloat}
     nlay = as.nlay
-    for ilay in 1:nlay
+    @inbounds for ilay in 1:nlay
         if lkp_cld isa Nothing
             compute_optical_props_kernel!(op, as, ilay, gcol, igpt, lkp)
         else
@@ -228,7 +228,7 @@ function compute_optical_props!(
     lkp_cld::Union{AbstractLookUp, Nothing} = nothing,
 ) where {FT <: AbstractFloat}
     nlay = as.nlay
-    for ilay in 1:nlay
+    @inbounds for ilay in 1:nlay
         compute_optical_props_kernel!(op, as, ilay, gcol, sf)
     end
     return nothing
@@ -253,7 +253,7 @@ function compute_optical_props!(
     lkp_cld::Union{AbstractLookUp, Nothing} = nothing,
 ) where {FT <: AbstractFloat}
     nlay = as.nlay
-    for ilay in 1:nlay
+    @inbounds for ilay in 1:nlay
         compute_optical_props_kernel!(op, as, ilay, gcol)
     end
     return nothing
