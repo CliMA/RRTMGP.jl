@@ -1,6 +1,7 @@
 [deps]
 Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
 Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
+BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 CLIMAParameters = "6eacf6c3-8458-43b9-ae03-caf5306d3d53"
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 ClimaComms = "3a4d1b5c-c61d-41fd-a00a-5873ba7a1b0d"
@@ -15,4 +16,5 @@ Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 Profile = "9abbd945-dff8-562f-b5e8-e1ebf5ef1b79"
 RRTMGP = "a01a1ee8-cea4-48fc-987c-fc7878d79da1"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
+Suppressor = "fd094767-a336-5f1f-9728-57cf17d0bbfb"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
