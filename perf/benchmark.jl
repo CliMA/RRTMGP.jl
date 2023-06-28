@@ -21,7 +21,13 @@ end
 (; slv, max_threads) = Infiltrator.exfiltrated
 @info "gray_atm lw"
 solve_lw!(slv, max_threads) # compile first
-trial = @benchmark solve_lw!(slv, max_threads)
+device = ClimaComms.device(ClimaComms.context())
+trial = if device isa ClimaComms.CUDADevice
+    using CUDA
+    @benchmark CUDA.@sync solve_lw!($slv, $max_threads)
+else
+    @benchmark solve_lw!($slv, $max_threads)
+end
 show(stdout, MIME("text/plain"), trial)
 println()
 
@@ -29,7 +35,13 @@ gray_atmos_sw_test(ClimaComms.context(), OneScalar, Float64, 1; exfiltrate = tru
 (; slv, max_threads) = Infiltrator.exfiltrated
 solve_sw!(slv, max_threads) # compile first
 @info "gray_atm sw"
-trial = @benchmark solve_sw!(slv, max_threads)
+device = ClimaComms.device(ClimaComms.context())
+trial = if device isa ClimaComms.CUDADevice
+    using CUDA
+    @benchmark CUDA.@sync solve_sw!($slv, $max_threads)
+else
+    @benchmark solve_sw!($slv, $max_threads)
+end
 show(stdout, MIME("text/plain"), trial)
 println()
 @info "------------------------------------------------- Benchmark: clear_sky"
@@ -42,13 +54,25 @@ end
 
 @info "clear_sky lw"
 solve_lw!(slv, max_threads, lookup_lw) # compile first
-trial = @benchmark solve_lw!(slv, max_threads, lookup_lw)
+device = ClimaComms.device(ClimaComms.context())
+trial = if device isa ClimaComms.CUDADevice
+    using CUDA
+    @benchmark CUDA.@sync solve_lw!($slv, $max_threads, $lookup_lw)
+else
+    @benchmark solve_lw!($slv, $max_threads, $lookup_lw)
+end
 show(stdout, MIME("text/plain"), trial)
 println()
 
 @info "clear_sky sw"
 solve_sw!(slv, max_threads, lookup_sw) # compile first
-trial = @benchmark solve_sw!(slv, max_threads, lookup_sw)
+device = ClimaComms.device(ClimaComms.context())
+trial = if device isa ClimaComms.CUDADevice
+    using CUDA
+    @benchmark CUDA.@sync solve_sw!($slv, $max_threads, $lookup_sw)
+else
+    @benchmark solve_sw!($slv, $max_threads, $lookup_sw)
+end
 show(stdout, MIME("text/plain"), trial)
 println()
 
@@ -64,11 +88,23 @@ solve_sw!(slv, max_threads, lookup_sw, lookup_sw_cld) # compile first
 solve_lw!(slv, max_threads, lookup_lw, lookup_lw_cld) # compile first
 
 @info "all_sky, lw, use_lut=true"
-trial = @benchmark solve_lw!(slv, max_threads, lookup_lw, lookup_lw_cld)
+device = ClimaComms.device(ClimaComms.context())
+trial = if device isa ClimaComms.CUDADevice
+    using CUDA
+    @benchmark CUDA.@sync solve_lw!($slv, $max_threads, $lookup_lw, $lookup_lw_cld)
+else
+    @benchmark solve_lw!($slv, $max_threads, $lookup_lw, $lookup_lw_cld)
+end
 show(stdout, MIME("text/plain"), trial)
 println()
 @info "all_sky, sw, use_lut=true"
-trial = @benchmark solve_sw!(slv, max_threads, lookup_sw, lookup_sw_cld)
+device = ClimaComms.device(ClimaComms.context())
+trial = if device isa ClimaComms.CUDADevice
+    using CUDA
+    @benchmark CUDA.@sync solve_sw!($slv, $max_threads, $lookup_sw, $lookup_sw_cld)
+else
+    @benchmark solve_sw!($slv, $max_threads, $lookup_sw, $lookup_sw_cld)
+end
 show(stdout, MIME("text/plain"), trial)
 println()
 
@@ -82,10 +118,22 @@ solve_sw!(slv, max_threads, lookup_sw, lookup_sw_cld) # compile first
 solve_lw!(slv, max_threads, lookup_lw, lookup_lw_cld) # compile first
 
 @info "all_sky, lw, use_lut=false"
-trial = @benchmark solve_lw!(slv, max_threads, lookup_lw, lookup_lw_cld)
+device = ClimaComms.device(ClimaComms.context())
+trial = if device isa ClimaComms.CUDADevice
+    using CUDA
+    @benchmark CUDA.@sync solve_lw!($slv, $max_threads, $lookup_lw, $lookup_lw_cld)
+else
+    @benchmark solve_lw!($slv, $max_threads, $lookup_lw, $lookup_lw_cld)
+end
 show(stdout, MIME("text/plain"), trial)
 println()
 @info "all_sky, sw, use_lut=false"
-trial = @benchmark solve_sw!(slv, max_threads, lookup_sw, lookup_sw_cld)
+device = ClimaComms.device(ClimaComms.context())
+trial = if device isa ClimaComms.CUDADevice
+    using CUDA
+    @benchmark CUDA.@sync solve_sw!($slv, $max_threads, $lookup_sw, $lookup_sw_cld)
+else
+    @benchmark solve_sw!($slv, $max_threads, $lookup_sw, $lookup_sw_cld)
+end
 show(stdout, MIME("text/plain"), trial)
 println()
