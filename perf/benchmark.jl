@@ -6,7 +6,7 @@ include(joinpath("perf", "benchmark.jl"))
 ```
 =#
 # ARGS[1]
-
+const FT = get(ARGS, 1, Float64) == "Float32" ? Float32 : Float64
 using BenchmarkTools
 using Suppressor
 root_dir = joinpath(dirname(@__DIR__))
@@ -16,7 +16,7 @@ import Logging
 @info "------------------------------------------------- Benchmark: gray_atm"
 @suppress_out begin
     include(joinpath(root_dir, "test", "gray_atm_utils.jl"))
-    gray_atmos_lw_equil(ClimaComms.context(), OneScalar, Float64; exfiltrate = true)
+    gray_atmos_lw_equil(ClimaComms.context(), OneScalar, FT; exfiltrate = true)
 end
 (; slv, max_threads) = Infiltrator.exfiltrated
 @info "gray_atm lw"
@@ -31,7 +31,7 @@ end
 show(stdout, MIME("text/plain"), trial)
 println()
 
-gray_atmos_sw_test(ClimaComms.context(), OneScalar, Float64, 1; exfiltrate = true)
+gray_atmos_sw_test(ClimaComms.context(), OneScalar, FT, 1; exfiltrate = true)
 (; slv, max_threads) = Infiltrator.exfiltrated
 solve_sw!(slv, max_threads) # compile first
 @info "gray_atm sw"
@@ -45,11 +45,11 @@ end
 show(stdout, MIME("text/plain"), trial)
 println()
 @info "------------------------------------------------- Benchmark: clear_sky"
-@suppress_out begin
-    include(joinpath(root_dir, "test", "clear_sky_utils.jl"))
-    context = ClimaComms.context()
-    clear_sky(ClimaComms.context(), TwoStream, SourceLW2Str, VmrGM, Float64; exfiltrate = true)
-end
+# @suppress_out begin
+include(joinpath(root_dir, "test", "clear_sky_utils.jl"))
+context = ClimaComms.context()
+clear_sky(ClimaComms.context(), TwoStream, SourceLW2Str, VmrGM, FT; exfiltrate = true)
+# end
 (; slv, max_threads, lookup_sw, lookup_lw) = Infiltrator.exfiltrated
 
 @info "clear_sky lw"
@@ -77,10 +77,10 @@ show(stdout, MIME("text/plain"), trial)
 println()
 
 @info "------------------------------------------------- Benchmark: all_sky"
-@suppress_out begin
-    include(joinpath(root_dir, "test", "all_sky_utils.jl"))
-    all_sky(ClimaComms.context(), TwoStream, Float64; use_lut = true, cldfrac = Float64(1), exfiltrate = true)
-end
+# @suppress_out begin
+include(joinpath(root_dir, "test", "all_sky_utils.jl"))
+all_sky(ClimaComms.context(), TwoStream, FT; use_lut = true, cldfrac = FT(1), exfiltrate = true)
+# end
 
 (; slv, max_threads, lookup_sw, lookup_sw_cld, lookup_lw, lookup_lw_cld) = Infiltrator.exfiltrated
 
@@ -108,9 +108,9 @@ end
 show(stdout, MIME("text/plain"), trial)
 println()
 
-@suppress_out begin
-    all_sky(ClimaComms.context(), TwoStream, Float64; use_lut = false, cldfrac = Float64(1), exfiltrate = true)
-end
+# @suppress_out begin
+all_sky(ClimaComms.context(), TwoStream, FT; use_lut = false, cldfrac = FT(1), exfiltrate = true)
+# end
 
 (; slv, max_threads, lookup_sw, lookup_sw_cld, lookup_lw, lookup_lw_cld) = Infiltrator.exfiltrated
 

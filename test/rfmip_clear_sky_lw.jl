@@ -17,8 +17,6 @@ using RRTMGP.RTESolver
 import CLIMAParameters as CP
 include(joinpath(pkgdir(RRTMGP), "parameters", "create_parameters.jl"))
 # overriding some parameters to match with RRTMGP FORTRAN code
-overrides = (; grav = 9.80665, molmass_dryair = 0.028964, molmass_water = 0.018016)
-param_set = create_insolation_parameters(FT, overrides)
 
 include("reference_files.jl")
 include("read_rfmip_clear_sky.jl")
@@ -30,6 +28,8 @@ function lw_rfmip(
     ::Type{FT},
     ::Type{DA},
 ) where {FT <: AbstractFloat, OPC, SRC, VMR, DA}
+    overrides = (; grav = 9.80665, molmass_dryair = 0.028964, molmass_water = 0.018016)
+    param_set = create_insolation_parameters(FT, overrides)
     opc = Symbol(OPC)
     lw_file = get_ref_filename(:lookup_tables, :clearsky, λ = :lw) # lw lookup tables
     lw_input_file = get_ref_filename(:atmos_state, :clearsky)      # clear-sky atmos state
@@ -50,7 +50,8 @@ function lw_rfmip(
     # reading rfmip data to atmospheric state
     ds_lw_in = Dataset(lw_input_file, "r")
 
-    (as, sfc_emis, _, _, _) = setup_rfmip_as(context, ds_lw_in, idx_gases, exp_no, lookup_lw, FT, VMR, max_threads)
+    (as, sfc_emis, _, _, _) =
+        setup_rfmip_as(context, ds_lw_in, idx_gases, exp_no, lookup_lw, FT, VMR, max_threads, param_set)
     close(ds_lw_in)
 
     ncol, nlay, ngpt = as.ncol, as.nlay, lookup_lw.n_gpt

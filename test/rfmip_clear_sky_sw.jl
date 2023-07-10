@@ -18,13 +18,14 @@ import CLIMAParameters as CP
 
 include(joinpath(pkgdir(RRTMGP), "parameters", "create_parameters.jl"))
 # overriding some parameters to match with RRTMGP FORTRAN code
-overrides = (; grav = 9.80665, molmass_dryair = 0.028964, molmass_water = 0.018016)
-param_set = create_insolation_parameters(FT, overrides)
 
 include("reference_files.jl")
 include("read_rfmip_clear_sky.jl")
 #---------------------------------------------------------------
 function sw_rfmip(context, ::Type{OPC}, ::Type{SRC}, ::Type{VMR}, ::Type{FT}) where {FT <: AbstractFloat, OPC, SRC, VMR}
+    overrides = (; grav = 9.80665, molmass_dryair = 0.028964, molmass_water = 0.018016)
+    param_set = create_insolation_parameters(FT, overrides)
+
     device = ClimaComms.device(context)
     DA = ClimaComms.array_type(device)
     opc = Symbol(OPC)
@@ -47,7 +48,7 @@ function sw_rfmip(context, ::Type{OPC}, ::Type{SRC}, ::Type{VMR}, ::Type{FT}) wh
     ds_sw_in = Dataset(sw_input_file, "r")
 
     (as, _, sfc_alb_direct, zenith, toa_flux, usecol) =
-        setup_rfmip_as(context, ds_sw_in, idx_gases, exp_no, lookup_sw, FT, VMR, max_threads)
+        setup_rfmip_as(context, ds_sw_in, idx_gases, exp_no, lookup_sw, FT, VMR, max_threads, param_set)
     close(ds_sw_in)
 
     ncol, nlay, ngpt = as.ncol, as.nlay, lookup_sw.n_gpt
