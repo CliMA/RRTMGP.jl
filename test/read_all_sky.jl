@@ -1,3 +1,9 @@
+function ncol_ds_all_sky(use_lut)
+    lut_pade = use_lut ? :lut : :pade
+    flux_file = get_ref_filename(:comparison, :cloudysky, lut_pade = lut_pade)
+    ds_comp = Dataset(flux_file, "r")
+    return size(ds_comp["lw_flux_up"][:], 1)
+end
 
 function setup_allsky_as(
     context,
@@ -106,8 +112,10 @@ function setup_allsky_as(
     # and not very close to the ground (< 900 hPa), and
     # put them in 2/3 of the columns since that's roughly the
     # total cloudiness of earth
+    ncol_ds = ncol_ds_all_sky(use_lut)
     for icol in 1:ncol, ilay in 1:nlay
-        if p_lay[ilay, icol] > FT(10000) && p_lay[ilay, icol] < FT(90000) && icol % 3 ≠ 0
+        icol_ds = icol % ncol_ds == 0 ? ncol_ds : icol % ncol_ds
+        if p_lay[ilay, icol] > FT(10000) && p_lay[ilay, icol] < FT(90000) && icol_ds % 3 ≠ 0
             cld_frac[ilay, icol] = cldfrac
             if t_lay[ilay, icol] > FT(263)
                 cld_path_liq[ilay, icol] = FT(10)
@@ -119,7 +127,6 @@ function setup_allsky_as(
             end
         end
     end
-
 
     p_lay = DA(p_lay)
     p_lev = DA(p_lev)
@@ -182,4 +189,24 @@ function setup_allsky_as(
         irrad,
         bot_at_1,
     )
+end
+
+_orient_data(data, bot_at_1) = bot_at_1 ? data : reverse(data, dims = 1)
+
+function load_comparison_data(use_lut, bot_at_1, ncol)
+    lut_pade = use_lut ? :lut : :pade
+    flux_file = get_ref_filename(:comparison, :cloudysky, lut_pade = lut_pade) # flux files for comparison (LUT)
+    ds_comp = Dataset(flux_file, "r")
+    ncol_ds = size(ds_comp["lw_flux_up"][:], 1)
+    nrepeat = cld(ncol, ncol_ds)
+    comp_flux_up_lw = repeat(_orient_data(transpose(ds_comp["lw_flux_up"][:]), bot_at_1), 1, nrepeat)
+    comp_flux_dn_lw = repeat(_orient_data(transpose(ds_comp["lw_flux_dn"][:]), bot_at_1), 1, nrepeat)
+    comp_flux_up_sw = repeat(_orient_data(transpose(ds_comp["sw_flux_up"][:]), bot_at_1), 1, nrepeat)
+    comp_flux_dn_sw = repeat(_orient_data(transpose(ds_comp["sw_flux_dn"][:]), bot_at_1), 1, nrepeat)
+    close(ds_comp)
+    nlev, ncol_ds = size(comp_flux_up_lw)
+    return comp_flux_up_lw[:, 1:ncol],
+    comp_flux_dn_lw[:, 1:ncol],
+    comp_flux_up_sw[:, 1:ncol],
+    comp_flux_dn_sw[:, 1:ncol]
 end

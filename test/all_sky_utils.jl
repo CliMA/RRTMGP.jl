@@ -30,6 +30,7 @@ function all_sky(
     context,
     ::Type{OPC},
     ::Type{FT};
+    ncol = 128,# repeats col#1 ncol times per RRTMGP example 
     use_lut::Bool = true,
     cldfrac = FT(1),
     exfiltrate = false,
@@ -41,7 +42,6 @@ function all_sky(
     FTA2D = DA{FT, 2}
     max_threads = 256
     n_gauss_angles = 1
-    ncol = 128 # repeats col#1 128 time per RRTMGP example
 
     lw_file = get_ref_filename(:lookup_tables, :clearsky, λ = :lw)             # lw lookup tables for gas optics
     lw_cld_file = get_ref_filename(:lookup_tables, :cloudysky, λ = :lw)        # lw cloud lookup tables
@@ -49,11 +49,6 @@ function all_sky(
     sw_cld_file = get_ref_filename(:lookup_tables, :cloudysky, λ = :sw)        # lw cloud lookup tables
 
     input_file = get_ref_filename(:atmos_state, :cloudysky)                    # all-sky atmos state
-    if use_lut
-        flux_file = get_ref_filename(:comparison, :cloudysky, lut_pade = :lut) # flux files for comparison (LUT)
-    else
-        flux_file = get_ref_filename(:comparison, :cloudysky, lut_pade = :pade) # flux files for comparison (pade)
-    end
 
     #reading longwave gas optics lookup data
     ds_lw = Dataset(lw_file, "r")
@@ -139,12 +134,7 @@ function all_sky(
     #-------------
     # comparison
     method = use_lut ? "Lookup Table Interpolation method" : "PADE method"
-    ds_comp = Dataset(flux_file, "r")
-    comp_flux_up_lw = Array(transpose(ds_comp["lw_flux_up"][:][1:ncol, flip_ind]))
-    comp_flux_dn_lw = Array(transpose(ds_comp["lw_flux_dn"][:][1:ncol, flip_ind]))
-    comp_flux_up_sw = Array(transpose(ds_comp["sw_flux_up"][:][1:ncol, flip_ind]))
-    comp_flux_dn_sw = Array(transpose(ds_comp["sw_flux_dn"][:][1:ncol, flip_ind]))
-    close(ds_comp)
+    comp_flux_up_lw, comp_flux_dn_lw, comp_flux_up_sw, comp_flux_dn_sw = load_comparison_data(use_lut, bot_at_1, ncol)
 
     flux_up_lw = Array(slv.flux_lw.flux_up)
     flux_dn_lw = Array(slv.flux_lw.flux_dn)
