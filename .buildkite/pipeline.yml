@@ -108,6 +108,14 @@ steps:
           queue: central
           slurm_ntasks: 1
           slurm_mem_per_cpu: 6G
+  
+      - label: "Benchmarks (Float32)"
+        command: "julia --color=yes --project=examples perf/benchmark.jl Float32"
+        agents:
+          config: cpu
+          queue: central
+          slurm_ntasks: 1
+          slurm_mem_per_cpu: 6G
 
       - label: "Threaded benchmarks"
         command: "julia --threads=8 --color=yes --project=examples perf/benchmark.jl"

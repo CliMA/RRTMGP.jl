@@ -18,6 +18,7 @@ function setup_allsky_as(
     ncol,
     FT,
     max_threads,
+    param_set,
 )
 
     device = ClimaComms.device(context)

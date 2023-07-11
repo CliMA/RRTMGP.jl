@@ -9,6 +9,7 @@ function setup_rfmip_as(
     ::Type{FT},
     ::Type{VMR},
     max_threads,
+    param_set,
 ) where {FT <: AbstractFloat, VMR}
     device = ClimaComms.device(context)
     DA = ClimaComms.array_type(device)

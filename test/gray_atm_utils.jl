@@ -17,7 +17,6 @@ using RRTMGP.BCs
 import CLIMAParameters as CP
 
 include(joinpath(pkgdir(RRTMGP), "parameters", "create_parameters.jl"))
-param_set = create_insolation_parameters(Float64)
 
 # overriding CLIMAParameters as different precision is needed by RRTMGP
 
@@ -28,6 +27,7 @@ Example program to demonstrate the calculation of longwave radiative fluxes in a
 """
 function gray_atmos_lw_equil(context, ::Type{OPC}, ::Type{FT}; exfiltrate = false) where {FT <: AbstractFloat, OPC}
     device = ClimaComms.device(context)
+    param_set = create_insolation_parameters(FT)
     ncol = if device isa ClimaComms.CUDADevice
         4096
     else
@@ -139,6 +139,7 @@ function gray_atmos_sw_test(
     ncol::Int;
     exfiltrate = false,
 ) where {FT <: AbstractFloat, OPC}
+    param_set = create_insolation_parameters(FT)
     device = ClimaComms.device(context)
     DA = ClimaComms.array_type(device)
     opc = Symbol(OPC)
