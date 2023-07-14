@@ -14,3 +14,13 @@ println("================================================================\n\n\n"
     include("all_sky.jl")
 end
 println("================================================================\n\n\n")
+
+@testset "RRTMGP stand-alone clear-sky lw solver tests" begin
+    include("rfmip_clear_sky_lw.jl")
+end
+println("================================================================\n\n\n")
+
+@testset "RRTMGP stand-alone clear-sky sw solver tests" begin
+    include("rfmip_clear_sky_sw.jl")
+end
+println("================================================================\n\n\n")

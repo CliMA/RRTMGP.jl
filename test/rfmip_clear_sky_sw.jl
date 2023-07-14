@@ -54,8 +54,8 @@ function sw_rfmip(context, ::Type{OPC}, ::Type{SRC}, ::Type{VMR}, ::Type{FT}) wh
     ncol, nlay, ngpt = as.ncol, as.nlay, lookup_sw.n_gpt
     nlev = nlay + 1
     op = OPC(FT, ncol, nlay, DA)            # allocating optical properties object
-    src_sw = SRC(FT, DA, nlay, ncol)        # allocating longwave source function object
-    #src_sw = source_func_shortwave(FT, ncol, nlay, opc, DA)        # allocating longwave source function object
+    #src_sw = SRC(FT, DA, nlay, ncol)        # allocating longwave source function object
+    src_sw = source_func_shortwave(FT, ncol, nlay, opc, DA)        # allocating longwave source function object
 
     # setting up boundary conditions
     inc_flux_diffuse = nothing
@@ -68,10 +68,6 @@ function sw_rfmip(context, ::Type{OPC}, ::Type{SRC}, ::Type{VMR}, ::Type{FT}) wh
     slv = Solver(context, as, op, nothing, src_sw, nothing, bcs_sw, nothing, fluxb_sw, nothing, flux_sw)
     #--------------------------------------------------
     solve_sw!(slv, max_threads, lookup_sw)
-
-    for i in 1:10
-        @time solve_sw!(slv, max_threads, lookup_sw)
-    end
 
     # reading comparison data
     flip_ind = nlev:-1:1
@@ -108,6 +104,5 @@ function sw_rfmip(context, ::Type{OPC}, ::Type{SRC}, ::Type{VMR}, ::Type{FT}) wh
     return nothing
 end
 
-context = ClimaComms.context()
-sw_rfmip(context, TwoStream, SourceSW2Str, VmrGM, Float64) # two-stream solver should be used for the short-wave problem
+sw_rfmip(ClimaComms.context(), TwoStream, SourceSW2Str, VmrGM, Float64) # two-stream solver should be used for the short-wave problem
 #sw_rfmip(OneScalar, VmrGM, Float64, Int, array_type()) # this only computes flux_dn_dir
