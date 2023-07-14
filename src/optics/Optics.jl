@@ -132,17 +132,6 @@ function compute_col_gas_CUDA!(col_dry, args...)
     return nothing
 end
 #-----------------------------------------------------------------------------
-function compute_optical_props_CUDA!(op, as, args...)
-    glx = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
-    nlay, ncol = size(op.τ)
-    if glx ≤ nlay * ncol
-        glay = (glx % nlay == 0) ? nlay : (glx % nlay)
-        gcol = cld(glx, nlay)
-        compute_optical_props_kernel!(op, as, glay, gcol, args...)
-    end
-    return nothing
-end
-#-----------------------------------------------------------------------------
 """
     compute_optical_props!(
         op::AbstractOpticalProps{FT},
