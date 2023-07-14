@@ -1,6 +1,7 @@
 using Test
 using Pkg.Artifacts
 using NCDatasets
+using ClimaComms
 
 using RRTMGP
 using RRTMGP.Vmrs
@@ -21,15 +22,11 @@ include(joinpath(pkgdir(RRTMGP), "parameters", "create_parameters.jl"))
 include("reference_files.jl")
 include("read_rfmip_clear_sky.jl")
 #---------------------------------------------------------------
-function lw_rfmip(
-    ::Type{OPC},
-    ::Type{SRC},
-    ::Type{VMR},
-    ::Type{FT},
-    ::Type{DA},
-) where {FT <: AbstractFloat, OPC, SRC, VMR, DA}
+function lw_rfmip(context, ::Type{OPC}, ::Type{SRC}, ::Type{VMR}, ::Type{FT}) where {FT <: AbstractFloat, OPC, SRC, VMR}
     overrides = (; grav = 9.80665, molmass_dryair = 0.028964, molmass_water = 0.018016)
     param_set = create_insolation_parameters(FT, overrides)
+    device = ClimaComms.device(context)
+    DA = ClimaComms.array_type(device)
     opc = Symbol(OPC)
     lw_file = get_ref_filename(:lookup_tables, :clearsky, λ = :lw) # lw lookup tables
     lw_input_file = get_ref_filename(:atmos_state, :clearsky)      # clear-sky atmos state
@@ -57,20 +54,15 @@ function lw_rfmip(
     ncol, nlay, ngpt = as.ncol, as.nlay, lookup_lw.n_gpt
     nlev = nlay + 1
     op = OPC(FT, ncol, nlay, DA)                                   # allocating optical properties object
-    src_lw = SRC(FT, DA, nlay, ncol)                               # allocating longwave source function object
+    src_lw = source_func_longwave(param_set, FT, ncol, nlay, opc, DA) # allocating longwave source function object
     bcs_lw = LwBCs{FT, typeof(sfc_emis), Nothing}(sfc_emis, nothing)            # setting up boundary conditions
     fluxb_lw = FluxLW(ncol, nlay, FT, DA)                          # flux storage for bandwise calculations
     flux_lw = FluxLW(ncol, nlay, FT, DA)                           # longwave fluxes
 
     # initializing RTE solver
-    slv = Solver(as, op, src_lw, nothing, bcs_lw, nothing, fluxb_lw, nothing, flux_lw, nothing)
+    slv = Solver(context, as, op, src_lw, nothing, bcs_lw, nothing, fluxb_lw, nothing, flux_lw, nothing)
 
     solve_lw!(slv, max_threads, lookup_lw)
-    println("Timing ==================================================")
-    for i in 1:5
-        @time solve_lw!(slv, max_threads, lookup_lw)
-        println("*************************************************")
-    end
     # comparing with data from RRTMGP FORTRAN code
     flip_ind = nlev:-1:1
 
@@ -97,5 +89,5 @@ function lw_rfmip(
     return nothing
 end
 
-lw_rfmip(OneScalar, SourceLWNoScat, VmrGM, Float64, Int, array_type())
-lw_rfmip(TwoStream, SourceLW2Str, VmrGM, Float64, Int, array_type())
+lw_rfmip(ClimaComms.context(), OneScalar, SourceLWNoScat, VmrGM, Float64)
+lw_rfmip(ClimaComms.context(), TwoStream, SourceLW2Str, VmrGM, Float64)
