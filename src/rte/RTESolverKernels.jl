@@ -16,7 +16,7 @@ function rte_lw_noscat_source!(src_lw::SourceLWNoScat{FT}, op::OneScalar{FT}, gc
     Ds = op.angle_disc.gauss_Ds
     τ = op.τ
 
-    τ_thresh = sqrt(eps(FT)) # or abs(eps(FT))?
+    τ_thresh = sqrt(sqrt(eps(FT))) # or abs(eps(FT))?
 
     @inbounds for glay in 1:nlay
         τ_loc = τ[glay, gcol] * Ds[1]      # Optical path and transmission,
@@ -25,11 +25,13 @@ function rte_lw_noscat_source!(src_lw::SourceLWNoScat{FT}, op::OneScalar{FT}, gc
         # Weighting factor. Use 2nd order series expansion when rounding error (~tau^2)
         # is of order epsilon (smallest difference from 1. in working precision)
         # Thanks to Peter Blossey
+        # Updated to 3rd order series and lower threshold based on suggestion from Dmitry Alexeev (Nvidia)
 
-        fact = (τ_loc > τ_thresh) ? ((FT(1) - trans) / τ_loc - trans) : τ_loc * (FT(1 / 2) - FT(1 / 3) * τ_loc)
+        fact =
+            (τ_loc > τ_thresh) ? ((FT(1) - trans) / τ_loc - trans) :
+            τ_loc * (FT(1 / 2) + τ_loc * (-FT(1 / 3) + τ_loc * FT(1 / 8)))
 
         # Equations below are developed in Clough et al., 1992, doi:10.1029/92JD01419, Eq 13
-
         src_up[glay, gcol] =
             (FT(1) - trans) * lev_source_inc[glay, gcol] +
             FT(2) * fact * (lay_source[glay, gcol] - lev_source_inc[glay, gcol])
@@ -161,20 +163,23 @@ function rte_lw_2stream_source!(
     # setting references
     (; τ, ssa, g) = op
     (; Rdif, Tdif, lev_source, src_up, src_dn) = src_lw
-
+    #k_min = FT === Float64 ? FT(1e-12) : FT(1e-4)
+    k_min = FT(1e4 * eps(FT))
     lw_diff_sec = FT(1.66)
+    τ_thresh = sqrt(eps(FT))
 
     @inbounds for glay in 1:nlay
         γ1 = lw_diff_sec * (1 - FT(0.5) * ssa[glay, gcol] * (1 + g[glay, gcol]))
         γ2 = lw_diff_sec * FT(0.5) * ssa[glay, gcol] * (1 - g[glay, gcol])
-        k = sqrt(max((γ1 + γ2) * (γ1 - γ2), FT(1e-12)))
+        k = sqrt(max((γ1 + γ2) * (γ1 - γ2), k_min))
+        τ_lay = τ[glay, gcol]
 
-        coeff = exp(-2 * τ[glay, gcol] * k)
+        coeff = exp(-2 * τ_lay * k)
         # Refactored to avoid rounding errors when k, gamma1 are of very different magnitudes
         RT_term = 1 / (k * (1 + coeff) + γ1 * (1 - coeff))
 
         @inbounds Rdif[glay, gcol] = RT_term * γ2 * (1 - coeff) # Equation 25
-        @inbounds Tdif[glay, gcol] = RT_term * 2 * k * exp(-τ[glay, gcol] * k) # Equation 26
+        @inbounds Tdif[glay, gcol] = RT_term * 2 * k * exp(-τ_lay * k) # Equation 26
 
         # Source function for diffuse radiation
         # Compute LW source function for upward and downward emission at levels using linear-in-tau assumption
@@ -182,19 +187,20 @@ function rte_lw_2stream_source!(
         # Source is provided as W/m2-str; factor of pi converts to flux units
         # lw_source_2str
 
-        top = glay + 1
-        bot = glay
+        lev_src_bot = lev_source[glay, gcol]
+        lev_src_top = lev_source[glay + 1, gcol]
+        Rdif_lay = Rdif[glay, gcol]
+        Tdif_lay = Tdif[glay, gcol]
 
-        if τ[glay, gcol] > 1.0e-8
+        if τ_lay > τ_thresh
             # Toon et al. (JGR 1989) Eqs 26-27
-            Z = (lev_source[bot, gcol] - lev_source[top, gcol]) / (τ[glay, gcol] * (γ1 + γ2))
-            Zup_top = Z + lev_source[top, gcol]
-            Zup_bottom = Z + lev_source[bot, gcol]
-            Zdn_top = -Z + lev_source[top, gcol]
-            Zdn_bottom = -Z + lev_source[bot, gcol]
-            @inbounds src_up[glay, gcol] = pi * (Zup_top - Rdif[glay, gcol] * Zdn_top - Tdif[glay, gcol] * Zup_bottom)
-            @inbounds src_dn[glay, gcol] =
-                pi * (Zdn_bottom - Rdif[glay, gcol] * Zup_bottom - Tdif[glay, gcol] * Zdn_top)
+            Z = (lev_src_bot - lev_src_top) / (τ_lay * (γ1 + γ2))
+            Zup_top = Z + lev_src_top
+            Zup_bottom = Z + lev_src_bot
+            Zdn_top = -Z + lev_src_top
+            Zdn_bottom = -Z + lev_src_bot
+            @inbounds src_up[glay, gcol] = pi * (Zup_top - Rdif_lay * Zdn_top - Tdif_lay * Zup_bottom)
+            @inbounds src_dn[glay, gcol] = pi * (Zdn_bottom - Rdif_lay * Zup_bottom - Tdif_lay * Zdn_top)
         else
             @inbounds src_up[glay, gcol] = FT(0)
             @inbounds src_dn[glay, gcol] = FT(0)
@@ -345,6 +351,8 @@ function sw_two_stream!(
     zenith = bcs_sw.zenith
     (; τ, ssa, g) = op
     (; Rdif, Tdif, Rdir, Tdir, Tnoscat) = src_sw
+    k_min = FT(1e4 * eps(FT)) # Suggestion from Chiel van Heerwaarden
+    μ₀ = FT(cos(zenith[gcol]))
 
     @inbounds for glay in 1:nlay
         # Zdunkowski Practical Improved Flux Method "PIFM"
@@ -355,7 +363,7 @@ function sw_two_stream!(
         γ4 = FT(1) - γ3
         α1 = γ1 * γ4 + γ2 * γ3                          # Eq. 16
         α2 = γ1 * γ3 + γ2 * γ4                          # Eq. 17
-        k = sqrt(max((γ1 - γ2) * (γ1 + γ2), FT(1e-12)))
+        k = sqrt(max((γ1 - γ2) * (γ1 + γ2), k_min))
 
         exp_minusktau = exp(-τ[glay, gcol] * k)
         exp_minus2ktau = exp_minusktau * exp_minusktau
@@ -367,10 +375,10 @@ function sw_two_stream!(
         @inbounds Tdif[glay, gcol] = RT_term * FT(2) * k * exp_minusktau     # Eqn. 26
 
         # Transmittance of direct, unscattered beam. Also used below
-        @inbounds Tnoscat[glay, gcol] = exp(-τ[glay, gcol] / cos(zenith[gcol]))
+        @inbounds T₀ = Tnoscat[glay, gcol] = exp(-τ[glay, gcol] / cos(zenith[gcol]))
 
         # Direct reflect and transmission
-        k_μ = k * cos(zenith[gcol])
+        k_μ = k * μ₀
         k_γ3 = k * γ3
         k_γ4 = k * γ4
 
@@ -382,10 +390,10 @@ function sw_two_stream!(
             RT_term = ssa[glay, gcol] * RT_term / eps(FT)
         end
 
-        @inbounds Rdir[glay, gcol] =
+        @inbounds Rdir_unconstrained =
             RT_term * (
                 (FT(1) - k_μ) * (α2 + k_γ3) - (FT(1) + k_μ) * (α2 - k_γ3) * exp_minus2ktau -
-                FT(2) * (k_γ3 - α2 * k_μ) * exp_minusktau * Tnoscat[glay, gcol]
+                FT(2) * (k_γ3 - α2 * k_μ) * exp_minusktau * T₀
             )
         #
         # Equation 15, multiplying top and bottom by exp(-k*tau),
@@ -393,12 +401,17 @@ function sw_two_stream!(
         #   prefer underflow to overflow
         # Omitting direct transmittance
         #
-        @inbounds Tdir[glay, gcol] =
+        @inbounds Tdir_unconstrained =
             -RT_term * (
-                (FT(1) + k_μ) * (α1 + k_γ4) * Tnoscat[glay, gcol] -
-                (FT(1) - k_μ) * (α1 - k_γ4) * exp_minus2ktau * Tnoscat[glay, gcol] -
+                (FT(1) + k_μ) * (α1 + k_γ4) * T₀ - (FT(1) - k_μ) * (α1 - k_γ4) * exp_minus2ktau * T₀ -
                 FT(2) * (k_γ4 + α1 * k_μ) * exp_minusktau
             )
+        # Final check that energy is not spuriously created, by recognizing that
+        # the beam can either be reflected, penetrate unscattered to the base of a layer, 
+        # or penetrate through but be scattered on the way - the rest is absorbed
+        # Makes the equations safer in single precision. Credit: Robin Hogan, Peter Ukkonen
+        Rdir[glay, gcol] = max(FT(0), min(Rdir_unconstrained, (FT(1) - T₀)))
+        Tdir[glay, gcol] = max(FT(0), min(Tdir_unconstrained, (FT(1) - T₀ - Rdir[glay, gcol])))
     end
 end
 
