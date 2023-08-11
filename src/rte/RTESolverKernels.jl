@@ -166,7 +166,7 @@ function rte_lw_2stream_source!(
     #k_min = FT === Float64 ? FT(1e-12) : FT(1e-4)
     k_min = FT(1e4 * eps(FT))
     lw_diff_sec = FT(1.66)
-    τ_thresh = sqrt(eps(FT))
+    τ_thresh = eps(FT)^(1 / 4)
 
     @inbounds for glay in 1:nlay
         γ1 = lw_diff_sec * (1 - FT(0.5) * ssa[glay, gcol] * (1 + g[glay, gcol]))
