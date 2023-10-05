@@ -4,11 +4,12 @@ using LaTeXStrings
 using RRTMGP
 using DocumenterCitations
 
-makedocs(
-    CitationBibliography(joinpath(@__DIR__, "bibliography.bib")),
+bib = CitationBibliography(joinpath(@__DIR__, "bibliography.bib"))
+
+makedocs(;
+    plugins = [bib],
     sitename = "RRTMGP.jl",
     doctest = false,
-    strict = true,
     format = Documenter.HTML(
         prettyurls = get(ENV, "CI", nothing) == "true",
         mathengine = MathJax(Dict(:TeX => Dict(:equationNumbers => Dict(:autoNumber => "AMS"), :Macros => Dict()))),
