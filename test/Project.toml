@@ -16,3 +16,6 @@ Profile = "9abbd945-dff8-562f-b5e8-e1ebf5ef1b79"
 RRTMGP = "a01a1ee8-cea4-48fc-987c-fc7878d79da1"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[compat]
+NCDatasets = "=0.12.17"

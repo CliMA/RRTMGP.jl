@@ -238,7 +238,7 @@ function LookUpLW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
         end
     end
 
-    key_species = IA3D(Int.(key_species))
+    key_species = IA3D(key_species)
 
     kmajor = FTA4D(ds["kmajor"][:])
     kminor_lower = FTA3D(ds["kminor_lower"][:])
