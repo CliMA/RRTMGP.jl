@@ -13,9 +13,18 @@
 This function computes the longwave TwoStream clouds optics properties and adds them
 to the TwoStream longwave gas optics properties.
 """
-function add_cloud_optics_2stream(op::TwoStream, as::AtmosphericState, lkp::LookUpLW, lkp_cld, glay, gcol, ibnd, igpt)
+function add_cloud_optics_2stream(
+    op::TwoStream,
+    as::AtmosphericState,
+    lkp::LookUpLW,
+    lkp_cld,
+    glay::Int,
+    gcol::Int,
+    ibnd,
+    igpt::Int,
+)
     if as.cld_mask_lw isa AbstractArray
-        cld_mask = as.cld_mask_lw[igpt, glay, gcol]
+        @inbounds cld_mask = as.cld_mask_lw[igpt, glay, gcol]
         if cld_mask
             τ_cl, τ_cl_ssa, τ_cl_ssag = compute_cld_props(lkp_cld, as, cld_mask, glay, gcol, ibnd, igpt)
             increment!(op, τ_cl, τ_cl_ssa, τ_cl_ssag, glay, gcol, igpt)
@@ -38,9 +47,18 @@ end
 This function computes the shortwave TwoStream clouds optics properties and adds them
 to the TwoStream shortwave gase optics properties.
 """
-function add_cloud_optics_2stream(op::TwoStream, as::AtmosphericState, lkp::LookUpSW, lkp_cld, glay, gcol, ibnd, igpt)
+function add_cloud_optics_2stream(
+    op::TwoStream,
+    as::AtmosphericState,
+    lkp::LookUpSW,
+    lkp_cld,
+    glay::Int,
+    gcol::Int,
+    ibnd,
+    igpt::Int,
+)
     if as.cld_mask_sw isa AbstractArray
-        cld_mask = as.cld_mask_sw[igpt, glay, gcol]
+        @inbounds cld_mask = as.cld_mask_sw[igpt, glay, gcol]
         if cld_mask
             τ_cl, τ_cl_ssa, τ_cl_ssag = compute_cld_props(lkp_cld, as, cld_mask, glay, gcol, ibnd, igpt)
             τ_cl, τ_cl_ssa, τ_cl_ssag = delta_scale(τ_cl, τ_cl_ssa, τ_cl_ssag)
