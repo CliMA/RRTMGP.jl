@@ -22,17 +22,17 @@ function setup_rfmip_as(
     nlev = nlay + 1
     ngas = lookup_lw.n_gases
     nbnd_lw = lookup_lw.n_bnd
-    lon = DA{FT, 1}(ds_lw_in["lon"][:])
-    lat = DA{FT, 1}(ds_lw_in["lat"][:])
+    lon = DA{FT, 1}(Array(ds_lw_in["lon"]))
+    lat = DA{FT, 1}(Array(ds_lw_in["lat"]))
 
     lon = nothing # This example skips latitude dependent gravity computation
     lat = nothing # to be consistent with the FORTRAN RRTMGP test case.
 
-    sfc_emis = DA{FT, 2}(repeat(reshape(Array{FT}(ds_lw_in["surface_emissivity"][:]), 1, :), nbnd_lw, 1)) # all bands use same emissivity
-    sfc_alb = DA{FT, 2}(repeat(reshape(Array{FT}(ds_lw_in["surface_albedo"][:]), 1, :), nbnd_lw, 1)) # all bands use same albedo
+    sfc_emis = DA{FT, 2}(repeat(reshape(Array{FT}(Array(ds_lw_in["surface_emissivity"])), 1, :), nbnd_lw, 1)) # all bands use same emissivity
+    sfc_alb = DA{FT, 2}(repeat(reshape(Array{FT}(Array(ds_lw_in["surface_albedo"])), 1, :), nbnd_lw, 1)) # all bands use same albedo
     #--------------------------------------------------------------
-    zenith = Array{FT, 1}(deg2rad .* ds_lw_in["solar_zenith_angle"][:])
-    irrad = Array{FT, 1}(ds_lw_in["total_solar_irradiance"][:])
+    zenith = Array{FT, 1}(deg2rad .* Array(ds_lw_in["solar_zenith_angle"]))
+    irrad = Array{FT, 1}(Array(ds_lw_in["total_solar_irradiance"]))
     # block out coluumns with zenith > π/2
     usecol = BitArray(undef, ncol)
     usecol .= 1
@@ -47,7 +47,7 @@ function setup_rfmip_as(
     irrad = DA{FT, 1}(irrad)
     #--------------------------------------------------------------
 
-    p_lev = ds_lw_in["pres_level"][:]
+    p_lev = Array(ds_lw_in["pres_level"])
 
     lev_ind = p_lev[1, 1] > p_lev[end, 1] ? (1:nlev) : (nlev:-1:1)
     lay_ind = p_lev[1, 1] > p_lev[end, 1] ? (1:nlay) : (nlay:-1:1)
@@ -55,17 +55,17 @@ function setup_rfmip_as(
     p_lev[lev_ind[end], :] .= lookup_lw.p_ref_min
 
     p_lev = DA{FT, 2}(p_lev[lev_ind, :])
-    p_lay = DA{FT, 2}(ds_lw_in["pres_layer"][:][lay_ind, :])
-    t_lev = DA{FT, 2}(ds_lw_in["temp_level"][:][lev_ind, :, exp_no])
-    t_lay = DA{FT, 2}(ds_lw_in["temp_layer"][:][lay_ind, :, exp_no])
+    p_lay = DA{FT, 2}(Array(ds_lw_in["pres_layer"])[lay_ind, :])
+    t_lev = DA{FT, 2}(Array(ds_lw_in["temp_level"])[lev_ind, :, exp_no])
+    t_lay = DA{FT, 2}(Array(ds_lw_in["temp_layer"])[lay_ind, :, exp_no])
 
     t_sfc = DA{FT, 1}(ds_lw_in["surface_temperature"][:, exp_no])
     col_dry = DA{FT, 2}(undef, nlay, ncol)
 
     # Reading volume mixing ratios 
 
-    vmr_h2o = FTA2D(ds_lw_in["water_vapor"][:][lay_ind, :, exp_no]) # vmr of H2O and O3
-    vmr_o3 = FTA2D(ds_lw_in["ozone"][:][lay_ind, :, exp_no])       # vary with height
+    vmr_h2o = FTA2D(Array(ds_lw_in["water_vapor"])[lay_ind, :, exp_no]) # vmr of H2O and O3
+    vmr_o3 = FTA2D(Array(ds_lw_in["ozone"])[lay_ind, :, exp_no])       # vary with height
 
     vmrat = zeros(FT, ngas)
 

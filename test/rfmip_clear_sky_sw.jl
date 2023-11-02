@@ -73,11 +73,11 @@ function sw_rfmip(context, ::Type{OPC}, ::Type{SRC}, ::Type{VMR}, ::Type{FT}) wh
     flip_ind = nlev:-1:1
 
     ds_flux_up = Dataset(flux_up_file, "r")
-    comp_flux_up = ds_flux_up["rsu"][:][flip_ind, :, exp_no]
+    comp_flux_up = Array(ds_flux_up["rsu"])[flip_ind, :, exp_no]
     close(ds_flux_up)
 
     ds_flux_dn = Dataset(flux_dn_file, "r")
-    comp_flux_dn = ds_flux_dn["rsd"][:][flip_ind, :, exp_no]
+    comp_flux_dn = Array(ds_flux_dn["rsd"])[flip_ind, :, exp_no]
     close(ds_flux_dn)
 
     flux_up = Array(slv.flux_sw.flux_up)

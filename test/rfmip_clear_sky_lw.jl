@@ -67,11 +67,11 @@ function lw_rfmip(context, ::Type{OPC}, ::Type{SRC}, ::Type{VMR}, ::Type{FT}) wh
     flip_ind = nlev:-1:1
 
     ds_flux_up = Dataset(flux_up_file, "r")
-    comp_flux_up = Array{FT}(ds_flux_up["rlu"][:][flip_ind, :, exp_no])
+    comp_flux_up = Array{FT}(Array(ds_flux_up["rlu"])[flip_ind, :, exp_no])
     close(ds_flux_up)
 
     ds_flux_dn = Dataset(flux_dn_file, "r")
-    comp_flux_dn = Array{FT}(ds_flux_dn["rld"][:][flip_ind, :, exp_no])
+    comp_flux_dn = Array{FT}(Array(ds_flux_dn["rld"])[flip_ind, :, exp_no])
     close(ds_flux_dn)
 
     max_err_flux_up = FT(maximum(abs.(Array(slv.flux_lw.flux_up) .- comp_flux_up)))
