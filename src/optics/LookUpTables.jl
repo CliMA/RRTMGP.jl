@@ -167,9 +167,9 @@ function LookUpLW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     n_contrib_lower = Int(ds.dim["contributors_lower"])
     n_contrib_upper = Int(ds.dim["contributors_upper"])
 
-    p_ref_tropo = FT(ds["press_ref_trop"][:][1])
-    t_ref_absrb = FT(ds["absorption_coefficient_ref_T"][:][1])
-    p_ref_absrb = FT(ds["absorption_coefficient_ref_P"][:][1])
+    p_ref_tropo = FT(Array(ds["press_ref_trop"])[1])
+    t_ref_absrb = FT(Array(ds["absorption_coefficient_ref_T"])[1])
+    p_ref_absrb = FT(Array(ds["absorption_coefficient_ref_P"])[1])
 
     gases_major = STA(undef, n_maj_absrb)
     gases_minor = STA(undef, n_min_absrb)
@@ -229,7 +229,7 @@ function LookUpLW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     idx_gases_minor_upper = DA(idx_gases_minor_upper)
     idx_scaling_gas_upper = DA(idx_scaling_gas_upper)
 
-    key_species = ds["key_species"][:]
+    key_species = Array(ds["key_species"])
     @inbounds for j in 1:size(key_species, 3)
         for i in 1:size(key_species, 2)
             if key_species[1, i, j] == 0 && key_species[2, i, j] == 0
@@ -240,18 +240,18 @@ function LookUpLW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
 
     key_species = IA3D(key_species)
 
-    kmajor = FTA4D(ds["kmajor"][:])
-    kminor_lower = FTA3D(ds["kminor_lower"][:])
-    kminor_upper = FTA3D(ds["kminor_upper"][:])
-    kminor_start_lower = IA1D(ds["kminor_start_lower"][:])
-    kminor_start_upper = IA1D(ds["kminor_start_upper"][:])
+    kmajor = FTA4D(Array(ds["kmajor"]))
+    kminor_lower = FTA3D(Array(ds["kminor_lower"]))
+    kminor_upper = FTA3D(Array(ds["kminor_upper"]))
+    kminor_start_lower = IA1D(Array(ds["kminor_start_lower"]))
+    kminor_start_upper = IA1D(Array(ds["kminor_start_upper"]))
 
-    planck_fraction = FTA4D(ds["plank_fraction"][:])
-    t_planck = FTA1D(ds["temperature_Planck"][:])
+    planck_fraction = FTA4D(Array(ds["plank_fraction"]))
+    t_planck = FTA1D(Array(ds["temperature_Planck"]))
 
-    totplnk = FTA2D(ds["totplnk"][:])
-    bnd_lims_gpt = Array{Int, 2}(ds["bnd_limits_gpt"][:])
-    bnd_lims_wn = FTA2D(ds["bnd_limits_wavenumber"][:])
+    totplnk = FTA2D(Array(ds["totplnk"]))
+    bnd_lims_gpt = Array{Int, 2}(Array(ds["bnd_limits_gpt"]))
+    bnd_lims_wn = FTA2D(Array(ds["bnd_limits_wavenumber"]))
     #-----------------------
     major_gpt2bnd = Array{UI8, 1}(undef, n_gpt)
     @inbounds for i in 1:n_bnd
@@ -259,8 +259,8 @@ function LookUpLW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     end
     #-----------------------
     bnd_lims_gpt = IA2D(bnd_lims_gpt)
-    minor_lower_gpt_lims = Array{Int, 2}(ds["minor_limits_gpt_lower"][:])
-    minor_upper_gpt_lims = Array{Int, 2}(ds["minor_limits_gpt_upper"][:])
+    minor_lower_gpt_lims = Array{Int, 2}(Array(ds["minor_limits_gpt_lower"]))
+    minor_upper_gpt_lims = Array{Int, 2}(Array(ds["minor_limits_gpt_upper"]))
     #-----------------------
     minor_lower_bnd = zeros(UI8, n_min_absrb_lower)
     minor_upper_bnd = zeros(UI8, n_min_absrb_upper)
@@ -319,14 +319,14 @@ function LookUpLW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     minor_upper_gpt_lims = IA2D(minor_upper_gpt_lims)
     #-----------------------
 
-    minor_lower_scales_with_density = IA1D(ds["minor_scales_with_density_lower"][:])
-    minor_upper_scales_with_density = IA1D(ds["minor_scales_with_density_upper"][:])
+    minor_lower_scales_with_density = IA1D(Array(ds["minor_scales_with_density_lower"]))
+    minor_upper_scales_with_density = IA1D(Array(ds["minor_scales_with_density_upper"]))
 
-    lower_scale_by_complement = IA1D(ds["scale_by_complement_lower"][:])
-    upper_scale_by_complement = IA1D(ds["scale_by_complement_upper"][:])
+    lower_scale_by_complement = IA1D(Array(ds["scale_by_complement_lower"]))
+    upper_scale_by_complement = IA1D(Array(ds["scale_by_complement_upper"]))
 
-    p_ref = Array{FT, 1}(ds["press_ref"][:])
-    t_ref = Array{FT, 1}(ds["temp_ref"][:])
+    p_ref = Array{FT, 1}(Array(ds["press_ref"]))
+    t_ref = Array{FT, 1}(Array(ds["temp_ref"]))
 
     p_ref_min = minimum(p_ref)
 
@@ -335,7 +335,7 @@ function LookUpLW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
 
     p_ref = FTA1D(p_ref)
     t_ref = FTA1D(t_ref)
-    vmr_ref = FTA3D(ds["vmr_ref"][:])
+    vmr_ref = FTA3D(Array(ds["vmr_ref"]))
 
     n_η = size(kmajor, 2)
 
@@ -556,9 +556,9 @@ function LookUpSW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     n_contrib_lower = Int(ds.dim["contributors_lower"])
     n_contrib_upper = Int(ds.dim["contributors_upper"])
 
-    p_ref_tropo = FT(ds["press_ref_trop"][:][1])
-    t_ref_absrb = FT(ds["absorption_coefficient_ref_T"][:][1])
-    p_ref_absrb = FT(ds["absorption_coefficient_ref_P"][:][1])
+    p_ref_tropo = FT(Array(ds["press_ref_trop"])[1])
+    t_ref_absrb = FT(Array(ds["absorption_coefficient_ref_T"])[1])
+    p_ref_absrb = FT(Array(ds["absorption_coefficient_ref_P"])[1])
 
     gases_major = STA(undef, n_maj_absrb)
     gases_minor = STA(undef, n_min_absrb)
@@ -613,7 +613,7 @@ function LookUpSW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
         end
     end
 
-    key_species = ds["key_species"][:]
+    key_species = Array(ds["key_species"])
     @inbounds for j in 1:size(key_species, 3)
         for i in 1:size(key_species, 2)
             if key_species[1, i, j] == 0 && key_species[2, i, j] == 0
@@ -624,14 +624,14 @@ function LookUpSW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
 
     key_species = IA3D(key_species)
 
-    kmajor = FTA4D(ds["kmajor"][:])
-    kminor_lower = FTA3D(ds["kminor_lower"][:])
-    kminor_upper = FTA3D(ds["kminor_upper"][:])
-    kminor_start_lower = IA1D(ds["kminor_start_lower"][:])
-    kminor_start_upper = IA1D(ds["kminor_start_upper"][:])
+    kmajor = FTA4D(Array(ds["kmajor"]))
+    kminor_lower = FTA3D(Array(ds["kminor_lower"]))
+    kminor_upper = FTA3D(Array(ds["kminor_upper"]))
+    kminor_start_lower = IA1D(Array(ds["kminor_start_lower"]))
+    kminor_start_upper = IA1D(Array(ds["kminor_start_upper"]))
 
-    bnd_lims_gpt = Array{Int, 2}(ds["bnd_limits_gpt"][:])
-    bnd_lims_wn = FTA2D(ds["bnd_limits_wavenumber"][:])
+    bnd_lims_gpt = Array{Int, 2}(Array(ds["bnd_limits_gpt"]))
+    bnd_lims_wn = FTA2D(Array(ds["bnd_limits_wavenumber"]))
     #-----------------------
     major_gpt2bnd = Array{UI8, 1}(undef, n_gpt)
     @inbounds for i in 1:n_bnd
@@ -639,8 +639,8 @@ function LookUpSW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     end
     #-----------------------
     bnd_lims_gpt = IA2D(bnd_lims_gpt)
-    minor_lower_gpt_lims = Array{Int, 2}(ds["minor_limits_gpt_lower"][:])
-    minor_upper_gpt_lims = Array{Int, 2}(ds["minor_limits_gpt_upper"][:])
+    minor_lower_gpt_lims = Array{Int, 2}(Array(ds["minor_limits_gpt_lower"]))
+    minor_upper_gpt_lims = Array{Int, 2}(Array(ds["minor_limits_gpt_upper"]))
     #-----------------------
     minor_lower_bnd = zeros(UI8, n_min_absrb_lower)
     minor_upper_bnd = zeros(UI8, n_min_absrb_upper)
@@ -698,13 +698,13 @@ function LookUpSW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     minor_lower_gpt_lims = IA2D(minor_lower_gpt_lims)
     minor_upper_gpt_lims = IA2D(minor_upper_gpt_lims)
     #-----------------------    
-    minor_lower_scales_with_density = IA1D(ds["minor_scales_with_density_lower"][:])
-    minor_upper_scales_with_density = IA1D(ds["minor_scales_with_density_upper"][:])
-    lower_scale_by_complement = IA1D(ds["scale_by_complement_lower"][:])
-    upper_scale_by_complement = IA1D(ds["scale_by_complement_upper"][:])
+    minor_lower_scales_with_density = IA1D(Array(ds["minor_scales_with_density_lower"]))
+    minor_upper_scales_with_density = IA1D(Array(ds["minor_scales_with_density_upper"]))
+    lower_scale_by_complement = IA1D(Array(ds["scale_by_complement_lower"]))
+    upper_scale_by_complement = IA1D(Array(ds["scale_by_complement_upper"]))
 
-    p_ref = Array{FT, 1}(ds["press_ref"][:])
-    t_ref = Array{FT, 1}(ds["temp_ref"][:])
+    p_ref = Array{FT, 1}(Array(ds["press_ref"]))
+    t_ref = Array{FT, 1}(Array(ds["temp_ref"]))
 
     p_ref_min = minimum(p_ref)
 
@@ -713,14 +713,14 @@ function LookUpSW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
 
     p_ref = FTA1D(p_ref)
     t_ref = FTA1D(t_ref)
-    vmr_ref = FTA3D(ds["vmr_ref"][:])
+    vmr_ref = FTA3D(Array(ds["vmr_ref"]))
 
     n_η = size(kmajor, 2)
 
-    rayl_lower = FTA3D(ds["rayl_lower"][:])
-    rayl_upper = FTA3D(ds["rayl_upper"][:])
+    rayl_lower = FTA3D(Array(ds["rayl_lower"]))
+    rayl_upper = FTA3D(Array(ds["rayl_upper"]))
 
-    solar_src = ds["solar_source"][:]
+    solar_src = Array(ds["solar_source"])
     solar_src_tot = FT(sum(solar_src))
     solar_src_scaled = FTA1D(solar_src ./ solar_src_tot)
 
@@ -891,39 +891,39 @@ function LookUpCld(ds, ::Type{FT}, ::Type{DA}, use_lut::Bool = true) where {FT <
 
     @assert nsizereg == 3 # RRTMGP pade approximation assumes exactly (3) size regimes
 
-    radliq_lwr = FT(ds["radliq_lwr"][:])
-    radliq_upr = FT(ds["radliq_upr"][:])
-    radliq_fac = FT(ds["radliq_fac"][:])
+    radliq_lwr = FT(Array(ds["radliq_lwr"]))
+    radliq_upr = FT(Array(ds["radliq_upr"]))
+    radliq_fac = FT(Array(ds["radliq_fac"]))
 
-    radice_lwr = FT(ds["radice_lwr"][:])
-    radice_upr = FT(ds["radice_upr"][:])
-    radice_fac = FT(ds["radice_fac"][:])
+    radice_lwr = FT(Array(ds["radice_lwr"]))
+    radice_upr = FT(Array(ds["radice_upr"]))
+    radice_fac = FT(Array(ds["radice_fac"]))
 
-    lut_extliq = FTA2D(ds["lut_extliq"][:])
-    lut_ssaliq = FTA2D(ds["lut_ssaliq"][:])
-    lut_asyliq = FTA2D(ds["lut_asyliq"][:])
+    lut_extliq = FTA2D(Array(ds["lut_extliq"]))
+    lut_ssaliq = FTA2D(Array(ds["lut_ssaliq"]))
+    lut_asyliq = FTA2D(Array(ds["lut_asyliq"]))
 
-    lut_extice = FTA3D(ds["lut_extice"][:])
-    lut_ssaice = FTA3D(ds["lut_ssaice"][:])
-    lut_asyice = FTA3D(ds["lut_asyice"][:])
+    lut_extice = FTA3D(Array(ds["lut_extice"]))
+    lut_ssaice = FTA3D(Array(ds["lut_ssaice"]))
+    lut_asyice = FTA3D(Array(ds["lut_asyice"]))
 
-    pade_extliq = FTA3D(ds["pade_extliq"][:])
-    pade_ssaliq = FTA3D(ds["pade_ssaliq"][:])
-    pade_asyliq = FTA3D(ds["pade_asyliq"][:])
+    pade_extliq = FTA3D(Array(ds["pade_extliq"]))
+    pade_ssaliq = FTA3D(Array(ds["pade_ssaliq"]))
+    pade_asyliq = FTA3D(Array(ds["pade_asyliq"]))
 
-    pade_extice = FTA4D(ds["pade_extice"][:])
-    pade_ssaice = FTA4D(ds["pade_ssaice"][:])
-    pade_asyice = FTA4D(ds["pade_asyice"][:])
+    pade_extice = FTA4D(Array(ds["pade_extice"]))
+    pade_ssaice = FTA4D(Array(ds["pade_ssaice"]))
+    pade_asyice = FTA4D(Array(ds["pade_asyice"]))
 
-    pade_sizreg_extliq = FTA1D(ds["pade_sizreg_extliq"][:])
-    pade_sizreg_ssaliq = FTA1D(ds["pade_sizreg_ssaliq"][:])
-    pade_sizreg_asyliq = FTA1D(ds["pade_sizreg_asyliq"][:])
+    pade_sizreg_extliq = FTA1D(Array(ds["pade_sizreg_extliq"]))
+    pade_sizreg_ssaliq = FTA1D(Array(ds["pade_sizreg_ssaliq"]))
+    pade_sizreg_asyliq = FTA1D(Array(ds["pade_sizreg_asyliq"]))
 
-    pade_sizreg_extice = FTA1D(ds["pade_sizreg_extice"][:])
-    pade_sizreg_ssaice = FTA1D(ds["pade_sizreg_ssaice"][:])
-    pade_sizreg_asyice = FTA1D(ds["pade_sizreg_asyice"][:])
+    pade_sizreg_extice = FTA1D(Array(ds["pade_sizreg_extice"]))
+    pade_sizreg_ssaice = FTA1D(Array(ds["pade_sizreg_ssaice"]))
+    pade_sizreg_asyice = FTA1D(Array(ds["pade_sizreg_asyice"]))
 
-    bnd_lims_wn = FTA2D(ds["bnd_limits_wavenumber"][:])
+    bnd_lims_wn = FTA2D(Array(ds["bnd_limits_wavenumber"]))
 
     return (LookUpCld{Bool, FT, FTA1D, FTA2D, FTA3D, FTA4D}(
         nband,
