@@ -3,9 +3,7 @@ name: OS Unit Tests
 on:
   pull_request:
   push:
-    branches:
-      - staging
-      - trying
+    tags: '*'
 jobs:
   test-os:
     timeout-minutes: 30
