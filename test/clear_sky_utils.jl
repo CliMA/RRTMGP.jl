@@ -114,11 +114,11 @@ function clear_sky(
     flip_ind = nlev:-1:1
 
     ds_flux_up_lw = Dataset(flux_up_file_lw, "r")
-    comp_flux_up_lw = ds_flux_up_lw["rlu"][:][flip_ind, :, exp_no]
+    comp_flux_up_lw = Array(ds_flux_up_lw["rlu"])[flip_ind, :, exp_no]
     close(ds_flux_up_lw)
 
     ds_flux_dn_lw = Dataset(flux_dn_file_lw, "r")
-    comp_flux_dn_lw = ds_flux_dn_lw["rld"][:][flip_ind, :, exp_no]
+    comp_flux_dn_lw = Array(ds_flux_dn_lw["rld"])[flip_ind, :, exp_no]
     close(ds_flux_dn_lw)
 
     flux_up_lw = Array(slv.flux_lw.flux_up)
@@ -136,11 +136,11 @@ function clear_sky(
     #--------------------------------------------------------------
     # comparing shortwave fluxes with data from RRTMGP FORTRAN code
     ds_flux_up_sw = Dataset(flux_up_file_sw, "r")
-    comp_flux_up_sw = ds_flux_up_sw["rsu"][:][flip_ind, :, exp_no]
+    comp_flux_up_sw = Array(ds_flux_up_sw["rsu"])[flip_ind, :, exp_no]
     close(ds_flux_up_sw)
 
     ds_flux_dn_sw = Dataset(flux_dn_file_sw, "r")
-    comp_flux_dn_sw = ds_flux_dn_sw["rsd"][:][flip_ind, :, exp_no]
+    comp_flux_dn_sw = Array(ds_flux_dn_sw["rsd"])[flip_ind, :, exp_no]
     close(ds_flux_dn_sw)
 
     flux_up_sw = Array(slv.flux_sw.flux_up)
