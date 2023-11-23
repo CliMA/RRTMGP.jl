@@ -28,8 +28,7 @@ end
     Aqua.test_stale_deps(RRTMGP)
     Aqua.test_deps_compat(RRTMGP)
     Aqua.test_project_extras(RRTMGP)
-    Aqua.test_project_toml_formatting(RRTMGP)
-    Aqua.test_piracy(RRTMGP)
+    Aqua.test_piracies(RRTMGP)
 end
 
 nothing

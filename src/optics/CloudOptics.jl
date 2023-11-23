@@ -15,7 +15,7 @@ to the TwoStream longwave gas optics properties.
 """
 function add_cloud_optics_2stream(op::TwoStream, as::AtmosphericState, lkp::LookUpLW, lkp_cld, glay, gcol, ibnd, igpt)
     if as.cld_mask_lw isa AbstractArray
-        cld_mask = as.cld_mask_lw[igpt, glay, gcol]
+        cld_mask = as.cld_mask_lw[glay, gcol]
         if cld_mask
             τ_cl, τ_cl_ssa, τ_cl_ssag = compute_cld_props(lkp_cld, as, cld_mask, glay, gcol, ibnd, igpt)
             increment!(op, τ_cl, τ_cl_ssa, τ_cl_ssag, glay, gcol, igpt)
@@ -40,7 +40,7 @@ to the TwoStream shortwave gase optics properties.
 """
 function add_cloud_optics_2stream(op::TwoStream, as::AtmosphericState, lkp::LookUpSW, lkp_cld, glay, gcol, ibnd, igpt)
     if as.cld_mask_sw isa AbstractArray
-        cld_mask = as.cld_mask_sw[igpt, glay, gcol]
+        cld_mask = as.cld_mask_sw[glay, gcol]
         if cld_mask
             τ_cl, τ_cl_ssa, τ_cl_ssag = compute_cld_props(lkp_cld, as, cld_mask, glay, gcol, ibnd, igpt)
             τ_cl, τ_cl_ssa, τ_cl_ssag = delta_scale(τ_cl, τ_cl_ssa, τ_cl_ssag)
@@ -204,13 +204,13 @@ Builds McICA-sampled cloud mask from cloud fraction data for maximum-random over
 
 Reference: https://github.com/AER-RC/RRTMG_SW/
 """
-function build_cloud_mask!(cld_mask, cld_frac, random_arr, gcol, ::MaxRandomOverlap)
+function build_cloud_mask!(cld_mask, cld_frac, random_arr, gcol, igpt, ::MaxRandomOverlap)
 
     FT = eltype(cld_frac)
-    local_rand = view(random_arr, :, :, gcol)
+    local_rand = view(random_arr, :, gcol)
     local_cld_frac = view(cld_frac, :, gcol)
-    local_cld_mask = view(cld_mask, :, :, gcol)
-    ngpt, nlay = size(local_rand)
+    local_cld_mask = view(cld_mask, :, gcol)
+    nlay = size(local_rand, 1)
 
     Random.rand!(local_rand)
     start = 0
@@ -222,8 +222,8 @@ function build_cloud_mask!(cld_mask, cld_frac, random_arr, gcol, ::MaxRandomOver
     end
 
     if start == 0 # no clouds in entire column
-        @inbounds for ilay in 1:nlay, igpt in 1:ngpt
-            local_cld_mask[igpt, ilay] = false
+        @inbounds for ilay in 1:nlay
+            local_cld_mask[ilay] = false
         end
     else
         # finish = findlast(local_cld_frac .> FT(0)) # for GPU compatibility
@@ -235,33 +235,27 @@ function build_cloud_mask!(cld_mask, cld_frac, random_arr, gcol, ::MaxRandomOver
             end
         end
         # set cloud mask for non-cloudy layers
-        @inbounds for ilay in 1:(start - 1), igpt in 1:ngpt
-            local_cld_mask[igpt, ilay] = false
+        @inbounds for ilay in 1:(start - 1)
+            local_cld_mask[ilay] = false
         end
-        @inbounds for ilay in (finish + 1):nlay, igpt in 1:ngpt
-            local_cld_mask[igpt, ilay] = false
+        @inbounds for ilay in (finish + 1):nlay
+            local_cld_mask[ilay] = false
         end
         # set cloud mask for cloudy layers
         # last layer
-        # RRTMG uses local_rand[igpt, finish] > (FT(1) - local_cld_frac[finish]), we change > to >= to address edge cases
-        @inbounds for igpt in 1:ngpt
-            local_cld_mask[igpt, finish] = local_rand[igpt, finish] >= (FT(1) - local_cld_frac[finish])
-        end
+        # RRTMG uses local_rand[finish] > (FT(1) - local_cld_frac[finish]), we change > to >= to address edge cases
+        @inbounds local_cld_mask[finish] = local_rand[finish] >= (FT(1) - local_cld_frac[finish])
         @inbounds for ilay in (finish - 1):-1:start
             if local_cld_frac[ilay] > FT(0)
-                for igpt in 1:ngpt
-                    if local_cld_mask[igpt, ilay + 1]
-                        local_rand[igpt, ilay] = local_rand[igpt, ilay + 1] # use same random number from the layer above if layer above is cloudy
-                    else
-                        local_rand[igpt, ilay] *= (FT(1) - local_cld_frac[ilay + 1]) # update random numbers if layer above is not cloudy
-                    end
-                    # RRTMG uses local_rand[igpt, ilay] > (FT(1) - local_cld_frac[ilay]), we change > to >= to address edge cases
-                    local_cld_mask[igpt, ilay] = local_rand[igpt, ilay] >= (FT(1) - local_cld_frac[ilay])
+                if local_cld_mask[ilay + 1]
+                    local_rand[ilay] = local_rand[ilay + 1] # use same random number from the layer above if layer above is cloudy
+                else
+                    local_rand[ilay] *= (FT(1) - local_cld_frac[ilay + 1]) # update random numbers if layer above is not cloudy
                 end
+                # RRTMG uses local_rand[ilay] > (FT(1) - local_cld_frac[ilay]), we change > to >= to address edge cases
+                local_cld_mask[ilay] = local_rand[ilay] >= (FT(1) - local_cld_frac[ilay])
             else
-                for igpt in 1:ngpt
-                    local_cld_mask[igpt, ilay] = false
-                end
+                local_cld_mask[ilay] = false
             end
         end
     end

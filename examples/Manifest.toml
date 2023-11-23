@@ -2,7 +2,7 @@
 
 julia_version = "1.9.3"
 manifest_format = "2.0"
-project_hash = "243c6060b2bc9f1d650bfee030845a40aea5b195"
+project_hash = "ae0ac46db0377691aef20bea1543b1fb30104413"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -657,7 +657,7 @@ uuid = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
 deps = ["Adapt", "CUDA", "ClimaComms", "DocStringExtensions", "GaussQuadrature", "Random", "StaticArrays"]
 path = ".."
 uuid = "a01a1ee8-cea4-48fc-987c-fc7878d79da1"
-version = "0.9.1"
+version = "0.9.3"
 
 [[deps.Random]]
 deps = ["SHA", "Serialization"]

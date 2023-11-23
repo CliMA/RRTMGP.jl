@@ -43,8 +43,8 @@ struct AtmosphericState{
     FTA1DN <: Union{AbstractArray{FT, 1}, Nothing},
     FTA2D <: AbstractArray{FT, 2},
     CLDP <: Union{AbstractArray{FT, 2}, Nothing},
-    CLDM <: Union{AbstractArray{Bool, 3}, Nothing},
-    RND <: Union{AbstractArray{FT, 3}, Nothing},
+    CLDM <: Union{AbstractArray{Bool, 2}, Nothing},
+    RND <: Union{AbstractArray{FT, 2}, Nothing},
     CMASK <: Union{AbstractCloudMask, Nothing},
     VMR <: AbstractVmr{FT},
 } <: AbstractAtmosphericState{FT, FTA1D}
@@ -76,9 +76,9 @@ struct AtmosphericState{
     cld_path_ice::CLDP
     "cloud fraction"
     cld_frac::CLDP
-    "random number storage for longwave bands `(ngpt, nlay, ncol)`"
+    "random number storage for longwave bands `(nlay, ncol)`"
     random_lw::RND
-    "random number storage for shortwave bands `(ngpt, nlay, ncol)`"
+    "random number storage for shortwave bands `(nlay, ncol)`"
     random_sw::RND
     "cloud mask (longwave), = true if clouds are present"
     cld_mask_lw::CLDM
