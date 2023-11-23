@@ -186,17 +186,19 @@ function rte_lw_solve!(
         args = (flux, flux_lw, src_lw, bcs_lw, op, nlay, ncol, major_gpt2bnd, as, lookup_lw, lookup_lw_cld)
         @cuda threads = (tx) blocks = (bx) rte_lw_2stream_solve_CUDA!(args...)
     else
-        if as isa AtmosphericState && as.cld_mask_type isa AbstractCloudMask
-            @inbounds begin
-                ClimaComms.@threaded device for gcol in 1:ncol
-                    Optics.build_cloud_mask!(as.cld_mask_lw, as.cld_frac, as.random_lw, gcol, as.cld_mask_type)
-                end
-            end
-        end
+        bld_cld_mask = as isa AtmosphericState && as.cld_mask_type isa AbstractCloudMask
         @inbounds begin
             for igpt in 1:n_gpt
                 ClimaComms.@threaded device for gcol in 1:ncol
                     igpt == 1 && set_flux_to_zero!(flux_lw, gcol)
+                    bld_cld_mask && Optics.build_cloud_mask!(
+                        as.cld_mask_lw,
+                        as.cld_frac,
+                        as.random_lw,
+                        gcol,
+                        igpt,
+                        as.cld_mask_type,
+                    )
                     compute_optical_props!(op, as, src_lw, gcol, igpt, lookup_lw, lookup_lw_cld)
                     rte_lw_2stream_combine_sources!(src_lw, gcol, nlev, ncol)
                     rte_lw_2stream_source!(op, src_lw, gcol, nlay, ncol)
@@ -226,11 +228,11 @@ function rte_lw_2stream_solve_CUDA!(
     nlev = nlay + 1
     n_gpt = length(major_gpt2bnd)
     if gcol ≤ ncol
-        if as isa AtmosphericState && as.cld_mask_type isa AbstractCloudMask
-            Optics.build_cloud_mask!(as.cld_mask_lw, as.cld_frac, as.random_lw, gcol, as.cld_mask_type)
-        end
         @inbounds for igpt in 1:n_gpt
             igpt == 1 && set_flux_to_zero!(flux_lw, gcol)
+            if as isa AtmosphericState && as.cld_mask_type isa AbstractCloudMask
+                Optics.build_cloud_mask!(as.cld_mask_lw, as.cld_frac, as.random_lw, gcol, igpt, as.cld_mask_type)
+            end
             compute_optical_props!(op, as, src_lw, gcol, igpt, lookup_lw, lookup_lw_cld)
             rte_lw_2stream_combine_sources!(src_lw, gcol, nlev, ncol)
             rte_lw_2stream_source!(op, src_lw, gcol, nlay, ncol)
@@ -443,15 +445,19 @@ function rte_sw_2stream_solve!(
         @cuda threads = (tx) blocks = (bx) rte_sw_2stream_solve_CUDA!(args...)
     else
         @inbounds begin
-            if as isa AtmosphericState && as.cld_mask_type isa AbstractCloudMask
-                ClimaComms.@threaded device for gcol in 1:ncol
-                    Optics.build_cloud_mask!(as.cld_mask_sw, as.cld_frac, as.random_sw, gcol, as.cld_mask_type)
-                end
-            end
+            bld_cld_mask = as isa AtmosphericState && as.cld_mask_type isa AbstractCloudMask
             # setting references for flux_sw
             for igpt in 1:n_gpt
                 ClimaComms.@threaded device for gcol in 1:ncol
                     igpt == 1 && set_flux_to_zero!(flux_sw, gcol)
+                    bld_cld_mask && Optics.build_cloud_mask!(
+                        as.cld_mask_sw,
+                        as.cld_frac,
+                        as.random_sw,
+                        gcol,
+                        igpt,
+                        as.cld_mask_type,
+                    )
                     compute_optical_props!(op, as, gcol, igpt, lookup_sw, lookup_sw_cld)
                     sw_two_stream!(op, src_sw, bcs_sw, gcol, nlay) # Cell properties: transmittance and reflectance for direct and diffuse radiation
                     sw_source_2str!(src_sw, bcs_sw, gcol, flux, igpt, solar_src_scaled, major_gpt2bnd, nlay) # Direct-beam and source for diffuse radiation
@@ -482,11 +488,11 @@ function rte_sw_2stream_solve_CUDA!(
     nlev = nlay + 1
     n_gpt = length(major_gpt2bnd)
     if gcol ≤ ncol
-        if as isa AtmosphericState && as.cld_mask_type isa AbstractCloudMask
-            Optics.build_cloud_mask!(as.cld_mask_sw, as.cld_frac, as.random_sw, gcol, as.cld_mask_type)
-        end
         @inbounds for igpt in 1:n_gpt
             igpt == 1 && set_flux_to_zero!(flux_sw, gcol)
+            if as isa AtmosphericState && as.cld_mask_type isa AbstractCloudMask
+                Optics.build_cloud_mask!(as.cld_mask_sw, as.cld_frac, as.random_sw, gcol, igpt, as.cld_mask_type)
+            end
             compute_optical_props!(op, as, gcol, igpt, lookup_sw, lookup_sw_cld)
             sw_two_stream!(op, src_sw, bcs_sw, gcol, nlay) # Cell properties: transmittance and reflectance for direct and diffuse radiation
             sw_source_2str!(src_sw, bcs_sw, gcol, flux, igpt, solar_src_scaled, major_gpt2bnd, nlay) # Direct-beam and source for diffuse radiation
