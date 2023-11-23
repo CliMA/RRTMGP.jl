@@ -198,7 +198,7 @@ function pade_eval(ibnd, re, irad, m, n, pade_coeffs, irgh::Union{Int, Nothing} 
 end
 
 """
-    build_cloud_mask!(cld_mask, cld_frac, random_arr, gcol, ::MaxRandomOverlap)
+    build_cloud_mask!(cld_mask, cld_frac, random_arr, gcol, igpt, ::MaxRandomOverlap)
 
 Builds McICA-sampled cloud mask from cloud fraction data for maximum-random overlap
 
