@@ -442,6 +442,20 @@ function rte_sw_2stream_solve!(
             lookup_sw,
             lookup_sw_cld,
         )
+        @info("metadata size",
+            flux = sizeof(CUDA.cudaconvert(flux)),
+            flux_sw = sizeof(CUDA.cudaconvert(flux_sw)),
+            op = sizeof(CUDA.cudaconvert(op)),
+            bcs_sw = sizeof(CUDA.cudaconvert(bcs_sw)),
+            src_sw = sizeof(CUDA.cudaconvert(src_sw)),
+            nlay = sizeof(CUDA.cudaconvert(nlay)),
+            ncol = sizeof(CUDA.cudaconvert(ncol)),
+            major_gpt2bnd = sizeof(CUDA.cudaconvert(major_gpt2bnd)),
+            solar_src_scaled = sizeof(CUDA.cudaconvert(solar_src_scaled)),
+            as = sizeof(CUDA.cudaconvert(as)),
+            lookup_sw = sizeof(CUDA.cudaconvert(lookup_sw)),
+            lookup_sw_cld = sizeof(CUDA.cudaconvert(lookup_sw_cld)),
+        )
         @cuda threads = (tx) blocks = (bx) rte_sw_2stream_solve_CUDA!(args...)
     else
         @inbounds begin
