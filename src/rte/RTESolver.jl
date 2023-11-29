@@ -261,48 +261,13 @@ function solve_sw!(
 )
     (; as, op, bcs_sw, src_sw, flux_sw, fluxb_sw) = slv
     context = RTE.context(slv)
-
     no_args = lookup_sw isa Nothing && lookup_sw_cld isa Nothing
-    if no_args
-        DA = RTE.array_type(slv)
-        FT = RTE.float_type(slv)
-        major_gpt2bnd = DA(UInt8[1])
-        solar_src_scaled = DA(FT[1])
-        flux = flux_sw
-    else
-        (; major_gpt2bnd, solar_src_scaled) = lookup_sw
-        flux = fluxb_sw
-    end
-
+    flux = no_args ? flux_sw : fluxb_sw
     # solving radiative transfer equation
     if slv.op isa OneScalar
-        rte_sw_noscat_solve!(
-            context,
-            flux,
-            flux_sw,
-            op,
-            bcs_sw,
-            solar_src_scaled,
-            max_threads,
-            as,
-            lookup_sw,
-            lookup_sw_cld,
-        ) # no-scattering solver
+        rte_sw_noscat_solve!(context, flux, flux_sw, op, bcs_sw, max_threads, as, lookup_sw, lookup_sw_cld) # no-scattering solver
     else
-        rte_sw_2stream_solve!(
-            context,
-            flux,
-            flux_sw,
-            op,
-            bcs_sw,
-            src_sw,
-            major_gpt2bnd,
-            solar_src_scaled,
-            max_threads,
-            as,
-            lookup_sw,
-            lookup_sw_cld,
-        ) # 2-stream solver
+        rte_sw_2stream_solve!(context, flux, flux_sw, op, bcs_sw, src_sw, max_threads, as, lookup_sw, lookup_sw_cld) # 2-stream solver
     end
     return nothing
 end
@@ -330,29 +295,31 @@ function rte_sw_noscat_solve!(
     flux_sw::FluxSW{FT},
     op::OneScalar{FT},
     bcs_sw::SwBCs{FT},
-    solar_src_scaled::AbstractArray{FT, 1},
     max_threads,
     as::AbstractAtmosphericState{FT},
     lookup_sw::Union{LookUpSW, Nothing} = nothing,
     lookup_sw_cld::Union{LookUpCld, Nothing} = nothing,
 ) where {FT <: AbstractFloat}
+    isgray = lookup_sw isa Nothing && lookup_sw_cld isa Nothing
     (; nlay, ncol) = as
     nlev = nlay + 1
-    n_gpt = length(solar_src_scaled)
+    n_gpt = isgray ? 1 : length(lookup_sw.solar_src_scaled)
     device = ClimaComms.device(context)
     # setting references for flux_sw
     if device isa ClimaComms.CUDADevice
         tx = min(ncol, max_threads)
         bx = cld(ncol, tx)
-        args = (flux, flux_sw, op, bcs_sw, nlay, ncol, solar_src_scaled, as, lookup_sw, lookup_sw_cld)
+        args = (flux, flux_sw, op, bcs_sw, nlay, ncol, as, lookup_sw, lookup_sw_cld)
         @cuda threads = (tx) blocks = (bx) rte_sw_noscat_solve_CUDA!(args...)
     else
+        solar_src_scaled = isgray ? Array([FT(1)]) : lookup_sw.solar_src_scaled
         @inbounds begin
             for igpt in 1:n_gpt
                 ClimaComms.@threaded device for gcol in 1:ncol
                     igpt == 1 && set_flux_to_zero!(flux_sw, gcol)
                     compute_optical_props!(op, as, gcol, igpt, lookup_sw, lookup_sw_cld)
-                    rte_sw_noscat_solve_kernel!(flux, op, bcs_sw, igpt, solar_src_scaled, gcol, nlev)
+                    solar_frac = isgray ? FT(1) : lookup_sw.solar_src_scaled[igpt]
+                    rte_sw_noscat_solve_kernel!(flux, op, bcs_sw, igpt, n_gpt, solar_frac, gcol, nlev)
                     n_gpt > 1 && add_to_flux!(flux_sw, flux, gcol)
                 end
             end
@@ -369,20 +336,21 @@ function rte_sw_noscat_solve_CUDA!(
     bcs_sw::SwBCs{FT},
     nlay,
     ncol,
-    solar_src_scaled::AbstractArray{FT, 1},
     as::AbstractAtmosphericState{FT},
     lookup_sw::Union{LookUpSW, Nothing} = nothing,
     lookup_sw_cld::Union{LookUpCld, Nothing} = nothing,
 ) where {FT <: AbstractFloat}
     gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
     nlev = nlay + 1
-    n_gpt = length(solar_src_scaled)
+    isgray = lookup_sw isa Nothing && lookup_sw_cld isa Nothing
+    n_gpt = isgray ? 1 : length(lookup_sw.solar_src_scaled)
     # setting references for flux_sw
     if gcol ≤ ncol
         @inbounds for igpt in 1:n_gpt
             igpt == 1 && set_flux_to_zero!(flux_sw, gcol)
             compute_optical_props!(op, as, gcol, igpt, lookup_sw, lookup_sw_cld)
-            rte_sw_noscat_solve_kernel!(flux, op, bcs_sw, igpt, solar_src_scaled, gcol, nlev)
+            solar_frac = isgray ? FT(1) : lookup_sw.solar_src_scaled[igpt]
+            rte_sw_noscat_solve_kernel!(flux, op, bcs_sw, igpt, n_gpt, solar_frac, gcol, nlev)
             n_gpt > 1 && add_to_flux!(flux_sw, flux, gcol)
         end
     end
@@ -414,36 +382,23 @@ function rte_sw_2stream_solve!(
     op::TwoStream{FT},
     bcs_sw::SwBCs{FT},
     src_sw::SourceSW2Str{FT},
-    major_gpt2bnd::AbstractArray{UInt8, 1},
-    solar_src_scaled::AbstractArray{FT, 1},
     max_threads,
     as::AbstractAtmosphericState{FT},
     lookup_sw::Union{LookUpSW, Nothing} = nothing,
     lookup_sw_cld::Union{LookUpCld, Nothing} = nothing,
 ) where {FT <: AbstractFloat}
+    isgray = lookup_sw isa Nothing && lookup_sw_cld isa Nothing
     (; nlay, ncol) = as
     nlev = nlay + 1
-    n_gpt = length(major_gpt2bnd)
+    n_gpt = isgray ? 1 : length(lookup_sw.major_gpt2bnd)
     device = ClimaComms.device(context)
     if device isa ClimaComms.CUDADevice
         tx = min(ncol, max_threads)
         bx = cld(ncol, tx)
-        args = (
-            flux,
-            flux_sw,
-            op,
-            bcs_sw,
-            src_sw,
-            nlay,
-            ncol,
-            major_gpt2bnd,
-            solar_src_scaled,
-            as,
-            lookup_sw,
-            lookup_sw_cld,
-        )
+        args = (flux, flux_sw, op, bcs_sw, src_sw, as, Val(n_gpt), lookup_sw, lookup_sw_cld)
         @cuda threads = (tx) blocks = (bx) rte_sw_2stream_solve_CUDA!(args...)
     else
+        major_gpt2bnd = isgray ? Array([UInt8(1)]) : lookup_sw.major_gpt2bnd
         @inbounds begin
             bld_cld_mask = as isa AtmosphericState && as.cld_mask_type isa AbstractCloudMask
             # setting references for flux_sw
@@ -460,8 +415,10 @@ function rte_sw_2stream_solve!(
                     )
                     compute_optical_props!(op, as, gcol, igpt, lookup_sw, lookup_sw_cld)
                     sw_two_stream!(op, src_sw, bcs_sw, gcol, nlay) # Cell properties: transmittance and reflectance for direct and diffuse radiation
-                    sw_source_2str!(src_sw, bcs_sw, gcol, flux, igpt, solar_src_scaled, major_gpt2bnd, nlay) # Direct-beam and source for diffuse radiation
-                    adding_sw!(src_sw, bcs_sw, gcol, flux, igpt, major_gpt2bnd, nlev) # Transport
+                    solar_frac = isgray ? FT(1) : lookup_sw.solar_src_scaled[igpt]
+                    ibnd = isgray ? UInt8(1) : lookup_sw.major_gpt2bnd[igpt]
+                    sw_source_2str!(src_sw, bcs_sw, gcol, flux, igpt, solar_frac, ibnd, nlay) # Direct-beam and source for diffuse radiation
+                    adding_sw!(src_sw, bcs_sw, gcol, flux, igpt, n_gpt, ibnd, nlev) # Transport
                     n_gpt > 1 && add_to_flux!(flux_sw, flux, gcol)
                 end
             end
@@ -476,17 +433,15 @@ function rte_sw_2stream_solve_CUDA!(
     op::TwoStream{FT},
     bcs_sw::SwBCs{FT},
     src_sw::SourceSW2Str{FT},
-    nlay,
-    ncol,
-    major_gpt2bnd::AbstractArray{UInt8, 1},
-    solar_src_scaled::AbstractArray{FT, 1},
     as::AbstractAtmosphericState{FT},
+    ::Val{n_gpt},
     lookup_sw::Union{LookUpSW, Nothing} = nothing,
     lookup_sw_cld::Union{LookUpCld, Nothing} = nothing,
-) where {FT <: AbstractFloat}
+) where {FT <: AbstractFloat, n_gpt}
     gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
+    (; nlay, ncol) = as
     nlev = nlay + 1
-    n_gpt = length(major_gpt2bnd)
+    isgray = lookup_sw isa Nothing && lookup_sw_cld isa Nothing
     if gcol ≤ ncol
         @inbounds for igpt in 1:n_gpt
             igpt == 1 && set_flux_to_zero!(flux_sw, gcol)
@@ -495,8 +450,10 @@ function rte_sw_2stream_solve_CUDA!(
             end
             compute_optical_props!(op, as, gcol, igpt, lookup_sw, lookup_sw_cld)
             sw_two_stream!(op, src_sw, bcs_sw, gcol, nlay) # Cell properties: transmittance and reflectance for direct and diffuse radiation
-            sw_source_2str!(src_sw, bcs_sw, gcol, flux, igpt, solar_src_scaled, major_gpt2bnd, nlay) # Direct-beam and source for diffuse radiation
-            adding_sw!(src_sw, bcs_sw, gcol, flux, igpt, major_gpt2bnd, nlev) # Transport
+            solar_frac = isgray ? FT(1) : lookup_sw.solar_src_scaled[igpt]
+            ibnd = isgray ? UInt8(1) : lookup_sw.major_gpt2bnd[igpt]
+            sw_source_2str!(src_sw, bcs_sw, gcol, flux, igpt, solar_frac, ibnd, nlay) # Direct-beam and source for diffuse radiation
+            adding_sw!(src_sw, bcs_sw, gcol, flux, igpt, n_gpt, ibnd, nlev) # Transport
             n_gpt > 1 && add_to_flux!(flux_sw, flux, gcol)
         end
     end
