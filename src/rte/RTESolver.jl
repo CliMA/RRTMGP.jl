@@ -267,7 +267,18 @@ function solve_sw!(
     if slv.op isa OneScalar
         rte_sw_noscat_solve!(context, flux, flux_sw, op, bcs_sw, max_threads, as, lookup_sw, lookup_sw_cld) # no-scattering solver
     else
-        rte_sw_2stream_solve!(context, flux, flux_sw, op, bcs_sw, src_sw, max_threads, as, lookup_sw, lookup_sw_cld) # 2-stream solver
+        rte_sw_2stream_solve!(
+            context.device,
+            flux,
+            flux_sw,
+            op,
+            bcs_sw,
+            src_sw,
+            max_threads,
+            as,
+            lookup_sw,
+            lookup_sw_cld,
+        ) # 2-stream solver
     end
     return nothing
 end
@@ -376,7 +387,7 @@ end
 Two stream solver for the shortwave problem.
 """
 function rte_sw_2stream_solve!(
-    context,
+    device::ClimaComms.AbstractCPUDevice,
     flux::FluxSW{FT},
     flux_sw::FluxSW{FT},
     op::TwoStream{FT},
@@ -391,43 +402,53 @@ function rte_sw_2stream_solve!(
     (; nlay, ncol) = as
     nlev = nlay + 1
     n_gpt = isgray ? 1 : length(lookup_sw.major_gpt2bnd)
-    device = ClimaComms.device(context)
-    if device isa ClimaComms.CUDADevice
-        tx = min(ncol, max_threads)
-        bx = cld(ncol, tx)
-        args = (flux, flux_sw, op, bcs_sw, src_sw, as, Val(n_gpt), lookup_sw, lookup_sw_cld)
-        @cuda threads = (tx) blocks = (bx) rte_sw_2stream_solve_CUDA!(args...)
-    else
-        major_gpt2bnd = isgray ? Array([UInt8(1)]) : lookup_sw.major_gpt2bnd
-        @inbounds begin
-            bld_cld_mask = as isa AtmosphericState && as.cld_mask_type isa AbstractCloudMask
-            # setting references for flux_sw
-            for igpt in 1:n_gpt
-                ClimaComms.@threaded device for gcol in 1:ncol
-                    igpt == 1 && set_flux_to_zero!(flux_sw, gcol)
-                    bld_cld_mask && Optics.build_cloud_mask!(
-                        as.cld_mask_sw,
-                        as.cld_frac,
-                        as.random_sw,
-                        gcol,
-                        igpt,
-                        as.cld_mask_type,
-                    )
-                    compute_optical_props!(op, as, gcol, igpt, lookup_sw, lookup_sw_cld)
-                    sw_two_stream!(op, src_sw, bcs_sw, gcol, nlay) # Cell properties: transmittance and reflectance for direct and diffuse radiation
-                    solar_frac = isgray ? FT(1) : lookup_sw.solar_src_scaled[igpt]
-                    ibnd = isgray ? UInt8(1) : lookup_sw.major_gpt2bnd[igpt]
-                    sw_source_2str!(src_sw, bcs_sw, gcol, flux, igpt, solar_frac, ibnd, nlay) # Direct-beam and source for diffuse radiation
-                    adding_sw!(src_sw, bcs_sw, gcol, flux, igpt, n_gpt, ibnd, nlev) # Transport
-                    n_gpt > 1 && add_to_flux!(flux_sw, flux, gcol)
-                end
+    major_gpt2bnd = isgray ? Array([UInt8(1)]) : lookup_sw.major_gpt2bnd
+    @inbounds begin
+        bld_cld_mask = as isa AtmosphericState && as.cld_mask_type isa AbstractCloudMask
+        # setting references for flux_sw
+        for igpt in 1:n_gpt
+            ClimaComms.@threaded device for gcol in 1:ncol
+                igpt == 1 && set_flux_to_zero!(flux_sw, gcol)
+                bld_cld_mask &&
+                    Optics.build_cloud_mask!(as.cld_mask_sw, as.cld_frac, as.random_sw, gcol, igpt, as.cld_mask_type)
+                compute_optical_props!(op, as, gcol, igpt, lookup_sw, lookup_sw_cld)
+                sw_two_stream!(op, src_sw, bcs_sw, gcol, nlay) # Cell properties: transmittance and reflectance for direct and diffuse radiation
+                solar_frac = isgray ? FT(1) : lookup_sw.solar_src_scaled[igpt]
+                ibnd = isgray ? UInt8(1) : lookup_sw.major_gpt2bnd[igpt]
+                sw_source_2str!(src_sw, bcs_sw, gcol, flux, igpt, solar_frac, ibnd, nlay) # Direct-beam and source for diffuse radiation
+                adding_sw!(src_sw, bcs_sw, gcol, flux, igpt, n_gpt, ibnd, nlev) # Transport
+                n_gpt > 1 && add_to_flux!(flux_sw, flux, gcol)
             end
         end
     end
     return nothing
 end
 #--------------------------------------------------------------------------------------------------
-function rte_sw_2stream_solve_CUDA!(
+function rte_sw_2stream_solve!(
+    device::ClimaComms.CUDADevice,
+    flux::FluxSW{FT},
+    flux_sw::FluxSW{FT},
+    op::TwoStream{FT},
+    bcs_sw::SwBCs{FT},
+    src_sw::SourceSW2Str{FT},
+    max_threads,
+    as::AbstractAtmosphericState{FT},
+    lookup_sw::Union{LookUpSW, Nothing} = nothing,
+    lookup_sw_cld::Union{LookUpCld, Nothing} = nothing,
+) where {FT <: AbstractFloat}
+    isgray = lookup_sw isa Nothing && lookup_sw_cld isa Nothing
+    (; nlay, ncol) = as
+    nlev = nlay + 1
+    n_gpt = isgray ? 1 : length(lookup_sw.major_gpt2bnd)
+    tx = min(ncol, max_threads)
+    bx = cld(ncol, tx)
+    args = (flux, flux_sw, op, bcs_sw, src_sw, as, Val(n_gpt), lookup_sw, lookup_sw_cld)
+    @cuda threads = (tx) blocks = (bx) rte_sw_2stream_solve_kernel!(args...)
+    return nothing
+end
+#--------------------------------------------------------------------------------------------------
+
+function rte_sw_2stream_solve_kernel!(
     flux::FluxSW{FT},
     flux_sw::FluxSW{FT},
     op::TwoStream{FT},
