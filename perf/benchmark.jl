@@ -78,8 +78,17 @@ println()
 
 @info "------------------------------------------------- Benchmark: all_sky"
 # @suppress_out begin
+ncols_all_sky_benchmark = 60000
 include(joinpath(root_dir, "test", "all_sky_utils.jl"))
-all_sky(ClimaComms.context(), TwoStream, FT; use_lut = true, cldfrac = FT(1), exfiltrate = true)
+all_sky(
+    ClimaComms.context(),
+    TwoStream,
+    FT;
+    ncol = ncols_all_sky_benchmark,
+    use_lut = true,
+    cldfrac = FT(1),
+    exfiltrate = true,
+)
 # end
 
 (; slv, max_threads, lookup_sw, lookup_sw_cld, lookup_lw, lookup_lw_cld) = Infiltrator.exfiltrated
@@ -109,7 +118,15 @@ show(stdout, MIME("text/plain"), trial)
 println()
 
 # @suppress_out begin
-all_sky(ClimaComms.context(), TwoStream, FT; use_lut = false, cldfrac = FT(1), exfiltrate = true)
+all_sky(
+    ClimaComms.context(),
+    TwoStream,
+    FT;
+    ncol = ncols_all_sky_benchmark,
+    use_lut = false,
+    cldfrac = FT(1),
+    exfiltrate = true,
+)
 # end
 
 (; slv, max_threads, lookup_sw, lookup_sw_cld, lookup_lw, lookup_lw_cld) = Infiltrator.exfiltrated

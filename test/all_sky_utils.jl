@@ -118,7 +118,12 @@ function all_sky(
     slv = Solver(context, as, op, src_lw, src_sw, bcs_lw, bcs_sw, fluxb_lw, fluxb_sw, flux_lw, flux_sw)
     #------calling solvers
     println("calling longwave solver; ncol = $ncol")
-    @time solve_lw!(slv, max_threads, lookup_lw, lookup_lw_cld)
+    solve_lw!(slv, max_threads, lookup_lw, lookup_lw_cld) # compile first
+    if device isa ClimaComms.CUDADevice
+        ClimaComms.CUDA.@time solve_lw!(slv, max_threads, lookup_lw, lookup_lw_cld)
+    else
+        @time solve_lw!(slv, max_threads, lookup_lw, lookup_lw_cld)
+    end
     if device isa ClimaComms.CPUSingleThreaded
         JET.@test_opt solve_lw!(slv, max_threads, lookup_lw, lookup_lw_cld)
         @test_broken (@allocated solve_lw!(slv, max_threads, lookup_lw, lookup_lw_cld)) == 0
@@ -126,8 +131,13 @@ function all_sky(
     end
 
     println("calling shortwave solver; ncol = $ncol")
+    solve_sw!(slv, max_threads, lookup_sw, lookup_sw_cld) # compile first
     exfiltrate && Infiltrator.@exfiltrate
-    @time solve_sw!(slv, max_threads, lookup_sw, lookup_sw_cld)
+    if device isa ClimaComms.CUDADevice
+        ClimaComms.CUDA.@time solve_sw!(slv, max_threads, lookup_sw, lookup_sw_cld)
+    else
+        @time solve_sw!(slv, max_threads, lookup_sw, lookup_sw_cld)
+    end
     if device isa ClimaComms.CPUSingleThreaded
         JET.@test_opt solve_sw!(slv, max_threads, lookup_sw, lookup_sw_cld)
         @test_broken (@allocated solve_sw!(slv, max_threads, lookup_sw, lookup_sw_cld)) == 0
