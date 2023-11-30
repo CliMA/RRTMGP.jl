@@ -1,6 +1,6 @@
 env:
-  JULIA_VERSION: "1.8.5"
-  CUDA_VERSION: "11.2"
+  JULIA_VERSION: "1.9.4"
+  CUDA_VERSION: "12.2"
 
 steps:
   - label: "init cpu environments :computer:"
