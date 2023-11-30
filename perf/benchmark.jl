@@ -78,7 +78,7 @@ println()
 
 @info "------------------------------------------------- Benchmark: all_sky"
 # @suppress_out begin
-ncols_all_sky_benchmark = 60000
+ncols_all_sky_benchmark = 30000
 include(joinpath(root_dir, "test", "all_sky_utils.jl"))
 all_sky(
     ClimaComms.context(),
