@@ -122,31 +122,18 @@ where,
     )
 end
 """
-    increment!(
-        op::TwoStream{FT},
-        τ2,
-        ssa2,
-        g2,
-        glay,
-        gcol,
-        igpt,
-    ) where {FT<:AbstractFloat}
+    increment_2stream!(τ1::FT, ssa1::FT, g1::FT, τ2::FT, ssa2::FT, g2::FT) where {FT}
 
-Increment TwoStream optical properties `op` for layer `glay` 
-and column `gcol` with optical thickness `τ2`, single scattering
-albedo `ssa2` and symmetry parameter `g2`.
+Increment TwoStream optical properties `τ1`, `ssa1` and `g1` 
+with `τ2`, `ssa2` and `g2`. Here `τ` is the optical thickness,
+`ssa` is the single-scattering albedo, and `g` is the symmetry parameter.
 """
-function increment!(op::TwoStream{FT}, τ2, ssa2, g2, glay, gcol, igpt) where {FT <: AbstractFloat}
-    τ1, ssa1, g1 = op.τ[glay, gcol], op.ssa[glay, gcol], op.g[glay, gcol]
+function increment_2stream(τ1::FT, ssa1::FT, g1::FT, τ2::FT, ssa2::FT, g2::FT) where {FT}
     τ = τ1 + τ2
     ssa = τ1 * ssa1 + τ2 * ssa2
     ssag = (τ1 * ssa1 * g1 + τ2 * ssa2 * g2) / max(eps(FT), ssa)
     ssa /= max(eps(FT), τ)
-
-    op.τ[glay, gcol] = τ
-    op.ssa[glay, gcol] = ssa
-    op.g[glay, gcol] = ssag
-    return nothing
+    return τ, ssa, ssag
 end
 """
     delta_scale(τ, ssa, g)

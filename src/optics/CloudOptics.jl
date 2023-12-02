@@ -18,7 +18,8 @@ function add_cloud_optics_2stream(op::TwoStream, as::AtmosphericState, lkp::Look
         cld_mask = as.cld_mask_lw[glay, gcol]
         if cld_mask
             τ_cl, τ_cl_ssa, τ_cl_ssag = compute_cld_props(lkp_cld, as, cld_mask, glay, gcol, ibnd, igpt)
-            increment!(op, τ_cl, τ_cl_ssa, τ_cl_ssag, glay, gcol, igpt)
+            op.τ[glay, gcol], op.ssa[glay, gcol], op.g[glay, gcol] =
+                increment_2stream(op.τ[glay, gcol], op.ssa[glay, gcol], op.g[glay, gcol], τ_cl, τ_cl_ssa, τ_cl_ssag)
         end
     end
     return nothing
@@ -44,7 +45,8 @@ function add_cloud_optics_2stream(op::TwoStream, as::AtmosphericState, lkp::Look
         if cld_mask
             τ_cl, τ_cl_ssa, τ_cl_ssag = compute_cld_props(lkp_cld, as, cld_mask, glay, gcol, ibnd, igpt)
             τ_cl, τ_cl_ssa, τ_cl_ssag = delta_scale(τ_cl, τ_cl_ssa, τ_cl_ssag)
-            increment!(op, τ_cl, τ_cl_ssa, τ_cl_ssag, glay, gcol, igpt)
+            op.τ[glay, gcol], op.ssa[glay, gcol], op.g[glay, gcol] =
+                increment_2stream(op.τ[glay, gcol], op.ssa[glay, gcol], op.g[glay, gcol], τ_cl, τ_cl_ssa, τ_cl_ssag)
         end
     end
     return nothing
