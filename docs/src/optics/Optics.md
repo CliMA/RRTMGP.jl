@@ -43,6 +43,6 @@ compute_gray_optical_thickness_sw
 interp1d
 interp2d
 interp3d
-increment!
+increment_2stream
 delta_scale
 ```
