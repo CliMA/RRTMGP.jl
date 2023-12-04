@@ -8,5 +8,6 @@ CurrentModule = RRTMGP.LookUpTables
 LookUpLW
 LookUpSW
 LookUpCld
+PadeCld
 AbstractLookUp
 ```

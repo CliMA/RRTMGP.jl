@@ -57,7 +57,7 @@ function all_sky(
     close(ds_lw)
     # reading longwave cloud lookup data
     ds_lw_cld = Dataset(lw_cld_file, "r")
-    lookup_lw_cld = LookUpCld(ds_lw_cld, FT, DA, use_lut)
+    lookup_lw_cld = use_lut ? LookUpCld(ds_lw_cld, FT, DA) : PadeCld(ds_lw_cld, FT, DA)
     close(ds_lw_cld)
     #reading shortwave gas optics lookup data
     ds_sw = Dataset(sw_file, "r")
@@ -65,7 +65,7 @@ function all_sky(
     close(ds_sw)
     # reading longwave cloud lookup data
     ds_sw_cld = Dataset(sw_cld_file, "r")
-    lookup_sw_cld = LookUpCld(ds_sw_cld, FT, DA, use_lut)
+    lookup_sw_cld = use_lut ? LookUpCld(ds_sw_cld, FT, DA) : PadeCld(ds_sw_cld, FT, DA)
     close(ds_sw_cld)
     # reading input file 
     ds_in = Dataset(input_file, "r")

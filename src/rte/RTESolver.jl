@@ -24,7 +24,7 @@ include("RTESolverKernels.jl")
         slv::Solver,
         max_threads::Int,
         lookup_lw::Union{LookUpLW, Nothing} = nothing,
-        lookup_lw_cld::Union{LookUpCld, Nothing} = nothing,
+        lookup_lw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
     )
 
 Solver for the longwave radiation problem
@@ -33,7 +33,7 @@ function solve_lw!(
     slv::Solver,
     max_threads::Int,
     lookup_lw::Union{LookUpLW, Nothing} = nothing,
-    lookup_lw_cld::Union{LookUpCld, Nothing} = nothing,
+    lookup_lw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
 )
     (; as, op, bcs_lw, src_lw, flux_lw, fluxb_lw) = slv
     context = RTE.context(slv)
@@ -63,7 +63,7 @@ end
         max_threads,
         as::AbstractAtmosphericState{FT},
         lookup_lw::Union{LookUpLW, Nothing} = nothing,
-        lookup_lw_cld::Union{LookUpCld, Nothing} = nothing,
+        lookup_lw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
     ) where {FT<:AbstractFloat}
 
 No scattering solver for the longwave problem.
@@ -82,7 +82,7 @@ function rte_lw_solve!(
     max_threads,
     as::AbstractAtmosphericState{FT},
     lookup_lw::Union{LookUpLW, Nothing} = nothing,
-    lookup_lw_cld::Union{LookUpCld, Nothing} = nothing,
+    lookup_lw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
 ) where {FT <: AbstractFloat}
     (; nlay, ncol) = as
     nlev = nlay + 1
@@ -121,7 +121,7 @@ function rte_lw_noscat_solve_CUDA!(
     major_gpt2bnd,
     as::AbstractAtmosphericState{FT},
     lookup_lw::Union{LookUpLW, Nothing} = nothing,
-    lookup_lw_cld::Union{LookUpCld, Nothing} = nothing,
+    lookup_lw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
 ) where {FT <: AbstractFloat}
     gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
     nlev = nlay + 1
@@ -174,7 +174,7 @@ function rte_lw_solve!(
     max_threads,
     as::AbstractAtmosphericState{FT},
     lookup_lw::Union{LookUpLW, Nothing} = nothing,
-    lookup_lw_cld::Union{LookUpCld, Nothing} = nothing,
+    lookup_lw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
 ) where {FT <: AbstractFloat}
     (; nlay, ncol) = as
     nlev = nlay + 1
@@ -222,7 +222,7 @@ function rte_lw_2stream_solve_CUDA!(
     major_gpt2bnd::AbstractArray{UInt8, 1},
     as::AbstractAtmosphericState{FT},
     lookup_lw::Union{LookUpLW, Nothing} = nothing,
-    lookup_lw_cld::Union{LookUpCld, Nothing} = nothing,
+    lookup_lw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
 ) where {FT <: AbstractFloat}
     gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
     nlev = nlay + 1
@@ -248,7 +248,7 @@ end
         slv::Solver,
         max_threads::Int,
         lookup_lw::Union{LookUpLW, Nothing} = nothing,
-        lookup_lw_cld::Union{LookUpCld, Nothing} = nothing,
+        lookup_lw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
     )
 
 Solver for the shortwave radiation problem
@@ -257,7 +257,7 @@ function solve_sw!(
     slv::Solver,
     max_threads::Int,
     lookup_sw::Union{LookUpSW, Nothing} = nothing,
-    lookup_sw_cld::Union{LookUpCld, Nothing} = nothing,
+    lookup_sw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
 )
     (; as, op, bcs_sw, src_sw, flux_sw, fluxb_sw) = slv
     context = RTE.context(slv)
@@ -318,7 +318,7 @@ end
         max_threads,
         as::AbstractAtmosphericState{FT},
         lookup_sw::Union{LookUpSW, Nothing} = nothing,
-        lookup_sw_cld::Union{LookUpCld, Nothing} = nothing,
+        lookup_sw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
     ) where {FT<:AbstractFloat}
 
 No-scattering solver for the shortwave problem.
@@ -334,7 +334,7 @@ function rte_sw_noscat_solve!(
     max_threads,
     as::AbstractAtmosphericState{FT},
     lookup_sw::Union{LookUpSW, Nothing} = nothing,
-    lookup_sw_cld::Union{LookUpCld, Nothing} = nothing,
+    lookup_sw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
 ) where {FT <: AbstractFloat}
     (; nlay, ncol) = as
     nlev = nlay + 1
@@ -372,7 +372,7 @@ function rte_sw_noscat_solve_CUDA!(
     solar_src_scaled::AbstractArray{FT, 1},
     as::AbstractAtmosphericState{FT},
     lookup_sw::Union{LookUpSW, Nothing} = nothing,
-    lookup_sw_cld::Union{LookUpCld, Nothing} = nothing,
+    lookup_sw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
 ) where {FT <: AbstractFloat}
     gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
     nlev = nlay + 1
@@ -402,7 +402,7 @@ end
         max_threads,
         as::AbstractAtmosphericState{FT},
         lookup_sw::Union{LookUpSW, Nothing} = nothing,
-        lookup_sw_cld::Union{LookUpCld, Nothing} = nothing,
+        lookup_sw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
     ) where {FT<:AbstractFloat}
 
 Two stream solver for the shortwave problem.
@@ -419,7 +419,7 @@ function rte_sw_2stream_solve!(
     max_threads,
     as::AbstractAtmosphericState{FT},
     lookup_sw::Union{LookUpSW, Nothing} = nothing,
-    lookup_sw_cld::Union{LookUpCld, Nothing} = nothing,
+    lookup_sw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
 ) where {FT <: AbstractFloat}
     (; nlay, ncol) = as
     nlev = nlay + 1
@@ -482,7 +482,7 @@ function rte_sw_2stream_solve_CUDA!(
     solar_src_scaled::AbstractArray{FT, 1},
     as::AbstractAtmosphericState{FT},
     lookup_sw::Union{LookUpSW, Nothing} = nothing,
-    lookup_sw_cld::Union{LookUpCld, Nothing} = nothing,
+    lookup_sw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
 ) where {FT <: AbstractFloat}
     gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
     nlev = nlay + 1

@@ -39,7 +39,7 @@ function compute_col_gas_kernel!(
 end
 """
     compute_interp_fractions(
-        lkp::AbstractLookUp{FT},
+        lkp::AbstractLookUp,
         vmr,
         p_lay,
         t_lay,
@@ -50,16 +50,7 @@ end
 
 compute interpolation fractions for binary species parameter, pressure and temperature.
 """
-@inline function compute_interp_fractions(
-    lkp::AbstractLookUp{FT},
-    vmr,
-    p_lay,
-    t_lay,
-    tropo,
-    ibnd,
-    glay,
-    gcol,
-) where {FT <: AbstractFloat}
+@inline function compute_interp_fractions(lkp::AbstractLookUp, vmr, p_lay, t_lay, tropo, ibnd, glay, gcol)
     jftemp = compute_interp_frac_temp(lkp, t_lay, glay, gcol)
     jfpress = compute_interp_frac_press(lkp, p_lay, tropo, glay, gcol)
     jfη, col_mix = compute_interp_frac_η(lkp, vmr, tropo, jftemp[1], ibnd, glay, gcol)
@@ -68,7 +59,7 @@ end
 
 """
     compute_interp_frac_temp(
-        lkp::AbstractLookUp{FT},
+        lkp::AbstractLookUp,
         t_lay,
         glay,
         gcol,
@@ -76,7 +67,7 @@ end
 
 compute interpolation fraction for temperature.
 """
-@inline function compute_interp_frac_temp(lkp::AbstractLookUp{FT}, t_lay, glay, gcol) where {FT <: AbstractFloat}
+@inline function compute_interp_frac_temp(lkp::AbstractLookUp, t_lay, glay, gcol)
     (; Δ_t_ref, n_t_ref, t_ref) = lkp
 
     @inbounds jtemp = loc_lower(t_lay, Δ_t_ref, n_t_ref, t_ref)
@@ -110,32 +101,24 @@ end
 
 """
     compute_interp_frac_η(
-        lkp::AbstractLookUp{FT},
+        lkp::AbstractLookUp,
         vmr,
         tropo,
         jtemp,
         ibnd,
         glay,
         gcol,
-    ) where {FT<:AbstractFloat}
+    )
 
 Compute interpolation fraction for binary species parameter.
 """
-@inline function compute_interp_frac_η(
-    lkp::AbstractLookUp{FT},
-    vmr,
-    tropo,
-    jtemp,
-    ibnd,
-    glay,
-    gcol,
-) where {FT <: AbstractFloat}
+@inline function compute_interp_frac_η(lkp::AbstractLookUp, vmr, tropo, jtemp, ibnd, glay, gcol)
     (; n_η, key_species, vmr_ref) = lkp
     ig = view(key_species, :, tropo, ibnd)
 
     vmr1 = get_vmr(vmr, ig[1], glay, gcol)
     vmr2 = get_vmr(vmr, ig[2], glay, gcol)
-
+    FT = eltype(vmr1)
     itemp = 1
     @inbounds η_half = vmr_ref[tropo, ig[1] + 1, jtemp + itemp - 1] / vmr_ref[tropo, ig[2] + 1, jtemp + itemp - 1]
     col_mix1 = vmr1 + η_half * vmr2
@@ -161,7 +144,7 @@ end
 
 """
     compute_τ_ssa_lw_src!(
-        lkp::AbstractLookUp{FT},
+        lkp::AbstractLookUp,
         vmr,
         col_dry,
         igpt,
@@ -176,7 +159,7 @@ Compute optical thickness, single scattering albedo, asymmetry parameter
 and longwave sources whenever applicable.
 """
 @inline function compute_τ_ssa_lw_src!(
-    lkp::AbstractLookUp{FT},
+    lkp::AbstractLookUp,
     vmr,
     col_dry,
     igpt,
