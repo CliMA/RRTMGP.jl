@@ -307,13 +307,12 @@ function rte_sw_noscat_solve_kernel!(
     op::OneScalar{FT},
     bcs_sw::SwBCs{FT},
     igpt::Int,
-    solar_src_scaled::AbstractArray{FT, 1},
+    n_gpt::Int,
+    solar_frac::FT,
     gcol::Int,
     nlev::Int,
 ) where {FT <: AbstractFloat}
-    solar_frac = solar_src_scaled[igpt]
     (; toa_flux, zenith) = bcs_sw
-    n_gpt = length(solar_src_scaled)
     τ = op.τ
     (; flux_dn_dir, flux_net) = flux
     # downward propagation
@@ -434,12 +433,10 @@ function sw_source_2str!(
     gcol::Int,
     flux::FluxSW{FT},
     igpt::Int,
-    solar_src_scaled::AbstractArray{FT, 1},
-    major_gpt2bnd::AbstractArray{UInt8, 1},
+    solar_frac::FT,
+    ibnd::UInt8,
     nlay::Int,
 ) where {FT <: AbstractFloat}
-    ibnd = major_gpt2bnd[igpt]
-    solar_frac = solar_src_scaled[igpt]
     (; toa_flux, zenith, sfc_alb_direct) = bcs_sw
     (; Rdir, Tdir, Tnoscat, src_up, src_dn, sfc_source) = src_sw
     flux_dn_dir = flux.flux_dn_dir
@@ -477,12 +474,11 @@ function adding_sw!(
     gcol::Int,
     flux::FluxSW{FT},
     igpt::Int,
-    major_gpt2bnd::AbstractArray{UInt8, 1},
+    n_gpt::Int,
+    ibnd::UInt8,
     nlev::Int,
 ) where {FT <: AbstractFloat}
-    ibnd = major_gpt2bnd[igpt]
     nlay = nlev - 1
-    n_gpt = length(major_gpt2bnd)
     # destructuring
     (; flux_up, flux_dn, flux_dn_dir, flux_net) = flux
     (; albedo, sfc_source, Rdif, Tdif, src_up, src_dn, src) = src_sw
