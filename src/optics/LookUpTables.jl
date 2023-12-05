@@ -3,18 +3,18 @@ module LookUpTables
 using DocStringExtensions
 using Adapt
 
-export AbstractLookUp, LookUpLW, LookUpSW, LookUpCld
+export AbstractLookUp, LookUpLW, LookUpSW, LookUpCld, PadeCld
 
 """
-    AbstractLookUp{FT}
+    AbstractLookUp
 
 Abstract lookup table for longwave and shortwave problems.
 """
-abstract type AbstractLookUp{FT} end
+abstract type AbstractLookUp end
 
 """
     LookUpLW{FT,UI8A1D,IA1D,IA2D,IA3D,FTA1D,FTA2D,FTA3D,FTA4D} <: 
-        AbstractLookUp{FT}
+        AbstractLookUp
 
 Longwave lookup tables, used to compute optical properties. 
 
@@ -31,7 +31,7 @@ struct LookUpLW{
     FTA2D <: AbstractArray{FT, 2},
     FTA3D <: AbstractArray{FT, 3},
     FTA4D <: AbstractArray{FT, 4},
-} <: AbstractLookUp{FT}
+} <: AbstractLookUp
     "number of gases used in the lookup table"
     n_gases::Int
     "number of longwave bands"
@@ -401,7 +401,7 @@ end
 
 """
     LookUpSW{FT,UI8A1D,IA1D,IA2D,IA3D,FTA1D,FTA2D,FTA3D,FTA4D} <:
-        AbstractLookUp{FT}
+        AbstractLookUp
 
 Shortwave lookup tables, used to compute optical properties. 
 
@@ -418,7 +418,7 @@ struct LookUpSW{
     FTA2D <: AbstractArray{FT, 2},
     FTA3D <: AbstractArray{FT, 3},
     FTA4D <: AbstractArray{FT, 4},
-} <: AbstractLookUp{FT}
+} <: AbstractLookUp
     "number of gases used in the lookup table"
     n_gases::Int
     "number of shortwave bands"
@@ -785,11 +785,11 @@ function LookUpSW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
 end
 
 """
-    LookUpCld{FT,FTA1D,FTA2D,FTA3D,FTA4D}
+    LookUpCld{FT,FTA2D,FTA3D}
 
 Lookup table for cloud optics.
 
-This struct stores the tables and Pade coefficients for determing extinction coeffient, 
+This struct stores the lookup tables for determing extinction coeffient, 
 single-scattering albedo, and asymmetry parameter g as a function of effective radius.
 We compute the optical depth tau (=exintinction coeff * condensed water path)
 and the products tau*ssa and tau*ssa*g for liquid and ice cloud separately.
@@ -798,25 +798,7 @@ These are used to determine the optical properties of ice and water cloud togeth
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct LookUpCld{B, FT, FTA1D, FTA2D, FTA3D, FTA4D} <: AbstractLookUp{FT}
-    "number of bands"
-    nband::Int
-    "number of ice roughness types"
-    nrghice::Int
-    "number of liquid particle sizes"
-    nsize_liq::Int
-    "number of ice particle sizes"
-    nsize_ice::Int
-    "number of size regimes"
-    nsizereg::Int
-    "number of extinction coefficients for pade approximation"
-    ncoeff_ext::Int
-    "number of ssa/g coefficients for pade approximation"
-    ncoeff_ssa_g::Int
-    "number of size regime boundaries for pade interpolation"
-    nbound::Int
-    "pair = 2"
-    pair::Int
+struct LookUpCld{FT, FTA2D, FTA3D} <: AbstractLookUp
     "liquid particle size lower bound for LUT interpolation"
     radliq_lwr::FT
     "liquid particle size upper bound for LUT interpolation"
@@ -841,6 +823,82 @@ struct LookUpCld{B, FT, FTA1D, FTA2D, FTA3D, FTA4D} <: AbstractLookUp{FT}
     lut_ssaice::FTA3D
     "LUT ice asymmetry parameter (`nsize_ice, nband, nrghice`)"
     lut_asyice::FTA3D
+    "beginning and ending wavenumber for each band (`2, nband`) cm⁻¹"
+    bnd_lims_wn::FTA2D
+end
+Adapt.@adapt_structure LookUpCld
+
+# number of bands (cloud lookup table dimension)
+get_nband(lkp::LookUpCld) = size(lkp.lut_extliq, 2)
+# number of ice roughness types (cloud lookup table dimension)
+get_nrghice(lkp::LookUpCld) = size(lkp.lut_extice, 3)
+# number of liquid particle sizes (cloud lookup table dimension)
+get_nsize_liq(lkp::LookUpCld) = size(lkp.lut_extliq, 1)
+# number of ice particle sizes (cloud lookup table dimension)
+get_nsize_ice(lkp::LookUpCld) = size(lkp.lut_extice, 1)
+# pair = 2 (cloud lookup table dimension)
+get_pair(::LookUpCld) = 2
+
+function LookUpCld(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
+    FTA2D = DA{FT, 2}
+    FTA3D = DA{FT, 3}
+
+    nband = Int(ds.dim["nband"])
+    nrghice = Int(ds.dim["nrghice"])
+    nsize_liq = Int(ds.dim["nsize_liq"])
+    nsize_ice = Int(ds.dim["nsize_ice"])
+    pair = Int(ds.dim["pair"])
+
+    radliq_lwr = FT(Array(ds["radliq_lwr"]))
+    radliq_upr = FT(Array(ds["radliq_upr"]))
+    radliq_fac = FT(Array(ds["radliq_fac"]))
+
+    radice_lwr = FT(Array(ds["radice_lwr"]))
+    radice_upr = FT(Array(ds["radice_upr"]))
+    radice_fac = FT(Array(ds["radice_fac"]))
+
+    lut_extliq = FTA2D(Array(ds["lut_extliq"]))
+    lut_ssaliq = FTA2D(Array(ds["lut_ssaliq"]))
+    lut_asyliq = FTA2D(Array(ds["lut_asyliq"]))
+
+    lut_extice = FTA3D(Array(ds["lut_extice"]))
+    lut_ssaice = FTA3D(Array(ds["lut_ssaice"]))
+    lut_asyice = FTA3D(Array(ds["lut_asyice"]))
+
+    bnd_lims_wn = FTA2D(Array(ds["bnd_limits_wavenumber"]))
+
+    return (LookUpCld{FT, FTA2D, FTA3D}(
+        radliq_lwr,
+        radliq_upr,
+        radliq_fac,
+        radice_lwr,
+        radice_upr,
+        radice_fac,
+        lut_extliq,
+        lut_ssaliq,
+        lut_asyliq,
+        lut_extice,
+        lut_ssaice,
+        lut_asyice,
+        bnd_lims_wn,
+    ))
+end
+
+"""
+    PadeCld{FTA1D,FTA2D,FTA3D,FTA4D}
+
+Pade coefficients for cloud optics.
+
+This struct stores the Pade coefficients for determing extinction coeffient, 
+single-scattering albedo, and asymmetry parameter g as a function of effective radius.
+We compute the optical depth tau (=exintinction coeff * condensed water path)
+and the products tau*ssa and tau*ssa*g for liquid and ice cloud separately.
+These are used to determine the optical properties of ice and water cloud together.
+
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
+struct PadeCld{FTA1D, FTA2D, FTA3D, FTA4D} <: AbstractLookUp
     "pade coefficients for liquid extinction (`nband, nsizereg, ncoeff_ext`)"
     pade_extliq::FTA3D
     "pade coefficients for liquid single scattening albedo (`nband, nsizereg, ncoeff_ssa_g`)"
@@ -867,45 +925,28 @@ struct LookUpCld{B, FT, FTA1D, FTA2D, FTA3D, FTA4D} <: AbstractLookUp{FT}
     pade_sizreg_asyice::FTA1D
     "beginning and ending wavenumber for each band (`2, nband`) cm⁻¹"
     bnd_lims_wn::FTA2D
-    "use LUT (default) or pade interpolation"
-    use_lut::B
 end
-Adapt.@adapt_structure LookUpCld
+Adapt.@adapt_structure PadeCld
 
-function LookUpCld(ds, ::Type{FT}, ::Type{DA}, use_lut::Bool = true) where {FT <: AbstractFloat, DA}
+# number of bands for Pade approximation
+get_nband(lkp::PadeCld) = size(lkp.pade_extliq, 1)
+# number of size regimes for Pade approximation
+get_nsizereg(lkp::PadeCld) = size(lkp.pade_extliq, 2)
+# number of extinction coefficients for pade approximation
+get_ncoeff_ext(lkp::PadeCld) = size(lkp.pade_extliq, 3)
+# number of ssa/g coefficients for pade approximation
+get_ncoeff_ssa_g(lkp::PadeCld) = size(lkp.pade_ssaliq, 3)
+# number of size regime boundaries for pade interpolation
+get_nbound(lkp::PadeCld) = size(lkp.pade_sizreg_extliq, 1)
 
+function PadeCld(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     FTA1D = DA{FT, 1}
     FTA2D = DA{FT, 2}
     FTA3D = DA{FT, 3}
     FTA4D = DA{FT, 4}
 
-    nband = Int(ds.dim["nband"])
-    nrghice = Int(ds.dim["nrghice"])
-    nsize_liq = Int(ds.dim["nsize_liq"])
-    nsize_ice = Int(ds.dim["nsize_ice"])
     nsizereg = Int(ds.dim["nsizereg"])
-    ncoeff_ext = Int(ds.dim["ncoeff_ext"])
-    ncoeff_ssa_g = Int(ds.dim["ncoeff_ssa_g"])
-    nbound = Int(ds.dim["nbound"])
-    pair = Int(ds.dim["pair"])
-
     @assert nsizereg == 3 # RRTMGP pade approximation assumes exactly (3) size regimes
-
-    radliq_lwr = FT(Array(ds["radliq_lwr"]))
-    radliq_upr = FT(Array(ds["radliq_upr"]))
-    radliq_fac = FT(Array(ds["radliq_fac"]))
-
-    radice_lwr = FT(Array(ds["radice_lwr"]))
-    radice_upr = FT(Array(ds["radice_upr"]))
-    radice_fac = FT(Array(ds["radice_fac"]))
-
-    lut_extliq = FTA2D(Array(ds["lut_extliq"]))
-    lut_ssaliq = FTA2D(Array(ds["lut_ssaliq"]))
-    lut_asyliq = FTA2D(Array(ds["lut_asyliq"]))
-
-    lut_extice = FTA3D(Array(ds["lut_extice"]))
-    lut_ssaice = FTA3D(Array(ds["lut_ssaice"]))
-    lut_asyice = FTA3D(Array(ds["lut_asyice"]))
 
     pade_extliq = FTA3D(Array(ds["pade_extliq"]))
     pade_ssaliq = FTA3D(Array(ds["pade_ssaliq"]))
@@ -925,28 +966,7 @@ function LookUpCld(ds, ::Type{FT}, ::Type{DA}, use_lut::Bool = true) where {FT <
 
     bnd_lims_wn = FTA2D(Array(ds["bnd_limits_wavenumber"]))
 
-    return (LookUpCld{Bool, FT, FTA1D, FTA2D, FTA3D, FTA4D}(
-        nband,
-        nrghice,
-        nsize_liq,
-        nsize_ice,
-        nsizereg,
-        ncoeff_ext,
-        ncoeff_ssa_g,
-        nbound,
-        pair,
-        radliq_lwr,
-        radliq_upr,
-        radliq_fac,
-        radice_lwr,
-        radice_upr,
-        radice_fac,
-        lut_extliq,
-        lut_ssaliq,
-        lut_asyliq,
-        lut_extice,
-        lut_ssaice,
-        lut_asyice,
+    return (PadeCld{FTA1D, FTA2D, FTA3D, FTA4D}(
         pade_extliq,
         pade_ssaliq,
         pade_asyliq,
@@ -960,9 +980,7 @@ function LookUpCld(ds, ::Type{FT}, ::Type{DA}, use_lut::Bool = true) where {FT <
         pade_sizreg_ssaice,
         pade_sizreg_asyice,
         bnd_lims_wn,
-        use_lut,
     ))
-
 end
 
 end

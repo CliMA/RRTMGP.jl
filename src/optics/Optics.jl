@@ -140,7 +140,7 @@ end
         gcol::Int,
         igpt::Int,
         lkp::LookUpLW{FT},
-        lkp_cld::Union{LookUpCld,Nothing} = nothing,
+        lkp_cld::Union{LookUpCld,PadeCld,Nothing} = nothing,
     ) where {FT<:AbstractFloat}
 
 Computes optical properties for the longwave problem.
@@ -172,7 +172,7 @@ end
         gcol::Int,
         igpt::Int,
         lkp::LookUpSW{FT},
-        lkp_cld::Union{LookUpCld,Nothing} = nothing,
+        lkp_cld::Union{LookUpCld,PadeCld,Nothing} = nothing,
     ) where {FT<:AbstractFloat}
 
 Computes optical properties for the shortwave problem.

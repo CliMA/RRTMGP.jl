@@ -12,7 +12,7 @@ function compute_optical_props_kernel!(
     sf::AbstractSourceLW{FT},
     igpt,
     lkp::LookUpLW{FT},
-    lkp_cld::LookUpCld,
+    lkp_cld::Union{LookUpCld, PadeCld},
 ) where {FT <: AbstractFloat}
     ibnd = lkp.major_gpt2bnd[igpt]
 
@@ -43,7 +43,7 @@ function compute_optical_props_kernel!(
     gcol,
     igpt,
     lkp::LookUpSW{FT},
-    lkp_cld::LookUpCld,
+    lkp_cld::Union{LookUpCld, PadeCld},
 ) where {FT <: AbstractFloat}
     ibnd = lkp.major_gpt2bnd[igpt]
 
