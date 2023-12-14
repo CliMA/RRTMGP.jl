@@ -5,7 +5,8 @@ using DocStringExtensions
 
 import ..Parameters as RP
 
-export AbstractSourceLW, SourceLWNoScat, SourceLW2Str, SourceSW2Str, source_func_longwave, source_func_shortwave
+export AbstractSourceLW,
+    SourceLWNoScat, SourceLW2Str, SourceSW2Str, source_func_longwave, source_func_shortwave, SourceSW2Strc
 
 """
     AbstractSourceLW{FT,FTA1D,FTA2D}
@@ -234,6 +235,34 @@ struct SourceSW2Str{FT <: AbstractFloat, FTA1D <: AbstractArray{FT, 1}, FTA2D <:
     src::FTA2D
 end
 Adapt.@adapt_structure SourceSW2Str
+
+struct SourceSW2Strc{FTVA1D, FTA1D}
+    sfc_source::FTVA1D
+    albedo::FTA1D
+    src_up::FTA1D
+    src_dn::FTA1D
+    Rdif::FTA1D
+    Tdif::FTA1D
+    Rdir::FTA1D
+    Tdir::FTA1D
+    Tnoscat::FTA1D
+    src::FTA1D
+end
+Adapt.@adapt_structure SourceSW2Strc
+
+SourceSW2Strc(source::SourceSW2Str, gcol::Int) = SourceSW2Strc(
+    view(source.sfc_source, gcol:gcol),
+    view(source.albedo, :, gcol),
+    view(source.src_up, :, gcol),
+    view(source.src_dn, :, gcol),
+    view(source.Rdif, :, gcol),
+    view(source.Tdif, :, gcol),
+    view(source.Rdir, :, gcol),
+    view(source.Tdir, :, gcol),
+    view(source.Tnoscat, :, gcol),
+    view(source.src, :, gcol),
+)
+
 
 function SourceSW2Str(::Type{FT}, ::Type{DA}, nlay::Int, ncol::Int) where {FT <: AbstractFloat, DA}
     FTA1D = DA{FT, 1}

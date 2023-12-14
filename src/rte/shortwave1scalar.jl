@@ -1,54 +1,114 @@
-"""
-    rte_sw_noscat_solve!(
-        context,
-        flux::FluxSW{FT},
-        flux_sw::FluxSW{FT},
-        op::OneScalar{FT},
-        bcs_sw::SwBCs{FT},
-        solar_src_scaled::AbstractArray{FT,1},
-        max_threads,
-        as::AbstractAtmosphericState{FT},
-        lookup_sw::Union{LookUpSW, Nothing} = nothing,
-        lookup_sw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
-    ) where {FT<:AbstractFloat}
-
-No-scattering solver for the shortwave problem.
-(Extinction-only i.e. solar direct beam)
-"""
 function rte_sw_noscat_solve!(
-    context,
+    device::ClimaComms.AbstractCPUDevice,
+    flux_sw::FluxSW{FT},
+    op::OneScalar{FT},
+    bcs_sw::SwBCs{FT},
+    max_threads,
+    as::GrayAtmosphericState{FT},
+) where {FT <: AbstractFloat}
+    (; nlay, ncol) = as
+    nlev = nlay + 1
+    n_gpt, igpt = 1, 1
+    solar_frac = FT(1)
+    # setting references for flux_sw
+    @inbounds begin
+        ClimaComms.@threaded device for gcol in 1:ncol
+            set_flux_to_zero!(flux_sw, gcol)
+            compute_optical_props!(op, as, gcol, igpt, nothing, nothing)
+            rte_sw_noscat_solve_kernel!(flux_sw, op, bcs_sw, igpt, n_gpt, solar_frac, gcol, nlev)
+        end
+    end
+    return nothing
+end
+
+function rte_sw_noscat_solve!(
+    device::ClimaComms.CUDADevice,
+    flux_sw::FluxSW{FT},
+    op::OneScalar{FT},
+    bcs_sw::SwBCs{FT},
+    max_threads,
+    as::GrayAtmosphericState{FT},
+) where {FT <: AbstractFloat}
+    (; nlay, ncol) = as
+    nlev = nlay + 1
+    # setting references for flux_sw
+    tx = min(ncol, max_threads)
+    bx = cld(ncol, tx)
+    args = (flux_sw, op, bcs_sw, nlay, ncol, as)
+    @cuda threads = (tx) blocks = (bx) rte_sw_noscat_solve_CUDA!(args...)
+    return nothing
+end
+
+function rte_sw_noscat_solve_CUDA!(
+    flux_sw::FluxSW{FT},
+    op::OneScalar{FT},
+    bcs_sw::SwBCs{FT},
+    nlay,
+    ncol,
+    as::GrayAtmosphericState{FT},
+) where {FT <: AbstractFloat}
+    gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
+    nlev = nlay + 1
+    n_gpt, igpt = 1, 1
+    solar_frac = FT(1)
+    # setting references for flux_sw
+    if gcol ≤ ncol
+        @inbounds begin
+            set_flux_to_zero!(flux_sw, gcol)
+            compute_optical_props!(op, as, gcol, igpt, nothing, nothing)
+            rte_sw_noscat_solve_kernel!(flux_sw, op, bcs_sw, igpt, n_gpt, solar_frac, gcol, nlev)
+        end
+    end
+    return nothing
+end
+
+function rte_sw_noscat_solve!(
+    device::ClimaComms.AbstractCPUDevice,
     flux::FluxSW{FT},
     flux_sw::FluxSW{FT},
     op::OneScalar{FT},
     bcs_sw::SwBCs{FT},
-    solar_src_scaled::AbstractArray{FT, 1},
     max_threads,
-    as::AbstractAtmosphericState{FT},
-    lookup_sw::Union{LookUpSW, Nothing} = nothing,
+    as::AtmosphericState{FT},
+    lookup_sw::LookUpSW,
     lookup_sw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
 ) where {FT <: AbstractFloat}
     (; nlay, ncol) = as
     nlev = nlay + 1
-    n_gpt = length(solar_src_scaled)
-    device = ClimaComms.device(context)
+    n_gpt = length(lookup_sw.solar_src_scaled)
     # setting references for flux_sw
-    if device isa ClimaComms.CUDADevice
-        tx = min(ncol, max_threads)
-        bx = cld(ncol, tx)
-        args = (flux, flux_sw, op, bcs_sw, nlay, ncol, solar_src_scaled, as, lookup_sw, lookup_sw_cld)
-        @cuda threads = (tx) blocks = (bx) rte_sw_noscat_solve_CUDA!(args...)
-    else
-        @inbounds begin
-            for igpt in 1:n_gpt
-                ClimaComms.@threaded device for gcol in 1:ncol
-                    igpt == 1 && set_flux_to_zero!(flux_sw, gcol)
-                    compute_optical_props!(op, as, gcol, igpt, lookup_sw, lookup_sw_cld)
-                    rte_sw_noscat_solve_kernel!(flux, op, bcs_sw, igpt, solar_src_scaled, gcol, nlev)
-                    n_gpt > 1 && add_to_flux!(flux_sw, flux, gcol)
-                end
+    @inbounds begin
+        for igpt in 1:n_gpt
+            ClimaComms.@threaded device for gcol in 1:ncol
+                igpt == 1 && set_flux_to_zero!(flux_sw, gcol)
+                compute_optical_props!(op, as, gcol, igpt, lookup_sw, lookup_sw_cld)
+                solar_frac = as isa GrayAtmosphericState ? FT(1) : lookup_sw.solar_src_scaled[igpt]
+                rte_sw_noscat_solve_kernel!(flux, op, bcs_sw, igpt, n_gpt, solar_frac, gcol, nlev)
+                n_gpt > 1 && add_to_flux!(flux_sw, flux, gcol)
             end
         end
     end
+    return nothing
+end
+
+function rte_sw_noscat_solve!(
+    device::ClimaComms.CUDADevice,
+    flux::FluxSW{FT},
+    flux_sw::FluxSW{FT},
+    op::OneScalar{FT},
+    bcs_sw::SwBCs{FT},
+    max_threads,
+    as::AtmosphericState{FT},
+    lookup_sw::LookUpSW,
+    lookup_sw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
+) where {FT <: AbstractFloat}
+    (; nlay, ncol) = as
+    nlev = nlay + 1
+    # setting references for flux_sw
+    tx = min(ncol, max_threads)
+    bx = cld(ncol, tx)
+    args = (flux, flux_sw, op, bcs_sw, nlay, ncol, as, lookup_sw, lookup_sw_cld)
+    @cuda threads = (tx) blocks = (bx) rte_sw_noscat_solve_CUDA!(args...)
     return nothing
 end
 
@@ -59,20 +119,20 @@ function rte_sw_noscat_solve_CUDA!(
     bcs_sw::SwBCs{FT},
     nlay,
     ncol,
-    solar_src_scaled::AbstractArray{FT, 1},
-    as::AbstractAtmosphericState{FT},
-    lookup_sw::Union{LookUpSW, Nothing} = nothing,
+    as::AtmosphericState{FT},
+    lookup_sw::LookUpSW,
     lookup_sw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
 ) where {FT <: AbstractFloat}
     gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
     nlev = nlay + 1
-    n_gpt = length(solar_src_scaled)
+    n_gpt = length(lookup_sw.solar_src_scaled)
     # setting references for flux_sw
     if gcol ≤ ncol
+        set_flux_to_zero!(flux_sw, gcol)
         @inbounds for igpt in 1:n_gpt
-            igpt == 1 && set_flux_to_zero!(flux_sw, gcol)
             compute_optical_props!(op, as, gcol, igpt, lookup_sw, lookup_sw_cld)
-            rte_sw_noscat_solve_kernel!(flux, op, bcs_sw, igpt, solar_src_scaled, gcol, nlev)
+            solar_frac = as isa GrayAtmosphericState ? FT(1) : lookup_sw.solar_src_scaled[igpt]
+            rte_sw_noscat_solve_kernel!(flux, op, bcs_sw, igpt, n_gpt, solar_frac, gcol, nlev)
             n_gpt > 1 && add_to_flux!(flux_sw, flux, gcol)
         end
     end
@@ -97,13 +157,14 @@ function rte_sw_noscat_solve_kernel!(
     op::OneScalar{FT},
     bcs_sw::SwBCs{FT},
     igpt::Int,
-    solar_src_scaled::AbstractArray{FT, 1},
+    n_gpt::Int,
+    solar_frac::FT,
     gcol::Int,
     nlev::Int,
 ) where {FT <: AbstractFloat}
-    solar_frac = solar_src_scaled[igpt]
+    #solar_frac = solar_src_scaled[igpt]
     (; toa_flux, zenith) = bcs_sw
-    n_gpt = length(solar_src_scaled)
+    #n_gpt = length(solar_src_scaled)
     τ = op.τ
     (; flux_dn_dir, flux_net) = flux
     # downward propagation

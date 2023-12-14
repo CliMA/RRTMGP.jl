@@ -208,7 +208,8 @@ function gray_atmos_sw_test(
 
     if device isa ClimaComms.CPUSingleThreaded
         JET.@test_opt solve_sw!(slv, max_threads)
-        @test_broken (@allocated solve_sw!(slv, max_threads)) == 0
+        @test (@allocated solve_sw!(slv, max_threads)) == 0
+        #@test_broken (@allocated solve_sw!(slv, max_threads)) == 0
         @test (@allocated solve_sw!(slv, max_threads)) ≤ 256
     end
 end

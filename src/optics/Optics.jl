@@ -15,7 +15,7 @@ using ..AngularDiscretizations
 import ..Parameters as RP
 #---------------------------------------
 
-export AbstractOpticalProps, OneScalar, TwoStream, compute_col_gas!, compute_optical_props!
+export AbstractOpticalProps, OneScalar, TwoStream, compute_col_gas!, compute_optical_props!, OneScalarc, TwoStreamc
 
 """
     AbstractOpticalProps{FT,FTA2D}
@@ -49,6 +49,14 @@ function OneScalar(::Type{FT}, ncol::Int, nlay::Int, ::Type{DA}) where {FT <: Ab
     return OneScalar{eltype(τ), typeof(τ), typeof(ad)}(τ, ad)
 end
 
+struct OneScalarc{FTA1D, AD}
+    τ::FTA1D
+    angle_disc::AD
+end
+Adapt.@adapt_structure OneScalarc
+
+OneScalarc(op::OneScalar, gcol::Int) = OneScalarc(view(op.τ, :, gcol), op.angle_disc)
+
 """
     TwoStream{FT,FTA2D} <: AbstractOpticalProps{FT,FTA2D}
 
@@ -74,6 +82,14 @@ function TwoStream(::Type{FT}, ncol::Int, nlay::Int, ::Type{DA}) where {FT <: Ab
     g = DA{FT, 2}(zeros(nlay, ncol))
     return TwoStream{eltype(τ), typeof(τ)}(τ, ssa, g)
 end
+
+struct TwoStreamc{FTA1D}
+    τ::FTA1D
+    ssa::FTA1D
+    g::FTA1D
+end
+Adapt.@adapt_structure TwoStreamc
+TwoStreamc(op::TwoStream, gcol::Int) = TwoStreamc(view(op.τ, :, gcol), view(op.ssa, :, gcol), view(op.g, :, gcol))
 
 """
     compute_col_gas!(

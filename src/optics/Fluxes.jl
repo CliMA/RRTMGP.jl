@@ -3,7 +3,7 @@ module Fluxes
 using Adapt
 using DocStringExtensions
 
-export AbstractFlux, FluxLW, FluxSW, set_flux_to_zero!, add_to_flux!
+export AbstractFlux, FluxLW, FluxSW, set_flux_to_zero!, add_to_flux!, get_col_view, FluxSWc
 
 abstract type AbstractFlux{FT <: AbstractFloat, FTA2D <: AbstractArray{FT, 2}} end
 
@@ -64,6 +64,21 @@ function FluxSW(ncol::Int, nlay::Int, ::Type{FT}, ::Type{DA}) where {FT <: Abstr
     return FluxSW{FT, typeof(flux_net)}(flux_up, flux_dn, flux_net, flux_dn_dir)
 end
 
+struct FluxSWc{FTA1D}
+    flux_up::FTA1D
+    flux_dn::FTA1D
+    flux_net::FTA1D
+    flux_dn_dir::FTA1D
+end
+FluxSWc(flux_up, flux_dn, flux_net, flux_dn_dir) = FluxSWc{typeof(flux_up)}(flux_up, flux_dn, flux_net, flux_dn_dir)
+Adapt.@adapt_structure FluxSWc
+FluxSWc(flux::FluxSW, gcol::Int) = FluxSWc(
+    view(flux.flux_up, :, gcol),
+    view(flux.flux_dn, :, gcol),
+    view(flux.flux_net, :, gcol),
+    view(flux.flux_dn_dir, :, gcol),
+)
+
 """
     set_flux_to_zero!(flux::FluxLW{FT}) where {FT<:AbstractFloat}
 
@@ -121,6 +136,15 @@ function set_flux_to_zero!(flux::FluxSW{FT}, gcol::Int) where {FT <: AbstractFlo
         flux_net[ilev, gcol] = FT(0)
         flux_dn_dir[ilev, gcol] = FT(0)
     end
+    return nothing
+end
+function set_flux_to_zero!(flux::FluxSWc)
+    (; flux_up, flux_dn, flux_net, flux_dn_dir) = flux
+    zval = zero(flux_up[1])
+    map!(x -> zval, flux_up, flux_up)
+    map!(x -> zval, flux_dn, flux_dn)
+    map!(x -> zval, flux_net, flux_net)
+    map!(x -> zval, flux_dn_dir, flux_dn_dir)
     return nothing
 end
 
@@ -189,5 +213,12 @@ function add_to_flux!(flux1::FluxSW, flux2::FluxSW, gcol)
     end
     return nothing
 end
+
+get_col_view(flux::FluxSW, gcol::Int) = (
+    view(flux.flux_up, :, gcol),
+    view(flux.flux_dn, :, gcol),
+    view(flux.flux_dn_dir, :, gcol),
+    view(flux.flux_net, :, gcol),
+)
 
 end
