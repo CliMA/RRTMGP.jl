@@ -293,7 +293,7 @@ function rte_sw!(
     nlay = nlev - 1
     toa_flux = bcs_sw.toa_flux[1]
     sfc_alb_direct = bcs_sw.sfc_alb_direct[ibnd]
-    μ₀ = FT(cos(bcs_sw.zenith[1]))
+    μ₀ = bcs_sw.cos_zenith[1]
     τ_sum = FT(0)
     for ilay in 1:nlay
         @inbounds τ_sum += τ[ilay]

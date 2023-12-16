@@ -163,14 +163,14 @@ function rte_sw_noscat_solve_kernel!(
     nlev::Int,
 ) where {FT <: AbstractFloat}
     #solar_frac = solar_src_scaled[igpt]
-    (; toa_flux, zenith) = bcs_sw
+    (; toa_flux, cos_zenith) = bcs_sw
     #n_gpt = length(solar_src_scaled)
     τ = op.τ
     (; flux_dn_dir, flux_net) = flux
     # downward propagation
-    @inbounds flux_dn_dir[nlev, gcol] = toa_flux[gcol] * solar_frac * cos(zenith[gcol])
+    @inbounds flux_dn_dir[nlev, gcol] = toa_flux[gcol] * solar_frac * cos_zenith[gcol]
     @inbounds for ilev in (nlev - 1):-1:1
-        flux_dn_dir[ilev, gcol] = flux_dn_dir[ilev + 1, gcol] * exp(-τ[ilev, gcol] / cos(zenith[gcol]))
+        flux_dn_dir[ilev, gcol] = flux_dn_dir[ilev + 1, gcol] * exp(-τ[ilev, gcol] / cos_zenith[gcol])
         flux_net[ilev, gcol] = -flux_dn_dir[ilev, gcol]
     end
 end
