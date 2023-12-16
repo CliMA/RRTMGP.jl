@@ -192,7 +192,7 @@ function gray_atmos_sw_test(
 
     τ = Array(slv.op.τ)
     zenith = Array(zenith)
-    flux_dn_dir = Array(slv.flux_sw.flux_dn_dir)
+    flux_dn_dir_bot = Array(slv.flux_sw.flux_dn_dir)[1]
     toa_flux = Array(toa_flux)
 
     # testing with exact solution
@@ -200,7 +200,7 @@ function gray_atmos_sw_test(
     exact = (toa_flux[1] * cos(zenith[1])) * exp(-ot_tot)
 
     rel_toler = FT(0.001)
-    rel_error = abs(flux_dn_dir[1] - exact) / exact
+    rel_error = abs(flux_dn_dir_bot - exact) / exact
     println("*************************************************")
     println("Running shortwave test for gray atmosphere model - $(opc); ncol = $ncol; context = $context")
     println("relative error = $rel_error")
