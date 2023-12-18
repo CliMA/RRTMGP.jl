@@ -216,65 +216,69 @@ function pade_eval(ibnd, re, irad, m, n, pade_coeffs, irgh::Union{Int, Nothing} 
 end
 
 """
-    build_cloud_mask!(cld_mask, cld_frac, random_arr, gcol, igpt, ::MaxRandomOverlap)
+    build_cloud_mask!(cld_mask, cld_frac, ::MaxRandomOverlap)
 
 Builds McICA-sampled cloud mask from cloud fraction data for maximum-random overlap
 
 Reference: https://github.com/AER-RC/RRTMG_SW/
 """
-function build_cloud_mask!(cld_mask, cld_frac, random_arr, gcol, igpt, ::MaxRandomOverlap)
+function build_cloud_mask!(
+    cld_mask::AbstractArray{Bool, 1},
+    cld_frac::AbstractArray{FT, 1},
+    ::MaxRandomOverlap,
+) where {FT}
+    nlay = size(cld_frac, 1)
+    start = _get_start(cld_frac) # first cloudy layer
 
-    FT = eltype(cld_frac)
-    local_rand = view(random_arr, :, gcol)
-    local_cld_frac = view(cld_frac, :, gcol)
-    local_cld_mask = view(cld_mask, :, gcol)
-    nlay = size(local_rand, 1)
-
-    Random.rand!(local_rand)
-    start = 0
-    @inbounds for ilay in 1:nlay # for GPU compatibility (start = findfirst(local_cld_frac .> FT(0)))
-        if local_cld_frac[ilay] > FT(0)
-            start = ilay
-            break
+    if start > 0
+        finish = _get_finish(cld_frac) # last cloudy layer
+        # set cloud mask for non-cloudy layers
+        _mask_outer_non_cloudy_layers!(cld_mask, start, finish)
+        # RRTMG uses random_arr[finish] > (FT(1) - cld_frac[finish]), 
+        # we change > to >= to address edge cases
+        @inbounds cld_frac_ilayplus1 = cld_frac[finish]
+        random_ilayplus1 = Random.rand()
+        @inbounds cld_mask[finish] = cld_mask_ilayplus1 = random_ilayplus1 >= (FT(1) - cld_frac_ilayplus1)
+        for ilay in (finish - 1):-1:start
+            @inbounds cld_frac_ilay = cld_frac[ilay]
+            if cld_frac_ilay > FT(0)
+                # use same random number from the layer above if layer above is cloudy
+                # update random numbers if layer above is not cloudy
+                random_ilay = cld_mask_ilayplus1 ? random_ilayplus1 : Random.rand() * (FT(1) - cld_frac_ilayplus1)
+                # RRTMG uses random_arr[ilay] > (FT(1) - cld_frac[ilay]), we change > to >= to address edge cases
+                cld_mask_ilay = random_ilay >= (FT(1) - cld_frac_ilay)
+                @inbounds cld_mask[ilay] = cld_mask_ilay
+                random_ilayplus1 = random_ilay
+            end
+            cld_frac_ilayplus1 = cld_frac_ilay
+            cld_mask_ilayplus1 = cld_mask_ilay
         end
     end
+    return nothing
+end
 
-    if start == 0 # no clouds in entire column
-        @inbounds for ilay in 1:nlay
-            local_cld_mask[ilay] = false
+function _get_finish(cld_frac)
+    @inbounds for ilay in reverse(eachindex(cld_frac))
+        cld_frac[ilay] > 0 && return ilay
+    end
+    return 0
+end
+
+function _get_start(cld_frac)
+    @inbounds for ilay in eachindex(cld_frac)
+        cld_frac[ilay] > 0 && return ilay
+    end
+    return 0
+end
+
+function _mask_outer_non_cloudy_layers!(cld_mask, start, finish)
+    if start > 0
+        for ilay in 1:(start - 1)
+            @inbounds cld_mask[ilay] = false
         end
-    else
-        # finish = findlast(local_cld_frac .> FT(0)) # for GPU compatibility
-        finish = start
-        @inbounds for ilay in nlay:-1:(start + 1)
-            if local_cld_frac[ilay] > FT(0)
-                finish = ilay
-                break
-            end
-        end
-        # set cloud mask for non-cloudy layers
-        @inbounds for ilay in 1:(start - 1)
-            local_cld_mask[ilay] = false
-        end
-        @inbounds for ilay in (finish + 1):nlay
-            local_cld_mask[ilay] = false
-        end
-        # set cloud mask for cloudy layers
-        # last layer
-        # RRTMG uses local_rand[finish] > (FT(1) - local_cld_frac[finish]), we change > to >= to address edge cases
-        @inbounds local_cld_mask[finish] = local_rand[finish] >= (FT(1) - local_cld_frac[finish])
-        @inbounds for ilay in (finish - 1):-1:start
-            if local_cld_frac[ilay] > FT(0)
-                if local_cld_mask[ilay + 1]
-                    local_rand[ilay] = local_rand[ilay + 1] # use same random number from the layer above if layer above is cloudy
-                else
-                    local_rand[ilay] *= (FT(1) - local_cld_frac[ilay + 1]) # update random numbers if layer above is not cloudy
-                end
-                # RRTMG uses local_rand[ilay] > (FT(1) - local_cld_frac[ilay]), we change > to >= to address edge cases
-                local_cld_mask[ilay] = local_rand[ilay] >= (FT(1) - local_cld_frac[ilay])
-            else
-                local_cld_mask[ilay] = false
-            end
+        nlay = length(cld_mask)
+        for ilay in (finish + 1):nlay
+            @inbounds cld_mask[ilay] = false
         end
     end
     return nothing

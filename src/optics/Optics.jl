@@ -194,20 +194,31 @@ end
 Computes optical properties for the shortwave problem.
 """
 function compute_optical_props!(
-    op::AbstractOpticalProps{FT},
-    as::AtmosphericState{FT},
+    op::AbstractOpticalProps,
+    as::AtmosphericState,
     gcol::Int,
     igpt::Int,
-    lkp::Union{AbstractLookUp, Nothing} = nothing,
-    lkp_cld::Union{AbstractLookUp, Nothing} = nothing,
-) where {FT <: AbstractFloat}
+    lkp::LookUpSW,
+    ::Nothing,
+)
     nlay = as.nlay
     @inbounds for ilay in 1:nlay
-        if lkp_cld isa Nothing
-            compute_optical_props_kernel!(op, as, ilay, gcol, igpt, lkp)
-        else
-            compute_optical_props_kernel!(op, as, ilay, gcol, igpt, lkp, lkp_cld)
-        end
+        compute_optical_props_kernel!(op, as, ilay, gcol, igpt, lkp)
+    end
+    return nothing
+end
+
+function compute_optical_props!(
+    op::AbstractOpticalProps,
+    as::AtmosphericState,
+    gcol::Int,
+    igpt::Int,
+    lkp::LookUpSW,
+    lkp_cld::Union{LookUpCld, PadeCld},
+)
+    nlay = as.nlay
+    @inbounds for ilay in 1:nlay
+        compute_optical_props_kernel!(op, as, ilay, gcol, igpt, lkp, lkp_cld)
     end
     return nothing
 end
