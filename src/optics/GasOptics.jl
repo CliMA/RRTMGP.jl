@@ -51,28 +51,27 @@ end
 compute interpolation fractions for binary species parameter, pressure and temperature.
 """
 @inline function compute_interp_fractions(lkp::AbstractLookUp, vmr, p_lay, t_lay, tropo, ibnd, glay, gcol)
-    jftemp = compute_interp_frac_temp(lkp, t_lay, glay, gcol)
-    jfpress = compute_interp_frac_press(lkp, p_lay, tropo, glay, gcol)
-    jfη, col_mix = compute_interp_frac_η(lkp, vmr, tropo, jftemp[1], ibnd, glay, gcol)
+    (; Δ_t_ref, n_t_ref, t_ref) = lkp
+    (; Δ_ln_p_ref, p_ref, n_p_ref) = lkp
+    (; n_η, vmr_ref) = lkp
+    ig = view(lkp.key_species, 1:2, tropo, ibnd)
+    @inbounds vmr1 = get_vmr(vmr, ig[1], glay, gcol)
+    @inbounds vmr2 = get_vmr(vmr, ig[2], glay, gcol)
+
+    jftemp = compute_interp_frac_temp(Δ_t_ref, n_t_ref, t_ref, t_lay)
+    jfpress = compute_interp_frac_press(Δ_ln_p_ref, p_ref, n_p_ref, p_lay, tropo)
+    jfη, col_mix = compute_interp_frac_η(n_η, ig, vmr_ref, (vmr1, vmr2), tropo, jftemp[1])
     return (jftemp, jfpress, jfη, col_mix)
 end
 
 """
-    compute_interp_frac_temp(
-        lkp::AbstractLookUp,
-        t_lay,
-        glay,
-        gcol,
-    ) where {FT<:AbstractFloat}
+    compute_interp_frac_temp(Δ_t_ref, n_t_ref, t_ref, t_lay)
 
 compute interpolation fraction for temperature.
 """
-@inline function compute_interp_frac_temp(lkp::AbstractLookUp, t_lay, glay, gcol)
-    (; Δ_t_ref, n_t_ref, t_ref) = lkp
-
+@inline function compute_interp_frac_temp(Δ_t_ref, n_t_ref, t_ref, t_lay)
     @inbounds jtemp = loc_lower(t_lay, Δ_t_ref, n_t_ref, t_ref)
     @inbounds ftemp = (t_lay - t_ref[jtemp]) / Δ_t_ref
-
     return (jtemp, ftemp)
 end
 
@@ -87,8 +86,7 @@ end
 
 Compute interpolation fraction for pressure.
 """
-@inline function compute_interp_frac_press(lkp::AbstractLookUp, p_lay, tropo, glay, gcol)
-    (; Δ_ln_p_ref, p_ref, n_p_ref) = lkp
+@inline function compute_interp_frac_press(Δ_ln_p_ref, p_ref, n_p_ref, p_lay, tropo)
 
     log_p_lay = log(p_lay)
     @inbounds jpress = Int(min(max(fld(log(p_ref[1]) - log_p_lay, Δ_ln_p_ref) + 1, 1), n_p_ref - 1) + 1)
@@ -112,12 +110,7 @@ end
 
 Compute interpolation fraction for binary species parameter.
 """
-@inline function compute_interp_frac_η(lkp::AbstractLookUp, vmr, tropo, jtemp, ibnd, glay, gcol)
-    (; n_η, key_species, vmr_ref) = lkp
-    ig = view(key_species, :, tropo, ibnd)
-
-    vmr1 = get_vmr(vmr, ig[1], glay, gcol)
-    vmr2 = get_vmr(vmr, ig[2], glay, gcol)
+@inline function compute_interp_frac_η(n_η, ig, vmr_ref, (vmr1, vmr2), tropo, jtemp)
     FT = eltype(vmr1)
     itemp = 1
     @inbounds η_half = vmr_ref[tropo, ig[1] + 1, jtemp + itemp - 1] / vmr_ref[tropo, ig[2] + 1, jtemp + itemp - 1]
@@ -165,7 +158,7 @@ and longwave sources whenever applicable.
     igpt,
     ibnd,
     p_lay::FT,
-    t_lay,
+    t_lay::FT,
     glay,
     gcol,
     src_args...,
