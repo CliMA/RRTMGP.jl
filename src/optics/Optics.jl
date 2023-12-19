@@ -167,15 +167,75 @@ function compute_optical_props!(
     sf::AbstractSourceLW{FT},
     gcol::Int,
     igpt::Int,
-    lkp::Union{AbstractLookUp, Nothing} = nothing,
-    lkp_cld::Union{AbstractLookUp, Nothing} = nothing,
+    lkp::LookUpLW,
+    ::Nothing,
 ) where {FT <: AbstractFloat}
-    nlay = as.nlay
-    @inbounds for ilay in 1:nlay
-        if lkp_cld isa Nothing
-            compute_optical_props_kernel!(op, as, ilay, gcol, sf, igpt, lkp)
-        else
-            compute_optical_props_kernel!(op, as, ilay, gcol, sf, igpt, lkp, lkp_cld)
+    (; nlay, vmr) = as
+    @inbounds ibnd = lkp.major_gpt2bnd[igpt]
+    @inbounds t_sfc = as.t_sfc[gcol]
+    is2stream = op isa TwoStream
+    planck_args = (lkp.t_planck, lkp.totplnk, ibnd)
+    @inbounds for glay in 1:nlay
+        col_dry = as.col_dry[glay, gcol]
+        p_lay = as.p_lay[glay, gcol]
+        t_lay = as.t_lay[glay, gcol]
+        # gas optics
+        τ, ssa, g = compute_gas_optics(lkp, vmr, col_dry, igpt, ibnd, p_lay, t_lay, glay, gcol)
+        op.τ[glay, gcol] = τ
+        if is2stream
+            op.ssa[glay, gcol] = ssa
+            op.g[glay, gcol] = g
+        end
+        # compute Planck sources
+        p_frac = compute_lw_planck_fraction(lkp, vmr, p_lay, t_lay, igpt, ibnd, glay, gcol)
+
+        sf.lay_source[glay, gcol] = interp1d(t_lay, planck_args...) * p_frac
+        sf.lev_source_inc[glay, gcol] = interp1d(as.t_lev[glay + 1, gcol], planck_args...) * p_frac
+        sf.lev_source_dec[glay, gcol] = interp1d(as.t_lev[glay, gcol], planck_args...) * p_frac
+
+        if glay == 1
+            sf.sfc_source[gcol] = interp1d(t_sfc, planck_args...) * p_frac
+        end
+    end
+    return nothing
+end
+
+function compute_optical_props!(
+    op::TwoStream,
+    as::AtmosphericState,
+    sf::AbstractSourceLW,
+    gcol::Int,
+    igpt::Int,
+    lkp::LookUpLW,
+    lkp_cld::Union{LookUpCld, PadeCld},
+)
+    (; nlay, vmr) = as
+    @inbounds ibnd = lkp.major_gpt2bnd[igpt]
+    @inbounds t_sfc = as.t_sfc[gcol]
+    is2stream = op isa TwoStream
+    planck_args = (lkp.t_planck, lkp.totplnk, ibnd)
+    @inbounds for glay in 1:nlay
+        col_dry = as.col_dry[glay, gcol]
+        p_lay = as.p_lay[glay, gcol]
+        t_lay = as.t_lay[glay, gcol]
+        # gas optics
+        τ, ssa, g = compute_gas_optics(lkp, vmr, col_dry, igpt, ibnd, p_lay, t_lay, glay, gcol)
+        op.τ[glay, gcol] = τ
+        if is2stream
+            op.ssa[glay, gcol] = ssa
+            op.g[glay, gcol] = g
+        end
+        # add cloud optics
+        add_cloud_optics_2stream(op, as, lkp, lkp_cld, glay, gcol, ibnd, igpt)
+        # compute Planck sources
+        p_frac = compute_lw_planck_fraction(lkp, vmr, p_lay, t_lay, igpt, ibnd, glay, gcol)
+
+        sf.lay_source[glay, gcol] = interp1d(t_lay, planck_args...) * p_frac
+        sf.lev_source_inc[glay, gcol] = interp1d(as.t_lev[glay + 1, gcol], planck_args...) * p_frac
+        sf.lev_source_dec[glay, gcol] = interp1d(as.t_lev[glay, gcol], planck_args...) * p_frac
+
+        if glay == 1
+            sf.sfc_source[gcol] = interp1d(t_sfc, planck_args...) * p_frac
         end
     end
     return nothing
@@ -201,24 +261,42 @@ function compute_optical_props!(
     lkp::LookUpSW,
     ::Nothing,
 )
-    nlay = as.nlay
-    @inbounds for ilay in 1:nlay
-        compute_optical_props_kernel!(op, as, ilay, gcol, igpt, lkp)
+    (; nlay, vmr) = as
+    is2stream = op isa TwoStream
+    @inbounds ibnd = lkp.major_gpt2bnd[igpt]
+    @inbounds for glay in 1:nlay
+        col_dry = as.col_dry[glay, gcol]
+        p_lay = as.p_lay[glay, gcol]
+        t_lay = as.t_lay[glay, gcol]
+        τ, ssa, g = compute_gas_optics(lkp, vmr, col_dry, igpt, ibnd, p_lay, t_lay, glay, gcol)
+        op.τ[glay, gcol] = τ
+        if is2stream
+            op.ssa[glay, gcol] = ssa
+            op.g[glay, gcol] = g
+        end
     end
     return nothing
 end
 
 function compute_optical_props!(
-    op::AbstractOpticalProps,
+    op::TwoStream,
     as::AtmosphericState,
     gcol::Int,
     igpt::Int,
     lkp::LookUpSW,
     lkp_cld::Union{LookUpCld, PadeCld},
 )
-    nlay = as.nlay
-    @inbounds for ilay in 1:nlay
-        compute_optical_props_kernel!(op, as, ilay, gcol, igpt, lkp, lkp_cld)
+    (; nlay, vmr) = as
+    @inbounds ibnd = lkp.major_gpt2bnd[igpt]
+    @inbounds for glay in 1:nlay
+        col_dry = as.col_dry[glay, gcol]
+        p_lay = as.p_lay[glay, gcol]
+        t_lay = as.t_lay[glay, gcol]
+        τ, ssa, g = compute_gas_optics(lkp, vmr, col_dry, igpt, ibnd, p_lay, t_lay, glay, gcol)
+        op.τ[glay, gcol] = τ
+        op.ssa[glay, gcol] = ssa
+        op.g[glay, gcol] = g
+        add_cloud_optics_2stream(op, as, lkp, lkp_cld, glay, gcol, ibnd, igpt) # add cloud optics
     end
     return nothing
 end
@@ -275,6 +353,9 @@ function compute_optical_props!(
     return nothing
 end
 
-include("OpticsKernels.jl")
+include("OpticsUtils.jl")
+include("GasOptics.jl")
+include("CloudOptics.jl")
+include("GrayOpticsKernels.jl")
 
 end
