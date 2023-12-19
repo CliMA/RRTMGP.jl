@@ -37,14 +37,14 @@ function compute_optical_props_kernel!(
 end
 
 function compute_optical_props_kernel!(
-    op::AbstractOpticalProps{FT},
-    as::AtmosphericState{FT},
+    op::AbstractOpticalProps,
+    as::AtmosphericState,
     glay,
     gcol,
     igpt,
-    lkp::LookUpSW{FT},
+    lkp::LookUpSW,
     lkp_cld::Union{LookUpCld, PadeCld},
-) where {FT <: AbstractFloat}
+)
     ibnd = lkp.major_gpt2bnd[igpt]
 
     compute_optical_props_kernel!(op, as, glay, gcol, igpt, lkp) # shortwave gas optics
@@ -79,13 +79,13 @@ function compute_optical_props_kernel!(
 end
 
 function compute_optical_props_kernel!(
-    op::AbstractOpticalProps{FT},
-    as::AtmosphericState{FT},
+    op::AbstractOpticalProps,
+    as::AtmosphericState,
     glay,
     gcol,
     igpt::Int,
-    lkp::LookUpSW{FT},
-) where {FT <: AbstractFloat}
+    lkp::LookUpSW,
+)
 
     vmr = as.vmr
     col_dry = as.col_dry[glay, gcol]
@@ -98,7 +98,7 @@ function compute_optical_props_kernel!(
 
     if op isa TwoStream
         @inbounds op.ssa[glay, gcol] = ssa
-        @inbounds op.g[glay, gcol] = FT(0) # initializing asymmetry parameter
+        @inbounds op.g[glay, gcol] = zero(p_lay) # initializing asymmetry parameter
     end
     return nothing
 end

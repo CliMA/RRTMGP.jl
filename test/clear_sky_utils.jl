@@ -66,7 +66,7 @@ function clear_sky(
     # reading rfmip data to atmospheric state
     ds_lw_in = Dataset(input_file, "r")
 
-    (as, sfc_emis, sfc_alb_direct, zenith, toa_flux, usecol) =
+    (as, sfc_emis, sfc_alb_direct, cos_zenith, toa_flux, usecol) =
         setup_rfmip_as(context, ds_lw_in, idx_gases, exp_no, lookup_lw, FT, VMR, max_threads, param_set)
     close(ds_lw_in)
 
@@ -86,7 +86,7 @@ function clear_sky(
     src_sw = source_func_shortwave(FT, ncol, nlay, opc, DA)        # allocating shortwave source function object
     inc_flux_diffuse = nothing
     sfc_alb_diffuse = FTA2D(deepcopy(sfc_alb_direct))
-    bcs_sw = SwBCs(zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse)
+    bcs_sw = SwBCs(cos_zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse)
 
     fluxb_sw = FluxSW(ncol, nlay, FT, DA) # flux storage for bandwise calculations
     flux_sw = FluxSW(ncol, nlay, FT, DA)  # shortwave fluxes for band calculations

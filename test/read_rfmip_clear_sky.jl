@@ -43,7 +43,7 @@ function setup_rfmip_as(
         end
     end
 
-    zenith = DA{FT, 1}(zenith)
+    cos_zenith = DA{FT, 1}(cos.(zenith))
     irrad = DA{FT, 1}(irrad)
     #--------------------------------------------------------------
 
@@ -162,7 +162,7 @@ function setup_rfmip_as(
         ),
         sfc_emis,
         sfc_alb,
-        zenith,
+        cos_zenith,
         irrad,
         usecol,
     )
