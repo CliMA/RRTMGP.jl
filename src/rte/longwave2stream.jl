@@ -52,11 +52,8 @@ function rte_lw_solve!(
                 ClimaComms.@threaded device for gcol in 1:ncol
                     igpt == 1 && set_flux_to_zero!(flux_lw, gcol)
                     bld_cld_mask && Optics.build_cloud_mask!(
-                        as.cld_mask_lw,
-                        as.cld_frac,
-                        as.random_lw,
-                        gcol,
-                        igpt,
+                        view(as.cld_mask_lw, :, gcol),
+                        view(as.cld_frac, :, gcol),
                         as.cld_mask_type,
                     )
                     compute_optical_props!(op, as, src_lw, gcol, igpt, lookup_lw, lookup_lw_cld)
@@ -91,7 +88,7 @@ function rte_lw_2stream_solve_CUDA!(
         @inbounds for igpt in 1:n_gpt
             igpt == 1 && set_flux_to_zero!(flux_lw, gcol)
             if as isa AtmosphericState && as.cld_mask_type isa AbstractCloudMask
-                Optics.build_cloud_mask!(as.cld_mask_lw, as.cld_frac, as.random_lw, gcol, igpt, as.cld_mask_type)
+                Optics.build_cloud_mask!(view(as.cld_mask_lw, :, gcol), view(as.cld_frac, :, gcol), as.cld_mask_type)
             end
             compute_optical_props!(op, as, src_lw, gcol, igpt, lookup_lw, lookup_lw_cld)
             rte_lw_2stream_combine_sources!(src_lw, gcol, nlev, ncol)

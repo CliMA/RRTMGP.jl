@@ -60,11 +60,8 @@ function rte_sw_2stream_solve!(
                 ClimaComms.@threaded device for gcol in 1:ncol
                     igpt == 1 && set_flux_to_zero!(flux_sw, gcol)
                     bld_cld_mask && Optics.build_cloud_mask!(
-                        as.cld_mask_sw,
-                        as.cld_frac,
-                        as.random_sw,
-                        gcol,
-                        igpt,
+                        view(as.cld_mask_sw, :, gcol),
+                        view(as.cld_frac, :, gcol),
                         as.cld_mask_type,
                     )
                     compute_optical_props!(op, as, gcol, igpt, lookup_sw, lookup_sw_cld)
@@ -100,7 +97,7 @@ function rte_sw_2stream_solve_CUDA!(
         @inbounds for igpt in 1:n_gpt
             igpt == 1 && set_flux_to_zero!(flux_sw, gcol)
             if as isa AtmosphericState && as.cld_mask_type isa AbstractCloudMask
-                Optics.build_cloud_mask!(as.cld_mask_sw, as.cld_frac, as.random_sw, gcol, igpt, as.cld_mask_type)
+                Optics.build_cloud_mask!(view(as.cld_mask_sw, :, gcol), view(as.cld_frac, :, gcol), as.cld_mask_type)
             end
             compute_optical_props!(op, as, gcol, igpt, lookup_sw, lookup_sw_cld)
             sw_two_stream!(op, src_sw, bcs_sw, gcol, nlay) # Cell properties: transmittance and reflectance for direct and diffuse radiation
