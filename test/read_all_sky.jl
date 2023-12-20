@@ -91,8 +91,6 @@ function setup_allsky_as(
     vmr_h2o = view(vmr.vmr, :, :, idx_gases["h2o"])
 
     cld_frac = zeros(FT, nlay, ncol)
-    random_lw = DA{FT}(undef, nlay, ncol)
-    random_sw = DA{FT}(undef, nlay, ncol)
     cld_mask_lw = zeros(Bool, nlay, ncol)
     cld_mask_sw = zeros(Bool, nlay, ncol)
     cld_r_eff_liq = zeros(FT, nlay, ncol)
@@ -155,7 +153,6 @@ function setup_allsky_as(
             typeof(p_lev),
             typeof(cld_r_eff_liq),
             typeof(cld_mask_lw),
-            typeof(random_lw),
             MaxRandomOverlap,
             typeof(vmr),
         }(
@@ -173,8 +170,6 @@ function setup_allsky_as(
             cld_path_liq,
             cld_path_ice,
             cld_frac,
-            random_lw,
-            random_sw,
             cld_mask_lw,
             cld_mask_sw,
             MaxRandomOverlap(),
