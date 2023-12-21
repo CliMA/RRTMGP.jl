@@ -209,7 +209,7 @@ function compute_optical_props!(
     lkp::LookUpLW,
     lkp_cld::Union{LookUpCld, PadeCld},
 )
-    (; nlay, vmr, ice_rgh) = as
+    (; nlay, vmr) = as
     @inbounds ibnd = lkp.major_gpt2bnd[igpt]
     @inbounds t_sfc = as.t_sfc[gcol]
     is2stream = op isa TwoStream
@@ -220,18 +220,13 @@ function compute_optical_props!(
         t_lay = as.t_lay[glay, gcol]
         # gas optics
         τ, ssa, g = compute_gas_optics(lkp, vmr, col_dry, igpt, ibnd, p_lay, t_lay, glay, gcol)
+        op.τ[glay, gcol] = τ
+        if is2stream
+            op.ssa[glay, gcol] = ssa
+            op.g[glay, gcol] = g
+        end
         # add cloud optics
-        delta_scaling = false
-        cld_params = (
-            as.cld_mask_lw[glay, gcol],
-            as.cld_r_eff_liq[glay, gcol],
-            as.cld_r_eff_ice[glay, gcol],
-            ice_rgh,
-            as.cld_path_liq[glay, gcol],
-            as.cld_path_ice[glay, gcol],
-        )
-        τ, ssa, g = add_cloud_optics_2stream(τ, ssa, g, cld_params..., lkp_cld, ibnd, igpt, delta_scaling)
-        op.τ[glay, gcol], op.ssa[glay, gcol], op.g[glay, gcol] = τ, ssa, g
+        add_cloud_optics_2stream(op, as, lkp, lkp_cld, glay, gcol, ibnd, igpt)
         # compute Planck sources
         p_frac = compute_lw_planck_fraction(lkp, vmr, p_lay, t_lay, igpt, ibnd, glay, gcol)
 
@@ -291,25 +286,17 @@ function compute_optical_props!(
     lkp::LookUpSW,
     lkp_cld::Union{LookUpCld, PadeCld},
 )
-    (; nlay, vmr, ice_rgh) = as
+    (; nlay, vmr) = as
     @inbounds ibnd = lkp.major_gpt2bnd[igpt]
     @inbounds for glay in 1:nlay
         col_dry = as.col_dry[glay, gcol]
         p_lay = as.p_lay[glay, gcol]
         t_lay = as.t_lay[glay, gcol]
         τ, ssa, g = compute_gas_optics(lkp, vmr, col_dry, igpt, ibnd, p_lay, t_lay, glay, gcol)
-        # add cloud optics
-        delta_scaling = true
-        cld_params = (
-            as.cld_mask_sw[glay, gcol],
-            as.cld_r_eff_liq[glay, gcol],
-            as.cld_r_eff_ice[glay, gcol],
-            ice_rgh,
-            as.cld_path_liq[glay, gcol],
-            as.cld_path_ice[glay, gcol],
-        )
-        τ, ssa, g = add_cloud_optics_2stream(τ, ssa, g, cld_params..., lkp_cld, ibnd, igpt, delta_scaling)
-        op.τ[glay, gcol], op.ssa[glay, gcol], op.g[glay, gcol] = τ, ssa, g
+        op.τ[glay, gcol] = τ
+        op.ssa[glay, gcol] = ssa
+        op.g[glay, gcol] = g
+        add_cloud_optics_2stream(op, as, lkp, lkp_cld, glay, gcol, ibnd, igpt) # add cloud optics
     end
     return nothing
 end
