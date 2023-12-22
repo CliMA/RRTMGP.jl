@@ -72,23 +72,23 @@ function setup_allsky_as(
     #col_dry from the dataset not used in the FORTRAN RRTMGP example
 
     # Reading volume mixing ratios 
-    vmrat = zeros(FT, nlay, ncol, ngas)
+    vmrat = zeros(FT, ngas, nlay, ncol)
 
-    vmrat[:, 1, idx_gases["h2o"]] .= Array{FT}(Array(ds_in["vmr_h2o"])[1, lay_ind])
-    vmrat[:, 1, idx_gases["o3"]] .= Array{FT}(Array(ds_in["vmr_o3"])[1, lay_ind])
-    vmrat[:, 1, idx_gases["co2"]] .= Array{FT}(Array(ds_in["vmr_co2"])[1, lay_ind])
-    vmrat[:, 1, idx_gases["n2o"]] .= Array{FT}(Array(ds_in["vmr_n2o"])[1, lay_ind])
-    vmrat[:, 1, idx_gases["co"]] .= Array{FT}(Array(ds_in["vmr_co"])[1, lay_ind])
-    vmrat[:, 1, idx_gases["ch4"]] .= Array{FT}(Array(ds_in["vmr_ch4"])[1, lay_ind])
-    vmrat[:, 1, idx_gases["o2"]] .= Array{FT}(Array(ds_in["vmr_o2"])[1, lay_ind])
-    vmrat[:, 1, idx_gases["n2"]] .= Array{FT}(Array(ds_in["vmr_n2"])[1, lay_ind])
+    vmrat[idx_gases["h2o"], :, 1] .= Array{FT}(Array(ds_in["vmr_h2o"])[1, lay_ind])
+    vmrat[idx_gases["o3"], :, 1] .= Array{FT}(Array(ds_in["vmr_o3"])[1, lay_ind])
+    vmrat[idx_gases["co2"], :, 1] .= Array{FT}(Array(ds_in["vmr_co2"])[1, lay_ind])
+    vmrat[idx_gases["n2o"], :, 1] .= Array{FT}(Array(ds_in["vmr_n2o"])[1, lay_ind])
+    vmrat[idx_gases["co"], :, 1] .= Array{FT}(Array(ds_in["vmr_co"])[1, lay_ind])
+    vmrat[idx_gases["ch4"], :, 1] .= Array{FT}(Array(ds_in["vmr_ch4"])[1, lay_ind])
+    vmrat[idx_gases["o2"], :, 1] .= Array{FT}(Array(ds_in["vmr_o2"])[1, lay_ind])
+    vmrat[idx_gases["n2"], :, 1] .= Array{FT}(Array(ds_in["vmr_n2"])[1, lay_ind])
 
     for icol in 2:ncol
-        vmrat[:, icol, :] .= vmrat[:, 1, :]
+        vmrat[:, :, icol] .= vmrat[:, :, 1]
     end
     vmr = Vmr(DA(vmrat))
     col_dry = DA{FT, 2}(undef, nlay, ncol)
-    vmr_h2o = view(vmr.vmr, :, :, idx_gases["h2o"])
+    vmr_h2o = view(vmr.vmr, idx_gases["h2o"], :, :)
 
     cld_frac = zeros(FT, nlay, ncol)
     cld_mask_lw = zeros(Bool, nlay, ncol)

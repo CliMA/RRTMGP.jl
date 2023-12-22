@@ -73,7 +73,7 @@ struct Vmrc{FTA2D} <: AbstractVmrc
 end
 Adapt.@adapt_structure Vmrc
 
-Vmrc(vmr::Vmr, gcol) = Vmrc(view(vmr.vmr, :, gcol, :))
+Vmrc(vmr::Vmr, gcol) = Vmrc(view(vmr.vmr, :, :, gcol))
 get_col_view(vmr::Vmr, gcol) = Vmrc(vmr, gcol)
 
 """
@@ -125,7 +125,7 @@ Obtain volume mixing ratio of gas `ig` for layer `ilay` of column `icol`.
     if ig == 0
         return FT(1)
     else
-        return @inbounds vmr.vmr[ilay, icol, ig]
+        return @inbounds vmr.vmr[ig, ilay, icol]
     end
 end
 
@@ -134,7 +134,7 @@ end
         FT = eltype(vmr.vmr)
         return FT(1)
     else
-        return @inbounds vmr.vmr[ilay, ig]
+        return @inbounds vmr.vmr[ig, ilay]
     end
 end
 
@@ -164,7 +164,7 @@ function init_vmr(
         return VmrGM{FT, FTA1D, FTA2D}(FTA2D(zeros(nlay, ncol)), FTA2D(zeros(nlay, ncol)), FTA1D(zeros(ngas)))
     else
         FTA3D = DA{FT, 3}
-        return Vmr{FT, FTA3D}(FTA3D(zeros(nlay, ncol, ngas)))
+        return Vmr{FT, FTA3D}(FTA3D(zeros(ngas, nlay, ncol)))
     end
 end
 
