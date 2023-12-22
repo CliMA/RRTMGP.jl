@@ -136,7 +136,7 @@ Compute optical thickness, single scattering albedo, and asymmetry parameter.
     # upper/lower troposphere
     tropo = p_lay > lkp.p_ref_tropo ? 1 : 2
     # volume mixing ratio of h2o
-    vmr_h2o = get_vmr(vmr, lkp.idx_h2o, glay, gcol)
+    vmr_h2o = get_vmr(vmr, lkp.idx_h2o, glay)
 
     (; Δ_t_ref, n_t_ref, t_ref) = lkp
     jftemp = compute_interp_frac_temp(Δ_t_ref, n_t_ref, t_ref, t_lay)
@@ -146,8 +146,8 @@ Compute optical thickness, single scattering albedo, and asymmetry parameter.
 
     (; n_η, vmr_ref) = lkp
     ig = view(lkp.key_species, 1:2, tropo, ibnd)
-    @inbounds vmr1 = get_vmr(vmr, ig[1], glay, gcol)
-    @inbounds vmr2 = get_vmr(vmr, ig[2], glay, gcol)
+    @inbounds vmr1 = get_vmr(vmr, ig[1], glay)
+    @inbounds vmr2 = get_vmr(vmr, ig[2], glay)
 
     jfη, col_mix = compute_interp_frac_η(n_η, ig, vmr_ref, (vmr1, vmr2), tropo, jftemp[1])
 
@@ -234,7 +234,7 @@ Compute optical thickness contributions from minor gases.
     @inbounds loc_in_bnd = igpt - (lkp.bnd_lims_gpt[1, ibnd] - 1)
 
     @inbounds for i in minor_bnd_st[ibnd]:(minor_bnd_st[ibnd + 1] - 1)
-        vmr_imnr = get_vmr(vmr, idx_gases_minor[i], glay, gcol)
+        vmr_imnr = get_vmr(vmr, idx_gases_minor[i], glay)
         if vmr_imnr > eps(FT) * 2
             scaling = vmr_imnr * col_dry
 
@@ -243,9 +243,9 @@ Compute optical thickness contributions from minor gases.
                 sgas = idx_scaling_gas[i]
                 if sgas > 0
                     if scale_by_complement[i] == 1
-                        scaling *= (FT(1) - get_vmr(vmr, sgas, glay, gcol) * dry_fact)
+                        scaling *= (FT(1) - get_vmr(vmr, sgas, glay) * dry_fact)
                     else
-                        scaling *= get_vmr(vmr, sgas, glay, gcol) * dry_fact
+                        scaling *= get_vmr(vmr, sgas, glay) * dry_fact
                     end
                 end
             end
@@ -337,8 +337,8 @@ Computes Planck sources for the longwave problem.
 
     (; n_η, vmr_ref) = lkp
     ig = view(lkp.key_species, 1:2, tropo, ibnd)
-    @inbounds vmr1 = get_vmr(vmr, ig[1], glay, gcol)
-    @inbounds vmr2 = get_vmr(vmr, ig[2], glay, gcol)
+    @inbounds vmr1 = get_vmr(vmr, ig[1], glay)
+    @inbounds vmr2 = get_vmr(vmr, ig[2], glay)
 
     (jη1, jη2, fη1, fη2), (col_mix1, col_mix2) = compute_interp_frac_η(n_η, ig, vmr_ref, (vmr1, vmr2), tropo, jtemp)
 
@@ -376,8 +376,8 @@ end
 
     (; n_η, vmr_ref) = lkp
     ig = view(lkp.key_species, 1:2, tropo, ibnd)
-    @inbounds vmr1 = get_vmr(vmr, ig[1], glay, gcol)
-    @inbounds vmr2 = get_vmr(vmr, ig[2], glay, gcol)
+    @inbounds vmr1 = get_vmr(vmr, ig[1], glay)
+    @inbounds vmr2 = get_vmr(vmr, ig[2], glay)
 
     (jη1, jη2, fη1, fη2), (col_mix1, col_mix2) = compute_interp_frac_η(n_η, ig, vmr_ref, (vmr1, vmr2), tropo, jtemp)
 

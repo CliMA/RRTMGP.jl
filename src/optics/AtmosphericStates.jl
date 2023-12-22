@@ -45,7 +45,7 @@ struct AtmosphericState{
     CLDP <: Union{AbstractArray{FT, 2}, Nothing},
     CLDM <: Union{AbstractArray{Bool, 2}, Nothing},
     CMASK <: Union{AbstractCloudMask, Nothing},
-    VMR <: AbstractVmr{FT},
+    VMR <: AbstractVmr,
 } <: AbstractAtmosphericState{FT, FTA1D}
     "longitude, in degrees (`ncol`), optional"
     lon::FTA1DN

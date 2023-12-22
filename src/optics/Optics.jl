@@ -175,19 +175,20 @@ function compute_optical_props!(
     @inbounds t_sfc = as.t_sfc[gcol]
     is2stream = op isa TwoStream
     planck_args = (lkp.t_planck, lkp.totplnk, ibnd)
+    vmr_col = Vmrs.get_col_view(vmr, gcol)
     @inbounds for glay in 1:nlay
         col_dry = as.col_dry[glay, gcol]
         p_lay = as.p_lay[glay, gcol]
         t_lay = as.t_lay[glay, gcol]
         # gas optics
-        τ, ssa, g = compute_gas_optics(lkp, vmr, col_dry, igpt, ibnd, p_lay, t_lay, glay, gcol)
+        τ, ssa, g = compute_gas_optics(lkp, vmr_col, col_dry, igpt, ibnd, p_lay, t_lay, glay, gcol)
         op.τ[glay, gcol] = τ
         if is2stream
             op.ssa[glay, gcol] = ssa
             op.g[glay, gcol] = g
         end
         # compute Planck sources
-        p_frac = compute_lw_planck_fraction(lkp, vmr, p_lay, t_lay, igpt, ibnd, glay, gcol)
+        p_frac = compute_lw_planck_fraction(lkp, vmr_col, p_lay, t_lay, igpt, ibnd, glay, gcol)
 
         sf.lay_source[glay, gcol] = interp1d(t_lay, planck_args...) * p_frac
         sf.lev_source_inc[glay, gcol] = interp1d(as.t_lev[glay + 1, gcol], planck_args...) * p_frac
@@ -223,15 +224,16 @@ function compute_optical_props!(
     cld_path_ice_col = view(as.cld_path_ice, :, gcol)
     cld_mask_lw_col = view(as.cld_mask_lw, :, gcol)
     (; τ, ssa, g) = op_col
+    vmr_col = Vmrs.get_col_view(as.vmr, gcol)
     @inbounds for glay in 1:nlay
         col_dry = col_dry_col[glay]
         p_lay = p_lay_col[glay]
         t_lay = t_lay_col[glay]
         cld_mask = cld_mask_lw_col[glay]
         # compute gas optics
-        τ[glay], ssa[glay], g[glay] = compute_gas_optics(lkp, vmr, col_dry, igpt, ibnd, p_lay, t_lay, glay, gcol)
+        τ[glay], ssa[glay], g[glay] = compute_gas_optics(lkp, vmr_col, col_dry, igpt, ibnd, p_lay, t_lay, glay, gcol)
         # compute Planck sources
-        p_frac = compute_lw_planck_fraction(lkp, vmr, p_lay, t_lay, igpt, ibnd, glay, gcol)
+        p_frac = compute_lw_planck_fraction(lkp, vmr_col, p_lay, t_lay, igpt, ibnd, glay, gcol)
 
         sf.lay_source[glay, gcol] = interp1d(t_lay, planck_args...) * p_frac
         sf.lev_source_inc[glay, gcol] = interp1d(as.t_lev[glay + 1, gcol], planck_args...) * p_frac
@@ -280,11 +282,12 @@ function compute_optical_props!(
     (; nlay, vmr) = as
     is2stream = op isa TwoStreamc
     @inbounds ibnd = lkp.major_gpt2bnd[igpt]
+    vmr_col = Vmrs.get_col_view(as.vmr, gcol)
     @inbounds for glay in 1:nlay
         col_dry = as.col_dry[glay, gcol]
         p_lay = as.p_lay[glay, gcol]
         t_lay = as.t_lay[glay, gcol]
-        τ, ssa, g = compute_gas_optics(lkp, vmr, col_dry, igpt, ibnd, p_lay, t_lay, glay, gcol)
+        τ, ssa, g = compute_gas_optics(lkp, vmr_col, col_dry, igpt, ibnd, p_lay, t_lay, glay, gcol)
         op.τ[glay] = τ
         if is2stream
             op.ssa[glay] = ssa
@@ -313,13 +316,14 @@ function compute_optical_props!(
     cld_path_ice_col = view(as.cld_path_ice, :, gcol)
     cld_mask_sw_col = view(as.cld_mask_sw, :, gcol)
     (; τ, ssa, g) = op
+    vmr_col = Vmrs.get_col_view(as.vmr, gcol)
     @inbounds for glay in 1:nlay
         col_dry = col_dry_col[glay]
         p_lay = p_lay_col[glay]
         t_lay = t_lay_col[glay]
         cld_mask = cld_mask_sw_col[glay]
         # compute gas optics
-        τ[glay], ssa[glay], g[glay] = compute_gas_optics(lkp, vmr, col_dry, igpt, ibnd, p_lay, t_lay, glay, gcol)
+        τ[glay], ssa[glay], g[glay] = compute_gas_optics(lkp, vmr_col, col_dry, igpt, ibnd, p_lay, t_lay, glay, gcol)
     end
     @inbounds for glay in 1:nlay
         cld_mask = cld_mask_sw_col[glay]
