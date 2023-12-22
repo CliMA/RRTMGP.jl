@@ -1,97 +1,19 @@
-
-"""
-    add_cloud_optics_2stream(
-        op::TwoStream,
-        as::AtmosphericState,
-        lkp::LookUpLW,
-        lkp_cld,
-        glay, gcol,
-        ibnd,
-        igpt,
-    )
-
-This function computes the longwave TwoStream clouds optics properties and adds them
-to the TwoStream longwave gas optics properties.
-"""
-function add_cloud_optics_2stream(op::TwoStream, as::AtmosphericState, lkp::LookUpLW, lkp_cld, glay, gcol, ibnd, igpt)
-    if as.cld_mask_lw isa AbstractArray
-        @inbounds cld_mask = as.cld_mask_lw[glay, gcol]
-        if cld_mask
-
-            @inbounds begin
-                cld_mask = as.cld_mask_lw[glay, gcol]
-                re_liq = as.cld_r_eff_liq[glay, gcol]
-                re_ice = as.cld_r_eff_ice[glay, gcol]
-                ice_rgh = as.ice_rgh
-                cld_path_liq = as.cld_path_liq[glay, gcol]
-                cld_path_ice = as.cld_path_ice[glay, gcol]
-                τ_gas = op.τ[glay, gcol]
-                ssa_gas = op.ssa[glay, gcol]
-                g_gas = op.g[glay, gcol]
-            end
-            τ_cl, τ_cl_ssa, τ_cl_ssag =
-                compute_cld_props(lkp_cld, re_liq, re_ice, ice_rgh, cld_path_liq, cld_path_ice, ibnd)
-            @inbounds op.τ[glay, gcol], op.ssa[glay, gcol], op.g[glay, gcol] =
-                increment_2stream(τ_gas, ssa_gas, g_gas, τ_cl, τ_cl_ssa, τ_cl_ssag)
-        end
-    end
-    return nothing
-end
-
-"""
-    add_cloud_optics_2stream(
-        op::TwoStream,
-        as::AtmosphericState,
-        lkp::LookUpSW,
-        lkp_cld,
-        glay, gcol,
-        ibnd,
-        igpt,
-    )
-
-This function computes the shortwave TwoStream clouds optics properties and adds them
-to the TwoStream shortwave gase optics properties.
-"""
-function add_cloud_optics_2stream(op::TwoStream, as::AtmosphericState, lkp::LookUpSW, lkp_cld, glay, gcol, ibnd, igpt)
-    if as.cld_mask_sw isa AbstractArray
-        @inbounds cld_mask = as.cld_mask_lw[glay, gcol]
-        if cld_mask
-            @inbounds begin
-                cld_mask = as.cld_mask_lw[glay, gcol]
-                re_liq = as.cld_r_eff_liq[glay, gcol]
-                re_ice = as.cld_r_eff_ice[glay, gcol]
-                ice_rgh = as.ice_rgh
-                cld_path_liq = as.cld_path_liq[glay, gcol]
-                cld_path_ice = as.cld_path_ice[glay, gcol]
-                τ_gas = op.τ[glay, gcol]
-                ssa_gas = op.ssa[glay, gcol]
-                g_gas = op.g[glay, gcol]
-            end
-            τ_cl, τ_cl_ssa, τ_cl_ssag =
-                compute_cld_props(lkp_cld, re_liq, re_ice, ice_rgh, cld_path_liq, cld_path_ice, ibnd)
-            τ_cl, τ_cl_ssa, τ_cl_ssag = delta_scale(τ_cl, τ_cl_ssa, τ_cl_ssag)
-            @inbounds op.τ[glay, gcol], op.ssa[glay, gcol], op.g[glay, gcol] =
-                increment_2stream(τ_gas, ssa_gas, g_gas, τ_cl, τ_cl_ssa, τ_cl_ssag)
-        end
-    end
-    return nothing
-end
-"""
-    add_cloud_optics_2stream(op::OneScalar, args...)
-
-Cloud optics is currently only supported for the TwoStream solver.
-"""
-function add_cloud_optics_2stream(op::OneScalar, args...)
-    return nothing
-end
 """
     compute_cld_props(lkp_cld, as, glay, gcol, ibnd, igpt)
 
 This function computed the TwoSteam cloud optics properties using either the 
 lookup table method or pade method.
 """
-function compute_cld_props(lkp_cld::LookUpCld, re_liq, re_ice, ice_rgh, cld_path_liq, cld_path_ice, ibnd)
-    FT = eltype(re_liq)
+function compute_cld_props(
+    lkp_cld::LookUpCld,
+    re_liq::FT,
+    re_ice::FT,
+    ice_rgh::Int,
+    cld_path_liq::FT,
+    cld_path_ice::FT,
+    ibnd::UInt8,
+) where {FT}
+    #FT = eltype(re_liq)
     τl, τl_ssa, τl_ssag = FT(0), FT(0), FT(0)
     τi, τi_ssa, τi_ssag = FT(0), FT(0), FT(0)
     (;
@@ -141,8 +63,16 @@ function compute_cld_props(lkp_cld::LookUpCld, re_liq, re_ice, ice_rgh, cld_path
     return (τ, τ_ssa, τ_ssag)
 end
 
-function compute_cld_props(lkp_cld::PadeCld, re_liq, re_ice, ice_rgh, cld_path_liq, cld_path_ice, ibnd)
-    FT = eltype(re_liq)
+function compute_cld_props(
+    lkp_cld::PadeCld,
+    re_liq::FT,
+    re_ice::FT,
+    ice_rgh::Int,
+    cld_path_liq::FT,
+    cld_path_ice::FT,
+    ibnd::UInt8,
+) where {FT}
+    #FT = eltype(re_liq)
     τl, τl_ssa, τl_ssag = FT(0), FT(0), FT(0)
     τi, τi_ssa, τi_ssag = FT(0), FT(0), FT(0)
 

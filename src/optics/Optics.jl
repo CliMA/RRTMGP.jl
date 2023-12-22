@@ -209,24 +209,27 @@ function compute_optical_props!(
     lkp::LookUpLW,
     lkp_cld::Union{LookUpCld, PadeCld},
 )
-    (; nlay, vmr) = as
+    (; nlay, vmr, ice_rgh) = as
     @inbounds ibnd = lkp.major_gpt2bnd[igpt]
     @inbounds t_sfc = as.t_sfc[gcol]
-    is2stream = op isa TwoStream
     planck_args = (lkp.t_planck, lkp.totplnk, ibnd)
+    op_col = TwoStreamc(op, gcol)
+    col_dry_col = view(as.col_dry, :, gcol)
+    p_lay_col = view(as.p_lay, :, gcol)
+    t_lay_col = view(as.t_lay, :, gcol)
+    re_liq_col = view(as.cld_r_eff_liq, :, gcol)
+    re_ice_col = view(as.cld_r_eff_ice, :, gcol)
+    cld_path_liq_col = view(as.cld_path_liq, :, gcol)
+    cld_path_ice_col = view(as.cld_path_ice, :, gcol)
+    cld_mask_lw_col = view(as.cld_mask_lw, :, gcol)
+    (; τ, ssa, g) = op_col
     @inbounds for glay in 1:nlay
-        col_dry = as.col_dry[glay, gcol]
-        p_lay = as.p_lay[glay, gcol]
-        t_lay = as.t_lay[glay, gcol]
-        # gas optics
-        τ, ssa, g = compute_gas_optics(lkp, vmr, col_dry, igpt, ibnd, p_lay, t_lay, glay, gcol)
-        op.τ[glay, gcol] = τ
-        if is2stream
-            op.ssa[glay, gcol] = ssa
-            op.g[glay, gcol] = g
-        end
-        # add cloud optics
-        add_cloud_optics_2stream(op, as, lkp, lkp_cld, glay, gcol, ibnd, igpt)
+        col_dry = col_dry_col[glay]
+        p_lay = p_lay_col[glay]
+        t_lay = t_lay_col[glay]
+        cld_mask = cld_mask_lw_col[glay]
+        # compute gas optics
+        τ[glay], ssa[glay], g[glay] = compute_gas_optics(lkp, vmr, col_dry, igpt, ibnd, p_lay, t_lay, glay, gcol)
         # compute Planck sources
         p_frac = compute_lw_planck_fraction(lkp, vmr, p_lay, t_lay, igpt, ibnd, glay, gcol)
 
@@ -236,6 +239,19 @@ function compute_optical_props!(
 
         if glay == 1
             sf.sfc_source[gcol] = interp1d(t_sfc, planck_args...) * p_frac
+        end
+    end
+    @inbounds for glay in 1:nlay
+        cld_mask = cld_mask_lw_col[glay]
+        if cld_mask
+            re_liq = re_liq_col[glay]
+            re_ice = re_ice_col[glay]
+            cld_path_liq = cld_path_liq_col[glay]
+            cld_path_ice = cld_path_ice_col[glay]
+            # add cloud optics
+            τ_cl, ssa_cl, g_cl = compute_cld_props(lkp_cld, re_liq, re_ice, ice_rgh, cld_path_liq, cld_path_ice, ibnd)
+            τ_cl, ssa_cl, g_cl = delta_scale(τ_cl, ssa_cl, g_cl)
+            τ[glay], ssa[glay], g[glay] = increment_2stream(τ[glay], ssa[glay], g[glay], τ_cl, ssa_cl, g_cl)
         end
     end
     return nothing
@@ -286,17 +302,38 @@ function compute_optical_props!(
     lkp::LookUpSW,
     lkp_cld::Union{LookUpCld, PadeCld},
 )
-    (; nlay, vmr) = as
+    (; nlay, vmr, ice_rgh) = as
     @inbounds ibnd = lkp.major_gpt2bnd[igpt]
+    op_col = TwoStreamc(op, gcol)
+    col_dry_col = view(as.col_dry, :, gcol)
+    p_lay_col = view(as.p_lay, :, gcol)
+    t_lay_col = view(as.t_lay, :, gcol)
+    re_liq_col = view(as.cld_r_eff_liq, :, gcol)
+    re_ice_col = view(as.cld_r_eff_ice, :, gcol)
+    cld_path_liq_col = view(as.cld_path_liq, :, gcol)
+    cld_path_ice_col = view(as.cld_path_ice, :, gcol)
+    cld_mask_sw_col = view(as.cld_mask_sw, :, gcol)
+    (; τ, ssa, g) = op_col
     @inbounds for glay in 1:nlay
-        col_dry = as.col_dry[glay, gcol]
-        p_lay = as.p_lay[glay, gcol]
-        t_lay = as.t_lay[glay, gcol]
-        τ, ssa, g = compute_gas_optics(lkp, vmr, col_dry, igpt, ibnd, p_lay, t_lay, glay, gcol)
-        op.τ[glay, gcol] = τ
-        op.ssa[glay, gcol] = ssa
-        op.g[glay, gcol] = g
-        add_cloud_optics_2stream(op, as, lkp, lkp_cld, glay, gcol, ibnd, igpt) # add cloud optics
+        col_dry = col_dry_col[glay]
+        p_lay = p_lay_col[glay]
+        t_lay = t_lay_col[glay]
+        cld_mask = cld_mask_sw_col[glay]
+        # compute gas optics
+        τ[glay], ssa[glay], g[glay] = compute_gas_optics(lkp, vmr, col_dry, igpt, ibnd, p_lay, t_lay, glay, gcol)
+    end
+    @inbounds for glay in 1:nlay
+        cld_mask = cld_mask_sw_col[glay]
+        if cld_mask
+            re_liq = re_liq_col[glay]
+            re_ice = re_ice_col[glay]
+            cld_path_liq = cld_path_liq_col[glay]
+            cld_path_ice = cld_path_ice_col[glay]
+            # add cloud optics
+            τ_cl, ssa_cl, g_cl = compute_cld_props(lkp_cld, re_liq, re_ice, ice_rgh, cld_path_liq, cld_path_ice, ibnd)
+            τ_cl, ssa_cl, g_cl = delta_scale(τ_cl, ssa_cl, g_cl)
+            τ[glay], ssa[glay], g[glay] = increment_2stream(τ[glay], ssa[glay], g[glay], τ_cl, ssa_cl, g_cl)
+        end
     end
     return nothing
 end

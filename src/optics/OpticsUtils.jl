@@ -128,7 +128,8 @@ Increment TwoStream optical properties `τ1`, `ssa1` and `g1`
 with `τ2`, `ssa2` and `g2`. Here `τ` is the optical thickness,
 `ssa` is the single-scattering albedo, and `g` is the symmetry parameter.
 """
-function increment_2stream(τ1::FT, ssa1::FT, g1::FT, τ2::FT, ssa2::FT, g2::FT) where {FT}
+@inline function increment_2stream(τ1::FT, ssa1::FT, g1::FT, τ2::FT, ssa2::FT, g2::FT) where {FT}
+    #FT = eltype(τ1)
     τ = τ1 + τ2
     ssa = τ1 * ssa1 + τ2 * ssa2
     ssag = (τ1 * ssa1 * g1 + τ2 * ssa2 * g2) / max(eps(FT), ssa)
@@ -140,8 +141,8 @@ end
 
 delta-scale two stream optical properties.
 """
-function delta_scale(τ, ssa, g)
-    FT = typeof(τ)
+@inline function delta_scale(τ::FT, ssa::FT, g::FT) where {FT}
+    #FT = typeof(τ)
     f = g * g
     wf = ssa * f
     τ_s = (FT(1) - wf) * τ
