@@ -106,7 +106,7 @@ function rte_sw_2stream_solve!(
                 )
                 #igpt == 1 && set_flux_to_zero!(flux_sw, gcol)
                 igpt == 1 && set_flux_to_zero!(flux_sw_col)
-                compute_optical_props!(op, as, gcol, igpt, lookup_sw, lookup_sw_cld)
+                compute_optical_props!(op_col, as, gcol, igpt, lookup_sw, lookup_sw_cld)
                 # Cell properties: transmittance and reflectance for direct and diffuse radiation
                 solar_frac = lookup_sw.solar_src_scaled[igpt]
                 ibnd = lookup_sw.major_gpt2bnd[igpt]
@@ -173,7 +173,7 @@ function rte_sw_2stream_solve_CUDA!(
             if as isa AtmosphericState && as.cld_mask_type isa AbstractCloudMask
                 Optics.build_cloud_mask!(view(as.cld_mask_sw, :, gcol), view(as.cld_frac, :, gcol), as.cld_mask_type)
             end
-            compute_optical_props!(op, as, gcol, igpt, lookup_sw, lookup_sw_cld)
+            compute_optical_props!(op_col, as, gcol, igpt, lookup_sw, lookup_sw_cld)
             # Cell properties: transmittance and reflectance for direct and diffuse radiation
             solar_frac = lookup_sw.solar_src_scaled[igpt]
             ibnd = lookup_sw.major_gpt2bnd[igpt]
