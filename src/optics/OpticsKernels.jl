@@ -17,7 +17,7 @@ function compute_optical_props_kernel!(
     ibnd = lkp.major_gpt2bnd[igpt]
 
     compute_optical_props_kernel!(op, as, glay, gcol, sf, igpt, lkp) # longwave gas optics
-    add_cloud_optics_2stream(op, as, lkp, lkp_cld, glay, gcol, ibnd, igpt) # add cloud optics
+    add_cloud_optics_2stream(op, as, lkp, lkp_cld, glay, gcol, ibnd) # add cloud optics
     return nothing
 end
 
@@ -48,7 +48,7 @@ function compute_optical_props_kernel!(
     ibnd = lkp.major_gpt2bnd[igpt]
 
     compute_optical_props_kernel!(op, as, glay, gcol, igpt, lkp) # shortwave gas optics
-    add_cloud_optics_2stream(op, as, lkp, lkp_cld, glay, gcol, ibnd, igpt) # add cloud optics
+    add_cloud_optics_2stream(op, as, lkp, lkp_cld, glay, gcol, ibnd) # add cloud optics
     return nothing
 end
 
