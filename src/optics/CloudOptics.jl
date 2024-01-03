@@ -3,54 +3,52 @@
     add_cloud_optics_2stream(
         op::TwoStream,
         as::AtmosphericState,
-        lkp::LookUpLW,
+        lkp::Union{LookUpLW,LookUpSW},
         lkp_cld,
-        glay, gcol,
+        glay,
+        gcol,
         ibnd,
-        igpt,
     )
 
 This function computes the longwave TwoStream clouds optics properties and adds them
 to the TwoStream longwave gas optics properties.
 """
-function add_cloud_optics_2stream(op::TwoStream, as::AtmosphericState, lkp::LookUpLW, lkp_cld, glay, gcol, ibnd, igpt)
-    if as.cld_mask_lw isa AbstractArray
-        cld_mask = as.cld_mask_lw[glay, gcol]
+function add_cloud_optics_2stream(
+    op::TwoStream,
+    as::AtmosphericState,
+    lkp::Union{LookUpLW, LookUpSW},
+    lkp_cld,
+    glay,
+    gcol,
+    ibnd,
+)
+    is_sw = lkp isa LookUpSW
+    cld_mask_array = is_sw ? as.cld_mask_sw : as.cld_mask_lw
+    if !isnothing(cld_mask_array)
+        @inbounds cld_mask = cld_mask_array[glay, gcol]
         if cld_mask
-            τ_cl, τ_cl_ssa, τ_cl_ssag = compute_cld_props(lkp_cld, as, cld_mask, glay, gcol, ibnd, igpt)
-            op.τ[glay, gcol], op.ssa[glay, gcol], op.g[glay, gcol] =
+            @inbounds begin
+                re_liq = as.cld_r_eff_liq[glay, gcol]
+                re_ice = as.cld_r_eff_ice[glay, gcol]
+                ice_rgh = as.ice_rgh
+                cld_path_liq = as.cld_path_liq[glay, gcol]
+                cld_path_ice = as.cld_path_ice[glay, gcol]
+                τ_gas = op.τ[glay, gcol]
+                ssa_gas = op.ssa[glay, gcol]
+                g_gas = op.g[glay, gcol]
+            end
+            τ_cl, τ_cl_ssa, τ_cl_ssag =
+                compute_cld_props(lkp_cld, re_liq, re_ice, ice_rgh, cld_path_liq, cld_path_ice, ibnd)
+            if is_sw
+                τ_cl, τ_cl_ssa, τ_cl_ssag = delta_scale(τ_cl, τ_cl_ssa, τ_cl_ssag)
+            end
+            @inbounds op.τ[glay, gcol], op.ssa[glay, gcol], op.g[glay, gcol] =
                 increment_2stream(op.τ[glay, gcol], op.ssa[glay, gcol], op.g[glay, gcol], τ_cl, τ_cl_ssa, τ_cl_ssag)
         end
     end
     return nothing
 end
 
-"""
-    add_cloud_optics_2stream(
-        op::TwoStream,
-        as::AtmosphericState,
-        lkp::LookUpSW,
-        lkp_cld,
-        glay, gcol,
-        ibnd,
-        igpt,
-    )
-
-This function computes the shortwave TwoStream clouds optics properties and adds them
-to the TwoStream shortwave gase optics properties.
-"""
-function add_cloud_optics_2stream(op::TwoStream, as::AtmosphericState, lkp::LookUpSW, lkp_cld, glay, gcol, ibnd, igpt)
-    if as.cld_mask_sw isa AbstractArray
-        cld_mask = as.cld_mask_sw[glay, gcol]
-        if cld_mask
-            τ_cl, τ_cl_ssa, τ_cl_ssag = compute_cld_props(lkp_cld, as, cld_mask, glay, gcol, ibnd, igpt)
-            τ_cl, τ_cl_ssa, τ_cl_ssag = delta_scale(τ_cl, τ_cl_ssa, τ_cl_ssag)
-            op.τ[glay, gcol], op.ssa[glay, gcol], op.g[glay, gcol] =
-                increment_2stream(op.τ[glay, gcol], op.ssa[glay, gcol], op.g[glay, gcol], τ_cl, τ_cl_ssa, τ_cl_ssag)
-        end
-    end
-    return nothing
-end
 """
     add_cloud_optics_2stream(op::OneScalar, args...)
 
@@ -60,18 +58,29 @@ function add_cloud_optics_2stream(op::OneScalar, args...)
     return nothing
 end
 """
-    compute_cld_props(lkp_cld, as, glay, gcol, ibnd, igpt)
+    compute_cld_props(
+        lkp_cld::LookUpCld,
+        re_liq::FT,
+        re_ice::FT,
+        ice_rgh::Int,
+        cld_path_liq::FT,
+        cld_path_ice::FT,
+        ibnd::UInt8,
+    ) where {FT}
 
 This function computed the TwoSteam cloud optics properties using either the 
 lookup table method or pade method.
 """
-function compute_cld_props(lkp_cld::LookUpCld, as, cld_mask, glay, gcol, ibnd, igpt)
-    re_liq = as.cld_r_eff_liq[glay, gcol]
-    re_ice = as.cld_r_eff_ice[glay, gcol]
-    ice_rgh = as.ice_rgh
-    cld_path_liq = as.cld_path_liq[glay, gcol]
-    cld_path_ice = as.cld_path_ice[glay, gcol]
-    FT = eltype(re_liq)
+function compute_cld_props(
+    lkp_cld::LookUpCld,
+    re_liq::FT,
+    re_ice::FT,
+    ice_rgh::Int,
+    cld_path_liq::FT,
+    cld_path_ice::FT,
+    ibnd::UInt8,
+) where {FT}
+    #FT = eltype(re_liq)
     τl, τl_ssa, τl_ssag = FT(0), FT(0), FT(0)
     τi, τi_ssa, τi_ssag = FT(0), FT(0), FT(0)
     (;
@@ -95,18 +104,22 @@ function compute_cld_props(lkp_cld::LookUpCld, as, cld_mask, glay, gcol, ibnd, i
         loc = Int(max(min(unsafe_trunc(Int, (re_liq - radliq_lwr) / Δr_liq) + 1, nsize_liq - 1), 1))
         fac = (re_liq - radliq_lwr - (loc - 1) * Δr_liq) / Δr_liq
         fc1 = FT(1) - fac
-        τl = (fc1 * lut_extliq[loc, ibnd] + fac * lut_extliq[loc + 1, ibnd]) * cld_path_liq
-        τl_ssa = (fc1 * lut_ssaliq[loc, ibnd] + fac * lut_ssaliq[loc + 1, ibnd]) * τl
-        τl_ssag = (fc1 * lut_asyliq[loc, ibnd] + fac * lut_asyliq[loc + 1, ibnd]) * τl_ssa
+        @inbounds begin
+            τl = (fc1 * lut_extliq[loc, ibnd] + fac * lut_extliq[loc + 1, ibnd]) * cld_path_liq
+            τl_ssa = (fc1 * lut_ssaliq[loc, ibnd] + fac * lut_ssaliq[loc + 1, ibnd]) * τl
+            τl_ssag = (fc1 * lut_asyliq[loc, ibnd] + fac * lut_asyliq[loc + 1, ibnd]) * τl_ssa
+        end
     end
     # cloud ice particles
     if cld_path_ice > eps(FT)
         loc = Int(max(min(unsafe_trunc(Int, (re_ice - radice_lwr) / Δr_ice) + 1, nsize_ice - 1), 1))
         fac = (re_ice - radice_lwr - (loc - 1) * Δr_ice) / Δr_ice
         fc1 = FT(1) - fac
-        τi = (fc1 * lut_extice[loc, ibnd, ice_rgh] + fac * lut_extice[loc + 1, ibnd, ice_rgh]) * cld_path_ice
-        τi_ssa = (fc1 * lut_ssaice[loc, ibnd, ice_rgh] + fac * lut_ssaice[loc + 1, ibnd, ice_rgh]) * τi
-        τi_ssag = (fc1 * lut_asyice[loc, ibnd, ice_rgh] + fac * lut_asyice[loc + 1, ibnd, ice_rgh]) * τi_ssa
+        @inbounds begin
+            τi = (fc1 * lut_extice[loc, ibnd, ice_rgh] + fac * lut_extice[loc + 1, ibnd, ice_rgh]) * cld_path_ice
+            τi_ssa = (fc1 * lut_ssaice[loc, ibnd, ice_rgh] + fac * lut_ssaice[loc + 1, ibnd, ice_rgh]) * τi
+            τi_ssag = (fc1 * lut_asyice[loc, ibnd, ice_rgh] + fac * lut_asyice[loc + 1, ibnd, ice_rgh]) * τi_ssa
+        end
     end
 
     τ = τl + τi
@@ -117,13 +130,16 @@ function compute_cld_props(lkp_cld::LookUpCld, as, cld_mask, glay, gcol, ibnd, i
     return (τ, τ_ssa, τ_ssag)
 end
 
-function compute_cld_props(lkp_cld::PadeCld, as, cld_mask, glay, gcol, ibnd, igpt)
-    re_liq = as.cld_r_eff_liq[glay, gcol]
-    re_ice = as.cld_r_eff_ice[glay, gcol]
-    ice_rgh = as.ice_rgh
-    cld_path_liq = as.cld_path_liq[glay, gcol]
-    cld_path_ice = as.cld_path_ice[glay, gcol]
-    FT = eltype(re_liq)
+function compute_cld_props(
+    lkp_cld::PadeCld,
+    re_liq::FT,
+    re_ice::FT,
+    ice_rgh::Int,
+    cld_path_liq::FT,
+    cld_path_ice::FT,
+    ibnd::UInt8,
+) where {FT}
+    #FT = eltype(re_liq)
     τl, τl_ssa, τl_ssag = FT(0), FT(0), FT(0)
     τi, τi_ssa, τi_ssag = FT(0), FT(0), FT(0)
 
@@ -147,26 +163,30 @@ function compute_cld_props(lkp_cld::PadeCld, as, cld_mask, glay, gcol, ibnd, igp
     # This works only if there are precisely three size regimes (four bounds) and it's
     # previously guaranteed that size_bounds(1) <= size <= size_bounds(4)
     if cld_path_liq > eps(FT)
-        irad = Int(min(floor((re_liq - pade_sizreg_extliq[2]) / pade_sizreg_extliq[3]) + 2, 3))
-        τl = pade_eval(ibnd, re_liq, irad, m_ext, n_ext, pade_extliq) * cld_path_liq
+        @inbounds begin
+            irad = Int(min(floor((re_liq - pade_sizreg_extliq[2]) / pade_sizreg_extliq[3]) + 2, 3))
+            τl = pade_eval(ibnd, re_liq, irad, m_ext, n_ext, pade_extliq) * cld_path_liq
 
-        irad = Int(min(floor((re_liq - pade_sizreg_ssaliq[2]) / pade_sizreg_ssaliq[3]) + 2, 3))
-        τl_ssa = (FT(1) - max(FT(0), pade_eval(ibnd, re_liq, irad, m_ssa_g, n_ssa_g, pade_ssaliq))) * τl
+            irad = Int(min(floor((re_liq - pade_sizreg_ssaliq[2]) / pade_sizreg_ssaliq[3]) + 2, 3))
+            τl_ssa = (FT(1) - max(FT(0), pade_eval(ibnd, re_liq, irad, m_ssa_g, n_ssa_g, pade_ssaliq))) * τl
 
-        irad = Int(min(floor((re_liq - pade_sizreg_asyliq[2]) / pade_sizreg_asyliq[3]) + 2, 3))
-        τl_ssag = pade_eval(ibnd, re_liq, irad, m_ssa_g, n_ssa_g, pade_asyliq) * τl_ssa
+            irad = Int(min(floor((re_liq - pade_sizreg_asyliq[2]) / pade_sizreg_asyliq[3]) + 2, 3))
+            τl_ssag = pade_eval(ibnd, re_liq, irad, m_ssa_g, n_ssa_g, pade_asyliq) * τl_ssa
+        end
     end
 
     if cld_path_ice > eps(FT)
-        irad = Int(min(floor((re_ice - pade_sizreg_extice[2]) / pade_sizreg_extice[3]) + 2, 3))
+        @inbounds begin
+            irad = Int(min(floor((re_ice - pade_sizreg_extice[2]) / pade_sizreg_extice[3]) + 2, 3))
 
-        τi = pade_eval(ibnd, re_ice, irad, m_ext, n_ext, pade_extice, ice_rgh) * cld_path_ice
+            τi = pade_eval(ibnd, re_ice, irad, m_ext, n_ext, pade_extice, ice_rgh) * cld_path_ice
 
-        irad = Int(min(floor((re_ice - pade_sizreg_ssaice[2]) / pade_sizreg_ssaice[3]) + 2, 3))
-        τi_ssa = (FT(1) - max(FT(0), pade_eval(ibnd, re_ice, irad, m_ssa_g, n_ssa_g, pade_ssaice, ice_rgh))) * τi
+            irad = Int(min(floor((re_ice - pade_sizreg_ssaice[2]) / pade_sizreg_ssaice[3]) + 2, 3))
+            τi_ssa = (FT(1) - max(FT(0), pade_eval(ibnd, re_ice, irad, m_ssa_g, n_ssa_g, pade_ssaice, ice_rgh))) * τi
 
-        irad = Int(min(floor((re_ice - pade_sizreg_asyice[2]) / pade_sizreg_asyice[3]) + 2, 3))
-        τi_ssag = pade_eval(ibnd, re_ice, irad, m_ssa_g, n_ssa_g, pade_asyice, ice_rgh) * τi_ssa
+            irad = Int(min(floor((re_ice - pade_sizreg_asyice[2]) / pade_sizreg_asyice[3]) + 2, 3))
+            τi_ssag = pade_eval(ibnd, re_ice, irad, m_ssa_g, n_ssa_g, pade_asyice, ice_rgh) * τi_ssa
+        end
     end
 
     τ = τl + τi
@@ -200,17 +220,17 @@ function pade_eval(ibnd, re, irad, m, n, pade_coeffs, irgh::Union{Int, Nothing} 
         coeffs = pade_coeffs
     end
 
-    denom = coeffs[ibnd, irad, n + m]
+    @inbounds denom = coeffs[ibnd, irad, n + m]
     @inbounds for i in (n + m - 1):-1:(1 + m)
         denom = coeffs[ibnd, irad, i] + re * denom
     end
     denom = FT(1) + re * denom
 
-    numer = coeffs[ibnd, irad, m]
+    @inbounds numer = coeffs[ibnd, irad, m]
     @inbounds for i in (m - 1):-1:2
         numer = coeffs[ibnd, irad, i] + re * numer
     end
-    numer = coeffs[ibnd, irad, 1] + re * numer
+    @inbounds numer = coeffs[ibnd, irad, 1] + re * numer
 
     return (numer / denom)
 end
