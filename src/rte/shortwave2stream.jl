@@ -97,6 +97,7 @@ function rte_sw_2stream_solve!(
                 flux_col = FluxSWc(flux, gcol)
                 flux_sw_col = FluxSWc(flux_sw, gcol)
                 op_col = TwoStreamc(op, gcol)
+                as_col = AtmosphericStatec(as, gcol)
                 src_sw_col = SourceSW2Strc(src_sw, gcol)
                 bcs_sw_col = SwBCsc(bcs_sw, gcol)
                 bld_cld_mask && Optics.build_cloud_mask!(
@@ -104,9 +105,13 @@ function rte_sw_2stream_solve!(
                     view(as.cld_frac, :, gcol),
                     as.cld_mask_type,
                 )
+                (; τ, ssa, g) = op_col
                 #igpt == 1 && set_flux_to_zero!(flux_sw, gcol)
                 igpt == 1 && set_flux_to_zero!(flux_sw_col)
-                compute_optical_props!(op_col, as, gcol, igpt, lookup_sw, lookup_sw_cld)
+                for glay in 1:nlay
+                    τ[glay], ssa[glay], g[glay] =
+                        compute_optical_props(as_col, gcol, glay, igpt, lookup_sw, lookup_sw_cld)
+                end
                 # Cell properties: transmittance and reflectance for direct and diffuse radiation
                 solar_frac = lookup_sw.solar_src_scaled[igpt]
                 ibnd = lookup_sw.major_gpt2bnd[igpt]
@@ -161,6 +166,7 @@ function rte_sw_2stream_solve_CUDA!(
         flux_col = FluxSWc(flux, gcol)
         flux_sw_col = FluxSWc(flux_sw, gcol)
         op_col = TwoStreamc(op, gcol)
+        as_col = AtmosphericStatec(as, gcol)
         src_sw_col = SourceSW2Strc(src_sw, gcol)
         bcs_sw_col = SwBCsc(bcs_sw, gcol)
         set_flux_to_zero!(flux_sw_col)
@@ -169,11 +175,14 @@ function rte_sw_2stream_solve_CUDA!(
         flux_net_col_sw = flux_sw_col.flux_net
         flux_up_col = flux_col.flux_up
         flux_dn_col = flux_col.flux_dn
+        (; τ, ssa, g) = op_col
         @inbounds for igpt in 1:n_gpt
             if as isa AtmosphericState && as.cld_mask_type isa AbstractCloudMask
                 Optics.build_cloud_mask!(view(as.cld_mask_sw, :, gcol), view(as.cld_frac, :, gcol), as.cld_mask_type)
             end
-            compute_optical_props!(op_col, as, gcol, igpt, lookup_sw, lookup_sw_cld)
+            for glay in 1:nlay
+                τ[glay], ssa[glay], g[glay] = compute_optical_props(as_col, gcol, glay, igpt, lookup_sw, lookup_sw_cld)
+            end
             # Cell properties: transmittance and reflectance for direct and diffuse radiation
             solar_frac = lookup_sw.solar_src_scaled[igpt]
             ibnd = lookup_sw.major_gpt2bnd[igpt]

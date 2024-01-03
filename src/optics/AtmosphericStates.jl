@@ -10,6 +10,7 @@ using ..Vmrs
 
 export AbstractAtmosphericState,
     AtmosphericState,
+    AtmosphericStatec,
     GrayAtmosphericState,
     setup_gray_as_pr_grid,
     setup_gray_as_alt_grid,
@@ -91,4 +92,54 @@ struct AtmosphericState{
     ngas::Int
 end
 Adapt.@adapt_structure AtmosphericState
+
+struct AtmosphericStatec{FTVA1DN, FTVA1D, FTA1D, CLDP, CLDM, CMASK, VMR}
+    lon::FTVA1DN
+    lat::FTVA1DN
+    p_lay::FTA1D
+    p_lev::FTA1D
+    t_lay::FTA1D
+    t_lev::FTA1D
+    t_sfc::FTVA1D
+    col_dry::FTA1D
+    vmr::VMR
+    cld_r_eff_liq::CLDP
+    cld_r_eff_ice::CLDP
+    cld_path_liq::CLDP
+    cld_path_ice::CLDP
+    cld_frac::CLDP
+    cld_mask_lw::CLDM
+    cld_mask_sw::CLDM
+    cld_mask_type::CMASK
+    ice_rgh::Int
+    nlay::Int
+    ncol::Int
+    ngas::Int
+end
+Adapt.@adapt_structure AtmosphericStatec
+
+AtmosphericStatec(as::AtmosphericState, gcol::Int) = AtmosphericStatec(
+    isnothing(as.lon) ? nothing : view(as.lon, gcol:gcol),
+    isnothing(as.lat) ? nothing : view(as.lat, gcol:gcol),
+    view(as.p_lay, :, gcol),
+    view(as.p_lev, :, gcol),
+    view(as.t_lay, :, gcol),
+    view(as.t_lev, :, gcol),
+    view(as.t_sfc, gcol:gcol),
+    view(as.col_dry, :, gcol),
+    Vmrs.get_col_view(as.vmr, gcol),
+    isnothing(as.cld_r_eff_liq) ? nothing : view(as.cld_r_eff_liq, :, gcol),
+    isnothing(as.cld_r_eff_ice) ? nothing : view(as.cld_r_eff_ice, :, gcol),
+    isnothing(as.cld_path_liq) ? nothing : view(as.cld_path_liq, :, gcol),
+    isnothing(as.cld_path_ice) ? nothing : view(as.cld_path_ice, :, gcol),
+    isnothing(as.cld_frac) ? nothing : view(as.cld_frac, :, gcol),
+    isnothing(as.cld_mask_lw) ? nothing : view(as.cld_mask_lw, :, gcol),
+    isnothing(as.cld_mask_sw) ? nothing : view(as.cld_mask_sw, :, gcol),
+    as.cld_mask_type,
+    as.ice_rgh,
+    as.nlay,
+    as.ncol,
+    as.ngas,
+)
+
 end

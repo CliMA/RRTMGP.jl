@@ -157,7 +157,11 @@ Compute optical thickness, single scattering albedo, and asymmetry parameter.
     τ_minor =
         compute_τ_minor(lkp, tropo, vmr, vmr_h2o, col_dry, p_lay, t_lay, jftemp..., jfη..., igpt, ibnd, glay, gcol)
     # compute τ_Rayleigh
-    τ_ray = compute_τ_rayleigh(lkp, tropo, col_dry, vmr_h2o, jftemp..., jfη..., igpt)
+    τ_ray = FT(0)
+    if lkp isa LookUpSW
+        rayleigh_coeff = tropo == 1 ? lkp.rayl_lower : lkp.rayl_upper
+        τ_ray = compute_τ_rayleigh(rayleigh_coeff, tropo, col_dry, vmr_h2o, jftemp..., jfη..., igpt)
+    end
     τ = τ_major + τ_minor + τ_ray
     ssa = FT(0)
     if τ > 2 * eps(FT) # single scattering albedo
@@ -274,8 +278,8 @@ end
 
 Compute Rayleigh scattering optical depths for shortwave problem
 """
-@inline function compute_τ_rayleigh(
-    lkp::LookUpSW,
+@inline compute_τ_rayleigh(
+    rayleigh_coeff::AbstractArray{FT, 3},
     tropo::Int,
     col_dry::FT,
     vmr_h2o::FT,
@@ -286,19 +290,8 @@ Compute Rayleigh scattering optical depths for shortwave problem
     fη1::FT,
     fη2::FT,
     igpt::Int,
-) where {FT <: AbstractFloat}
-    if tropo == 1
-        τ_ray = interp2d(fη1, fη2, ftemp, lkp.rayl_lower, igpt, jη1, jη2, jtemp) * (vmr_h2o + FT(1)) * col_dry
-    else
-        τ_ray = interp2d(fη1, fη2, ftemp, lkp.rayl_upper, igpt, jη1, jη2, jtemp) * (vmr_h2o + FT(1)) * col_dry
-    end
-
-    return τ_ray
-end
-
-@inline function compute_τ_rayleigh(lkp::LookUpLW{FT}, args...) where {FT <: AbstractFloat}
-    return FT(0)
-end
+) where {FT <: AbstractFloat} =
+    interp2d(fη1, fη2, ftemp, rayleigh_coeff, igpt, jη1, jη2, jtemp) * (vmr_h2o + FT(1)) * col_dry
 
 """
     compute_lw_planck_src!(

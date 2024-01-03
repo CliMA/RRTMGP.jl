@@ -15,7 +15,8 @@ using ..AngularDiscretizations
 import ..Parameters as RP
 #---------------------------------------
 
-export AbstractOpticalProps, OneScalar, TwoStream, compute_col_gas!, compute_optical_props!, OneScalarc, TwoStreamc
+export AbstractOpticalProps,
+    OneScalar, TwoStream, compute_col_gas!, compute_optical_props!, OneScalarc, TwoStreamc, compute_optical_props
 
 """
     AbstractOpticalProps{FT,FTA2D}
@@ -264,6 +265,7 @@ end
         op::AbstractOpticalProps{FT},
         as::AtmosphericState{FT},
         gcol::Int,
+        glay::Int,
         igpt::Int,
         lkp::LookUpSW{FT},
         lkp_cld::Union{LookUpCld,PadeCld,Nothing} = nothing,
@@ -271,74 +273,42 @@ end
 
 Computes optical properties for the shortwave problem.
 """
-function compute_optical_props!(
-    op::Union{OneScalarc, TwoStreamc},
-    as::AtmosphericState,
-    gcol::Int,
-    igpt::Int,
-    lkp::LookUpSW,
-    ::Nothing,
-)
+@inline function compute_optical_props(as::AtmosphericStatec, gcol::Int, glay::Int, igpt::Int, lkp::LookUpSW, ::Nothing)
     (; nlay, vmr) = as
-    is2stream = op isa TwoStreamc
-    @inbounds ibnd = lkp.major_gpt2bnd[igpt]
-    vmr_col = Vmrs.get_col_view(as.vmr, gcol)
-    @inbounds for glay in 1:nlay
-        col_dry = as.col_dry[glay, gcol]
-        p_lay = as.p_lay[glay, gcol]
-        t_lay = as.t_lay[glay, gcol]
-        τ, ssa, g = compute_gas_optics(lkp, vmr_col, col_dry, igpt, ibnd, p_lay, t_lay, glay, gcol)
-        op.τ[glay] = τ
-        if is2stream
-            op.ssa[glay] = ssa
-            op.g[glay] = g
-        end
+    @inbounds begin
+        ibnd = lkp.major_gpt2bnd[igpt]
+        col_dry = as.col_dry[glay]
+        p_lay = as.p_lay[glay]
+        t_lay = as.t_lay[glay]
+        τ, ssa, g = compute_gas_optics(lkp, vmr, col_dry, igpt, ibnd, p_lay, t_lay, glay, gcol)
     end
-    return nothing
+    return τ, ssa, g
 end
 
-function compute_optical_props!(
-    op::TwoStreamc,
-    as::AtmosphericState,
+@inline function compute_optical_props(
+    as::AtmosphericStatec,
     gcol::Int,
+    glay::Int,
     igpt::Int,
     lkp::LookUpSW,
     lkp_cld::Union{LookUpCld, PadeCld},
 )
-    (; nlay, vmr, ice_rgh) = as
-    @inbounds ibnd = lkp.major_gpt2bnd[igpt]
-    col_dry_col = view(as.col_dry, :, gcol)
-    p_lay_col = view(as.p_lay, :, gcol)
-    t_lay_col = view(as.t_lay, :, gcol)
-    re_liq_col = view(as.cld_r_eff_liq, :, gcol)
-    re_ice_col = view(as.cld_r_eff_ice, :, gcol)
-    cld_path_liq_col = view(as.cld_path_liq, :, gcol)
-    cld_path_ice_col = view(as.cld_path_ice, :, gcol)
-    cld_mask_sw_col = view(as.cld_mask_sw, :, gcol)
-    (; τ, ssa, g) = op
-    vmr_col = Vmrs.get_col_view(as.vmr, gcol)
-    @inbounds for glay in 1:nlay
-        col_dry = col_dry_col[glay]
-        p_lay = p_lay_col[glay]
-        t_lay = t_lay_col[glay]
-        cld_mask = cld_mask_sw_col[glay]
+    (; nlay, vmr, ice_rgh, p_lay, t_lay, col_dry, cld_mask_sw) = as
+    @inbounds begin
+        ibnd = lkp.major_gpt2bnd[igpt]
         # compute gas optics
-        τ[glay], ssa[glay], g[glay] = compute_gas_optics(lkp, vmr_col, col_dry, igpt, ibnd, p_lay, t_lay, glay, gcol)
-    end
-    @inbounds for glay in 1:nlay
-        cld_mask = cld_mask_sw_col[glay]
-        if cld_mask
-            re_liq = re_liq_col[glay]
-            re_ice = re_ice_col[glay]
-            cld_path_liq = cld_path_liq_col[glay]
-            cld_path_ice = cld_path_ice_col[glay]
-            # add cloud optics
-            τ_cl, ssa_cl, g_cl = compute_cld_props(lkp_cld, re_liq, re_ice, ice_rgh, cld_path_liq, cld_path_ice, ibnd)
-            τ_cl, ssa_cl, g_cl = delta_scale(τ_cl, ssa_cl, g_cl)
-            τ[glay], ssa[glay], g[glay] = increment_2stream(τ[glay], ssa[glay], g[glay], τ_cl, ssa_cl, g_cl)
+        τ, ssa, g = compute_gas_optics(lkp, vmr, col_dry[glay], igpt, ibnd, p_lay[glay], t_lay[glay], glay, gcol)
+        if cld_mask_sw[glay]
+            re_liq = as.cld_r_eff_liq[glay]
+            re_ice = as.cld_r_eff_ice[glay]
+            # compute cloud optics
+            τ_cl, ssa_cl, g_cl =
+                compute_cld_props(lkp_cld, re_liq, re_ice, ice_rgh, as.cld_path_liq[glay], as.cld_path_ice[glay], ibnd)
+            τ_cl, ssa_cl, g_cl = delta_scale(τ_cl, ssa_cl, g_cl) # delta scale
+            τ, ssa, g = increment_2stream(τ, ssa, g, τ_cl, ssa_cl, g_cl) # add to gas optics
         end
     end
-    return nothing
+    return τ, ssa, g
 end
 #-----------------------------------------------------------------------------
 """

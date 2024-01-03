@@ -74,6 +74,7 @@ function rte_sw_noscat_solve!(
     lookup_sw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
 ) where {FT <: AbstractFloat}
     (; nlay, ncol) = as
+    τ = op.τ
     nlev = nlay + 1
     n_gpt = length(lookup_sw.solar_src_scaled)
     # setting references for flux_sw
@@ -81,7 +82,9 @@ function rte_sw_noscat_solve!(
         for igpt in 1:n_gpt
             ClimaComms.@threaded device for gcol in 1:ncol
                 igpt == 1 && set_flux_to_zero!(flux_sw, gcol)
-                compute_optical_props!(op, as, gcol, igpt, lookup_sw, lookup_sw_cld)
+                for glay in 1:nlay
+                    τ[glay, gcol], _, _ = compute_optical_props(as, gcol, glay, igpt, lookup_sw, lookup_sw_cld)
+                end
                 solar_frac = as isa GrayAtmosphericState ? FT(1) : lookup_sw.solar_src_scaled[igpt]
                 rte_sw_noscat_solve_kernel!(flux, op, bcs_sw, igpt, n_gpt, solar_frac, gcol, nlev)
                 n_gpt > 1 && add_to_flux!(flux_sw, flux, gcol)
@@ -128,9 +131,12 @@ function rte_sw_noscat_solve_CUDA!(
     n_gpt = length(lookup_sw.solar_src_scaled)
     # setting references for flux_sw
     if gcol ≤ ncol
+        τ = op.τ
         set_flux_to_zero!(flux_sw, gcol)
         @inbounds for igpt in 1:n_gpt
-            compute_optical_props!(op, as, gcol, igpt, lookup_sw, lookup_sw_cld)
+            for glay in 1:nlay
+                τ[glay, gcol] = compute_optical_props(as, gcol, glay, igpt, lookup_sw, lookup_sw_cld)
+            end
             solar_frac = as isa GrayAtmosphericState ? FT(1) : lookup_sw.solar_src_scaled[igpt]
             rte_sw_noscat_solve_kernel!(flux, op, bcs_sw, igpt, n_gpt, solar_frac, gcol, nlev)
             n_gpt > 1 && add_to_flux!(flux_sw, flux, gcol)
