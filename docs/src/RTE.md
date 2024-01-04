@@ -21,7 +21,7 @@ where ``F_{net} = \sum_j (F^{+}_j - F^{-}_j)``, and ``F^{+}_j`` and ``F^{-}_j`` 
 
 ## Computing fluxes through a vertically layered atmosphere
 
-`adding_lw!` and `adding_sw!` compute longwave and shortwave radiative fluxes through a vertically layered atmosphere. The equations for upward and downward fluxes are calculated following [shonk2008](@cite):
+`adding_lw!` and `rte_sw_2stream!` compute longwave and shortwave radiative fluxes through a vertically layered atmosphere. The equations for upward and downward fluxes are calculated following [shonk2008](@cite):
 
 ```math
 \begin{align}
@@ -52,7 +52,7 @@ where ``\tau`` is the optical depth, and ``k = \sqrt{\gamma_1^2 - \gamma_2^2}``.
 ``S^+`` and ``S^-`` are calculated from optical properties and Planck source functions following [toon1989](@cite).
 
 ### Shortwave
-`rte_sw_2stream!` calculates diffuse transmittance (``T``), diffuse reflectance (``R``), direct transmittance (``T_{dir}``), and direct reflectance (``R_{dir}``) from optical properties for shortwave radiation. ``T`` and ``R`` are calculated following the same equations as for the longwave radiation. ``T_{dir}`` and ``R_{dir}`` is calculated following [meador1980](@cite):
+`sw_2stream_coeffs` calculates diffuse transmittance (``T``), diffuse reflectance (``R``), direct transmittance (``T_{dir}``), and direct reflectance (``R_{dir}``) from optical properties for shortwave radiation. ``T`` and ``R`` are calculated following the same equations as for the longwave radiation. ``T_{dir}`` and ``R_{dir}`` is calculated following [meador1980](@cite):
 
 ```math
 \begin{align}
