@@ -174,6 +174,15 @@ function rte_sw_2stream_solve_CUDA!(
     return nothing
 end
 
+"""
+    sw_2stream_coeffs(τ::FT, ssa::FT, g::FT, μ₀::FT) where {FT}
+Computes cell properties (transmittance and reflectance) for direct and diffuse radiation
+Two-stream solutions to direct and diffuse reflectance and transmittance for a layer
+with optical depth tau, single scattering albedo w0, and asymmetery parameter g.
+ 
+Equations are developed in Meador and Weaver, 1980,
+doi:10.1175/1520-0469(1980)037<0630:TSATRT>2.0.CO;2
+"""
 function sw_2stream_coeffs(τ::FT, ssa::FT, g::FT, μ₀::FT) where {FT}
     k_min = FT(1e4 * eps(FT)) # Suggestion from Chiel van Heerwaarden
     # Zdunkowski Practical Improved Flux Method "PIFM"
