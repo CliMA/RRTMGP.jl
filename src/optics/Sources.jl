@@ -216,20 +216,6 @@ struct SourceSW2Str{FT <: AbstractFloat, FTA1D <: AbstractArray{FT, 1}, FTA2D <:
     sfc_source::FTA1D
     "albedo `(nlay + 1, ncol)`"
     albedo::FTA2D
-    "temporary storage array, used in 2 stream calculations `(nlay, ncol)`"
-    src_up::FTA2D
-    "temporary storage array, used in 2 stream calculations `(nlay, ncol)`"
-    src_dn::FTA2D
-    "temporary storage array, used in 2 stream calculations `(nlay, ncol)`"
-    Rdif::FTA2D
-    "temporary storage array, used in 2 stream calculations `(nlay, ncol)`"
-    Tdif::FTA2D
-    "temporary storage array, used in 2 stream calculations `(nlay, ncol)`"
-    Rdir::FTA2D
-    "temporary storage array, used in 2 stream calculations `(nlay, ncol)`"
-    Tdir::FTA2D
-    "temporary storage array, used in 2 stream calculations `(nlay, ncol)`"
-    Tnoscat::FTA2D
     "temporary storage array, used in 2 stream calculations `(nlay + 1, ncol)`"
     src::FTA2D
 end
@@ -241,27 +227,9 @@ function SourceSW2Str(::Type{FT}, ::Type{DA}, nlay::Int, ncol::Int) where {FT <:
 
     sfc_source = FTA1D(undef, ncol)
     albedo = FTA2D(undef, nlay + 1, ncol)
-    src_up = FTA2D(undef, nlay, ncol)
-    src_dn = FTA2D(undef, nlay, ncol)
-    Rdif = FTA2D(undef, nlay, ncol)
-    Tdif = FTA2D(undef, nlay, ncol)
-    Rdir = FTA2D(undef, nlay, ncol)
-    Tdir = FTA2D(undef, nlay, ncol)
-    Tnoscat = FTA2D(undef, nlay, ncol)
     src = FTA2D(undef, nlay + 1, ncol)
 
-    return SourceSW2Str{eltype(sfc_source), typeof(sfc_source), typeof(albedo)}(
-        sfc_source,
-        albedo,
-        src_up,
-        src_dn,
-        Rdif,
-        Tdif,
-        Rdir,
-        Tdir,
-        Tnoscat,
-        src,
-    )
+    return SourceSW2Str{eltype(sfc_source), typeof(sfc_source), typeof(albedo)}(sfc_source, albedo, src)
 end
 
 """
@@ -287,26 +255,8 @@ function source_func_shortwave(
     else
         sfc_source = DA{FT}(undef, ncol)
         albedo = DA{FT}(undef, nlay + 1, ncol)
-        src_up = DA{FT}(undef, nlay, ncol)
-        src_dn = DA{FT}(undef, nlay, ncol)
-        Rdif = DA{FT}(undef, nlay, ncol)
-        Tdif = DA{FT}(undef, nlay, ncol)
-        Rdir = DA{FT}(undef, nlay, ncol)
-        Tdir = DA{FT}(undef, nlay, ncol)
-        Tnoscat = DA{FT}(undef, nlay, ncol)
         src = DA{FT}(undef, nlay + 1, ncol)
-        return SourceSW2Str{FT, typeof(sfc_source), typeof(src_up)}(
-            sfc_source,
-            albedo,
-            src_up,
-            src_dn,
-            Rdif,
-            Tdif,
-            Rdir,
-            Tdir,
-            Tnoscat,
-            src,
-        )
+        return SourceSW2Str{FT, typeof(sfc_source), typeof(src)}(sfc_source, albedo, src)
     end
 end
 

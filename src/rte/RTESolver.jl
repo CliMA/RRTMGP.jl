@@ -58,64 +58,53 @@ end
     solve_sw!(
         slv::Solver,
         max_threads::Int,
-        lookup_lw::Union{LookUpLW, Nothing} = nothing,
-        lookup_lw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
+        lookup_sw::Union{LookUpSW, Nothing} = nothing,
+        lookup_sw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
     )
 
 Solver for the shortwave radiation problem
 """
-function solve_sw!(
+solve_sw!(
     slv::Solver,
     max_threads::Int,
     lookup_sw::Union{LookUpSW, Nothing} = nothing,
     lookup_sw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
-)
-    (; as, op, bcs_sw, src_sw, flux_sw, fluxb_sw) = slv
-    context = RTE.context(slv)
+) = solve_sw!(slv.context.device, slv, max_threads, lookup_sw, lookup_sw_cld)
 
-    no_args = lookup_sw isa Nothing && lookup_sw_cld isa Nothing
-    if no_args
-        DA = RTE.array_type(slv)
-        FT = RTE.float_type(slv)
-        major_gpt2bnd = DA(UInt8[1])
-        solar_src_scaled = DA(FT[1])
-        flux = flux_sw
-    else
-        (; major_gpt2bnd, solar_src_scaled) = lookup_sw
-        flux = fluxb_sw
-    end
+# non-scattering solver, gray optics
+solve_sw!(
+    device::ClimaComms.AbstractDevice,
+    (; flux_sw, op, bcs_sw, as)::Solver{<:Any, <:GrayAtmosphericState, <:OneScalar},
+    max_threads::Int,
+    ::Nothing,
+    ::Nothing,
+) = rte_sw_noscat_solve!(device, flux_sw, op, bcs_sw, max_threads, as) # non-scattering solver, gray optics
 
-    # solving radiative transfer equation
-    if slv.op isa OneScalar
-        rte_sw_noscat_solve!(
-            context,
-            flux,
-            flux_sw,
-            op,
-            bcs_sw,
-            solar_src_scaled,
-            max_threads,
-            as,
-            lookup_sw,
-            lookup_sw_cld,
-        ) # no-scattering solver
-    else
-        rte_sw_2stream_solve!(
-            context,
-            flux,
-            flux_sw,
-            op,
-            bcs_sw,
-            src_sw,
-            major_gpt2bnd,
-            solar_src_scaled,
-            max_threads,
-            as,
-            lookup_sw,
-            lookup_sw_cld,
-        ) # 2-stream solver
-    end
-    return nothing
-end
+# 2-stream solver, gray optics
+solve_sw!(
+    device::ClimaComms.AbstractDevice,
+    (; flux_sw, op, bcs_sw, src_sw, as)::Solver{<:Any, <:GrayAtmosphericState, <:TwoStream},
+    max_threads::Int,
+    ::Nothing,
+    ::Nothing,
+) = rte_sw_2stream_solve!(device, flux_sw, op, bcs_sw, src_sw, max_threads, as)
+
+# non-scattering solver, RRTMGP optics
+solve_sw!(
+    device::ClimaComms.AbstractDevice,
+    (; fluxb_sw, flux_sw, op, bcs_sw, as)::Solver{<:Any, <:AtmosphericState, <:OneScalar},
+    max_threads::Int,
+    lookup_sw::LookUpSW,
+    lookup_sw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
+) = rte_sw_noscat_solve!(device, fluxb_sw, flux_sw, op, bcs_sw, max_threads, as, slv.lookup_sw, slv.lookup_sw_cld)
+
+# 2-stream solver, RRTMGP optics
+solve_sw!(
+    device::ClimaComms.AbstractDevice,
+    (; fluxb_sw, flux_sw, op, bcs_sw, src_sw, as)::Solver{<:Any, <:AtmosphericState, <:TwoStream},
+    max_threads::Int,
+    lookup_sw::LookUpSW,
+    lookup_sw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
+) = rte_sw_2stream_solve!(device, fluxb_sw, flux_sw, op, bcs_sw, src_sw, max_threads, as, lookup_sw, lookup_sw_cld)
 
 end

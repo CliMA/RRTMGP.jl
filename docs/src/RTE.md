@@ -52,7 +52,7 @@ where ``\tau`` is the optical depth, and ``k = \sqrt{\gamma_1^2 - \gamma_2^2}``.
 ``S^+`` and ``S^-`` are calculated from optical properties and Planck source functions following [toon1989](@cite).
 
 ### Shortwave
-`sw_two_stream!` calculates diffuse transmittance (``T``), diffuse reflectance (``R``), direct transmittance (``T_{dir}``), and direct reflectance (``R_{dir}``) from optical properties for shortwave radiation. ``T`` and ``R`` are calculated following the same equations as for the longwave radiation. ``T_{dir}`` and ``R_{dir}`` is calculated following [meador1980](@cite):
+`rte_sw_2stream!` calculates diffuse transmittance (``T``), diffuse reflectance (``R``), direct transmittance (``T_{dir}``), and direct reflectance (``R_{dir}``) from optical properties for shortwave radiation. ``T`` and ``R`` are calculated following the same equations as for the longwave radiation. ``T_{dir}`` and ``R_{dir}`` is calculated following [meador1980](@cite):
 
 ```math
 \begin{align}
@@ -63,7 +63,7 @@ R_{dir} = A ((1 - k \mu) (\alpha_2 + k \gamma_3) - (1 + k \mu) (\alpha_2 - k \ga
 
 where ``A = \omega_0 / (1 - k^2 \mu^2) / (k (1 + e^{-2 k \tau}) + \gamma_1 (1 - e^{-2 k \tau}))``. ``\omega_0`` is the single scattering albedo. ``\mu`` is the cosine of solar zenith angle. ``\gamma_3``, and ``\gamma_4`` are coefficients in the two-stream approximation and determined by the optical properties. They are constrained to ``\gamma_3 + \gamma_4 = 1`` by energy conservation.
 
-`sw_source_2str!` calculates the direct downward flux (``F^{-}_{dir}``) and source functions (``S^+`` and ``S^-``) for each level from ``T_{dir}`` and ``R_{dir}``:
+The direct downward flux (``F^{-}_{dir}``) and source functions (``S^+`` and ``S^-``) for each level are calculated from ``T_{dir}`` and ``R_{dir}``:
 
 ```math
 \begin{align}
