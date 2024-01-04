@@ -29,8 +29,8 @@ Shortwave boundary conditions
 $(DocStringExtensions.FIELDS)
 """
 struct SwBCs{FT, FTA1D, FTA1DN, FTA2D}
-    "zenith angle `(ncol)`"
-    zenith::FTA1D
+    "cosine of zenith angle `(ncol)`"
+    cos_zenith::FTA1D
     "top of atmosphere flux `(ncol)`"
     toa_flux::FTA1D
     "surface albedo for specular (direct) radiation `(nbnd, ncol)`"
@@ -40,9 +40,9 @@ struct SwBCs{FT, FTA1D, FTA1DN, FTA2D}
     "surface albedo for diffuse radiation `(nbnd, ncol)`"
     sfc_alb_diffuse::FTA2D
 end
-SwBCs(zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse) =
-    SwBCs{eltype(zenith), typeof(zenith), typeof(inc_flux_diffuse), typeof(sfc_alb_direct)}(
-        zenith,
+SwBCs(cos_zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse) =
+    SwBCs{eltype(cos_zenith), typeof(cos_zenith), typeof(inc_flux_diffuse), typeof(sfc_alb_direct)}(
+        cos_zenith,
         toa_flux,
         sfc_alb_direct,
         inc_flux_diffuse,

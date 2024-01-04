@@ -69,7 +69,7 @@ function all_sky(
     close(ds_sw_cld)
     # reading input file 
     ds_in = Dataset(input_file, "r")
-    as, sfc_emis, sfc_alb_direct, sfc_alb_diffuse, zenith, toa_flux, bot_at_1 = setup_allsky_as(
+    as, sfc_emis, sfc_alb_direct, sfc_alb_diffuse, cos_zenith, toa_flux, bot_at_1 = setup_allsky_as(
         context,
         ds_in,
         idx_gases,
@@ -109,7 +109,7 @@ function all_sky(
     # setting up boundary conditions
     inc_flux_diffuse = nothing
 
-    bcs_sw = SwBCs(zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse)
+    bcs_sw = SwBCs(cos_zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse)
 
     fluxb_sw = FluxSW(ncol, nlay, FT, DA) # flux storage for bandwise calculations
     flux_sw = FluxSW(ncol, nlay, FT, DA)  # shortwave fluxes for band calculations    
