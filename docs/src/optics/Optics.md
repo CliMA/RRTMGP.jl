@@ -14,11 +14,10 @@ compute_optical_props!
 
 ```@docs
 compute_col_gas_kernel!
-compute_interp_fractions
 compute_interp_frac_temp
 compute_interp_frac_press
 compute_interp_frac_η
-compute_τ_ssa_lw_src!
+compute_gas_optics
 compute_τ_minor
 compute_τ_rayleigh
 compute_lw_planck_src!
