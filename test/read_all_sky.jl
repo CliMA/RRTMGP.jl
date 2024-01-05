@@ -41,13 +41,13 @@ function setup_allsky_as(
     sfc_emis = DA{FT, 2}(undef, nbnd_lw, ncol)
     sfc_alb_direct = DA{FT, 2}(undef, nbnd_sw, ncol)
     sfc_alb_diffuse = DA{FT, 2}(undef, nbnd_sw, ncol)
-    zenith = DA{FT, 1}(undef, ncol)
+    cos_zenith = DA{FT, 1}(undef, ncol)
     irrad = DA{FT, 1}(undef, ncol)
     # these values are taken from the example
     sfc_emis .= FT(0.98)
     sfc_alb_direct .= FT(0.06)
     sfc_alb_diffuse .= FT(0.06)
-    zenith .= acos(FT(0.86))
+    cos_zenith .= FT(0.86)
     irrad .= FT(lkp_sw.solar_src_tot)
 
 
@@ -181,7 +181,7 @@ function setup_allsky_as(
         sfc_emis,
         sfc_alb_direct,
         sfc_alb_diffuse,
-        zenith,
+        cos_zenith,
         irrad,
         bot_at_1,
     )

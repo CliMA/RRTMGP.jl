@@ -159,7 +159,7 @@ function gray_atmos_sw_test(
     max_threads = 256            # maximum number of threads for KA kernels
     deg2rad = FT(π) / FT(180)
 
-    zenith = DA{FT, 1}(undef, ncol)   # solar zenith angle in radians
+    cos_zenith = DA{FT, 1}(undef, ncol)   # cosine of solar zenith angle
     toa_flux = DA{FT, 1}(undef, ncol) # top of atmosphere flux
     sfc_alb_direct = DA{FT, 2}(undef, nbnd, ncol) # surface albedo (direct)
     sfc_alb_diffuse = DA{FT, 2}(undef, nbnd, ncol) # surface albedo (diffuse)
@@ -174,7 +174,7 @@ function gray_atmos_sw_test(
         lat = DA{FT}(range(FT(-90), FT(90), length = ncol)) # latitude
     end
 
-    zenith .= deg2rad * 52.95 #acsc(FT(1.66))               # corresponding to ~52.95 deg zenith angle    
+    cos_zenith .= cos(deg2rad * 52.95) # corresponding to ~52.95 deg zenith angle    
     toa_flux .= FT(1407.679)
     sfc_alb_direct .= FT(0.1)
     sfc_alb_diffuse .= FT(0.1)
@@ -182,7 +182,7 @@ function gray_atmos_sw_test(
     as = setup_gray_as_pr_grid(context, nlay, lat, p0, pe, otp, param_set, DA) # init gray atmos state
     op = OPC(FT, ncol, nlay, DA)
     src_sw = source_func_shortwave(FT, ncol, nlay, opc, DA)
-    bcs_sw = SwBCs(zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse)
+    bcs_sw = SwBCs(cos_zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse)
     fluxb_sw = FluxSW(ncol, nlay, FT, DA)
     flux_sw = FluxSW(ncol, nlay, FT, DA)
 
@@ -191,13 +191,13 @@ function gray_atmos_sw_test(
     solve_sw!(slv, max_threads)
 
     τ = Array(slv.op.τ)
-    zenith = Array(zenith)
+    cos_zenith = Array(cos_zenith)
     flux_dn_dir = Array(slv.flux_sw.flux_dn_dir)
     toa_flux = Array(toa_flux)
 
     # testing with exact solution
-    ot_tot = sum(τ[:, 1]) / cos(zenith[1])
-    exact = (toa_flux[1] * cos(zenith[1])) * exp(-ot_tot)
+    ot_tot = sum(τ[:, 1]) / cos_zenith[1]
+    exact = (toa_flux[1] * cos_zenith[1]) * exp(-ot_tot)
 
     rel_toler = FT(0.001)
     rel_error = abs(flux_dn_dir[1] - exact) / exact

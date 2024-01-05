@@ -47,7 +47,7 @@ function sw_rfmip(context, ::Type{OPC}, ::Type{SRC}, ::Type{VMR}, ::Type{FT}) wh
     # reading rfmip data to atmospheric state
     ds_sw_in = Dataset(sw_input_file, "r")
 
-    (as, _, sfc_alb_direct, zenith, toa_flux, usecol) =
+    (as, _, sfc_alb_direct, cos_zenith, toa_flux, usecol) =
         setup_rfmip_as(context, ds_sw_in, idx_gases, exp_no, lookup_sw, FT, VMR, max_threads, param_set)
     close(ds_sw_in)
 
@@ -60,7 +60,7 @@ function sw_rfmip(context, ::Type{OPC}, ::Type{SRC}, ::Type{VMR}, ::Type{FT}) wh
     # setting up boundary conditions
     inc_flux_diffuse = nothing
     sfc_alb_diffuse = FTA2D(deepcopy(sfc_alb_direct))
-    bcs_sw = SwBCs{FT, FTA1D, Nothing, FTA2D}(zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse)
+    bcs_sw = SwBCs{FT, FTA1D, Nothing, FTA2D}(cos_zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse)
     fluxb_sw = FluxSW(ncol, nlay, FT, DA) # flux storage for bandwise calculations
     flux_sw = FluxSW(ncol, nlay, FT, DA)  # shortwave fluxes for band calculations
 

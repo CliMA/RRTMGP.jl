@@ -287,9 +287,11 @@ function rte_sw_2stream!(
     gcol::Int,
 ) where {FT}
     nlay = nlev - 1
-    toa_flux = bcs_sw.toa_flux[gcol]
-    sfc_alb_direct = bcs_sw.sfc_alb_direct[ibnd, gcol]
-    μ₀ = cos(bcs_sw.zenith[gcol])
+    @inbounds begin
+        toa_flux = bcs_sw.toa_flux[gcol]
+        sfc_alb_direct = bcs_sw.sfc_alb_direct[ibnd, gcol]
+        μ₀ = bcs_sw.cos_zenith[gcol]
+    end
     τ_sum = FT(0)
     for ilay in 1:nlay
         @inbounds τ_sum += τ[ilay, gcol]
