@@ -62,8 +62,7 @@ Compute interpolation fraction for pressure.
 """
 @inline function compute_interp_frac_press(Δ_ln_p_ref, ln_p_ref, n_p_ref, p_lay, tropo)
     log_p_lay = log(p_lay)
-    @inbounds jpress = Int(min(max(fld(ln_p_ref[1] - log_p_lay, Δ_ln_p_ref) + 1, 1), n_p_ref - 1) + 1)
-
+    @inbounds jpress = Int(min(max(unsafe_trunc(Int, (ln_p_ref[1] - log_p_lay) / Δ_ln_p_ref) + 1, 1), n_p_ref - 1) + 1)
     @inbounds fpress = (ln_p_ref[jpress - 1] - log_p_lay) / Δ_ln_p_ref
     jpress = jpress + tropo - 1
 
@@ -91,9 +90,7 @@ Compute interpolation fraction for binary species parameter.
     η = col_mix1 ≥ eps(FT) * 2 ? vmr1 / col_mix1 : FT(0.5)
     loc_η = FT(η * (n_η - 1))
     jη1 = min(unsafe_trunc(Int, loc_η) + 1, n_η - 1)
-    #fη1 = loc_η % FT(1) # TODO: "%: operator seems unstable on GPU
-    #fη1 = FT(loc_η % 1) # to be revisited
-    fη1 = loc_η - fld(loc_η, FT(1))
+    fη1 = loc_η - unsafe_trunc(Int, loc_η)
 
     itemp = 2
     @inbounds η_half = vmr_ref[tropo, ig[1] + 1, jtemp + itemp - 1] / vmr_ref[tropo, ig[2] + 1, jtemp + itemp - 1]
@@ -101,9 +98,7 @@ Compute interpolation fraction for binary species parameter.
     η = col_mix2 ≥ eps(FT) * 2 ? vmr1 / col_mix2 : FT(0.5)
     loc_η = FT(η * (n_η - 1))
     jη2 = min(unsafe_trunc(Int, loc_η) + 1, n_η - 1)
-    #fη2 = loc_η % FT(1) # TODO: "%" operator seems unstable on GPU
-    #fη2 = FT(loc_η % 1) # to be revisited
-    fη2 = loc_η - fld(loc_η, FT(1))
+    fη2 = loc_η - unsafe_trunc(Int, loc_η)
 
     return ((jη1, jη2, fη1, fη2), (col_mix1, col_mix2))#nothing
 end
