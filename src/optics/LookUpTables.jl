@@ -129,8 +129,8 @@ struct LookUpLW{
     lower_scale_by_complement::IA1D
     "minor gas (upper atmosphere) scales by compliment `(n_min_absrb_upper)`"
     upper_scale_by_complement::IA1D
-    "reference pressures used by the lookup table `(n_p_ref)`"
-    p_ref::FTA1D
+    "log of reference pressures used by the lookup table `(n_p_ref)`"
+    ln_p_ref::FTA1D
     "reference temperatures used by the lookup table `(n_t_ref)`"
     t_ref::FTA1D
     "reference volume mixing ratios used by the lookup table `(2, n_gases, n_t_ref)`"
@@ -333,7 +333,7 @@ function LookUpLW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     Δ_t_ref = t_ref[2] - t_ref[1]
     Δ_ln_p_ref = log(p_ref[1]) - log(p_ref[2])
 
-    p_ref = FTA1D(p_ref)
+    ln_p_ref = FTA1D(log.(p_ref))
     t_ref = FTA1D(t_ref)
     vmr_ref = FTA3D(Array(ds["vmr_ref"]))
 
@@ -391,7 +391,7 @@ function LookUpLW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
             minor_upper_scales_with_density,
             lower_scale_by_complement,
             upper_scale_by_complement,
-            p_ref,
+            ln_p_ref,
             t_ref,
             vmr_ref,
         ),
@@ -510,8 +510,8 @@ struct LookUpSW{
     lower_scale_by_complement::IA1D
     "minor gas (upper atmosphere) scales by compliment `(n_min_absrb_upper)`"
     upper_scale_by_complement::IA1D
-    "reference pressures used by the lookup table `(n_p_ref)`"
-    p_ref::FTA1D
+    "log of reference pressures used by the lookup table `(n_p_ref)`"
+    ln_p_ref::FTA1D
     "reference temperatures used by the lookup table `(n_t_ref)`"
     t_ref::FTA1D
     "reference volume mixing ratios used by the lookup table `(2, n_gases, n_t_ref)`"
@@ -711,7 +711,7 @@ function LookUpSW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     Δ_t_ref = t_ref[2] - t_ref[1]
     Δ_ln_p_ref = log(p_ref[1]) - log(p_ref[2])
 
-    p_ref = FTA1D(p_ref)
+    ln_p_ref = FTA1D(log.(p_ref))
     t_ref = FTA1D(t_ref)
     vmr_ref = FTA3D(Array(ds["vmr_ref"]))
 
@@ -773,7 +773,7 @@ function LookUpSW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
             minor_upper_scales_with_density,
             lower_scale_by_complement,
             upper_scale_by_complement,
-            p_ref,
+            ln_p_ref,
             t_ref,
             vmr_ref,
             rayl_lower,

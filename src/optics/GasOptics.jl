@@ -60,11 +60,11 @@ end
 
 Compute interpolation fraction for pressure.
 """
-@inline function compute_interp_frac_press(Δ_ln_p_ref, p_ref, n_p_ref, p_lay, tropo)
+@inline function compute_interp_frac_press(Δ_ln_p_ref, ln_p_ref, n_p_ref, p_lay, tropo)
     log_p_lay = log(p_lay)
-    @inbounds jpress = Int(min(max(fld(log(p_ref[1]) - log_p_lay, Δ_ln_p_ref) + 1, 1), n_p_ref - 1) + 1)
+    @inbounds jpress = Int(min(max(fld(ln_p_ref[1] - log_p_lay, Δ_ln_p_ref) + 1, 1), n_p_ref - 1) + 1)
 
-    @inbounds fpress = (log(p_ref[jpress - 1]) - log_p_lay) / Δ_ln_p_ref
+    @inbounds fpress = (ln_p_ref[jpress - 1] - log_p_lay) / Δ_ln_p_ref
     jpress = jpress + tropo - 1
 
     return (jpress, fpress)
@@ -141,8 +141,8 @@ Compute optical thickness, single scattering albedo, and asymmetry parameter.
     (; Δ_t_ref, n_t_ref, t_ref) = lkp
     jftemp = compute_interp_frac_temp(Δ_t_ref, n_t_ref, t_ref, t_lay)
 
-    (; Δ_ln_p_ref, p_ref, n_p_ref) = lkp
-    jfpress = compute_interp_frac_press(Δ_ln_p_ref, p_ref, n_p_ref, p_lay, tropo)
+    (; Δ_ln_p_ref, ln_p_ref, n_p_ref) = lkp
+    jfpress = compute_interp_frac_press(Δ_ln_p_ref, ln_p_ref, n_p_ref, p_lay, tropo)
 
     (; n_η, vmr_ref) = lkp
     ig = view(lkp.key_species, 1:2, tropo, ibnd)
@@ -307,8 +307,8 @@ Computes Planck sources for the longwave problem.
     (; Δ_t_ref, n_t_ref, t_ref) = lkp
     jtemp, ftemp = compute_interp_frac_temp(Δ_t_ref, n_t_ref, t_ref, t_lay)
 
-    (; Δ_ln_p_ref, p_ref, n_p_ref) = lkp
-    jpresst, fpress = compute_interp_frac_press(Δ_ln_p_ref, p_ref, n_p_ref, p_lay, tropo)
+    (; Δ_ln_p_ref, ln_p_ref, n_p_ref) = lkp
+    jpresst, fpress = compute_interp_frac_press(Δ_ln_p_ref, ln_p_ref, n_p_ref, p_lay, tropo)
 
     (; n_η, vmr_ref) = lkp
     ig = view(lkp.key_species, 1:2, tropo, ibnd)
@@ -334,8 +334,8 @@ end
     (; Δ_t_ref, n_t_ref, t_ref) = lkp
     jtemp, ftemp = compute_interp_frac_temp(Δ_t_ref, n_t_ref, t_ref, t_lay)
 
-    (; Δ_ln_p_ref, p_ref, n_p_ref) = lkp
-    jpresst, fpress = compute_interp_frac_press(Δ_ln_p_ref, p_ref, n_p_ref, p_lay, tropo)
+    (; Δ_ln_p_ref, ln_p_ref, n_p_ref) = lkp
+    jpresst, fpress = compute_interp_frac_press(Δ_ln_p_ref, ln_p_ref, n_p_ref, p_lay, tropo)
 
     (; n_η, vmr_ref) = lkp
     ig = view(lkp.key_species, 1:2, tropo, ibnd)
