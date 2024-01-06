@@ -5,7 +5,7 @@ using CUDA
 using Adapt
 using Random
 import ClimaComms
-#---------------------------------------
+
 using ..Vmrs
 import ..pow_fast
 using ..LookUpTables
@@ -13,7 +13,6 @@ using ..AtmosphericStates
 using ..Sources
 using ..AngularDiscretizations
 import ..Parameters as RP
-#---------------------------------------
 
 export AbstractOpticalProps, OneScalar, TwoStream, compute_col_gas!, compute_optical_props!
 
@@ -131,7 +130,7 @@ function compute_col_gas_CUDA!(col_dry, args...)
     end
     return nothing
 end
-#-----------------------------------------------------------------------------
+
 """
     compute_optical_props!(
         op::AbstractOpticalProps{FT},
@@ -145,22 +144,70 @@ end
 
 Computes optical properties for the longwave problem.
 """
-function compute_optical_props!(
+@inline function compute_optical_props!(
     op::AbstractOpticalProps{FT},
     as::AtmosphericState{FT},
     sf::AbstractSourceLW{FT},
     gcol::Int,
     igpt::Int,
-    lkp::Union{AbstractLookUp, Nothing} = nothing,
-    lkp_cld::Union{AbstractLookUp, Nothing} = nothing,
+    lkp::LookUpLW,
+    lkp_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
 ) where {FT <: AbstractFloat}
-    nlay = as.nlay
-    @inbounds for ilay in 1:nlay
-        if lkp_cld isa Nothing
-            compute_optical_props_kernel!(op, as, ilay, gcol, sf, igpt, lkp)
+    (; nlay, vmr) = as
+    @inbounds ibnd = lkp.major_gpt2bnd[igpt]
+    @inbounds t_sfc = as.t_sfc[gcol]
+    planck_args = (lkp.t_planck, lkp.totplnk, ibnd)
+    col_dry_col = view(as.col_dry, :, gcol)
+    p_lay_col = view(as.p_lay, :, gcol)
+    t_lay_col = view(as.t_lay, :, gcol)
+    τ = view(op.τ, :, gcol)
+    if op isa TwoStream
+        ssa = view(op.ssa, :, gcol)
+        g = view(op.g, :, gcol)
+    end
+
+    @inbounds for glay in 1:nlay
+        col_dry = col_dry_col[glay]
+        p_lay = p_lay_col[glay]
+        t_lay = t_lay_col[glay]
+        # compute gas optics
+        if op isa TwoStream
+            τ[glay], ssa[glay], g[glay] = compute_gas_optics(lkp, vmr, col_dry, igpt, ibnd, p_lay, t_lay, glay, gcol)
         else
-            compute_optical_props_kernel!(op, as, ilay, gcol, sf, igpt, lkp, lkp_cld)
+            τ[glay], _, _ = compute_gas_optics(lkp, vmr, col_dry, igpt, ibnd, p_lay, t_lay, glay, gcol)
         end
+        # compute Planck sources
+        p_frac = compute_lw_planck_fraction(lkp, vmr, p_lay, t_lay, igpt, ibnd, glay, gcol)
+
+        sf.lay_source[glay, gcol] = interp1d(t_lay, planck_args...) * p_frac
+        sf.lev_source_inc[glay, gcol] = interp1d(as.t_lev[glay + 1, gcol], planck_args...) * p_frac
+        sf.lev_source_dec[glay, gcol] = interp1d(as.t_lev[glay, gcol], planck_args...) * p_frac
+
+        if glay == 1
+            sf.sfc_source[gcol] = interp1d(t_sfc, planck_args...) * p_frac
+        end
+    end
+    if !isnothing(lkp_cld) # clouds need TwoStream optics
+        cld_r_eff_liq = view(as.cld_r_eff_liq, :, gcol)
+        cld_r_eff_ice = view(as.cld_r_eff_ice, :, gcol)
+        cld_path_liq = view(as.cld_path_liq, :, gcol)
+        cld_path_ice = view(as.cld_path_ice, :, gcol)
+        cld_mask = view(as.cld_mask_lw, :, gcol)
+
+        add_cloud_optics_2stream(
+            τ,
+            ssa,
+            g,
+            cld_mask,
+            cld_r_eff_liq,
+            cld_r_eff_ice,
+            cld_path_liq,
+            cld_path_ice,
+            as.ice_rgh,
+            lkp_cld,
+            ibnd;
+            delta_scaling = false,
+        )
     end
     return nothing
 end
@@ -177,25 +224,62 @@ end
 
 Computes optical properties for the shortwave problem.
 """
-function compute_optical_props!(
+@inline function compute_optical_props!(
     op::AbstractOpticalProps{FT},
     as::AtmosphericState{FT},
     gcol::Int,
     igpt::Int,
-    lkp::Union{AbstractLookUp, Nothing} = nothing,
-    lkp_cld::Union{AbstractLookUp, Nothing} = nothing,
+    lkp::LookUpSW,
+    lkp_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
 ) where {FT <: AbstractFloat}
-    nlay = as.nlay
-    @inbounds for ilay in 1:nlay
-        if lkp_cld isa Nothing
-            compute_optical_props_kernel!(op, as, ilay, gcol, igpt, lkp)
+    (; nlay, vmr) = as
+    @inbounds ibnd = lkp.major_gpt2bnd[igpt]
+    @inbounds t_sfc = as.t_sfc[gcol]
+    col_dry_col = view(as.col_dry, :, gcol)
+    p_lay_col = view(as.p_lay, :, gcol)
+    t_lay_col = view(as.t_lay, :, gcol)
+    τ = view(op.τ, :, gcol)
+    if op isa TwoStream
+        ssa = view(op.ssa, :, gcol)
+        g = view(op.g, :, gcol)
+    end
+
+    @inbounds for glay in 1:nlay
+        col_dry = col_dry_col[glay]
+        p_lay = p_lay_col[glay]
+        t_lay = t_lay_col[glay]
+        # compute gas optics
+        if op isa TwoStream
+            τ[glay], ssa[glay], g[glay] = compute_gas_optics(lkp, vmr, col_dry, igpt, ibnd, p_lay, t_lay, glay, gcol)
         else
-            compute_optical_props_kernel!(op, as, ilay, gcol, igpt, lkp, lkp_cld)
+            τ[glay], _, _ = compute_gas_optics(lkp, vmr, col_dry, igpt, ibnd, p_lay, t_lay, glay, gcol)
         end
+    end
+    if !isnothing(lkp_cld) # clouds need TwoStream optics
+        cld_r_eff_liq = view(as.cld_r_eff_liq, :, gcol)
+        cld_r_eff_ice = view(as.cld_r_eff_ice, :, gcol)
+        cld_path_liq = view(as.cld_path_liq, :, gcol)
+        cld_path_ice = view(as.cld_path_ice, :, gcol)
+        cld_mask = view(as.cld_mask_sw, :, gcol)
+
+        add_cloud_optics_2stream(
+            τ,
+            ssa,
+            g,
+            cld_mask,
+            cld_r_eff_liq,
+            cld_r_eff_ice,
+            cld_path_liq,
+            cld_path_ice,
+            as.ice_rgh,
+            lkp_cld,
+            ibnd;
+            delta_scaling = true,
+        )
     end
     return nothing
 end
-#-----------------------------------------------------------------------------
+
 """
     compute_optical_props!(
         op::AbstractOpticalProps{FT},
@@ -248,6 +332,9 @@ function compute_optical_props!(
     return nothing
 end
 
-include("OpticsKernels.jl")
+include("OpticsUtils.jl")
+include("GasOptics.jl")
+include("CloudOptics.jl")
+include("GrayOpticsKernels.jl")
 
 end

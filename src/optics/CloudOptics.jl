@@ -1,62 +1,63 @@
 
 """
     add_cloud_optics_2stream(
-        op::TwoStream,
-        as::AtmosphericState,
-        lkp::Union{LookUpLW,LookUpSW},
+        τ,
+        ssa,
+        g,
+        cld_mask,
+        cld_r_eff_liq,
+        cld_r_eff_ice,
+        cld_path_liq,
+        cld_path_ice,
+        ice_rgh,
         lkp_cld,
-        glay,
-        gcol,
-        ibnd,
+        ibnd;
+        delta_scaling = false,
     )
 
-This function computes the longwave TwoStream clouds optics properties and adds them
-to the TwoStream longwave gas optics properties.
+This function computes the TwoStream clouds optics properties and adds them
+to the TwoStream gas optics properties.
 """
-function add_cloud_optics_2stream(
-    op::TwoStream,
-    as::AtmosphericState,
-    lkp::Union{LookUpLW, LookUpSW},
+@inline function add_cloud_optics_2stream(
+    τ,
+    ssa,
+    g,
+    cld_mask,
+    cld_r_eff_liq,
+    cld_r_eff_ice,
+    cld_path_liq,
+    cld_path_ice,
+    ice_rgh,
     lkp_cld,
-    glay,
-    gcol,
-    ibnd,
+    ibnd;
+    delta_scaling = false,
 )
-    is_sw = lkp isa LookUpSW
-    cld_mask_array = is_sw ? as.cld_mask_sw : as.cld_mask_lw
-    if !isnothing(cld_mask_array)
-        @inbounds cld_mask = cld_mask_array[glay, gcol]
-        if cld_mask
-            @inbounds begin
-                re_liq = as.cld_r_eff_liq[glay, gcol]
-                re_ice = as.cld_r_eff_ice[glay, gcol]
-                ice_rgh = as.ice_rgh
-                cld_path_liq = as.cld_path_liq[glay, gcol]
-                cld_path_ice = as.cld_path_ice[glay, gcol]
-                τ_gas = op.τ[glay, gcol]
-                ssa_gas = op.ssa[glay, gcol]
-                g_gas = op.g[glay, gcol]
+    nlay = length(τ)
+    @inbounds begin
+        for glay in 1:nlay
+            if cld_mask[glay]
+                # compute cloud optical optics
+                τ_cl, ssa_cl, g_cl = compute_cld_props(
+                    lkp_cld,
+                    cld_r_eff_liq[glay],
+                    cld_r_eff_ice[glay],
+                    ice_rgh,
+                    cld_path_liq[glay],
+                    cld_path_ice[glay],
+                    ibnd,
+                )
+                if delta_scaling # delta scaling is applied for shortwave problem
+                    τ_cl, ssa_cl, g_cl = delta_scale(τ_cl, ssa_cl, g_cl)
+                end
+                # compute cloud optical optics
+                τ[glay], ssa[glay], g[glay] = increment_2stream(τ[glay], ssa[glay], g[glay], τ_cl, ssa_cl, g_cl)
             end
-            τ_cl, τ_cl_ssa, τ_cl_ssag =
-                compute_cld_props(lkp_cld, re_liq, re_ice, ice_rgh, cld_path_liq, cld_path_ice, ibnd)
-            if is_sw
-                τ_cl, τ_cl_ssa, τ_cl_ssag = delta_scale(τ_cl, τ_cl_ssa, τ_cl_ssag)
-            end
-            @inbounds op.τ[glay, gcol], op.ssa[glay, gcol], op.g[glay, gcol] =
-                increment_2stream(op.τ[glay, gcol], op.ssa[glay, gcol], op.g[glay, gcol], τ_cl, τ_cl_ssa, τ_cl_ssag)
         end
     end
     return nothing
 end
 
-"""
-    add_cloud_optics_2stream(op::OneScalar, args...)
 
-Cloud optics is currently only supported for the TwoStream solver.
-"""
-function add_cloud_optics_2stream(op::OneScalar, args...)
-    return nothing
-end
 """
     compute_cld_props(
         lkp_cld::LookUpCld,
@@ -80,7 +81,6 @@ function compute_cld_props(
     cld_path_ice::FT,
     ibnd::UInt8,
 ) where {FT}
-    #FT = eltype(re_liq)
     τl, τl_ssa, τl_ssag = FT(0), FT(0), FT(0)
     τi, τi_ssa, τi_ssag = FT(0), FT(0), FT(0)
     (;
