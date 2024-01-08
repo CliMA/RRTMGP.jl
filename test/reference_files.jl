@@ -39,6 +39,11 @@ function get_ref_filename(ftype, optics_type; λ = nothing, opc = nothing, flux_
             fname *= "_" * String(lut_pade)
         end
     end
+    if ftype == :lookup_tables
+        dir = RRTMGP.lookup_data()
+    else
+        dir = joinpath(artifact"RRTMGPReferenceData", "RRTMGPReferenceData", String(ftype))
+    end
 
-    return joinpath(artifact"RRTMGPReferenceData", "RRTMGPReferenceData", String(ftype), fname * ".nc")
+    return joinpath(dir, fname * ".nc")
 end
