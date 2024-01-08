@@ -1,0 +1,6 @@
+[rrtmgp-lookup-data]
+git-tree-sha1 = "9a2a6c0f3934a2328502635dfc7927e20b9d6327"
+
+    [[rrtmgp-lookup-data.download]]
+    url = "https://data.caltech.edu/records/ppv8a-4q131/files/rrtmgp-lookup-data.tar.gz?download=1"
+    sha256 = "f5003a657559cce4fca6cff1d6b2e9fd3f744e656cd7aa434903e7e753650260"
