@@ -117,10 +117,13 @@ function gray_atmos_lw_equil(context, ::Type{OPC}, ::Type{FT}; exfiltrate = fals
     end
 
     t_error = maximum(abs.(T_ex_lev .- gray_as.t_lev))
-    println("*************************************************")
-    println("Longwave test for gray atmosphere model - $opc; ncol = $ncol; context = $context")
-    println("Integration time = $(FT(nsteps)/FT(24.0/tstep) / FT(365.0)) years")
-    println("t_error = $(t_error); flux_grad_err = $(flux_grad_err)")
+    color2 = :cyan
+
+    printstyled("\nGray atmosphere longwave test with ncol = $ncol, nlev = $nlev, OPC = $opc\n", color = color2)
+    printstyled("device = $device\n", color = color2)
+    printstyled("Integration time = $(FT(nsteps)/FT(24.0/tstep) / FT(365.0)) years\n\n", color = color2)
+
+    println("t_error = $(t_error); flux_grad_err = $(flux_grad_err)\n")
 
     @test maximum(t_error) < temp_toler
     if device isa ClimaComms.CPUSingleThreaded
@@ -201,9 +204,14 @@ function gray_atmos_sw_test(
 
     rel_toler = FT(0.001)
     rel_error = abs(flux_dn_dir[1] - exact) / exact
-    println("*************************************************")
-    println("Running shortwave test for gray atmosphere model - $(opc); ncol = $ncol; context = $context")
+
+    color2 = :cyan
+
+    printstyled("\nGray atmosphere shortwave test with ncol = $ncol, nlev = $nlev, OPC = $opc\n", color = color2)
+    printstyled("device = $device\n\n", color = color2)
+
     println("relative error = $rel_error")
+
     @test rel_error < rel_toler
 
     if device isa ClimaComms.CPUSingleThreaded
