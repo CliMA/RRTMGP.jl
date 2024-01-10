@@ -291,7 +291,7 @@ end
 
 Computes optical properties for the longwave gray radiation problem.
 """
-function compute_optical_props!(
+@inline function compute_optical_props!(
     op::AbstractOpticalProps{FT},
     as::GrayAtmosphericState{FT},
     sf::AbstractSourceLW{FT},
@@ -317,7 +317,7 @@ end
 
 Computes optical properties for the shortwave gray radiation problem.
 """
-function compute_optical_props!(
+@inline function compute_optical_props!(
     op::AbstractOpticalProps{FT},
     as::GrayAtmosphericState{FT},
     gcol::Int,

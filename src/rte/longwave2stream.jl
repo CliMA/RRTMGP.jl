@@ -1,70 +1,141 @@
-"""
-    rte_lw_solve!(
-        context,
-        flux::FluxLW{FT},
-        flux_lw::FluxLW{FT},
-        src_lw::SourceLW2Str{FT},
-        bcs_lw::LwBCs{FT},
-        op::TwoStream{FT},
-        major_gpt2bnd::AbstractArray{UInt8,1},
-        max_threads,
-        as::AbstractAtmosphericState{FT},
-        lookup_lw::Union{LookUpLW, Nothing} = nothing,
-        lookup_lw_cld::Union{LookUpCld, Nothing} = nothing,
-    ) where {FT<:AbstractFloat}
 
-Two stream solver for the longwave problem.
 
-RRTMGP provides source functions at each level using the spectral mapping
-of each adjacent layer. Combine these for two-stream calculations
-lw combine sources (rte_lw_2stream_combine_sources!)
-combine RRTMGP-specific sources at levels
-compute layer reflectance, transmittance
-compute total source function at levels using linear-in-tau (rte_lw_2stream_source!)
-transport (adding_lw!)
-"""
 function rte_lw_solve!(
-    context,
+    device::ClimaComms.AbstractCPUDevice,
+    flux_lw::FluxLW{FT},
+    src_lw::SourceLW2Str{FT},
+    bcs_lw::LwBCs{FT},
+    op::TwoStream{FT},
+    max_threads,
+    as::GrayAtmosphericState{FT},
+) where {FT <: AbstractFloat}
+    (; nlay, ncol) = as
+    nlev = nlay + 1
+    igpt, ibnd = 1, UInt8(1)
+    (; flux_up, flux_dn, flux_net) = flux_lw
+    @inbounds begin
+        ClimaComms.@threaded device for gcol in 1:ncol
+            compute_optical_props!(op, as, src_lw, gcol, igpt)
+            rte_lw_2stream_combine_sources!(src_lw, gcol, nlev, ncol)
+            rte_lw_2stream_source!(op, src_lw, gcol, nlay, ncol)
+            adding_lw!(flux_lw, src_lw, bcs_lw, gcol, igpt, ibnd, nlev, ncol)
+            for ilev in 1:nlev
+                flux_net[ilev, gcol] = flux_up[ilev, gcol] - flux_dn[ilev, gcol]
+            end
+        end
+    end
+    return nothing
+end
+
+function rte_lw_solve!(
+    device::ClimaComms.CUDADevice,
+    flux_lw::FluxLW{FT},
+    src_lw::SourceLW2Str{FT},
+    bcs_lw::LwBCs{FT},
+    op::TwoStream{FT},
+    max_threads,
+    as::GrayAtmosphericState{FT},
+) where {FT <: AbstractFloat}
+    (; nlay, ncol) = as
+    nlev = nlay + 1
+    tx = min(ncol, max_threads)
+    bx = cld(ncol, tx)
+    args = (flux_lw, src_lw, bcs_lw, op, nlay, ncol, as)
+    @cuda threads = (tx) blocks = (bx) rte_lw_2stream_solve_CUDA!(args...)
+    return nothing
+end
+
+function rte_lw_2stream_solve_CUDA!(
+    flux_lw::FluxLW{FT},
+    src_lw::SourceLW2Str{FT},
+    bcs_lw::LwBCs{FT},
+    op::TwoStream{FT},
+    nlay,
+    ncol,
+    as::GrayAtmosphericState{FT},
+) where {FT <: AbstractFloat}
+    gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
+    nlev = nlay + 1
+    igpt, ibnd = 1, UInt8(1)
+    if gcol ≤ ncol
+        (; flux_up, flux_dn, flux_net) = flux_lw
+        compute_optical_props!(op, as, src_lw, gcol, igpt)
+        rte_lw_2stream_combine_sources!(src_lw, gcol, nlev, ncol)
+        rte_lw_2stream_source!(op, src_lw, gcol, nlay, ncol)
+        adding_lw!(flux_lw, src_lw, bcs_lw, gcol, igpt, ibnd, nlev, ncol)
+        @inbounds begin
+            for ilev in 1:nlev
+                flux_net[ilev, gcol] = flux_up[ilev, gcol] - flux_dn[ilev, gcol]
+            end
+        end
+    end
+    return nothing
+end
+
+function rte_lw_solve!(
+    device::ClimaComms.AbstractCPUDevice,
     flux::FluxLW{FT},
     flux_lw::FluxLW{FT},
     src_lw::SourceLW2Str{FT},
     bcs_lw::LwBCs{FT},
     op::TwoStream{FT},
-    major_gpt2bnd::AbstractArray{UInt8, 1},
     max_threads,
-    as::AbstractAtmosphericState{FT},
-    lookup_lw::Union{LookUpLW, Nothing} = nothing,
+    as::AtmosphericState{FT},
+    lookup_lw::LookUpLW,
     lookup_lw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
 ) where {FT <: AbstractFloat}
     (; nlay, ncol) = as
     nlev = nlay + 1
+    (; major_gpt2bnd) = lookup_lw
     n_gpt = length(major_gpt2bnd)
-    device = ClimaComms.device(context)
-    if device isa ClimaComms.CUDADevice
-        tx = min(ncol, max_threads)
-        bx = cld(ncol, tx)
-        args = (flux, flux_lw, src_lw, bcs_lw, op, nlay, ncol, major_gpt2bnd, as, lookup_lw, lookup_lw_cld)
-        @cuda threads = (tx) blocks = (bx) rte_lw_2stream_solve_CUDA!(args...)
-    else
-        bld_cld_mask = as isa AtmosphericState && as.cld_mask_type isa AbstractCloudMask
-        @inbounds begin
-            for igpt in 1:n_gpt
-                ClimaComms.@threaded device for gcol in 1:ncol
-                    igpt == 1 && set_flux_to_zero!(flux_lw, gcol)
-                    bld_cld_mask && Optics.build_cloud_mask!(
-                        view(as.cld_mask_lw, :, gcol),
-                        view(as.cld_frac, :, gcol),
-                        as.cld_mask_type,
-                    )
-                    compute_optical_props!(op, as, src_lw, gcol, igpt, lookup_lw, lookup_lw_cld)
-                    rte_lw_2stream_combine_sources!(src_lw, gcol, nlev, ncol)
-                    rte_lw_2stream_source!(op, src_lw, gcol, nlay, ncol)
-                    adding_lw!(flux, src_lw, bcs_lw, gcol, igpt, major_gpt2bnd, nlev, ncol)
-                    n_gpt > 1 && add_to_flux!(flux_lw, flux, gcol)
-                end
+    bld_cld_mask = as isa AtmosphericState && as.cld_mask_type isa AbstractCloudMask
+    flux_up_lw = flux_lw.flux_up
+    flux_dn_lw = flux_lw.flux_dn
+    flux_net_lw = flux_lw.flux_net
+    @inbounds begin
+        for igpt in 1:n_gpt
+            ClimaComms.@threaded device for gcol in 1:ncol
+                ibnd = major_gpt2bnd[igpt]
+                igpt == 1 && set_flux_to_zero!(flux_lw, gcol)
+                bld_cld_mask && Optics.build_cloud_mask!(
+                    view(as.cld_mask_lw, :, gcol),
+                    view(as.cld_frac, :, gcol),
+                    as.cld_mask_type,
+                )
+                compute_optical_props!(op, as, src_lw, gcol, igpt, lookup_lw, lookup_lw_cld)
+                rte_lw_2stream_combine_sources!(src_lw, gcol, nlev, ncol)
+                rte_lw_2stream_source!(op, src_lw, gcol, nlay, ncol)
+                adding_lw!(flux, src_lw, bcs_lw, gcol, igpt, ibnd, nlev, ncol)
+                n_gpt > 1 && add_to_flux!(flux_lw, flux, gcol)
+            end
+        end
+        ClimaComms.@threaded device for gcol in 1:ncol
+            for ilev in 1:nlev
+                flux_net_lw[ilev, gcol] = flux_up_lw[ilev, gcol] - flux_dn_lw[ilev, gcol]
             end
         end
     end
+    return nothing
+end
+
+function rte_lw_solve!(
+    device::ClimaComms.CUDADevice,
+    flux::FluxLW{FT},
+    flux_lw::FluxLW{FT},
+    src_lw::SourceLW2Str{FT},
+    bcs_lw::LwBCs{FT},
+    op::TwoStream{FT},
+    max_threads,
+    as::AtmosphericState{FT},
+    lookup_lw::LookUpLW,
+    lookup_lw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
+) where {FT <: AbstractFloat}
+    (; nlay, ncol) = as
+    nlev = nlay + 1
+    tx = min(ncol, max_threads)
+    bx = cld(ncol, tx)
+    args = (flux, flux_lw, src_lw, bcs_lw, op, nlay, ncol, as, lookup_lw, lookup_lw_cld)
+    @cuda threads = (tx) blocks = (bx) rte_lw_2stream_solve_CUDA!(args...)
     return nothing
 end
 
@@ -76,16 +147,20 @@ function rte_lw_2stream_solve_CUDA!(
     op::TwoStream{FT},
     nlay,
     ncol,
-    major_gpt2bnd::AbstractArray{UInt8, 1},
-    as::AbstractAtmosphericState{FT},
-    lookup_lw::Union{LookUpLW, Nothing} = nothing,
+    as::AtmosphericState{FT},
+    lookup_lw::LookUpLW,
     lookup_lw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
 ) where {FT <: AbstractFloat}
     gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
     nlev = nlay + 1
+    (; major_gpt2bnd) = lookup_lw
     n_gpt = length(major_gpt2bnd)
     if gcol ≤ ncol
+        flux_up_lw = flux_lw.flux_up
+        flux_dn_lw = flux_lw.flux_dn
+        flux_net_lw = flux_lw.flux_net
         @inbounds for igpt in 1:n_gpt
+            ibnd = major_gpt2bnd[igpt]
             igpt == 1 && set_flux_to_zero!(flux_lw, gcol)
             if as isa AtmosphericState && as.cld_mask_type isa AbstractCloudMask
                 Optics.build_cloud_mask!(view(as.cld_mask_lw, :, gcol), view(as.cld_frac, :, gcol), as.cld_mask_type)
@@ -93,8 +168,13 @@ function rte_lw_2stream_solve_CUDA!(
             compute_optical_props!(op, as, src_lw, gcol, igpt, lookup_lw, lookup_lw_cld)
             rte_lw_2stream_combine_sources!(src_lw, gcol, nlev, ncol)
             rte_lw_2stream_source!(op, src_lw, gcol, nlay, ncol)
-            adding_lw!(flux, src_lw, bcs_lw, gcol, igpt, major_gpt2bnd, nlev, ncol)
+            adding_lw!(flux, src_lw, bcs_lw, gcol, igpt, ibnd, nlev, ncol)
             n_gpt > 1 && add_to_flux!(flux_lw, flux, gcol)
+        end
+        @inbounds begin
+            for ilev in 1:nlev
+                flux_net_lw[ilev, gcol] = flux_up_lw[ilev, gcol] - flux_dn_lw[ilev, gcol]
+            end
         end
     end
     return nothing
@@ -216,26 +296,18 @@ function adding_lw!(
     bcs_lw::BCL,
     gcol::Int,
     igpt::Int,
-    major_gpt2bnd::AbstractArray{UInt8, 1},
+    ibnd::UInt8,
     nlev::Int,
     ncol::Int,
 ) where {FT <: AbstractFloat, SL <: SourceLW2Str{FT}, BCL <: LwBCs{FT}}
     nlay = nlev - 1
-    ibnd = major_gpt2bnd[igpt]
     # setting references
     (; flux_up, flux_dn, flux_net) = flux
 
     (; albedo, sfc_source, Rdif, Tdif, src_up, src_dn, src) = src_lw
     (; inc_flux, sfc_emis) = bcs_lw
 
-    @inbounds for ilev in 1:nlev
-        flux_dn[ilev, gcol] = FT(0)
-        flux_up[ilev, gcol] = FT(0)
-    end
-
-    if inc_flux ≠ nothing
-        @inbounds flux_dn[nlev, gcol] = inc_flux[gcol, igpt]
-    end
+    @inbounds flux_dn[nlev, gcol] = isnothing(inc_flux) ? FT(0) : inc_flux[gcol, igpt]
     # Albedo of lowest level is the surface albedo...
     @inbounds albedo[1, gcol] = FT(1) - sfc_emis[ibnd, gcol]
     # ... and source of diffuse radiation is surface emission
@@ -269,9 +341,5 @@ function adding_lw!(
         flux_up[ilev, gcol] =
             flux_dn[ilev, gcol] * albedo[ilev, gcol] + # Equation 12
             src[ilev, gcol]
-    end
-
-    @inbounds for ilev in 1:nlev
-        flux_net[ilev, gcol] = flux_up[ilev, gcol] - flux_dn[ilev, gcol]
     end
 end

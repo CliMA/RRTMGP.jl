@@ -12,7 +12,7 @@
 This function computes the optical properties using the gray atmosphere assumption
 for the longwave solver.
 """
-function compute_optical_props_kernel!(
+@inline function compute_optical_props_kernel!(
     op::AbstractOpticalProps{FT},
     as::GrayAtmosphericState{FT},
     glay,
@@ -36,7 +36,7 @@ end
 This function computes the optical properties using the gray atmosphere assumption
 for the longwave solver.
 """
-function compute_optical_props_kernel_lw!(
+@inline function compute_optical_props_kernel_lw!(
     op::AbstractOpticalProps{FT},
     as::GrayAtmosphericState{FT},
     glay,
@@ -60,7 +60,7 @@ end
 
 This function computes the Planck sources for the gray longwave solver.
 """
-function compute_sources_gray_kernel!(
+@inline function compute_sources_gray_kernel!(
     source::AbstractSourceLW{FT},
     as::GrayAtmosphericState{FT},
     glay,
@@ -89,7 +89,7 @@ end
 This function computes the optical properties using the gray atmosphere assumption
 for the shortwave solver.
 """
-function compute_optical_props_kernel!(
+@inline function compute_optical_props_kernel!(
     op::AbstractOpticalProps{FT},
     as::GrayAtmosphericState{FT},
     glay,
@@ -124,7 +124,7 @@ and lapse rate for a gray atmosphere.
 See Schneider 2004, J. Atmos. Sci. (2004) 61 (12): 1317–1340.
 DOI: https://doi.org/10.1175/1520-0469(2004)061<1317:TTATTS>2.0.CO;2
 """
-function compute_gray_optical_thickness_lw(
+@inline function compute_gray_optical_thickness_lw(
     params::GrayOpticalThicknessSchneider2004{FT},
     glay,
     gcol,
@@ -140,7 +140,7 @@ function compute_gray_optical_thickness_lw(
     return abs(τ)
 end
 
-compute_gray_optical_thickness_sw(params::GrayOpticalThicknessSchneider2004{FT}, rest...) where {FT} = FT(0)
+@inline compute_gray_optical_thickness_sw(params::GrayOpticalThicknessSchneider2004{FT}, rest...) where {FT} = FT(0)
 
 """
     compute_gray_optical_thickness_lw(
@@ -157,7 +157,7 @@ and lapse rate for a gray atmosphere.
 See O'Gorman 2008, Journal of Climate Vol 21, Page(s): 3815–3832.
 DOI: https://doi.org/10.1175/2007JCLI2065.1
 """
-function compute_gray_optical_thickness_lw(
+@inline function compute_gray_optical_thickness_lw(
     params::GrayOpticalThicknessOGorman2008{FT},
     glay,
     gcol,
@@ -188,7 +188,7 @@ for a gray atmosphere.
 See O'Gorman 2008, Journal of Climate Vol 21, Page(s): 3815–3832.
 DOI: https://doi.org/10.1175/2007JCLI2065.1
 """
-function compute_gray_optical_thickness_sw(
+@inline function compute_gray_optical_thickness_sw(
     params::GrayOpticalThicknessOGorman2008{FT},
     glay,
     gcol,
