@@ -184,7 +184,7 @@ Equations are developed in Meador and Weaver, 1980,
 doi:10.1175/1520-0469(1980)037<0630:TSATRT>2.0.CO;2
 """
 function sw_2stream_coeffs(τ::FT, ssa::FT, g::FT, μ₀::FT) where {FT}
-    k_min = FT(1e4 * eps(FT)) # Suggestion from Chiel van Heerwaarden
+    k_min = sqrt(eps(FT)) #FT(1e4 * eps(FT)) # Suggestion from Chiel van Heerwaarden
     # Zdunkowski Practical Improved Flux Method "PIFM"
     #  (Zdunkowski et al., 1980;  Contributions to Atmospheric Physics 53, 147-66)
     γ1 = (FT(8) - ssa * (FT(5) + FT(3) * g)) * FT(0.25)

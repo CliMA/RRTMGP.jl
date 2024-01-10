@@ -101,10 +101,10 @@ function rte_lw_noscat_source!(src_lw::SourceLWNoScat{FT}, op::OneScalar{FT}, gc
     Ds = op.angle_disc.gauss_Ds
     τ = op.τ
 
-    τ_thresh = sqrt(sqrt(eps(FT))) # or abs(eps(FT))?
+    τ_thresh = 100 * eps(FT)
 
     @inbounds for glay in 1:nlay
-        τ_loc = τ[glay, gcol] * Ds[1]      # Optical path and transmission,
+        τ_loc = τ[glay, gcol] * Ds[1] # Optical path and transmission,
 
         trans = exp(-τ_loc)    # used in source function and transport calculations
         # Weighting factor. Use 2nd order series expansion when rounding error (~tau^2)

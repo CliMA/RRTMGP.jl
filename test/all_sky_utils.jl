@@ -117,17 +117,15 @@ function all_sky(
     # initializing RTE solver
     slv = Solver(context, as, op, src_lw, src_sw, bcs_lw, bcs_sw, fluxb_lw, fluxb_sw, flux_lw, flux_sw)
     #------calling solvers
-    println("calling longwave solver; ncol = $ncol")
-    @time solve_lw!(slv, max_threads, lookup_lw, lookup_lw_cld)
+    solve_lw!(slv, max_threads, lookup_lw, lookup_lw_cld)
     if device isa ClimaComms.CPUSingleThreaded
         JET.@test_opt solve_lw!(slv, max_threads, lookup_lw, lookup_lw_cld)
         @test_broken (@allocated solve_lw!(slv, max_threads, lookup_lw, lookup_lw_cld)) == 0
         @test (@allocated solve_lw!(slv, max_threads, lookup_lw, lookup_lw_cld)) ≤ 736
     end
 
-    println("calling shortwave solver; ncol = $ncol")
     exfiltrate && Infiltrator.@exfiltrate
-    @time solve_sw!(slv, max_threads, lookup_sw, lookup_sw_cld)
+    solve_sw!(slv, max_threads, lookup_sw, lookup_sw_cld)
     if device isa ClimaComms.CPUSingleThreaded
         JET.@test_opt solve_sw!(slv, max_threads, lookup_sw, lookup_sw_cld)
         @test_broken (@allocated solve_sw!(slv, max_threads, lookup_sw, lookup_sw_cld)) == 0
@@ -138,34 +136,67 @@ function all_sky(
     method = use_lut ? "Lookup Table Interpolation method" : "PADE method"
     comp_flux_up_lw, comp_flux_dn_lw, comp_flux_up_sw, comp_flux_dn_sw = load_comparison_data(use_lut, bot_at_1, ncol)
 
+    comp_flux_net_lw = comp_flux_up_lw .- comp_flux_dn_lw
+    comp_flux_net_sw = comp_flux_up_sw .- comp_flux_dn_sw
+
     flux_up_lw = Array(slv.flux_lw.flux_up)
     flux_dn_lw = Array(slv.flux_lw.flux_dn)
+    flux_net_lw = flux_up_lw .- flux_dn_lw
 
     max_err_flux_up_lw = maximum(abs.(flux_up_lw .- comp_flux_up_lw))
     max_err_flux_dn_lw = maximum(abs.(flux_dn_lw .- comp_flux_dn_lw))
-    println("=======================================")
-    println("Cloudy-sky longwave test - $opc")
-    println(method)
-    println("max_err_flux_up_lw = $max_err_flux_up_lw")
-    println("max_err_flux_dn_lw = $max_err_flux_dn_lw")
+    max_err_flux_net_lw = maximum(abs.(flux_net_lw .- comp_flux_net_lw))
+
+    rel_err_flux_net_lw = abs.(flux_net_lw .- comp_flux_net_lw)
+
+    for gcol in 1:ncol, glev in 1:nlev
+        den = abs(comp_flux_net_lw[glev, gcol])
+        if den > 10 * eps(FT)
+            rel_err_flux_net_lw[glev, gcol] /= den
+        end
+    end
+    max_rel_err_flux_net_lw = maximum(rel_err_flux_net_lw)
+    color2 = :cyan
+    printstyled("Cloudy-sky longwave test with ncol = $ncol, nlev = $nlev, OPC = $opc, FT = $FT\n", color = color2)
+    printstyled("device = $device\n", color = color2)
+    printstyled("$method\n\n", color = color2)
+    println("L∞ error in flux_up           = $max_err_flux_up_lw")
+    println("L∞ error in flux_dn           = $max_err_flux_dn_lw")
+    println("L∞ error in flux_net          = $max_err_flux_net_lw")
+    println("L∞ relative error in flux_net = $(max_rel_err_flux_net_lw * 100) %\n")
 
     flux_up_sw = Array(slv.flux_sw.flux_up)
     flux_dn_sw = Array(slv.flux_sw.flux_dn)
     flux_dn_dir_sw = Array(slv.flux_sw.flux_dn_dir)
+    flux_net_sw = flux_up_sw .- flux_dn_sw
 
     max_err_flux_up_sw = maximum(abs.(flux_up_sw .- comp_flux_up_sw))
     max_err_flux_dn_sw = maximum(abs.(flux_dn_sw .- comp_flux_dn_sw))
+    max_err_flux_net_sw = maximum(abs.(flux_net_sw .- comp_flux_net_sw))
 
-    println("Cloudy-sky shortwave test - $opc")
-    println(method)
-    println("max_err_flux_up_sw = $max_err_flux_up_sw")
-    println("max_err_flux_dn_sw = $max_err_flux_dn_sw")
-    println("=======================================")
-    toler = FT(1e-5)
+    rel_err_flux_net_sw = abs.(flux_net_sw .- comp_flux_net_sw)
 
-    @test max_err_flux_up_lw ≤ toler broken = (FT == Float32)
-    @test max_err_flux_dn_lw ≤ toler broken = (FT == Float32)
+    for gcol in 1:ncol, glev in 1:nlev
+        den = abs(comp_flux_net_sw[glev, gcol])
+        if den > 10 * eps(FT)
+            rel_err_flux_net_sw[glev, gcol] /= den
+        end
+    end
+    max_rel_err_flux_net_sw = maximum(rel_err_flux_net_sw)
 
-    @test max_err_flux_up_sw ≤ toler broken = (FT == Float32)
-    @test max_err_flux_dn_sw ≤ toler broken = (FT == Float32)
+    printstyled("Cloudy-sky shortwave test with ncol = $ncol, nlev = $nlev, OPC = $opc, FT = $FT\n", color = color2)
+    printstyled("device = $device\n", color = color2)
+    printstyled("$method\n\n", color = color2)
+    println("L∞ error in flux_up           = $max_err_flux_up_sw")
+    println("L∞ error in flux_dn           = $max_err_flux_dn_sw")
+    println("L∞ error in flux_net          = $max_err_flux_net_sw")
+    println("L∞ relative error in flux_net = $(max_rel_err_flux_net_sw * 100) %\n")
+
+    toler = Dict(Float64 => Float64(1e-5), Float32 => Float32(0.05))
+
+    @test max_err_flux_up_lw ≤ toler[FT]
+    @test max_err_flux_dn_lw ≤ toler[FT]
+
+    @test max_err_flux_up_sw ≤ toler[FT]
+    @test max_err_flux_dn_sw ≤ toler[FT]
 end

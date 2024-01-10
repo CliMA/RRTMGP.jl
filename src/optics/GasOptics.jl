@@ -87,7 +87,7 @@ Compute interpolation fraction for binary species parameter.
     itemp = 1
     @inbounds η_half = vmr_ref[tropo, ig[1] + 1, jtemp + itemp - 1] / vmr_ref[tropo, ig[2] + 1, jtemp + itemp - 1]
     col_mix1 = vmr1 + η_half * vmr2
-    η = col_mix1 ≥ eps(FT) * 2 ? vmr1 / col_mix1 : FT(0.5)
+    η = col_mix1 > 0 ? vmr1 / col_mix1 : FT(0.5) # rte-rrtmgp uses col_mix1 > tiny(col_mix1)
     loc_η = FT(η * (n_η - 1))
     jη1 = min(unsafe_trunc(Int, loc_η) + 1, n_η - 1)
     fη1 = loc_η - unsafe_trunc(Int, loc_η)
@@ -95,7 +95,7 @@ Compute interpolation fraction for binary species parameter.
     itemp = 2
     @inbounds η_half = vmr_ref[tropo, ig[1] + 1, jtemp + itemp - 1] / vmr_ref[tropo, ig[2] + 1, jtemp + itemp - 1]
     col_mix2 = vmr1 + η_half * vmr2
-    η = col_mix2 ≥ eps(FT) * 2 ? vmr1 / col_mix2 : FT(0.5)
+    η = col_mix2 > 0 ? vmr1 / col_mix2 : FT(0.5) # rte-rrtmgp uses col_mix2 > tiny(col_mix2)
     loc_η = FT(η * (n_η - 1))
     jη2 = min(unsafe_trunc(Int, loc_η) + 1, n_η - 1)
     fη2 = loc_η - unsafe_trunc(Int, loc_η)
@@ -159,7 +159,7 @@ Compute optical thickness, single scattering albedo, and asymmetry parameter.
     end
     τ = τ_major + τ_minor + τ_ray
     ssa = FT(0)
-    if τ > 2 * eps(FT) # single scattering albedo
+    if τ > 0 # single scattering albedo
         ssa = τ_ray / τ
     end
     return (τ, ssa, zero(τ)) # initializing asymmetry parameter
@@ -234,7 +234,7 @@ Compute optical thickness contributions from minor gases.
 
     @inbounds for i in minor_bnd_st[ibnd]:(minor_bnd_st[ibnd + 1] - 1)
         vmr_imnr = get_vmr(vmr, idx_gases_minor[i], glay, gcol)
-        if vmr_imnr > eps(FT) * 2
+        if vmr_imnr > 0
             scaling = vmr_imnr * col_dry
 
             if minor_scales_with_density[i] == 1

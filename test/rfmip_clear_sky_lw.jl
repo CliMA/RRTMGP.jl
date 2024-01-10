@@ -77,11 +77,16 @@ function lw_rfmip(context, ::Type{OPC}, ::Type{SRC}, ::Type{VMR}, ::Type{FT}) wh
     max_err_flux_up = FT(maximum(abs.(Array(slv.flux_lw.flux_up) .- comp_flux_up)))
     max_err_flux_dn = FT(maximum(abs.(Array(slv.flux_lw.flux_dn) .- comp_flux_dn)))
 
-    println("=======================================")
-    println("Clear-sky longwave test - $opc")
-    println("max_err_flux_up = $max_err_flux_up")
-    println("max_err_flux_dn = $max_err_flux_dn")
-    println("=======================================")
+    color2 = :cyan
+
+    printstyled(
+        "Stand-alone clear-sky longwave test with ncol = $ncol, nlev = $nlev, OPC = $opc, FT = $FT\n",
+        color = color2,
+    )
+    printstyled("device = $device\n\n", color = color2)
+    println("L∞ error in flux_up = $max_err_flux_up")
+    println("L∞ error in flux_dn = $max_err_flux_dn\n")
+
     toler = FT(1e-4)
 
     @test max_err_flux_up ≤ toler

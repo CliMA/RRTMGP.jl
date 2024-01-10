@@ -149,10 +149,11 @@ function rte_lw_2stream_source!(
     # setting references
     (; τ, ssa, g) = op
     (; Rdif, Tdif, lev_source, src_up, src_dn) = src_lw
-    #k_min = FT === Float64 ? FT(1e-12) : FT(1e-4)
-    k_min = FT(1e4 * eps(FT))
+    #k_min = FT === Float64 ? FT(1e-12) : FT(1e-4) used in RRTMGP-RTE FORTRAN code
+    k_min = sqrt(eps(FT)) #FT(1e4 * eps(FT))
     lw_diff_sec = FT(1.66)
-    τ_thresh = sqrt(eps(FT))
+    τ_thresh = 100 * eps(FT)# tau(icol,ilay) > 1.0e-8_wp used in rte-rrtmgp
+    # this is chosen to prevent catastrophic cancellation in src_up and src_dn calculation
 
     @inbounds for glay in 1:nlay
         γ1 = lw_diff_sec * (1 - FT(0.5) * ssa[glay, gcol] * (1 + g[glay, gcol]))
