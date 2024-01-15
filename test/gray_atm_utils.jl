@@ -28,11 +28,8 @@ Example program to demonstrate the calculation of longwave radiative fluxes in a
 function gray_atmos_lw_equil(context, ::Type{OPC}, ::Type{FT}; exfiltrate = false) where {FT <: AbstractFloat, OPC}
     device = ClimaComms.device(context)
     param_set = create_insolation_parameters(FT)
-    ncol = if device isa ClimaComms.CUDADevice
-        4096
-    else
-        9
-    end
+    ncol = device isa ClimaComms.CUDADevice ? 4096 : 9
+    max_threads = device isa ClimaComms.CUDADevice ? 64 : 4 # chosen for this problem size on a A100
     DA = ClimaComms.array_type(device)
     opc = Symbol(OPC)
     nlay = 60                               # number of layers
@@ -51,7 +48,6 @@ function gray_atmos_lw_equil(context, ::Type{OPC}, ::Type{FT}; exfiltrate = fals
     sfc_emis = Array{FT}(undef, nbnd, ncol) # surface emissivity
     sfc_emis .= FT(1.0)
     inc_flux = nothing                      # incoming flux
-    max_threads = 256                  # maximum number of threads for KA kernels
 
     if ncol == 1
         lat = DA{FT}([0])                   # latitude
@@ -121,7 +117,10 @@ function gray_atmos_lw_equil(context, ::Type{OPC}, ::Type{FT}; exfiltrate = fals
 
     printstyled("\nGray atmosphere longwave test with ncol = $ncol, nlev = $nlev, OPC = $opc\n", color = color2)
     printstyled("device = $device\n", color = color2)
-    printstyled("Integration time = $(FT(nsteps)/FT(24.0/tstep) / FT(365.0)) years\n\n", color = color2)
+    printstyled(
+        "Integration time = $(FT(nsteps)/FT(24.0/tstep) / FT(365.0)) years / $nsteps time steps\n\n",
+        color = color2,
+    )
 
     println("t_error = $(t_error); flux_grad_err = $(flux_grad_err)\n")
 

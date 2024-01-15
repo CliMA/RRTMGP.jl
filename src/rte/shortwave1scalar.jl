@@ -10,10 +10,11 @@ function rte_sw_noscat_solve!(
     nlev = nlay + 1
     n_gpt, igpt = 1, 1
     solar_frac = FT(1)
+    grayoptfun = Optics.gray_optical_thickness_sw
     @inbounds begin
         ClimaComms.@threaded device for gcol in 1:ncol
             set_flux_to_zero!(flux_sw, gcol)
-            compute_optical_props!(op, as, gcol, igpt, nothing, nothing)
+            compute_optical_props!(grayoptfun, op, as, gcol)
             rte_sw_noscat!(flux_sw, op, bcs_sw, igpt, n_gpt, solar_frac, gcol, nlev)
         end
     end
@@ -49,11 +50,12 @@ function rte_sw_noscat_solve_CUDA!(
     nlev = nlay + 1
     n_gpt, igpt = 1, 1
     solar_frac = FT(1)
+    grayoptfun = Optics.gray_optical_thickness_sw
     # setting references for flux_sw
     if gcol ≤ ncol
         @inbounds begin
             set_flux_to_zero!(flux_sw, gcol)
-            compute_optical_props!(op, as, gcol, igpt, nothing, nothing)
+            compute_optical_props!(grayoptfun, op, as, gcol)
             rte_sw_noscat!(flux_sw, op, bcs_sw, igpt, n_gpt, solar_frac, gcol, nlev)
         end
     end

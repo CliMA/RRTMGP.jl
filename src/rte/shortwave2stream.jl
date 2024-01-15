@@ -11,10 +11,11 @@ function rte_sw_2stream_solve!(
     nlev = nlay + 1
     n_gpt, igpt, ibnd = 1, 1, UInt8(1)
     solar_frac = FT(1)
+    grayoptfun = Optics.gray_optical_thickness_sw
     @inbounds begin
         ClimaComms.@threaded device for gcol in 1:ncol
             set_flux_to_zero!(flux_sw, gcol)
-            compute_optical_props!(op, as, gcol, igpt, nothing, nothing)
+            compute_optical_props!(grayoptfun, op, as, gcol)
             # call shortwave rte solver
             rte_sw_2stream!(op, src_sw, bcs_sw, flux_sw, solar_frac, igpt, n_gpt, ibnd, nlev, gcol)
         end
@@ -53,10 +54,11 @@ function rte_sw_2stream_solve_CUDA!(
     nlev = nlay + 1
     n_gpt, igpt, ibnd = 1, 1, UInt8(1)
     solar_frac = FT(1)
+    grayoptfun = Optics.gray_optical_thickness_sw
     if gcol ≤ ncol
         @inbounds begin
             set_flux_to_zero!(flux_sw, gcol)
-            compute_optical_props!(op, as, gcol, igpt, nothing, nothing)
+            compute_optical_props!(grayoptfun, op, as, gcol)
             # call shortwave rte solver
             rte_sw_2stream!(op, src_sw, bcs_sw, flux_sw, solar_frac, igpt, n_gpt, ibnd, nlev, gcol)
         end

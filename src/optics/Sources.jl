@@ -40,10 +40,6 @@ struct SourceLWNoScat{
     lev_source_dec::FTA2D
     "Surface source `[W/m2]` `(ncol)`"
     sfc_source::FTA1D
-    "temporary storage array used in no scattering GPU calculations `(nlay, ncol)`"
-    src_up::FTA2D
-    "temporary storage array used in no scattering GPU calculations `(nlay, ncol)`"
-    src_dn::FTA2D
 end
 Adapt.@adapt_structure SourceLWNoScat
 
@@ -55,8 +51,6 @@ function SourceLWNoScat(param_set::RP.ARP, ::Type{FT}, ::Type{DA}, nlay::Int, nc
     lev_source_inc = FTA2D(undef, nlay, ncol) # lev_source_inc
     lev_source_dec = FTA2D(undef, nlay, ncol) # lev_source_dec
     sfc_source = FTA1D(undef, ncol)       # sfc_source
-    src_up = FTA2D(undef, nlay, ncol) # src_up
-    src_dn = FTA2D(undef, nlay, ncol) # src_dn
 
     return SourceLWNoScat{eltype(lay_source), typeof(sfc_source), typeof(lay_source), typeof(param_set)}(
         param_set,
@@ -64,8 +58,6 @@ function SourceLWNoScat(param_set::RP.ARP, ::Type{FT}, ::Type{DA}, nlay::Int, nc
         lev_source_inc,
         lev_source_dec,
         sfc_source,
-        src_up,
-        src_dn,
     )
 end
 
@@ -83,24 +75,10 @@ struct SourceLW2Str{FT <: AbstractFloat, FTA1D <: AbstractArray{FT, 1}, FTA2D <:
        AbstractSourceLW{FT, FTA1D, FTA2D}
     "Parameter set"
     param_set::PS
-    "Planck source at layer average temperature `[W/m2]` `(nlay, ncol)`"
-    lay_source::FTA2D
-    "Planck source at layer edge in increasing ilay direction `[W/m2]` `(nlay, ncol)`, includes spectral weighting that accounts for state-dependent frequency to g-space mapping"
-    lev_source_inc::FTA2D
-    "Planck source at layer edge in decreasing ilay direction `[W/m2]` `(nlay, ncol)`, includes spectral weighting that accounts for state-dependent frequency to g-space mapping"
-    lev_source_dec::FTA2D
     "Surface source `[W/m2]` `(ncol)`"
     sfc_source::FTA1D
     "level source `[W/m2]` `(nlay+1, ncol)`, used in 2 stream calculations"
     lev_source::FTA2D
-    "temporary storage array, used in 2 stream calculations `(nlay, ncol)`"
-    src_up::FTA2D
-    "temporary storage array, used in 2 stream calculations `(nlay, ncol)`"
-    src_dn::FTA2D
-    "temporary storage array, used in 2 stream calculations `(nlay, ncol)`"
-    Rdif::FTA2D
-    "temporary storage array, used in 2 stream calculations `(nlay, ncol)`"
-    Tdif::FTA2D
     "temporary storage array, used in 2 stream calculations `(nlay + 1, ncol)`"
     albedo::FTA2D
     "temporary storage array, used in 2 stream calculations `(nlay + 1, ncol)`"
@@ -112,29 +90,15 @@ function SourceLW2Str(param_set::RP.ARP, ::Type{FT}, ::Type{DA}, nlay::Int, ncol
     FTA1D = DA{FT, 1}
     FTA2D = DA{FT, 2}
 
-    lay_source = FTA2D(undef, nlay, ncol) # lay_source
-    lev_source_inc = FTA2D(undef, nlay, ncol) # lev_source_inc
-    lev_source_dec = FTA2D(undef, nlay, ncol) # lev_source_dec
     sfc_source = FTA1D(undef, ncol) # sfc_source
     lev_source = FTA2D(undef, nlay + 1, ncol) # lev_source
-    src_up = FTA2D(undef, nlay, ncol) # src_up
-    src_dn = FTA2D(undef, nlay, ncol) # src_dn
-    Rdif = FTA2D(undef, nlay, ncol) # Rdif
-    Tdif = FTA2D(undef, nlay, ncol) # Tdif
     albedo = FTA2D(undef, nlay + 1, ncol) # albedo
     src = FTA2D(undef, nlay + 1, ncol) # src
 
-    return SourceLW2Str{eltype(lay_source), typeof(sfc_source), typeof(lay_source), typeof(param_set)}(
+    return SourceLW2Str{eltype(lev_source), typeof(sfc_source), typeof(lev_source), typeof(param_set)}(
         param_set,
-        lay_source,
-        lev_source_inc,
-        lev_source_dec,
         sfc_source,
         lev_source,
-        src_up,
-        src_dn,
-        Rdif,
-        Tdif,
         albedo,
         src,
     )
@@ -160,41 +124,28 @@ function source_func_longwave(
     OPC::Symbol,
     ::Type{DA},
 ) where {FT <: AbstractFloat, DA}
-    lay_source = DA{FT, 2}(undef, nlay, ncol)
-    lev_source_inc = DA{FT, 2}(undef, nlay, ncol)
-    lev_source_dec = DA{FT, 2}(undef, nlay, ncol)
     sfc_source = DA{FT, 1}(undef, ncol)
-    src_up = DA{FT, 2}(undef, nlay, ncol)
-    src_dn = DA{FT, 2}(undef, nlay, ncol)
 
     if OPC === :OneScalar
-        return SourceLWNoScat{eltype(lay_source), typeof(sfc_source), typeof(src_up), typeof(param_set)}(
+        lay_source = DA{FT, 2}(undef, nlay, ncol)
+        lev_source_inc = DA{FT, 2}(undef, nlay, ncol)
+        lev_source_dec = DA{FT, 2}(undef, nlay, ncol)
+        return SourceLWNoScat{eltype(lay_source), typeof(sfc_source), typeof(lay_source), typeof(param_set)}(
             param_set,
             lay_source,
             lev_source_inc,
             lev_source_dec,
             sfc_source,
-            src_up,
-            src_dn,
         )
     else
         PS = typeof(param_set)
         lev_source = DA{FT, 2}(undef, nlay + 1, ncol)
-        Rdif = DA{FT, 2}(undef, nlay, ncol)
-        Tdif = DA{FT, 2}(undef, nlay, ncol)
         albedo = DA{FT, 2}(undef, nlay + 1, ncol)
         src = DA{FT, 2}(undef, nlay + 1, ncol)
-        return SourceLW2Str{FT, typeof(sfc_source), typeof(src_up), PS}(
+        return SourceLW2Str{FT, typeof(sfc_source), typeof(lev_source), PS}(
             param_set,
-            lay_source,
-            lev_source_inc,
-            lev_source_dec,
             sfc_source,
             lev_source,
-            src_up,
-            src_dn,
-            Rdif,
-            Tdif,
             albedo,
             src,
         )

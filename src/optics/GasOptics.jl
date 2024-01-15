@@ -117,17 +117,38 @@ end
 
 Compute optical thickness, single scattering albedo, and asymmetry parameter.
 """
-@inline function compute_gas_optics(
-    lkp::Union{LookUpLW, LookUpSW},
-    vmr,
-    col_dry,
-    igpt,
-    ibnd,
-    p_lay::FT,
-    t_lay::FT,
-    glay,
-    gcol,
-) where {FT <: AbstractFloat}
+@inline function compute_gas_optics(lkp::LookUpLW, vmr, col_dry, igpt, ibnd, p_lay, t_lay, glay, gcol)
+    # upper/lower troposphere
+    tropo = p_lay > lkp.p_ref_tropo ? 1 : 2
+    # volume mixing ratio of h2o
+    vmr_h2o = get_vmr(vmr, lkp.idx_h2o, glay, gcol)
+
+    (; Δ_t_ref, n_t_ref, t_ref) = lkp
+    jftemp = compute_interp_frac_temp(Δ_t_ref, n_t_ref, t_ref, t_lay)
+
+    (; Δ_ln_p_ref, ln_p_ref, n_p_ref) = lkp
+    jfpress = compute_interp_frac_press(Δ_ln_p_ref, ln_p_ref, n_p_ref, p_lay, tropo)
+
+    (; n_η, vmr_ref) = lkp
+    ig = view(lkp.key_species, 1:2, tropo, ibnd)
+    @inbounds vmr1 = get_vmr(vmr, ig[1], glay, gcol)
+    @inbounds vmr2 = get_vmr(vmr, ig[2], glay, gcol)
+
+    jfη, col_mix = compute_interp_frac_η(n_η, ig, vmr_ref, (vmr1, vmr2), tropo, jftemp[1])
+    # compute Planck fraction
+    pfrac = interp3d(jfη..., jftemp..., jfpress..., lkp.planck_fraction, igpt)
+
+    # computing τ_major
+    τ_major = interp3d(jfη..., jftemp..., jfpress..., lkp.kmajor, igpt, col_mix...) * col_dry
+    # computing τ_minor
+    τ_minor =
+        compute_τ_minor(lkp, tropo, vmr, vmr_h2o, col_dry, p_lay, t_lay, jftemp..., jfη..., igpt, ibnd, glay, gcol)
+    # τ_Rayleigh is zero for longwave
+    τ = τ_major + τ_minor
+    return (τ, zero(τ), zero(τ), pfrac) # initializing asymmetry parameter
+end
+
+@inline function compute_gas_optics(lkp::LookUpSW, vmr, col_dry, igpt, ibnd, p_lay, t_lay, glay, gcol)
     # upper/lower troposphere
     tropo = p_lay > lkp.p_ref_tropo ? 1 : 2
     # volume mixing ratio of h2o
@@ -152,16 +173,10 @@ Compute optical thickness, single scattering albedo, and asymmetry parameter.
     τ_minor =
         compute_τ_minor(lkp, tropo, vmr, vmr_h2o, col_dry, p_lay, t_lay, jftemp..., jfη..., igpt, ibnd, glay, gcol)
     # compute τ_Rayleigh
-    τ_ray = FT(0)
-    if lkp isa LookUpSW
-        rayleigh_coeff = tropo == 1 ? lkp.rayl_lower : lkp.rayl_upper
-        τ_ray = compute_τ_rayleigh(rayleigh_coeff, tropo, col_dry, vmr_h2o, jftemp..., jfη..., igpt)
-    end
+    rayleigh_coeff = tropo == 1 ? lkp.rayl_lower : lkp.rayl_upper
+    τ_ray = compute_τ_rayleigh(rayleigh_coeff, tropo, col_dry, vmr_h2o, jftemp..., jfη..., igpt)
     τ = τ_major + τ_minor + τ_ray
-    ssa = FT(0)
-    if τ > 0 # single scattering albedo
-        ssa = τ_ray / τ
-    end
+    ssa = τ > 0 ? τ_ray / τ : zero(τ) # single scattering albedo
     return (τ, ssa, zero(τ)) # initializing asymmetry parameter
 end
 

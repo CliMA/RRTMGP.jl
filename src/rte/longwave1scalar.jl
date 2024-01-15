@@ -13,9 +13,11 @@ function rte_lw_solve!(
     τ = op.τ
     Ds = op.angle_disc.gauss_Ds
     (; flux_up, flux_dn, flux_net) = flux_lw
+    grayoptfun = Optics.gray_optical_thickness_lw
     @inbounds begin
         ClimaComms.@threaded device for gcol in 1:ncol
-            compute_optical_props!(op, as, src_lw, gcol, igpt, nothing, nothing)
+            compute_optical_props!(grayoptfun, op, as, gcol)
+            compute_longwave_sources!(as, src_lw, gcol)
             rte_lw_noscat_transport!(src_lw, bcs_lw, op, gcol, flux_lw, igpt, ibnd, nlay, nlev)
             for ilev in 1:nlev
                 flux_net[ilev, gcol] = flux_up[ilev, gcol] - flux_dn[ilev, gcol]
@@ -58,8 +60,10 @@ function rte_lw_noscat_solve_CUDA!(
     τ = op.τ
     Ds = op.angle_disc.gauss_Ds
     (; flux_up, flux_dn, flux_net) = flux_lw
+    grayoptfun = Optics.gray_optical_thickness_lw
     if gcol ≤ ncol
-        compute_optical_props!(op, as, src_lw, gcol, igpt, nothing, nothing)
+        compute_optical_props!(grayoptfun, op, as, gcol)
+        compute_longwave_sources!(as, src_lw, gcol)
         rte_lw_noscat_transport!(src_lw, bcs_lw, op, gcol, flux_lw, igpt, ibnd, nlay, nlev)
         @inbounds for ilev in 1:nlev
             flux_net[ilev, gcol] = flux_up[ilev, gcol] - flux_dn[ilev, gcol]
@@ -95,6 +99,7 @@ function rte_lw_solve!(
                 ibnd = major_gpt2bnd[igpt]
                 igpt == 1 && set_flux_to_zero!(flux_lw, gcol)
                 compute_optical_props!(op, as, src_lw, gcol, igpt, lookup_lw, lookup_lw_cld)
+                compute_longwave_sources!(as, src_lw, gcol, igpt, lookup_lw)
                 rte_lw_noscat_transport!(src_lw, bcs_lw, op, gcol, flux, igpt, ibnd, nlay, nlev)
                 add_to_flux!(flux_lw, flux, gcol)
             end
@@ -155,6 +160,7 @@ function rte_lw_noscat_solve_CUDA!(
             ibnd = major_gpt2bnd[igpt]
             igpt == 1 && set_flux_to_zero!(flux_lw, gcol)
             compute_optical_props!(op, as, src_lw, gcol, igpt, lookup_lw, lookup_lw_cld)
+            compute_longwave_sources!(as, src_lw, gcol, igpt, lookup_lw)
             rte_lw_noscat_transport!(src_lw, bcs_lw, op, gcol, flux, igpt, ibnd, nlay, nlev)
             add_to_flux!(flux_lw, flux, gcol)
         end
@@ -210,7 +216,7 @@ Transport for no-scattering longwave problem.
     nlev,
 ) where {FT <: AbstractFloat}
     # setting references
-    (; src_up, src_dn, sfc_source) = src_lw
+    (; sfc_source) = src_lw
     (; lay_source, lev_source_inc, lev_source_dec) = src_lw
     (; sfc_emis, inc_flux) = bcs_lw
     (; flux_up, flux_dn, flux_net) = flux
