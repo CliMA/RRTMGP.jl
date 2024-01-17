@@ -16,10 +16,9 @@ using RRTMGP.Fluxes
 using RRTMGP.AngularDiscretizations
 using RRTMGP.RTE
 using RRTMGP.RTESolver
-
+import RRTMGP.Parameters.RRTMGPParameters
 import CLIMAParameters as CP
 
-include(joinpath(pkgdir(RRTMGP), "parameters", "create_parameters.jl"))
 # overriding some parameters to match with RRTMGP FORTRAN code
 
 include("reference_files.jl")
@@ -34,7 +33,7 @@ function clear_sky(
     exfiltrate = false,
 ) where {FT <: AbstractFloat, OPC, SRC, VMR}
     overrides = (; grav = 9.80665, molmass_dryair = 0.028964, molmass_water = 0.018016)
-    param_set = create_insolation_parameters(FT, overrides)
+    param_set = RRTMGPParameters(FT, overrides)
     device = ClimaComms.device(context)
     DA = ClimaComms.array_type(device)
     opc = Symbol(OPC)
