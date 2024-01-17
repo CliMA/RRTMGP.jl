@@ -1,12 +1,12 @@
 function rte_lw_solve!(
     device::ClimaComms.AbstractCPUDevice,
-    flux_lw::FluxLW{FT},
-    src_lw::SourceLWNoScat{FT},
-    bcs_lw::LwBCs{FT},
-    op::OneScalar{FT},
+    flux_lw::FluxLW,
+    src_lw::SourceLWNoScat,
+    bcs_lw::LwBCs,
+    op::OneScalar,
     max_threads,
-    as::GrayAtmosphericState{FT},
-) where {FT <: AbstractFloat}
+    as::GrayAtmosphericState,
+)
     (; nlay, ncol) = as
     nlev = nlay + 1
     igpt, ibnd = 1, UInt8(1)
@@ -29,13 +29,13 @@ end
 
 function rte_lw_solve!(
     device::ClimaComms.CUDADevice,
-    flux_lw::FluxLW{FT},
-    src_lw::SourceLWNoScat{FT},
-    bcs_lw::LwBCs{FT},
-    op::OneScalar{FT},
+    flux_lw::FluxLW,
+    src_lw::SourceLWNoScat,
+    bcs_lw::LwBCs,
+    op::OneScalar,
     max_threads,
-    as::GrayAtmosphericState{FT},
-) where {FT <: AbstractFloat}
+    as::GrayAtmosphericState,
+)
     (; nlay, ncol) = as
     nlev = nlay + 1
     tx = min(ncol, max_threads)
@@ -46,14 +46,14 @@ function rte_lw_solve!(
 end
 
 function rte_lw_noscat_solve_CUDA!(
-    flux_lw::FluxLW{FT},
-    src_lw::SourceLWNoScat{FT},
-    bcs_lw::LwBCs{FT},
-    op::OneScalar{FT},
+    flux_lw::FluxLW,
+    src_lw::SourceLWNoScat,
+    bcs_lw::LwBCs,
+    op::OneScalar,
     nlay,
     ncol,
-    as::GrayAtmosphericState{FT},
-) where {FT <: AbstractFloat}
+    as::GrayAtmosphericState,
+)
     gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
     nlev = nlay + 1
     igpt, ibnd = 1, UInt8(1)
@@ -74,16 +74,16 @@ end
 
 function rte_lw_solve!(
     device::ClimaComms.AbstractCPUDevice,
-    flux::FluxLW{FT},
-    flux_lw::FluxLW{FT},
-    src_lw::SourceLWNoScat{FT},
-    bcs_lw::LwBCs{FT},
-    op::OneScalar{FT},
+    flux::FluxLW,
+    flux_lw::FluxLW,
+    src_lw::SourceLWNoScat,
+    bcs_lw::LwBCs,
+    op::OneScalar,
     max_threads,
-    as::AtmosphericState{FT},
+    as::AtmosphericState,
     lookup_lw::LookUpLW,
     lookup_lw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
-) where {FT <: AbstractFloat}
+)
     (; nlay, ncol) = as
     nlev = nlay + 1
     (; major_gpt2bnd) = lookup_lw
@@ -115,16 +115,16 @@ end
 
 function rte_lw_solve!(
     device::ClimaComms.CUDADevice,
-    flux::FluxLW{FT},
-    flux_lw::FluxLW{FT},
-    src_lw::SourceLWNoScat{FT},
-    bcs_lw::LwBCs{FT},
-    op::OneScalar{FT},
+    flux::FluxLW,
+    flux_lw::FluxLW,
+    src_lw::SourceLWNoScat,
+    bcs_lw::LwBCs,
+    op::OneScalar,
     max_threads,
-    as::AtmosphericState{FT},
+    as::AtmosphericState,
     lookup_lw::LookUpLW,
     lookup_lw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
-) where {FT <: AbstractFloat}
+)
     (; nlay, ncol) = as
     nlev = nlay + 1
     tx = min(ncol, max_threads)
@@ -135,17 +135,17 @@ function rte_lw_solve!(
 end
 
 function rte_lw_noscat_solve_CUDA!(
-    flux::FluxLW{FT},
-    flux_lw::FluxLW{FT},
-    src_lw::SourceLWNoScat{FT},
-    bcs_lw::LwBCs{FT},
-    op::OneScalar{FT},
+    flux::FluxLW,
+    flux_lw::FluxLW,
+    src_lw::SourceLWNoScat,
+    bcs_lw::LwBCs,
+    op::OneScalar,
     nlay,
     ncol,
-    as::AtmosphericState{FT},
+    as::AtmosphericState,
     lookup_lw::LookUpLW,
     lookup_lw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
-) where {FT <: AbstractFloat}
+)
     gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
     nlev = nlay + 1
     (; major_gpt2bnd) = lookup_lw
@@ -195,7 +195,7 @@ end
         bcs_lw::LwBCs{FT},
         op::OneScalar{FT},
         gcol,
-        flux::FluxLW{FT},
+        flux::FluxLW,
         igpt,
         ibnd,
         nlay,
@@ -205,27 +205,28 @@ end
 Transport for no-scattering longwave problem.
 """
 @inline function rte_lw_noscat_transport!(
-    src_lw::SourceLWNoScat{FT},
-    bcs_lw::LwBCs{FT},
-    op::OneScalar{FT},
+    src_lw::SourceLWNoScat,
+    bcs_lw::LwBCs,
+    op::OneScalar,
     gcol,
-    flux::FluxLW{FT},
+    flux::FluxLW,
     igpt,
     ibnd,
     nlay,
     nlev,
-) where {FT <: AbstractFloat}
+)
     # setting references
     (; sfc_source) = src_lw
     (; lay_source, lev_source_inc, lev_source_dec) = src_lw
     (; sfc_emis, inc_flux) = bcs_lw
     (; flux_up, flux_dn, flux_net) = flux
-    τ_thresh = 100 * eps(FT) # or abs(eps(FT))?
 
     Ds = op.angle_disc.gauss_Ds
     w_μ = op.angle_disc.gauss_wts
     n_μ = op.angle_disc.n_gauss_angles
     τ = op.τ
+    FT = eltype(τ)
+    τ_thresh = 100 * eps(FT) # or abs(eps(FT))?
 
     intensity_to_flux = FT(2) * FT(π) * w_μ[1]
     flux_to_intensity = FT(1) / intensity_to_flux

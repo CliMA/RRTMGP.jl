@@ -1,10 +1,10 @@
 function rte_sw_noscat_solve!(
     device::ClimaComms.AbstractCPUDevice,
     flux_sw::FluxSW{FT},
-    op::OneScalar{FT},
-    bcs_sw::SwBCs{FT},
+    op::OneScalar,
+    bcs_sw::SwBCs,
     max_threads,
-    as::GrayAtmosphericState{FT},
+    as::GrayAtmosphericState,
 ) where {FT <: AbstractFloat}
     (; nlay, ncol) = as
     nlev = nlay + 1
@@ -23,12 +23,12 @@ end
 
 function rte_sw_noscat_solve!(
     device::ClimaComms.CUDADevice,
-    flux_sw::FluxSW{FT},
-    op::OneScalar{FT},
-    bcs_sw::SwBCs{FT},
+    flux_sw::FluxSW,
+    op::OneScalar,
+    bcs_sw::SwBCs,
     max_threads,
-    as::GrayAtmosphericState{FT},
-) where {FT <: AbstractFloat}
+    as::GrayAtmosphericState,
+)
     (; nlay, ncol) = as
     nlev = nlay + 1
     tx = min(ncol, max_threads)
@@ -40,11 +40,11 @@ end
 
 function rte_sw_noscat_solve_CUDA!(
     flux_sw::FluxSW{FT},
-    op::OneScalar{FT},
-    bcs_sw::SwBCs{FT},
+    op::OneScalar,
+    bcs_sw::SwBCs,
     nlay,
     ncol,
-    as::GrayAtmosphericState{FT},
+    as::GrayAtmosphericState,
 ) where {FT <: AbstractFloat}
     gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
     nlev = nlay + 1
@@ -64,15 +64,15 @@ end
 
 function rte_sw_noscat_solve!(
     device::ClimaComms.AbstractCPUDevice,
-    flux::FluxSW{FT},
-    flux_sw::FluxSW{FT},
-    op::OneScalar{FT},
-    bcs_sw::SwBCs{FT},
+    flux::FluxSW,
+    flux_sw::FluxSW,
+    op::OneScalar,
+    bcs_sw::SwBCs,
     max_threads,
-    as::AtmosphericState{FT},
+    as::AtmosphericState,
     lookup_sw::LookUpSW,
     lookup_sw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
-) where {FT <: AbstractFloat}
+)
     (; nlay, ncol) = as
     nlev = nlay + 1
     n_gpt = length(lookup_sw.solar_src_scaled)
@@ -93,15 +93,15 @@ end
 
 function rte_sw_noscat_solve!(
     device::ClimaComms.CUDADevice,
-    flux::FluxSW{FT},
-    flux_sw::FluxSW{FT},
-    op::OneScalar{FT},
-    bcs_sw::SwBCs{FT},
+    flux::FluxSW,
+    flux_sw::FluxSW,
+    op::OneScalar,
+    bcs_sw::SwBCs,
     max_threads,
-    as::AtmosphericState{FT},
+    as::AtmosphericState,
     lookup_sw::LookUpSW,
     lookup_sw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
-) where {FT <: AbstractFloat}
+)
     (; nlay, ncol) = as
     nlev = nlay + 1
     # setting references for flux_sw
@@ -113,16 +113,16 @@ function rte_sw_noscat_solve!(
 end
 
 function rte_sw_noscat_solve_CUDA!(
-    flux::FluxSW{FT},
-    flux_sw::FluxSW{FT},
-    op::OneScalar{FT},
-    bcs_sw::SwBCs{FT},
+    flux::FluxSW,
+    flux_sw::FluxSW,
+    op::OneScalar,
+    bcs_sw::SwBCs,
     nlay,
     ncol,
-    as::AtmosphericState{FT},
+    as::AtmosphericState,
     lookup_sw::LookUpSW,
     lookup_sw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
-) where {FT <: AbstractFloat}
+)
     gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
     nlev = nlay + 1
     n_gpt = length(lookup_sw.solar_src_scaled)
@@ -153,9 +153,9 @@ No-scattering solver for the shortwave problem.
 (Extinction-only i.e. solar direct beam)
 """
 function rte_sw_noscat!(
-    flux::FluxSW{FT},
-    op::OneScalar{FT},
-    bcs_sw::SwBCs{FT},
+    flux::FluxSW,
+    op::OneScalar,
+    bcs_sw::SwBCs,
     igpt::Int,
     n_gpt::Int,
     solar_frac::FT,

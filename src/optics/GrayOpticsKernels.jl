@@ -5,7 +5,7 @@
     compute_optical_props!(
         op::AbstractOpticalProps{FT},
         as::GrayAtmosphericState{FT},
-        sf::AbstractSourceLW{FT},
+        sf::AbstractSourceLW,
         gcol::Int,
     )
 
@@ -42,7 +42,7 @@ end
 """
     compute_sources_gray_kernel!(
         as::GrayAtmosphericState{FT},
-        sf::AbstractSourceLW{FT},
+        sf::AbstractSourceLW,
         glay, gcol,
     ) where {FT<:AbstractFloat}
 

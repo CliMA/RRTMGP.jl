@@ -21,8 +21,23 @@ export AbstractOpticalProps, OneScalar, TwoStream, compute_col_gas!, compute_opt
 
 Optical properties for one scalar and two stream calculations.
 """
-abstract type AbstractOpticalProps{FT <: AbstractFloat, FTA2D <: AbstractArray{FT, 2}} end
+abstract type AbstractOpticalProps end
 
+struct OneScalar{D, V, AD <: AngularDiscretization} <: AbstractOpticalProps
+    data::D
+    τ::V
+    angle_disc::AD
+end
+Adapt.@adapt_structure OneScalar
+
+function OneScalar(::Type{FT}, ncol::Int, nlay::Int, ::Type{DA}) where {FT <: AbstractFloat, DA}
+    data = DA{FT, 3}(undef, 1, nlay, ncol)
+    τ = view(data, 1, :, :)
+    ad = AngularDiscretization(FT, DA, 1)
+    V = typeof(τ)
+    return OneScalar{typeof(data), V, typeof(ad)}(data, τ, ad)
+end
+#=
 """
     OneScalar{FT,FTA1D,FTA2D,AD} <: AbstractOpticalProps{FT,FTA2D}
 
@@ -33,7 +48,7 @@ calculations accounting for extinction and emission
 $(DocStringExtensions.FIELDS)
 """
 struct OneScalar{FT <: AbstractFloat, FTA2D <: AbstractArray{FT, 2}, AD <: AngularDiscretization} <:
-       AbstractOpticalProps{FT, FTA2D}
+       AbstractOpticalProps
     "Optical Depth"
     τ::FTA2D
     "Angular discretization"
@@ -47,7 +62,8 @@ function OneScalar(::Type{FT}, ncol::Int, nlay::Int, ::Type{DA}) where {FT <: Ab
 
     return OneScalar{eltype(τ), typeof(τ), typeof(ad)}(τ, ad)
 end
-
+=#
+#=
 """
     TwoStream{FT,FTA2D} <: AbstractOpticalProps{FT,FTA2D}
 
@@ -57,7 +73,7 @@ calculations accounting for extinction and emission
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct TwoStream{FT <: AbstractFloat, FTA2D <: AbstractArray{FT, 2}} <: AbstractOpticalProps{FT, FTA2D}
+struct TwoStream{FT <: AbstractFloat, FTA2D <: AbstractArray{FT, 2}} <: AbstractOpticalProps
     "Optical depth"
     τ::FTA2D
     "Single-scattering albedo"
@@ -72,6 +88,25 @@ function TwoStream(::Type{FT}, ncol::Int, nlay::Int, ::Type{DA}) where {FT <: Ab
     ssa = DA{FT, 2}(zeros(nlay, ncol))
     g = DA{FT, 2}(zeros(nlay, ncol))
     return TwoStream{eltype(τ), typeof(τ)}(τ, ssa, g)
+end
+=#
+struct TwoStream{D, V} <: AbstractOpticalProps
+    data::D
+    τ::V
+    ssa::V
+    g::V
+end
+Adapt.@adapt_structure TwoStream
+
+function TwoStream(::Type{FT}, ncol::Int, nlay::Int, ::Type{DA}) where {FT <: AbstractFloat, DA}
+    data = DA{FT, 3}(zeros(3, nlay, ncol))
+    V = typeof(view(data, 1, :, :))
+    return TwoStream{typeof(data), V}(data, view(data, 1, :, :), view(data, 2, :, :), view(data, 3, :, :))
+end
+
+function Base.getindex(op::TwoStream, glay, gcol)
+    data = op.data
+    return @inbounds (data[1, glay, gcol], data[2, glay, gcol], data[3, glay, gcol])
 end
 
 """
@@ -144,14 +179,14 @@ end
 Computes optical properties for the longwave problem.
 """
 @inline function compute_optical_props!(
-    op::OneScalar{FT},
-    as::AtmosphericState{FT},
-    sf::AbstractSourceLW{FT},
+    op::OneScalar,
+    as::AtmosphericState,
+    sf::AbstractSourceLW,
     gcol::Int,
     igpt::Int,
     lkp::LookUpLW,
     lkp_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
-) where {FT <: AbstractFloat}
+)
     (; nlay, vmr) = as
     (; t_planck, totplnk) = lkp
     (; lay_source, lev_source_inc, lev_source_dec, sfc_source) = sf
@@ -186,14 +221,14 @@ Computes optical properties for the longwave problem.
 end
 
 @inline function compute_optical_props!(
-    op::TwoStream{FT},
-    as::AtmosphericState{FT},
-    sf::AbstractSourceLW{FT},
+    op::TwoStream,
+    as::AtmosphericState,
+    sf::AbstractSourceLW,
     gcol::Int,
     igpt::Int,
     lkp::LookUpLW,
     lkp_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
-) where {FT <: AbstractFloat}
+)
     (; nlay, vmr) = as
     (; t_planck, totplnk) = lkp
     (; lev_source, sfc_source) = sf
@@ -346,13 +381,13 @@ end
 Computes optical properties for the shortwave problem.
 """
 @inline function compute_optical_props!(
-    op::AbstractOpticalProps{FT},
-    as::AtmosphericState{FT},
+    op::AbstractOpticalProps,
+    as::AtmosphericState,
     gcol::Int,
     igpt::Int,
     lkp::LookUpSW,
     lkp_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
-) where {FT <: AbstractFloat}
+)
     (; nlay, vmr) = as
     @inbounds ibnd = lkp.major_gpt2bnd[igpt]
     @inbounds t_sfc = as.t_sfc[gcol]

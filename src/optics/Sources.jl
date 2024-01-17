@@ -8,14 +8,14 @@ import ..Parameters as RP
 export AbstractSourceLW, SourceLWNoScat, SourceLW2Str, SourceSW2Str, source_func_longwave, source_func_shortwave
 
 """
-    AbstractSourceLW{FT,FTA1D,FTA2D}
+    AbstractSourceLW
 
 Abstract longwave source for no-scattering and two stream longwave solvers.
 """
-abstract type AbstractSourceLW{FT, FTA1D, FTA2D} end
+abstract type AbstractSourceLW end
 
 """
-    SourceLWNoScat{FT,FTA1D,FTA2D} <: AbstractSourceLW{FT,FTA1D,FTA2D}
+    SourceLWNoScat{FT,FTA1D,FTA2D} <: AbstractSourceLW
 
 Longwave sources: computed at layer center, layer edges, 
 and at the surface for no scattering calculations
@@ -29,7 +29,7 @@ struct SourceLWNoScat{
     FTA1D <: AbstractArray{FT, 1},
     FTA2D <: AbstractArray{FT, 2},
     PS <: RP.ARP,
-} <: AbstractSourceLW{FT, FTA1D, FTA2D}
+} <: AbstractSourceLW
     "Parameter set"
     param_set::PS
     "Planck source at layer average temperature `[W/m2]` `(nlay, ncol)`"
@@ -62,7 +62,7 @@ function SourceLWNoScat(param_set::RP.ARP, ::Type{FT}, ::Type{DA}, nlay::Int, nc
 end
 
 """
-    SourceLW2Str{FT,FTA1D,FTA2D} <: AbstractSourceLW{FT,FTA1D,FTA2D}
+    SourceLW2Str{FT,FTA1D,FTA2D} <: AbstractSourceLW
 
 Longwave sources: computed at layer center, layer edges, 
 and at the surface for 2-stream calculations
@@ -71,33 +71,39 @@ and at the surface for 2-stream calculations
 
 $(DocStringExtensions.FIELDS)
 """
-struct SourceLW2Str{FT <: AbstractFloat, FTA1D <: AbstractArray{FT, 1}, FTA2D <: AbstractArray{FT, 2}, PS <: RP.ARP} <:
-       AbstractSourceLW{FT, FTA1D, FTA2D}
+struct SourceLW2Str{FTA1D, D, V, PS <: RP.ARP} <: AbstractSourceLW
     "Parameter set"
     param_set::PS
     "Surface source `[W/m2]` `(ncol)`"
     sfc_source::FTA1D
+    leveldata::D
     "level source `[W/m2]` `(nlay+1, ncol)`, used in 2 stream calculations"
-    lev_source::FTA2D
+    lev_source::V
     "temporary storage array, used in 2 stream calculations `(nlay + 1, ncol)`"
-    albedo::FTA2D
+    albedo::V
     "temporary storage array, used in 2 stream calculations `(nlay + 1, ncol)`"
-    src::FTA2D
+    src::V
 end
 Adapt.@adapt_structure SourceLW2Str
 
 function SourceLW2Str(param_set::RP.ARP, ::Type{FT}, ::Type{DA}, nlay::Int, ncol::Int) where {FT <: AbstractFloat, DA}
     FTA1D = DA{FT, 1}
-    FTA2D = DA{FT, 2}
+    D = DA{FT, 3}
 
     sfc_source = FTA1D(undef, ncol) # sfc_source
-    lev_source = FTA2D(undef, nlay + 1, ncol) # lev_source
-    albedo = FTA2D(undef, nlay + 1, ncol) # albedo
-    src = FTA2D(undef, nlay + 1, ncol) # src
+    leveldata = D(undef, 3, nlay + 1, ncol)
+    #lev_source = FTA2D(undef, nlay + 1, ncol) # lev_source
+    #albedo = FTA2D(undef, nlay + 1, ncol) # albedo
+    #src = FTA2D(undef, nlay + 1, ncol) # src
+    lev_source = view(leveldata, 1, :, :)
+    albedo = view(leveldata, 2, :, :)
+    src = view(leveldata, 3, :, :)
+    V = typeof(src)
 
-    return SourceLW2Str{eltype(lev_source), typeof(sfc_source), typeof(lev_source), typeof(param_set)}(
+    return SourceLW2Str{typeof(sfc_source), typeof(leveldata), V, typeof(param_set)}(
         param_set,
         sfc_source,
+        leveldata,
         lev_source,
         albedo,
         src,
@@ -138,17 +144,20 @@ function source_func_longwave(
             sfc_source,
         )
     else
+        return SourceLW2Str(param_set, FT, DA, nlay, ncol)
+        #=
         PS = typeof(param_set)
         lev_source = DA{FT, 2}(undef, nlay + 1, ncol)
         albedo = DA{FT, 2}(undef, nlay + 1, ncol)
         src = DA{FT, 2}(undef, nlay + 1, ncol)
-        return SourceLW2Str{FT, typeof(sfc_source), typeof(lev_source), PS}(
+        return SourceLW2Str{typeof(sfc_source), typeof(lev_source), PS}(
             param_set,
             sfc_source,
             lev_source,
             albedo,
             src,
         )
+        =#
     end
 end
 

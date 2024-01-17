@@ -68,14 +68,14 @@ struct Solver{C, AS, OP, SL, SS, BCL, BCS, FXBL, FXBS, FXL, FXS}
         FTA2D = typeof(as.p_lev)
         @assert targs[1] <: ClimaComms.AbstractCommsContext
         @assert targs[2] <: AbstractAtmosphericState{FT, FTA1D}
-        @assert targs[3] <: AbstractOpticalProps{FT, FTA2D}
-        @assert targs[4] <: Union{AbstractSourceLW{FT, FTA1D, FTA2D}, Nothing}
+        @assert targs[3] <: AbstractOpticalProps#{FT, FTA2D}
+        @assert targs[4] <: Union{AbstractSourceLW, Nothing}
         @assert targs[5] <: Union{SourceSW2Str{FT, FTA1D, FTA2D}, Nothing}
         @assert targs[6] <: Union{LwBCs{FT}, Nothing}
         @assert targs[7] <: Union{SwBCs{FT}, Nothing}
-        @assert targs[8] <: Union{FluxLW{FT, FTA2D}, Nothing}
+        @assert targs[8] <: Union{FluxLW, Nothing}
         @assert targs[9] <: Union{FluxSW{FT, FTA2D}, Nothing}
-        @assert targs[10] <: Union{FluxLW{FT, FTA2D}, Nothing}
+        @assert targs[10] <: Union{FluxLW, Nothing}
         @assert targs[11] <: Union{FluxSW{FT, FTA2D}, Nothing}
         return new{targs...}(args...)
     end

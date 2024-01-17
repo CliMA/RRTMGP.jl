@@ -2,13 +2,13 @@
 
 function rte_lw_solve!(
     device::ClimaComms.AbstractCPUDevice,
-    flux_lw::FluxLW{FT},
-    src_lw::SourceLW2Str{FT},
-    bcs_lw::LwBCs{FT},
-    op::TwoStream{FT},
+    flux_lw::FluxLW,
+    src_lw::SourceLW2Str,
+    bcs_lw::LwBCs,
+    op::TwoStream,
     max_threads,
-    as::GrayAtmosphericState{FT},
-) where {FT <: AbstractFloat}
+    as::GrayAtmosphericState,
+)
     (; nlay, ncol) = as
     nlev = nlay + 1
     igpt, ibnd = 1, UInt8(1)
@@ -29,13 +29,13 @@ end
 
 function rte_lw_solve!(
     device::ClimaComms.CUDADevice,
-    flux_lw::FluxLW{FT},
-    src_lw::SourceLW2Str{FT},
-    bcs_lw::LwBCs{FT},
-    op::TwoStream{FT},
+    flux_lw::FluxLW,
+    src_lw::SourceLW2Str,
+    bcs_lw::LwBCs,
+    op::TwoStream,
     max_threads,
-    as::GrayAtmosphericState{FT},
-) where {FT <: AbstractFloat}
+    as::GrayAtmosphericState,
+)
     (; nlay, ncol) = as
     nlev = nlay + 1
     tx = min(ncol, max_threads)
@@ -46,14 +46,14 @@ function rte_lw_solve!(
 end
 
 function rte_lw_2stream_solve_CUDA!(
-    flux_lw::FluxLW{FT},
-    src_lw::SourceLW2Str{FT},
-    bcs_lw::LwBCs{FT},
-    op::TwoStream{FT},
+    flux_lw::FluxLW,
+    src_lw::SourceLW2Str,
+    bcs_lw::LwBCs,
+    op::TwoStream,
     nlay,
     ncol,
-    as::GrayAtmosphericState{FT},
-) where {FT <: AbstractFloat}
+    as::GrayAtmosphericState,
+)
     gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
     nlev = nlay + 1
     igpt, ibnd = 1, UInt8(1)
@@ -74,16 +74,16 @@ end
 
 function rte_lw_solve!(
     device::ClimaComms.AbstractCPUDevice,
-    flux::FluxLW{FT},
-    flux_lw::FluxLW{FT},
-    src_lw::SourceLW2Str{FT},
-    bcs_lw::LwBCs{FT},
-    op::TwoStream{FT},
+    flux::FluxLW,
+    flux_lw::FluxLW,
+    src_lw::SourceLW2Str,
+    bcs_lw::LwBCs,
+    op::TwoStream,
     max_threads,
-    as::AtmosphericState{FT},
+    as::AtmosphericState,
     lookup_lw::LookUpLW,
     lookup_lw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
-) where {FT <: AbstractFloat}
+)
     (; nlay, ncol) = as
     nlev = nlay + 1
     (; major_gpt2bnd) = lookup_lw
@@ -127,16 +127,16 @@ end
 
 function rte_lw_solve!(
     device::ClimaComms.CUDADevice,
-    flux::FluxLW{FT},
-    flux_lw::FluxLW{FT},
-    src_lw::SourceLW2Str{FT},
-    bcs_lw::LwBCs{FT},
-    op::TwoStream{FT},
+    flux::FluxLW,
+    flux_lw::FluxLW,
+    src_lw::SourceLW2Str,
+    bcs_lw::LwBCs,
+    op::TwoStream,
     max_threads,
-    as::AtmosphericState{FT},
+    as::AtmosphericState,
     lookup_lw::LookUpLW,
     lookup_lw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
-) where {FT <: AbstractFloat}
+)
     (; nlay, ncol) = as
     nlev = nlay + 1
     tx = min(ncol, max_threads)
@@ -147,17 +147,17 @@ function rte_lw_solve!(
 end
 
 function rte_lw_2stream_solve_CUDA!(
-    flux::FluxLW{FT},
-    flux_lw::FluxLW{FT},
-    src_lw::SourceLW2Str{FT},
-    bcs_lw::LwBCs{FT},
-    op::TwoStream{FT},
+    flux::FluxLW,
+    flux_lw::FluxLW,
+    src_lw::SourceLW2Str,
+    bcs_lw::LwBCs,
+    op::TwoStream,
     nlay,
     ncol,
-    as::AtmosphericState{FT},
+    as::AtmosphericState,
     lookup_lw::LookUpLW,
     lookup_lw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
-) where {FT <: AbstractFloat}
+)
     gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
     nlev = nlay + 1
     (; major_gpt2bnd) = lookup_lw
@@ -260,7 +260,7 @@ end
 
 """
     adding_lw!(
-        flux::FluxLW{FT},
+        flux::FluxLW,
         src_lw::SL,
         bcs_lw::BCL,
         gcol,
@@ -275,7 +275,7 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
 """
 @inline function adding_lw!(
     op::TwoStream,
-    flux::FluxLW{FT},
+    flux::FluxLW,
     src_lw::SL,
     bcs_lw::BCL,
     gcol::Int,
@@ -283,7 +283,7 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
     ibnd::UInt8,
     nlev::Int,
     ncol::Int,
-) where {FT <: AbstractFloat, SL <: SourceLW2Str{FT}, BCL <: LwBCs{FT}}
+) where {SL, BCL}
     nlay = nlev - 1
     # setting references
     (; τ, ssa, g) = op
@@ -291,7 +291,7 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
 
     (; albedo, lev_source, sfc_source, src) = src_lw
     (; inc_flux, sfc_emis) = bcs_lw
-
+    FT = eltype(τ)
     @inbounds flux_dn_ilevplus1 = isnothing(inc_flux) ? FT(0) : inc_flux[gcol, igpt]
     @inbounds flux_dn[nlev, gcol] = flux_dn_ilevplus1
     # Albedo of lowest level is the surface albedo...

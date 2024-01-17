@@ -5,7 +5,7 @@ using DocStringExtensions
 
 export AbstractFlux, FluxLW, FluxSW, set_flux_to_zero!, add_to_flux!
 
-abstract type AbstractFlux{FT <: AbstractFloat, FTA2D <: AbstractArray{FT, 2}} end
+abstract type AbstractFlux end
 
 
 """
@@ -16,22 +16,26 @@ Upward, downward and net longwave fluxes at each level.
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct FluxLW{FT <: AbstractFloat, FTA2D <: AbstractArray{FT, 2}} <: AbstractFlux{FT, FTA2D}
+struct FluxLW{D, V} <: AbstractFlux
+    leveldata::D
     "upward flux `[W/m²]` `(nlev,ncol)`"
-    flux_up::FTA2D
+    flux_up::V
     "downward flux `[W/m²]` `(nlev,ncol)`"
-    flux_dn::FTA2D
+    flux_dn::V
     "net flux `[W/m²]` `(nlev,ncol)`"
-    flux_net::FTA2D
+    flux_net::V
 end
-FluxLW(flux_up, flux_dn, flux_net) = FluxLW{eltype(flux_up), typeof(flux_up)}(flux_up, flux_dn, flux_net)
+#FluxLW(flux_up, flux_dn, flux_net) = FluxLW{typeof(flux_up)}(flux_up, flux_dn, flux_net)
 Adapt.@adapt_structure FluxLW
 
 function FluxLW(ncol::Int, nlay::Int, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
-    flux_up = DA{FT}(undef, nlay + 1, ncol)
-    flux_dn = DA{FT}(undef, nlay + 1, ncol)
-    flux_net = DA{FT}(undef, nlay + 1, ncol)
-    return FluxLW{FT, typeof(flux_net)}(flux_up, flux_dn, flux_net)
+    leveldata = DA{FT}(undef, 3, nlay + 1, ncol)
+    flux_up = view(leveldata, 1, :, :)#DA{FT}(undef, nlay + 1, ncol)
+    flux_dn = view(leveldata, 2, :, :)#DA{FT}(undef, nlay + 1, ncol)
+    flux_net = view(leveldata, 3, :, :)#DA{FT}(undef, nlay + 1, ncol)
+    V = typeof(flux_up)
+    #return FluxLW{typeof(flux_net)}(flux_up, flux_dn, flux_net)
+    return FluxLW{typeof(leveldata), V}(leveldata, flux_up, flux_dn, flux_net)
 end
 
 """
@@ -42,7 +46,7 @@ Upward, downward and net shortwave fluxes at each level.
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct FluxSW{FT <: AbstractFloat, FTA2D <: AbstractArray{FT, 2}} <: AbstractFlux{FT, FTA2D}
+struct FluxSW{FT <: AbstractFloat, FTA2D <: AbstractArray{FT, 2}} <: AbstractFlux
     "upward flux `[W/m²]` `(nlev,ncol)`"
     flux_up::FTA2D
     "downward flux `[W/m²]` `(nlev,ncol)`"
@@ -65,12 +69,13 @@ function FluxSW(ncol::Int, nlay::Int, ::Type{FT}, ::Type{DA}) where {FT <: Abstr
 end
 
 """
-    set_flux_to_zero!(flux::FluxLW{FT}) where {FT<:AbstractFloat}
+    set_flux_to_zero!(flux::FluxLW) where {FT<:AbstractFloat}
 
 Set longwave flux to zero
 
 """
-function set_flux_to_zero!(flux::FluxLW{FT}) where {FT <: AbstractFloat}
+function set_flux_to_zero!(flux::FluxLW)
+    FT = eltype(flux.flux_up)
     flux.flux_up .= FT(0)
     flux.flux_dn .= FT(0)
     flux.flux_net .= FT(0)
@@ -78,12 +83,13 @@ function set_flux_to_zero!(flux::FluxLW{FT}) where {FT <: AbstractFloat}
 end
 
 """
-    set_flux_to_zero!(flux::FluxLW{FT}, gcol::Int) where {FT<:AbstractFloat}
+    set_flux_to_zero!(flux::FluxLW, gcol::Int) where {FT<:AbstractFloat}
 
 Set longwave flux for column `gcol` to zero
 """
-function set_flux_to_zero!(flux::FluxLW{FT}, gcol::Int) where {FT <: AbstractFloat}
+function set_flux_to_zero!(flux::FluxLW, gcol::Int)
     (; flux_up, flux_dn, flux_net) = flux
+    FT = eltype(flux_up)
     nlev = size(flux_up, 1)
     @inbounds for ilev in 1:nlev
         flux_up[ilev, gcol] = FT(0)
