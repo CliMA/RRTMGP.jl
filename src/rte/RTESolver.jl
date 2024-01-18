@@ -32,27 +32,26 @@ include("shortwave2stream.jl")
 
 Solver for the longwave radiation problem
 """
-function solve_lw!(
-    slv::Solver,
-    max_threads::Int,
-    lookup_lw::Union{LookUpLW, Nothing} = nothing,
-    lookup_lw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
-)
-    (; as, op, bcs_lw, src_lw, flux_lw, fluxb_lw) = slv
-    context = RTE.context(slv)
-    DA = RTE.array_type(slv)
-    no_args = lookup_lw isa Nothing && lookup_lw_cld isa Nothing
-    if no_args
-        major_gpt2bnd = DA(UInt8[1])
-        flux = flux_lw
-    else
-        (; major_gpt2bnd) = lookup_lw
-        flux = fluxb_lw
-    end
+solve_lw!(slv::Solver, max_threads, lookup_lw = nothing, lookup_lw_cld = nothing) =
+    solve_lw!(slv.context.device, slv, max_threads, lookup_lw, lookup_lw_cld)
 
-    rte_lw_solve!(context, flux, flux_lw, src_lw, bcs_lw, op, major_gpt2bnd, max_threads, as, lookup_lw, lookup_lw_cld)
-    return nothing
-end
+# OneScalar and 2-stream solvers with gray optics
+solve_lw!(
+    device::ClimaComms.AbstractDevice,
+    (; flux_lw, src_lw, bcs_lw, op, as)::Solver{<:Any, <:GrayAtmosphericState},
+    max_threads::Int,
+    ::Nothing,
+    ::Nothing,
+) = rte_lw_solve!(device, flux_lw, src_lw, bcs_lw, op, max_threads, as)
+
+# OneScalar & 2-stream solvers with RRTMGP optics
+solve_lw!(
+    device::ClimaComms.AbstractDevice,
+    (; fluxb_lw, flux_lw, src_lw, bcs_lw, op, as)::Solver{<:Any, <:AtmosphericState},
+    max_threads::Int,
+    lookup_lw::LookUpLW,
+    lookup_lw_cld::Union{LookUpCld, PadeCld, Nothing},
+) = rte_lw_solve!(device, fluxb_lw, flux_lw, src_lw, bcs_lw, op, max_threads, as, lookup_lw, lookup_lw_cld)
 
 """
     solve_sw!(
