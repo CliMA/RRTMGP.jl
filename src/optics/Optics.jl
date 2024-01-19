@@ -17,14 +17,14 @@ import ..Parameters as RP
 export AbstractOpticalProps, OneScalar, TwoStream, compute_col_gas!, compute_optical_props!
 
 """
-    AbstractOpticalProps{FT,FTA2D}
+    AbstractOpticalProps
 
 Optical properties for one scalar and two stream calculations.
 """
-abstract type AbstractOpticalProps{FT <: AbstractFloat, FTA2D <: AbstractArray{FT, 2}} end
+abstract type AbstractOpticalProps end
 
 """
-    OneScalar{FT,FTA1D,FTA2D,AD} <: AbstractOpticalProps{FT,FTA2D}
+    OneScalar{FTA2D,AD} <: AbstractOpticalProps
 
 Single scalar approximation for optical depth, used in
 calculations accounting for extinction and emission
@@ -32,8 +32,7 @@ calculations accounting for extinction and emission
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct OneScalar{FT <: AbstractFloat, FTA2D <: AbstractArray{FT, 2}, AD <: AngularDiscretization} <:
-       AbstractOpticalProps{FT, FTA2D}
+struct OneScalar{FTA2D, AD} <: AbstractOpticalProps
     "Optical Depth"
     τ::FTA2D
     "Angular discretization"
@@ -45,11 +44,11 @@ function OneScalar(::Type{FT}, ncol::Int, nlay::Int, ::Type{DA}) where {FT <: Ab
     τ = DA{FT, 2}(undef, nlay, ncol)
     ad = AngularDiscretization(FT, DA, 1)
 
-    return OneScalar{eltype(τ), typeof(τ), typeof(ad)}(τ, ad)
+    return OneScalar{typeof(τ), typeof(ad)}(τ, ad)
 end
 
 """
-    TwoStream{FT,FTA2D} <: AbstractOpticalProps{FT,FTA2D}
+    TwoStream{FTA2D} <: AbstractOpticalProps
 
 Two stream approximation for optical properties, used in
 calculations accounting for extinction and emission
@@ -57,7 +56,7 @@ calculations accounting for extinction and emission
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct TwoStream{FT <: AbstractFloat, FTA2D <: AbstractArray{FT, 2}} <: AbstractOpticalProps{FT, FTA2D}
+struct TwoStream{FTA2D} <: AbstractOpticalProps
     "Optical depth"
     τ::FTA2D
     "Single-scattering albedo"
@@ -71,7 +70,7 @@ function TwoStream(::Type{FT}, ncol::Int, nlay::Int, ::Type{DA}) where {FT <: Ab
     τ = DA{FT, 2}(zeros(nlay, ncol))
     ssa = DA{FT, 2}(zeros(nlay, ncol))
     g = DA{FT, 2}(zeros(nlay, ncol))
-    return TwoStream{eltype(τ), typeof(τ)}(τ, ssa, g)
+    return TwoStream{typeof(τ)}(τ, ssa, g)
 end
 
 """
@@ -133,7 +132,7 @@ end
 
 """
     compute_optical_props!(
-        op::AbstractOpticalProps{FT},
+        op::AbstractOpticalProps,
         as::AtmosphericState{FT},
         sf::AbstractSourceLW{FT},
         gcol::Int,
@@ -145,7 +144,7 @@ end
 Computes optical properties for the longwave problem.
 """
 @inline function compute_optical_props!(
-    op::AbstractOpticalProps{FT},
+    op::AbstractOpticalProps,
     as::AtmosphericState{FT},
     sf::AbstractSourceLW{FT},
     gcol::Int,
@@ -214,7 +213,7 @@ end
 
 """
     compute_optical_props!(
-        op::AbstractOpticalProps{FT},
+        op::AbstractOpticalProps,
         as::AtmosphericState{FT},
         gcol::Int,
         igpt::Int,
@@ -225,7 +224,7 @@ end
 Computes optical properties for the shortwave problem.
 """
 @inline function compute_optical_props!(
-    op::AbstractOpticalProps{FT},
+    op::AbstractOpticalProps,
     as::AtmosphericState{FT},
     gcol::Int,
     igpt::Int,
@@ -282,7 +281,7 @@ end
 
 """
     compute_optical_props!(
-        op::AbstractOpticalProps{FT},
+        op::AbstractOpticalProps,
         as::GrayAtmosphericState{FT},
         sf::AbstractSourceLW{FT},
         gcol::Int,
@@ -292,7 +291,7 @@ end
 Computes optical properties for the longwave gray radiation problem.
 """
 function compute_optical_props!(
-    op::AbstractOpticalProps{FT},
+    op::AbstractOpticalProps,
     as::GrayAtmosphericState{FT},
     sf::AbstractSourceLW{FT},
     gcol::Int,
@@ -309,7 +308,7 @@ end
 
 """
     compute_optical_props!(
-        op::AbstractOpticalProps{FT},
+        op::AbstractOpticalProps,
         as::GrayAtmosphericState{FT},
         gcol::Int,
         igpt::Int = 1,
@@ -318,7 +317,7 @@ end
 Computes optical properties for the shortwave gray radiation problem.
 """
 function compute_optical_props!(
-    op::AbstractOpticalProps{FT},
+    op::AbstractOpticalProps,
     as::GrayAtmosphericState{FT},
     gcol::Int,
     igpt::Int = 1,

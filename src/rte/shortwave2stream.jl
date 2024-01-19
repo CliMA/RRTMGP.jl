@@ -1,7 +1,7 @@
 function rte_sw_2stream_solve!(
     device::ClimaComms.AbstractCPUDevice,
     flux_sw::FluxSW{FT},
-    op::TwoStream{FT},
+    op::TwoStream,
     bcs_sw::SwBCs{FT},
     src_sw::SourceSW2Str{FT},
     max_threads,
@@ -25,7 +25,7 @@ end
 function rte_sw_2stream_solve!(
     device::ClimaComms.CUDADevice,
     flux_sw::FluxSW{FT},
-    op::TwoStream{FT},
+    op::TwoStream,
     bcs_sw::SwBCs{FT},
     src_sw::SourceSW2Str{FT},
     max_threads,
@@ -42,7 +42,7 @@ end
 
 function rte_sw_2stream_solve_CUDA!(
     flux_sw::FluxSW{FT},
-    op::TwoStream{FT},
+    op::TwoStream,
     bcs_sw::SwBCs{FT},
     src_sw::SourceSW2Str{FT},
     nlay,
@@ -68,7 +68,7 @@ function rte_sw_2stream_solve!(
     device::ClimaComms.AbstractCPUDevice,
     flux::FluxSW{FT},
     flux_sw::FluxSW{FT},
-    op::TwoStream{FT},
+    op::TwoStream,
     bcs_sw::SwBCs{FT},
     src_sw::SourceSW2Str{FT},
     max_threads,
@@ -106,7 +106,7 @@ function rte_sw_2stream_solve!(
     device::ClimaComms.CUDADevice,
     flux::FluxSW{FT},
     flux_sw::FluxSW{FT},
-    op::TwoStream{FT},
+    op::TwoStream,
     bcs_sw::SwBCs{FT},
     src_sw::SourceSW2Str{FT},
     max_threads,
@@ -127,7 +127,7 @@ end
 function rte_sw_2stream_solve_CUDA!(
     flux::FluxSW{FT},
     flux_sw::FluxSW{FT},
-    op::TwoStream{FT},
+    op::TwoStream,
     bcs_sw::SwBCs{FT},
     src_sw::SourceSW2Str{FT},
     nlay,

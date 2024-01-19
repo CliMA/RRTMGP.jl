@@ -1,7 +1,7 @@
 function rte_sw_noscat_solve!(
     device::ClimaComms.AbstractCPUDevice,
     flux_sw::FluxSW{FT},
-    op::OneScalar{FT},
+    op::OneScalar,
     bcs_sw::SwBCs{FT},
     max_threads,
     as::GrayAtmosphericState{FT},
@@ -23,7 +23,7 @@ end
 function rte_sw_noscat_solve!(
     device::ClimaComms.CUDADevice,
     flux_sw::FluxSW{FT},
-    op::OneScalar{FT},
+    op::OneScalar,
     bcs_sw::SwBCs{FT},
     max_threads,
     as::GrayAtmosphericState{FT},
@@ -39,7 +39,7 @@ end
 
 function rte_sw_noscat_solve_CUDA!(
     flux_sw::FluxSW{FT},
-    op::OneScalar{FT},
+    op::OneScalar,
     bcs_sw::SwBCs{FT},
     nlay,
     ncol,
@@ -64,7 +64,7 @@ function rte_sw_noscat_solve!(
     device::ClimaComms.AbstractCPUDevice,
     flux::FluxSW{FT},
     flux_sw::FluxSW{FT},
-    op::OneScalar{FT},
+    op::OneScalar,
     bcs_sw::SwBCs{FT},
     max_threads,
     as::AtmosphericState{FT},
@@ -93,7 +93,7 @@ function rte_sw_noscat_solve!(
     device::ClimaComms.CUDADevice,
     flux::FluxSW{FT},
     flux_sw::FluxSW{FT},
-    op::OneScalar{FT},
+    op::OneScalar,
     bcs_sw::SwBCs{FT},
     max_threads,
     as::AtmosphericState{FT},
@@ -113,7 +113,7 @@ end
 function rte_sw_noscat_solve_CUDA!(
     flux::FluxSW{FT},
     flux_sw::FluxSW{FT},
-    op::OneScalar{FT},
+    op::OneScalar,
     bcs_sw::SwBCs{FT},
     nlay,
     ncol,
@@ -140,7 +140,7 @@ end
 """
     rte_sw_noscat!(
         flux::FluxSW{FT},
-        op::OneScalar{FT},
+        op::OneScalar,
         bcs_sw::SwBCs{FT},
         solar_frac::FT,
         gcol,
@@ -152,7 +152,7 @@ No-scattering solver for the shortwave problem.
 """
 function rte_sw_noscat!(
     flux::FluxSW{FT},
-    op::OneScalar{FT},
+    op::OneScalar,
     bcs_sw::SwBCs{FT},
     igpt::Int,
     n_gpt::Int,
