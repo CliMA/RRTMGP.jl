@@ -1,15 +1,16 @@
 function rte_sw_2stream_solve!(
     device::ClimaComms.AbstractCPUDevice,
-    flux_sw::FluxSW{FT},
+    flux_sw::FluxSW,
     op::TwoStream,
-    bcs_sw::SwBCs{FT},
-    src_sw::SourceSW2Str{FT},
+    bcs_sw::SwBCs,
+    src_sw::SourceSW2Str,
     max_threads,
-    as::GrayAtmosphericState{FT},
-) where {FT <: AbstractFloat}
+    as::GrayAtmosphericState,
+)
     (; nlay, ncol) = as
     nlev = nlay + 1
     n_gpt, igpt, ibnd = 1, 1, UInt8(1)
+    FT = eltype(bcs_sw.cos_zenith)
     solar_frac = FT(1)
     @inbounds begin
         ClimaComms.@threaded device for gcol in 1:ncol
@@ -24,13 +25,13 @@ end
 
 function rte_sw_2stream_solve!(
     device::ClimaComms.CUDADevice,
-    flux_sw::FluxSW{FT},
+    flux_sw::FluxSW,
     op::TwoStream,
-    bcs_sw::SwBCs{FT},
-    src_sw::SourceSW2Str{FT},
+    bcs_sw::SwBCs,
+    src_sw::SourceSW2Str,
     max_threads,
-    as::GrayAtmosphericState{FT},
-) where {FT <: AbstractFloat}
+    as::GrayAtmosphericState,
+)
     (; nlay, ncol) = as
     nlev = nlay + 1
     tx = min(ncol, max_threads)
@@ -41,17 +42,18 @@ function rte_sw_2stream_solve!(
 end
 
 function rte_sw_2stream_solve_CUDA!(
-    flux_sw::FluxSW{FT},
+    flux_sw::FluxSW,
     op::TwoStream,
-    bcs_sw::SwBCs{FT},
-    src_sw::SourceSW2Str{FT},
+    bcs_sw::SwBCs,
+    src_sw::SourceSW2Str,
     nlay,
     ncol,
-    as::GrayAtmosphericState{FT},
-) where {FT <: AbstractFloat}
+    as::GrayAtmosphericState,
+)
     gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
     nlev = nlay + 1
     n_gpt, igpt, ibnd = 1, 1, UInt8(1)
+    FT = eltype(bcs_sw.cos_zenith)
     solar_frac = FT(1)
     if gcol ≤ ncol
         @inbounds begin
@@ -66,16 +68,16 @@ end
 
 function rte_sw_2stream_solve!(
     device::ClimaComms.AbstractCPUDevice,
-    flux::FluxSW{FT},
-    flux_sw::FluxSW{FT},
+    flux::FluxSW,
+    flux_sw::FluxSW,
     op::TwoStream,
-    bcs_sw::SwBCs{FT},
-    src_sw::SourceSW2Str{FT},
+    bcs_sw::SwBCs,
+    src_sw::SourceSW2Str,
     max_threads,
-    as::AtmosphericState{FT},
+    as::AtmosphericState,
     lookup_sw::LookUpSW,
     lookup_sw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
-) where {FT <: AbstractFloat}
+)
     (; nlay, ncol) = as
     nlev = nlay + 1
     n_gpt = length(lookup_sw.solar_src_scaled)
@@ -104,16 +106,16 @@ end
 
 function rte_sw_2stream_solve!(
     device::ClimaComms.CUDADevice,
-    flux::FluxSW{FT},
-    flux_sw::FluxSW{FT},
+    flux::FluxSW,
+    flux_sw::FluxSW,
     op::TwoStream,
-    bcs_sw::SwBCs{FT},
-    src_sw::SourceSW2Str{FT},
+    bcs_sw::SwBCs,
+    src_sw::SourceSW2Str,
     max_threads,
-    as::AtmosphericState{FT},
+    as::AtmosphericState,
     lookup_sw::LookUpSW,
     lookup_sw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
-) where {FT <: AbstractFloat}
+)
     (; nlay, ncol) = as
     nlev = nlay + 1
     n_gpt = length(lookup_sw.solar_src_scaled)
@@ -125,17 +127,17 @@ function rte_sw_2stream_solve!(
 end
 
 function rte_sw_2stream_solve_CUDA!(
-    flux::FluxSW{FT},
-    flux_sw::FluxSW{FT},
+    flux::FluxSW,
+    flux_sw::FluxSW,
     op::TwoStream,
-    bcs_sw::SwBCs{FT},
-    src_sw::SourceSW2Str{FT},
+    bcs_sw::SwBCs,
+    src_sw::SourceSW2Str,
     nlay,
     ncol,
-    as::AtmosphericState{FT},
+    as::AtmosphericState,
     lookup_sw::LookUpSW,
     lookup_sw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
-) where {FT <: AbstractFloat}
+)
     gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
     nlev = nlay + 1
     n_gpt = length(lookup_sw.major_gpt2bnd)
@@ -145,6 +147,7 @@ function rte_sw_2stream_solve_CUDA!(
         flux_net_sw = flux_sw.flux_net
         flux_up = flux.flux_up
         flux_dn = flux.flux_dn
+        FT = eltype(flux_up)
         @inbounds for ilev in 1:nlev
             flux_up_sw[ilev, gcol] = FT(0)
             flux_dn_sw[ilev, gcol] = FT(0)
