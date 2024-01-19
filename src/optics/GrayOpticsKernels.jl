@@ -3,7 +3,7 @@
 
 """
     compute_optical_props_kernel!(
-        op::AbstractOpticalProps{FT},
+        op::AbstractOpticalProps,
         as::GrayAtmosphericState{FT},
         glay, gcol,
         source::AbstractSourceLW{FT},
@@ -13,7 +13,7 @@ This function computes the optical properties using the gray atmosphere assumpti
 for the longwave solver.
 """
 function compute_optical_props_kernel!(
-    op::AbstractOpticalProps{FT},
+    op::AbstractOpticalProps,
     as::GrayAtmosphericState{FT},
     glay,
     gcol,
@@ -27,7 +27,7 @@ end
 
 """
     compute_optical_props_kernel!(
-        op::AbstractOpticalProps{FT},
+        op::AbstractOpticalProps,
         as::GrayAtmosphericState{FT},
         glay, gcol,
     ) where {FT<:AbstractFloat}
@@ -37,7 +37,7 @@ This function computes the optical properties using the gray atmosphere assumpti
 for the longwave solver.
 """
 function compute_optical_props_kernel_lw!(
-    op::AbstractOpticalProps{FT},
+    op::AbstractOpticalProps,
     as::GrayAtmosphericState{FT},
     glay,
     gcol,
@@ -82,7 +82,7 @@ end
 
 """
     compute_optical_props_kernel!(
-        op::AbstractOpticalProps{FT},
+        op::AbstractOpticalProps,
         as::GrayAtmosphericState{FT},
         glay, gcol,
     ) where {FT<:AbstractFloat}
@@ -90,7 +90,7 @@ This function computes the optical properties using the gray atmosphere assumpti
 for the shortwave solver.
 """
 function compute_optical_props_kernel!(
-    op::AbstractOpticalProps{FT},
+    op::AbstractOpticalProps,
     as::GrayAtmosphericState{FT},
     glay,
     gcol,

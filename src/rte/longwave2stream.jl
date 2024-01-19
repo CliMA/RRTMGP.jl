@@ -5,7 +5,7 @@
         flux_lw::FluxLW{FT},
         src_lw::SourceLW2Str{FT},
         bcs_lw::LwBCs{FT},
-        op::TwoStream{FT},
+        op::TwoStream,
         major_gpt2bnd::AbstractArray{UInt8,1},
         max_threads,
         as::AbstractAtmosphericState{FT},
@@ -29,7 +29,7 @@ function rte_lw_solve!(
     flux_lw::FluxLW{FT},
     src_lw::SourceLW2Str{FT},
     bcs_lw::LwBCs{FT},
-    op::TwoStream{FT},
+    op::TwoStream,
     major_gpt2bnd::AbstractArray{UInt8, 1},
     max_threads,
     as::AbstractAtmosphericState{FT},
@@ -73,7 +73,7 @@ function rte_lw_2stream_solve_CUDA!(
     flux_lw::FluxLW{FT},
     src_lw::SourceLW2Str{FT},
     bcs_lw::LwBCs{FT},
-    op::TwoStream{FT},
+    op::TwoStream,
     nlay,
     ncol,
     major_gpt2bnd::AbstractArray{UInt8, 1},
@@ -117,7 +117,7 @@ end
 
 """
     rte_lw_2stream_source!(
-        op::TwoStream{FT},
+        op::TwoStream,
         src_lw::SourceLW2Str{FT},
         gcol,
         nlay,
@@ -128,13 +128,7 @@ This function combines RRTMGP-specific sources at levels,
 computes layer reflectance, transmittance, and
 total source function at levels using linear-in-tau approximation.
 """
-function rte_lw_2stream_source!(
-    op::TwoStream{FT},
-    src_lw::SourceLW2Str{FT},
-    gcol,
-    nlay,
-    ncol,
-) where {FT <: AbstractFloat}
+function rte_lw_2stream_source!(op::TwoStream, src_lw::SourceLW2Str{FT}, gcol, nlay, ncol) where {FT <: AbstractFloat}
     # Cell properties: reflection, transmission for diffuse radiation
     # Coupling coefficients needed for source function
     # -------------------------------------------------------------------------------------------------

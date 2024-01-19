@@ -5,7 +5,7 @@
         flux_lw::FluxLW{FT},
         src_lw::SourceLWNoScat{FT},
         bcs_lw::LwBCs{FT},
-        op::OneScalar{FT},
+        op::OneScalar,
         major_gpt2bnd::AbstractArray{UInt8,1},
         max_threads,
         as::AbstractAtmosphericState{FT},
@@ -24,7 +24,7 @@ function rte_lw_solve!(
     flux_lw::FluxLW{FT},
     src_lw::SourceLWNoScat{FT},
     bcs_lw::LwBCs{FT},
-    op::OneScalar{FT},
+    op::OneScalar,
     major_gpt2bnd::AbstractArray{UInt8, 1},
     max_threads,
     as::AbstractAtmosphericState{FT},
@@ -61,7 +61,7 @@ function rte_lw_noscat_solve_CUDA!(
     flux_lw::FluxLW{FT},
     src_lw::SourceLWNoScat{FT},
     bcs_lw::LwBCs{FT},
-    op::OneScalar{FT},
+    op::OneScalar,
     nlay,
     ncol,
     major_gpt2bnd,
@@ -87,7 +87,7 @@ end
 """
     rte_lw_noscat_source!(
         src_lw::SourceLWNoScat{FT},
-        op::OneScalar{FT},
+        op::OneScalar,
         gcol,
         nlay,
     ) where {FT<:AbstractFloat}
@@ -95,7 +95,7 @@ end
 Compute LW source function for upward and downward emission at levels using linear-in-tau assumption
 See Clough et al., 1992, doi: 10.1029/92JD01419, Eq 13
 """
-function rte_lw_noscat_source!(src_lw::SourceLWNoScat{FT}, op::OneScalar{FT}, gcol, nlay) where {FT <: AbstractFloat}
+function rte_lw_noscat_source!(src_lw::SourceLWNoScat{FT}, op::OneScalar, gcol, nlay) where {FT <: AbstractFloat}
     # setting references
     (; src_up, src_dn, lev_source_inc, lev_source_dec, lay_source) = src_lw
     Ds = op.angle_disc.gauss_Ds
@@ -131,7 +131,7 @@ end
     rte_lw_noscat_transport!(
         src_lw::SourceLWNoScat{FT},
         bcs_lw::LwBCs{FT},
-        op::OneScalar{FT},
+        op::OneScalar,
         gcol,
         flux::FluxLW{FT},
         igpt,
@@ -145,7 +145,7 @@ Transport for no-scattering longwave problem.
 function rte_lw_noscat_transport!(
     src_lw::SourceLWNoScat{FT},
     bcs_lw::LwBCs{FT},
-    op::OneScalar{FT},
+    op::OneScalar,
     gcol,
     flux::FluxLW{FT},
     igpt,
