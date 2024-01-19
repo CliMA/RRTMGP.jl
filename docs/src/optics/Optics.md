@@ -20,7 +20,6 @@ compute_interp_frac_η
 compute_gas_optics
 compute_τ_minor
 compute_τ_rayleigh
-compute_lw_planck_src!
 ```
 
 ```@docs

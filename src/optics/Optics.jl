@@ -153,38 +153,46 @@ Computes optical properties for the longwave problem.
     lkp_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
 ) where {FT <: AbstractFloat}
     (; nlay, vmr) = as
-    @inbounds ibnd = lkp.major_gpt2bnd[igpt]
-    @inbounds t_sfc = as.t_sfc[gcol]
+    @inbounds begin
+        ibnd = lkp.major_gpt2bnd[igpt]
+        t_sfc = as.t_sfc[gcol]
+        col_dry_col = view(as.col_dry, :, gcol)
+        p_lay_col = view(as.p_lay, :, gcol)
+        t_lay_col = view(as.t_lay, :, gcol)
+        t_lev_col = view(as.t_lev, :, gcol)
+        lay_source = view(sf.lay_source, :, gcol)
+        lev_source_inc = view(sf.lev_source_inc, :, gcol)
+        lev_source_dec = view(sf.lev_source_dec, :, gcol)
+        sfc_source = sf.sfc_source
+        τ = view(op.τ, :, gcol)
+    end
     planck_args = (lkp.t_planck, lkp.totplnk, ibnd)
-    col_dry_col = view(as.col_dry, :, gcol)
-    p_lay_col = view(as.p_lay, :, gcol)
-    t_lay_col = view(as.t_lay, :, gcol)
-    τ = view(op.τ, :, gcol)
     if op isa TwoStream
         ssa = view(op.ssa, :, gcol)
         g = view(op.g, :, gcol)
     end
-
+    @inbounds t_lev_dec = t_lev_col[1]
     @inbounds for glay in 1:nlay
         col_dry = col_dry_col[glay]
         p_lay = p_lay_col[glay]
         t_lay = t_lay_col[glay]
+        t_lev_inc = t_lev_col[glay + 1]
         # compute gas optics
         if op isa TwoStream
-            τ[glay], ssa[glay], g[glay] = compute_gas_optics(lkp, vmr, col_dry, igpt, ibnd, p_lay, t_lay, glay, gcol)
+            τ[glay], ssa[glay], g[glay], p_frac =
+                compute_gas_optics(lkp, vmr, col_dry, igpt, ibnd, p_lay, t_lay, glay, gcol)
         else
-            τ[glay], _, _ = compute_gas_optics(lkp, vmr, col_dry, igpt, ibnd, p_lay, t_lay, glay, gcol)
+            τ[glay], _, _, p_frac = compute_gas_optics(lkp, vmr, col_dry, igpt, ibnd, p_lay, t_lay, glay, gcol)
         end
         # compute Planck sources
-        p_frac = compute_lw_planck_fraction(lkp, vmr, p_lay, t_lay, igpt, ibnd, glay, gcol)
-
-        sf.lay_source[glay, gcol] = interp1d(t_lay, planck_args...) * p_frac
-        sf.lev_source_inc[glay, gcol] = interp1d(as.t_lev[glay + 1, gcol], planck_args...) * p_frac
-        sf.lev_source_dec[glay, gcol] = interp1d(as.t_lev[glay, gcol], planck_args...) * p_frac
+        lay_source[glay] = interp1d(t_lay, planck_args...) * p_frac
+        lev_source_inc[glay] = interp1d(t_lev_inc, planck_args...) * p_frac
+        lev_source_dec[glay] = interp1d(t_lev_dec, planck_args...) * p_frac
 
         if glay == 1
-            sf.sfc_source[gcol] = interp1d(t_sfc, planck_args...) * p_frac
+            sfc_source[gcol] = interp1d(t_sfc, planck_args...) * p_frac
         end
+        t_lev_dec = t_lev_inc
     end
     if !isnothing(lkp_cld) # clouds need TwoStream optics
         cld_r_eff_liq = view(as.cld_r_eff_liq, :, gcol)
