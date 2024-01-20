@@ -14,7 +14,7 @@ function rte_sw_noscat_solve!(
     @inbounds begin
         ClimaComms.@threaded device for gcol in 1:ncol
             set_flux_to_zero!(flux_sw, gcol)
-            compute_optical_props!(op, as, gcol, igpt, nothing, nothing)
+            compute_optical_props!(op, as, gcol)
             rte_sw_noscat!(flux_sw, op, bcs_sw, igpt, n_gpt, solar_frac, gcol, nlev)
         end
     end
@@ -48,7 +48,7 @@ function rte_sw_noscat_solve_CUDA!(flux_sw::FluxSW, op::OneScalar, bcs_sw::SwBCs
     if gcol ≤ ncol
         @inbounds begin
             set_flux_to_zero!(flux_sw, gcol)
-            compute_optical_props!(op, as, gcol, igpt, nothing, nothing)
+            compute_optical_props!(op, as, gcol)
             rte_sw_noscat!(flux_sw, op, bcs_sw, igpt, n_gpt, solar_frac, gcol, nlev)
         end
     end

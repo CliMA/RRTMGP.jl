@@ -144,55 +144,98 @@ end
 Computes optical properties for the longwave problem.
 """
 @inline function compute_optical_props!(
-    op::AbstractOpticalProps,
-    as::AtmosphericState{FT},
-    sf::AbstractSourceLW{FT},
+    op::OneScalar,
+    as::AtmosphericState,
+    sf::SourceLWNoScat,
     gcol::Int,
     igpt::Int,
     lkp::LookUpLW,
     lkp_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
-) where {FT <: AbstractFloat}
+)
     (; nlay, vmr) = as
-    @inbounds begin
-        ibnd = lkp.major_gpt2bnd[igpt]
-        t_sfc = as.t_sfc[gcol]
-        col_dry_col = view(as.col_dry, :, gcol)
-        p_lay_col = view(as.p_lay, :, gcol)
-        t_lay_col = view(as.t_lay, :, gcol)
-        t_lev_col = view(as.t_lev, :, gcol)
-        lay_source = view(sf.lay_source, :, gcol)
-        lev_source_inc = view(sf.lev_source_inc, :, gcol)
-        lev_source_dec = view(sf.lev_source_dec, :, gcol)
-        sfc_source = sf.sfc_source
-        τ = view(op.τ, :, gcol)
-    end
-    planck_args = (lkp.t_planck, lkp.totplnk, ibnd)
-    if op isa TwoStream
-        ssa = view(op.ssa, :, gcol)
-        g = view(op.g, :, gcol)
-    end
-    @inbounds t_lev_dec = t_lev_col[1]
-    @inbounds for glay in 1:nlay
-        col_dry = col_dry_col[glay]
-        p_lay = p_lay_col[glay]
-        t_lay = t_lay_col[glay]
-        t_lev_inc = t_lev_col[glay + 1]
-        # compute gas optics
-        if op isa TwoStream
-            τ[glay], ssa[glay], g[glay], p_frac =
-                compute_gas_optics(lkp, vmr, col_dry, igpt, ibnd, p_lay, t_lay, glay, gcol)
-        else
-            τ[glay], _, _, p_frac = compute_gas_optics(lkp, vmr, col_dry, igpt, ibnd, p_lay, t_lay, glay, gcol)
-        end
-        # compute Planck sources
-        lay_source[glay] = interp1d(t_lay, planck_args...) * p_frac
-        lev_source_inc[glay] = interp1d(t_lev_inc, planck_args...) * p_frac
-        lev_source_dec[glay] = interp1d(t_lev_dec, planck_args...) * p_frac
+    (; t_planck, totplnk) = lkp
+    (; lay_source, lev_source_inc, lev_source_dec, sfc_source) = sf
+    @inbounds t_sfc = as.t_sfc[gcol]
+    @inbounds ibnd = lkp.major_gpt2bnd[igpt]
+    col_dry_col = view(as.col_dry, :, gcol)
+    p_lay_col = view(as.p_lay, :, gcol)
+    t_lay_col = view(as.t_lay, :, gcol)
+    t_lev_col = view(as.t_lev, :, gcol)
+    τ = view(op.τ, :, gcol)
 
-        if glay == 1
-            sfc_source[gcol] = interp1d(t_sfc, planck_args...) * p_frac
+    @inbounds begin
+        t_lev_dec = t_lev_col[1]
+        for glay in 1:nlay
+            col_dry = col_dry_col[glay]
+            p_lay = p_lay_col[glay]
+            t_lay = t_lay_col[glay]
+            # compute gas optics
+            τ[glay], _, _, planckfrac = compute_gas_optics(lkp, vmr, col_dry, igpt, ibnd, p_lay, t_lay, glay, gcol)
+            # compute longwave source terms
+            t_lev_inc = t_lev_col[glay + 1]
+
+            lay_source[glay, gcol] = interp1d(t_lay, t_planck, totplnk, ibnd) * planckfrac
+            lev_source_inc[glay, gcol] = interp1d(t_lev_inc, t_planck, totplnk, ibnd) * planckfrac
+            lev_source_dec[glay, gcol] = interp1d(t_lev_dec, t_planck, totplnk, ibnd) * planckfrac
+            if glay == 1
+                sfc_source[gcol] = interp1d(t_sfc, t_planck, totplnk, ibnd) * planckfrac
+            end
+            t_lev_dec = t_lev_inc
         end
-        t_lev_dec = t_lev_inc
+    end
+    return nothing
+end
+
+@inline function compute_optical_props!(
+    op::TwoStream,
+    as::AtmosphericState,
+    sf::SourceLW2Str,
+    gcol::Int,
+    igpt::Int,
+    lkp::LookUpLW,
+    lkp_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
+)
+    (; nlay, vmr) = as
+    (; t_planck, totplnk) = lkp
+    (; lev_source, sfc_source) = sf
+    @inbounds t_sfc = as.t_sfc[gcol]
+    @inbounds ibnd = lkp.major_gpt2bnd[igpt]
+    col_dry_col = view(as.col_dry, :, gcol)
+    p_lay_col = view(as.p_lay, :, gcol)
+    t_lay_col = view(as.t_lay, :, gcol)
+    t_lev_col = view(as.t_lev, :, gcol)
+    τ = view(op.τ, :, gcol)
+    ssa = view(op.ssa, :, gcol)
+    g = view(op.g, :, gcol)
+
+    lev_src_inc_prev = zero(t_sfc)
+    lev_src_dec_prev = zero(t_sfc)
+
+    @inbounds begin
+        t_lev_dec = t_lev_col[1]
+        for glay in 1:nlay
+            col_dry = col_dry_col[glay]
+            p_lay = p_lay_col[glay]
+            t_lay = t_lay_col[glay]
+            # compute gas optics
+            τ[glay], ssa[glay], g[glay], planckfrac =
+                compute_gas_optics(lkp, vmr, col_dry, igpt, ibnd, p_lay, t_lay, glay, gcol)
+            # compute longwave source terms
+            t_lev_inc = t_lev_col[glay + 1]
+
+            lev_src_inc = interp1d(t_lev_inc, t_planck, totplnk, ibnd) * planckfrac
+            lev_src_dec = interp1d(t_lev_dec, t_planck, totplnk, ibnd) * planckfrac
+            if glay == 1
+                sfc_source[gcol] = interp1d(t_sfc, t_planck, totplnk, ibnd) * planckfrac
+                lev_source[glay, gcol] = lev_src_dec
+            else
+                lev_source[glay, gcol] = sqrt(lev_src_inc_prev * lev_src_dec)
+            end
+            lev_src_dec_prev = lev_src_dec
+            lev_src_inc_prev = lev_src_inc
+            t_lev_dec = t_lev_inc
+        end
+        @inbounds lev_source[nlay + 1, gcol] = lev_src_inc_prev
     end
     if !isnothing(lkp_cld) # clouds need TwoStream optics
         cld_r_eff_liq = view(as.cld_r_eff_liq, :, gcol)
@@ -283,58 +326,6 @@ Computes optical properties for the shortwave problem.
             ibnd;
             delta_scaling = true,
         )
-    end
-    return nothing
-end
-
-"""
-    compute_optical_props!(
-        op::AbstractOpticalProps,
-        as::GrayAtmosphericState{FT},
-        sf::AbstractSourceLW{FT},
-        gcol::Int,
-        igpt::Int = 1,
-    ) where {FT<:AbstractFloat}
-
-Computes optical properties for the longwave gray radiation problem.
-"""
-function compute_optical_props!(
-    op::AbstractOpticalProps,
-    as::GrayAtmosphericState{FT},
-    sf::AbstractSourceLW{FT},
-    gcol::Int,
-    igpt::Int = 1,
-    lkp::Union{AbstractLookUp, Nothing} = nothing,
-    lkp_cld::Union{AbstractLookUp, Nothing} = nothing,
-) where {FT <: AbstractFloat}
-    nlay = as.nlay
-    @inbounds for ilay in 1:nlay
-        compute_optical_props_kernel!(op, as, ilay, gcol, sf)
-    end
-    return nothing
-end
-
-"""
-    compute_optical_props!(
-        op::AbstractOpticalProps,
-        as::GrayAtmosphericState{FT},
-        gcol::Int,
-        igpt::Int = 1,
-    ) where {FT<:AbstractFloat}
-
-Computes optical properties for the shortwave gray radiation problem.
-"""
-function compute_optical_props!(
-    op::AbstractOpticalProps,
-    as::GrayAtmosphericState{FT},
-    gcol::Int,
-    igpt::Int = 1,
-    lkp::Union{AbstractLookUp, Nothing} = nothing,
-    lkp_cld::Union{AbstractLookUp, Nothing} = nothing,
-) where {FT <: AbstractFloat}
-    nlay = as.nlay
-    @inbounds for ilay in 1:nlay
-        compute_optical_props_kernel!(op, as, ilay, gcol)
     end
     return nothing
 end

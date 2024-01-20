@@ -2,117 +2,125 @@
 # Calculate optical properties for gray radiation solver.
 
 """
-    compute_optical_props_kernel!(
+    compute_optical_props!(
         op::AbstractOpticalProps,
-        as::GrayAtmosphericState{FT},
-        glay, gcol,
-        source::AbstractSourceLW{FT},
-    ) where {FT<:AbstractFloat}
+        as::GrayAtmosphericState,
+        sf::AbstractSourceLW,
+        gcol::Int,
+    )
 
-This function computes the optical properties using the gray atmosphere assumption
-for the longwave solver.
+Computes optical properties for the longwave gray radiation problem.
 """
-function compute_optical_props_kernel!(
-    op::AbstractOpticalProps,
-    as::GrayAtmosphericState{FT},
-    glay,
-    gcol,
-    source::AbstractSourceLW{FT},
-) where {FT <: AbstractFloat}
+function compute_optical_props!(op::OneScalar, as::GrayAtmosphericState, sf::SourceLWNoScat, gcol::Int)
+    (; p_lay, p_lev, t_lay, t_lev, otp, nlay) = as
+    (; lay_source, lev_source_inc, lev_source_dec, sfc_source) = sf
+    τ = op.τ
+    FT = eltype(τ)
+    sbc = FT(RP.Stefan(sf.param_set))
+    @inbounds begin
+        lat = as.lat[gcol]
+        p0 = p_lev[1, gcol]
+        p_lev_glay = p_lev[1, gcol]
+        t_lev_dec = t_lev[1, gcol]
+        t_sfc = as.t_sfc[gcol]
+        sfc_source[gcol] = sbc * t_sfc^FT(4) / FT(π)   # computing sfc_source
 
-    compute_optical_props_kernel_lw!(op, as, glay, gcol)     # computing optical thickness
-    compute_sources_gray_kernel!(source, as, glay, gcol) # computing Planck sources
+        for glay in 1:nlay
+            # compute optical thickness
+            p_lev_glayplus1 = p_lev[glay + 1, gcol]
+            Δp = p_lev_glayplus1 - p_lev_glay
+            p = p_lay[glay, gcol]
+            τ[glay, gcol] = compute_gray_optical_thickness_lw(otp, p0, Δp, p, lat)
+            p_lev_glay = p_lev_glayplus1
+            # compute longwave source terms
+            t_lev_inc = t_lev[glay + 1, gcol]
+            lay_source[glay, gcol] = sbc * t_lay[glay, gcol]^FT(4) / FT(π)   # computing lay_source
+            lev_source_inc[glay, gcol] = sbc * t_lev_inc^FT(4) / FT(π)
+            lev_source_dec[glay, gcol] = sbc * t_lev_dec^FT(4) / FT(π)
+            t_lev_dec = t_lev_inc
+        end
+    end
     return nothing
 end
 
+function compute_optical_props!(op::TwoStream, as::GrayAtmosphericState, sf::SourceLW2Str, gcol::Int)
+    (; p_lay, p_lev, t_lay, t_lev, otp, nlay) = as
+    (; τ, ssa, g) = op
+    (; lev_source, sfc_source) = sf
+    FT = eltype(τ)
+    sbc = FT(RP.Stefan(sf.param_set))
+    @inbounds begin
+        lat = as.lat[gcol]
+        p0 = p_lev[1, gcol]
+        p_lev_glay = p_lev[1, gcol]
+        t_lev_dec = t_lev[1, gcol]
+        t_sfc = as.t_sfc[gcol]
+        sfc_source[gcol] = sbc * t_sfc^FT(4) / FT(π)   # computing sfc_source
+        lev_src_inc_prev = FT(0)
+        lev_src_dec_prev = FT(0)
+        for glay in 1:nlay
+            p_lev_glayplus1 = p_lev[glay + 1, gcol]
+            Δp = p_lev_glayplus1 - p_lev_glay
+            p = p_lay[glay, gcol]
+            τ[glay, gcol] = compute_gray_optical_thickness_lw(otp, p0, Δp, p, lat)
+            p_lev_glay = p_lev_glayplus1
+            # compute longwave source terms
+            t_lev_inc = t_lev[glay + 1, gcol]
+            lev_src_inc = sbc * t_lev_inc^FT(4) / FT(π)
+            lev_src_dec = sbc * t_lev_dec^FT(4) / FT(π)
+            if glay == 1
+                lev_source[glay, gcol] = lev_src_dec
+            else
+                lev_source[glay, gcol] = sqrt(lev_src_inc_prev * lev_src_dec)
+            end
+            lev_src_dec_prev = lev_src_dec
+            lev_src_inc_prev = lev_src_inc
+            t_lev_dec = t_lev_inc
+        end
+        lev_source[nlay + 1, gcol] = lev_src_inc_prev
+    end
+    zeroval = zero(FT)
+    map!(x -> zeroval, view(ssa, :, gcol), view(ssa, :, gcol))
+    map!(x -> zeroval, view(g, :, gcol), view(g, :, gcol))
+    return nothing
+end
+
+
 """
-    compute_optical_props_kernel!(
+    compute_optical_props!(
         op::AbstractOpticalProps,
-        as::GrayAtmosphericState{FT},
-        glay, gcol,
-    ) where {FT<:AbstractFloat}
+        as::GrayAtmosphericState,
+        gcol::Int,
+    )
 
-
-This function computes the optical properties using the gray atmosphere assumption
-for the longwave solver.
+Computes optical properties for the shortwave gray radiation problem.
 """
-function compute_optical_props_kernel_lw!(
-    op::AbstractOpticalProps,
-    as::GrayAtmosphericState{FT},
-    glay,
-    gcol,
-) where {FT <: AbstractFloat}
-    # setting references
-    (; p_lay, p_lev, otp, lat) = as
-    @inbounds p0 = p_lev[1, gcol]
-    @inbounds Δp = p_lev[glay + 1, gcol] - p_lev[glay, gcol]
-    @inbounds p = p_lay[glay, gcol]
+function compute_optical_props!(op::AbstractOpticalProps, as::GrayAtmosphericState, gcol::Int)
+    (; p_lay, p_lev, otp, nlay) = as
+    τ = op.τ
     @inbounds lat = as.lat[gcol]
-    @inbounds op.τ[glay, gcol] = compute_gray_optical_thickness_lw(otp, glay, gcol, p0, Δp, p, lat)
-    return nothing
-end
-"""
-    compute_sources_gray_kernel!(
-        source::AbstractSourceLW{FT},
-        as::GrayAtmosphericState{FT},
-        glay, gcol,
-    ) where {FT<:AbstractFloat}
-
-This function computes the Planck sources for the gray longwave solver.
-"""
-function compute_sources_gray_kernel!(
-    source::AbstractSourceLW{FT},
-    as::GrayAtmosphericState{FT},
-    glay,
-    gcol,
-) where {FT <: AbstractFloat}
-    # computing Planck sources
-    (; t_lay, t_lev) = as
-    (; lay_source, lev_source_inc, lev_source_dec, sfc_source) = source
-
-    sbc = FT(RP.Stefan(source.param_set))
-    @inbounds lay_source[glay, gcol] = sbc * t_lay[glay, gcol]^FT(4) / FT(π)   # computing lay_source
-    @inbounds lev_source_inc[glay, gcol] = sbc * t_lev[glay + 1, gcol]^FT(4) / FT(π)
-    @inbounds lev_source_dec[glay, gcol] = sbc * t_lev[glay, gcol]^FT(4) / FT(π)
-    if glay == 1
-        @inbounds sfc_source[gcol] = sbc * as.t_sfc[gcol]^FT(4) / FT(π)   # computing sfc_source
-    end
-    return nothing
-end
-
-"""
-    compute_optical_props_kernel!(
-        op::AbstractOpticalProps,
-        as::GrayAtmosphericState{FT},
-        glay, gcol,
-    ) where {FT<:AbstractFloat}
-This function computes the optical properties using the gray atmosphere assumption
-for the shortwave solver.
-"""
-function compute_optical_props_kernel!(
-    op::AbstractOpticalProps,
-    as::GrayAtmosphericState{FT},
-    glay,
-    gcol,
-) where {FT <: AbstractFloat}
-    # setting references
-    (; p_lay, p_lev, otp) = as
     @inbounds p0 = p_lev[1, gcol]
-    @inbounds Δp = p_lev[glay + 1, gcol] - p_lev[glay, gcol]
-    @inbounds p = p_lay[glay, gcol]
-
-    @inbounds op.τ[glay, gcol] = compute_gray_optical_thickness_sw(otp, glay, gcol, p0, Δp, p)
-
+    @inbounds p_lev_glay = p_lev[1, gcol]
+    for glay in 1:nlay
+        @inbounds p_lev_glayplus1 = p_lev[glay + 1, gcol]
+        @inbounds Δp = p_lev_glayplus1 - p_lev_glay
+        @inbounds p = p_lay[glay, gcol]
+        @inbounds τ[glay, gcol] = compute_gray_optical_thickness_sw(otp, p0, Δp, p, lat)
+        p_lev_glay = p_lev_glayplus1
+    end
     if op isa TwoStream
-        op.ssa[glay, gcol] = FT(0)
-        op.g[glay, gcol] = FT(0)
+        (; ssa, g) = op
+        FT = eltype(τ)
+        zeroval = zero(FT)
+        map!(x -> zeroval, view(ssa, :, gcol), view(ssa, :, gcol))
+        map!(x -> zeroval, view(g, :, gcol), view(g, :, gcol))
     end
     return nothing
 end
+
 """
     compute_gray_optical_thickness_lw(
         params::GrayOpticalThicknessSchneider2004{FT},
-        glay, gcol,
         p0,
         Δp,
         p,
@@ -126,8 +134,6 @@ DOI: https://doi.org/10.1175/1520-0469(2004)061<1317:TTATTS>2.0.CO;2
 """
 function compute_gray_optical_thickness_lw(
     params::GrayOpticalThicknessSchneider2004{FT},
-    glay,
-    gcol,
     p0,
     Δp,
     p,
@@ -145,7 +151,6 @@ compute_gray_optical_thickness_sw(params::GrayOpticalThicknessSchneider2004{FT},
 """
     compute_gray_optical_thickness_lw(
         params::GrayOpticalThicknessOGorman2008{FT},
-        glay, gcol,
         p0,
         Δp,
         p,
@@ -157,15 +162,7 @@ and lapse rate for a gray atmosphere.
 See O'Gorman 2008, Journal of Climate Vol 21, Page(s): 3815–3832.
 DOI: https://doi.org/10.1175/2007JCLI2065.1
 """
-function compute_gray_optical_thickness_lw(
-    params::GrayOpticalThicknessOGorman2008{FT},
-    glay,
-    gcol,
-    p0,
-    Δp,
-    p,
-    lat,
-) where {FT}
+function compute_gray_optical_thickness_lw(params::GrayOpticalThicknessOGorman2008{FT}, p0, Δp, p, lat) where {FT}
     (; α, fₗ, τₑ, τₚ) = params
     σ = p / p0
 
@@ -176,7 +173,6 @@ end
 """
     compute_gray_optical_thickness_sw(
         params::GrayOpticalThicknessOGorman2008{FT},
-        glay, gcol,
         p0,
         Δp,
         p,
@@ -188,15 +184,7 @@ for a gray atmosphere.
 See O'Gorman 2008, Journal of Climate Vol 21, Page(s): 3815–3832.
 DOI: https://doi.org/10.1175/2007JCLI2065.1
 """
-function compute_gray_optical_thickness_sw(
-    params::GrayOpticalThicknessOGorman2008{FT},
-    glay,
-    gcol,
-    p0,
-    Δp,
-    p,
-    rest...,
-) where {FT}
+function compute_gray_optical_thickness_sw(params::GrayOpticalThicknessOGorman2008{FT}, p0, Δp, p, rest...) where {FT}
     (; τ₀) = params
     @inbounds τ = 2 * τ₀ * (p / p0) * (Δp / p0)
     return abs(τ)

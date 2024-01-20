@@ -126,7 +126,7 @@ function gray_atmos_lw_equil(context, ::Type{OPC}, ::Type{FT}; exfiltrate = fals
     @test maximum(t_error) < temp_toler
     if device isa ClimaComms.CPUSingleThreaded
         JET.@test_opt solve_lw!(slv, max_threads)
-        @test_broken (@allocated solve_lw!(slv, max_threads)) == 0
+        @test (@allocated solve_lw!(slv, max_threads)) == 0
         @test (@allocated solve_lw!(slv, max_threads)) ≤ 128
     end
     #--------------------------------------------------------
