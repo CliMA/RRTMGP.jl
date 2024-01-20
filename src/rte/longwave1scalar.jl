@@ -1,139 +1,207 @@
-"""
-    rte_lw_solve!(
-        context,
-        flux::FluxLW{FT},
-        flux_lw::FluxLW{FT},
-        src_lw::SourceLWNoScat{FT},
-        bcs_lw::LwBCs{FT},
-        op::OneScalar,
-        major_gpt2bnd::AbstractArray{UInt8,1},
-        max_threads,
-        as::AbstractAtmosphericState{FT},
-        lookup_lw::Union{LookUpLW, Nothing} = nothing,
-        lookup_lw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
-    ) where {FT<:AbstractFloat}
-
-No scattering solver for the longwave problem.
-LW fluxes, no scattering, mu (cosine of integration angle) specified by column
-Does radiation calculation at user-supplied angles; converts radiances to flux
-using user-supplied weights. Currently, only n_gauss_angles = 1 supported.
-"""
-function rte_lw_solve!(
-    context,
-    flux::FluxLW{FT},
-    flux_lw::FluxLW{FT},
-    src_lw::SourceLWNoScat{FT},
-    bcs_lw::LwBCs{FT},
+function rte_lw_noscat_solve!(
+    device::ClimaComms.AbstractCPUDevice,
+    flux_lw::FluxLW,
+    src_lw::SourceLWNoScat,
+    bcs_lw::LwBCs,
     op::OneScalar,
-    major_gpt2bnd::AbstractArray{UInt8, 1},
     max_threads,
-    as::AbstractAtmosphericState{FT},
-    lookup_lw::Union{LookUpLW, Nothing} = nothing,
-    lookup_lw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
-) where {FT <: AbstractFloat}
+    as::GrayAtmosphericState,
+)
     (; nlay, ncol) = as
     nlev = nlay + 1
-    n_gpt = length(major_gpt2bnd)
-    device = ClimaComms.device(context)
-    if device isa ClimaComms.CUDADevice
-        tx = min(ncol, max_threads)
-        bx = cld(ncol, tx)
-        args = (flux, flux_lw, src_lw, bcs_lw, op, nlay, ncol, major_gpt2bnd, as, lookup_lw, lookup_lw_cld)
-        @cuda threads = (tx) blocks = (bx) rte_lw_noscat_solve_CUDA!(args...)
-    else
-        @inbounds begin
-            for igpt in 1:n_gpt
-                ClimaComms.@threaded device for gcol in 1:ncol
-                    igpt == 1 && set_flux_to_zero!(flux_lw, gcol)
-                    compute_optical_props!(op, as, src_lw, gcol, igpt, lookup_lw, lookup_lw_cld)
-                    rte_lw_noscat_source!(src_lw, op, gcol, nlay)
-                    rte_lw_noscat_transport!(src_lw, bcs_lw, op, gcol, flux, igpt, major_gpt2bnd, nlay, nlev)
-                    n_gpt > 1 && add_to_flux!(flux_lw, flux, gcol)
-                end
+    igpt, ibnd = 1, UInt8(1)
+    τ = op.τ
+    Ds = op.angle_disc.gauss_Ds
+    (; flux_up, flux_dn, flux_net) = flux_lw
+    @inbounds begin
+        ClimaComms.@threaded device for gcol in 1:ncol
+            compute_optical_props!(op, as, src_lw, gcol)
+            rte_lw_noscat!(src_lw, bcs_lw, op, gcol, flux_lw, igpt, ibnd, nlay, nlev)
+            for ilev in 1:nlev
+                flux_net[ilev, gcol] = flux_up[ilev, gcol] - flux_dn[ilev, gcol]
             end
         end
     end
     return nothing
 end
 
+function rte_lw_noscat_solve!(
+    device::ClimaComms.CUDADevice,
+    flux_lw::FluxLW,
+    src_lw::SourceLWNoScat,
+    bcs_lw::LwBCs,
+    op::OneScalar,
+    max_threads,
+    as::GrayAtmosphericState,
+)
+    (; nlay, ncol) = as
+    nlev = nlay + 1
+    tx = min(ncol, max_threads)
+    bx = cld(ncol, tx)
+    args = (flux_lw, src_lw, bcs_lw, op, nlay, ncol, as)
+    @cuda threads = (tx) blocks = (bx) rte_lw_noscat_solve_CUDA!(args...)
+    return nothing
+end
+
 function rte_lw_noscat_solve_CUDA!(
-    flux::FluxLW{FT},
-    flux_lw::FluxLW{FT},
-    src_lw::SourceLWNoScat{FT},
-    bcs_lw::LwBCs{FT},
+    flux_lw::FluxLW,
+    src_lw::SourceLWNoScat,
+    bcs_lw::LwBCs,
     op::OneScalar,
     nlay,
     ncol,
-    major_gpt2bnd,
-    as::AbstractAtmosphericState{FT},
-    lookup_lw::Union{LookUpLW, Nothing} = nothing,
-    lookup_lw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
-) where {FT <: AbstractFloat}
+    as::GrayAtmosphericState,
+)
     gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
     nlev = nlay + 1
-    n_gpt = length(major_gpt2bnd)
+    igpt, ibnd = 1, UInt8(1)
+    τ = op.τ
+    Ds = op.angle_disc.gauss_Ds
+    (; flux_up, flux_dn, flux_net) = flux_lw
     if gcol ≤ ncol
+        compute_optical_props!(op, as, src_lw, gcol)
+        rte_lw_noscat!(src_lw, bcs_lw, op, gcol, flux_lw, igpt, ibnd, nlay, nlev)
+        @inbounds for ilev in 1:nlev
+            flux_net[ilev, gcol] = flux_up[ilev, gcol] - flux_dn[ilev, gcol]
+        end
+    end
+    return nothing
+end
+
+function rte_lw_noscat_solve!(
+    device::ClimaComms.AbstractCPUDevice,
+    flux::FluxLW,
+    flux_lw::FluxLW,
+    src_lw::SourceLWNoScat,
+    bcs_lw::LwBCs,
+    op::OneScalar,
+    max_threads,
+    as::AtmosphericState,
+    lookup_lw::LookUpLW,
+    lookup_lw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
+)
+    (; nlay, ncol) = as
+    nlev = nlay + 1
+    (; major_gpt2bnd) = lookup_lw
+    n_gpt = length(major_gpt2bnd)
+    τ = op.τ
+    Ds = op.angle_disc.gauss_Ds
+    flux_up_lw = flux_lw.flux_up
+    flux_dn_lw = flux_lw.flux_dn
+    flux_net_lw = flux_lw.flux_net
+    @inbounds begin
+        for igpt in 1:n_gpt
+            ClimaComms.@threaded device for gcol in 1:ncol
+                ibnd = major_gpt2bnd[igpt]
+                igpt == 1 && set_flux_to_zero!(flux_lw, gcol)
+                compute_optical_props!(op, as, src_lw, gcol, igpt, lookup_lw, lookup_lw_cld)
+                rte_lw_noscat!(src_lw, bcs_lw, op, gcol, flux, igpt, ibnd, nlay, nlev)
+                add_to_flux!(flux_lw, flux, gcol)
+            end
+        end
+        ClimaComms.@threaded device for gcol in 1:ncol
+            for ilev in 1:nlev
+                flux_net_lw[ilev, gcol] = flux_up_lw[ilev, gcol] - flux_dn_lw[ilev, gcol]
+            end
+        end
+    end
+    return nothing
+end
+
+function rte_lw_noscat_solve!(
+    device::ClimaComms.CUDADevice,
+    flux::FluxLW,
+    flux_lw::FluxLW,
+    src_lw::SourceLWNoScat,
+    bcs_lw::LwBCs,
+    op::OneScalar,
+    max_threads,
+    as::AtmosphericState,
+    lookup_lw::LookUpLW,
+    lookup_lw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
+)
+    (; nlay, ncol) = as
+    nlev = nlay + 1
+    tx = min(ncol, max_threads)
+    bx = cld(ncol, tx)
+    args = (flux, flux_lw, src_lw, bcs_lw, op, nlay, ncol, as, lookup_lw, lookup_lw_cld)
+    @cuda threads = (tx) blocks = (bx) rte_lw_noscat_solve_CUDA!(args...)
+    return nothing
+end
+
+function rte_lw_noscat_solve_CUDA!(
+    flux::FluxLW,
+    flux_lw::FluxLW,
+    src_lw::SourceLWNoScat,
+    bcs_lw::LwBCs,
+    op::OneScalar,
+    nlay,
+    ncol,
+    as::AtmosphericState,
+    lookup_lw::LookUpLW,
+    lookup_lw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
+)
+    gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
+    nlev = nlay + 1
+    (; major_gpt2bnd) = lookup_lw
+    n_gpt = length(major_gpt2bnd)
+    τ = op.τ
+    Ds = op.angle_disc.gauss_Ds
+    if gcol ≤ ncol
+        flux_up_lw = flux_lw.flux_up
+        flux_dn_lw = flux_lw.flux_dn
+        flux_net_lw = flux_lw.flux_net
         @inbounds for igpt in 1:n_gpt
+            ibnd = major_gpt2bnd[igpt]
             igpt == 1 && set_flux_to_zero!(flux_lw, gcol)
             compute_optical_props!(op, as, src_lw, gcol, igpt, lookup_lw, lookup_lw_cld)
-            rte_lw_noscat_source!(src_lw, op, gcol, nlay)
-            rte_lw_noscat_transport!(src_lw, bcs_lw, op, gcol, flux, igpt, major_gpt2bnd, nlay, nlev)
-            n_gpt > 1 && add_to_flux!(flux_lw, flux, gcol)
+            rte_lw_noscat!(src_lw, bcs_lw, op, gcol, flux, igpt, ibnd, nlay, nlev)
+            add_to_flux!(flux_lw, flux, gcol)
+        end
+        @inbounds begin
+            for ilev in 1:nlev
+                flux_net_lw[ilev, gcol] = flux_up_lw[ilev, gcol] - flux_dn_lw[ilev, gcol]
+            end
         end
     end
     return nothing
 end
 
 """
-    rte_lw_noscat_source!(
-        src_lw::SourceLWNoScat{FT},
-        op::OneScalar,
-        gcol,
-        nlay,
-    ) where {FT<:AbstractFloat}
+    lw_noscat_source_up(lev_source_inc::FT, lay_source::FT, τ_loc::FT, trans::FT, τ_thresh) where {FT}
 
-Compute LW source function for upward and downward emission at levels using linear-in-tau assumption
+Compute LW source function for upward emission at levels using linear-in-tau assumption
 See Clough et al., 1992, doi: 10.1029/92JD01419, Eq 13
 """
-function rte_lw_noscat_source!(src_lw::SourceLWNoScat{FT}, op::OneScalar, gcol, nlay) where {FT <: AbstractFloat}
-    # setting references
-    (; src_up, src_dn, lev_source_inc, lev_source_dec, lay_source) = src_lw
-    Ds = op.angle_disc.gauss_Ds
-    τ = op.τ
-
-    τ_thresh = 100 * eps(FT)
-
-    @inbounds for glay in 1:nlay
-        τ_loc = τ[glay, gcol] * Ds[1] # Optical path and transmission,
-
-        trans = exp(-τ_loc)    # used in source function and transport calculations
-        # Weighting factor. Use 2nd order series expansion when rounding error (~tau^2)
-        # is of order epsilon (smallest difference from 1. in working precision)
-        # Thanks to Peter Blossey
-        # Updated to 3rd order series and lower threshold based on suggestion from Dmitry Alexeev (Nvidia)
-
-        fact =
-            (τ_loc > τ_thresh) ? ((FT(1) - trans) / τ_loc - trans) :
-            τ_loc * (FT(1 / 2) + τ_loc * (-FT(1 / 3) + τ_loc * FT(1 / 8)))
-
-        # Equations below are developed in Clough et al., 1992, doi:10.1029/92JD01419, Eq 13
-        src_up[glay, gcol] =
-            (FT(1) - trans) * lev_source_inc[glay, gcol] +
-            FT(2) * fact * (lay_source[glay, gcol] - lev_source_inc[glay, gcol])
-
-        src_dn[glay, gcol] =
-            (FT(1) - trans) * lev_source_dec[glay, gcol] +
-            FT(2) * fact * (lay_source[glay, gcol] - lev_source_dec[glay, gcol])
-    end
+@inline function lw_noscat_source_up(lev_source_inc::FT, lay_source::FT, τ_loc::FT, trans::FT, τ_thresh) where {FT}
+    fact =
+        (τ_loc > τ_thresh) ? ((FT(1) - trans) / τ_loc - trans) :
+        τ_loc * (FT(1 / 2) + τ_loc * (-FT(1 / 3) + τ_loc * FT(1 / 8)))
+    # Equations below are developed in Clough et al., 1992, doi:10.1029/92JD01419, Eq 13
+    return (FT(1) - trans) * lev_source_inc + FT(2) * fact * (lay_source - lev_source_inc)
 end
 
 """
-    rte_lw_noscat_transport!(
+    lw_noscat_source_dn(lev_source_dec::FT, lay_source::FT, τ_loc::FT, trans::FT, τ_thresh) where {FT}
+
+Compute LW source function for downward emission at levels using linear-in-tau assumption
+See Clough et al., 1992, doi: 10.1029/92JD01419, Eq 13
+"""
+@inline function lw_noscat_source_dn(lev_source_dec::FT, lay_source::FT, τ_loc::FT, trans::FT, τ_thresh) where {FT}
+    fact =
+        (τ_loc > τ_thresh) ? ((FT(1) - trans) / τ_loc - trans) :
+        τ_loc * (FT(1 / 2) + τ_loc * (-FT(1 / 3) + τ_loc * FT(1 / 8)))
+    # Equations below are developed in Clough et al., 1992, doi:10.1029/92JD01419, Eq 13
+    return (FT(1) - trans) * lev_source_dec + FT(2) * fact * (lay_source - lev_source_dec)
+end
+
+"""
+    rte_lw_noscat!(
         src_lw::SourceLWNoScat{FT},
         bcs_lw::LwBCs{FT},
-        op::OneScalar,
+        op::OneScalar{FT},
         gcol,
-        flux::FluxLW{FT},
+        flux::FluxLW,
         igpt,
         ibnd,
         nlay,
@@ -142,20 +210,20 @@ end
 
 Transport for no-scattering longwave problem.
 """
-function rte_lw_noscat_transport!(
-    src_lw::SourceLWNoScat{FT},
-    bcs_lw::LwBCs{FT},
+@inline function rte_lw_noscat!(
+    src_lw::SourceLWNoScat,
+    bcs_lw::LwBCs,
     op::OneScalar,
     gcol,
-    flux::FluxLW{FT},
+    flux::FluxLW,
     igpt,
-    major_gpt2bnd::AbstractArray{UInt8, 1},
+    ibnd,
     nlay,
     nlev,
-) where {FT <: AbstractFloat}
-    ibnd = major_gpt2bnd[igpt]
+)
     # setting references
-    (; src_up, src_dn, sfc_source) = src_lw
+    (; sfc_source) = src_lw
+    (; lay_source, lev_source_inc, lev_source_dec) = src_lw
     (; sfc_emis, inc_flux) = bcs_lw
     (; flux_up, flux_dn, flux_net) = flux
 
@@ -163,39 +231,46 @@ function rte_lw_noscat_transport!(
     w_μ = op.angle_disc.gauss_wts
     n_μ = op.angle_disc.n_gauss_angles
     τ = op.τ
+    FT = eltype(τ)
+    τ_thresh = 100 * eps(FT) # or abs(eps(FT))?
 
-    @inbounds for ilev in 1:nlev
-        flux_dn[ilev, gcol] = FT(0)
-        flux_up[ilev, gcol] = FT(0)
-    end
+    intensity_to_flux = FT(2) * FT(π) * w_μ[1]
+    flux_to_intensity = FT(1) / intensity_to_flux
 
-    if inc_flux ≠ nothing
-        @inbounds flux_dn[nlev, gcol] = inc_flux[gcol, igpt]
-    end
     # Transport is for intensity
     #   convert flux at top of domain to intensity assuming azimuthal isotropy
-    @inbounds flux_dn[nlev, gcol] /= (FT(2) * FT(π) * w_μ[1])
+    intensity_dn_ilevplus1 = isnothing(inc_flux) ? FT(0) : inc_flux[gcol, igpt] * flux_to_intensity
+    @inbounds flux_dn[nlev, gcol] = intensity_dn_ilevplus1 * intensity_to_flux
 
     # Top of domain is index nlev
     # Downward propagation
     @inbounds for ilev in nlay:-1:1
-        trans = exp(-τ[ilev, gcol] * Ds[1])
-        flux_dn[ilev, gcol] = trans * flux_dn[ilev + 1, gcol] + src_dn[ilev, gcol]
+        τ_loc = τ[ilev, gcol] * Ds[1]
+        trans = exp(-τ_loc)
+        lay_src = lay_source[ilev, gcol]
+        lev_src_dec = lev_source_dec[ilev, gcol]
+        intensity_dn_ilev =
+            trans * intensity_dn_ilevplus1 + lw_noscat_source_dn(lev_src_dec, lay_src, τ_loc, trans, τ_thresh)
+        intensity_dn_ilevplus1 = intensity_dn_ilev
+        flux_dn[ilev, gcol] = intensity_dn_ilev * intensity_to_flux
     end
 
     # Surface reflection and emission
-    @inbounds flux_up[1, gcol] =
-        flux_dn[1, gcol] * (FT(1) - sfc_emis[ibnd, gcol]) + sfc_emis[ibnd, gcol] * sfc_source[gcol]
+    @inbounds intensity_up_ilevminus1 =
+        intensity_dn_ilevplus1 * (FT(1) - sfc_emis[ibnd, gcol]) + sfc_emis[ibnd, gcol] * sfc_source[gcol]
+    #flux_dn[1, gcol] * (FT(1) - sfc_emis[ibnd, gcol]) + sfc_emis[ibnd, gcol] * sfc_source[gcol]
+    @inbounds flux_up[1, gcol] = intensity_up_ilevminus1 * intensity_to_flux
 
     # Upward propagation
     @inbounds for ilev in 2:(nlay + 1)
-        trans = exp(-τ[ilev - 1, gcol] * Ds[1])
-        flux_up[ilev, gcol] = trans * flux_up[ilev - 1, gcol] + src_up[ilev - 1, gcol]
+        τ_loc = τ[ilev - 1, gcol] * Ds[1]
+        trans = exp(-τ_loc)
+        lay_src = lay_source[ilev - 1, gcol]
+        lev_src_inc = lev_source_inc[ilev - 1, gcol]
+        intensity_up_ilev =
+            trans * intensity_up_ilevminus1 + lw_noscat_source_up(lev_src_inc, lay_src, τ_loc, trans, τ_thresh)
+        intensity_up_ilevminus1 = intensity_up_ilev
+        flux_up[ilev, gcol] = intensity_up_ilev * intensity_to_flux
     end
-
-    @inbounds for ilev in 1:nlev
-        flux_up[ilev, gcol] *= (FT(2) * FT(π) * w_μ[1])
-        flux_dn[ilev, gcol] *= (FT(2) * FT(π) * w_μ[1])
-        flux_net[ilev, gcol] = flux_up[ilev, gcol] - flux_dn[ilev, gcol]
-    end
+    return nothing
 end

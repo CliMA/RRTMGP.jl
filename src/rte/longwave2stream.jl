@@ -1,134 +1,202 @@
-"""
-    rte_lw_solve!(
-        context,
-        flux::FluxLW{FT},
-        flux_lw::FluxLW{FT},
-        src_lw::SourceLW2Str{FT},
-        bcs_lw::LwBCs{FT},
-        op::TwoStream,
-        major_gpt2bnd::AbstractArray{UInt8,1},
-        max_threads,
-        as::AbstractAtmosphericState{FT},
-        lookup_lw::Union{LookUpLW, Nothing} = nothing,
-        lookup_lw_cld::Union{LookUpCld, Nothing} = nothing,
-    ) where {FT<:AbstractFloat}
 
-Two stream solver for the longwave problem.
 
-RRTMGP provides source functions at each level using the spectral mapping
-of each adjacent layer. Combine these for two-stream calculations
-lw combine sources (rte_lw_2stream_combine_sources!)
-combine RRTMGP-specific sources at levels
-compute layer reflectance, transmittance
-compute total source function at levels using linear-in-tau (rte_lw_2stream_source!)
-transport (adding_lw!)
-"""
-function rte_lw_solve!(
-    context,
-    flux::FluxLW{FT},
-    flux_lw::FluxLW{FT},
-    src_lw::SourceLW2Str{FT},
-    bcs_lw::LwBCs{FT},
+function rte_lw_2stream_solve!(
+    device::ClimaComms.AbstractCPUDevice,
+    flux_lw::FluxLW,
+    src_lw::SourceLW2Str,
+    bcs_lw::LwBCs,
     op::TwoStream,
-    major_gpt2bnd::AbstractArray{UInt8, 1},
     max_threads,
-    as::AbstractAtmosphericState{FT},
-    lookup_lw::Union{LookUpLW, Nothing} = nothing,
-    lookup_lw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
-) where {FT <: AbstractFloat}
+    as::GrayAtmosphericState,
+)
     (; nlay, ncol) = as
     nlev = nlay + 1
-    n_gpt = length(major_gpt2bnd)
-    device = ClimaComms.device(context)
-    if device isa ClimaComms.CUDADevice
-        tx = min(ncol, max_threads)
-        bx = cld(ncol, tx)
-        args = (flux, flux_lw, src_lw, bcs_lw, op, nlay, ncol, major_gpt2bnd, as, lookup_lw, lookup_lw_cld)
-        @cuda threads = (tx) blocks = (bx) rte_lw_2stream_solve_CUDA!(args...)
-    else
-        bld_cld_mask = as isa AtmosphericState && as.cld_mask_type isa AbstractCloudMask
-        @inbounds begin
-            for igpt in 1:n_gpt
-                ClimaComms.@threaded device for gcol in 1:ncol
-                    igpt == 1 && set_flux_to_zero!(flux_lw, gcol)
-                    bld_cld_mask && Optics.build_cloud_mask!(
-                        view(as.cld_mask_lw, :, gcol),
-                        view(as.cld_frac, :, gcol),
-                        as.cld_mask_type,
-                    )
-                    compute_optical_props!(op, as, src_lw, gcol, igpt, lookup_lw, lookup_lw_cld)
-                    rte_lw_2stream_combine_sources!(src_lw, gcol, nlev, ncol)
-                    rte_lw_2stream_source!(op, src_lw, gcol, nlay, ncol)
-                    adding_lw!(flux, src_lw, bcs_lw, gcol, igpt, major_gpt2bnd, nlev, ncol)
-                    n_gpt > 1 && add_to_flux!(flux_lw, flux, gcol)
-                end
+    igpt, ibnd = 1, UInt8(1)
+    (; flux_up, flux_dn, flux_net) = flux_lw
+    @inbounds begin
+        ClimaComms.@threaded device for gcol in 1:ncol
+            compute_optical_props!(op, as, src_lw, gcol)
+            rte_lw_2stream!(op, flux_lw, src_lw, bcs_lw, gcol, igpt, ibnd, nlev, ncol)
+            for ilev in 1:nlev
+                flux_net[ilev, gcol] = flux_up[ilev, gcol] - flux_dn[ilev, gcol]
             end
         end
     end
+    return nothing
+end
+
+function rte_lw_2stream_solve!(
+    device::ClimaComms.CUDADevice,
+    flux_lw::FluxLW,
+    src_lw::SourceLW2Str,
+    bcs_lw::LwBCs,
+    op::TwoStream,
+    max_threads,
+    as::GrayAtmosphericState,
+)
+    (; nlay, ncol) = as
+    nlev = nlay + 1
+    tx = min(ncol, max_threads)
+    bx = cld(ncol, tx)
+    args = (flux_lw, src_lw, bcs_lw, op, nlay, ncol, as)
+    @cuda threads = (tx) blocks = (bx) rte_lw_2stream_solve_CUDA!(args...)
     return nothing
 end
 
 function rte_lw_2stream_solve_CUDA!(
-    flux::FluxLW{FT},
-    flux_lw::FluxLW{FT},
-    src_lw::SourceLW2Str{FT},
-    bcs_lw::LwBCs{FT},
+    flux_lw::FluxLW,
+    src_lw::SourceLW2Str,
+    bcs_lw::LwBCs,
     op::TwoStream,
     nlay,
     ncol,
-    major_gpt2bnd::AbstractArray{UInt8, 1},
-    as::AbstractAtmosphericState{FT},
-    lookup_lw::Union{LookUpLW, Nothing} = nothing,
-    lookup_lw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
-) where {FT <: AbstractFloat}
+    as::GrayAtmosphericState,
+)
     gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
     nlev = nlay + 1
-    n_gpt = length(major_gpt2bnd)
+    igpt, ibnd = 1, UInt8(1)
     if gcol ≤ ncol
-        @inbounds for igpt in 1:n_gpt
-            igpt == 1 && set_flux_to_zero!(flux_lw, gcol)
-            if as isa AtmosphericState && as.cld_mask_type isa AbstractCloudMask
-                Optics.build_cloud_mask!(view(as.cld_mask_lw, :, gcol), view(as.cld_frac, :, gcol), as.cld_mask_type)
+        (; flux_up, flux_dn, flux_net) = flux_lw
+        compute_optical_props!(op, as, src_lw, gcol)
+        rte_lw_2stream!(op, flux_lw, src_lw, bcs_lw, gcol, igpt, ibnd, nlev, ncol)
+        @inbounds begin
+            for ilev in 1:nlev
+                flux_net[ilev, gcol] = flux_up[ilev, gcol] - flux_dn[ilev, gcol]
             end
-            compute_optical_props!(op, as, src_lw, gcol, igpt, lookup_lw, lookup_lw_cld)
-            rte_lw_2stream_combine_sources!(src_lw, gcol, nlev, ncol)
-            rte_lw_2stream_source!(op, src_lw, gcol, nlay, ncol)
-            adding_lw!(flux, src_lw, bcs_lw, gcol, igpt, major_gpt2bnd, nlev, ncol)
-            n_gpt > 1 && add_to_flux!(flux_lw, flux, gcol)
         end
     end
     return nothing
 end
 
-
-"""
-    rte_lw_2stream_combine_sources!(src::SourceLW2Str, gcol, nlev, ncol)
-
-RRTMGP provides source functions at each level using the spectral mapping
-of each adjacent layer. This function combines these for two-stream calculations.
-"""
-function rte_lw_2stream_combine_sources!(src::SourceLW2Str, gcol, nlev, ncol)
-    @inbounds src.lev_source[1, gcol] = src.lev_source_dec[1, gcol] # glev == 1
-    @inbounds src.lev_source[nlev, gcol] = src.lev_source_inc[nlev - 1, gcol] # glev == nlev
-    @inbounds for glev in 2:(nlev - 1)
-        src.lev_source[glev, gcol] = sqrt(src.lev_source_dec[glev, gcol] * src.lev_source_inc[glev - 1, gcol])
+function rte_lw_2stream_solve!(
+    device::ClimaComms.AbstractCPUDevice,
+    flux::FluxLW,
+    flux_lw::FluxLW,
+    src_lw::SourceLW2Str,
+    bcs_lw::LwBCs,
+    op::TwoStream,
+    max_threads,
+    as::AtmosphericState,
+    lookup_lw::LookUpLW,
+    lookup_lw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
+)
+    (; nlay, ncol) = as
+    nlev = nlay + 1
+    (; major_gpt2bnd) = lookup_lw
+    n_gpt = length(major_gpt2bnd)
+    bld_cld_mask = as isa AtmosphericState && as.cld_mask_type isa AbstractCloudMask
+    flux_up_lw = flux_lw.flux_up
+    flux_dn_lw = flux_lw.flux_dn
+    flux_net_lw = flux_lw.flux_net
+    (; flux_up, flux_dn) = flux
+    @inbounds begin
+        for igpt in 1:n_gpt
+            ClimaComms.@threaded device for gcol in 1:ncol
+                ibnd = major_gpt2bnd[igpt]
+                bld_cld_mask && Optics.build_cloud_mask!(
+                    view(as.cld_mask_lw, :, gcol),
+                    view(as.cld_frac, :, gcol),
+                    as.cld_mask_type,
+                )
+                compute_optical_props!(op, as, src_lw, gcol, igpt, lookup_lw, lookup_lw_cld)
+                rte_lw_2stream!(op, flux, src_lw, bcs_lw, gcol, igpt, ibnd, nlev, ncol)
+                if igpt == 1
+                    map!(x -> x, view(flux_up_lw, :, gcol), view(flux_up, :, gcol))
+                    map!(x -> x, view(flux_dn_lw, :, gcol), view(flux_dn, :, gcol))
+                else
+                    for ilev in 1:nlev
+                        @inbounds flux_up_lw[ilev, gcol] += flux_up[ilev, gcol]
+                        @inbounds flux_dn_lw[ilev, gcol] += flux_dn[ilev, gcol]
+                    end
+                end
+            end
+        end
+        ClimaComms.@threaded device for gcol in 1:ncol
+            for ilev in 1:nlev
+                flux_net_lw[ilev, gcol] = flux_up_lw[ilev, gcol] - flux_dn_lw[ilev, gcol]
+            end
+        end
     end
+    return nothing
+end
+
+function rte_lw_2stream_solve!(
+    device::ClimaComms.CUDADevice,
+    flux::FluxLW,
+    flux_lw::FluxLW,
+    src_lw::SourceLW2Str,
+    bcs_lw::LwBCs,
+    op::TwoStream,
+    max_threads,
+    as::AtmosphericState,
+    lookup_lw::LookUpLW,
+    lookup_lw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
+)
+    (; nlay, ncol) = as
+    nlev = nlay + 1
+    tx = min(ncol, max_threads)
+    bx = cld(ncol, tx)
+    args = (flux, flux_lw, src_lw, bcs_lw, op, nlay, ncol, as, lookup_lw, lookup_lw_cld)
+    @cuda threads = (tx) blocks = (bx) rte_lw_2stream_solve_CUDA!(args...)
+    return nothing
+end
+
+function rte_lw_2stream_solve_CUDA!(
+    flux::FluxLW,
+    flux_lw::FluxLW,
+    src_lw::SourceLW2Str,
+    bcs_lw::LwBCs,
+    op::TwoStream,
+    nlay,
+    ncol,
+    as::AtmosphericState,
+    lookup_lw::LookUpLW,
+    lookup_lw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
+)
+    gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
+    nlev = nlay + 1
+    (; major_gpt2bnd) = lookup_lw
+    n_gpt = length(major_gpt2bnd)
+    if gcol ≤ ncol
+        flux_up_lw = flux_lw.flux_up
+        flux_dn_lw = flux_lw.flux_dn
+        flux_net_lw = flux_lw.flux_net
+        (; flux_up, flux_dn) = flux
+        @inbounds for igpt in 1:n_gpt
+            ibnd = major_gpt2bnd[igpt]
+            if as isa AtmosphericState && as.cld_mask_type isa AbstractCloudMask
+                Optics.build_cloud_mask!(view(as.cld_mask_lw, :, gcol), view(as.cld_frac, :, gcol), as.cld_mask_type)
+            end
+            compute_optical_props!(op, as, src_lw, gcol, igpt, lookup_lw, lookup_lw_cld)
+            rte_lw_2stream!(op, flux, src_lw, bcs_lw, gcol, igpt, ibnd, nlev, ncol)
+            if igpt == 1
+                map!(x -> x, view(flux_up_lw, :, gcol), view(flux_up, :, gcol))
+                map!(x -> x, view(flux_dn_lw, :, gcol), view(flux_dn, :, gcol))
+            else
+                for ilev in 1:nlev
+                    @inbounds flux_up_lw[ilev, gcol] += flux_up[ilev, gcol]
+                    @inbounds flux_dn_lw[ilev, gcol] += flux_dn[ilev, gcol]
+                end
+            end
+        end
+        @inbounds begin
+            for ilev in 1:nlev
+                flux_net_lw[ilev, gcol] = flux_up_lw[ilev, gcol] - flux_dn_lw[ilev, gcol]
+            end
+        end
+    end
+    return nothing
 end
 
 """
-    rte_lw_2stream_source!(
-        op::TwoStream,
-        src_lw::SourceLW2Str{FT},
-        gcol,
-        nlay,
-        ncol,
-    ) where {FT<:AbstractFloat}
+    lw_2stream_coeffs(τ::FT, ssa::FT, g::FT, lev_src_bot::FT, lev_src_top::FT) where {FT}
 
 This function combines RRTMGP-specific sources at levels,
 computes layer reflectance, transmittance, and
 total source function at levels using linear-in-tau approximation.
 """
-function rte_lw_2stream_source!(op::TwoStream, src_lw::SourceLW2Str{FT}, gcol, nlay, ncol) where {FT <: AbstractFloat}
+@inline function lw_2stream_coeffs(τ, ssa, g, lev_src_bot, lev_src_top)
+    FT = eltype(τ)
     # Cell properties: reflection, transmission for diffuse radiation
     # Coupling coefficients needed for source function
     # -------------------------------------------------------------------------------------------------
@@ -141,131 +209,133 @@ function rte_lw_2stream_source!(op::TwoStream, src_lw::SourceLW2Str{FT}, gcol, n
     #
     # -------------------------------------------------------------------------------------------------    
     # setting references
-    (; τ, ssa, g) = op
-    (; Rdif, Tdif, lev_source, src_up, src_dn) = src_lw
     #k_min = FT === Float64 ? FT(1e-12) : FT(1e-4) used in RRTMGP-RTE FORTRAN code
     k_min = sqrt(eps(FT)) #FT(1e4 * eps(FT))
     lw_diff_sec = FT(1.66)
     τ_thresh = 100 * eps(FT)# tau(icol,ilay) > 1.0e-8_wp used in rte-rrtmgp
     # this is chosen to prevent catastrophic cancellation in src_up and src_dn calculation
 
-    @inbounds for glay in 1:nlay
-        γ1 = lw_diff_sec * (1 - FT(0.5) * ssa[glay, gcol] * (1 + g[glay, gcol]))
-        γ2 = lw_diff_sec * FT(0.5) * ssa[glay, gcol] * (1 - g[glay, gcol])
-        k = sqrt(max((γ1 + γ2) * (γ1 - γ2), k_min))
-        τ_lay = τ[glay, gcol]
+    γ1 = lw_diff_sec * (1 - FT(0.5) * ssa * (1 + g))
+    γ2 = lw_diff_sec * FT(0.5) * ssa * (1 - g)
+    k = sqrt(max((γ1 + γ2) * (γ1 - γ2), k_min))
 
-        coeff = exp(-2 * τ_lay * k)
-        # Refactored to avoid rounding errors when k, gamma1 are of very different magnitudes
-        RT_term = 1 / (k * (1 + coeff) + γ1 * (1 - coeff))
+    coeff = exp(-2 * τ * k)
+    # Refactored to avoid rounding errors when k, gamma1 are of very different magnitudes
+    RT_term = 1 / (k * (1 + coeff) + γ1 * (1 - coeff))
 
-        @inbounds Rdif[glay, gcol] = RT_term * γ2 * (1 - coeff) # Equation 25
-        @inbounds Tdif[glay, gcol] = RT_term * 2 * k * exp(-τ_lay * k) # Equation 26
+    Rdif = RT_term * γ2 * (1 - coeff) # Equation 25
+    Tdif = RT_term * 2 * k * exp(-τ * k) # Equation 26
 
-        # Source function for diffuse radiation
-        # Compute LW source function for upward and downward emission at levels using linear-in-tau assumption
-        # This version straight from ECRAD
-        # Source is provided as W/m2-str; factor of pi converts to flux units
-        # lw_source_2str
+    # Source function for diffuse radiation
+    # Compute LW source function for upward and downward emission at levels using linear-in-tau assumption
+    # This version straight from ECRAD
+    # Source is provided as W/m2-str; factor of pi converts to flux units
+    # lw_source_2str
 
-        lev_src_bot = lev_source[glay, gcol]
-        lev_src_top = lev_source[glay + 1, gcol]
-        Rdif_lay = Rdif[glay, gcol]
-        Tdif_lay = Tdif[glay, gcol]
-
-        if τ_lay > τ_thresh
-            # Toon et al. (JGR 1989) Eqs 26-27
-            Z = (lev_src_bot - lev_src_top) / (τ_lay * (γ1 + γ2))
-            Zup_top = Z + lev_src_top
-            Zup_bottom = Z + lev_src_bot
-            Zdn_top = -Z + lev_src_top
-            Zdn_bottom = -Z + lev_src_bot
-            @inbounds src_up[glay, gcol] = pi * (Zup_top - Rdif_lay * Zdn_top - Tdif_lay * Zup_bottom)
-            @inbounds src_dn[glay, gcol] = pi * (Zdn_bottom - Rdif_lay * Zup_bottom - Tdif_lay * Zdn_top)
-        else
-            @inbounds src_up[glay, gcol] = FT(0)
-            @inbounds src_dn[glay, gcol] = FT(0)
-        end
+    if τ > τ_thresh
+        # Toon et al. (JGR 1989) Eqs 26-27
+        Z = (lev_src_bot - lev_src_top) / (τ * (γ1 + γ2))
+        Zup_top = Z + lev_src_top
+        Zup_bottom = Z + lev_src_bot
+        Zdn_top = -Z + lev_src_top
+        Zdn_bottom = -Z + lev_src_bot
+        src_up = pi * (Zup_top - Rdif * Zdn_top - Tdif * Zup_bottom)
+        src_dn = pi * (Zdn_bottom - Rdif * Zup_bottom - Tdif * Zdn_top)
+    else
+        src_up = FT(0)
+        src_dn = FT(0)
     end
+    return (Rdif, Tdif, src_up, src_dn)
 end
 
+
 """
-    adding_lw!(
-        flux::FluxLW{FT},
+    rte_lw_2stream!(
+        op::TwoStream,
+        flux::FluxLW,
         src_lw::SL,
         bcs_lw::BCL,
-        gcol,
-        igpt,
-        ibnd,
-        nlev,
-        ncol,
-    ) where {FT<:AbstractFloat,SL<:SourceLW2Str{FT},BCL<:LwBCs{FT}}
+        gcol::Int,
+        igpt::Int,
+        ibnd::UInt8,
+        nlev::Int,
+        ncol::Int,
+    ) where {SL, BCL}
+
+Two stream solver for the longwave problem.
 
 Transport of diffuse radiation through a vertically layered atmosphere, for the longwave problem.
 Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
 """
-function adding_lw!(
-    flux::FluxLW{FT},
+@inline function rte_lw_2stream!(
+    op::TwoStream,
+    flux::FluxLW,
     src_lw::SL,
     bcs_lw::BCL,
     gcol::Int,
     igpt::Int,
-    major_gpt2bnd::AbstractArray{UInt8, 1},
+    ibnd::UInt8,
     nlev::Int,
     ncol::Int,
-) where {FT <: AbstractFloat, SL <: SourceLW2Str{FT}, BCL <: LwBCs{FT}}
+) where {SL, BCL}
     nlay = nlev - 1
-    ibnd = major_gpt2bnd[igpt]
     # setting references
+    (; τ, ssa, g) = op
     (; flux_up, flux_dn, flux_net) = flux
 
-    (; albedo, sfc_source, Rdif, Tdif, src_up, src_dn, src) = src_lw
+    (; albedo, lev_source, sfc_source, src) = src_lw
     (; inc_flux, sfc_emis) = bcs_lw
-
-    @inbounds for ilev in 1:nlev
-        flux_dn[ilev, gcol] = FT(0)
-        flux_up[ilev, gcol] = FT(0)
-    end
-
-    if inc_flux ≠ nothing
-        @inbounds flux_dn[nlev, gcol] = inc_flux[gcol, igpt]
-    end
+    FT = eltype(τ)
+    @inbounds flux_dn_ilevplus1 = isnothing(inc_flux) ? FT(0) : inc_flux[gcol, igpt]
+    @inbounds flux_dn[nlev, gcol] = flux_dn_ilevplus1
     # Albedo of lowest level is the surface albedo...
-    @inbounds albedo[1, gcol] = FT(1) - sfc_emis[ibnd, gcol]
+    @inbounds albedo_ilev = FT(1) - sfc_emis[ibnd, gcol]
+    @inbounds albedo[1, gcol] = albedo_ilev
     # ... and source of diffuse radiation is surface emission
     @inbounds src[1, gcol] = FT(π) * sfc_emis[ibnd, gcol] * sfc_source[gcol]
 
     # From bottom to top of atmosphere --
     #   compute albedo and source of upward radiation
+    @inbounds lev_src_bot = lev_source[1, gcol]
     @inbounds for ilev in 1:nlay
-        denom = FT(1) / (FT(1) - Rdif[ilev, gcol] * albedo[ilev, gcol])  # Eq 10
-        albedo[ilev + 1, gcol] = Rdif[ilev, gcol] + Tdif[ilev, gcol] * Tdif[ilev, gcol] * albedo[ilev, gcol] * denom # Equation 9
+        lev_src_top = lev_source[ilev + 1, gcol]
+        τ_lay, ssa_lay, g_lay = τ[ilev, gcol], ssa[ilev, gcol], g[ilev, gcol]
+        Rdif, Tdif, src_up, src_dn = lw_2stream_coeffs(τ_lay, ssa_lay, g_lay, lev_src_bot, lev_src_top)
+        denom = FT(1) / (FT(1) - Rdif * albedo_ilev)  # Eq 10
+        albedo_ilevplus1 = Rdif + Tdif * Tdif * albedo_ilev * denom # Equation 9
+        albedo[ilev + 1, gcol] = albedo_ilevplus1
         # 
         # Equation 11 -- source is emitted upward radiation at top of layer plus
         # radiation emitted at bottom of layer,
         # transmitted through the layer and reflected from layers below (Tdiff*src*albedo)
-        src[ilev + 1, gcol] =
-            src_up[ilev, gcol] + Tdif[ilev, gcol] * denom * (src[ilev, gcol] + albedo[ilev, gcol] * src_dn[ilev, gcol])
+        src[ilev + 1, gcol] = src_up + Tdif * denom * (src[ilev, gcol] + albedo_ilev * src_dn)
+        lev_src_bot = lev_src_top
+        albedo_ilev = albedo_ilevplus1
     end
 
     # Eq 12, at the top of the domain upwelling diffuse is due to ...
     @inbounds flux_up[nlev, gcol] =
-        flux_dn[nlev, gcol] * albedo[nlev, gcol] + # ... reflection of incident diffuse and
+        flux_dn_ilevplus1 * albedo[nlev, gcol] + # ... reflection of incident diffuse and
         src[nlev, gcol]                          # scattering by the direct beam below
 
     # From the top of the atmosphere downward -- compute fluxes
+    @inbounds lev_src_top = lev_source[nlay + 1, gcol]
     @inbounds for ilev in nlay:-1:1
-        denom = FT(1) / (FT(1) - Rdif[ilev, gcol] * albedo[ilev, gcol])  # Eq 10
-        flux_dn[ilev, gcol] =
-            (Tdif[ilev, gcol] * flux_dn[ilev + 1, gcol] + # Equation 13
-             Rdif[ilev, gcol] * src[ilev, gcol] +
-             src_dn[ilev, gcol]) * denom
-        flux_up[ilev, gcol] =
-            flux_dn[ilev, gcol] * albedo[ilev, gcol] + # Equation 12
-            src[ilev, gcol]
-    end
+        lev_src_bot = lev_source[ilev, gcol]
+        src_ilev = src[ilev, gcol]
+        τ_lay, ssa_lay, g_lay = τ[ilev, gcol], ssa[ilev, gcol], g[ilev, gcol]
+        Rdif, Tdif, _, src_dn = lw_2stream_coeffs(τ_lay, ssa_lay, g_lay, lev_src_bot, lev_src_top)
 
-    @inbounds for ilev in 1:nlev
-        flux_net[ilev, gcol] = flux_up[ilev, gcol] - flux_dn[ilev, gcol]
+        denom = FT(1) / (FT(1) - Rdif * albedo[ilev, gcol])  # Eq 10
+        #flux_dn[ilev, gcol] = (Tdif * flux_dn[ilev + 1, gcol] + # Equation 13
+        flux_dn_ilev = (Tdif * flux_dn_ilevplus1 + # Equation 13
+                        Rdif * src_ilev +
+                        src_dn) * denom
+        flux_up[ilev, gcol] =
+            flux_dn_ilev * albedo[ilev, gcol] + # Equation 12
+            src_ilev
+        flux_dn[ilev, gcol] = flux_dn_ilev
+        flux_dn_ilevplus1 = flux_dn_ilev
+        lev_src_top = lev_src_bot
     end
 end

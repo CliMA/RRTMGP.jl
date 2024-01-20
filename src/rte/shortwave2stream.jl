@@ -15,7 +15,7 @@ function rte_sw_2stream_solve!(
     @inbounds begin
         ClimaComms.@threaded device for gcol in 1:ncol
             set_flux_to_zero!(flux_sw, gcol)
-            compute_optical_props!(op, as, gcol, igpt, nothing, nothing)
+            compute_optical_props!(op, as, gcol)
             # call shortwave rte solver
             rte_sw_2stream!(op, src_sw, bcs_sw, flux_sw, solar_frac, igpt, n_gpt, ibnd, nlev, gcol)
         end
@@ -58,7 +58,7 @@ function rte_sw_2stream_solve_CUDA!(
     if gcol ≤ ncol
         @inbounds begin
             set_flux_to_zero!(flux_sw, gcol)
-            compute_optical_props!(op, as, gcol, igpt, nothing, nothing)
+            compute_optical_props!(op, as, gcol)
             # call shortwave rte solver
             rte_sw_2stream!(op, src_sw, bcs_sw, flux_sw, solar_frac, igpt, n_gpt, ibnd, nlev, gcol)
         end

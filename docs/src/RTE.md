@@ -21,7 +21,7 @@ where ``F_{net} = \sum_j (F^{+}_j - F^{-}_j)``, and ``F^{+}_j`` and ``F^{-}_j`` 
 
 ## Computing fluxes through a vertically layered atmosphere
 
-`adding_lw!` and `rte_sw_2stream!` compute longwave and shortwave radiative fluxes through a vertically layered atmosphere. The equations for upward and downward fluxes are calculated following [shonk2008](@cite):
+`rte_lw_2stream!` and `rte_sw_2stream!` compute longwave and shortwave radiative fluxes through a vertically layered atmosphere. The equations for upward and downward fluxes are calculated following [shonk2008](@cite):
 
 ```math
 \begin{align}
@@ -38,7 +38,7 @@ where ``\beta_k = 1 / (1 - \alpha_k R_k)``. ``T`` and ``R`` are transmittance an
 
 ### Longwave
 
-`rte_lw_2stream_source!` calculates transmittance (``T``), reflectance (``R``), and source functions (``S^+`` and ``S^-``) from optical properties for longwave radiation. Transmittance and reflectance are calculated following [meador1980](@cite):
+`lw_2stream_coeffs` calculates transmittance (``T``), reflectance (``R``), and source functions (``S^+`` and ``S^-``) from optical properties for longwave radiation. Transmittance and reflectance are calculated following [meador1980](@cite):
 
 ```math
 \begin{align}
