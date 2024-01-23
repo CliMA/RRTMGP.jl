@@ -2,16 +2,16 @@
 @inline loc_lower(xi, Δx, n, x) = @inbounds max(min(unsafe_trunc(Int, (xi - x[1]) / Δx) + 1, n - 1), 1)
 
 """
-    interp1d(xi::FT, x, y, col) where {FT<:AbstractFloat}
+    interp1d(xi::FT, x, y) where {FT<:AbstractFloat}
 
 perform 1D linear interpolation.
 """
-@inline function interp1d(xi::FT, x, y, col) where {FT <: AbstractFloat}
+@inline function interp1d(xi::FT, x, y) where {FT <: AbstractFloat}
     @inbounds Δx = x[2] - x[1]
     n = length(x)
     loc = loc_lower(xi, Δx, n, x)
     @inbounds factor = (xi - x[loc]) / Δx
-    return @inbounds (y[loc, col] * (FT(1) - factor) + y[loc + 1, col] * factor)
+    return @inbounds (y[loc] * (FT(1) - factor) + y[loc + 1] * factor)
 end
 
 """
@@ -19,12 +19,11 @@ end
         fη1::FT,
         fη2::FT,
         ftemp::FT,
-        coeff::FTA3D,
-        igpt::Int,
+        coeff::FTA2D,
         jη1::Int,
         jη2::Int,
         jtemp::Int,
-    ) where {FT<:AbstractFloat,FTA3D<:AbstractArray{FT,3}}
+    ) where {FT,FTA2D}
 
 Perform 2D linear interpolation.
 
@@ -36,20 +35,11 @@ Perform 2D linear interpolation.
 
 `fminor[2, 2] = fη2 * ftemp`
 """
-@inline function interp2d(
-    fη1::FT,
-    fη2::FT,
-    ftemp::FT,
-    coeff::FTA3D,
-    igpt::Int,
-    jη1::Int,
-    jη2::Int,
-    jtemp::Int,
-) where {FT <: AbstractFloat, FTA3D <: AbstractArray{FT, 3}}
-    return @inbounds (FT(1) - fη1) * (1 - ftemp) * coeff[igpt, jη1, jtemp] +
-                     fη1 * (1 - ftemp) * coeff[igpt, jη1 + 1, jtemp] +
-                     (FT(1) - fη2) * ftemp * coeff[igpt, jη2, jtemp + 1] +
-                     fη2 * ftemp * coeff[igpt, jη2 + 1, jtemp + 1]
+@inline function interp2d(fη1::FT, fη2::FT, ftemp::FT, coeff::FTA2D, jη1::Int, jη2::Int, jtemp::Int) where {FT, FTA2D}
+    return @inbounds (FT(1) - fη1) * (1 - ftemp) * coeff[jη1, jtemp] +
+                     fη1 * (1 - ftemp) * coeff[jη1 + 1, jtemp] +
+                     (FT(1) - fη2) * ftemp * coeff[jη2, jtemp + 1] +
+                     fη2 * ftemp * coeff[jη2 + 1, jtemp + 1]
 end
 
 """
@@ -62,8 +52,7 @@ end
         ftemp::FT,
         jpresst::Int,
         fpress::FT,
-        coeff::FTA4D,
-        igpt::Int,
+        coeff::FTA3D,
         s1::FT = FT(1),
         s2::FT = FT(1),
     ) where {FT<:AbstractFloat,FTA4D<:AbstractArray{FT,4}}
@@ -98,27 +87,22 @@ where,
     ftemp::FT,
     jpresst::Int,
     fpress::FT,
-    coeff::FTA4D,
-    igpt::Int,
+    coeff::FTA3D,
     s1::FT = FT(1),
     s2::FT = FT(1),
-) where {FT <: AbstractFloat, FTA4D <: AbstractArray{FT, 4}}
+) where {FT, FTA3D}
     omftemp = FT(1) - ftemp
     omfpress = FT(1) - fpress
     omfη1 = FT(1) - fη1
     omfη2 = FT(1) - fη2
     return @inbounds s1 * (
-        omfpress *
-        (omftemp * (omfη1 * coeff[igpt, jη1, jpresst - 1, jtemp] + fη1 * coeff[igpt, jη1 + 1, jpresst - 1, jtemp])) +
-        fpress * (omftemp * (omfη1 * coeff[igpt, jη1, jpresst, jtemp] + fη1 * coeff[igpt, jη1 + 1, jpresst, jtemp]))
+        omfpress * (omftemp * (omfη1 * coeff[jη1, jpresst - 1, jtemp] + fη1 * coeff[jη1 + 1, jpresst - 1, jtemp])) +
+        fpress * (omftemp * (omfη1 * coeff[jη1, jpresst, jtemp] + fη1 * coeff[jη1 + 1, jpresst, jtemp]))
     ) +
                      s2 * (
-        omfpress * (
-            ftemp *
-            (omfη2 * coeff[igpt, jη2, jpresst - 1, jtemp + 1] + fη2 * coeff[igpt, jη2 + 1, jpresst - 1, jtemp + 1])
-        ) +
-        fpress *
-        (ftemp * (omfη2 * coeff[igpt, jη2, jpresst, jtemp + 1] + fη2 * coeff[igpt, jη2 + 1, jpresst, jtemp + 1]))
+        omfpress *
+        (ftemp * (omfη2 * coeff[jη2, jpresst - 1, jtemp + 1] + fη2 * coeff[jη2 + 1, jpresst - 1, jtemp + 1])) +
+        fpress * (ftemp * (omfη2 * coeff[jη2, jpresst, jtemp + 1] + fη2 * coeff[jη2 + 1, jpresst, jtemp + 1]))
     )
 end
 """

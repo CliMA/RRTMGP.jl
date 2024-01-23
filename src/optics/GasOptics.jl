@@ -136,10 +136,12 @@ Compute optical thickness, single scattering albedo, and asymmetry parameter.
 
     jfη, col_mix = compute_interp_frac_η(n_η, ig, vmr_ref, (vmr1, vmr2), tropo, jftemp[1])
     # compute Planck fraction
-    pfrac = interp3d(jfη..., jftemp..., jfpress..., lkp.planck_fraction, igpt)
+    @inbounds planck_fraction = view(lkp.planck_fraction, :, :, :, igpt)
+    pfrac = interp3d(jfη..., jftemp..., jfpress..., planck_fraction)
 
     # computing τ_major
-    τ_major = interp3d(jfη..., jftemp..., jfpress..., lkp.kmajor, igpt, col_mix...) * col_dry
+    @inbounds kmajor = view(lkp.kmajor, :, :, :, igpt)
+    τ_major = interp3d(jfη..., jftemp..., jfpress..., kmajor, col_mix...) * col_dry
     # computing τ_minor
     τ_minor =
         compute_τ_minor(lkp, tropo, vmr, vmr_h2o, col_dry, p_lay, t_lay, jftemp..., jfη..., igpt, ibnd, glay, gcol)
@@ -168,12 +170,13 @@ end
     jfη, col_mix = compute_interp_frac_η(n_η, ig, vmr_ref, (vmr1, vmr2), tropo, jftemp[1])
 
     # computing τ_major
-    τ_major = interp3d(jfη..., jftemp..., jfpress..., lkp.kmajor, igpt, col_mix...) * col_dry
+    @inbounds kmajor = view(lkp.kmajor, :, :, :, igpt)
+    τ_major = interp3d(jfη..., jftemp..., jfpress..., kmajor, col_mix...) * col_dry
     # computing τ_minor
     τ_minor =
         compute_τ_minor(lkp, tropo, vmr, vmr_h2o, col_dry, p_lay, t_lay, jftemp..., jfη..., igpt, ibnd, glay, gcol)
     # compute τ_Rayleigh
-    rayleigh_coeff = tropo == 1 ? lkp.rayl_lower : lkp.rayl_upper
+    @inbounds rayleigh_coeff = tropo == 1 ? view(lkp.rayl_lower, :, :, igpt) : view(lkp.rayl_upper, :, :, igpt)
     τ_ray = compute_τ_rayleigh(rayleigh_coeff, tropo, col_dry, vmr_h2o, jftemp..., jfη..., igpt)
     τ = τ_major + τ_minor + τ_ray
     ssa = τ > 0 ? τ_ray / τ : zero(τ) # single scattering albedo
@@ -264,7 +267,8 @@ Compute optical thickness contributions from minor gases.
                 end
             end
             k_loc = minor_gpt_sh[i] + loc_in_bnd
-            τ_minor += interp2d(fη1, fη2, ftemp, kminor, k_loc, jη1, jη2, jtemp) * scaling
+            @inbounds kminorview = view(kminor, :, :, k_loc)
+            τ_minor += interp2d(fη1, fη2, ftemp, kminorview, jη1, jη2, jtemp) * scaling
         end
     end
 
@@ -289,7 +293,7 @@ end
 Compute Rayleigh scattering optical depths for shortwave problem
 """
 @inline compute_τ_rayleigh(
-    rayleigh_coeff::AbstractArray{FT, 3},
+    rayleigh_coeff::AbstractArray{FT, 2},
     tropo::Int,
     col_dry::FT,
     vmr_h2o::FT,
@@ -300,5 +304,4 @@ Compute Rayleigh scattering optical depths for shortwave problem
     fη1::FT,
     fη2::FT,
     igpt::Int,
-) where {FT <: AbstractFloat} =
-    interp2d(fη1, fη2, ftemp, rayleigh_coeff, igpt, jη1, jη2, jtemp) * (vmr_h2o + FT(1)) * col_dry
+) where {FT <: AbstractFloat} = interp2d(fη1, fη2, ftemp, rayleigh_coeff, jη1, jη2, jtemp) * (vmr_h2o + FT(1)) * col_dry
