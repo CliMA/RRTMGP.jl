@@ -87,9 +87,9 @@ struct LookUpLW{
     key_species::IA3D
     "major absorption coefficient `(n_gpt, n_η, n_p_ref, n_t_ref)`"
     kmajor::FTA4D
-    "minor absorption coefficient in lower atmosphere `(n_contrib_lower, n_η, n_t_ref)`"
+    "minor absorption coefficient in lower atmosphere `(n_η, n_t_ref, n_contrib_lower)`"
     kminor_lower::FTA3D
-    "minor absorption coefficient in upper atmosphere `(n_contrib_upper, n_η, n_t_ref)`"
+    "minor absorption coefficient in upper atmosphere `(n_η, n_t_ref, n_contrib_upper)`"
     kminor_upper::FTA3D
     kminor_start_lower::IA1D # not currently used
     kminor_start_upper::IA1D # not currently used
@@ -241,8 +241,8 @@ function LookUpLW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     key_species = IA3D(key_species)
 
     kmajor = FTA4D(Array(ds["kmajor"]))
-    kminor_lower = FTA3D(Array(ds["kminor_lower"]))
-    kminor_upper = FTA3D(Array(ds["kminor_upper"]))
+    kminor_lower = FTA3D(permutedims(Array(ds["kminor_lower"]), [2, 3, 1]))
+    kminor_upper = FTA3D(permutedims(Array(ds["kminor_upper"]), [2, 3, 1]))
     kminor_start_lower = IA1D(Array(ds["kminor_start_lower"]))
     kminor_start_upper = IA1D(Array(ds["kminor_start_upper"]))
 
@@ -474,9 +474,9 @@ struct LookUpSW{
     key_species::IA3D
     "major absorption coefficient `(n_gpt, n_η, n_p_ref, n_t_ref)`"
     kmajor::FTA4D
-    "minor absorption coefficient in lower atmosphere `(n_contrib_lower, n_η, n_t_ref)`"
+    "minor absorption coefficient in lower atmosphere `(n_η, n_t_ref, n_contrib_lower)`"
     kminor_lower::FTA3D
-    "minor absorption coefficient in upper atmosphere `(n_contrib_upper, n_η, n_t_ref)`"
+    "minor absorption coefficient in upper atmosphere `(n_η, n_t_ref, n_contrib_upper)`"
     kminor_upper::FTA3D
     kminor_start_lower::IA1D # not currently used
     kminor_start_upper::IA1D # not currently used
@@ -516,9 +516,9 @@ struct LookUpSW{
     t_ref::FTA1D
     "reference volume mixing ratios used by the lookup table `(2, n_gases, n_t_ref)`"
     vmr_ref::FTA3D
-    "Rayleigh absorption coefficient for lower atmosphere `(n_gpt, n_η, n_t_ref)`"
+    "Rayleigh absorption coefficient for lower atmosphere `(n_η, n_t_ref, n_gpt)`"
     rayl_lower::FTA3D
-    "Rayleigh absorption coefficient for upper atmosphere `(n_gpt, n_η, n_t_ref)`"
+    "Rayleigh absorption coefficient for upper atmosphere `(n_η, n_t_ref, n_gpt)`"
     rayl_upper::FTA3D
     "relative solar source contribution from each `g-point` `(n_gpt)`"
     solar_src_scaled::FTA1D
@@ -625,8 +625,8 @@ function LookUpSW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     key_species = IA3D(key_species)
 
     kmajor = FTA4D(Array(ds["kmajor"]))
-    kminor_lower = FTA3D(Array(ds["kminor_lower"]))
-    kminor_upper = FTA3D(Array(ds["kminor_upper"]))
+    kminor_lower = FTA3D(permutedims(Array(ds["kminor_lower"]), [2, 3, 1]))
+    kminor_upper = FTA3D(permutedims(Array(ds["kminor_upper"]), [2, 3, 1]))
     kminor_start_lower = IA1D(Array(ds["kminor_start_lower"]))
     kminor_start_upper = IA1D(Array(ds["kminor_start_upper"]))
 
@@ -717,8 +717,8 @@ function LookUpSW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
 
     n_η = size(kmajor, 2)
 
-    rayl_lower = FTA3D(Array(ds["rayl_lower"]))
-    rayl_upper = FTA3D(Array(ds["rayl_upper"]))
+    rayl_lower = FTA3D(permutedims(Array(ds["rayl_lower"]), [2, 3, 1]))
+    rayl_upper = FTA3D(permutedims(Array(ds["rayl_upper"]), [2, 3, 1]))
 
     solar_src = Array(ds["solar_source"])
     solar_src_tot = FT(sum(solar_src))

@@ -19,12 +19,11 @@ end
         fη1::FT,
         fη2::FT,
         ftemp::FT,
-        coeff::FTA3D,
-        igpt::Int,
+        coeff::FTA2D,
         jη1::Int,
         jη2::Int,
         jtemp::Int,
-    ) where {FT<:AbstractFloat,FTA3D<:AbstractArray{FT,3}}
+    ) where {FT,FTA2D}
 
 Perform 2D linear interpolation.
 
@@ -36,20 +35,11 @@ Perform 2D linear interpolation.
 
 `fminor[2, 2] = fη2 * ftemp`
 """
-@inline function interp2d(
-    fη1::FT,
-    fη2::FT,
-    ftemp::FT,
-    coeff::FTA3D,
-    igpt::Int,
-    jη1::Int,
-    jη2::Int,
-    jtemp::Int,
-) where {FT <: AbstractFloat, FTA3D <: AbstractArray{FT, 3}}
-    return @inbounds (FT(1) - fη1) * (1 - ftemp) * coeff[igpt, jη1, jtemp] +
-                     fη1 * (1 - ftemp) * coeff[igpt, jη1 + 1, jtemp] +
-                     (FT(1) - fη2) * ftemp * coeff[igpt, jη2, jtemp + 1] +
-                     fη2 * ftemp * coeff[igpt, jη2 + 1, jtemp + 1]
+@inline function interp2d(fη1::FT, fη2::FT, ftemp::FT, coeff::FTA2D, jη1::Int, jη2::Int, jtemp::Int) where {FT, FTA2D}
+    return @inbounds (FT(1) - fη1) * (1 - ftemp) * coeff[jη1, jtemp] +
+                     fη1 * (1 - ftemp) * coeff[jη1 + 1, jtemp] +
+                     (FT(1) - fη2) * ftemp * coeff[jη2, jtemp + 1] +
+                     fη2 * ftemp * coeff[jη2 + 1, jtemp + 1]
 end
 
 """
