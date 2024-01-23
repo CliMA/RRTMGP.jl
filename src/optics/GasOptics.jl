@@ -136,10 +136,12 @@ Compute optical thickness, single scattering albedo, and asymmetry parameter.
 
     jfη, col_mix = compute_interp_frac_η(n_η, ig, vmr_ref, (vmr1, vmr2), tropo, jftemp[1])
     # compute Planck fraction
-    pfrac = interp3d(jfη..., jftemp..., jfpress..., lkp.planck_fraction, igpt)
+    @inbounds planck_fraction = view(lkp.planck_fraction, :, :, :, igpt)
+    pfrac = interp3d(jfη..., jftemp..., jfpress..., planck_fraction)
 
     # computing τ_major
-    τ_major = interp3d(jfη..., jftemp..., jfpress..., lkp.kmajor, igpt, col_mix...) * col_dry
+    @inbounds kmajor = view(lkp.kmajor, :, :, :, igpt)
+    τ_major = interp3d(jfη..., jftemp..., jfpress..., kmajor, col_mix...) * col_dry
     # computing τ_minor
     τ_minor =
         compute_τ_minor(lkp, tropo, vmr, vmr_h2o, col_dry, p_lay, t_lay, jftemp..., jfη..., igpt, ibnd, glay, gcol)
@@ -168,7 +170,8 @@ end
     jfη, col_mix = compute_interp_frac_η(n_η, ig, vmr_ref, (vmr1, vmr2), tropo, jftemp[1])
 
     # computing τ_major
-    τ_major = interp3d(jfη..., jftemp..., jfpress..., lkp.kmajor, igpt, col_mix...) * col_dry
+    @inbounds kmajor = view(lkp.kmajor, :, :, :, igpt)
+    τ_major = interp3d(jfη..., jftemp..., jfpress..., kmajor, col_mix...) * col_dry
     # computing τ_minor
     τ_minor =
         compute_τ_minor(lkp, tropo, vmr, vmr_h2o, col_dry, p_lay, t_lay, jftemp..., jfη..., igpt, ibnd, glay, gcol)

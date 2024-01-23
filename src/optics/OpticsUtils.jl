@@ -52,8 +52,7 @@ end
         ftemp::FT,
         jpresst::Int,
         fpress::FT,
-        coeff::FTA4D,
-        igpt::Int,
+        coeff::FTA3D,
         s1::FT = FT(1),
         s2::FT = FT(1),
     ) where {FT<:AbstractFloat,FTA4D<:AbstractArray{FT,4}}
@@ -88,27 +87,22 @@ where,
     ftemp::FT,
     jpresst::Int,
     fpress::FT,
-    coeff::FTA4D,
-    igpt::Int,
+    coeff::FTA3D,
     s1::FT = FT(1),
     s2::FT = FT(1),
-) where {FT <: AbstractFloat, FTA4D <: AbstractArray{FT, 4}}
+) where {FT, FTA3D}
     omftemp = FT(1) - ftemp
     omfpress = FT(1) - fpress
     omfη1 = FT(1) - fη1
     omfη2 = FT(1) - fη2
     return @inbounds s1 * (
-        omfpress *
-        (omftemp * (omfη1 * coeff[igpt, jη1, jpresst - 1, jtemp] + fη1 * coeff[igpt, jη1 + 1, jpresst - 1, jtemp])) +
-        fpress * (omftemp * (omfη1 * coeff[igpt, jη1, jpresst, jtemp] + fη1 * coeff[igpt, jη1 + 1, jpresst, jtemp]))
+        omfpress * (omftemp * (omfη1 * coeff[jη1, jpresst - 1, jtemp] + fη1 * coeff[jη1 + 1, jpresst - 1, jtemp])) +
+        fpress * (omftemp * (omfη1 * coeff[jη1, jpresst, jtemp] + fη1 * coeff[jη1 + 1, jpresst, jtemp]))
     ) +
                      s2 * (
-        omfpress * (
-            ftemp *
-            (omfη2 * coeff[igpt, jη2, jpresst - 1, jtemp + 1] + fη2 * coeff[igpt, jη2 + 1, jpresst - 1, jtemp + 1])
-        ) +
-        fpress *
-        (ftemp * (omfη2 * coeff[igpt, jη2, jpresst, jtemp + 1] + fη2 * coeff[igpt, jη2 + 1, jpresst, jtemp + 1]))
+        omfpress *
+        (ftemp * (omfη2 * coeff[jη2, jpresst - 1, jtemp + 1] + fη2 * coeff[jη2 + 1, jpresst - 1, jtemp + 1])) +
+        fpress * (ftemp * (omfη2 * coeff[jη2, jpresst, jtemp + 1] + fη2 * coeff[jη2 + 1, jpresst, jtemp + 1]))
     )
 end
 """
