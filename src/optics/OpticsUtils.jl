@@ -2,16 +2,16 @@
 @inline loc_lower(xi, Δx, n, x) = @inbounds max(min(unsafe_trunc(Int, (xi - x[1]) / Δx) + 1, n - 1), 1)
 
 """
-    interp1d(xi::FT, x, y, col) where {FT<:AbstractFloat}
+    interp1d(xi::FT, x, y) where {FT<:AbstractFloat}
 
 perform 1D linear interpolation.
 """
-@inline function interp1d(xi::FT, x, y, col) where {FT <: AbstractFloat}
+@inline function interp1d(xi::FT, x, y) where {FT <: AbstractFloat}
     @inbounds Δx = x[2] - x[1]
     n = length(x)
     loc = loc_lower(xi, Δx, n, x)
     @inbounds factor = (xi - x[loc]) / Δx
-    return @inbounds (y[loc, col] * (FT(1) - factor) + y[loc + 1, col] * factor)
+    return @inbounds (y[loc] * (FT(1) - factor) + y[loc + 1] * factor)
 end
 
 """

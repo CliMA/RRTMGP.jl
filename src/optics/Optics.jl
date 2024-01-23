@@ -153,17 +153,18 @@ Computes optical properties for the longwave problem.
     lkp_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
 )
     (; nlay, vmr) = as
-    (; t_planck, totplnk) = lkp
+    (; t_planck) = lkp
     (; lay_source, lev_source_inc, lev_source_dec, sfc_source) = sf
-    @inbounds t_sfc = as.t_sfc[gcol]
-    @inbounds ibnd = lkp.major_gpt2bnd[igpt]
-    col_dry_col = view(as.col_dry, :, gcol)
-    p_lay_col = view(as.p_lay, :, gcol)
-    t_lay_col = view(as.t_lay, :, gcol)
-    t_lev_col = view(as.t_lev, :, gcol)
-    τ = view(op.τ, :, gcol)
-
     @inbounds begin
+        t_sfc = as.t_sfc[gcol]
+        ibnd = lkp.major_gpt2bnd[igpt]
+        totplnk = view(lkp.totplnk, :, ibnd)
+        col_dry_col = view(as.col_dry, :, gcol)
+        p_lay_col = view(as.p_lay, :, gcol)
+        t_lay_col = view(as.t_lay, :, gcol)
+        t_lev_col = view(as.t_lev, :, gcol)
+        τ = view(op.τ, :, gcol)
+
         t_lev_dec = t_lev_col[1]
         for glay in 1:nlay
             col_dry = col_dry_col[glay]
@@ -174,11 +175,11 @@ Computes optical properties for the longwave problem.
             # compute longwave source terms
             t_lev_inc = t_lev_col[glay + 1]
 
-            lay_source[glay, gcol] = interp1d(t_lay, t_planck, totplnk, ibnd) * planckfrac
-            lev_source_inc[glay, gcol] = interp1d(t_lev_inc, t_planck, totplnk, ibnd) * planckfrac
-            lev_source_dec[glay, gcol] = interp1d(t_lev_dec, t_planck, totplnk, ibnd) * planckfrac
+            lay_source[glay, gcol] = interp1d(t_lay, t_planck, totplnk) * planckfrac
+            lev_source_inc[glay, gcol] = interp1d(t_lev_inc, t_planck, totplnk) * planckfrac
+            lev_source_dec[glay, gcol] = interp1d(t_lev_dec, t_planck, totplnk) * planckfrac
             if glay == 1
-                sfc_source[gcol] = interp1d(t_sfc, t_planck, totplnk, ibnd) * planckfrac
+                sfc_source[gcol] = interp1d(t_sfc, t_planck, totplnk) * planckfrac
             end
             t_lev_dec = t_lev_inc
         end
@@ -196,17 +197,20 @@ end
     lkp_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
 )
     (; nlay, vmr) = as
-    (; t_planck, totplnk) = lkp
+    (; t_planck) = lkp
     (; lev_source, sfc_source) = sf
-    @inbounds t_sfc = as.t_sfc[gcol]
-    @inbounds ibnd = lkp.major_gpt2bnd[igpt]
-    col_dry_col = view(as.col_dry, :, gcol)
-    p_lay_col = view(as.p_lay, :, gcol)
-    t_lay_col = view(as.t_lay, :, gcol)
-    t_lev_col = view(as.t_lev, :, gcol)
-    τ = view(op.τ, :, gcol)
-    ssa = view(op.ssa, :, gcol)
-    g = view(op.g, :, gcol)
+    @inbounds begin
+        t_sfc = as.t_sfc[gcol]
+        ibnd = lkp.major_gpt2bnd[igpt]
+        totplnk = view(lkp.totplnk, :, ibnd)
+        col_dry_col = view(as.col_dry, :, gcol)
+        p_lay_col = view(as.p_lay, :, gcol)
+        t_lay_col = view(as.t_lay, :, gcol)
+        t_lev_col = view(as.t_lev, :, gcol)
+        τ = view(op.τ, :, gcol)
+        ssa = view(op.ssa, :, gcol)
+        g = view(op.g, :, gcol)
+    end
 
     lev_src_inc_prev = zero(t_sfc)
     lev_src_dec_prev = zero(t_sfc)
@@ -223,10 +227,10 @@ end
             # compute longwave source terms
             t_lev_inc = t_lev_col[glay + 1]
 
-            lev_src_inc = interp1d(t_lev_inc, t_planck, totplnk, ibnd) * planckfrac
-            lev_src_dec = interp1d(t_lev_dec, t_planck, totplnk, ibnd) * planckfrac
+            lev_src_inc = interp1d(t_lev_inc, t_planck, totplnk) * planckfrac
+            lev_src_dec = interp1d(t_lev_dec, t_planck, totplnk) * planckfrac
             if glay == 1
-                sfc_source[gcol] = interp1d(t_sfc, t_planck, totplnk, ibnd) * planckfrac
+                sfc_source[gcol] = interp1d(t_sfc, t_planck, totplnk) * planckfrac
                 lev_source[glay, gcol] = lev_src_dec
             else
                 lev_source[glay, gcol] = sqrt(lev_src_inc_prev * lev_src_dec)
