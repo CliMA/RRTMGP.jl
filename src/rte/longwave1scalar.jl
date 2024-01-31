@@ -225,7 +225,7 @@ Transport for no-scattering longwave problem.
     (; sfc_source) = src_lw
     (; lay_source, lev_source_inc, lev_source_dec) = src_lw
     (; sfc_emis, inc_flux) = bcs_lw
-    (; flux_up, flux_dn, flux_net) = flux
+    (; flux_up, flux_dn) = flux
 
     Ds = op.angle_disc.gauss_Ds
     w_μ = op.angle_disc.gauss_wts

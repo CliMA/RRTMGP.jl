@@ -13,11 +13,17 @@ function rte_sw_2stream_solve!(
     FT = eltype(bcs_sw.cos_zenith)
     solar_frac = FT(1)
     @inbounds begin
+        flux_up_sw = flux_sw.flux_up
+        flux_dn_sw = flux_sw.flux_dn
+        flux_net_sw = flux_sw.flux_net
         ClimaComms.@threaded device for gcol in 1:ncol
             set_flux_to_zero!(flux_sw, gcol)
             compute_optical_props!(op, as, gcol)
             # call shortwave rte solver
             rte_sw_2stream!(op, src_sw, bcs_sw, flux_sw, solar_frac, igpt, n_gpt, ibnd, nlev, gcol)
+            for ilev in 1:nlev
+                flux_net_sw[ilev, gcol] = flux_up_sw[ilev, gcol] - flux_dn_sw[ilev, gcol]
+            end
         end
     end
     return nothing
@@ -56,11 +62,17 @@ function rte_sw_2stream_solve_CUDA!(
     FT = eltype(bcs_sw.cos_zenith)
     solar_frac = FT(1)
     if gcol ≤ ncol
+        flux_up_sw = flux_sw.flux_up
+        flux_dn_sw = flux_sw.flux_dn
+        flux_net_sw = flux_sw.flux_net
         @inbounds begin
             set_flux_to_zero!(flux_sw, gcol)
             compute_optical_props!(op, as, gcol)
             # call shortwave rte solver
             rte_sw_2stream!(op, src_sw, bcs_sw, flux_sw, solar_frac, igpt, n_gpt, ibnd, nlev, gcol)
+            for ilev in 1:nlev
+                flux_net_sw[ilev, gcol] = flux_up_sw[ilev, gcol] - flux_dn_sw[ilev, gcol]
+            end
         end
     end
     return nothing
@@ -83,6 +95,10 @@ function rte_sw_2stream_solve!(
     n_gpt = length(lookup_sw.solar_src_scaled)
     @inbounds begin
         bld_cld_mask = as.cld_mask_type isa AbstractCloudMask
+        flux_up_sw = flux_sw.flux_up
+        flux_dn_sw = flux_sw.flux_dn
+        flux_net_sw = flux_sw.flux_net
+        (; flux_up, flux_dn) = flux
         for igpt in 1:n_gpt
             ClimaComms.@threaded device for gcol in 1:ncol
                 bld_cld_mask && Optics.build_cloud_mask!(
@@ -90,14 +106,27 @@ function rte_sw_2stream_solve!(
                     view(as.cld_frac, :, gcol),
                     as.cld_mask_type,
                 )
-                igpt == 1 && set_flux_to_zero!(flux_sw, gcol)
                 # compute optical properties
                 compute_optical_props!(op, as, gcol, igpt, lookup_sw, lookup_sw_cld)
                 solar_frac = lookup_sw.solar_src_scaled[igpt]
                 ibnd = lookup_sw.major_gpt2bnd[igpt]
                 # call rte shortwave solver
                 rte_sw_2stream!(op, src_sw, bcs_sw, flux, solar_frac, igpt, n_gpt, ibnd, nlev, gcol)
-                n_gpt > 1 && add_to_flux!(flux_sw, flux, gcol)
+                if igpt == 1
+                    map!(x -> x, view(flux_up_sw, :, gcol), view(flux_up, :, gcol))
+                    map!(x -> x, view(flux_dn_sw, :, gcol), view(flux_dn, :, gcol))
+                else
+                    for ilev in 1:nlev
+                        @inbounds flux_up_sw[ilev, gcol] += flux_up[ilev, gcol]
+                        @inbounds flux_dn_sw[ilev, gcol] += flux_dn[ilev, gcol]
+                    end
+                end
+            end
+        end
+
+        ClimaComms.@threaded device for gcol in 1:ncol
+            for ilev in 1:nlev
+                flux_net_sw[ilev, gcol] = flux_up_sw[ilev, gcol] - flux_dn_sw[ilev, gcol]
             end
         end
     end
@@ -148,30 +177,35 @@ function rte_sw_2stream_solve_CUDA!(
         flux_up = flux.flux_up
         flux_dn = flux.flux_dn
         FT = eltype(flux_up)
-        @inbounds for ilev in 1:nlev
-            flux_up_sw[ilev, gcol] = FT(0)
-            flux_dn_sw[ilev, gcol] = FT(0)
-        end
-        @inbounds for igpt in 1:n_gpt
-            # set cloud mask, if applicable
-            if as.cld_mask_type isa AbstractCloudMask
-                Optics.build_cloud_mask!(view(as.cld_mask_sw, :, gcol), view(as.cld_frac, :, gcol), as.cld_mask_type)
-            end
-            # compute optical properties
-            compute_optical_props!(op, as, gcol, igpt, lookup_sw, lookup_sw_cld)
-            solar_frac = lookup_sw.solar_src_scaled[igpt]
-            ibnd = lookup_sw.major_gpt2bnd[igpt]
-            # rte shortwave solver
-            rte_sw_2stream!(op, src_sw, bcs_sw, flux, solar_frac, igpt, n_gpt, ibnd, nlev, gcol)
-            if n_gpt > 1
-                for ilev in 1:nlev
-                    @inbounds flux_up_sw[ilev, gcol] += flux_up[ilev, gcol]
-                    @inbounds flux_dn_sw[ilev, gcol] += flux_dn[ilev, gcol]
+        @inbounds begin
+            for igpt in 1:n_gpt
+                # set cloud mask, if applicable
+                if as.cld_mask_type isa AbstractCloudMask
+                    Optics.build_cloud_mask!(
+                        view(as.cld_mask_sw, :, gcol),
+                        view(as.cld_frac, :, gcol),
+                        as.cld_mask_type,
+                    )
+                end
+                # compute optical properties
+                compute_optical_props!(op, as, gcol, igpt, lookup_sw, lookup_sw_cld)
+                solar_frac = lookup_sw.solar_src_scaled[igpt]
+                ibnd = lookup_sw.major_gpt2bnd[igpt]
+                # rte shortwave solver
+                rte_sw_2stream!(op, src_sw, bcs_sw, flux, solar_frac, igpt, n_gpt, ibnd, nlev, gcol)
+                if igpt == 1
+                    map!(x -> x, view(flux_up_sw, :, gcol), view(flux_up, :, gcol))
+                    map!(x -> x, view(flux_dn_sw, :, gcol), view(flux_dn, :, gcol))
+                else
+                    for ilev in 1:nlev
+                        flux_up_sw[ilev, gcol] += flux_up[ilev, gcol]
+                        flux_dn_sw[ilev, gcol] += flux_dn[ilev, gcol]
+                    end
                 end
             end
-        end
-        for ilev in 1:nlev
-            @inbounds flux_net_sw[ilev, gcol] = flux_up_sw[ilev, gcol] - flux_dn_sw[ilev, gcol]
+            for ilev in 1:nlev
+                flux_net_sw[ilev, gcol] = flux_up_sw[ilev, gcol] - flux_dn_sw[ilev, gcol]
+            end
         end
     end
     return nothing
