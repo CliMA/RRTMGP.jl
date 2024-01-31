@@ -1,5 +1,4 @@
 
-
 function rte_lw_2stream_solve!(
     device::ClimaComms.AbstractCPUDevice,
     flux_lw::FluxLW,

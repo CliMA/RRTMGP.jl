@@ -140,7 +140,7 @@ function all_sky(
 
     flux_up_lw = Array(slv.flux_lw.flux_up)
     flux_dn_lw = Array(slv.flux_lw.flux_dn)
-    flux_net_lw = flux_up_lw .- flux_dn_lw
+    flux_net_lw = Array(slv.flux_lw.flux_net)
 
     max_err_flux_up_lw = maximum(abs.(flux_up_lw .- comp_flux_up_lw))
     max_err_flux_dn_lw = maximum(abs.(flux_dn_lw .- comp_flux_dn_lw))
@@ -167,7 +167,7 @@ function all_sky(
     flux_up_sw = Array(slv.flux_sw.flux_up)
     flux_dn_sw = Array(slv.flux_sw.flux_dn)
     flux_dn_dir_sw = Array(slv.flux_sw.flux_dn_dir)
-    flux_net_sw = flux_up_sw .- flux_dn_sw
+    flux_net_sw = Array(slv.flux_sw.flux_net)
 
     max_err_flux_up_sw = maximum(abs.(flux_up_sw .- comp_flux_up_sw))
     max_err_flux_dn_sw = maximum(abs.(flux_dn_sw .- comp_flux_dn_sw))
@@ -195,7 +195,9 @@ function all_sky(
 
     @test max_err_flux_up_lw ≤ toler[FT]
     @test max_err_flux_dn_lw ≤ toler[FT]
+    @test max_err_flux_net_lw ≤ toler[FT]
 
     @test max_err_flux_up_sw ≤ toler[FT]
     @test max_err_flux_dn_sw ≤ toler[FT]
+    @test max_err_flux_net_sw ≤ toler[FT]
 end
