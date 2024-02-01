@@ -96,14 +96,14 @@ function clear_sky(
     solve_lw!(slv, max_threads, lookup_lw)
     if device isa ClimaComms.CPUSingleThreaded
         JET.@test_opt solve_lw!(slv, max_threads, lookup_lw)
-        @test_broken (@allocated solve_lw!(slv, max_threads, lookup_lw)) == 0
+        @test (@allocated solve_lw!(slv, max_threads, lookup_lw)) == 0
         @test (@allocated solve_lw!(slv, max_threads, lookup_lw)) ≤ 448
     end
 
     solve_sw!(slv, max_threads, lookup_sw)
     if device isa ClimaComms.CPUSingleThreaded
         JET.@test_opt solve_sw!(slv, max_threads, lookup_sw)
-        @test_broken (@allocated solve_sw!(slv, max_threads, lookup_sw)) == 0
+        @test (@allocated solve_sw!(slv, max_threads, lookup_sw)) == 0
         @test (@allocated solve_sw!(slv, max_threads, lookup_sw)) ≤ 448
     end
 
