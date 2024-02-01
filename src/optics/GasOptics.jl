@@ -100,7 +100,7 @@ Compute interpolation fraction for binary species parameter.
     jη2 = min(unsafe_trunc(Int, loc_η) + 1, n_η - 1)
     fη2 = loc_η - unsafe_trunc(Int, loc_η)
 
-    return ((jη1, jη2, fη1, fη2), (col_mix1, col_mix2))#nothing
+    return ((jη1, jη2, fη1, fη2), (col_mix1, col_mix2))
 end
 
 """
@@ -143,8 +143,8 @@ Compute optical thickness, single scattering albedo, and asymmetry parameter.
     @inbounds kmajor = view(lkp.kmajor, :, :, :, igpt)
     τ_major = interp3d(jfη..., jftemp..., jfpress..., kmajor, col_mix...) * col_dry
     # computing τ_minor
-    τ_minor =
-        compute_τ_minor(lkp, tropo, vmr, vmr_h2o, col_dry, p_lay, t_lay, jftemp..., jfη..., igpt, ibnd, glay, gcol)
+    lkp_minor = tropo == 1 ? lkp.minor_lower : lkp.minor_upper
+    τ_minor = compute_τ_minor(lkp_minor, vmr, vmr_h2o, col_dry, p_lay, t_lay, jftemp..., jfη..., igpt, ibnd, glay, gcol)
     # τ_Rayleigh is zero for longwave
     τ = τ_major + τ_minor
     return (τ, zero(τ), zero(τ), pfrac) # initializing asymmetry parameter
@@ -173,11 +173,11 @@ end
     @inbounds kmajor = view(lkp.kmajor, :, :, :, igpt)
     τ_major = interp3d(jfη..., jftemp..., jfpress..., kmajor, col_mix...) * col_dry
     # computing τ_minor
-    τ_minor =
-        compute_τ_minor(lkp, tropo, vmr, vmr_h2o, col_dry, p_lay, t_lay, jftemp..., jfη..., igpt, ibnd, glay, gcol)
+    lkp_minor = tropo == 1 ? lkp.minor_lower : lkp.minor_upper
+    τ_minor = compute_τ_minor(lkp_minor, vmr, vmr_h2o, col_dry, p_lay, t_lay, jftemp..., jfη..., igpt, ibnd, glay, gcol)
     # compute τ_Rayleigh
     @inbounds rayleigh_coeff = tropo == 1 ? view(lkp.rayl_lower, :, :, igpt) : view(lkp.rayl_upper, :, :, igpt)
-    τ_ray = compute_τ_rayleigh(rayleigh_coeff, tropo, col_dry, vmr_h2o, jftemp..., jfη..., igpt)
+    τ_ray = compute_τ_rayleigh(rayleigh_coeff, col_dry, vmr_h2o, jftemp..., jfη..., igpt)
     τ = τ_major + τ_minor + τ_ray
     ssa = τ > 0 ? τ_ray / τ : zero(τ) # single scattering albedo
     return (τ, ssa, zero(τ)) # initializing asymmetry parameter
@@ -186,7 +186,6 @@ end
 """
     compute_τ_minor(
         lkp::AbstractLookUp,
-        tropo::Int,
         vmr,
         vmr_h2o::FT,
         col_dry,
@@ -207,8 +206,7 @@ end
 Compute optical thickness contributions from minor gases.
 """
 @inline function compute_τ_minor(
-    lkp::AbstractLookUp,
-    tropo::Int,
+    lkp_minor::LookUpMinor,
     vmr,
     vmr_h2o::FT,
     col_dry,
@@ -224,61 +222,45 @@ Compute optical thickness contributions from minor gases.
     ibnd,
     glay,
     gcol,
-) where {FT <: AbstractFloat}
-
-    if tropo == 1 # in lower atmosphere
-        minor_bnd_st = lkp.minor_lower_bnd_st
-        idx_gases_minor = lkp.idx_gases_minor_lower
-        minor_scales_with_density = lkp.minor_lower_scales_with_density
-        idx_scaling_gas = lkp.idx_scaling_gas_lower
-        scale_by_complement = lkp.lower_scale_by_complement
-        minor_gpt_sh = lkp.minor_lower_gpt_sh
-        kminor = lkp.kminor_lower
-    else # in upper atmosphere
-        minor_bnd_st = lkp.minor_upper_bnd_st
-        idx_gases_minor = lkp.idx_gases_minor_upper
-        minor_scales_with_density = lkp.minor_upper_scales_with_density
-        idx_scaling_gas = lkp.idx_scaling_gas_upper
-        scale_by_complement = lkp.upper_scale_by_complement
-        minor_gpt_sh = lkp.minor_upper_gpt_sh
-        kminor = lkp.kminor_upper
-    end
-
+) where {FT}
+    (; kminor) = lkp_minor
     τ_minor = FT(0)
-    pa2hpa = FT(0.01) # pascals to hectopascals
-    dry_fact = FT(1) / (FT(1) + vmr_h2o)
+    (st_bnd, st_gpt, n) = LookUpTables.getbounds(lkp_minor, ibnd, igpt)
 
-    @inbounds loc_in_bnd = igpt - (lkp.bnd_lims_gpt[1, ibnd] - 1)
+    if n > 0
+        @inbounds begin
+            pa2hpa = FT(0.01) # pascals to hectopascals
+            dry_fact = FT(1) / (FT(1) + vmr_h2o)
+            density_fact = pa2hpa * p_lay / t_lay
 
-    @inbounds for i in minor_bnd_st[ibnd]:(minor_bnd_st[ibnd + 1] - 1)
-        vmr_imnr = get_vmr(vmr, idx_gases_minor[i], glay, gcol)
-        if vmr_imnr > 0
-            scaling = vmr_imnr * col_dry
+            for i in 0:(n - 1)
+                idx_gas, idx_scaling_gas, scales_with_density, scale_by_complement =
+                    LookUpTables.get_minor_gas_data(lkp_minor, st_bnd + i)
 
-            if minor_scales_with_density[i] == 1
-                scaling *= (pa2hpa * p_lay / t_lay)
-                sgas = idx_scaling_gas[i]
-                if sgas > 0
-                    if scale_by_complement[i] == 1
-                        scaling *= (FT(1) - get_vmr(vmr, sgas, glay, gcol) * dry_fact)
-                    else
-                        scaling *= get_vmr(vmr, sgas, glay, gcol) * dry_fact
+                vmr_imnr = get_vmr(vmr, idx_gas, glay, gcol)
+                if vmr_imnr > 0
+                    scaling = vmr_imnr * col_dry
+                    if scales_with_density == 1
+                        scaling *= density_fact
+                        if idx_scaling_gas > 0
+                            if scale_by_complement == 1
+                                scaling *= (FT(1) - get_vmr(vmr, idx_scaling_gas, glay, gcol) * dry_fact)
+                            else
+                                scaling *= get_vmr(vmr, idx_scaling_gas, glay, gcol) * dry_fact
+                            end
+                        end
                     end
+                    τ_minor += interp2d(fη1, fη2, ftemp, view(kminor, :, :, st_gpt + i), jη1, jη2, jtemp) * scaling
                 end
             end
-            k_loc = minor_gpt_sh[i] + loc_in_bnd
-            @inbounds kminorview = view(kminor, :, :, k_loc)
-            τ_minor += interp2d(fη1, fη2, ftemp, kminorview, jη1, jη2, jtemp) * scaling
         end
     end
-
     return τ_minor
 end
 
 """
     compute_τ_rayleigh(
         lkp::LookUpSW,
-        tropo::Int,
         col_dry::FT,
         vmr_h2o::FT,
         jtemp::Int,
@@ -294,7 +276,6 @@ Compute Rayleigh scattering optical depths for shortwave problem
 """
 @inline compute_τ_rayleigh(
     rayleigh_coeff::AbstractArray{FT, 2},
-    tropo::Int,
     col_dry::FT,
     vmr_h2o::FT,
     jtemp::Int,

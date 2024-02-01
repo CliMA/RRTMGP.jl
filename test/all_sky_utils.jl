@@ -119,7 +119,7 @@ function all_sky(
     solve_lw!(slv, max_threads, lookup_lw, lookup_lw_cld)
     if device isa ClimaComms.CPUSingleThreaded
         JET.@test_opt solve_lw!(slv, max_threads, lookup_lw, lookup_lw_cld)
-        @test_broken (@allocated solve_lw!(slv, max_threads, lookup_lw, lookup_lw_cld)) == 0
+        @test (@allocated solve_lw!(slv, max_threads, lookup_lw, lookup_lw_cld)) == 0
         @test (@allocated solve_lw!(slv, max_threads, lookup_lw, lookup_lw_cld)) ≤ 736
     end
 
@@ -127,7 +127,7 @@ function all_sky(
     solve_sw!(slv, max_threads, lookup_sw, lookup_sw_cld)
     if device isa ClimaComms.CPUSingleThreaded
         JET.@test_opt solve_sw!(slv, max_threads, lookup_sw, lookup_sw_cld)
-        @test_broken (@allocated solve_sw!(slv, max_threads, lookup_sw, lookup_sw_cld)) == 0
+        @test (@allocated solve_sw!(slv, max_threads, lookup_sw, lookup_sw_cld)) == 0
         @test (@allocated solve_sw!(slv, max_threads, lookup_sw, lookup_sw_cld)) ≤ 736
     end
     #-------------

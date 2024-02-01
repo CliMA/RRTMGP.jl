@@ -5,6 +5,7 @@ CurrentModule = RRTMGP.LookUpTables
 ```
 
 ```@docs
+LookUpMinor
 LookUpLW
 LookUpSW
 LookUpCld
