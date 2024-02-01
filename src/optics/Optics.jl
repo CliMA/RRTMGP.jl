@@ -32,19 +32,22 @@ calculations accounting for extinction and emission
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct OneScalar{FTA2D, AD} <: AbstractOpticalProps
-    "Optical Depth"
-    τ::FTA2D
+struct OneScalar{D, V, AD <: AngularDiscretization} <: AbstractOpticalProps
+    "storage for optical thickness"
+    layerdata::D
+    "view into optical depth"
+    τ::V
     "Angular discretization"
     angle_disc::AD
 end
 Adapt.@adapt_structure OneScalar
 
 function OneScalar(::Type{FT}, ncol::Int, nlay::Int, ::Type{DA}) where {FT <: AbstractFloat, DA}
-    τ = DA{FT, 2}(undef, nlay, ncol)
+    layerdata = DA{FT, 3}(undef, 1, nlay, ncol)
+    τ = view(layerdata, 1, :, :)
     ad = AngularDiscretization(FT, DA, 1)
-
-    return OneScalar{typeof(τ), typeof(ad)}(τ, ad)
+    V = typeof(τ)
+    return OneScalar{typeof(layerdata), V, typeof(ad)}(layerdata, τ, ad)
 end
 
 """
@@ -56,21 +59,27 @@ calculations accounting for extinction and emission
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct TwoStream{FTA2D} <: AbstractOpticalProps
-    "Optical depth"
-    τ::FTA2D
-    "Single-scattering albedo"
-    ssa::FTA2D
-    "Asymmetry parameter"
-    g::FTA2D
+struct TwoStream{D, V} <: AbstractOpticalProps
+    "storage for optical depth, single scattering albedo and asymmerty parameter"
+    layerdata::D
+    "view into optical depth"
+    τ::V
+    "view into single scattering albedo"
+    ssa::V
+    "view into asymmetry parameter"
+    g::V
 end
 Adapt.@adapt_structure TwoStream
 
 function TwoStream(::Type{FT}, ncol::Int, nlay::Int, ::Type{DA}) where {FT <: AbstractFloat, DA}
-    τ = DA{FT, 2}(zeros(nlay, ncol))
-    ssa = DA{FT, 2}(zeros(nlay, ncol))
-    g = DA{FT, 2}(zeros(nlay, ncol))
-    return TwoStream{typeof(τ)}(τ, ssa, g)
+    layerdata = DA{FT, 3}(zeros(3, nlay, ncol))
+    V = typeof(view(layerdata, 1, :, :))
+    return TwoStream{typeof(layerdata), V}(
+        layerdata,
+        view(layerdata, 1, :, :),
+        view(layerdata, 2, :, :),
+        view(layerdata, 3, :, :),
+    )
 end
 
 """
