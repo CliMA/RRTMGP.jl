@@ -69,8 +69,8 @@ struct Solver{C, AS, OP, SL, SS, BCL, BCS, FXBL, FXBS, FXL, FXS}
         @assert targs[1] <: ClimaComms.AbstractCommsContext
         @assert targs[2] <: AbstractAtmosphericState{FT, FTA1D}
         @assert targs[3] <: AbstractOpticalProps
-        @assert targs[4] <: Union{AbstractSourceLW{FT, FTA1D, FTA2D}, Nothing}
-        @assert targs[5] <: Union{SourceSW2Str{FT, FTA1D, FTA2D}, Nothing}
+        @assert targs[4] <: Union{AbstractSourceLW, Nothing}
+        @assert targs[5] <: Union{SourceSW2Str, Nothing}
         @assert targs[6] <: Union{LwBCs{FT}, Nothing}
         @assert targs[7] <: Union{SwBCs{FT}, Nothing}
         @assert targs[8] <: Union{FluxLW{FT, FTA2D}, Nothing}

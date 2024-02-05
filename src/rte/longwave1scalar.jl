@@ -247,8 +247,7 @@ Transport for no-scattering longwave problem.
     @inbounds for ilev in nlay:-1:1
         τ_loc = τ[ilev, gcol] * Ds[1]
         trans = exp(-τ_loc)
-        lay_src = lay_source[ilev, gcol]
-        lev_src_dec = lev_source_dec[ilev, gcol]
+        lay_src, lev_src_dec = lay_source[ilev, gcol], lev_source_dec[ilev, gcol]
         intensity_dn_ilev =
             trans * intensity_dn_ilevplus1 + lw_noscat_source_dn(lev_src_dec, lay_src, τ_loc, trans, τ_thresh)
         intensity_dn_ilevplus1 = intensity_dn_ilev
@@ -265,8 +264,7 @@ Transport for no-scattering longwave problem.
     @inbounds for ilev in 2:(nlay + 1)
         τ_loc = τ[ilev - 1, gcol] * Ds[1]
         trans = exp(-τ_loc)
-        lay_src = lay_source[ilev - 1, gcol]
-        lev_src_inc = lev_source_inc[ilev - 1, gcol]
+        lay_src, lev_src_inc = lay_source[ilev - 1, gcol], lev_source_inc[ilev - 1, gcol]
         intensity_up_ilev =
             trans * intensity_up_ilevminus1 + lw_noscat_source_up(lev_src_inc, lay_src, τ_loc, trans, τ_thresh)
         intensity_up_ilevminus1 = intensity_up_ilev
