@@ -67,7 +67,7 @@ struct Solver{C, AS, OP, SL, SS, BCL, BCS, FXBL, FXBS, FXL, FXS}
         FTA1D = typeof(as.t_sfc)
         FTA2D = typeof(as.p_lev)
         @assert targs[1] <: ClimaComms.AbstractCommsContext
-        @assert targs[2] <: AbstractAtmosphericState{FT, FTA1D}
+        @assert targs[2] <: AbstractAtmosphericState
         @assert targs[3] <: AbstractOpticalProps
         @assert targs[4] <: Union{AbstractSourceLW, Nothing}
         @assert targs[5] <: Union{SourceSW2Str, Nothing}

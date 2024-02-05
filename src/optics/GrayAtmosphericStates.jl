@@ -66,7 +66,7 @@ struct GrayAtmosphericState{
     FTA1D <: AbstractArray{FT, 1},
     FTA2D <: AbstractArray{FT, 2},
     OTP <: AbstractGrayOpticalThickness,
-} <: AbstractAtmosphericState{FT, FTA1D}
+} <: AbstractAtmosphericState
     "latitude, in degrees, for each column; `(ncol,)`"
     lat::FTA1D
     "Layer pressures `[Pa, mb]`; `(nlay, ncol)`"

@@ -278,23 +278,23 @@ end
 """
     compute_optical_props!(
         op::AbstractOpticalProps,
-        as::AtmosphericState{FT},
+        as::AtmosphericState,
         gcol::Int,
         igpt::Int,
-        lkp::LookUpSW{FT},
+        lkp::LookUpSW,
         lkp_cld::Union{LookUpCld,PadeCld,Nothing} = nothing,
-    ) where {FT<:AbstractFloat}
+    )
 
 Computes optical properties for the shortwave problem.
 """
 @inline function compute_optical_props!(
     op::AbstractOpticalProps,
-    as::AtmosphericState{FT},
+    as::AtmosphericState,
     gcol::Int,
     igpt::Int,
     lkp::LookUpSW,
     lkp_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
-) where {FT <: AbstractFloat}
+)
     (; nlay, vmr) = as
     @inbounds ibnd = lkp.major_gpt2bnd[igpt]
     @inbounds t_sfc = as.t_sfc[gcol]
