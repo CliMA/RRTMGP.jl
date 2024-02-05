@@ -123,16 +123,7 @@ function setup_rfmip_as(
     ice_rgh = 1
     #------------------
     return (
-        AtmosphericState{
-            FT,
-            typeof(t_sfc),
-            typeof(lat),
-            typeof(p_lev),
-            typeof(cld_r_eff_liq),
-            typeof(cld_mask_lw),
-            Nothing,
-            typeof(vmr),
-        }(
+        AtmosphericState(
             lon,
             lat,
             p_lay,

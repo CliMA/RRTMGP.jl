@@ -19,7 +19,7 @@ export AbstractAtmosphericState,
     GrayOpticalThicknessOGorman2008,
     AbstractGrayOpticalThickness
 
-abstract type AbstractAtmosphericState{FT, FTA1D} end
+abstract type AbstractAtmosphericState end
 
 include("GrayAtmosphericStates.jl")
 
@@ -29,24 +29,15 @@ struct MaxRandomOverlap <: AbstractCloudMask end
 Adapt.@adapt_structure MaxRandomOverlap
 
 """
-    AtmosphericState{FT,FTA1D,FTA1DN,FTA2D,CLDP,CLDM,VMR} <:
-        AbstractAtmosphericState{FT,FTA1D}
+    AtmosphericState{FTA1D,FTA1DN,FTA2D,CLDP,CLDM,VMR} <:
+        AbstractAtmosphericState
 
 Atmospheric conditions, used to compute optical properties. 
 
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct AtmosphericState{
-    FT <: AbstractFloat,
-    FTA1D <: AbstractArray{FT, 1},
-    FTA1DN <: Union{AbstractArray{FT, 1}, Nothing},
-    FTA2D <: AbstractArray{FT, 2},
-    CLDP <: Union{AbstractArray{FT, 2}, Nothing},
-    CLDM <: Union{AbstractArray{Bool, 2}, Nothing},
-    CMASK <: Union{AbstractCloudMask, Nothing},
-    VMR <: AbstractVmr{FT},
-} <: AbstractAtmosphericState{FT, FTA1D}
+struct AtmosphericState{FTA1D, FTA1DN, FTA2D, CLDP, CLDM, CMASK, VMR} <: AbstractAtmosphericState
     "longitude, in degrees (`ncol`), optional"
     lon::FTA1DN
     "latitude, in degrees (`ncol`), optional"

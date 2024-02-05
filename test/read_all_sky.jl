@@ -146,16 +146,7 @@ function setup_allsky_as(
     ice_rgh = 2 # medium ice roughness
 
     return (
-        AtmosphericState{
-            FT,
-            typeof(t_sfc),
-            typeof(lat),
-            typeof(p_lev),
-            typeof(cld_r_eff_liq),
-            typeof(cld_mask_lw),
-            MaxRandomOverlap,
-            typeof(vmr),
-        }(
+        AtmosphericState(
             lon,
             lat,
             p_lay,
