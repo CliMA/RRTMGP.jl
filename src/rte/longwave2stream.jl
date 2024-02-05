@@ -291,7 +291,8 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
     @inbounds albedo_ilev = FT(1) - sfc_emis[ibnd, gcol]
     @inbounds albedo[1, gcol] = albedo_ilev
     # ... and source of diffuse radiation is surface emission
-    @inbounds src[1, gcol] = FT(π) * sfc_emis[ibnd, gcol] * sfc_source[gcol]
+    @inbounds src_ilev = FT(π) * sfc_emis[ibnd, gcol] * sfc_source[gcol]
+    @inbounds src[1, gcol] = src_ilev#FT(π) * sfc_emis[ibnd, gcol] * sfc_source[gcol]
 
     # From bottom to top of atmosphere --
     #   compute albedo and source of upward radiation
@@ -302,14 +303,14 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
         Rdif, Tdif, src_up, src_dn = lw_2stream_coeffs(τ_lay, ssa_lay, g_lay, lev_src_bot, lev_src_top)
         denom = FT(1) / (FT(1) - Rdif * albedo_ilev)  # Eq 10
         albedo_ilevplus1 = Rdif + Tdif * Tdif * albedo_ilev * denom # Equation 9
-        albedo[ilev + 1, gcol] = albedo_ilevplus1
         # 
         # Equation 11 -- source is emitted upward radiation at top of layer plus
         # radiation emitted at bottom of layer,
         # transmitted through the layer and reflected from layers below (Tdiff*src*albedo)
-        src[ilev + 1, gcol] = src_up + Tdif * denom * (src[ilev, gcol] + albedo_ilev * src_dn)
+        src_ilevplus1 = src_up + Tdif * denom * (src_ilev + albedo_ilev * src_dn)
+        albedo[ilev + 1, gcol], src[ilev + 1, gcol] = albedo_ilevplus1, src_ilevplus1
         lev_src_bot = lev_src_top
-        albedo_ilev = albedo_ilevplus1
+        albedo_ilev, src_ilev = albedo_ilevplus1, src_ilevplus1
     end
 
     # Eq 12, at the top of the domain upwelling diffuse is due to ...
@@ -320,18 +321,16 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
     # From the top of the atmosphere downward -- compute fluxes
     @inbounds lev_src_top = lev_source[nlay + 1, gcol]
     @inbounds for ilev in nlay:-1:1
-        lev_src_bot = lev_source[ilev, gcol]
-        src_ilev = src[ilev, gcol]
+        lev_src_bot, albedo_ilev, src_ilev = lev_source[ilev, gcol], albedo[ilev, gcol], src[ilev, gcol]
         τ_lay, ssa_lay, g_lay = τ[ilev, gcol], ssa[ilev, gcol], g[ilev, gcol]
         Rdif, Tdif, _, src_dn = lw_2stream_coeffs(τ_lay, ssa_lay, g_lay, lev_src_bot, lev_src_top)
 
-        denom = FT(1) / (FT(1) - Rdif * albedo[ilev, gcol])  # Eq 10
-        #flux_dn[ilev, gcol] = (Tdif * flux_dn[ilev + 1, gcol] + # Equation 13
+        denom = FT(1) / (FT(1) - Rdif * albedo_ilev)  # Eq 10
         flux_dn_ilev = (Tdif * flux_dn_ilevplus1 + # Equation 13
                         Rdif * src_ilev +
                         src_dn) * denom
         flux_up[ilev, gcol] =
-            flux_dn_ilev * albedo[ilev, gcol] + # Equation 12
+            flux_dn_ilev * albedo_ilev + # Equation 12
             src_ilev
         flux_dn[ilev, gcol] = flux_dn_ilev
         flux_dn_ilevplus1 = flux_dn_ilev

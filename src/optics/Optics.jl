@@ -248,7 +248,7 @@ end
             lev_src_inc_prev = lev_src_inc
             t_lev_dec = t_lev_inc
         end
-        @inbounds lev_source[nlay + 1, gcol] = lev_src_inc_prev
+        lev_source[nlay + 1, gcol] = lev_src_inc_prev
     end
     if !isnothing(lkp_cld) # clouds need TwoStream optics
         cld_r_eff_liq = view(as.cld_r_eff_liq, :, gcol)
