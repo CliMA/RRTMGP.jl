@@ -38,7 +38,7 @@ function rte_lw_2stream_solve!(
     tx = min(ncol, max_threads)
     bx = cld(ncol, tx)
     args = (flux_lw, src_lw, bcs_lw, op, nlay, ncol, as)
-    @cuda threads = (tx) blocks = (bx) rte_lw_2stream_solve_CUDA!(args...)
+    @cuda always_inline = true threads = (tx) blocks = (bx) rte_lw_2stream_solve_CUDA!(args...)
     return nothing
 end
 
@@ -136,7 +136,7 @@ function rte_lw_2stream_solve!(
     tx = min(ncol, max_threads)
     bx = cld(ncol, tx)
     args = (flux, flux_lw, src_lw, bcs_lw, op, nlay, ncol, as, lookup_lw, lookup_lw_cld)
-    @cuda threads = (tx) blocks = (bx) rte_lw_2stream_solve_CUDA!(args...)
+    @cuda always_inline = true threads = (tx) blocks = (bx) rte_lw_2stream_solve_CUDA!(args...)
     return nothing
 end
 
@@ -320,7 +320,8 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
 
     # From the top of the atmosphere downward -- compute fluxes
     @inbounds lev_src_top = lev_source[nlay + 1, gcol]
-    @inbounds for ilev in nlay:-1:1
+    ilev = nlay
+    @inbounds while ilev ≥ 1
         lev_src_bot, albedo_ilev, src_ilev = lev_source[ilev, gcol], albedo[ilev, gcol], src[ilev, gcol]
         τ_lay, ssa_lay, g_lay = τ[ilev, gcol], ssa[ilev, gcol], g[ilev, gcol]
         Rdif, Tdif, _, src_dn = lw_2stream_coeffs(τ_lay, ssa_lay, g_lay, lev_src_bot, lev_src_top)
@@ -335,5 +336,6 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
         flux_dn[ilev, gcol] = flux_dn_ilev
         flux_dn_ilevplus1 = flux_dn_ilev
         lev_src_top = lev_src_bot
+        ilev -= 1
     end
 end

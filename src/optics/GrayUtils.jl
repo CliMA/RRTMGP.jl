@@ -52,7 +52,7 @@ function update_profile_lw!(
         max_threads = 256
         tx = min(ncol, max_threads)
         bx = cld(ncol, tx)
-        @cuda threads = (tx) blocks = (bx) update_profile_lw_CUDA!(param_set, ncol, args...)
+        @cuda always_inline = true threads = (tx) blocks = (bx) update_profile_lw_CUDA!(param_set, ncol, args...)
     else
         @inbounds begin
             ClimaComms.@threaded device for gcol in 1:ncol
@@ -137,7 +137,7 @@ function compute_gray_heating_rate!(context, hr_lay, p_lev, ncol, nlay, flux_net
         max_threads = 256
         tx = min(ncol, max_threads)
         bx = cld(ncol, tx)
-        @cuda threads = (tx) blocks = (bx) compute_gray_heating_rate_CUDA!(ncol, args...)
+        @cuda always_inline = true threads = (tx) blocks = (bx) compute_gray_heating_rate_CUDA!(ncol, args...)
     else
         @inbounds begin
             ClimaComms.@threaded device for gcol in 1:ncol

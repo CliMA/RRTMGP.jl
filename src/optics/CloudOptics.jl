@@ -221,14 +221,18 @@ function pade_eval(ibnd, re, irad, m, n, pade_coeffs, irgh::Union{Int, Nothing} 
     end
 
     @inbounds denom = coeffs[ibnd, irad, n + m]
-    @inbounds for i in (n + m - 1):-1:(1 + m)
+    i = (n + m - 1)
+    @inbounds while i ≥ (1 + m)
         denom = coeffs[ibnd, irad, i] + re * denom
+        i -= 1
     end
     denom = FT(1) + re * denom
 
     @inbounds numer = coeffs[ibnd, irad, m]
-    @inbounds for i in (m - 1):-1:2
+    i = (m - 1)
+    @inbounds while i ≥ 2
         numer = coeffs[ibnd, irad, i] + re * numer
+        i -= 1
     end
     @inbounds numer = coeffs[ibnd, irad, 1] + re * numer
 

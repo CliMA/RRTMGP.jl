@@ -34,7 +34,7 @@ function rte_sw_noscat_solve!(
     tx = min(ncol, max_threads)
     bx = cld(ncol, tx)
     args = (flux_sw, op, bcs_sw, nlay, ncol, as)
-    @cuda threads = (tx) blocks = (bx) rte_sw_noscat_solve_CUDA!(args...)
+    @cuda always_inline = true threads = (tx) blocks = (bx) rte_sw_noscat_solve_CUDA!(args...)
     return nothing
 end
 
@@ -101,7 +101,7 @@ function rte_sw_noscat_solve!(
     tx = min(ncol, max_threads)
     bx = cld(ncol, tx)
     args = (flux, flux_sw, op, bcs_sw, nlay, ncol, as, lookup_sw, lookup_sw_cld)
-    @cuda threads = (tx) blocks = (bx) rte_sw_noscat_solve_CUDA!(args...)
+    @cuda always_inline = true threads = (tx) blocks = (bx) rte_sw_noscat_solve_CUDA!(args...)
     return nothing
 end
 
@@ -160,8 +160,10 @@ function rte_sw_noscat!(
     (; flux_dn_dir, flux_net) = flux
     # downward propagation
     @inbounds flux_dn_dir[nlev, gcol] = toa_flux[gcol] * solar_frac * cos_zenith[gcol]
-    @inbounds for ilev in (nlev - 1):-1:1
+    ilev = nlev - 1
+    @inbounds while ilev ≥ 1
         flux_dn_dir[ilev, gcol] = flux_dn_dir[ilev + 1, gcol] * exp(-τ[ilev, gcol] / cos_zenith[gcol])
         flux_net[ilev, gcol] = -flux_dn_dir[ilev, gcol]
+        ilev -= 1
     end
 end

@@ -39,7 +39,7 @@ function rte_lw_noscat_solve!(
     tx = min(ncol, max_threads)
     bx = cld(ncol, tx)
     args = (flux_lw, src_lw, bcs_lw, op, nlay, ncol, as)
-    @cuda threads = (tx) blocks = (bx) rte_lw_noscat_solve_CUDA!(args...)
+    @cuda always_inline = true threads = (tx) blocks = (bx) rte_lw_noscat_solve_CUDA!(args...)
     return nothing
 end
 
@@ -125,7 +125,7 @@ function rte_lw_noscat_solve!(
     tx = min(ncol, max_threads)
     bx = cld(ncol, tx)
     args = (flux, flux_lw, src_lw, bcs_lw, op, nlay, ncol, as, lookup_lw, lookup_lw_cld)
-    @cuda threads = (tx) blocks = (bx) rte_lw_noscat_solve_CUDA!(args...)
+    @cuda always_inline = true threads = (tx) blocks = (bx) rte_lw_noscat_solve_CUDA!(args...)
     return nothing
 end
 
@@ -244,7 +244,8 @@ Transport for no-scattering longwave problem.
 
     # Top of domain is index nlev
     # Downward propagation
-    @inbounds for ilev in nlay:-1:1
+    ilev = nlay
+    @inbounds while ilev ≥ 1
         τ_loc = τ[ilev, gcol] * Ds[1]
         trans = exp(-τ_loc)
         lay_src, lev_src_dec = lay_source[ilev, gcol], lev_source_dec[ilev, gcol]
@@ -252,6 +253,7 @@ Transport for no-scattering longwave problem.
             trans * intensity_dn_ilevplus1 + lw_noscat_source_dn(lev_src_dec, lay_src, τ_loc, trans, τ_thresh)
         intensity_dn_ilevplus1 = intensity_dn_ilev
         flux_dn[ilev, gcol] = intensity_dn_ilev * intensity_to_flux
+        ilev -= 1
     end
 
     # Surface reflection and emission
