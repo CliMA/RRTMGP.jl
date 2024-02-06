@@ -376,7 +376,8 @@ function rte_sw_2stream!(
     @inbounds flux_dn[nlev, gcol] += flux_dn_dir_top
     τ_cum = FT(0)
 
-    @inbounds for ilev in nlay:-1:1
+    ilev = nlay
+    @inbounds while ilev ≥ 1
         τ_ilev, ssa_ilev, g_ilev = τ[ilev, gcol], ssa[ilev, gcol], g[ilev, gcol]
         albedo_ilev, src_ilev = albedo[ilev, gcol], src[ilev, gcol]
         (_, Tdir, _, Rdif, Tdif) = sw_2stream_coeffs(τ_ilev, ssa_ilev, g_ilev, μ₀)
@@ -391,6 +392,7 @@ function rte_sw_2stream!(
             src_ilev
         flux_dn[ilev, gcol] = flux_dn_ilev + flux_dn_dir_top * exp(-τ_cum / μ₀)
         flux_dn_ilevplus1 = flux_dn_ilev
+        ilev -= 1
     end
     return nothing
 end
