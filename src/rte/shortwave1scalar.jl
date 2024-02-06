@@ -34,7 +34,7 @@ function rte_sw_noscat_solve!(
     tx = min(ncol, max_threads)
     bx = cld(ncol, tx)
     args = (flux_sw, op, bcs_sw, nlay, ncol, as)
-    @cuda threads = (tx) blocks = (bx) rte_sw_noscat_solve_CUDA!(args...)
+    @cuda always_inline = true threads = (tx) blocks = (bx) rte_sw_noscat_solve_CUDA!(args...)
     return nothing
 end
 
@@ -101,7 +101,7 @@ function rte_sw_noscat_solve!(
     tx = min(ncol, max_threads)
     bx = cld(ncol, tx)
     args = (flux, flux_sw, op, bcs_sw, nlay, ncol, as, lookup_sw, lookup_sw_cld)
-    @cuda threads = (tx) blocks = (bx) rte_sw_noscat_solve_CUDA!(args...)
+    @cuda always_inline = true threads = (tx) blocks = (bx) rte_sw_noscat_solve_CUDA!(args...)
     return nothing
 end
 

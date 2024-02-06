@@ -38,7 +38,7 @@ function rte_lw_2stream_solve!(
     tx = min(ncol, max_threads)
     bx = cld(ncol, tx)
     args = (flux_lw, src_lw, bcs_lw, op, nlay, ncol, as)
-    @cuda threads = (tx) blocks = (bx) rte_lw_2stream_solve_CUDA!(args...)
+    @cuda always_inline = true threads = (tx) blocks = (bx) rte_lw_2stream_solve_CUDA!(args...)
     return nothing
 end
 
@@ -136,7 +136,7 @@ function rte_lw_2stream_solve!(
     tx = min(ncol, max_threads)
     bx = cld(ncol, tx)
     args = (flux, flux_lw, src_lw, bcs_lw, op, nlay, ncol, as, lookup_lw, lookup_lw_cld)
-    @cuda threads = (tx) blocks = (bx) rte_lw_2stream_solve_CUDA!(args...)
+    @cuda always_inline = true threads = (tx) blocks = (bx) rte_lw_2stream_solve_CUDA!(args...)
     return nothing
 end
 

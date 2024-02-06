@@ -115,7 +115,7 @@ function compute_col_gas!(
     if device isa ClimaComms.CUDADevice
         tx = min(nlay * ncol, max_threads)
         bx = cld(nlay * ncol, tx)
-        @cuda threads = (tx) blocks = (bx) compute_col_gas_CUDA!(col_dry, args...)
+        @cuda always_inline = true threads = (tx) blocks = (bx) compute_col_gas_CUDA!(col_dry, args...)
     else
         @inbounds begin
             ClimaComms.@threaded device for icnt in 1:(nlay * ncol)
