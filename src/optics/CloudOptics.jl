@@ -1,6 +1,6 @@
 
 """
-    add_cloud_optics_2stream(
+    add_cloud_optics_2stream!(
         τ,
         ssa,
         g,
@@ -18,7 +18,7 @@
 This function computes the TwoStream clouds optics properties and adds them
 to the TwoStream gas optics properties.
 """
-@inline function add_cloud_optics_2stream(
+@inline function add_cloud_optics_2stream!(
     τ,
     ssa,
     g,
@@ -28,7 +28,7 @@ to the TwoStream gas optics properties.
     cld_path_liq,
     cld_path_ice,
     ice_rgh,
-    lkp_cld,
+    lkp_cld::PadeCld,
     ibnd;
     delta_scaling = false,
 )
@@ -37,7 +37,7 @@ to the TwoStream gas optics properties.
         for glay in 1:nlay
             if cld_mask[glay]
                 # compute cloud optical optics
-                τ_cl, ssa_cl, g_cl = compute_cld_props(
+                τ_cl, ssa_cl, g_cl = compute_pade_cld_props(
                     lkp_cld,
                     cld_r_eff_liq[glay],
                     cld_r_eff_ice[glay],
@@ -57,10 +57,153 @@ to the TwoStream gas optics properties.
     return nothing
 end
 
+@inline function add_cloud_optics_2stream!(
+    τ,
+    ssa,
+    g,
+    cld_mask,
+    cld_r_eff_liq,
+    cld_r_eff_ice,
+    cld_path_liq,
+    cld_path_ice,
+    ice_rgh,
+    lkp_cld::LookUpCld,
+    ibnd;
+    delta_scaling = false,
+)
+    nlay = length(τ)
+    FT = eltype(τ)
+    lut_extliq, lut_ssaliq, lut_asyliq = LookUpTables.getview_liqdata(lkp_cld, ibnd)
+    lut_extice, lut_ssaice, lut_asyice = LookUpTables.getview_icedata(lkp_cld, ibnd, ice_rgh)
+    _, _, nsize_liq, nsize_ice, _ = lkp_cld.dims
+    radliq_lwr, radliq_upr, _, radice_lwr, radice_upr, _ = lkp_cld.bounds
+    @inbounds begin
+        for glay in 1:nlay
+            if cld_mask[glay]
+                # cloud liquid particles
+                τl, τl_ssa, τl_ssag = compute_lookup_cld_liq_props(
+                    nsize_liq,
+                    radliq_lwr,
+                    radliq_upr,
+                    lut_extliq,
+                    lut_ssaliq,
+                    lut_asyliq,
+                    cld_r_eff_liq[glay],
+                    cld_path_liq[glay],
+                )
+                # cloud ice particles
+                τi, τi_ssa, τi_ssag = compute_lookup_cld_ice_props(
+                    nsize_ice,
+                    radice_lwr,
+                    radice_upr,
+                    lut_extice,
+                    lut_ssaice,
+                    lut_asyice,
+                    cld_r_eff_ice[glay],
+                    cld_path_ice[glay],
+                )
+
+                τ_cl = τl + τi
+                ssa_cl = τl_ssa + τi_ssa
+                g_cl = (τl_ssag + τi_ssag) / max(eps(FT), ssa_cl)
+                ssa_cl /= max(eps(FT), τ_cl)
+
+                if delta_scaling # delta scaling is applied for shortwave problem
+                    τ_cl, ssa_cl, g_cl = delta_scale(τ_cl, ssa_cl, g_cl)
+                end
+                # compute cloud optical optics
+                τ[glay], ssa[glay], g[glay] = increment_2stream(τ[glay], ssa[glay], g[glay], τ_cl, ssa_cl, g_cl)
+            end
+        end
+    end
+    return nothing
+end
 
 """
-    compute_cld_props(
-        lkp_cld::LookUpCld,
+    compute_lookup_cld_liq_props(
+        nsize_liq,
+        radliq_lwr,
+        radliq_upr,
+        lut_extliq,
+        lut_ssaliq,
+        lut_asyliq,
+        re_liq,
+        cld_path_liq,
+    )
+
+This function computes the `TwoStream` cloud liquid properties using the `LookUpTable` method.
+"""
+@inline function compute_lookup_cld_liq_props(
+    nsize_liq,
+    radliq_lwr,
+    radliq_upr,
+    lut_extliq,
+    lut_ssaliq,
+    lut_asyliq,
+    re_liq,
+    cld_path_liq,
+)
+    FT = eltype(re_liq)
+    τl, τl_ssa, τl_ssag = FT(0), FT(0), FT(0)
+    # cloud liquid particles
+    if cld_path_liq > eps(FT)
+        Δr_liq = (radliq_upr - radliq_lwr) / FT(nsize_liq - 1)
+        loc = Int(max(min(unsafe_trunc(Int, (re_liq - radliq_lwr) / Δr_liq) + 1, nsize_liq - 1), 1))
+        fac = (re_liq - radliq_lwr - (loc - 1) * Δr_liq) / Δr_liq
+        fc1 = FT(1) - fac
+        @inbounds begin
+            τl = (fc1 * lut_extliq[loc] + fac * lut_extliq[loc + 1]) * cld_path_liq
+            τl_ssa = (fc1 * lut_ssaliq[loc] + fac * lut_ssaliq[loc + 1]) * τl
+            τl_ssag = (fc1 * lut_asyliq[loc] + fac * lut_asyliq[loc + 1]) * τl_ssa
+        end
+    end
+    return (τl, τl_ssa, τl_ssag)
+end
+
+"""
+    compute_lookup_cld_ice_props(
+        nsize_ice,
+        radice_lwr,
+        radice_upr,
+        lut_extice,
+        lut_ssaice,
+        lut_asyice,
+        re_ice,
+        cld_path_ice,
+    )
+
+This function computes the `TwoStream` cloud ice properties using the `LookUpTable` method.
+"""
+@inline function compute_lookup_cld_ice_props(
+    nsize_ice,
+    radice_lwr,
+    radice_upr,
+    lut_extice,
+    lut_ssaice,
+    lut_asyice,
+    re_ice,
+    cld_path_ice,
+)
+    FT = eltype(re_ice)
+    τi, τi_ssa, τi_ssag = FT(0), FT(0), FT(0)
+    # cloud ice particles
+    if cld_path_ice > eps(FT)
+        Δr_ice = (radice_upr - radice_lwr) / FT(nsize_ice - 1)
+        loc = Int(max(min(unsafe_trunc(Int, (re_ice - radice_lwr) / Δr_ice) + 1, nsize_ice - 1), 1))
+        fac = (re_ice - radice_lwr - (loc - 1) * Δr_ice) / Δr_ice
+        fc1 = FT(1) - fac
+        @inbounds begin
+            τi = (fc1 * lut_extice[loc] + fac * lut_extice[loc + 1]) * cld_path_ice
+            τi_ssa = (fc1 * lut_ssaice[loc] + fac * lut_ssaice[loc + 1]) * τi
+            τi_ssag = (fc1 * lut_asyice[loc] + fac * lut_asyice[loc + 1]) * τi_ssa
+        end
+    end
+    return (τi, τi_ssa, τi_ssag)
+end
+
+"""
+    compute_pade_cld_props(
+        lkp_cld::PadeCld,
         re_liq::FT,
         re_ice::FT,
         ice_rgh::Int,
@@ -69,68 +212,9 @@ end
         ibnd::UInt8,
     ) where {FT}
 
-This function computed the TwoSteam cloud optics properties using either the 
-lookup table method or pade method.
+This function computes the `TwoSteam` cloud optics properties using the pade method.
 """
-function compute_cld_props(
-    lkp_cld::LookUpCld,
-    re_liq::FT,
-    re_ice::FT,
-    ice_rgh::Int,
-    cld_path_liq::FT,
-    cld_path_ice::FT,
-    ibnd::UInt8,
-) where {FT}
-    τl, τl_ssa, τl_ssag = FT(0), FT(0), FT(0)
-    τi, τi_ssa, τi_ssag = FT(0), FT(0), FT(0)
-    (;
-        lut_extliq,
-        lut_ssaliq,
-        lut_asyliq,
-        lut_extice,
-        lut_ssaice,
-        lut_asyice,
-        radliq_lwr,
-        radliq_upr,
-        radice_lwr,
-        radice_upr,
-    ) = lkp_cld
-    nsize_liq = LookUpTables.get_nsize_liq(lkp_cld)
-    nsize_ice = LookUpTables.get_nsize_ice(lkp_cld)
-    Δr_liq = (radliq_upr - radliq_lwr) / FT(nsize_liq - 1)
-    Δr_ice = (radice_upr - radice_lwr) / FT(nsize_ice - 1)
-    # cloud liquid particles
-    if cld_path_liq > eps(FT)
-        loc = Int(max(min(unsafe_trunc(Int, (re_liq - radliq_lwr) / Δr_liq) + 1, nsize_liq - 1), 1))
-        fac = (re_liq - radliq_lwr - (loc - 1) * Δr_liq) / Δr_liq
-        fc1 = FT(1) - fac
-        @inbounds begin
-            τl = (fc1 * lut_extliq[loc, ibnd] + fac * lut_extliq[loc + 1, ibnd]) * cld_path_liq
-            τl_ssa = (fc1 * lut_ssaliq[loc, ibnd] + fac * lut_ssaliq[loc + 1, ibnd]) * τl
-            τl_ssag = (fc1 * lut_asyliq[loc, ibnd] + fac * lut_asyliq[loc + 1, ibnd]) * τl_ssa
-        end
-    end
-    # cloud ice particles
-    if cld_path_ice > eps(FT)
-        loc = Int(max(min(unsafe_trunc(Int, (re_ice - radice_lwr) / Δr_ice) + 1, nsize_ice - 1), 1))
-        fac = (re_ice - radice_lwr - (loc - 1) * Δr_ice) / Δr_ice
-        fc1 = FT(1) - fac
-        @inbounds begin
-            τi = (fc1 * lut_extice[loc, ibnd, ice_rgh] + fac * lut_extice[loc + 1, ibnd, ice_rgh]) * cld_path_ice
-            τi_ssa = (fc1 * lut_ssaice[loc, ibnd, ice_rgh] + fac * lut_ssaice[loc + 1, ibnd, ice_rgh]) * τi
-            τi_ssag = (fc1 * lut_asyice[loc, ibnd, ice_rgh] + fac * lut_asyice[loc + 1, ibnd, ice_rgh]) * τi_ssa
-        end
-    end
-
-    τ = τl + τi
-    τ_ssa = τl_ssa + τi_ssa
-    τ_ssag = (τl_ssag + τi_ssag) / max(eps(FT), τ_ssa)
-    τ_ssa /= max(eps(FT), τ)
-
-    return (τ, τ_ssa, τ_ssag)
-end
-
-function compute_cld_props(
+function compute_pade_cld_props(
     lkp_cld::PadeCld,
     re_liq::FT,
     re_ice::FT,
@@ -263,7 +347,8 @@ function build_cloud_mask!(
         @inbounds cld_frac_ilayplus1 = cld_frac[finish]
         random_ilayplus1 = Random.rand()
         @inbounds cld_mask[finish] = cld_mask_ilayplus1 = random_ilayplus1 >= (FT(1) - cld_frac_ilayplus1)
-        for ilay in (finish - 1):-1:start
+        ilay = finish - 1
+        while ilay ≥ start
             @inbounds cld_frac_ilay = cld_frac[ilay]
             if cld_frac_ilay > FT(0)
                 # use same random number from the layer above if layer above is cloudy
@@ -278,6 +363,7 @@ function build_cloud_mask!(
             @inbounds cld_mask[ilay] = cld_mask_ilay
             cld_frac_ilayplus1 = cld_frac_ilay
             cld_mask_ilayplus1 = cld_mask_ilay
+            ilay -= 1
         end
     end
     return nothing

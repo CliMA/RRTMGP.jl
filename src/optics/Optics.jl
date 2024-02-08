@@ -257,7 +257,7 @@ end
         cld_path_ice = view(as.cld_path_ice, :, gcol)
         cld_mask = view(as.cld_mask_lw, :, gcol)
 
-        add_cloud_optics_2stream(
+        add_cloud_optics_2stream!(
             τ,
             ssa,
             g,
@@ -325,7 +325,7 @@ Computes optical properties for the shortwave problem.
         cld_path_ice = view(as.cld_path_ice, :, gcol)
         cld_mask = view(as.cld_mask_sw, :, gcol)
 
-        add_cloud_optics_2stream(
+        add_cloud_optics_2stream!(
             τ,
             ssa,
             g,
