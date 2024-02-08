@@ -99,8 +99,9 @@ function setup_allsky_as(
     cld_path_ice = zeros(FT, nlay, ncol)
 
     if use_lut
-        r_eff_liq = (lkp_lw_cld.radliq_lwr + lkp_lw_cld.radliq_upr) / FT(2)
-        r_eff_ice = (lkp_lw_cld.radice_lwr + lkp_lw_cld.radice_upr) / FT(2)
+        radliq_lwr, radliq_upr, _, radice_lwr, radice_upr, _ = Array(lkp_lw_cld.bounds)
+        r_eff_liq = (radliq_lwr + radliq_upr) / FT(2)
+        r_eff_ice = (radice_lwr + radice_upr) / FT(2)
     else
         pade_sizreg_extliq = Array(lkp_lw_cld.pade_sizreg_extliq) # TODO temp fix to avoid scalar indexing on GPU
         pade_sizreg_extice = Array(lkp_lw_cld.pade_sizreg_extice)

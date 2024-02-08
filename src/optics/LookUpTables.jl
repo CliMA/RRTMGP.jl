@@ -762,7 +762,7 @@ get_n_contrib_lower(lkp::LookUpSW) = get_n_contrib(lkp.minor_lower)
 get_n_contrib_upper(lkp::LookUpSW) = get_n_contrib(lkp.minor_upper)
 
 """
-    LookUpCld{FT,FTA2D,FTA3D}
+    LookUpCld{D, B, L, I, W} <: AbstractLookUp
 
 Lookup table for cloud optics.
 
@@ -775,90 +775,84 @@ These are used to determine the optical properties of ice and water cloud togeth
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct LookUpCld{FT, FTA2D, FTA3D} <: AbstractLookUp
-    "liquid particle size lower bound for LUT interpolation"
-    radliq_lwr::FT
-    "liquid particle size upper bound for LUT interpolation"
-    radliq_upr::FT
-    "factor for calculating LUT interpolation for liquid particle"
-    radliq_fac::FT
-    "ice particle size lower bound for LUT interpolation"
-    radice_lwr::FT
-    "ice particle size upper bound for LUT interpolation"
-    radice_upr::FT
-    "factor for calculating LUT interpolation for ice particle"
-    radice_fac::FT
-    "LUT liquid extinction coefficient (`nsize_liq, nbnd`) m²/g"
-    lut_extliq::FTA2D
-    "LUT liquid single scattering albedo (`nsize_liq, nbnd`)"
-    lut_ssaliq::FTA2D
-    "LUT liquid asymmetry parameter (`nsize_liq, nbnd`)"
-    lut_asyliq::FTA2D
-    "LUT ice extinction coefficient (`nsize_ice, nband, nrghice`) m²/g"
-    lut_extice::FTA3D
-    "LUT ice single scattering albedo (`nsize_ice, nband, nrghice`)"
-    lut_ssaice::FTA3D
-    "LUT ice asymmetry parameter (`nsize_ice, nband, nrghice`)"
-    lut_asyice::FTA3D
+struct LookUpCld{D, B, L, I, W} <: AbstractLookUp
+    "`nband`, `nrghice`, `nsize_liq`, `nsize_ice`, `pair`"
+    dims::D
+    "particle size lower and upper bounds and factor for LUT interpolation for liquid and ice particles"
+    bounds::B
+    "liquid extinction coefficient, single scattering albedo and symmetry paramter `(3*nsize_liq, nbnd)`"
+    liqdata::L
+    "ice extinction coefficient, single scattering albedo and symmetry paramter `(3*nsize_ice, nbnd, nrghice)`"
+    icedata::I
     "beginning and ending wavenumber for each band (`2, nband`) cm⁻¹"
-    bnd_lims_wn::FTA2D
+    bnd_lims_wn::W
 end
 Adapt.@adapt_structure LookUpCld
 
-# number of bands (cloud lookup table dimension)
-get_nband(lkp::LookUpCld) = size(lkp.lut_extliq, 2)
-# number of ice roughness types (cloud lookup table dimension)
-get_nrghice(lkp::LookUpCld) = size(lkp.lut_extice, 3)
-# number of liquid particle sizes (cloud lookup table dimension)
-get_nsize_liq(lkp::LookUpCld) = size(lkp.lut_extliq, 1)
-# number of ice particle sizes (cloud lookup table dimension)
-get_nsize_ice(lkp::LookUpCld) = size(lkp.lut_extice, 1)
-# pair = 2 (cloud lookup table dimension)
-get_pair(::LookUpCld) = 2
-
 function LookUpCld(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
-    FTA2D = DA{FT, 2}
-    FTA3D = DA{FT, 3}
+    dims = DA([
+        Int(ds.dim["nband"]),
+        Int(ds.dim["nrghice"]),
+        Int(ds.dim["nsize_liq"]),
+        Int(ds.dim["nsize_ice"]),
+        Int(ds.dim["pair"]),
+    ])
+    bounds = DA([
+        # liquid particle size lower bound for LUT interpolation
+        FT(Array(ds["radliq_lwr"])),
+        # liquid particle size upper bound for LUT interpolation
+        FT(Array(ds["radliq_upr"])),
+        # factor for calculating LUT interpolation for liquid particle
+        FT(Array(ds["radliq_fac"])),
+        # ice particle size lower bound for LUT interpolation
+        FT(Array(ds["radice_lwr"])),
+        # ice particle size upper bound for LUT interpolation
+        FT(Array(ds["radice_upr"])),
+        # factor for calculating LUT interpolation for ice particle
+        FT(Array(ds["radice_fac"])),
+    ])
+    liqdata = DA(vcat(Array(ds["lut_extliq"]), Array(ds["lut_ssaliq"]), Array(ds["lut_asyliq"])))
+    icedata = DA(vcat(Array(ds["lut_extice"]), Array(ds["lut_ssaice"]), Array(ds["lut_asyice"])))
+    bnd_lims_wn = DA(Array(ds["bnd_limits_wavenumber"]))
+    return LookUpCld(dims, bounds, liqdata, icedata, bnd_lims_wn)
+end
 
-    nband = Int(ds.dim["nband"])
-    nrghice = Int(ds.dim["nrghice"])
-    nsize_liq = Int(ds.dim["nsize_liq"])
-    nsize_ice = Int(ds.dim["nsize_ice"])
-    pair = Int(ds.dim["pair"])
+@inline get_dims(lkp::LookUpCld) = lkp.dims
+# number of bands (cloud lookup table dimension)
+@inline get_nband(lkp::LookUpCld) = @inbounds lkp.dims[1]
+# number of ice roughness types (cloud lookup table dimension)
+@inline get_nrghice(lkp::LookUpCld) = @inbounds lkp.dims[2]
+# number of liquid particle sizes (cloud lookup table dimension)
+@inline get_nsize_liq(lkp::LookUpCld) = @inbounds lkp.dims[3]
+# number of ice particle sizes (cloud lookup table dimension)
+@inline get_nsize_ice(lkp::LookUpCld) = @inbounds lkp.dims[4]
+# pair = 2 (cloud lookup table dimension)
+@inline get_pair(::LookUpCld) = @inbounds lkp.dims[5]
 
-    radliq_lwr = FT(Array(ds["radliq_lwr"]))
-    radliq_upr = FT(Array(ds["radliq_upr"]))
-    radliq_fac = FT(Array(ds["radliq_fac"]))
+@inline function getview_liqdata(lkp::LookUpCld, ibnd)
+    n = get_nsize_liq(lkp)
+    liqdata = lkp.liqdata
+    return @inbounds (
+        # LUT liquid extinction coefficient (`nsize_liq, nbnd`) m²/g
+        view(liqdata, 1:n, ibnd),
+        # LUT liquid single scattering albedo (`nsize_liq, nbnd`)
+        view(liqdata, (n + 1):(n * 2), ibnd),
+        # LUT liquid asymmetry parameter (`nsize_liq, nbnd`)
+        view(liqdata, (n * 2 + 1):(n * 3), ibnd),
+    )
+end
 
-    radice_lwr = FT(Array(ds["radice_lwr"]))
-    radice_upr = FT(Array(ds["radice_upr"]))
-    radice_fac = FT(Array(ds["radice_fac"]))
-
-    lut_extliq = FTA2D(Array(ds["lut_extliq"]))
-    lut_ssaliq = FTA2D(Array(ds["lut_ssaliq"]))
-    lut_asyliq = FTA2D(Array(ds["lut_asyliq"]))
-
-    lut_extice = FTA3D(Array(ds["lut_extice"]))
-    lut_ssaice = FTA3D(Array(ds["lut_ssaice"]))
-    lut_asyice = FTA3D(Array(ds["lut_asyice"]))
-
-    bnd_lims_wn = FTA2D(Array(ds["bnd_limits_wavenumber"]))
-
-    return (LookUpCld{FT, FTA2D, FTA3D}(
-        radliq_lwr,
-        radliq_upr,
-        radliq_fac,
-        radice_lwr,
-        radice_upr,
-        radice_fac,
-        lut_extliq,
-        lut_ssaliq,
-        lut_asyliq,
-        lut_extice,
-        lut_ssaice,
-        lut_asyice,
-        bnd_lims_wn,
-    ))
+@inline function getview_icedata(lkp::LookUpCld, ibnd, ice_rgh)
+    n = get_nsize_ice(lkp)
+    icedata = lkp.icedata
+    return @inbounds (
+        # LUT ice extinction coefficient (`nsize_ice, nband, nrghice`) m²/g
+        view(icedata, 1:n, ibnd, ice_rgh),
+        # LUT ice single scattering albedo (`nsize_ice, nband, nrghice`)
+        view(icedata, (n + 1):(n * 2), ibnd, ice_rgh),
+        # LUT ice asymmetry parameter (`nsize_ice, nband, nrghice`)
+        view(icedata, (n * 2 + 1):(n * 3), ibnd, ice_rgh),
+    )
 end
 
 """
