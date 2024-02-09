@@ -87,7 +87,11 @@ Compute interpolation fraction for binary species parameter.
     itemp = 1
     @inbounds η_half = vmr_ref[tropo, ig[1] + 1, jtemp + itemp - 1] / vmr_ref[tropo, ig[2] + 1, jtemp + itemp - 1]
     col_mix1 = vmr1 + η_half * vmr2
-    η = col_mix1 > 0 ? vmr1 / col_mix1 : FT(0.5) # rte-rrtmgp uses col_mix1 > tiny(col_mix1)
+    η = vmr1 * (FT(1) / col_mix1) # rewritten to ease register pressure
+    if col_mix1 ≤ FT(0)
+        η = FT(0.5)
+    end
+    #η = col_mix1 > 0 ? vmr1 / col_mix1 : FT(0.5) # rte-rrtmgp uses col_mix1 > tiny(col_mix1)
     loc_η = FT(η * (n_η - 1))
     jη1 = min(unsafe_trunc(Int, loc_η) + 1, n_η - 1)
     fη1 = loc_η - unsafe_trunc(Int, loc_η)
@@ -95,7 +99,11 @@ Compute interpolation fraction for binary species parameter.
     itemp = 2
     @inbounds η_half = vmr_ref[tropo, ig[1] + 1, jtemp + itemp - 1] / vmr_ref[tropo, ig[2] + 1, jtemp + itemp - 1]
     col_mix2 = vmr1 + η_half * vmr2
-    η = col_mix2 > 0 ? vmr1 / col_mix2 : FT(0.5) # rte-rrtmgp uses col_mix2 > tiny(col_mix2)
+    η = vmr1 * (FT(1) / col_mix2) # rewritten to ease register pressure
+    if col_mix2 ≤ FT(0)
+        η = FT(0.5)
+    end
+    #η = col_mix2 > 0 ? vmr1 / col_mix2 : FT(0.5) # rte-rrtmgp uses col_mix2 > tiny(col_mix2)
     loc_η = FT(η * (n_η - 1))
     jη2 = min(unsafe_trunc(Int, loc_η) + 1, n_η - 1)
     fη2 = loc_η - unsafe_trunc(Int, loc_η)
@@ -179,7 +187,12 @@ end
     @inbounds rayleigh_coeff = tropo == 1 ? view(lkp.rayl_lower, :, :, igpt) : view(lkp.rayl_upper, :, :, igpt)
     τ_ray = compute_τ_rayleigh(rayleigh_coeff, col_dry, vmr_h2o, jftemp..., jfη..., igpt)
     τ = τ_major + τ_minor + τ_ray
-    ssa = τ > 0 ? τ_ray / τ : zero(τ) # single scattering albedo
+    FT = eltype(τ)
+    ssa = τ_ray * (FT(1) / τ)# rewritten to ease register pressure
+    if τ ≤ FT(0)
+        ssa = FT(0)
+    end
+    #ssa = τ > 0 ? τ_ray / τ : zero(τ) # single scattering albedo
     return (τ, ssa, zero(τ)) # initializing asymmetry parameter
 end
 
