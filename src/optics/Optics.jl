@@ -288,7 +288,33 @@ end
 Computes optical properties for the shortwave problem.
 """
 @inline function compute_optical_props!(
-    op::AbstractOpticalProps,
+    op::OneScalar,
+    as::AtmosphericState,
+    gcol::Int,
+    igpt::Int,
+    lkp::LookUpSW,
+    ::Nothing,
+)
+    (; nlay, vmr) = as
+    @inbounds ibnd = lkp.major_gpt2bnd[igpt]
+    @inbounds t_sfc = as.t_sfc[gcol]
+    col_dry_col = view(as.col_dry, :, gcol)
+    p_lay_col = view(as.p_lay, :, gcol)
+    t_lay_col = view(as.t_lay, :, gcol)
+    τ = view(op.τ, :, gcol)
+
+    @inbounds for glay in 1:nlay
+        col_dry = col_dry_col[glay]
+        p_lay = p_lay_col[glay]
+        t_lay = t_lay_col[glay]
+        # compute gas optics
+        τ[glay], _, _ = compute_gas_optics(lkp, vmr, col_dry, igpt, ibnd, p_lay, t_lay, glay, gcol)
+    end
+    return nothing
+end
+
+@inline function compute_optical_props!(
+    op::TwoStream,
     as::AtmosphericState,
     gcol::Int,
     igpt::Int,
@@ -302,21 +328,15 @@ Computes optical properties for the shortwave problem.
     p_lay_col = view(as.p_lay, :, gcol)
     t_lay_col = view(as.t_lay, :, gcol)
     τ = view(op.τ, :, gcol)
-    if op isa TwoStream
-        ssa = view(op.ssa, :, gcol)
-        g = view(op.g, :, gcol)
-    end
+    ssa = view(op.ssa, :, gcol)
+    g = view(op.g, :, gcol)
 
     @inbounds for glay in 1:nlay
         col_dry = col_dry_col[glay]
         p_lay = p_lay_col[glay]
         t_lay = t_lay_col[glay]
         # compute gas optics
-        if op isa TwoStream
-            τ[glay], ssa[glay], g[glay] = compute_gas_optics(lkp, vmr, col_dry, igpt, ibnd, p_lay, t_lay, glay, gcol)
-        else
-            τ[glay], _, _ = compute_gas_optics(lkp, vmr, col_dry, igpt, ibnd, p_lay, t_lay, glay, gcol)
-        end
+        τ[glay], ssa[glay], g[glay] = compute_gas_optics(lkp, vmr, col_dry, igpt, ibnd, p_lay, t_lay, glay, gcol)
     end
     if !isnothing(lkp_cld) # clouds need TwoStream optics
         cld_r_eff_liq = view(as.cld_r_eff_liq, :, gcol)
