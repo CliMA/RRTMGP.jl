@@ -351,13 +351,14 @@ function rte_sw_2stream!(
     @inbounds for ilev in 1:nlay
         τ_ilev, ssa_ilev, g_ilev = τ[ilev, gcol], ssa[ilev, gcol], g[ilev, gcol]
         (Rdir, Tdir, _, Rdif, Tdif) = sw_2stream_coeffs(τ_ilev, ssa_ilev, g_ilev, μ₀)
-        denom = FT(1) / (FT(1) - Rdif * albedo_ilev)  # Eq 10
+        denom = FT(1) / max((FT(1) - Rdif * albedo_ilev), eps(FT))  # Eq 10
         albedo_ilevplus1 = Rdif + Tdif * Tdif * albedo_ilev * denom # Equation 9
         # 
         # Equation 11 -- source is emitted upward radiation at top of layer plus
         # radiation emitted at bottom of layer,
         # transmitted through the layer and reflected from layers below (Tdiff*src*albedo)
         τ_cum -= τ_ilev
+        #τ_cum = max(τ_cum, 0)
         flux_dn_dir_ilevplus1 = flux_dn_dir_top * exp(-τ_cum / μ₀)
         src_up_ilev = Rdir * flux_dn_dir_ilevplus1 #flux_dn_dir[ilev + 1]
         src_dn_ilev = Tdir * flux_dn_dir_ilevplus1 #flux_dn_dir[ilev + 1]
@@ -365,8 +366,18 @@ function rte_sw_2stream!(
         albedo[ilev + 1, gcol], src[ilev + 1, gcol] = albedo_ilevplus1, src_ilevplus1
         albedo_ilev = albedo_ilevplus1
         src_ilev = src_ilevplus1
+        if τ_cum < 0 && src_ilev > FT(1e3)
+            @info "τ_cum" τ_cum
+            @info "τ_ilev" τ_ilev
+            @info "μ₀" μ₀
+            @info "-τ_cum / μ₀" -τ_cum / μ₀
+        end
     end
     # Eq 12, at the top of the domain upwelling diffuse is due to ...
+    # if (μ₀ < FT(2e-7) && src[nlev, gcol] > 1e5)
+    #     @info "albedo" albedo[nlev, gcol]
+    #     @info "src" src[nlev, gcol] 
+    # end
     @inbounds flux_up[nlev, gcol] =
         flux_dn[nlev, gcol] * albedo[nlev, gcol] + # ... reflection of incident diffuse and
         src[nlev, gcol]                          # scattering by the direct beam below
@@ -381,7 +392,7 @@ function rte_sw_2stream!(
         τ_ilev, ssa_ilev, g_ilev = τ[ilev, gcol], ssa[ilev, gcol], g[ilev, gcol]
         albedo_ilev, src_ilev = albedo[ilev, gcol], src[ilev, gcol]
         (_, Tdir, _, Rdif, Tdif) = sw_2stream_coeffs(τ_ilev, ssa_ilev, g_ilev, μ₀)
-        denom = FT(1) / (FT(1) - Rdif * albedo_ilev)  # Eq 10
+        denom = FT(1) / max((FT(1) - Rdif * albedo_ilev), eps(FT))  # Eq 10
         src_dn_ilev = Tdir * flux_dn_dir_top * exp(-τ_cum / μ₀)
         τ_cum += τ_ilev
         flux_dn_ilev = (Tdif * flux_dn_ilevplus1 + # Equation 13

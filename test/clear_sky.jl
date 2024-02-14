@@ -1,4 +1,5 @@
 FT = get(ARGS, 1, Float64) == "Float32" ? Float32 : Float64
+FT = Float32
 
 include("clear_sky_utils.jl")
 

@@ -38,6 +38,7 @@ function setup_rfmip_as(
     usecol .= 1
     for i in 1:ncol
         if zenith[i] > FT(π) / 2 - 2 * eps(FT)
+            zenith[i] = FT(π) / 2 - 2 * eps(FT)
             irrad[i] = FT(0)
             usecol[i] = 0
         end
