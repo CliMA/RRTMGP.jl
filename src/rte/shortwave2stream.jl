@@ -9,7 +9,7 @@ function rte_sw_2stream_solve!(
 )
     (; nlay, ncol) = as
     nlev = nlay + 1
-    n_gpt, igpt, ibnd = 1, 1, UInt8(1)
+    n_gpt, igpt, ibnd = 1, 1, 1
     FT = eltype(bcs_sw.cos_zenith)
     solar_frac = FT(1)
     @inbounds begin
@@ -58,7 +58,7 @@ function rte_sw_2stream_solve_CUDA!(
 )
     gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
     nlev = nlay + 1
-    n_gpt, igpt, ibnd = 1, 1, UInt8(1)
+    n_gpt, igpt, ibnd = 1, 1, 1
     FT = eltype(bcs_sw.cos_zenith)
     solar_frac = FT(1)
     if gcol ≤ ncol
@@ -109,7 +109,7 @@ function rte_sw_2stream_solve!(
                 # compute optical properties
                 compute_optical_props!(op, as, gcol, igpt, lookup_sw, lookup_sw_cld)
                 solar_frac = lookup_sw.solar_src_scaled[igpt]
-                ibnd = lookup_sw.major_gpt2bnd[igpt]
+                ibnd = lookup_sw.band_data.major_gpt2bnd[igpt]
                 # call rte shortwave solver
                 rte_sw_2stream!(op, src_sw, bcs_sw, flux, solar_frac, igpt, n_gpt, ibnd, nlev, gcol)
                 if igpt == 1
@@ -169,7 +169,7 @@ function rte_sw_2stream_solve_CUDA!(
 )
     gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
     nlev = nlay + 1
-    n_gpt = length(lookup_sw.major_gpt2bnd)
+    n_gpt = length(lookup_sw.band_data.major_gpt2bnd)
     if gcol ≤ ncol
         flux_up_sw = flux_sw.flux_up
         flux_dn_sw = flux_sw.flux_dn
@@ -190,7 +190,7 @@ function rte_sw_2stream_solve_CUDA!(
                 # compute optical properties
                 compute_optical_props!(op, as, gcol, igpt, lookup_sw, lookup_sw_cld)
                 solar_frac = lookup_sw.solar_src_scaled[igpt]
-                ibnd = lookup_sw.major_gpt2bnd[igpt]
+                ibnd = lookup_sw.band_data.major_gpt2bnd[igpt]
                 # rte shortwave solver
                 rte_sw_2stream!(op, src_sw, bcs_sw, flux, solar_frac, igpt, n_gpt, ibnd, nlev, gcol)
                 if igpt == 1
@@ -301,7 +301,7 @@ end
         solar_frac::FT,
         igpt::Int,
         n_gpt::Int,
-        ibnd::UInt8,
+        ibnd::Int,
         nlev::Int,
         gcol::Int,
     ) where {FT}
@@ -319,7 +319,7 @@ function rte_sw_2stream!(
     solar_frac::FT,
     igpt::Int,
     n_gpt::Int,
-    ibnd::UInt8,
+    ibnd::Int,
     nlev::Int,
     gcol::Int,
 ) where {FT}

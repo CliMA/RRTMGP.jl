@@ -27,11 +27,9 @@ function setup_allsky_as(
     nlay = Int(ds_in.dim["lay"])
     #ncol = Int(ds_in.dim["col"]) # col#1 repeated 128 times, per RRTMGP example
     nlev = nlay + 1
-    ngas = lkp_lw.n_gases
-    nbnd_lw = lkp_lw.n_bnd
-    nbnd_sw = lkp_sw.n_bnd
-    ngpt_lw = lkp_lw.n_gpt
-    ngpt_sw = lkp_sw.n_gpt
+    ngas = LookUpTables.get_n_gases(lkp_lw)
+    nbnd_lw = LookUpTables.get_n_bnd(lkp_lw)
+    nbnd_sw = LookUpTables.get_n_bnd(lkp_sw)
     #---no lat / long information for this
     lon = nothing
     lat = nothing

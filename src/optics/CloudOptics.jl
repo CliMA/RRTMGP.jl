@@ -221,9 +221,8 @@ function compute_pade_cld_props(
     ice_rgh::Int,
     cld_path_liq::FT,
     cld_path_ice::FT,
-    ibnd::UInt8,
+    ibnd::Int,
 ) where {FT}
-    #FT = eltype(re_liq)
     τl, τl_ssa, τl_ssag = FT(0), FT(0), FT(0)
     τi, τi_ssa, τi_ssag = FT(0), FT(0), FT(0)
 

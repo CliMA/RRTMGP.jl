@@ -43,7 +43,9 @@ end
 
 compute interpolation fraction for temperature.
 """
-@inline function compute_interp_frac_temp(Δ_t_ref, n_t_ref, t_ref, t_lay)
+@inline function compute_interp_frac_temp(t_ref, t_lay)
+    @inbounds Δ_t_ref = t_ref[2] - t_ref[1]
+    n_t_ref = length(t_ref)
     @inbounds jtemp = loc_lower(t_lay, Δ_t_ref, n_t_ref, t_ref)
     @inbounds ftemp = (t_lay - t_ref[jtemp]) / Δ_t_ref
     return (jtemp, ftemp)
@@ -60,13 +62,13 @@ end
 
 Compute interpolation fraction for pressure.
 """
-@inline function compute_interp_frac_press(Δ_ln_p_ref, ln_p_ref, n_p_ref, p_lay, tropo)
+@inline function compute_interp_frac_press(ln_p_ref, p_lay, tropo)
+    @inbounds Δ_ln_p_ref = ln_p_ref[1] - ln_p_ref[2]
+    n_p_ref = length(ln_p_ref)
     log_p_lay = log(p_lay)
     @inbounds jpress = Int(min(max(unsafe_trunc(Int, (ln_p_ref[1] - log_p_lay) / Δ_ln_p_ref) + 1, 1), n_p_ref - 1) + 1)
     @inbounds fpress = (ln_p_ref[jpress - 1] - log_p_lay) / Δ_ln_p_ref
-    jpress = jpress + tropo - 1
-
-    return (jpress, fpress)
+    return (jpress + tropo - 1, fpress)
 end
 
 """
@@ -131,24 +133,22 @@ Compute optical thickness, single scattering albedo, and asymmetry parameter.
     # volume mixing ratio of h2o
     vmr_h2o = get_vmr(vmr, lkp.idx_h2o, glay, gcol)
 
-    (; Δ_t_ref, n_t_ref, t_ref) = lkp
-    jftemp = compute_interp_frac_temp(Δ_t_ref, n_t_ref, t_ref, t_lay)
+    jftemp = compute_interp_frac_temp(lkp.ref_points.t_ref, t_lay)
+    jfpress = compute_interp_frac_press(lkp.ref_points.ln_p_ref, p_lay, tropo)
 
-    (; Δ_ln_p_ref, ln_p_ref, n_p_ref) = lkp
-    jfpress = compute_interp_frac_press(Δ_ln_p_ref, ln_p_ref, n_p_ref, p_lay, tropo)
+    @inbounds kmajor = view(lkp.kmajor, :, :, :, igpt)
+    n_η = size(kmajor, 1)
 
-    (; n_η, vmr_ref) = lkp
     ig = view(lkp.key_species, 1:2, tropo, ibnd)
     @inbounds vmr1 = get_vmr(vmr, ig[1], glay, gcol)
     @inbounds vmr2 = get_vmr(vmr, ig[2], glay, gcol)
 
-    jfη, col_mix = compute_interp_frac_η(n_η, ig, vmr_ref, (vmr1, vmr2), tropo, jftemp[1])
+    jfη, col_mix = compute_interp_frac_η(n_η, ig, lkp.ref_points.vmr_ref, (vmr1, vmr2), tropo, jftemp[1])
     # compute Planck fraction
-    @inbounds planck_fraction = view(lkp.planck_fraction, :, :, :, igpt)
+    @inbounds planck_fraction = view(lkp.planck.planck_fraction, :, :, :, igpt)
     pfrac = interp3d(jfη..., jftemp..., jfpress..., planck_fraction)
 
     # computing τ_major
-    @inbounds kmajor = view(lkp.kmajor, :, :, :, igpt)
     τ_major = interp3d(jfη..., jftemp..., jfpress..., kmajor, col_mix...) * col_dry
     # computing τ_minor
     lkp_minor = tropo == 1 ? lkp.minor_lower : lkp.minor_upper
@@ -164,21 +164,19 @@ end
     # volume mixing ratio of h2o
     vmr_h2o = get_vmr(vmr, lkp.idx_h2o, glay, gcol)
 
-    (; Δ_t_ref, n_t_ref, t_ref) = lkp
-    jftemp = compute_interp_frac_temp(Δ_t_ref, n_t_ref, t_ref, t_lay)
+    jftemp = compute_interp_frac_temp(lkp.ref_points.t_ref, t_lay)
+    jfpress = compute_interp_frac_press(lkp.ref_points.ln_p_ref, p_lay, tropo)
 
-    (; Δ_ln_p_ref, ln_p_ref, n_p_ref) = lkp
-    jfpress = compute_interp_frac_press(Δ_ln_p_ref, ln_p_ref, n_p_ref, p_lay, tropo)
+    @inbounds kmajor = view(lkp.kmajor, :, :, :, igpt)
+    n_η = size(kmajor, 1)
 
-    (; n_η, vmr_ref) = lkp
     ig = view(lkp.key_species, 1:2, tropo, ibnd)
     @inbounds vmr1 = get_vmr(vmr, ig[1], glay, gcol)
     @inbounds vmr2 = get_vmr(vmr, ig[2], glay, gcol)
 
-    jfη, col_mix = compute_interp_frac_η(n_η, ig, vmr_ref, (vmr1, vmr2), tropo, jftemp[1])
+    jfη, col_mix = compute_interp_frac_η(n_η, ig, lkp.ref_points.vmr_ref, (vmr1, vmr2), tropo, jftemp[1])
 
     # computing τ_major
-    @inbounds kmajor = view(lkp.kmajor, :, :, :, igpt)
     τ_major = interp3d(jfη..., jftemp..., jfpress..., kmajor, col_mix...) * col_dry
     # computing τ_minor
     lkp_minor = tropo == 1 ? lkp.minor_lower : lkp.minor_upper

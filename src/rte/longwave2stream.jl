@@ -10,7 +10,7 @@ function rte_lw_2stream_solve!(
 )
     (; nlay, ncol) = as
     nlev = nlay + 1
-    igpt, ibnd = 1, UInt8(1)
+    igpt, ibnd = 1, 1
     (; flux_up, flux_dn, flux_net) = flux_lw
     @inbounds begin
         ClimaComms.@threaded device for gcol in 1:ncol
@@ -53,7 +53,7 @@ function rte_lw_2stream_solve_CUDA!(
 )
     gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
     nlev = nlay + 1
-    igpt, ibnd = 1, UInt8(1)
+    igpt, ibnd = 1, 1
     if gcol ≤ ncol
         (; flux_up, flux_dn, flux_net) = flux_lw
         compute_optical_props!(op, as, src_lw, gcol)
@@ -81,7 +81,7 @@ function rte_lw_2stream_solve!(
 )
     (; nlay, ncol) = as
     nlev = nlay + 1
-    (; major_gpt2bnd) = lookup_lw
+    (; major_gpt2bnd) = lookup_lw.band_data
     n_gpt = length(major_gpt2bnd)
     bld_cld_mask = as isa AtmosphericState && as.cld_mask_type isa AbstractCloudMask
     flux_up_lw = flux_lw.flux_up
@@ -154,7 +154,7 @@ function rte_lw_2stream_solve_CUDA!(
 )
     gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
     nlev = nlay + 1
-    (; major_gpt2bnd) = lookup_lw
+    (; major_gpt2bnd) = lookup_lw.band_data
     n_gpt = length(major_gpt2bnd)
     if gcol ≤ ncol
         flux_up_lw = flux_lw.flux_up
@@ -256,7 +256,7 @@ end
         bcs_lw::BCL,
         gcol::Int,
         igpt::Int,
-        ibnd::UInt8,
+        ibnd::Int,
         nlev::Int,
         ncol::Int,
     ) where {SL, BCL}
@@ -273,7 +273,7 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
     bcs_lw::BCL,
     gcol::Int,
     igpt::Int,
-    ibnd::UInt8,
+    ibnd::Int,
     nlev::Int,
     ncol::Int,
 ) where {SL, BCL}

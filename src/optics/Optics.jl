@@ -162,12 +162,12 @@ Computes optical properties for the longwave problem.
     lkp_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
 )
     (; nlay, vmr) = as
-    (; t_planck) = lkp
+    (; t_planck) = lkp.planck
     (; lay_source, lev_source_inc, lev_source_dec, sfc_source) = sf
     @inbounds begin
         t_sfc = as.t_sfc[gcol]
-        ibnd = lkp.major_gpt2bnd[igpt]
-        totplnk = view(lkp.totplnk, :, ibnd)
+        ibnd = lkp.band_data.major_gpt2bnd[igpt]
+        totplnk = view(lkp.planck.tot_planck, :, ibnd)
         col_dry_col = view(as.col_dry, :, gcol)
         p_lay_col = view(as.p_lay, :, gcol)
         t_lay_col = view(as.t_lay, :, gcol)
@@ -206,12 +206,12 @@ end
     lkp_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
 )
     (; nlay, vmr) = as
-    (; t_planck) = lkp
+    (; t_planck) = lkp.planck
     (; lev_source, sfc_source) = sf
     @inbounds begin
         t_sfc = as.t_sfc[gcol]
-        ibnd = lkp.major_gpt2bnd[igpt]
-        totplnk = view(lkp.totplnk, :, ibnd)
+        ibnd = lkp.band_data.major_gpt2bnd[igpt]
+        totplnk = view(lkp.planck.tot_planck, :, ibnd)
         col_dry_col = view(as.col_dry, :, gcol)
         p_lay_col = view(as.p_lay, :, gcol)
         t_lay_col = view(as.t_lay, :, gcol)
@@ -296,7 +296,7 @@ Computes optical properties for the shortwave problem.
     ::Nothing,
 )
     (; nlay, vmr) = as
-    @inbounds ibnd = lkp.major_gpt2bnd[igpt]
+    @inbounds ibnd = lkp.band_data.major_gpt2bnd[igpt]
     @inbounds t_sfc = as.t_sfc[gcol]
     col_dry_col = view(as.col_dry, :, gcol)
     p_lay_col = view(as.p_lay, :, gcol)
@@ -322,7 +322,7 @@ end
     lkp_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
 )
     (; nlay, vmr) = as
-    @inbounds ibnd = lkp.major_gpt2bnd[igpt]
+    @inbounds ibnd = lkp.band_data.major_gpt2bnd[igpt]
     @inbounds t_sfc = as.t_sfc[gcol]
     col_dry_col = view(as.col_dry, :, gcol)
     p_lay_col = view(as.p_lay, :, gcol)
