@@ -3,7 +3,7 @@ module LookUpTables
 using DocStringExtensions
 using Adapt
 
-export AbstractLookUp, LookUpLW, LookUpSW, LookUpCld, PadeCld, LookUpMinor
+export AbstractLookUp, LookUpLW, LookUpSW, LookUpCld, PadeCld, LookUpMinor, ReferencePoints, LookUpPlanck, BandData
 
 """
     AbstractLookUp
@@ -32,9 +32,9 @@ struct LookUpMinor{O, G, K}
 end
 Adapt.@adapt_structure LookUpMinor
 
-#number of minor absorbors in the lower/upper atmosphere
+# number of minor absorbors in the lower/upper atmosphere
 @inline get_n_min_absrb(lkp::LookUpMinor) = size(lkp.idx_gases, 2)
-#number of minor contributors in the lower/upper atmosphere
+# number of minor contributors in the lower/upper atmosphere
 @inline get_n_contrib(lkp::LookUpMinor) = size(lkp.kminor, 3)
 # get bounds for each g-point
 @inline getbounds(lkp::LookUpMinor, ibnd, igpt) =
@@ -43,67 +43,75 @@ Adapt.@adapt_structure LookUpMinor
 @inline get_minor_gas_data(lkp::LookUpMinor, idx) = @inbounds view(lkp.gasdata, :, idx)
 
 """
-    LookUpLW{FT,UI8A1D,IA2D,IA3D,FTA1D,FTA2D,FTA3D,FTA4D} <: 
-        AbstractLookUp
+    ReferencePoints{RD1, RD3}
+
+Log of reference pressures, reference temperatures, and volume mixing ratios used by the lookup table
+"""
+struct ReferencePoints{RD1, RD3}
+    "log of reference pressures used by the lookup table `(n_p_ref)`"
+    ln_p_ref::RD1
+    "reference temperatures used by the lookup table `(n_t_ref)`"
+    t_ref::RD1
+    "reference volume mixing ratios used by the lookup table `(2, n_gases, n_t_ref)`"
+    vmr_ref::RD3
+end
+Adapt.@adapt_structure ReferencePoints
+
+"""
+    LookUpPlanck{PD1, PD2, PD4}
+
+Look up data for Planck source calculations.
+"""
+struct LookUpPlanck{PD1, PD2, PD4}
+    "Planck fraction `(n_η, n_p_ref, n_t_ref, n_gpt)`"
+    planck_fraction::PD4
+    "reference temperatures for Planck source calculations `(n_t_plnk)`"
+    t_planck::PD1
+    "total Planck source for each band `(n_t_plnk, n_bnd)`"
+    tot_planck::PD2
+end
+Adapt.@adapt_structure LookUpPlanck
+
+"""
+    BandData{BNDI1, BNDI2, BNDD2}
+
+Band/g-point data for the lookup table.
+"""
+struct BandData{BNDI1, BNDI2, BNDD2}
+    "map from `g-point` to band"
+    major_gpt2bnd::BNDI1
+    "starting and ending `g-point` for each band `(2, n_bnd)`"
+    bnd_lims_gpt::BNDI2
+    "starting and ending wavenumber for each band `(2, n_bnd)`"
+    bnd_lims_wn::BNDD2
+end
+Adapt.@adapt_structure BandData
+
+"""
+    LookUpLW{FT, IA3D, FTA4D, BND, P, R, LMNR} <: AbstractLookUp
 
 Longwave lookup tables, used to compute optical properties. 
 
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct LookUpLW{FT, UI8A1D, IA2D, IA3D, FTA1D, FTA2D, FTA3D, FTA4D, LMNR} <: AbstractLookUp
-    "number of gases used in the lookup table"
-    n_gases::Int
-    "number of longwave bands"
-    n_bnd::Int
-    "number of `g-points`"
-    n_gpt::Int
-    "number of atmospheric layers (=2, lower and upper atmospheres)"
-    n_atmos_layers::Int
-    "number of reference temperatures for absorption coefficient lookup table"
-    n_t_ref::Int
-    "number of reference pressures for absorption lookup table"
-    n_p_ref::Int
-    "number of reference binary mixing fractions, for absorption coefficient lookup table"
-    n_η::Int
-    "number of reference temperatures, for Planck source calculations"
-    n_t_plnk::Int
+struct LookUpLW{FT, IA3D, FTA4D, BND, P, R, LMNR} <: AbstractLookUp
     "vmr array index for h2o"
     idx_h2o::Int
     "Reference pressure separating upper and lower atmosphere"
     p_ref_tropo::FT
-    "Reference temperature"
-    t_ref_absrb::FT
-    "Reference pressure"
-    p_ref_absrb::FT
     "minimum pressure supported by RRTMGP lookup tables"
     p_ref_min::FT
-    "Δt for reference temperature values (Δt is constant)"
-    Δ_t_ref::FT
-    "Δ for log of reference pressure values (Δp is constant)"
-    Δ_ln_p_ref::FT
     "major absorbing species in each band `(2, n_atmos_layers, n_bnd)`"
     key_species::IA3D
     "major absorption coefficient `(n_η, n_p_ref + 1, n_t_ref, n_gpt)`"
     kmajor::FTA4D
-    "Planck fraction `(n_η, n_p_ref, n_t_ref, n_gpt)`"
-    planck_fraction::FTA4D
-    "reference temperatures for Planck source calculations `(n_t_plnk)`"
-    t_planck::FTA1D
-    "total Planck source for each band `(n_t_plnk, n_bnd)`"
-    totplnk::FTA2D
-    "map from `g-point` to band"
-    major_gpt2bnd::UI8A1D
-    "starting and ending `g-point` for each band `(2, n_bnd)`"
-    bnd_lims_gpt::IA2D
-    "starting and ending wavenumber for each band `(2, n_bnd)`"
-    bnd_lims_wn::FTA2D
-    "log of reference pressures used by the lookup table `(n_p_ref)`"
-    ln_p_ref::FTA1D
-    "reference temperatures used by the lookup table `(n_t_ref)`"
-    t_ref::FTA1D
-    "reference volume mixing ratios used by the lookup table `(2, n_gases, n_t_ref)`"
-    vmr_ref::FTA3D
+    "lookup data for Planck source calculations"
+    planck::P
+    "band data"
+    band_data::BND
+    "reference temperatures, pressures and volume mixing ratios"
+    ref_points::R
     "lookup data for minor gases in the lower atmosphere"
     minor_lower::LMNR
     "lookup data for minor gases in the upper atmosphere"
@@ -112,9 +120,6 @@ end
 Adapt.@adapt_structure LookUpLW
 
 function LookUpLW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
-
-    UI8 = UInt8
-    UI8A1D = DA{UInt8, 1}
     STA = Array{String, 1}
     IA1D = DA{Int, 1}
     IA2D = DA{Int, 2}
@@ -141,8 +146,8 @@ function LookUpLW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     n_contrib_upper = Int(ds.dim["contributors_upper"])
 
     p_ref_tropo = FT(Array(ds["press_ref_trop"])[1])
-    t_ref_absrb = FT(Array(ds["absorption_coefficient_ref_T"])[1])
-    p_ref_absrb = FT(Array(ds["absorption_coefficient_ref_P"])[1])
+    t_ref_absrb = FT(Array(ds["absorption_coefficient_ref_T"])[1]) # not currently used
+    p_ref_absrb = FT(Array(ds["absorption_coefficient_ref_P"])[1]) # not currently used
 
     gases_major = STA(undef, n_maj_absrb)
     gases_minor = STA(undef, n_min_absrb)
@@ -219,13 +224,16 @@ function LookUpLW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     planck_fraction = FTA4D(permutedims(Array(ds["plank_fraction"]), [2, 3, 4, 1]))
     t_planck = FTA1D(Array(ds["temperature_Planck"]))
 
-    totplnk = FTA2D(Array(ds["totplnk"]))
+    tot_planck = FTA2D(Array(ds["totplnk"]))
+
+    planck = LookUpPlanck(planck_fraction, t_planck, tot_planck)
+
     bnd_lims_gpt = Array{Int, 2}(Array(ds["bnd_limits_gpt"]))
     bnd_lims_wn = FTA2D(Array(ds["bnd_limits_wavenumber"]))
     #-----------------------
-    major_gpt2bnd = Array{UI8, 1}(undef, n_gpt)
+    major_gpt2bnd = Array{Int, 1}(undef, n_gpt)
     @inbounds for i in 1:n_bnd
-        major_gpt2bnd[bnd_lims_gpt[1, i]:bnd_lims_gpt[2, i]] .= UI8(i)
+        major_gpt2bnd[bnd_lims_gpt[1, i]:bnd_lims_gpt[2, i]] .= i
     end
     #-----------------------
     #`g-point` limits for minor contributors in lower/upper atmosphere `(2, n_min_absrb_lower/upper)`
@@ -233,8 +241,8 @@ function LookUpLW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     minor_upper_gpt_lims = Array{Int, 2}(Array(ds["minor_limits_gpt_upper"]))
     #-----------------------
     #band number for minor contributor in the lower/upper atmosphere `(n_min_absrb_lower)`
-    minor_lower_bnd = zeros(UI8, n_min_absrb_lower)
-    minor_upper_bnd = zeros(UI8, n_min_absrb_upper)
+    minor_lower_bnd = zeros(Int, n_min_absrb_lower)
+    minor_upper_bnd = zeros(Int, n_min_absrb_upper)
 
     minor_lower_bnd_st = Array{Int, 1}(undef, n_bnd + 1)
     minor_upper_bnd_st = Array{Int, 1}(undef, n_bnd + 1)
@@ -267,18 +275,18 @@ function LookUpLW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     minor_upper_bnd_st[1] = 1
 
     @inbounds for ibnd in 2:(n_bnd + 1)
-        loc_low = findlast(isequal(UI8(ibnd - 1)), minor_lower_bnd)
-        loc_upp = findlast(isequal(UI8(ibnd - 1)), minor_upper_bnd)
+        loc_low = findlast(isequal(ibnd - 1), minor_lower_bnd)
+        loc_upp = findlast(isequal(ibnd - 1), minor_upper_bnd)
         if isnothing(loc_low)
             minor_lower_bnd_st[ibnd] = minor_lower_bnd_st[ibnd - 1]
         else
-            minor_lower_bnd_st[ibnd] = UI8(loc_low + 1)
+            minor_lower_bnd_st[ibnd] = loc_low + 1
         end
 
         if isnothing(loc_upp)
             minor_upper_bnd_st[ibnd] = minor_upper_bnd_st[ibnd - 1]
         else
-            minor_upper_bnd_st[ibnd] = UI8(loc_upp + 1)
+            minor_upper_bnd_st[ibnd] = loc_upp + 1
         end
     end
     # reorder kminor
@@ -314,6 +322,7 @@ function LookUpLW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     minor_upper_gpt_lims = IA2D(minor_upper_gpt_lims)
     bnd_lims_gpt = IA2D(bnd_lims_gpt)
     #-----------------------
+    band_data = BandData(major_gpt2bnd, bnd_lims_gpt, bnd_lims_wn)
 
     minor_lower_scales_with_density = reshape(Array(ds["minor_scales_with_density_lower"]), 1, :)
     minor_upper_scales_with_density = reshape(Array(ds["minor_scales_with_density_upper"]), 1, :)
@@ -361,34 +370,17 @@ function LookUpLW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
         ),
         kminor_upper,
     )
+    ref_points = ReferencePoints(ln_p_ref, t_ref, vmr_ref)
     return (
-        LookUpLW{FT, UI8A1D, IA2D, IA3D, FTA1D, FTA2D, FTA3D, FTA4D, typeof(minor_lower)}(
-            n_gases,
-            n_bnd,
-            n_gpt,
-            n_atmos_layers,
-            n_t_ref,
-            n_p_ref,
-            n_η,
-            n_t_plnk,
+        LookUpLW{FT, IA3D, FTA4D, typeof(band_data), typeof(planck), typeof(ref_points), typeof(minor_lower)}(
             idx_h2o,
             p_ref_tropo,
-            t_ref_absrb,
-            p_ref_absrb,
             p_ref_min,
-            Δ_t_ref,
-            Δ_ln_p_ref,
             key_species,
             kmajor,
-            planck_fraction,
-            t_planck,
-            totplnk,
-            major_gpt2bnd,
-            bnd_lims_gpt,
-            bnd_lims_wn,
-            ln_p_ref,
-            t_ref,
-            vmr_ref,
+            planck,
+            band_data,
+            ref_points,
             minor_lower,
             minor_upper,
         ),
@@ -396,85 +388,61 @@ function LookUpLW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     )
 end
 
-#number of minor absorbors in the lower/upper atmosphere
-get_n_min_absrb_lower(lkp::LookUpLW) = get_n_min_absrb(lkp.minor_lower)
-get_n_min_absrb_upper(lkp::LookUpLW) = get_n_min_absrb(lkp.minor_upper)
-#number of minor contributors in the lower/upper atmosphere
-get_n_contrib_lower(lkp::LookUpLW) = get_n_contrib(lkp.minor_lower)
-get_n_contrib_upper(lkp::LookUpLW) = get_n_contrib(lkp.minor_upper)
+# number of minor absorbors in the lower/upper atmosphere
+@inline get_n_min_absrb_lower(lkp::LookUpLW) = get_n_min_absrb(lkp.minor_lower)
+@inline get_n_min_absrb_upper(lkp::LookUpLW) = get_n_min_absrb(lkp.minor_upper)
+# number of minor contributors in the lower/upper atmosphere
+@inline get_n_contrib_lower(lkp::LookUpLW) = get_n_contrib(lkp.minor_lower)
+@inline get_n_contrib_upper(lkp::LookUpLW) = get_n_contrib(lkp.minor_upper)
+# number of bands in the longwave lookup table
+@inline get_n_bnd(lkp::LookUpLW) = size(lkp.key_species, 3)
+# number of atmospheric layers (=2, lower and upper atmospheres)
+@inline get_n_atmos_layers(lkp::LookUpLW) = size(lkp.key_species, 2)
+# number of gases used in the lookup table
+@inline get_n_gases(lkp::LookUpLW) = size(lkp.ref_points.vmr_ref, 2)
+
+@inline get_n_η(lkp::LookUpLW) = size(lkp.kmajor, 1)
 
 """
-    LookUpSW{FT,UI8A1D,IA2D,IA3D,FTA1D,FTA2D,FTA3D,FTA4D} <:
-        AbstractLookUp
+    LookUpSW{FT, IA3D, FTA1D, FTA3D, FTA4D, BND, R, LMNR} <: AbstractLookUp
 
 Shortwave lookup tables, used to compute optical properties. 
 
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct LookUpSW{FT, UI8A1D, IA2D, IA3D, FTA1D, FTA2D, FTA3D, FTA4D, LMNR} <: AbstractLookUp
-    "number of gases used in the lookup table"
-    n_gases::Int
-    "number of shortwave bands"
-    n_bnd::Int
-    "number of `g-points`"
-    n_gpt::Int
-    "number of atmospheric layers (=2, lower and upper atmospheres)"
-    n_atmos_layers::Int
-    "number of reference temperatures for absorption coefficient lookup table"
-    n_t_ref::Int
-    "number of reference pressures for absorption lookup table"
-    n_p_ref::Int
-    "number of reference binary mixing fractions, for absorption coefficient lookup table"
-    n_η::Int
+struct LookUpSW{FT, IA3D, FTA1D, FTA3D, FTA4D, BND, R, LMNR} <: AbstractLookUp
     "vmr array index for h2o"
     idx_h2o::Int
     "Reference pressure separating upper and lower atmosphere"
     p_ref_tropo::FT
-    "Reference temperature"
-    t_ref_absrb::FT
-    "Reference pressure"
-    p_ref_absrb::FT
     "minimum pressure supported by RRTMGP lookup tables"
     p_ref_min::FT
-    "Δt for reference temperature values (Δt is constant, array is linearly equispaced)"
-    Δ_t_ref::FT
-    "Δ for log of reference pressure values (Δ is constant, equispaced on logarithmic scale)"
-    Δ_ln_p_ref::FT
     "total solar irradiation"
     solar_src_tot::FT
     "major absorbing species in each band `(2, n_atmos_layers, n_bnd)`"
     key_species::IA3D
     "major absorption coefficient `(n_η, n_p_ref + 1, n_t_ref, n_gpt)`"
     kmajor::FTA4D
-    "map from g-point to band"
-    major_gpt2bnd::UI8A1D
-    "starting and ending `g-point` for each band `(2, n_bnd)`"
-    bnd_lims_gpt::IA2D
-    "starting and ending wavenumber for each band `(2, n_bnd)`"
-    bnd_lims_wn::FTA2D
-    "log of reference pressures used by the lookup table `(n_p_ref)`"
-    ln_p_ref::FTA1D
-    "reference temperatures used by the lookup table `(n_t_ref)`"
-    t_ref::FTA1D
-    "reference volume mixing ratios used by the lookup table `(2, n_gases, n_t_ref)`"
-    vmr_ref::FTA3D
+    "band data"
+    band_data::BND
+    "reference temperatures, pressures and volume mixing ratios"
+    ref_points::R
     "Rayleigh absorption coefficient for lower atmosphere `(n_η, n_t_ref, n_gpt)`"
     rayl_lower::FTA3D
     "Rayleigh absorption coefficient for upper atmosphere `(n_η, n_t_ref, n_gpt)`"
     rayl_upper::FTA3D
     "relative solar source contribution from each `g-point` `(n_gpt)`"
     solar_src_scaled::FTA1D
+    "lookup data for minor gases in the lower atmosphere"
     minor_lower::LMNR
+    "lookup data for minor gases in the upper atmosphere"
     minor_upper::LMNR
 end
 Adapt.@adapt_structure LookUpSW
 
 
 function LookUpSW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
-
-    UI8 = UInt8
-    UI8A1D = DA{UInt8, 1}
     STA = Array{String, 1}
     IA1D = DA{Int, 1}
     IA2D = DA{Int, 2}
@@ -502,8 +470,8 @@ function LookUpSW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     n_contrib_upper = Int(ds.dim["contributors_upper"])
 
     p_ref_tropo = FT(Array(ds["press_ref_trop"])[1])
-    t_ref_absrb = FT(Array(ds["absorption_coefficient_ref_T"])[1])
-    p_ref_absrb = FT(Array(ds["absorption_coefficient_ref_P"])[1])
+    t_ref_absrb = FT(Array(ds["absorption_coefficient_ref_T"])[1]) # not currently used
+    p_ref_absrb = FT(Array(ds["absorption_coefficient_ref_P"])[1]) # not currently used
 
     gases_major = STA(undef, n_maj_absrb)
     gases_minor = STA(undef, n_min_absrb)
@@ -576,16 +544,16 @@ function LookUpSW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     bnd_lims_gpt = Array{Int, 2}(Array(ds["bnd_limits_gpt"]))
     bnd_lims_wn = FTA2D(Array(ds["bnd_limits_wavenumber"]))
     #-----------------------
-    major_gpt2bnd = Array{UI8, 1}(undef, n_gpt)
+    major_gpt2bnd = Array{Int, 1}(undef, n_gpt)
     @inbounds for i in 1:n_bnd
-        major_gpt2bnd[bnd_lims_gpt[1, i]:bnd_lims_gpt[2, i]] .= UI8(i)
+        major_gpt2bnd[bnd_lims_gpt[1, i]:bnd_lims_gpt[2, i]] .= i
     end
     #-----------------------
     minor_lower_gpt_lims = Array{Int, 2}(Array(ds["minor_limits_gpt_lower"]))
     minor_upper_gpt_lims = Array{Int, 2}(Array(ds["minor_limits_gpt_upper"]))
     #-----------------------
-    minor_lower_bnd = zeros(UI8, n_min_absrb_lower)
-    minor_upper_bnd = zeros(UI8, n_min_absrb_upper)
+    minor_lower_bnd = zeros(Int, n_min_absrb_lower)
+    minor_upper_bnd = zeros(Int, n_min_absrb_upper)
 
     minor_lower_bnd_st = Array{Int, 1}(undef, n_bnd + 1)
     minor_upper_bnd_st = Array{Int, 1}(undef, n_bnd + 1)
@@ -618,18 +586,18 @@ function LookUpSW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     minor_upper_bnd_st[1] = 1
 
     @inbounds for ibnd in 2:(n_bnd + 1)
-        loc_low = findlast(isequal(UI8(ibnd - 1)), minor_lower_bnd)
-        loc_upp = findlast(isequal(UI8(ibnd - 1)), minor_upper_bnd)
+        loc_low = findlast(isequal(ibnd - 1), minor_lower_bnd)
+        loc_upp = findlast(isequal(ibnd - 1), minor_upper_bnd)
         if isnothing(loc_low)
             minor_lower_bnd_st[ibnd] = minor_lower_bnd_st[ibnd - 1]
         else
-            minor_lower_bnd_st[ibnd] = UI8(loc_low + 1)
+            minor_lower_bnd_st[ibnd] = loc_low + 1
         end
 
         if isnothing(loc_upp)
             minor_upper_bnd_st[ibnd] = minor_upper_bnd_st[ibnd - 1]
         else
-            minor_upper_bnd_st[ibnd] = UI8(loc_upp + 1)
+            minor_upper_bnd_st[ibnd] = loc_upp + 1
         end
     end
     # reorder kminor
@@ -665,6 +633,8 @@ function LookUpSW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     minor_upper_gpt_lims = IA2D(minor_upper_gpt_lims)
     bnd_lims_gpt = IA2D(bnd_lims_gpt)
     #-----------------------    
+    band_data = BandData(major_gpt2bnd, bnd_lims_gpt, bnd_lims_wn)
+
     minor_lower_scales_with_density = reshape(Array(ds["minor_scales_with_density_lower"]), 1, :)
     minor_upper_scales_with_density = reshape(Array(ds["minor_scales_with_density_upper"]), 1, :)
     lower_scale_by_complement = reshape(Array(ds["scale_by_complement_lower"]), 1, :)
@@ -718,32 +688,18 @@ function LookUpSW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
         ),
         kminor_upper,
     )
+    ref_points = ReferencePoints(ln_p_ref, t_ref, vmr_ref)
 
     return (
-        LookUpSW{FT, UI8A1D, IA2D, IA3D, FTA1D, FTA2D, FTA3D, FTA4D, typeof(minor_lower)}(
-            n_gases,
-            n_bnd,
-            n_gpt,
-            n_atmos_layers,
-            n_t_ref,
-            n_p_ref,
-            n_η,
+        LookUpSW{FT, IA3D, FTA1D, FTA3D, FTA4D, typeof(band_data), typeof(ref_points), typeof(minor_lower)}(
             idx_h2o,
             p_ref_tropo,
-            t_ref_absrb,
-            p_ref_absrb,
             p_ref_min,
-            Δ_t_ref,
-            Δ_ln_p_ref,
             solar_src_tot,
             key_species,
             kmajor,
-            major_gpt2bnd,
-            bnd_lims_gpt,
-            bnd_lims_wn,
-            ln_p_ref,
-            t_ref,
-            vmr_ref,
+            band_data,
+            ref_points,
             rayl_lower,
             rayl_upper,
             solar_src_scaled,
@@ -754,13 +710,20 @@ function LookUpSW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     )
 end
 
-#number of minor absorbors in the lower/upper atmosphere
-get_n_min_absrb_lower(lkp::LookUpSW) = get_n_min_absrb(lkp.minor_lower)
-get_n_min_absrb_upper(lkp::LookUpSW) = get_n_min_absrb(lkp.minor_upper)
-#number of minor contributors in the lower/upper atmosphere
-get_n_contrib_lower(lkp::LookUpSW) = get_n_contrib(lkp.minor_lower)
-get_n_contrib_upper(lkp::LookUpSW) = get_n_contrib(lkp.minor_upper)
+# number of minor absorbors in the lower/upper atmosphere
+@inline get_n_min_absrb_lower(lkp::LookUpSW) = get_n_min_absrb(lkp.minor_lower)
+@inline get_n_min_absrb_upper(lkp::LookUpSW) = get_n_min_absrb(lkp.minor_upper)
+# number of minor contributors in the lower/upper atmosphere
+@inline get_n_contrib_lower(lkp::LookUpSW) = get_n_contrib(lkp.minor_lower)
+@inline get_n_contrib_upper(lkp::LookUpSW) = get_n_contrib(lkp.minor_upper)
+# number of bands in the shortwave lookup table
+@inline get_n_bnd(lkp::LookUpSW) = size(lkp.key_species, 3)
+# number of atmospheric layers (=2, lower and upper atmospheres)
+@inline get_n_atmos_layers(lkp::LookUpSW) = size(lkp.key_species, 2)
+# number of gases used in the lookup table
+@inline get_n_gases(lkp::LookUpSW) = size(lkp.ref_points.vmr_ref, 2)
 
+@inline get_n_η(lkp::LookUpSW) = size(lkp.kmajor, 1)
 """
     LookUpCld{D, B, L, I, W} <: AbstractLookUp
 
@@ -856,7 +819,7 @@ end
 end
 
 """
-    PadeCld{FTA1D,FTA2D,FTA3D,FTA4D}
+    PadeCld{FTA1D, FTA2D, FTA3D, FTA4D} <: AbstractLookUp
 
 Pade coefficients for cloud optics.
 

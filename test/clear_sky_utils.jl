@@ -69,19 +69,17 @@ function clear_sky(
         setup_rfmip_as(context, ds_lw_in, idx_gases, exp_no, lookup_lw, FT, VMR, max_threads, param_set)
     close(ds_lw_in)
 
-    ncol, nlay, ngpt_lw = as.ncol, as.nlay, lookup_lw.n_gpt
+    ncol, nlay = as.ncol, as.nlay
     nlev = nlay + 1
     op = OPC(FT, ncol, nlay, DA) # allocating optical properties object
 
     # setting up longwave problem
-    ngpt_lw = lookup_lw.n_gpt
     src_lw = source_func_longwave(param_set, FT, ncol, nlay, opc, DA)         # allocating longwave source function object
     bcs_lw = LwBCs{FT, typeof(sfc_emis), Nothing}(sfc_emis, nothing) # setting up boundary conditions
     ang_disc = nothing#AngularDiscretization(opc, FT, n_gauss_angles, DA)  # initializing Angular discretization
     fluxb_lw = FluxLW(ncol, nlay, FT, DA)                          # flux storage for bandwise calculations
     flux_lw = FluxLW(ncol, nlay, FT, DA)                           # longwave fluxes
     # setting up shortwave problem
-    ngpt_sw = lookup_sw.n_gpt
     src_sw = source_func_shortwave(FT, ncol, nlay, opc, DA)        # allocating shortwave source function object
     inc_flux_diffuse = nothing
     sfc_alb_diffuse = FTA2D(deepcopy(sfc_alb_direct))

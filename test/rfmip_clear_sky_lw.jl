@@ -50,7 +50,7 @@ function lw_rfmip(context, ::Type{OPC}, ::Type{SRC}, ::Type{VMR}, ::Type{FT}) wh
         setup_rfmip_as(context, ds_lw_in, idx_gases, exp_no, lookup_lw, FT, VMR, max_threads, param_set)
     close(ds_lw_in)
 
-    ncol, nlay, ngpt = as.ncol, as.nlay, lookup_lw.n_gpt
+    ncol, nlay = as.ncol, as.nlay
     nlev = nlay + 1
     op = OPC(FT, ncol, nlay, DA)                                   # allocating optical properties object
     src_lw = source_func_longwave(param_set, FT, ncol, nlay, opc, DA) # allocating longwave source function object

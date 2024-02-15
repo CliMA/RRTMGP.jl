@@ -94,7 +94,6 @@ function all_sky(
     end
 
     # Setting up longwave problem---------------------------------------
-    ngpt_lw = lookup_lw.n_gpt
     op = OPC(FT, ncol, nlay, DA) # allocating optical properties object
     src_lw = source_func_longwave(param_set, FT, ncol, nlay, opc, DA)   # allocating longwave source function object
     bcs_lw = LwBCs{FT, typeof(sfc_emis), Nothing}(sfc_emis, nothing)    # setting up boundary conditions
@@ -102,7 +101,6 @@ function all_sky(
     flux_lw = FluxLW(ncol, nlay, FT, DA)                              # longwave fluxes
 
     # Setting up shortwave problem---------------------------------------
-    ngpt_sw = lookup_sw.n_gpt
     src_sw = source_func_shortwave(FT, ncol, nlay, opc, DA)        # allocating longwave source function object
 
     # setting up boundary conditions

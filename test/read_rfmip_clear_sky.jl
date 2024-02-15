@@ -20,8 +20,8 @@ function setup_rfmip_as(
     nlay = Int(ds_lw_in.dim["layer"])
     ncol = Int(ds_lw_in.dim["site"])
     nlev = nlay + 1
-    ngas = lookup_lw.n_gases
-    nbnd_lw = lookup_lw.n_bnd
+    ngas = LookUpTables.get_n_gases(lookup_lw)
+    nbnd_lw = LookUpTables.get_n_bnd(lookup_lw)
     lon = DA{FT, 1}(Array(ds_lw_in["lon"]))
     lat = DA{FT, 1}(Array(ds_lw_in["lat"]))
 

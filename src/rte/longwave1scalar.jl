@@ -9,7 +9,7 @@ function rte_lw_noscat_solve!(
 )
     (; nlay, ncol) = as
     nlev = nlay + 1
-    igpt, ibnd = 1, UInt8(1)
+    igpt, ibnd = 1, 1
     τ = op.τ
     Ds = op.angle_disc.gauss_Ds
     (; flux_up, flux_dn, flux_net) = flux_lw
@@ -54,7 +54,7 @@ function rte_lw_noscat_solve_CUDA!(
 )
     gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
     nlev = nlay + 1
-    igpt, ibnd = 1, UInt8(1)
+    igpt, ibnd = 1, 1
     τ = op.τ
     Ds = op.angle_disc.gauss_Ds
     (; flux_up, flux_dn, flux_net) = flux_lw
@@ -82,7 +82,7 @@ function rte_lw_noscat_solve!(
 )
     (; nlay, ncol) = as
     nlev = nlay + 1
-    (; major_gpt2bnd) = lookup_lw
+    (; major_gpt2bnd) = lookup_lw.band_data
     n_gpt = length(major_gpt2bnd)
     τ = op.τ
     Ds = op.angle_disc.gauss_Ds
@@ -143,7 +143,7 @@ function rte_lw_noscat_solve_CUDA!(
 )
     gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
     nlev = nlay + 1
-    (; major_gpt2bnd) = lookup_lw
+    (; major_gpt2bnd) = lookup_lw.band_data
     n_gpt = length(major_gpt2bnd)
     τ = op.τ
     Ds = op.angle_disc.gauss_Ds
