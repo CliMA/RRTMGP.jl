@@ -358,6 +358,7 @@ function rte_sw_2stream!(
         # radiation emitted at bottom of layer,
         # transmitted through the layer and reflected from layers below (Tdiff*src*albedo)
         τ_cum -= τ_ilev
+        τ_cum = max(τ_cum, FT(0))
         flux_dn_dir_ilevplus1 = flux_dn_dir_top * exp(-τ_cum / μ₀)
         src_up_ilev = Rdir * flux_dn_dir_ilevplus1 #flux_dn_dir[ilev + 1]
         src_dn_ilev = Tdir * flux_dn_dir_ilevplus1 #flux_dn_dir[ilev + 1]
