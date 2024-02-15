@@ -89,8 +89,10 @@ function setup_allsky_as(
     vmr_h2o = view(vmr.vmr, idx_gases["h2o"], :, :)
 
     cld_frac = zeros(FT, nlay, ncol)
-    cld_mask_lw = zeros(Bool, nlay, ncol)
-    cld_mask_sw = zeros(Bool, nlay, ncol)
+    cld_mask_lw = BitArray(undef, nlay, ncol)
+    fill!(cld_mask_lw, 0)
+    cld_mask_sw = BitArray(undef, nlay, ncol)
+    fill!(cld_mask_sw, 0)
     cld_r_eff_liq = zeros(FT, nlay, ncol)
     cld_r_eff_ice = zeros(FT, nlay, ncol)
     cld_path_liq = zeros(FT, nlay, ncol)
