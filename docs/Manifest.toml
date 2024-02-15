@@ -632,7 +632,7 @@ uuid = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
 deps = ["Adapt", "Artifacts", "CUDA", "ClimaComms", "DocStringExtensions", "GaussQuadrature", "Random", "StaticArrays"]
 path = ".."
 uuid = "a01a1ee8-cea4-48fc-987c-fc7878d79da1"
-version = "0.11.0"
+version = "0.11.1"
 
     [deps.RRTMGP.extensions]
     CreateParametersExt = "CLIMAParameters"
