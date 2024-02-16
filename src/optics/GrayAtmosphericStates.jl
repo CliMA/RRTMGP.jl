@@ -83,12 +83,14 @@ struct GrayAtmosphericState{
     t_sfc::FTA1D
     "optical thickness parameters"
     otp::OTP
-    "Number of layers."
-    nlay::Int
-    "Number of columns."
-    ncol::Int
 end
 Adapt.@adapt_structure GrayAtmosphericState
+# Number of layers
+@inline get_nlay(as::GrayAtmosphericState) = size(as.p_lay, 1)
+# Number of columns
+@inline get_ncol(as::GrayAtmosphericState) = size(as.p_lay, 2)
+# Number of layers and columns
+@inline get_dims(as::GrayAtmosphericState) = size(as.p_lay)
 #---------------------------------------------------------------
 # This functions sets up a model temperature and pressure 
 # distributions for a gray atmosphere based on a pressure grid
@@ -148,8 +150,6 @@ function setup_gray_as_pr_grid(
         z_lev,
         t_sfc,
         otp,
-        nlay,
-        ncol,
     )
 end
 
@@ -229,19 +229,7 @@ function setup_gray_as_alt_grid(
         #--------------------------------------------------------
         t_sfc[icol] = t_lev[1, icol]
     end
-    return GrayAtmosphericState{FT, DA{FT, 1}, DA{FT, 2}}(
-        p_lay,
-        p_lev,
-        t_lay,
-        t_lev,
-        z_lev,
-        t_sfc,
-        α,
-        τ₀,
-        d0,
-        nlay,
-        ncol,
-    )
+    return GrayAtmosphericState{FT, DA{FT, 1}, DA{FT, 2}}(p_lay, p_lev, t_lay, t_lev, z_lev, t_sfc, α, τ₀, d0)
 end
 
 #-------------------------------------------------------------------------

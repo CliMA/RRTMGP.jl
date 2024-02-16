@@ -161,7 +161,8 @@ Computes optical properties for the longwave problem.
     lkp::LookUpLW,
     lkp_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
 )
-    (; nlay, vmr) = as
+    nlay = AtmosphericStates.get_nlay(as)
+    (; vmr) = as
     (; t_planck) = lkp.planck
     (; lay_source, lev_source_inc, lev_source_dec, sfc_source) = sf
     @inbounds begin
@@ -205,7 +206,8 @@ end
     lkp::LookUpLW,
     lkp_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
 )
-    (; nlay, vmr) = as
+    nlay = AtmosphericStates.get_nlay(as)
+    (; vmr) = as
     (; t_planck) = lkp.planck
     (; lev_source, sfc_source) = sf
     @inbounds begin
@@ -295,7 +297,8 @@ Computes optical properties for the shortwave problem.
     lkp::LookUpSW,
     ::Nothing,
 )
-    (; nlay, vmr) = as
+    nlay = AtmosphericStates.get_nlay(as)
+    (; vmr) = as
     @inbounds ibnd = lkp.band_data.major_gpt2bnd[igpt]
     @inbounds t_sfc = as.t_sfc[gcol]
     col_dry_col = view(as.col_dry, :, gcol)
@@ -321,7 +324,8 @@ end
     lkp::LookUpSW,
     lkp_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
 )
-    (; nlay, vmr) = as
+    nlay = AtmosphericStates.get_nlay(as)
+    (; vmr) = as
     @inbounds ibnd = lkp.band_data.major_gpt2bnd[igpt]
     @inbounds t_sfc = as.t_sfc[gcol]
     col_dry_col = view(as.col_dry, :, gcol)

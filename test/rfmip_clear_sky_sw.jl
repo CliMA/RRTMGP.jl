@@ -49,7 +49,7 @@ function sw_rfmip(context, ::Type{OPC}, ::Type{SRC}, ::Type{VMR}, ::Type{FT}) wh
         setup_rfmip_as(context, ds_sw_in, idx_gases, exp_no, lookup_sw, FT, VMR, max_threads, param_set)
     close(ds_sw_in)
 
-    ncol, nlay = as.ncol, as.nlay
+    nlay, ncol = AtmosphericStates.get_dims(as)
     nlev = nlay + 1
     op = OPC(FT, ncol, nlay, DA)            # allocating optical properties object
     #src_sw = SRC(FT, DA, nlay, ncol)        # allocating longwave source function object

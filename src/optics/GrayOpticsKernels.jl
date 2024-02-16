@@ -12,7 +12,8 @@
 Computes optical properties for the longwave gray radiation problem.
 """
 function compute_optical_props!(op::OneScalar, as::GrayAtmosphericState, sf::SourceLWNoScat, gcol::Int)
-    (; p_lay, p_lev, t_lay, t_lev, otp, nlay) = as
+    nlay = AtmosphericStates.get_nlay(as)
+    (; p_lay, p_lev, t_lay, t_lev, otp) = as
     (; lay_source, lev_source_inc, lev_source_dec, sfc_source) = sf
     τ = op.τ
     FT = eltype(τ)
@@ -44,7 +45,8 @@ function compute_optical_props!(op::OneScalar, as::GrayAtmosphericState, sf::Sou
 end
 
 function compute_optical_props!(op::TwoStream, as::GrayAtmosphericState, sf::SourceLW2Str, gcol::Int)
-    (; p_lay, p_lev, t_lay, t_lev, otp, nlay) = as
+    nlay = AtmosphericStates.get_nlay(as)
+    (; p_lay, p_lev, t_lay, t_lev, otp) = as
     (; τ, ssa, g) = op
     (; lev_source, sfc_source) = sf
     FT = eltype(τ)
@@ -96,7 +98,8 @@ end
 Computes optical properties for the shortwave gray radiation problem.
 """
 function compute_optical_props!(op::AbstractOpticalProps, as::GrayAtmosphericState, gcol::Int)
-    (; p_lay, p_lev, otp, nlay) = as
+    nlay = AtmosphericStates.get_nlay(as)
+    (; p_lay, p_lev, otp) = as
     τ = op.τ
     @inbounds lat = as.lat[gcol]
     @inbounds p0 = p_lev[1, gcol]

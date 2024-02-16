@@ -74,12 +74,13 @@ struct AtmosphericState{FTA1D, FTA1DN, FTA2D, CLDP, CLDM, CMASK, VMR} <: Abstrac
     cld_mask_type::CMASK
     "ice roughness, 1 = none, 2 = medium, 3 = rough"
     ice_rgh::Int
-    "Number of layers."
-    nlay::Int
-    "Number of columns."
-    ncol::Int
-    "Number of gases."
-    ngas::Int
 end
 Adapt.@adapt_structure AtmosphericState
+
+# Number of layers
+@inline get_nlay(as::AtmosphericState) = size(as.p_lay, 1)
+# Number of columns
+@inline get_ncol(as::AtmosphericState) = size(as.p_lay, 2)
+# Number of layers and columns
+@inline get_dims(as::AtmosphericState) = size(as.p_lay)
 end
