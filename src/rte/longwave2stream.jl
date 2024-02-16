@@ -8,7 +8,7 @@ function rte_lw_2stream_solve!(
     max_threads,
     as::GrayAtmosphericState,
 )
-    (; nlay, ncol) = as
+    nlay, ncol = AtmosphericStates.get_dims(as)
     nlev = nlay + 1
     igpt, ibnd = 1, 1
     (; flux_up, flux_dn, flux_net) = flux_lw
@@ -33,7 +33,7 @@ function rte_lw_2stream_solve!(
     max_threads,
     as::GrayAtmosphericState,
 )
-    (; nlay, ncol) = as
+    nlay, ncol = AtmosphericStates.get_dims(as)
     nlev = nlay + 1
     tx = min(ncol, max_threads)
     bx = cld(ncol, tx)
@@ -79,7 +79,7 @@ function rte_lw_2stream_solve!(
     lookup_lw::LookUpLW,
     lookup_lw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
 )
-    (; nlay, ncol) = as
+    nlay, ncol = AtmosphericStates.get_dims(as)
     nlev = nlay + 1
     (; major_gpt2bnd) = lookup_lw.band_data
     n_gpt = length(major_gpt2bnd)
@@ -131,7 +131,7 @@ function rte_lw_2stream_solve!(
     lookup_lw::LookUpLW,
     lookup_lw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
 )
-    (; nlay, ncol) = as
+    nlay, ncol = AtmosphericStates.get_dims(as)
     nlev = nlay + 1
     tx = min(ncol, max_threads)
     bx = cld(ncol, tx)

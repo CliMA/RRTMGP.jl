@@ -6,7 +6,7 @@ function rte_sw_noscat_solve!(
     max_threads,
     as::GrayAtmosphericState,
 )
-    (; nlay, ncol) = as
+    nlay, ncol = AtmosphericStates.get_dims(as)
     nlev = nlay + 1
     n_gpt, igpt = 1, 1
     FT = eltype(op.angle_disc.gauss_Ds)
@@ -29,7 +29,7 @@ function rte_sw_noscat_solve!(
     max_threads,
     as::GrayAtmosphericState,
 )
-    (; nlay, ncol) = as
+    nlay, ncol = AtmosphericStates.get_dims(as)
     nlev = nlay + 1
     tx = min(ncol, max_threads)
     bx = cld(ncol, tx)
@@ -66,7 +66,7 @@ function rte_sw_noscat_solve!(
     lookup_sw::LookUpSW,
     lookup_sw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
 )
-    (; nlay, ncol) = as
+    nlay, ncol = AtmosphericStates.get_dims(as)
     nlev = nlay + 1
     n_gpt = length(lookup_sw.solar_src_scaled)
     # setting references for flux_sw
@@ -95,7 +95,7 @@ function rte_sw_noscat_solve!(
     lookup_sw::LookUpSW,
     lookup_sw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
 )
-    (; nlay, ncol) = as
+    nlay, ncol = AtmosphericStates.get_dims(as)
     nlev = nlay + 1
     # setting references for flux_sw
     tx = min(ncol, max_threads)

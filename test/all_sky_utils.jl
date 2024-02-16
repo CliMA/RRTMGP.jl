@@ -84,7 +84,7 @@ function all_sky(
         param_set,
     )
     close(ds_in)
-    ncol, nlay = as.ncol, as.nlay
+    nlay, ncol = AtmosphericStates.get_dims(as)
     nlev = nlay + 1
     #---reading comparison files -----------------------------------
     if bot_at_1
