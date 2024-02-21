@@ -11,6 +11,7 @@ using ..Vmrs
 export AbstractAtmosphericState,
     AtmosphericState,
     GrayAtmosphericState,
+    CloudState,
     setup_gray_as_pr_grid,
     setup_gray_as_alt_grid,
     MaxRandomOverlap,
@@ -37,7 +38,7 @@ Atmospheric conditions, used to compute optical properties.
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct AtmosphericState{FTA1D, FTA1DN, FTA2D, CLDP, CLDM, CMASK, VMR} <: AbstractAtmosphericState
+struct AtmosphericState{FTA1D, FTA1DN, FTA2D, VMR, CLD} <: AbstractAtmosphericState
     "longitude, in degrees (`ncol`), optional"
     lon::FTA1DN
     "latitude, in degrees (`ncol`), optional"
@@ -56,24 +57,8 @@ struct AtmosphericState{FTA1D, FTA1DN, FTA2D, CLDP, CLDM, CMASK, VMR} <: Abstrac
     col_dry::FTA2D
     "volume mixing ratio of all relevant gases"
     vmr::VMR
-    "effective radius of cloud liquid particles"
-    cld_r_eff_liq::CLDP
-    "effective radius of cloud ice particles"
-    cld_r_eff_ice::CLDP
-    "cloud water path"
-    cld_path_liq::CLDP
-    "cloud ice path"
-    cld_path_ice::CLDP
-    "cloud fraction"
-    cld_frac::CLDP
-    "cloud mask (longwave), = true if clouds are present"
-    cld_mask_lw::CLDM
-    "cloud mask (shortwave), = true if clouds are present"
-    cld_mask_sw::CLDM
-    "cloud mask type"
-    cld_mask_type::CMASK
-    "ice roughness, 1 = none, 2 = medium, 3 = rough"
-    ice_rgh::Int
+    "cloud state"
+    cloud_state::CLD
 end
 Adapt.@adapt_structure AtmosphericState
 
@@ -83,4 +68,31 @@ Adapt.@adapt_structure AtmosphericState
 @inline get_ncol(as::AtmosphericState) = size(as.p_lay, 2)
 # Number of layers and columns
 @inline get_dims(as::AtmosphericState) = size(as.p_lay)
+
+"""
+    CloudState{CD, CF, CM, CMT}
+
+Cloud state, used to compute optical properties.
+"""
+struct CloudState{CD, CF, CM, CMT}
+    "effective radius of cloud liquid particles"
+    cld_r_eff_liq::CD
+    "effective radius of cloud ice particles"
+    cld_r_eff_ice::CD
+    "cloud water path"
+    cld_path_liq::CD
+    "cloud ice path"
+    cld_path_ice::CD
+    "cloud fraction"
+    cld_frac::CF
+    "cloud mask (longwave), = true if clouds are present"
+    mask_lw::CM
+    "cloud mask (shortwave), = true if clouds are present"
+    mask_sw::CM
+    "cloud mask type"
+    mask_type::CMT
+    "ice roughness, 1 = none, 2 = medium, 3 = rough"
+    ice_rgh::Int
+end
+Adapt.@adapt_structure CloudState
 end

@@ -83,7 +83,8 @@ function rte_lw_2stream_solve!(
     nlev = nlay + 1
     (; major_gpt2bnd) = lookup_lw.band_data
     n_gpt = length(major_gpt2bnd)
-    bld_cld_mask = as isa AtmosphericState && as.cld_mask_type isa AbstractCloudMask
+    cloud_state = as.cloud_state
+    bld_cld_mask = cloud_state isa CloudState
     flux_up_lw = flux_lw.flux_up
     flux_dn_lw = flux_lw.flux_dn
     flux_net_lw = flux_lw.flux_net
@@ -93,9 +94,9 @@ function rte_lw_2stream_solve!(
             ClimaComms.@threaded device for gcol in 1:ncol
                 ibnd = major_gpt2bnd[igpt]
                 bld_cld_mask && Optics.build_cloud_mask!(
-                    view(as.cld_mask_lw, :, gcol),
-                    view(as.cld_frac, :, gcol),
-                    as.cld_mask_type,
+                    view(cloud_state.mask_lw, :, gcol),
+                    view(cloud_state.cld_frac, :, gcol),
+                    cloud_state.mask_type,
                 )
                 compute_optical_props!(op, as, src_lw, gcol, igpt, lookup_lw, lookup_lw_cld)
                 rte_lw_2stream!(op, flux, src_lw, bcs_lw, gcol, igpt, ibnd, nlev, ncol)
@@ -161,10 +162,15 @@ function rte_lw_2stream_solve_CUDA!(
         flux_dn_lw = flux_lw.flux_dn
         flux_net_lw = flux_lw.flux_net
         (; flux_up, flux_dn) = flux
+        cloud_state = as.cloud_state
         @inbounds for igpt in 1:n_gpt
             ibnd = major_gpt2bnd[igpt]
-            if as isa AtmosphericState && as.cld_mask_type isa AbstractCloudMask
-                Optics.build_cloud_mask!(view(as.cld_mask_lw, :, gcol), view(as.cld_frac, :, gcol), as.cld_mask_type)
+            if cloud_state isa CloudState
+                Optics.build_cloud_mask!(
+                    view(cloud_state.mask_lw, :, gcol),
+                    view(cloud_state.cld_frac, :, gcol),
+                    cloud_state.mask_type,
+                )
             end
             compute_optical_props!(op, as, src_lw, gcol, igpt, lookup_lw, lookup_lw_cld)
             rte_lw_2stream!(op, flux, src_lw, bcs_lw, gcol, igpt, ibnd, nlev, ncol)

@@ -94,7 +94,8 @@ function rte_sw_2stream_solve!(
     nlev = nlay + 1
     n_gpt = length(lookup_sw.solar_src_scaled)
     @inbounds begin
-        bld_cld_mask = as.cld_mask_type isa AbstractCloudMask
+        cloud_state = as.cloud_state
+        bld_cld_mask = cloud_state isa CloudState
         flux_up_sw = flux_sw.flux_up
         flux_dn_sw = flux_sw.flux_dn
         flux_net_sw = flux_sw.flux_net
@@ -102,9 +103,9 @@ function rte_sw_2stream_solve!(
         for igpt in 1:n_gpt
             ClimaComms.@threaded device for gcol in 1:ncol
                 bld_cld_mask && Optics.build_cloud_mask!(
-                    view(as.cld_mask_sw, :, gcol),
-                    view(as.cld_frac, :, gcol),
-                    as.cld_mask_type,
+                    view(cloud_state.mask_sw, :, gcol),
+                    view(cloud_state.cld_frac, :, gcol),
+                    cloud_state.mask_type,
                 )
                 # compute optical properties
                 compute_optical_props!(op, as, gcol, igpt, lookup_sw, lookup_sw_cld)
@@ -177,14 +178,15 @@ function rte_sw_2stream_solve_CUDA!(
         flux_up = flux.flux_up
         flux_dn = flux.flux_dn
         FT = eltype(flux_up)
+        cloud_state = as.cloud_state
         @inbounds begin
             for igpt in 1:n_gpt
                 # set cloud mask, if applicable
-                if as.cld_mask_type isa AbstractCloudMask
+                if cloud_state isa CloudState
                     Optics.build_cloud_mask!(
-                        view(as.cld_mask_sw, :, gcol),
-                        view(as.cld_frac, :, gcol),
-                        as.cld_mask_type,
+                        view(cloud_state.mask_sw, :, gcol),
+                        view(cloud_state.cld_frac, :, gcol),
+                        cloud_state.mask_type,
                     )
                 end
                 # compute optical properties

@@ -143,28 +143,19 @@ function setup_allsky_as(
     cld_path_liq = DA(cld_path_liq)
     cld_path_ice = DA(cld_path_ice)
     ice_rgh = 2 # medium ice roughness
-
+    cloud_state = CloudState(
+        cld_r_eff_liq,
+        cld_r_eff_ice,
+        cld_path_liq,
+        cld_path_ice,
+        cld_frac,
+        cld_mask_lw,
+        cld_mask_sw,
+        MaxRandomOverlap(),
+        ice_rgh,
+    )
     return (
-        AtmosphericState(
-            lon,
-            lat,
-            p_lay,
-            p_lev,
-            t_lay,
-            t_lev,
-            t_sfc,
-            col_dry,
-            vmr,
-            cld_r_eff_liq,
-            cld_r_eff_ice,
-            cld_path_liq,
-            cld_path_ice,
-            cld_frac,
-            cld_mask_lw,
-            cld_mask_sw,
-            MaxRandomOverlap(),
-            ice_rgh,
-        ),
+        AtmosphericState(lon, lat, p_lay, p_lev, t_lay, t_lev, t_sfc, col_dry, vmr, cloud_state),
         sfc_emis,
         sfc_alb_direct,
         sfc_alb_diffuse,
