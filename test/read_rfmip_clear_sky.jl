@@ -113,36 +113,9 @@ function setup_rfmip_as(
     compute_col_gas!(context, p_lev, col_dry, param_set, vmr_h2o, lat) # the example skips lat based gravity calculation
 
     vmr = VMR(vmr_h2o, vmr_o3, FTA1D(vmrat))
-    cld_r_eff_liq = nothing
-    cld_r_eff_ice = nothing
-    cld_path_liq = nothing
-    cld_path_ice = nothing
-    cld_frac = nothing
-    cld_mask_lw = nothing
-    cld_mask_sw = nothing
-    ice_rgh = 1
     #------------------
     return (
-        AtmosphericState(
-            lon,
-            lat,
-            p_lay,
-            p_lev,
-            t_lay,
-            t_lev,
-            t_sfc,
-            col_dry,
-            vmr,
-            cld_r_eff_liq,
-            cld_r_eff_ice,
-            cld_path_liq,
-            cld_path_ice,
-            cld_frac,
-            cld_mask_lw,
-            cld_mask_sw,
-            nothing,
-            ice_rgh,
-        ),
+        AtmosphericState(lon, lat, p_lay, p_lev, t_lay, t_lev, t_sfc, col_dry, vmr, nothing),
         sfc_emis,
         sfc_alb,
         cos_zenith,

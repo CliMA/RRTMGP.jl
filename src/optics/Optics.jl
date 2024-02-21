@@ -253,11 +253,12 @@ end
         lev_source[nlay + 1, gcol] = lev_src_inc_prev
     end
     if !isnothing(lkp_cld) # clouds need TwoStream optics
-        cld_r_eff_liq = view(as.cld_r_eff_liq, :, gcol)
-        cld_r_eff_ice = view(as.cld_r_eff_ice, :, gcol)
-        cld_path_liq = view(as.cld_path_liq, :, gcol)
-        cld_path_ice = view(as.cld_path_ice, :, gcol)
-        cld_mask = view(as.cld_mask_lw, :, gcol)
+        cloud_state = as.cloud_state
+        cld_r_eff_liq = view(cloud_state.cld_r_eff_liq, :, gcol)
+        cld_r_eff_ice = view(cloud_state.cld_r_eff_ice, :, gcol)
+        cld_path_liq = view(cloud_state.cld_path_liq, :, gcol)
+        cld_path_ice = view(cloud_state.cld_path_ice, :, gcol)
+        cld_mask = view(cloud_state.mask_lw, :, gcol)
 
         add_cloud_optics_2stream!(
             τ,
@@ -268,7 +269,7 @@ end
             cld_r_eff_ice,
             cld_path_liq,
             cld_path_ice,
-            as.ice_rgh,
+            cloud_state.ice_rgh,
             lkp_cld,
             ibnd;
             delta_scaling = false,
@@ -343,11 +344,12 @@ end
         τ[glay], ssa[glay], g[glay] = compute_gas_optics(lkp, vmr, col_dry, igpt, ibnd, p_lay, t_lay, glay, gcol)
     end
     if !isnothing(lkp_cld) # clouds need TwoStream optics
-        cld_r_eff_liq = view(as.cld_r_eff_liq, :, gcol)
-        cld_r_eff_ice = view(as.cld_r_eff_ice, :, gcol)
-        cld_path_liq = view(as.cld_path_liq, :, gcol)
-        cld_path_ice = view(as.cld_path_ice, :, gcol)
-        cld_mask = view(as.cld_mask_sw, :, gcol)
+        cloud_state = as.cloud_state
+        cld_r_eff_liq = view(cloud_state.cld_r_eff_liq, :, gcol)
+        cld_r_eff_ice = view(cloud_state.cld_r_eff_ice, :, gcol)
+        cld_path_liq = view(cloud_state.cld_path_liq, :, gcol)
+        cld_path_ice = view(cloud_state.cld_path_ice, :, gcol)
+        cld_mask = view(cloud_state.mask_sw, :, gcol)
 
         add_cloud_optics_2stream!(
             τ,
@@ -358,7 +360,7 @@ end
             cld_r_eff_ice,
             cld_path_liq,
             cld_path_ice,
-            as.ice_rgh,
+            cloud_state.ice_rgh,
             lkp_cld,
             ibnd;
             delta_scaling = true,
