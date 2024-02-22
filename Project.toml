@@ -21,7 +21,7 @@ CLIMAParameters = "6eacf6c3-8458-43b9-ae03-caf5306d3d53"
 CreateParametersExt = "CLIMAParameters"
 
 [compat]
-Adapt = "3.3"
+Adapt = "3.3, 4"
 Artifacts = "1"
 CUDA = "4, 5"
 ClimaComms = "0.5.1"
