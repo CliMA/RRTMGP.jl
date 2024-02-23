@@ -169,17 +169,13 @@ Computes optical properties for the longwave problem.
         t_sfc = as.t_sfc[gcol]
         ibnd = lkp.band_data.major_gpt2bnd[igpt]
         totplnk = view(lkp.planck.tot_planck, :, ibnd)
-        col_dry_col = view(as.col_dry, :, gcol)
-        p_lay_col = view(as.p_lay, :, gcol)
-        t_lay_col = view(as.t_lay, :, gcol)
+        as_layerdata = AtmosphericStates.getview_layerdata(as, gcol)
         t_lev_col = view(as.t_lev, :, gcol)
         τ = view(op.τ, :, gcol)
 
         t_lev_dec = t_lev_col[1]
         for glay in 1:nlay
-            col_dry = col_dry_col[glay]
-            p_lay = p_lay_col[glay]
-            t_lay = t_lay_col[glay]
+            col_dry, p_lay, t_lay = as_layerdata[1, glay], as_layerdata[2, glay], as_layerdata[3, glay]
             # compute gas optics
             τ[glay], _, _, planckfrac = compute_gas_optics(lkp, vmr, col_dry, igpt, ibnd, p_lay, t_lay, glay, gcol)
             # compute longwave source terms
@@ -214,9 +210,7 @@ end
         t_sfc = as.t_sfc[gcol]
         ibnd = lkp.band_data.major_gpt2bnd[igpt]
         totplnk = view(lkp.planck.tot_planck, :, ibnd)
-        col_dry_col = view(as.col_dry, :, gcol)
-        p_lay_col = view(as.p_lay, :, gcol)
-        t_lay_col = view(as.t_lay, :, gcol)
+        as_layerdata = AtmosphericStates.getview_layerdata(as, gcol)
         t_lev_col = view(as.t_lev, :, gcol)
         τ = view(op.τ, :, gcol)
         ssa = view(op.ssa, :, gcol)
@@ -229,9 +223,7 @@ end
     @inbounds begin
         t_lev_dec = t_lev_col[1]
         for glay in 1:nlay
-            col_dry = col_dry_col[glay]
-            p_lay = p_lay_col[glay]
-            t_lay = t_lay_col[glay]
+            col_dry, p_lay, t_lay = as_layerdata[1, glay], as_layerdata[2, glay], as_layerdata[3, glay]
             # compute gas optics
             τ[glay], ssa[glay], g[glay], planckfrac =
                 compute_gas_optics(lkp, vmr, col_dry, igpt, ibnd, p_lay, t_lay, glay, gcol)
@@ -300,17 +292,14 @@ Computes optical properties for the shortwave problem.
 )
     nlay = AtmosphericStates.get_nlay(as)
     (; vmr) = as
-    @inbounds ibnd = lkp.band_data.major_gpt2bnd[igpt]
-    @inbounds t_sfc = as.t_sfc[gcol]
-    col_dry_col = view(as.col_dry, :, gcol)
-    p_lay_col = view(as.p_lay, :, gcol)
-    t_lay_col = view(as.t_lay, :, gcol)
-    τ = view(op.τ, :, gcol)
-
+    @inbounds begin
+        ibnd = lkp.band_data.major_gpt2bnd[igpt]
+        t_sfc = as.t_sfc[gcol]
+        as_layerdata = AtmosphericStates.getview_layerdata(as, gcol)
+        τ = view(op.τ, :, gcol)
+    end
     @inbounds for glay in 1:nlay
-        col_dry = col_dry_col[glay]
-        p_lay = p_lay_col[glay]
-        t_lay = t_lay_col[glay]
+        col_dry, p_lay, t_lay = as_layerdata[1, glay], as_layerdata[2, glay], as_layerdata[3, glay]
         # compute gas optics
         τ[glay], _, _ = compute_gas_optics(lkp, vmr, col_dry, igpt, ibnd, p_lay, t_lay, glay, gcol)
     end
@@ -327,19 +316,16 @@ end
 )
     nlay = AtmosphericStates.get_nlay(as)
     (; vmr) = as
-    @inbounds ibnd = lkp.band_data.major_gpt2bnd[igpt]
-    @inbounds t_sfc = as.t_sfc[gcol]
-    col_dry_col = view(as.col_dry, :, gcol)
-    p_lay_col = view(as.p_lay, :, gcol)
-    t_lay_col = view(as.t_lay, :, gcol)
-    τ = view(op.τ, :, gcol)
-    ssa = view(op.ssa, :, gcol)
-    g = view(op.g, :, gcol)
-
+    @inbounds begin
+        ibnd = lkp.band_data.major_gpt2bnd[igpt]
+        t_sfc = as.t_sfc[gcol]
+        as_layerdata = AtmosphericStates.getview_layerdata(as, gcol)
+        τ = view(op.τ, :, gcol)
+        ssa = view(op.ssa, :, gcol)
+        g = view(op.g, :, gcol)
+    end
     @inbounds for glay in 1:nlay
-        col_dry = col_dry_col[glay]
-        p_lay = p_lay_col[glay]
-        t_lay = t_lay_col[glay]
+        col_dry, p_lay, t_lay = as_layerdata[1, glay], as_layerdata[2, glay], as_layerdata[3, glay]
         # compute gas optics
         τ[glay], ssa[glay], g[glay] = compute_gas_optics(lkp, vmr, col_dry, igpt, ibnd, p_lay, t_lay, glay, gcol)
     end

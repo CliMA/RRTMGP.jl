@@ -112,10 +112,15 @@ function setup_rfmip_as(
     # FORTRAN RRTMGP test case.
     compute_col_gas!(context, p_lev, col_dry, param_set, vmr_h2o, lat) # the example skips lat based gravity calculation
 
+    layerdata = similar(p_lay, 3, nlay, ncol)
+    layerdata[1, :, :] .= col_dry
+    layerdata[2, :, :] .= p_lay
+    layerdata[3, :, :] .= t_lay
+
     vmr = VMR(vmr_h2o, vmr_o3, FTA1D(vmrat))
     #------------------
     return (
-        AtmosphericState(lon, lat, p_lay, p_lev, t_lay, t_lev, t_sfc, col_dry, vmr, nothing),
+        AtmosphericState(lon, lat, layerdata, p_lev, t_lev, t_sfc, vmr, nothing),
         sfc_emis,
         sfc_alb,
         cos_zenith,
