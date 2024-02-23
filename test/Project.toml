@@ -1,7 +1,7 @@
 [deps]
 Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
 Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
-CLIMAParameters = "6eacf6c3-8458-43b9-ae03-caf5306d3d53"
+ClimaParams = "5c42b081-d73a-476f-9059-fd94b934656c"
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 ClimaComms = "3a4d1b5c-c61d-41fd-a00a-5873ba7a1b0d"
 Compat = "34da2185-b29b-5c13-b0c7-acf172513d20"

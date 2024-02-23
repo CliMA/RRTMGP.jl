@@ -17,7 +17,7 @@ using RRTMGP.AngularDiscretizations
 using RRTMGP.RTE
 using RRTMGP.RTESolver
 import RRTMGP.Parameters.RRTMGPParameters
-import CLIMAParameters as CP
+import ClimaParams as CP
 
 # overriding some parameters to match with RRTMGP FORTRAN code
 

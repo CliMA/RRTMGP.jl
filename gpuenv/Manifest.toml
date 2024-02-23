@@ -2,7 +2,7 @@
 
 julia_version = "1.10.0"
 manifest_format = "2.0"
-project_hash = "64fe974084ed75deefcd86f61ac1c5f7bba255ba"
+project_hash = "957d1ab0a9c2314f7c3216e54e479035f61cd467"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -84,12 +84,6 @@ git-tree-sha1 = "ed2e76c1c3c43fd9d0cb9248674620b29d71f2d1"
 uuid = "179af706-886a-5703-950a-314cd64e0468"
 version = "0.1.2"
 
-[[deps.CLIMAParameters]]
-deps = ["DocStringExtensions", "TOML", "Test"]
-git-tree-sha1 = "10473c458cd10f3808a438492447ca10d4dde7d0"
-uuid = "6eacf6c3-8458-43b9-ae03-caf5306d3d53"
-version = "0.9.0"
-
 [[deps.CUDA]]
 deps = ["AbstractFFTs", "Adapt", "BFloat16s", "CEnum", "CUDA_Driver_jll", "CUDA_Runtime_Discovery", "CUDA_Runtime_jll", "Crayons", "DataFrames", "ExprTools", "GPUArrays", "GPUCompiler", "KernelAbstractions", "LLVM", "LLVMLoopInfo", "LazyArtifacts", "Libdl", "LinearAlgebra", "Logging", "NVTX", "Preferences", "PrettyTables", "Printf", "Random", "Random123", "RandomNumbers", "Reexport", "Requires", "SparseArrays", "Statistics", "UnsafeAtomicsLLVM"]
 git-tree-sha1 = "95ac638373ac40e29c1b6d086a3698f5026ff6a6"
@@ -127,6 +121,12 @@ deps = ["CUDA", "MPI"]
 git-tree-sha1 = "57c054ddd4280ca8e2b5915ef1cf1395c4edbc78"
 uuid = "3a4d1b5c-c61d-41fd-a00a-5873ba7a1b0d"
 version = "0.5.6"
+
+[[deps.ClimaParams]]
+deps = ["DocStringExtensions", "TOML", "Test"]
+git-tree-sha1 = "f55c42259e444c29b2e7aeb6314ed8090a95f251"
+uuid = "5c42b081-d73a-476f-9059-fd94b934656c"
+version = "0.10.0"
 
 [[deps.CodeTracking]]
 deps = ["InteractiveUtils", "UUIDs"]
@@ -693,11 +693,11 @@ uuid = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
 deps = ["Adapt", "Artifacts", "CUDA", "ClimaComms", "DocStringExtensions", "GaussQuadrature", "Random", "StaticArrays"]
 path = ".."
 uuid = "a01a1ee8-cea4-48fc-987c-fc7878d79da1"
-version = "0.12.0"
-weakdeps = ["CLIMAParameters"]
+version = "0.12.1"
+weakdeps = ["ClimaParams"]
 
     [deps.RRTMGP.extensions]
-    CreateParametersExt = "CLIMAParameters"
+    CreateParametersExt = "ClimaParams"
 
 [[deps.Random]]
 deps = ["SHA"]
