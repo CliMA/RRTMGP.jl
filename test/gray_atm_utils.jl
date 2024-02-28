@@ -14,9 +14,9 @@ using RRTMGP.AtmosphericStates
 using RRTMGP.Sources
 using RRTMGP.BCs
 import RRTMGP.Parameters.RRTMGPParameters
-import CLIMAParameters as CP
+import ClimaParams as CP
 
-# overriding CLIMAParameters as different precision is needed by RRTMGP
+# overriding ClimaParams as different precision is needed by RRTMGP
 
 #using Plots
 

@@ -1,7 +1,7 @@
 module CreateParametersExt
 
 import RRTMGP.Parameters.RRTMGPParameters
-import CLIMAParameters as CP
+import ClimaParams as CP
 
 RRTMGPParameters(::Type{FT}, overrides = NamedTuple()) where {FT <: AbstractFloat} =
     RRTMGPParameters(CP.create_toml_dict(FT), overrides)
