@@ -1,43 +1,30 @@
+agents:
+  queue: new-central
+  modules: climacommon/2024_02_27
+
 env:
-  JULIA_VERSION: "1.10.0"
-  CUDA_VERSION: "12.2"
+  JULIA_LOAD_PATH: "${JULIA_LOAD_PATH}:${BUILDKITE_BUILD_CHECKOUT_PATH}/.buildkite"
+  OPENBLAS_NUM_THREADS: 1
+  JULIA_NVTX_CALLBACKS: gc
+  JULIA_MAX_NUM_PRECOMPILE_FILES: 100
+  JULIA_CPU_TARGET: 'broadwell;skylake;icelake;cascadelake;epyc'
+  SLURM_KILL_BAD_EXIT: 1
 
 steps:
-  - label: "init cpu environments :computer:"
-    key: "init_cpu_env"
+  - label: "init test environments :computer:"
+    key: "init_env"
     command:
 
-      - echo "--- Instantiate examples environment"
-      - "julia --project=examples -e 'using Pkg; Pkg.develop(path=\".\")'"
-      - "julia --project=examples -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
-      - "julia --project=examples -e 'using Pkg; Pkg.precompile()'"
-      - "julia --project=examples -e 'using Pkg; Pkg.status()'"
+      - echo "--- Instantiate test environment"
+      - "julia --project=test -e 'using Pkg; Pkg.develop(path=\".\")'"
+      - "julia --project=test -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
+      - "julia --project=test -e 'using Pkg; Pkg.precompile()'"
+      - "julia --project=test -e 'using Pkg; Pkg.status()'"
 
     agents:
-      config: cpu
-      queue: central
-      slurm_ntasks: 1
-    #   slurm_cpus_per_task: 8
-    # env:
-    #   JULIA_NUM_PRECOMPILE_TASKS: 8
-
-  - label: "init gpu environments :computer:"
-    key: "init_gpu_env"
-    command:
-      - echo "--- Instantiate gpu environment"
-      - "julia --project=gpuenv -e 'using Pkg; Pkg.develop(path=\".\")'"
-      - "julia --project=gpuenv -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
-      - "julia --project=gpuenv -e 'using Pkg; Pkg.precompile()'"
-      - "julia --project=gpuenv -e 'using Pkg; Pkg.status()'"
-
-    agents:
-      config: gpu
-      queue: central
-      slurm_ntasks: 1
-      slurm_gres: "gpu:1"
-    #   slurm_cpus_per_task: 8
-    # env:
-    #   JULIA_NUM_PRECOMPILE_TASKS: 8
+      slurm_mem: 16G 
+      slurm_gpus: 1
+      slurm_cpus_per_task: 4
 
   - wait
 
@@ -45,26 +32,20 @@ steps:
     steps:
 
       - label: "CPU unit tests"
-        command: "julia --color=yes --project=examples test/runtests.jl"
+        command: "julia --color=yes --project=test test/runtests.jl"
         agents:
-          config: cpu
-          queue: central
           slurm_ntasks: 1
           slurm_mem_per_cpu: 6G
 
       - label: "Threaded CPU unit tests"
-        command: "julia --threads 8 --color=yes --project=examples test/runtests.jl"
+        command: "julia --threads 8 --color=yes --project=test test/runtests.jl"
         agents:
-          config: cpu
-          queue: central
           slurm_cpus_per_task: 8
           slurm_mem_per_cpu: 6G
 
       - label: "GPU unit tests"
-        command: "julia --color=yes --project=gpuenv test/runtests_gpu.jl"
+        command: "julia --color=yes --project=test test/runtests_gpu.jl"
         agents:
-          config: gpu
-          queue: central
           slurm_ntasks: 1
           slurm_gres: "gpu:1"
 
@@ -72,29 +53,23 @@ steps:
     steps:
 
       - label: "Flame Graph: Gray Atm"
-        command: "julia --color=yes --project=examples perf/flame.jl gray_atm.jl"
+        command: "julia --color=yes --project=test perf/flame.jl gray_atm.jl"
         artifact_paths: "flame_graphs/gray_atm/*"
         agents:
-          config: cpu
-          queue: central
           slurm_ntasks: 1
           slurm_mem_per_cpu: 6G
 
       - label: "Flame Graph: Clear Sky"
-        command: "julia --color=yes --project=examples perf/flame.jl clear_sky.jl"
+        command: "julia --color=yes --project=test perf/flame.jl clear_sky.jl"
         artifact_paths: "flame_graphs/clear_sky/*"
         agents:
-          config: cpu
-          queue: central
           slurm_ntasks: 1
           slurm_mem_per_cpu: 6G
 
       - label: "Flame Graph: All Sky"
-        command: "julia --color=yes --project=examples perf/flame.jl all_sky.jl"
+        command: "julia --color=yes --project=test perf/flame.jl all_sky.jl"
         artifact_paths: "flame_graphs/all_sky/*"
         agents:
-          config: cpu
-          queue: central
           slurm_ntasks: 1
           slurm_mem_per_cpu: 6G
 
@@ -102,41 +77,32 @@ steps:
     steps:
   
       - label: "Benchmarks"
-        command: "julia --color=yes --project=examples perf/benchmark.jl"
+        command: "julia --color=yes --project=test perf/benchmark.jl"
         agents:
-          config: cpu
-          queue: central
           slurm_ntasks: 1
           slurm_mem_per_cpu: 6G
   
       - label: "Benchmarks (Float32)"
-        command: "julia --color=yes --project=examples perf/benchmark.jl Float32"
+        command: "julia --color=yes --project=test perf/benchmark.jl Float32"
         agents:
-          config: cpu
-          queue: central
           slurm_ntasks: 1
           slurm_mem_per_cpu: 6G
 
       - label: "Threaded benchmarks"
-        command: "julia --threads=8 --color=yes --project=examples perf/benchmark.jl"
+        command: "julia --threads=8 --color=yes --project=test perf/benchmark.jl"
         agents:
-          config: cpu
-          queue: central
           slurm_cpus_per_task: 8
           slurm_mem_per_cpu: 6G
 
       - label: "GPU benchmarks"
-        command: "julia --color=yes --project=gpuenv perf/benchmark.jl"
+        command: "julia --color=yes --project=test perf/benchmark.jl"
         agents:
-          config: gpu
-          queue: central
           slurm_ntasks: 1
           slurm_gres: "gpu:1"
 
       - label: "GPU All-sky DYAMOND benchmark"
-        command: "julia --color=yes --project=gpuenv test/all_sky_dyamond_gpu_benchmark.jl"
+        command: "julia --color=yes --project=test test/all_sky_dyamond_gpu_benchmark.jl"
         agents:
-          config: gpu
-          queue: central
           slurm_ntasks: 1
           slurm_gres: "gpu:1"
+
