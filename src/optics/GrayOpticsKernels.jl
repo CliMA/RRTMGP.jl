@@ -24,7 +24,7 @@ function compute_optical_props!(op::OneScalar, as::GrayAtmosphericState, sf::Sou
         p_lev_glay = p_lev[1, gcol]
         t_lev_dec = t_lev[1, gcol]
         t_sfc = as.t_sfc[gcol]
-        sfc_source[gcol] = sbc * t_sfc^FT(4) / FT(π)   # computing sfc_source
+        sfc_source[gcol] = sbc * (t_sfc * t_sfc * t_sfc * t_sfc) / FT(π)   # computing sfc_source
 
         for glay in 1:nlay
             # compute optical thickness
@@ -35,9 +35,10 @@ function compute_optical_props!(op::OneScalar, as::GrayAtmosphericState, sf::Sou
             p_lev_glay = p_lev_glayplus1
             # compute longwave source terms
             t_lev_inc = t_lev[glay + 1, gcol]
-            lay_source[glay, gcol] = sbc * t_lay[glay, gcol]^FT(4) / FT(π)   # computing lay_source
-            lev_source_inc[glay, gcol] = sbc * t_lev_inc^FT(4) / FT(π)
-            lev_source_dec[glay, gcol] = sbc * t_lev_dec^FT(4) / FT(π)
+            t_lay_loc = t_lay[glay, gcol]
+            lay_source[glay, gcol] = sbc * (t_lay_loc * t_lay_loc * t_lay_loc * t_lay_loc) / FT(π)   # computing lay_source
+            lev_source_inc[glay, gcol] = sbc * (t_lev_inc * t_lev_inc * t_lev_inc * t_lev_inc) / FT(π)
+            lev_source_dec[glay, gcol] = sbc * (t_lev_dec * t_lev_dec * t_lev_dec * t_lev_dec) / FT(π)
             t_lev_dec = t_lev_inc
         end
     end
@@ -57,7 +58,7 @@ function compute_optical_props!(op::TwoStream, as::GrayAtmosphericState, sf::Sou
         p_lev_glay = p_lev[1, gcol]
         t_lev_dec = t_lev[1, gcol]
         t_sfc = as.t_sfc[gcol]
-        sfc_source[gcol] = sbc * t_sfc^FT(4) / FT(π)   # computing sfc_source
+        sfc_source[gcol] = sbc * (t_sfc * t_sfc * t_sfc * t_sfc) / FT(π)   # computing sfc_source
         lev_src_inc_prev = FT(0)
         lev_src_dec_prev = FT(0)
         for glay in 1:nlay
@@ -68,8 +69,8 @@ function compute_optical_props!(op::TwoStream, as::GrayAtmosphericState, sf::Sou
             p_lev_glay = p_lev_glayplus1
             # compute longwave source terms
             t_lev_inc = t_lev[glay + 1, gcol]
-            lev_src_inc = sbc * t_lev_inc^FT(4) / FT(π)
-            lev_src_dec = sbc * t_lev_dec^FT(4) / FT(π)
+            lev_src_inc = sbc * (t_lev_inc * t_lev_inc * t_lev_inc * t_lev_inc) / FT(π)
+            lev_src_dec = sbc * (t_lev_dec * t_lev_dec * t_lev_dec * t_lev_dec) / FT(π)
             if glay == 1
                 lev_source[glay, gcol] = lev_src_dec
             else
