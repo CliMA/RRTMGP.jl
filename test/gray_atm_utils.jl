@@ -78,6 +78,9 @@ function gray_atmos_lw_equil(context, ::Type{OPC}, ::Type{FT}; exfiltrate = fals
     p_lev = gray_as.p_lev
     optical_props = slv.op
     source = slv.src_lw
+    sbc = FT(RRTMGP.Parameters.Stefan(param_set))
+    cp_d_ = FT(RRTMGP.Parameters.cp_d(param_set))
+    grav_ = FT(RRTMGP.Parameters.grav(param_set))
     #----------------------------------------------------
     hr_lay = DA{FT}(undef, nlay, ncol)
     T_ex_lev = DA{FT}(undef, nlev, ncol)
@@ -88,11 +91,11 @@ function gray_atmos_lw_equil(context, ::Type{OPC}, ::Type{FT}; exfiltrate = fals
         # calling the long wave gray radiation solver
         solve_lw!(slv, max_threads)
         # computing heating rate
-        compute_gray_heating_rate!(context, hr_lay, p_lev, ncol, nlay, flux_net, param_set, FT)
+        compute_gray_heating_rate!(context, hr_lay, p_lev, ncol, nlay, flux_net, cp_d_, grav_)
         # updating t_lay and t_lev based on heating rate
         update_profile_lw!(
             context,
-            param_set,
+            sbc,
             t_lay,
             t_lev,
             flux_dn,
@@ -104,7 +107,6 @@ function gray_atmos_lw_equil(context, ::Type{OPC}, ::Type{FT}; exfiltrate = fals
             nlay,
             nlev,
             ncol,
-            FT,
         )
         #----------------------------------------
         flux_grad_err = maximum(flux_grad)
