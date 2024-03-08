@@ -91,6 +91,14 @@ Adapt.@adapt_structure GrayAtmosphericState
 @inline get_ncol(as::GrayAtmosphericState) = size(as.p_lay, 2)
 # Number of layers and columns
 @inline get_dims(as::GrayAtmosphericState) = size(as.p_lay)
+
+# view of layer pressures [Pa, mb]
+@inline getview_p_lay(as::GrayAtmosphericState) = as.p_lay
+@inline getview_p_lay(as::GrayAtmosphericState, gcol) = @inbounds view(as.p_lay, :, gcol)
+
+# view of layer temperatures [K]
+@inline getview_t_lay(as::GrayAtmosphericState) = as.t_lay
+@inline getview_t_lay(as::GrayAtmosphericState, gcol) = @inbounds view(as.t_lay, :, gcol)
 #---------------------------------------------------------------
 # This functions sets up a model temperature and pressure 
 # distributions for a gray atmosphere based on a pressure grid
