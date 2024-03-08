@@ -136,18 +136,16 @@ and lapse rate for a gray atmosphere.
 See Schneider 2004, J. Atmos. Sci. (2004) 61 (12): 1317–1340.
 DOI: https://doi.org/10.1175/1520-0469(2004)061<1317:TTATTS>2.0.CO;2
 """
-function compute_gray_optical_thickness_lw(
-    params::GrayOpticalThicknessSchneider2004{FT},
-    p0,
-    Δp,
-    p,
-    lat,
-) where {FT <: AbstractFloat}
+function compute_gray_optical_thickness_lw(params::GrayOpticalThicknessSchneider2004{FT}, p0, Δp, p, lat) where {FT}
     (; α, te, tt, Δt) = params
-    ts = te + Δt * (FT(1) / FT(3) - sin(lat / FT(180) * FT(π))^2) # surface temp at a given latitude (K)
-    d0 = FT((ts / tt)^FT(4) - FT(1)) # optical depth
-    @inbounds τ = (α * d0 * pow_fast(p / p0, α) / p) * Δp
-    return abs(τ)
+    # surface temp at a given latitude (K) / temp at top of atmosphere
+    ts_by_tt = (te + Δt * (FT(1) / FT(3) - sin(lat / FT(180) * FT(π))^2)) / tt
+
+    ts_by_tt_pow4 = ts_by_tt * ts_by_tt * ts_by_tt * ts_by_tt
+
+    d0 = ts_by_tt_pow4 - FT(1) # optical depth
+
+    return abs((α * d0 * pow_fast(p / p0, α) / p) * Δp)
 end
 
 compute_gray_optical_thickness_sw(params::GrayOpticalThicknessSchneider2004{FT}, rest...) where {FT} = FT(0)
