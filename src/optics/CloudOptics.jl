@@ -364,6 +364,8 @@ function build_cloud_mask!(
             cld_mask_ilayplus1 = cld_mask_ilay
             ilay -= 1
         end
+    else
+        map!(x -> false, cld_mask, cld_mask)
     end
     return nothing
 end
