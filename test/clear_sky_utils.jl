@@ -65,7 +65,7 @@ function clear_sky(
     # reading rfmip data to atmospheric state
     ds_lw_in = Dataset(input_file, "r")
 
-    (as, sfc_emis, sfc_alb_direct, cos_zenith, toa_flux, usecol) =
+    (as, sfc_emis, sfc_alb_direct, cos_zenith, toa_flux) =
         setup_rfmip_as(context, ds_lw_in, idx_gases, exp_no, lookup_lw, FT, VMR, max_threads, param_set)
     close(ds_lw_in)
 
@@ -159,13 +159,21 @@ function clear_sky(
     flux_dn_sw = Array(slv.flux_sw.flux_dn)
     flux_net_sw = Array(slv.flux_sw.flux_net)
 
-    for i in 1:ncol
-        if usecol[i] == 0
-            flux_up_sw[:, i] .= FT(0)
-            flux_dn_sw[:, i] .= FT(0)
-            flux_net_sw[:, i] .= FT(0)
+    # Test if shortwave fluxes are zero if zenith angle is ≥ π/2
+    cos_zenith = Array(cos_zenith)
+    test_night_cols = true
+    nnightcol = 0
+    for gcol in 1:ncol
+        if cos_zenith[gcol] ≤ 0
+            test_flux_up_sw = maximum(abs.(flux_up_sw[:, gcol])) ≈ FT(0)
+            test_flux_dn_sw = maximum(abs.(flux_dn_sw[:, gcol])) ≈ FT(0)
+            if !(test_flux_up_sw && test_flux_dn_sw)
+                test_night_cols = false
+            end
+            nnightcol += 1
         end
     end
+    @test test_night_cols
 
     max_err_flux_up_sw = maximum(abs.(flux_up_sw .- comp_flux_up_sw))
     max_err_flux_dn_sw = maximum(abs.(flux_dn_sw .- comp_flux_dn_sw))

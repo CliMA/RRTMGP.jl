@@ -33,15 +33,6 @@ function setup_rfmip_as(
     #--------------------------------------------------------------
     zenith = Array{FT, 1}(deg2rad .* Array(ds_lw_in["solar_zenith_angle"]))
     irrad = Array{FT, 1}(Array(ds_lw_in["total_solar_irradiance"]))
-    # block out coluumns with zenith > π/2
-    usecol = BitArray(undef, ncol)
-    usecol .= 1
-    for i in 1:ncol
-        if zenith[i] > FT(π) / 2 - 2 * eps(FT)
-            irrad[i] = FT(0)
-            usecol[i] = 0
-        end
-    end
 
     cos_zenith = DA{FT, 1}(cos.(zenith))
     irrad = DA{FT, 1}(irrad)
@@ -125,37 +116,5 @@ function setup_rfmip_as(
         sfc_alb,
         cos_zenith,
         irrad,
-        usecol,
     )
-
-    #=
-    return (
-        ClearAtmosphericState{
-            FT,
-            DA{FT,1},
-            typeof(lat),
-            DA{FT,2},
-            typeof(vmr),
-            Int,
-        }(
-            lon,
-            lat,
-            p_lay,
-            p_lev,
-            t_lay,
-            t_lev,
-            t_sfc,
-            col_dry,
-            vmr,
-            nlay,
-            ncol,
-            ngas,
-        ),
-        sfc_emis,
-        sfc_alb,
-        zenith,
-        irrad,
-    )
-    =#
-
 end

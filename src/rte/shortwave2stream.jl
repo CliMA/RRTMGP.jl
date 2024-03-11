@@ -10,19 +10,24 @@ function rte_sw_2stream_solve!(
     nlay, ncol = AtmosphericStates.get_dims(as)
     nlev = nlay + 1
     n_gpt, igpt, ibnd = 1, 1, 1
-    FT = eltype(bcs_sw.cos_zenith)
+    cos_zenith = bcs_sw.cos_zenith
+    FT = eltype(cos_zenith)
     solar_frac = FT(1)
     @inbounds begin
         flux_up_sw = flux_sw.flux_up
         flux_dn_sw = flux_sw.flux_dn
         flux_net_sw = flux_sw.flux_net
+
         ClimaComms.@threaded device for gcol in 1:ncol
-            set_flux_to_zero!(flux_sw, gcol)
-            compute_optical_props!(op, as, gcol)
-            # call shortwave rte solver
-            rte_sw_2stream!(op, src_sw, bcs_sw, flux_sw, solar_frac, igpt, n_gpt, ibnd, nlev, gcol)
-            for ilev in 1:nlev
-                flux_net_sw[ilev, gcol] = flux_up_sw[ilev, gcol] - flux_dn_sw[ilev, gcol]
+            if cos_zenith[gcol] > 0 # zero out columns with zenith angle ≥ π/2
+                compute_optical_props!(op, as, gcol)
+                # call shortwave rte solver
+                rte_sw_2stream!(op, src_sw, bcs_sw, flux_sw, solar_frac, igpt, n_gpt, ibnd, nlev, gcol)
+                for ilev in 1:nlev
+                    flux_net_sw[ilev, gcol] = flux_up_sw[ilev, gcol] - flux_dn_sw[ilev, gcol]
+                end
+            else
+                set_flux_to_zero!(flux_sw, gcol)
             end
         end
     end
@@ -65,13 +70,24 @@ function rte_sw_2stream_solve_CUDA!(
         flux_up_sw = flux_sw.flux_up
         flux_dn_sw = flux_sw.flux_dn
         flux_net_sw = flux_sw.flux_net
+        μ₀ = bcs_sw.cos_zenith[gcol]
         @inbounds begin
-            set_flux_to_zero!(flux_sw, gcol)
             compute_optical_props!(op, as, gcol)
             # call shortwave rte solver
             rte_sw_2stream!(op, src_sw, bcs_sw, flux_sw, solar_frac, igpt, n_gpt, ibnd, nlev, gcol)
             for ilev in 1:nlev
                 flux_net_sw[ilev, gcol] = flux_up_sw[ilev, gcol] - flux_dn_sw[ilev, gcol]
+            end
+        end
+        if μ₀ ≤ 0 # zero out columns with zenith angle ≥ π/2
+            for ilev in 1:nlev
+                flux_up_sw[ilev, gcol] = FT(0)
+            end
+            for ilev in 1:nlev
+                flux_dn_sw[ilev, gcol] = FT(0)
+            end
+            for ilev in 1:nlev
+                flux_net_sw[ilev, gcol] = FT(0)
             end
         end
     end
@@ -100,34 +116,42 @@ function rte_sw_2stream_solve!(
         flux_dn_sw = flux_sw.flux_dn
         flux_net_sw = flux_sw.flux_net
         (; flux_up, flux_dn) = flux
+        cos_zenith = bcs_sw.cos_zenith
+        FT = eltype(flux_up)
         for igpt in 1:n_gpt
             ClimaComms.@threaded device for gcol in 1:ncol
-                bld_cld_mask && Optics.build_cloud_mask!(
-                    view(cloud_state.mask_sw, :, gcol),
-                    view(cloud_state.cld_frac, :, gcol),
-                    cloud_state.mask_type,
-                )
-                # compute optical properties
-                compute_optical_props!(op, as, gcol, igpt, lookup_sw, lookup_sw_cld)
-                solar_frac = lookup_sw.solar_src_scaled[igpt]
-                ibnd = lookup_sw.band_data.major_gpt2bnd[igpt]
-                # call rte shortwave solver
-                rte_sw_2stream!(op, src_sw, bcs_sw, flux, solar_frac, igpt, n_gpt, ibnd, nlev, gcol)
-                if igpt == 1
-                    map!(x -> x, view(flux_up_sw, :, gcol), view(flux_up, :, gcol))
-                    map!(x -> x, view(flux_dn_sw, :, gcol), view(flux_dn, :, gcol))
-                else
-                    for ilev in 1:nlev
-                        @inbounds flux_up_sw[ilev, gcol] += flux_up[ilev, gcol]
-                        @inbounds flux_dn_sw[ilev, gcol] += flux_dn[ilev, gcol]
+                if cos_zenith[gcol] > 0
+                    bld_cld_mask && Optics.build_cloud_mask!(
+                        view(cloud_state.mask_sw, :, gcol),
+                        view(cloud_state.cld_frac, :, gcol),
+                        cloud_state.mask_type,
+                    )
+                    # compute optical properties
+                    compute_optical_props!(op, as, gcol, igpt, lookup_sw, lookup_sw_cld)
+                    solar_frac = lookup_sw.solar_src_scaled[igpt]
+                    ibnd = lookup_sw.band_data.major_gpt2bnd[igpt]
+                    # call rte shortwave solver
+                    rte_sw_2stream!(op, src_sw, bcs_sw, flux, solar_frac, igpt, n_gpt, ibnd, nlev, gcol)
+                    if igpt == 1
+                        map!(x -> x, view(flux_up_sw, :, gcol), view(flux_up, :, gcol))
+                        map!(x -> x, view(flux_dn_sw, :, gcol), view(flux_dn, :, gcol))
+                    else
+                        for ilev in 1:nlev
+                            @inbounds flux_up_sw[ilev, gcol] += flux_up[ilev, gcol]
+                            @inbounds flux_dn_sw[ilev, gcol] += flux_dn[ilev, gcol]
+                        end
                     end
+                else
+                    set_flux_to_zero!(flux_sw, gcol)
                 end
             end
         end
 
         ClimaComms.@threaded device for gcol in 1:ncol
-            for ilev in 1:nlev
-                flux_net_sw[ilev, gcol] = flux_up_sw[ilev, gcol] - flux_dn_sw[ilev, gcol]
+            if cos_zenith[gcol] > 0
+                for ilev in 1:nlev
+                    flux_net_sw[ilev, gcol] = flux_up_sw[ilev, gcol] - flux_dn_sw[ilev, gcol]
+                end
             end
         end
     end
@@ -179,6 +203,7 @@ function rte_sw_2stream_solve_CUDA!(
         flux_dn = flux.flux_dn
         FT = eltype(flux_up)
         cloud_state = as.cloud_state
+        μ₀ = bcs_sw.cos_zenith[gcol]
         @inbounds begin
             for igpt in 1:n_gpt
                 # set cloud mask, if applicable
@@ -203,6 +228,14 @@ function rte_sw_2stream_solve_CUDA!(
                         flux_up_sw[ilev, gcol] += flux_up[ilev, gcol]
                         flux_dn_sw[ilev, gcol] += flux_dn[ilev, gcol]
                     end
+                end
+            end
+            if μ₀ ≤ 0 # zero out columns with zenith angle ≥ π/2
+                for ilev in 1:nlev
+                    flux_up_sw[ilev, gcol] = FT(0)
+                end
+                for ilev in 1:nlev
+                    flux_dn_sw[ilev, gcol] = FT(0)
                 end
             end
             for ilev in 1:nlev

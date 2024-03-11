@@ -9,13 +9,17 @@ function rte_sw_noscat_solve!(
     nlay, ncol = AtmosphericStates.get_dims(as)
     nlev = nlay + 1
     n_gpt, igpt = 1, 1
+    cos_zenith = bcs_sw.cos_zenith
     FT = eltype(op.angle_disc.gauss_Ds)
     solar_frac = FT(1)
     @inbounds begin
         ClimaComms.@threaded device for gcol in 1:ncol
-            set_flux_to_zero!(flux_sw, gcol)
-            compute_optical_props!(op, as, gcol)
-            rte_sw_noscat!(flux_sw, op, bcs_sw, igpt, n_gpt, solar_frac, gcol, nlev)
+            if cos_zenith[gcol] > 0
+                compute_optical_props!(op, as, gcol)
+                rte_sw_noscat!(flux_sw, op, bcs_sw, igpt, n_gpt, solar_frac, gcol, nlev)
+            else
+                set_flux_to_zero!(flux_sw, gcol)
+            end
         end
     end
     return nothing
@@ -44,12 +48,18 @@ function rte_sw_noscat_solve_CUDA!(flux_sw::FluxSW, op::OneScalar, bcs_sw::SwBCs
     n_gpt, igpt = 1, 1
     FT = eltype(op.angle_disc.gauss_Ds)
     solar_frac = FT(1)
-    # setting references for flux_sw
     if gcol ≤ ncol
+        flux_up_sw = flux_sw.flux_up
+        flux_dn_sw = flux_sw.flux_dn
+        flux_net_sw = flux_sw.flux_net
         @inbounds begin
-            set_flux_to_zero!(flux_sw, gcol)
-            compute_optical_props!(op, as, gcol)
-            rte_sw_noscat!(flux_sw, op, bcs_sw, igpt, n_gpt, solar_frac, gcol, nlev)
+            μ₀ = bcs_sw.cos_zenith[gcol]
+            if μ₀ > 0
+                compute_optical_props!(op, as, gcol)
+                rte_sw_noscat!(flux_sw, op, bcs_sw, igpt, n_gpt, solar_frac, gcol, nlev)
+            else
+                set_flux_to_zero!(flux_sw, gcol)
+            end
         end
     end
     return nothing
@@ -64,20 +74,41 @@ function rte_sw_noscat_solve!(
     max_threads,
     as::AtmosphericState,
     lookup_sw::LookUpSW,
-    lookup_sw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
 )
     nlay, ncol = AtmosphericStates.get_dims(as)
     nlev = nlay + 1
     n_gpt = length(lookup_sw.solar_src_scaled)
-    # setting references for flux_sw
+    flux_up_sw = flux_sw.flux_up
+    flux_dn_sw = flux_sw.flux_dn
+    flux_net_sw = flux_sw.flux_net
+    (; flux_up, flux_dn) = flux
+    cos_zenith = bcs_sw.cos_zenith
     @inbounds begin
         for igpt in 1:n_gpt
             ClimaComms.@threaded device for gcol in 1:ncol
-                igpt == 1 && set_flux_to_zero!(flux_sw, gcol)
-                compute_optical_props!(op, as, gcol, igpt, lookup_sw, lookup_sw_cld)
-                solar_frac = lookup_sw.solar_src_scaled[igpt]
-                rte_sw_noscat!(flux, op, bcs_sw, igpt, n_gpt, solar_frac, gcol, nlev)
-                n_gpt > 1 && add_to_flux!(flux_sw, flux, gcol)
+                if cos_zenith[gcol] > 0
+                    compute_optical_props!(op, as, gcol, igpt, lookup_sw, lookup_sw_cld)
+                    solar_frac = lookup_sw.solar_src_scaled[igpt]
+                    rte_sw_noscat!(flux, op, bcs_sw, igpt, n_gpt, solar_frac, gcol, nlev)
+                    if igpt == 1
+                        map!(x -> x, view(flux_up_sw, :, gcol), view(flux_up, :, gcol))
+                        map!(x -> x, view(flux_dn_sw, :, gcol), view(flux_dn, :, gcol))
+                    else
+                        for ilev in 1:nlev
+                            flux_up_sw[ilev, gcol] += flux_up[ilev, gcol]
+                            flux_dn_sw[ilev, gcol] += flux_dn[ilev, gcol]
+                        end
+                    end
+                else
+                    set_flux_to_zero!(flux_sw, gcol)
+                end
+            end
+        end
+        ClimaComms.@threaded device for gcol in 1:ncol
+            if cos_zenith[gcol] > 0
+                for ilev in 1:nlev
+                    flux_net_sw[ilev, gcol] = flux_up_sw[ilev, gcol] - flux_dn_sw[ilev, gcol]
+                end
             end
         end
     end
@@ -93,14 +124,12 @@ function rte_sw_noscat_solve!(
     max_threads,
     as::AtmosphericState,
     lookup_sw::LookUpSW,
-    lookup_sw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
 )
     nlay, ncol = AtmosphericStates.get_dims(as)
     nlev = nlay + 1
-    # setting references for flux_sw
     tx = min(ncol, max_threads)
     bx = cld(ncol, tx)
-    args = (flux, flux_sw, op, bcs_sw, nlay, ncol, as, lookup_sw, lookup_sw_cld)
+    args = (flux, flux_sw, op, bcs_sw, nlay, ncol, as, lookup_sw)
     @cuda always_inline = true threads = (tx) blocks = (bx) rte_sw_noscat_solve_CUDA!(args...)
     return nothing
 end
@@ -114,19 +143,47 @@ function rte_sw_noscat_solve_CUDA!(
     ncol,
     as::AtmosphericState,
     lookup_sw::LookUpSW,
-    lookup_sw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
 )
     gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
     nlev = nlay + 1
     n_gpt = length(lookup_sw.solar_src_scaled)
-    # setting references for flux_sw
     if gcol ≤ ncol
-        set_flux_to_zero!(flux_sw, gcol)
-        @inbounds for igpt in 1:n_gpt
-            compute_optical_props!(op, as, gcol, igpt, lookup_sw, lookup_sw_cld)
-            solar_frac = lookup_sw.solar_src_scaled[igpt]
-            rte_sw_noscat!(flux, op, bcs_sw, igpt, n_gpt, solar_frac, gcol, nlev)
-            n_gpt > 1 && add_to_flux!(flux_sw, flux, gcol)
+        flux_up_sw = flux_sw.flux_up
+        flux_dn_sw = flux_sw.flux_dn
+        flux_net_sw = flux_sw.flux_net
+        flux_up = flux.flux_up
+        flux_dn = flux.flux_dn
+        μ₀ = bcs_sw.cos_zenith[gcol]
+        @inbounds begin
+            for igpt in 1:n_gpt
+                compute_optical_props!(op, as, gcol, igpt, lookup_sw, lookup_sw_cld)
+                solar_frac = lookup_sw.solar_src_scaled[igpt]
+                rte_sw_noscat!(flux, op, bcs_sw, igpt, n_gpt, solar_frac, gcol, nlev)
+                if igpt == 1
+                    map!(x -> x, view(flux_up_sw, :, gcol), view(flux_up, :, gcol))
+                    map!(x -> x, view(flux_dn_sw, :, gcol), view(flux_dn, :, gcol))
+                else
+                    for ilev in 1:nlev
+                        flux_up_sw[ilev, gcol] += flux_up[ilev, gcol]
+                        flux_dn_sw[ilev, gcol] += flux_dn[ilev, gcol]
+                    end
+                end
+            end
+            if μ₀ <= 0
+                for ilev in 1:nlev
+                    flux_up_sw[ilev, gcol] = FT(0)
+                end
+                for ilev in 1:nlev
+                    flux_dn_sw[ilev, gcol] = FT(0)
+                end
+                for ilev in 1:nlev
+                    flux_net_sw[ilev, gcol] = FT(0)
+                end
+            else
+                for ilev in 1:nlev
+                    flux_net_sw[ilev, gcol] = flux_up_sw[ilev, gcol] - flux_dn_sw[ilev, gcol]
+                end
+            end
         end
     end
     return nothing

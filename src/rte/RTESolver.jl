@@ -113,7 +113,7 @@ solve_sw!(
     max_threads::Int,
     lookup_sw::LookUpSW,
     lookup_sw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
-) = rte_sw_noscat_solve!(device, fluxb_sw, flux_sw, op, bcs_sw, max_threads, as, slv.lookup_sw, slv.lookup_sw_cld)
+) = rte_sw_noscat_solve!(device, fluxb_sw, flux_sw, op, bcs_sw, max_threads, as, slv.lookup_sw)
 
 # 2-stream solver, RRTMGP optics
 solve_sw!(
