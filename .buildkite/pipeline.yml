@@ -1,13 +1,12 @@
 agents:
   queue: new-central
-  modules: climacommon/2024_03_18
+  modules: climacommon/2024_04_05
 
 env:
   JULIA_LOAD_PATH: "${JULIA_LOAD_PATH}:${BUILDKITE_BUILD_CHECKOUT_PATH}/.buildkite"
   OPENBLAS_NUM_THREADS: 1
   JULIA_NVTX_CALLBACKS: gc
   JULIA_MAX_NUM_PRECOMPILE_FILES: 100
-  JULIA_CPU_TARGET: 'broadwell;skylake;icelake;cascadelake;epyc'
   SLURM_KILL_BAD_EXIT: 1
 
 steps:
