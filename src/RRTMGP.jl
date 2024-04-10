@@ -21,6 +21,7 @@ include(joinpath("optics", "Fluxes.jl"))
 include(joinpath("optics", "GrayUtils.jl"))
 include(joinpath("optics", "BCs.jl"))
 include(joinpath("optics", "RTE.jl"))
+include(joinpath("optics", "AerosolOptics.jl"))
 
 include(joinpath("rte", "RTESolver.jl"))
 
