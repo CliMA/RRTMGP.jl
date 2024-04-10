@@ -31,6 +31,7 @@ function all_sky(
     use_lut::Bool = true,
     cldfrac = FT(1),
     exfiltrate = false,
+    aero = false,
 ) where {FT <: AbstractFloat, OPC}
     overrides = (; grav = 9.80665, molmass_dryair = 0.028964, molmass_water = 0.018016)
     param_set = RRTMGPParameters(FT, overrides)
@@ -47,6 +48,7 @@ function all_sky(
     lw_cld_file = get_ref_filename(:lookup_tables, :cloudysky, λ = :lw)        # lw cloud lookup tables
     sw_file = get_ref_filename(:lookup_tables, :clearsky, λ = :sw)             # sw lookup tables for gas optics
     sw_cld_file = get_ref_filename(:lookup_tables, :cloudysky, λ = :sw)        # lw cloud lookup tables
+    
 
     input_file = get_ref_filename(:atmos_state, :cloudysky)                    # all-sky atmos state
 
