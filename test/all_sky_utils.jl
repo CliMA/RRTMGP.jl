@@ -5,9 +5,8 @@ using NCDatasets
 import JET
 import Infiltrator
 import ClimaComms
-@static if pkgversion(ClimaComms) >= v"0.6"
-    ClimaComms.@import_required_backends
-end
+@static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
+
 using RRTMGP
 using RRTMGP.Vmrs
 using RRTMGP.LookUpTables

@@ -2,6 +2,7 @@ using Test
 using Pkg.Artifacts
 using NCDatasets
 import ClimaComms
+@static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
 
 using RRTMGP
 using RRTMGP.LookUpTables
