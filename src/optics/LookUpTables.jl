@@ -90,7 +90,7 @@ Adapt.@adapt_structure BandData
 """
     LookUpLW{FT, IA3D, FTA4D, BND, P, R, LMNR} <: AbstractLookUp
 
-Longwave lookup tables, used to compute optical properties. 
+Longwave lookup tables, used to compute optical properties.
 
 # Fields
 $(DocStringExtensions.FIELDS)
@@ -406,7 +406,7 @@ end
 """
     LookUpSW{FT, IA3D, FTA1D, FTA3D, FTA4D, BND, R, LMNR} <: AbstractLookUp
 
-Shortwave lookup tables, used to compute optical properties. 
+Shortwave lookup tables, used to compute optical properties.
 
 # Fields
 $(DocStringExtensions.FIELDS)
@@ -632,7 +632,7 @@ function LookUpSW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     minor_lower_gpt_lims = IA2D(minor_lower_gpt_lims)
     minor_upper_gpt_lims = IA2D(minor_upper_gpt_lims)
     bnd_lims_gpt = IA2D(bnd_lims_gpt)
-    #-----------------------    
+    #-----------------------
     band_data = BandData(major_gpt2bnd, bnd_lims_gpt, bnd_lims_wn)
 
     minor_lower_scales_with_density = reshape(Array(ds["minor_scales_with_density_lower"]), 1, :)
@@ -729,7 +729,7 @@ end
 
 Lookup table for cloud optics.
 
-This struct stores the lookup tables for determing extinction coeffient, 
+This struct stores the lookup tables for determing extinction coeffient,
 single-scattering albedo, and asymmetry parameter g as a function of effective radius.
 We compute the optical depth tau (=exintinction coeff * condensed water path)
 and the products tau*ssa and tau*ssa*g for liquid and ice cloud separately.
@@ -762,17 +762,17 @@ function LookUpCld(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     ])
     bounds = DA([
         # liquid particle size lower bound for LUT interpolation
-        FT(Array(ds["radliq_lwr"])),
+        FT(ds["radliq_lwr"][]),
         # liquid particle size upper bound for LUT interpolation
-        FT(Array(ds["radliq_upr"])),
+        FT(ds["radliq_upr"][]),
         # factor for calculating LUT interpolation for liquid particle
-        FT(Array(ds["radliq_fac"])),
+        FT(ds["radliq_fac"][]),
         # ice particle size lower bound for LUT interpolation
-        FT(Array(ds["radice_lwr"])),
+        FT(ds["radice_lwr"][]),
         # ice particle size upper bound for LUT interpolation
-        FT(Array(ds["radice_upr"])),
+        FT(ds["radice_upr"][]),
         # factor for calculating LUT interpolation for ice particle
-        FT(Array(ds["radice_fac"])),
+        FT(ds["radice_fac"][]),
     ])
     liqdata = DA(vcat(Array(ds["lut_extliq"]), Array(ds["lut_ssaliq"]), Array(ds["lut_asyliq"])))
     icedata = DA(vcat(Array(ds["lut_extice"]), Array(ds["lut_ssaice"]), Array(ds["lut_asyice"])))
@@ -823,7 +823,7 @@ end
 
 Pade coefficients for cloud optics.
 
-This struct stores the Pade coefficients for determing extinction coeffient, 
+This struct stores the Pade coefficients for determing extinction coeffient,
 single-scattering albedo, and asymmetry parameter g as a function of effective radius.
 We compute the optical depth tau (=exintinction coeff * condensed water path)
 and the products tau*ssa and tau*ssa*g for liquid and ice cloud separately.
