@@ -136,18 +136,7 @@ function setup_gray_as_pr_grid(
     grav_ = RP.grav(param_set)
     args = (p_lev, p_lay, t_lev, t_lay, z_lev, t_sfc, lat, d0, efac, p0, pe, Δp, te, tt, Δt, α, τ₀, r_d, grav_, nlay)
     device = ClimaComms.device(context)
-    if device isa ClimaComms.CUDADevice
-        max_threads = 256
-        tx = min(ncol, max_threads)
-        bx = cld(ncol, tx)
-        @cuda always_inline = true threads = (tx) blocks = (bx) setup_gray_as_pr_grid_CUDA!(ncol, args...)
-    else
-        @inbounds begin
-            ClimaComms.@threaded device for gcol in 1:ncol
-                setup_gray_as_pr_grid_kernel!(args..., gcol)
-            end
-        end
-    end
+    setup_gray_as_pr_grid!(device, ncol, args...)
     #------------------------------------------------
     return GrayAtmosphericState{eltype(t_sfc), typeof(t_sfc), typeof(p_lev), typeof(otp)}(
         lat,
@@ -161,18 +150,19 @@ function setup_gray_as_pr_grid(
     )
 end
 
-function setup_gray_as_pr_grid_CUDA!(ncol, args...)
-    gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
-    if gcol ≤ ncol
-        setup_gray_as_pr_grid_kernel!(args..., gcol)
-    end
-    return nothing
-end
 # This functions sets up a model temperature and pressure 
 # distributions for a gray atmosphere based on an altitude grid
 # with internal GLL point distribution within each cell
 # see Schneider 2004, J. Atmos. Sci. (2004) 61 (12): 1317–1340.
 # https://doi.org/10.1175/1520-0469(2004)061<1317:TTATTS>2.0.CO;2
+
+function setup_gray_as_pr_grid!(device::ClimaComms.AbstractCPUDevice, ncol, args...)
+    @inbounds begin
+        ClimaComms.@threaded device for gcol in 1:ncol
+            setup_gray_as_pr_grid_kernel!(args..., gcol)
+        end
+    end
+end
 
 function setup_gray_as_alt_grid(
     lat::FTA1D,

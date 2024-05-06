@@ -131,7 +131,8 @@ function setup_allsky_as(
     t_lay = DA(t_lay)
     t_lev = DA(t_lev)
 
-    compute_col_gas!(context, p_lev, col_dry, param_set, vmr_h2o, lat) # the example skips lat based gravity calculation
+    device = ClimaComms.device(context)
+    compute_col_gas!(device, p_lev, col_dry, param_set, vmr_h2o, lat) # the example skips lat based gravity calculation
 
     layerdata = similar(p_lay, 3, nlay, ncol)
     layerdata[1, :, :] .= col_dry

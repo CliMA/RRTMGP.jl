@@ -11,6 +11,7 @@ using BenchmarkTools
 using Suppressor
 root_dir = joinpath(dirname(@__DIR__))
 import ClimaComms
+ClimaComms.@import_required_backends
 import Logging
 
 @info "------------------------------------------------- Benchmark: gray_atm"

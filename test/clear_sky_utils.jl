@@ -3,6 +3,7 @@ using Pkg.Artifacts
 using NCDatasets
 import JET
 import ClimaComms
+ClimaComms.@import_required_backends
 import Infiltrator
 
 using RRTMGP

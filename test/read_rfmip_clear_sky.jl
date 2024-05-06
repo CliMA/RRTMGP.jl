@@ -101,7 +101,8 @@ function setup_rfmip_as(
 
     # This example skips latitude dependent gravity compution to be consistent with the
     # FORTRAN RRTMGP test case.
-    compute_col_gas!(context, p_lev, col_dry, param_set, vmr_h2o, lat) # the example skips lat based gravity calculation
+    device = ClimaComms.device(context)
+    compute_col_gas!(device, p_lev, col_dry, param_set, vmr_h2o, lat) # the example skips lat based gravity calculation
 
     layerdata = similar(p_lay, 3, nlay, ncol)
     layerdata[1, :, :] .= col_dry

@@ -1,6 +1,5 @@
 module GrayUtils
 
-using CUDA
 import ClimaComms
 using ..AtmosphericStates
 using ..Fluxes
@@ -11,6 +10,7 @@ export update_profile_lw!, compute_gray_heating_rate!
 
 """
     update_profile_lw!(
+        ::ClimaComms.AbstractDevice,
         sbc,
         t_lay,
         t_lev,
@@ -28,7 +28,7 @@ export update_profile_lw!, compute_gray_heating_rate!
 Updates t_lay and t_lev based on heating rate.
 """
 function update_profile_lw!(
-    context,
+    device::ClimaComms.AbstractCPUDevice,
     sbc,
     t_lay,
     t_lev,
@@ -43,28 +43,25 @@ function update_profile_lw!(
     ncol,
 )
     # updating t_lay and t_lev based on heating rate
-    args = (t_lay, t_lev, hr_lay, flux_dn, flux_net, flux_grad, T_ex_lev, Δt, nlay, nlev)
-    device = ClimaComms.device(context)
-    if device isa ClimaComms.CUDADevice
-        max_threads = 256
-        tx = min(ncol, max_threads)
-        bx = cld(ncol, tx)
-        @cuda always_inline = true threads = (tx) blocks = (bx) update_profile_lw_CUDA!(sbc, ncol, args...)
-    else
-        @inbounds begin
-            ClimaComms.@threaded device for gcol in 1:ncol
-                update_profile_lw_kernel!(sbc, args..., gcol)
-            end
+    # TODO: it looks like we should probably reorder these args and eliminate one method?
+    @inbounds begin
+        ClimaComms.@threaded device for gcol in 1:ncol
+            update_profile_lw_kernel!(
+                sbc,
+                t_lay,
+                t_lev,
+                hr_lay,
+                flux_dn,
+                flux_net,
+                flux_grad,
+                T_ex_lev,
+                Δt,
+                nlay,
+                nlev,
+                gcol,
+            )
         end
     end
-end
-
-function update_profile_lw_CUDA!(sbc, ncol, args...)
-    gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
-    if gcol ≤ ncol
-        update_profile_lw_kernel!(sbc, args..., gcol)
-    end
-    return nothing
 end
 
 function update_profile_lw_kernel!(
@@ -127,28 +124,21 @@ end
 
 Computes the heating rate for the gray radiation simulation.
 """
-function compute_gray_heating_rate!(context, hr_lay, p_lev, ncol, nlay, flux_net, cp_d_, grav_)
+function compute_gray_heating_rate!(
+    device::ClimaComms.AbstractCPUDevice,
+    hr_lay,
+    p_lev,
+    ncol,
+    nlay,
+    flux_net,
+    cp_d_,
+    grav_,
+)
     args = (hr_lay, flux_net, p_lev, grav_, cp_d_, nlay)
-    device = ClimaComms.device(context)
-    if device isa ClimaComms.CUDADevice
-        max_threads = 256
-        tx = min(ncol, max_threads)
-        bx = cld(ncol, tx)
-        @cuda always_inline = true threads = (tx) blocks = (bx) compute_gray_heating_rate_CUDA!(ncol, args...)
-    else
-        @inbounds begin
-            ClimaComms.@threaded device for gcol in 1:ncol
-                compute_gray_heating_rate_kernel!(args..., gcol)
-            end
+    @inbounds begin
+        ClimaComms.@threaded device for gcol in 1:ncol
+            compute_gray_heating_rate_kernel!(args..., gcol)
         end
-    end
-    return nothing
-end
-
-function compute_gray_heating_rate_CUDA!(ncol, args...)
-    gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
-    if gcol ≤ ncol
-        compute_gray_heating_rate_kernel!(args..., gcol)
     end
     return nothing
 end
