@@ -3,7 +3,9 @@ using Pkg.Artifacts
 using NCDatasets
 import JET
 import ClimaComms
-ClimaComms.@import_required_backends
+@static if pkgversion(ClimaComms) >= v"0.6"
+    ClimaComms.@import_required_backends
+end
 import Infiltrator
 
 using RRTMGP
