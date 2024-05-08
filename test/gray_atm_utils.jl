@@ -1,6 +1,8 @@
 using Test
 import ClimaComms
-ClimaComms.@import_required_backends
+@static if pkgversion(ClimaComms) >= v"0.6"
+    ClimaComms.@import_required_backends
+end
 import JET
 import Infiltrator
 using RRTMGP
