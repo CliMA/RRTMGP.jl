@@ -44,6 +44,8 @@ steps:
 
       - label: "GPU unit tests"
         command: "julia --color=yes --project=test test/runtests_gpu.jl"
+        env:
+          CLIMACOMMS_DEVICE: "CUDA"
         agents:
           slurm_ntasks: 1
           slurm_gres: "gpu:1"
@@ -95,12 +97,16 @@ steps:
 
       - label: "GPU benchmarks"
         command: "julia --color=yes --project=test perf/benchmark.jl"
+        env:
+          CLIMACOMMS_DEVICE: "CUDA"
         agents:
           slurm_ntasks: 1
           slurm_gres: "gpu:1"
 
       - label: "GPU All-sky DYAMOND benchmark"
         command: "julia --color=yes --project=test test/all_sky_dyamond_gpu_benchmark.jl"
+        env:
+          CLIMACOMMS_DEVICE: "CUDA"
         agents:
           slurm_ntasks: 1
           slurm_gres: "gpu:1"

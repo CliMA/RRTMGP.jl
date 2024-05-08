@@ -5,6 +5,7 @@ using NCDatasets
 import JET
 import Infiltrator
 import ClimaComms
+ClimaComms.@import_required_backends
 using RRTMGP
 using RRTMGP.Vmrs
 using RRTMGP.LookUpTables

@@ -1,6 +1,6 @@
 using Test
-using CUDA
 import ClimaComms
+ClimaComms.@import_required_backends
 import JET
 import Infiltrator
 using RRTMGP
@@ -87,14 +87,15 @@ function gray_atmos_lw_equil(context, ::Type{OPC}, ::Type{FT}; exfiltrate = fals
     flux_grad = DA{FT}(undef, nlay, ncol)
     flux_grad_err = FT(0)
     exfiltrate && Infiltrator.@exfiltrate
+    device = ClimaComms.device(context)
     for i in 1:nsteps
         # calling the long wave gray radiation solver
         solve_lw!(slv, max_threads)
         # computing heating rate
-        compute_gray_heating_rate!(context, hr_lay, p_lev, ncol, nlay, flux_net, cp_d_, grav_)
+        compute_gray_heating_rate!(device, hr_lay, p_lev, ncol, nlay, flux_net, cp_d_, grav_)
         # updating t_lay and t_lev based on heating rate
         update_profile_lw!(
-            context,
+            device,
             sbc,
             t_lay,
             t_lev,

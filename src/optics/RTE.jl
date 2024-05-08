@@ -1,5 +1,4 @@
 module RTE
-using CUDA
 using Adapt
 import ClimaComms
 using ..AtmosphericStates

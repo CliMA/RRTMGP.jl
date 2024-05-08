@@ -2,7 +2,6 @@ module RTESolver
 
 using StaticArrays
 import ClimaComms
-using CUDA
 using Adapt
 
 using ..AngularDiscretizations

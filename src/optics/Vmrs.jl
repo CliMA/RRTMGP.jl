@@ -1,5 +1,4 @@
 module Vmrs
-using CUDA
 using DocStringExtensions
 using Adapt
 

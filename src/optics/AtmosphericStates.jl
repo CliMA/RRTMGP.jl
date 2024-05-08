@@ -1,5 +1,4 @@
 module AtmosphericStates
-using CUDA
 import ClimaComms
 using DocStringExtensions
 using Adapt

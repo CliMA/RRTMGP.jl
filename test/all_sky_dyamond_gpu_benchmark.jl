@@ -1,12 +1,12 @@
 using Test
 using Pkg.Artifacts
 using NCDatasets
-using CUDA
 using Statistics
 using BenchmarkTools
 using Printf
 
 import ClimaComms
+ClimaComms.@import_required_backends
 using RRTMGP
 using RRTMGP.Vmrs
 using RRTMGP.LookUpTables

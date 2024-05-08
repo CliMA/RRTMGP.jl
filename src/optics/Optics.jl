@@ -1,7 +1,6 @@
 module Optics
 
 using DocStringExtensions
-using CUDA
 using Adapt
 using Random
 import ClimaComms
@@ -97,7 +96,7 @@ This function computes the column amounts of dry or moist air.
 
 """
 function compute_col_gas!(
-    context,
+    device::ClimaComms.AbstractCPUDevice,
     p_lev::AbstractArray{FT, 2},
     col_dry::AbstractArray{FT, 2},
     param_set::RP.ARP,
@@ -111,33 +110,16 @@ function compute_col_gas!(
     avogadro = RP.avogad(param_set)
     helmert1 = RP.grav(param_set)
     args = (p_lev, mol_m_dry, mol_m_h2o, avogadro, helmert1, vmr_h2o, lat)
-    device = ClimaComms.device(context)
-    if device isa ClimaComms.CUDADevice
-        tx = min(nlay * ncol, max_threads)
-        bx = cld(nlay * ncol, tx)
-        @cuda always_inline = true threads = (tx) blocks = (bx) compute_col_gas_CUDA!(col_dry, args...)
-    else
-        @inbounds begin
-            ClimaComms.@threaded device for icnt in 1:(nlay * ncol)
-                gcol = cld(icnt, nlay)
-                glay = (icnt % nlay == 0) ? nlay : (icnt % nlay)
-                compute_col_gas_kernel!(col_dry, args..., glay, gcol)
-            end
+    @inbounds begin
+        ClimaComms.@threaded device for icnt in 1:(nlay * ncol)
+            gcol = cld(icnt, nlay)
+            glay = (icnt % nlay == 0) ? nlay : (icnt % nlay)
+            compute_col_gas_kernel!(col_dry, args..., glay, gcol)
         end
     end
     return nothing
 end
 
-function compute_col_gas_CUDA!(col_dry, args...)
-    glx = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
-    nlay, ncol = size(col_dry)
-    if glx ≤ nlay * ncol
-        glay = (glx % nlay == 0) ? nlay : (glx % nlay)
-        gcol = cld(glx, nlay)
-        compute_col_gas_kernel!(col_dry, args..., glay, gcol)
-    end
-    return nothing
-end
 
 """
     compute_optical_props!(
