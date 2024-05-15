@@ -43,7 +43,7 @@ steps:
           slurm_mem_per_cpu: 6G
 
       - label: "GPU unit tests"
-        command: "julia --color=yes --project=test test/runtests_gpu.jl"
+        command: "julia --color=yes --project=test test/runtests.jl"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
         agents:
