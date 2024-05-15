@@ -7,7 +7,6 @@ Julia implementation of Rapid and accurate Radiative Transfer Model for General 
 | **Documentation**    | [![latest][docs-latest-img]][docs-latest-url] |
 | **Code Coverage**    | [![codecov][codecov-img]][codecov-url]        |
 | **BuildKite**        | [![buildkite][buildkite-img]][buildkite-url]  |
-| **Bors**             | [![Bors enabled][bors-img]][bors-url]         |
 
 
 [docs-latest-img]: https://img.shields.io/badge/docs-latest-blue.svg
@@ -18,10 +17,6 @@ Julia implementation of Rapid and accurate Radiative Transfer Model for General 
 
 [buildkite-img]: https://badge.buildkite.com/ee3a0c43cf4925ee14a966f794ac85d0b9439244d23e43b308.svg
 [buildkite-url]: https://buildkite.com/clima/rrtmgp-ci
-
-[bors-img]: https://bors.tech/images/badge_small.svg
-[bors-url]: https://app.bors.tech/repositories/24778
-
 
 This is based off of the [rte-rrtmgp](https://github.com/RobertPincus/rte-rrtmgp) repository.
 
