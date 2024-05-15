@@ -40,7 +40,7 @@ function get_ref_filename(ftype, optics_type; λ = nothing, opc = nothing, flux_
         end
     end
     if ftype == :lookup_tables
-        dir = "../lookup_data"
+        dir = "../lookup_data_new"
     else
         dir = joinpath("..", "RRTMGPReferenceData", String(ftype))
     end

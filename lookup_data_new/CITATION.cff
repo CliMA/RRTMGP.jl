@@ -1,0 +1,39 @@
+cff-version: 1.2.0
+title: "RRTMGP data"
+authors:
+  - family-names: Pincus
+    given-names: Robert
+    orcid: "https://orcid.org/0000-0002-0016-3470"
+  - family-names: Mlawer
+    given-names: Eli J. 
+    orcid: "https://orcid.org/0000-0001-7962-4307"
+  - family-names: Delamere
+    given-names: Jennifer 
+    orcid: "https://orcid.org/0000-0001-5074-6458"
+  - family-names: Iacono
+    given-names: Michael J. 
+    orcid: "https://orcid.org/0000-0002-9578-0649"
+  - family-names: Pernak
+    given-names: Rick
+    orcid: "https://orcid.org/0000-0002-3624-2314"
+type: dataset
+date-released: "2023-05-30"
+abstract: "Data for RRTMGP gas, cloud, and aersol optics; inputs and reference results for examples distributed in RTE+RRTMGP"
+identifiers:
+  - description: "All versions"
+    type: doi
+    value: 10.5281/zenodo.7988260
+  - description: "Version 1.7"
+    type: doi
+    value: 10.5281/zenodo.7988261
+keywords:
+  - netCDF
+  - "RTE+RRTMGP"
+  - "atmospheric radiation"
+  - "radiative transfer"
+  - "climate model"
+  - research
+license: BSD-3-Clause
+message: "If you use this software, please cite it using these metadata."
+repository-code: "https://github.com/earth-system-radiaton/rrtmgp-data"
+version: 1.7
