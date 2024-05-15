@@ -40,9 +40,9 @@ function get_ref_filename(ftype, optics_type; λ = nothing, opc = nothing, flux_
         end
     end
     if ftype == :lookup_tables
-        dir = RRTMGP.lookup_data()
+        dir = "../lookup_data"
     else
-        dir = joinpath(artifact"RRTMGPReferenceData", "RRTMGPReferenceData", String(ftype))
+        dir = joinpath("..", "RRTMGPReferenceData", String(ftype))
     end
 
     return joinpath(dir, fname * ".nc")
