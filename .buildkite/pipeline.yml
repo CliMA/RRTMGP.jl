@@ -1,6 +1,6 @@
 agents:
   queue: new-central
-  modules: climacommon/2024_04_05
+  modules: climacommon/2024_04_30
 
 env:
   JULIA_LOAD_PATH: "${JULIA_LOAD_PATH}:${BUILDKITE_BUILD_CHECKOUT_PATH}/.buildkite"
@@ -43,7 +43,7 @@ steps:
           slurm_mem_per_cpu: 6G
 
       - label: "GPU unit tests"
-        command: "julia --color=yes --project=test test/runtests_gpu.jl"
+        command: "julia --color=yes --project=test test/runtests.jl"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
         agents:

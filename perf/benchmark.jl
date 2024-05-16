@@ -11,9 +11,7 @@ using BenchmarkTools
 using Suppressor
 root_dir = joinpath(dirname(@__DIR__))
 import ClimaComms
-@static if pkgversion(ClimaComms) >= v"0.6"
-    ClimaComms.@import_required_backends
-end
+@static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
 import Logging
 
 @info "------------------------------------------------- Benchmark: gray_atm"
