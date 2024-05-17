@@ -1,6 +1,22 @@
 RRTMGP.jl Release Notes
 ========================
 
+v0.14.0
+------
+
+- CUDA is now an extension. Some methods have changed.
+  ([#485](https://github.com/CliMA/RRTMGP.jl/pull/485)).
+
+v0.13.4
+------
+
+Identical to v0.13.2
+
+v0.13.3
+------
+
+Broken release. Do not use
+
 v0.13.2
 ------
 
