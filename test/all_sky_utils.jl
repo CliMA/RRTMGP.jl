@@ -27,17 +27,19 @@ include("read_all_sky.jl")
 
 function all_sky(
     context,
-    ::Type{OPC},
+    ::Type{OPLW},
+    ::Type{OPSW},
+    ::Type{SLVLW},
+    ::Type{SLVSW},
     ::Type{FT};
     ncol = 128,# repeats col#1 ncol times per RRTMGP example 
     use_lut::Bool = true,
     cldfrac = FT(1),
     exfiltrate = false,
-) where {FT <: AbstractFloat, OPC}
+) where {FT <: AbstractFloat, OPLW, OPSW, SLVLW, SLVSW}
     overrides = (; grav = 9.80665, molmass_dryair = 0.028964, molmass_water = 0.018016)
     param_set = RRTMGPParameters(FT, overrides)
 
-    opc = Symbol(OPC)
     device = ClimaComms.device(context)
     DA = ClimaComms.array_type(device)
     FTA1D = DA{FT, 1}
@@ -94,41 +96,28 @@ function all_sky(
     else
         flip_ind = nlev:-1:1
     end
-
     # Setting up longwave problem---------------------------------------
-    op = OPC(FT, ncol, nlay, DA) # allocating optical properties object
-    src_lw = source_func_longwave(param_set, FT, ncol, nlay, opc, DA)   # allocating longwave source function object
-    bcs_lw = LwBCs{FT, typeof(sfc_emis), Nothing}(sfc_emis, nothing)    # setting up boundary conditions
-    fluxb_lw = FluxLW(ncol, nlay, FT, DA)                             # flux storage for bandwise calculations
-    flux_lw = FluxLW(ncol, nlay, FT, DA)                              # longwave fluxes
-
+    inc_flux = nothing
+    slv_lw = SLVLW(FT, DA, OPLW, context, param_set, nlay, ncol, sfc_emis, inc_flux)
     # Setting up shortwave problem---------------------------------------
-    src_sw = source_func_shortwave(FT, ncol, nlay, opc, DA)        # allocating longwave source function object
-
-    # setting up boundary conditions
     inc_flux_diffuse = nothing
-
-    bcs_sw = SwBCs(cos_zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse)
-
-    fluxb_sw = FluxSW(ncol, nlay, FT, DA) # flux storage for bandwise calculations
-    flux_sw = FluxSW(ncol, nlay, FT, DA)  # shortwave fluxes for band calculations    
-    #-------------------------------------------------------------------
-    # initializing RTE solver
-    slv = Solver(context, as, op, src_lw, src_sw, bcs_lw, bcs_sw, fluxb_lw, fluxb_sw, flux_lw, flux_sw)
+    swbcs = (cos_zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse)
+    slv_sw = SLVSW(FT, DA, OPSW, context, nlay, ncol, swbcs...)
     #------calling solvers
-    solve_lw!(slv, max_threads, lookup_lw, lookup_lw_cld)
+    solve_lw!(slv_lw, as, max_threads, lookup_lw, lookup_lw_cld)
     if device isa ClimaComms.CPUSingleThreaded
-        JET.@test_opt solve_lw!(slv, max_threads, lookup_lw, lookup_lw_cld)
-        @test (@allocated solve_lw!(slv, max_threads, lookup_lw, lookup_lw_cld)) == 0
-        @test (@allocated solve_lw!(slv, max_threads, lookup_lw, lookup_lw_cld)) ≤ 736
+        JET.@test_opt solve_lw!(slv_lw, as, max_threads, lookup_lw, lookup_lw_cld)
+        @test (@allocated solve_lw!(slv_lw, as, max_threads, lookup_lw, lookup_lw_cld)) == 0
+        @test (@allocated solve_lw!(slv_lw, as, max_threads, lookup_lw, lookup_lw_cld)) ≤ 736
     end
 
     exfiltrate && Infiltrator.@exfiltrate
-    solve_sw!(slv, max_threads, lookup_sw, lookup_sw_cld)
+    #solve_sw!(slv, max_threads, lookup_sw, lookup_sw_cld)
+    solve_sw!(slv_sw, as, max_threads, lookup_sw, lookup_sw_cld)
     if device isa ClimaComms.CPUSingleThreaded
-        JET.@test_opt solve_sw!(slv, max_threads, lookup_sw, lookup_sw_cld)
-        @test (@allocated solve_sw!(slv, max_threads, lookup_sw, lookup_sw_cld)) == 0
-        @test (@allocated solve_sw!(slv, max_threads, lookup_sw, lookup_sw_cld)) ≤ 736
+        JET.@test_opt solve_sw!(slv_sw, as, max_threads, lookup_sw, lookup_sw_cld)
+        @test (@allocated solve_sw!(slv_sw, as, max_threads, lookup_sw, lookup_sw_cld)) == 0
+        @test (@allocated solve_sw!(slv_sw, as, max_threads, lookup_sw, lookup_sw_cld)) ≤ 736
     end
     #-------------
     # comparison
@@ -138,9 +127,9 @@ function all_sky(
     comp_flux_net_lw = comp_flux_up_lw .- comp_flux_dn_lw
     comp_flux_net_sw = comp_flux_up_sw .- comp_flux_dn_sw
 
-    flux_up_lw = Array(slv.flux_lw.flux_up)
-    flux_dn_lw = Array(slv.flux_lw.flux_dn)
-    flux_net_lw = Array(slv.flux_lw.flux_net)
+    flux_up_lw = Array(slv_lw.flux.flux_up)
+    flux_dn_lw = Array(slv_lw.flux.flux_dn)
+    flux_net_lw = Array(slv_lw.flux.flux_net)
 
     max_err_flux_up_lw = maximum(abs.(flux_up_lw .- comp_flux_up_lw))
     max_err_flux_dn_lw = maximum(abs.(flux_dn_lw .- comp_flux_dn_lw))
@@ -156,7 +145,10 @@ function all_sky(
     end
     max_rel_err_flux_net_lw = maximum(rel_err_flux_net_lw)
     color2 = :cyan
-    printstyled("Cloudy-sky longwave test with ncol = $ncol, nlev = $nlev, OPC = $opc, FT = $FT\n", color = color2)
+    printstyled(
+        "Cloudy-sky longwave test with ncol = $ncol, nlev = $nlev, OP = $OPLW, Solver = $SLVLW, FT = $FT\n",
+        color = color2,
+    )
     printstyled("device = $device\n", color = color2)
     printstyled("$method\n\n", color = color2)
     println("L∞ error in flux_up           = $max_err_flux_up_lw")
@@ -164,10 +156,10 @@ function all_sky(
     println("L∞ error in flux_net          = $max_err_flux_net_lw")
     println("L∞ relative error in flux_net = $(max_rel_err_flux_net_lw * 100) %\n")
 
-    flux_up_sw = Array(slv.flux_sw.flux_up)
-    flux_dn_sw = Array(slv.flux_sw.flux_dn)
-    flux_dn_dir_sw = Array(slv.flux_sw.flux_dn_dir)
-    flux_net_sw = Array(slv.flux_sw.flux_net)
+    flux_up_sw = Array(slv_sw.flux.flux_up)
+    flux_dn_sw = Array(slv_sw.flux.flux_dn)
+    flux_dn_dir_sw = Array(slv_sw.flux.flux_dn_dir)
+    flux_net_sw = Array(slv_sw.flux.flux_net)
 
     max_err_flux_up_sw = maximum(abs.(flux_up_sw .- comp_flux_up_sw))
     max_err_flux_dn_sw = maximum(abs.(flux_dn_sw .- comp_flux_dn_sw))
@@ -183,7 +175,10 @@ function all_sky(
     end
     max_rel_err_flux_net_sw = maximum(rel_err_flux_net_sw)
 
-    printstyled("Cloudy-sky shortwave test with ncol = $ncol, nlev = $nlev, OPC = $opc, FT = $FT\n", color = color2)
+    printstyled(
+        "Cloudy-sky shortwave test with ncol = $ncol, nlev = $nlev, OP = $OPSW, Solver = $SLVSW, FT = $FT\n",
+        color = color2,
+    )
     printstyled("device = $device\n", color = color2)
     printstyled("$method\n\n", color = color2)
     println("L∞ error in flux_up           = $max_err_flux_up_sw")
