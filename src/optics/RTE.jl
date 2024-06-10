@@ -11,79 +11,168 @@ using ..BCs
 
 import ..Parameters as RP
 
-export Solver
+export NoScatLWRTE, TwoStreamLWRTE, NoScatSWRTE, TwoStreamSWRTE
 
 """
-    Solver(
+    NoScatLWRTE(
+        ::Type{FT},
+        ::Type{DA},
+        ::Type{OP},
         context,
-        as,
-        op,
-        src_lw,
-        src_sw,
-        bcs_lw,
-        bcs_sw,
-        fluxb_lw,
-        fluxb_sw,
-        flux_lw,
-        flux_sw
+        param_set,
+        nlay,
+        ncol,
+        sfc_emis,
+        inc_flux,
     )
 
-The high-level RRTMGP data structure storing
-the atmospheric state, optical properties,
-sources, boundary conditions and fluxes
-configurations for a given simulation.
+A high-level RRTMGP data structure storing the optical 
+properties, sources, boundary conditions and fluxes
+configurations for a non-scattering longwave simulation.
 
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct Solver{C, AS, OP, SL, SS, BCL, BCS, FXBL, FXBS, FXL, FXS}
+struct NoScatLWRTE{C, OP, SL <: SourceLWNoScat, BC <: LwBCs, FXBL, FXL <: FluxLW}
     "ClimaComms context"
     context::C
-    "atmospheric state"
-    as::AS
     "optical properties"
     op::OP
-    "source functions"
-    src_lw::SL
-    "source functions"
-    src_sw::SS
-    "boundary conditions"
-    bcs_lw::BCL
-    "boundary conditions"
-    bcs_sw::BCS
+    "longwave source functions"
+    src::SL
+    "longwave boundary conditions"
+    bcs::BC
     "temporary storage for bandwise calculations"
-    fluxb_lw::FXBL
-    "temporary storage for bandwise calculations"
-    fluxb_sw::FXBS
-    "fluxes for longwave problem"
-    flux_lw::FXL
-    "fluxes for shortwave problem"
-    flux_sw::FXS
-    function Solver(context, as, op, src_lw, src_sw, bcs_lw, bcs_sw, fluxb_lw, fluxb_sw, flux_lw, flux_sw)
-        args = (context, as, op, src_lw, src_sw, bcs_lw, bcs_sw, fluxb_lw, fluxb_sw, flux_lw, flux_sw)
-        targs = typeof.(args)
-        FT = eltype(as.p_lev)
-        FTA1D = typeof(as.t_sfc)
-        FTA2D = typeof(as.p_lev)
-        @assert targs[1] <: ClimaComms.AbstractCommsContext
-        @assert targs[2] <: AbstractAtmosphericState
-        @assert targs[3] <: AbstractOpticalProps
-        @assert targs[4] <: Union{AbstractSourceLW, Nothing}
-        @assert targs[5] <: Union{SourceSW2Str, Nothing}
-        @assert targs[6] <: Union{LwBCs{FT}, Nothing}
-        @assert targs[7] <: Union{SwBCs{FT}, Nothing}
-        @assert targs[8] <: Union{FluxLW{FT, FTA2D}, Nothing}
-        @assert targs[9] <: Union{FluxSW{FT, FTA2D}, Nothing}
-        @assert targs[10] <: Union{FluxLW{FT, FTA2D}, Nothing}
-        @assert targs[11] <: Union{FluxSW{FT, FTA2D}, Nothing}
-        return new{targs...}(args...)
-    end
+    fluxb::FXBL
+    "longwave fluxes"
+    flux::FXL
+end
+Adapt.@adapt_structure NoScatLWRTE
+
+function NoScatLWRTE(
+    ::Type{FT},
+    ::Type{DA},
+    ::Type{OP},
+    context,
+    param_set,
+    nlay,
+    ncol,
+    sfc_emis,
+    inc_flux,
+) where {FT, DA, OP}
+    op = OP(FT, ncol, nlay, DA)
+    src = SourceLWNoScat(param_set, FT, DA, nlay, ncol)
+    bcs = LwBCs(sfc_emis, inc_flux)
+    fluxb = FluxLW(ncol, nlay, FT, DA)
+    flux = FluxLW(ncol, nlay, FT, DA)
+    return NoScatLWRTE(context, op, src, bcs, fluxb, flux)
 end
 
-float_type(s::Solver) = eltype(s.as.p_lev)
-array_type(s::Solver) = ClimaComms.array_type(ClimaComms.device(s.context))
-context(s::Solver) = s.context
+"""
+    TwoStreamLWRTE(::Type{FT}, ::Type{DA}, context, param_set, nlay, ncol, sfc_emis, inc_flux)
 
+A high-level RRTMGP data structure storing the optical 
+properties, sources, boundary conditions and fluxes
+configurations for a `2-stream` longwave simulation.
 
-Adapt.@adapt_structure Solver
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
+struct TwoStreamLWRTE{C, OP <: TwoStream, SL <: SourceLW2Str, BC <: LwBCs, FXBL, FXL <: FluxLW}
+    "ClimaComms context"
+    context::C
+    "optical properties"
+    op::OP
+    "longwave source functions"
+    src::SL
+    "longwave boundary conditions"
+    bcs::BC
+    "temporary storage for bandwise calculations"
+    fluxb::FXBL
+    "longwave fluxes"
+    flux::FXL
+end
+Adapt.@adapt_structure TwoStreamLWRTE
+
+function TwoStreamLWRTE(::Type{FT}, ::Type{DA}, context, param_set, nlay, ncol, sfc_emis, inc_flux) where {FT, DA}
+    op = TwoStream(FT, ncol, nlay, DA)
+    src = SourceLW2Str(param_set, FT, DA, nlay, ncol)
+    bcs = LwBCs(sfc_emis, inc_flux)
+    fluxb = FluxLW(ncol, nlay, FT, DA)
+    flux = FluxLW(ncol, nlay, FT, DA)
+    return TwoStreamLWRTE(context, op, src, bcs, fluxb, flux)
+end
+
+TwoStreamLWRTE(::Type{FT}, ::Type{DA}, ::Type{OP}, args...) where {FT, DA, OP} = TwoStreamLWRTE(FT, DA, args...)
+
+"""
+    NoScatSWRTE(::Type{FT}, ::Type{DA}, context, nlay, ncol, swbcs...)
+
+A high-level RRTMGP data structure storing the optical 
+properties, sources, boundary conditions and fluxes
+configurations for a non-scattering shortwave simulation.
+
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
+struct NoScatSWRTE{C, OP <: OneScalar, BC <: SwBCs, FXBS, FXS <: FluxSW}
+    "ClimaComms context"
+    context::C
+    "optical properties"
+    op::OP
+    "shortwave boundary conditions"
+    bcs::BC
+    "temporary storage for bandwise calculations"
+    fluxb::FXBS
+    "shortwave fluxes"
+    flux::FXS
+end
+Adapt.@adapt_structure NoScatSWRTE
+
+function NoScatSWRTE(::Type{FT}, ::Type{DA}, context, nlay, ncol, swbcs...) where {FT, DA}
+    op = OneScalar(FT, ncol, nlay, DA)
+    bcs = SwBCs(swbcs...)
+    fluxb = FluxSW(ncol, nlay, FT, DA)
+    flux = FluxSW(ncol, nlay, FT, DA)
+    return NoScatSWRTE(context, op, bcs, fluxb, flux)
+end
+
+NoScatSWRTE(::Type{FT}, ::Type{DA}, ::Type{OP}, args...) where {FT, DA, OP} = NoScatSWRTE(FT, DA, args...)
+
+"""
+    TwoStreamSWRTE(::Type{FT}, ::Type{DA}, context, nlay, ncol, swbcs...)
+
+A high-level RRTMGP data structure storing the optical 
+properties, sources, boundary conditions and fluxes
+configurations for a `2-stream` shortwave simulation.
+
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
+struct TwoStreamSWRTE{C, OP <: TwoStream, SS, BC <: SwBCs, FXBS, FXS <: FluxSW}
+    "ClimaComms context"
+    context::C
+    "optical properties"
+    op::OP
+    "shortwave source functions"
+    src::SS
+    "shortwave boundary conditions"
+    bcs::BC
+    "temporary storage for bandwise calculations"
+    fluxb::FXBS
+    "shortwave fluxes"
+    flux::FXS
+end
+Adapt.@adapt_structure TwoStreamSWRTE
+
+function TwoStreamSWRTE(::Type{FT}, ::Type{DA}, context, nlay, ncol, swbcs...) where {FT, DA}
+    op = TwoStream(FT, ncol, nlay, DA)
+    src = SourceSW2Str(FT, DA, nlay, ncol)
+    bcs = SwBCs(swbcs...)
+    fluxb = FluxSW(ncol, nlay, FT, DA)
+    flux = FluxSW(ncol, nlay, FT, DA)
+    return TwoStreamSWRTE(context, op, src, bcs, fluxb, flux)
+end
+
+TwoStreamSWRTE(::Type{FT}, ::Type{DA}, ::Type{OP}, args...) where {FT, DA, OP} = TwoStreamSWRTE(FT, DA, args...)
 end

@@ -28,25 +28,29 @@ include("read_rfmip_clear_sky.jl")
 #---------------------------------------------------------------
 function clear_sky(
     context,
-    ::Type{OPC},
-    ::Type{SRC},
+    ::Type{OPLW},
+    ::Type{OPSW},
+    ::Type{SLVLW},
+    ::Type{SLVSW},
     ::Type{VMR},
     ::Type{FT};
     exfiltrate = false,
-) where {FT <: AbstractFloat, OPC, SRC, VMR}
+) where {FT, OPLW, OPSW, SLVLW, SLVSW, VMR}
     overrides = (; grav = 9.80665, molmass_dryair = 0.028964, molmass_water = 0.018016)
     param_set = RRTMGPParameters(FT, overrides)
     device = ClimaComms.device(context)
     DA = ClimaComms.array_type(device)
-    opc = Symbol(OPC)
+    op_lw = Symbol(OPLW)
+    op_sw = Symbol(OPSW)
+
     lw_file = get_ref_filename(:lookup_tables, :clearsky, λ = :lw) # lw lookup tables for gas optics
     sw_file = get_ref_filename(:lookup_tables, :clearsky, λ = :sw) # sw lookup tables for gas optics
     input_file = get_ref_filename(:atmos_state, :clearsky)         # clear-sky atmos state
     # reference data files for comparison
-    flux_up_file_lw = get_ref_filename(:comparison, :clearsky, λ = :lw, flux_up_dn = :flux_up, opc = opc)
-    flux_dn_file_lw = get_ref_filename(:comparison, :clearsky, λ = :lw, flux_up_dn = :flux_dn, opc = opc)
-    flux_up_file_sw = get_ref_filename(:comparison, :clearsky, λ = :sw, flux_up_dn = :flux_up, opc = opc)
-    flux_dn_file_sw = get_ref_filename(:comparison, :clearsky, λ = :sw, flux_up_dn = :flux_dn, opc = opc)
+    flux_up_file_lw = get_ref_filename(:comparison, :clearsky, λ = :lw, flux_up_dn = :flux_up, opc = Symbol(OPLW))
+    flux_dn_file_lw = get_ref_filename(:comparison, :clearsky, λ = :lw, flux_up_dn = :flux_dn, opc = Symbol(OPLW))
+    flux_up_file_sw = get_ref_filename(:comparison, :clearsky, λ = :sw, flux_up_dn = :flux_up, opc = Symbol(OPSW))
+    flux_dn_file_sw = get_ref_filename(:comparison, :clearsky, λ = :sw, flux_up_dn = :flux_dn, opc = Symbol(OPSW))
 
     FTA1D = DA{FT, 1}
     FTA2D = DA{FT, 2}
@@ -73,38 +77,32 @@ function clear_sky(
 
     nlay, ncol = AtmosphericStates.get_dims(as)
     nlev = nlay + 1
-    op = OPC(FT, ncol, nlay, DA) # allocating optical properties object
 
     # setting up longwave problem
-    src_lw = source_func_longwave(param_set, FT, ncol, nlay, opc, DA)         # allocating longwave source function object
-    bcs_lw = LwBCs{FT, typeof(sfc_emis), Nothing}(sfc_emis, nothing) # setting up boundary conditions
-    ang_disc = nothing#AngularDiscretization(opc, FT, n_gauss_angles, DA)  # initializing Angular discretization
-    fluxb_lw = FluxLW(ncol, nlay, FT, DA)                          # flux storage for bandwise calculations
-    flux_lw = FluxLW(ncol, nlay, FT, DA)                           # longwave fluxes
-    # setting up shortwave problem
-    src_sw = source_func_shortwave(FT, ncol, nlay, opc, DA)        # allocating shortwave source function object
-    inc_flux_diffuse = nothing
-    sfc_alb_diffuse = FTA2D(deepcopy(sfc_alb_direct))
-    bcs_sw = SwBCs(cos_zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse)
+    inc_flux = nothing
+    slv_lw = SLVLW(FT, DA, OPLW, context, param_set, nlay, ncol, sfc_emis, inc_flux)
 
-    fluxb_sw = FluxSW(ncol, nlay, FT, DA) # flux storage for bandwise calculations
-    flux_sw = FluxSW(ncol, nlay, FT, DA)  # shortwave fluxes for band calculations
+    # setting up shortwave problem
+    sfc_alb_diffuse = FTA2D(deepcopy(sfc_alb_direct))
+    inc_flux_diffuse = nothing
+    swbcs = (cos_zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse)
+    slv_sw = SLVSW(FT, DA, OPSW, context, nlay, ncol, swbcs...)
     #--------------------------------------------------
     # initializing RTE solver
-    slv = Solver(context, as, op, src_lw, src_sw, bcs_lw, bcs_sw, fluxb_lw, fluxb_sw, flux_lw, flux_sw)
     exfiltrate && Infiltrator.@exfiltrate
-    solve_lw!(slv, max_threads, lookup_lw)
+    solve_lw!(slv_lw, as, max_threads, lookup_lw, nothing)
+    #solve_lw!(slv, max_threads, lookup_lw)
     if device isa ClimaComms.CPUSingleThreaded
-        JET.@test_opt solve_lw!(slv, max_threads, lookup_lw)
-        @test (@allocated solve_lw!(slv, max_threads, lookup_lw)) == 0
-        @test (@allocated solve_lw!(slv, max_threads, lookup_lw)) ≤ 448
+        JET.@test_opt solve_lw!(slv_lw, as, max_threads, lookup_lw, nothing)
+        @test (@allocated solve_lw!(slv_lw, as, max_threads, lookup_lw, nothing)) == 0
+        @test (@allocated solve_lw!(slv_lw, as, max_threads, lookup_lw, nothing)) ≤ 448
     end
 
-    solve_sw!(slv, max_threads, lookup_sw)
+    solve_sw!(slv_sw, as, max_threads, lookup_sw, nothing)
     if device isa ClimaComms.CPUSingleThreaded
-        JET.@test_opt solve_sw!(slv, max_threads, lookup_sw)
-        @test (@allocated solve_sw!(slv, max_threads, lookup_sw)) == 0
-        @test (@allocated solve_sw!(slv, max_threads, lookup_sw)) ≤ 448
+        JET.@test_opt solve_sw!(slv_sw, as, max_threads, lookup_sw, nothing)
+        @test (@allocated solve_sw!(slv_sw, as, max_threads, lookup_sw, nothing)) == 0
+        @test (@allocated solve_sw!(slv_sw, as, max_threads, lookup_sw, nothing)) ≤ 448
     end
 
     # comparing longwave fluxes with data from RRTMGP FORTRAN code
@@ -120,9 +118,9 @@ function clear_sky(
 
     comp_flux_net_lw = comp_flux_up_lw .- comp_flux_dn_lw
 
-    flux_up_lw = Array(slv.flux_lw.flux_up)
-    flux_dn_lw = Array(slv.flux_lw.flux_dn)
-    flux_net_lw = Array(slv.flux_lw.flux_net)
+    flux_up_lw = Array(slv_lw.flux.flux_up)
+    flux_dn_lw = Array(slv_lw.flux.flux_dn)
+    flux_net_lw = Array(slv_lw.flux.flux_net)
 
     max_err_flux_up_lw = maximum(abs.(flux_up_lw .- comp_flux_up_lw))
     max_err_flux_dn_lw = maximum(abs.(flux_dn_lw .- comp_flux_dn_lw))
@@ -139,7 +137,10 @@ function clear_sky(
     max_rel_err_flux_net_lw = maximum(rel_err_flux_net_lw)
 
     color2 = :cyan
-    printstyled("Clear-sky longwave test with ncol = $ncol, nlev = $nlev, OPC = $opc, FT = $FT\n", color = color2)
+    printstyled(
+        "Clear-sky longwave test with ncol = $ncol, nlev = $nlev, OP = $OPLW, Solver = $SLVLW, FT = $FT\n",
+        color = color2,
+    )
     printstyled("device = $device\n\n", color = color2)
     println("L∞ error in flux_up           = $max_err_flux_up_lw")
     println("L∞ error in flux_dn           = $max_err_flux_dn_lw")
@@ -157,9 +158,9 @@ function clear_sky(
 
     comp_flux_net_sw = comp_flux_up_sw .- comp_flux_dn_sw
 
-    flux_up_sw = Array(slv.flux_sw.flux_up)
-    flux_dn_sw = Array(slv.flux_sw.flux_dn)
-    flux_net_sw = Array(slv.flux_sw.flux_net)
+    flux_up_sw = Array(slv_sw.flux.flux_up)
+    flux_dn_sw = Array(slv_sw.flux.flux_dn)
+    flux_net_sw = Array(slv_sw.flux.flux_net)
 
     # Test if shortwave fluxes are zero if zenith angle is ≥ π/2
     cos_zenith = Array(cos_zenith)
@@ -192,7 +193,10 @@ function clear_sky(
 
     max_rel_err_flux_net_sw = maximum(rel_err_flux_net_sw)
 
-    printstyled("Clear-sky shortwave test with ncol = $ncol, nlev = $nlev, OPC = $opc, FT = $FT\n", color = color2)
+    printstyled(
+        "Clear-sky shortwave test with ncol = $ncol, nlev = $nlev, OP = $OPSW, Solver = $SLVSW, FT = $FT\n",
+        color = color2,
+    )
     printstyled("device = $device\n\n", color = color2)
     println("L∞ error in flux_up           = $max_err_flux_up_sw")
     println("L∞ error in flux_dn           = $max_err_flux_dn_sw")

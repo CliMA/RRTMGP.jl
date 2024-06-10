@@ -28,16 +28,18 @@ include("read_all_sky.jl")
 
 function benchmark_all_sky(
     context,
-    ::Type{OPC},
+    ::Type{OPLW},
+    ::Type{OPSW},
+    ::Type{SLVLW},
+    ::Type{SLVSW},
     ::Type{FT};
     ncol = 128,# repeats col#1 ncol times per RRTMGP example 
     use_lut::Bool = true,
     cldfrac = FT(1),
-) where {FT <: AbstractFloat, OPC}
+) where {FT <: AbstractFloat, OPLW, OPSW, SLVLW, SLVSW}
     overrides = (; grav = 9.80665, molmass_dryair = 0.028964, molmass_water = 0.018016)
     param_set = RRTMGPParameters(FT, overrides)
 
-    opc = Symbol(OPC)
     device = ClimaComms.device(context)
     DA = ClimaComms.array_type(device)
     FTA1D = DA{FT, 1}
@@ -96,31 +98,18 @@ function benchmark_all_sky(
     end
 
     # Setting up longwave problem---------------------------------------
-    op = OPC(FT, ncol, nlay, DA) # allocating optical properties object
-    src_lw = source_func_longwave(param_set, FT, ncol, nlay, opc, DA)   # allocating longwave source function object
-    bcs_lw = LwBCs{FT, typeof(sfc_emis), Nothing}(sfc_emis, nothing)    # setting up boundary conditions
-    fluxb_lw = FluxLW(ncol, nlay, FT, DA)                             # flux storage for bandwise calculations
-    flux_lw = FluxLW(ncol, nlay, FT, DA)                              # longwave fluxes
-
+    inc_flux = nothing
+    slv_lw = SLVLW(FT, DA, OPLW, context, param_set, nlay, ncol, sfc_emis, inc_flux)
     # Setting up shortwave problem---------------------------------------
-    src_sw = source_func_shortwave(FT, ncol, nlay, opc, DA)        # allocating longwave source function object
-
-    # setting up boundary conditions
     inc_flux_diffuse = nothing
-
-    bcs_sw = SwBCs(cos_zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse)
-
-    fluxb_sw = FluxSW(ncol, nlay, FT, DA) # flux storage for bandwise calculations
-    flux_sw = FluxSW(ncol, nlay, FT, DA)  # shortwave fluxes for band calculations    
-    #-------------------------------------------------------------------
-    # initializing RTE solver
-    slv = Solver(context, as, op, src_lw, src_sw, bcs_lw, bcs_sw, fluxb_lw, fluxb_sw, flux_lw, flux_sw)
+    swbcs = (cos_zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse)
+    slv_sw = SLVSW(FT, DA, OPSW, context, nlay, ncol, swbcs...)
     #------calling solvers
-    solve_lw!(slv, max_threads, lookup_lw, lookup_lw_cld)
-    trial_lw = @benchmark CUDA.@sync solve_lw!($slv, $max_threads, $lookup_lw, $lookup_lw_cld)
+    solve_lw!(slv_lw, as, max_threads, lookup_lw, lookup_lw_cld)
+    trial_lw = @benchmark CUDA.@sync solve_lw!($slv_lw, $as, $max_threads, $lookup_lw, $lookup_lw_cld)
 
-    solve_sw!(slv, max_threads, lookup_sw, lookup_sw_cld)
-    trial_sw = @benchmark CUDA.@sync solve_sw!($slv, $max_threads, $lookup_sw, $lookup_sw_cld)
+    solve_sw!(slv_sw, as, max_threads, lookup_sw, lookup_sw_cld)
+    trial_sw = @benchmark CUDA.@sync solve_sw!($slv_sw, $as, $max_threads, $lookup_sw, $lookup_sw_cld)
     return trial_lw, trial_sw
 end
 
@@ -141,7 +130,17 @@ function generate_gpu_allsky_benchmarks(FT, npts)
         ncols = unsafe_trunc(Int, cld(ncols_dyamond, 2^(pts - 1)))
         ndof = ncols * nlev_test
         sz_per_fld_gb = ndof * sizeof(FT) / 1024 / 1024 / 1024
-        trial_lw, trial_sw = benchmark_all_sky(context, TwoStream, FT; ncol = ncols, use_lut = true, cldfrac = FT(1))
+        trial_lw, trial_sw = benchmark_all_sky(
+            context,
+            TwoStream,
+            TwoStream,
+            TwoStreamLWRTE,
+            TwoStreamSWRTE,
+            FT;
+            ncol = ncols,
+            use_lut = true,
+            cldfrac = FT(1),
+        )
         Printf.@printf(
             "%10i    |           %25s|       %25s \n",
             ncols,

@@ -5,5 +5,8 @@ CurrentModule = RRTMGP.RTE
 ```
 
 ```@docs
-Solver
+NoScatLWRTE
+TwoStreamLWRTE
+NoScatSWRTE
+TwoStreamSWRTE
 ```
