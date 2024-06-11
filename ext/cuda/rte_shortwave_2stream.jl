@@ -4,13 +4,11 @@ function rte_sw_2stream_solve!(
     op::TwoStream,
     bcs_sw::SwBCs,
     src_sw::SourceSW2Str,
-    max_threads,
     as::GrayAtmosphericState,
 )
     nlay, ncol = AtmosphericStates.get_dims(as)
     nlev = nlay + 1
-    tx = min(ncol, max_threads)
-    bx = cld(ncol, tx)
+    tx, bx = _configure_threadblock(ncol)
     args = (flux_sw, op, bcs_sw, src_sw, nlay, ncol, as)
     @cuda always_inline = true threads = (tx) blocks = (bx) rte_sw_2stream_solve_CUDA!(args...)
     return nothing
@@ -65,7 +63,6 @@ function rte_sw_2stream_solve!(
     op::TwoStream,
     bcs_sw::SwBCs,
     src_sw::SourceSW2Str,
-    max_threads,
     as::AtmosphericState,
     lookup_sw::LookUpSW,
     lookup_sw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
@@ -73,8 +70,7 @@ function rte_sw_2stream_solve!(
     nlay, ncol = AtmosphericStates.get_dims(as)
     nlev = nlay + 1
     n_gpt = length(lookup_sw.solar_src_scaled)
-    tx = min(ncol, max_threads)
-    bx = cld(ncol, tx)
+    tx, bx = _configure_threadblock(ncol)
     args = (flux, flux_sw, op, bcs_sw, src_sw, nlay, ncol, as, lookup_sw, lookup_sw_cld)
     @cuda always_inline = true threads = (tx) blocks = (bx) rte_sw_2stream_solve_CUDA!(args...)
     return nothing

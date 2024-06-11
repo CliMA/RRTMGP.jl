@@ -54,7 +54,6 @@ function clear_sky(
 
     FTA1D = DA{FT, 1}
     FTA2D = DA{FT, 2}
-    max_threads = 256
     exp_no = 1
     n_gauss_angles = 1
 
@@ -72,7 +71,7 @@ function clear_sky(
     ds_lw_in = Dataset(input_file, "r")
 
     (as, sfc_emis, sfc_alb_direct, cos_zenith, toa_flux) =
-        setup_rfmip_as(context, ds_lw_in, idx_gases, exp_no, lookup_lw, FT, VMR, max_threads, param_set)
+        setup_rfmip_as(context, ds_lw_in, idx_gases, exp_no, lookup_lw, FT, VMR, param_set)
     close(ds_lw_in)
 
     nlay, ncol = AtmosphericStates.get_dims(as)
@@ -90,19 +89,18 @@ function clear_sky(
     #--------------------------------------------------
     # initializing RTE solver
     exfiltrate && Infiltrator.@exfiltrate
-    solve_lw!(slv_lw, as, max_threads, lookup_lw, nothing)
-    #solve_lw!(slv, max_threads, lookup_lw)
+    solve_lw!(slv_lw, as, lookup_lw)
     if device isa ClimaComms.CPUSingleThreaded
-        JET.@test_opt solve_lw!(slv_lw, as, max_threads, lookup_lw, nothing)
-        @test (@allocated solve_lw!(slv_lw, as, max_threads, lookup_lw, nothing)) == 0
-        @test (@allocated solve_lw!(slv_lw, as, max_threads, lookup_lw, nothing)) ≤ 448
+        JET.@test_opt solve_lw!(slv_lw, as, lookup_lw)
+        @test (@allocated solve_lw!(slv_lw, as, lookup_lw)) == 0
+        @test (@allocated solve_lw!(slv_lw, as, lookup_lw)) ≤ 448
     end
 
-    solve_sw!(slv_sw, as, max_threads, lookup_sw, nothing)
+    solve_sw!(slv_sw, as, lookup_sw)
     if device isa ClimaComms.CPUSingleThreaded
-        JET.@test_opt solve_sw!(slv_sw, as, max_threads, lookup_sw, nothing)
-        @test (@allocated solve_sw!(slv_sw, as, max_threads, lookup_sw, nothing)) == 0
-        @test (@allocated solve_sw!(slv_sw, as, max_threads, lookup_sw, nothing)) ≤ 448
+        JET.@test_opt solve_sw!(slv_sw, as, lookup_sw)
+        @test (@allocated solve_sw!(slv_sw, as, lookup_sw)) == 0
+        @test (@allocated solve_sw!(slv_sw, as, lookup_sw)) ≤ 448
     end
 
     # comparing longwave fluxes with data from RRTMGP FORTRAN code

@@ -35,6 +35,16 @@ import RRTMGP.RTESolver: rte_sw_noscat!
 import RRTMGP.RTESolver: rte_sw_noscat_solve!
 import CUDA: threadIdx, blockIdx, blockDim, @cuda
 
+_max_threads_cuda() = 256
+
+function _configure_threadblock(max_threads, nitems)
+    nthreads = min(max_threads, nitems)
+    nblocks = cld(nitems, nthreads)
+    return (nthreads, nblocks)
+end
+
+_configure_threadblock(nitems) = _configure_threadblock(_max_threads_cuda(), nitems)
+
 include(joinpath("cuda", "gray_atmospheric_states.jl"))
 include(joinpath("cuda", "rte_longwave_2stream.jl"))
 include(joinpath("cuda", "optics.jl"))

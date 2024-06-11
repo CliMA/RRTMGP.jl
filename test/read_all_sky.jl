@@ -17,7 +17,6 @@ function setup_allsky_as(
     use_lut,
     ncol,
     FT,
-    max_threads,
     param_set,
 )
 

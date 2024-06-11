@@ -4,7 +4,6 @@ function rte_lw_noscat_solve!(
     src_lw::SourceLWNoScat,
     bcs_lw::LwBCs,
     op::OneScalar,
-    max_threads,
     as::GrayAtmosphericState,
 )
     nlay, ncol = AtmosphericStates.get_dims(as)
@@ -32,7 +31,6 @@ function rte_lw_noscat_solve!(
     src_lw::SourceLWNoScat,
     bcs_lw::LwBCs,
     op::OneScalar,
-    max_threads,
     as::AtmosphericState,
     lookup_lw::LookUpLW,
     lookup_lw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,

@@ -4,13 +4,11 @@ function rte_lw_noscat_solve!(
     src_lw::SourceLWNoScat,
     bcs_lw::LwBCs,
     op::OneScalar,
-    max_threads,
     as::GrayAtmosphericState,
 )
     nlay, ncol = AtmosphericStates.get_dims(as)
     nlev = nlay + 1
-    tx = min(ncol, max_threads)
-    bx = cld(ncol, tx)
+    tx, bx = _configure_threadblock(ncol)
     args = (flux_lw, src_lw, bcs_lw, op, nlay, ncol, as)
     @cuda always_inline = true threads = (tx) blocks = (bx) rte_lw_noscat_solve_CUDA!(args...)
     return nothing
@@ -48,15 +46,13 @@ function rte_lw_noscat_solve!(
     src_lw::SourceLWNoScat,
     bcs_lw::LwBCs,
     op::OneScalar,
-    max_threads,
     as::AtmosphericState,
     lookup_lw::LookUpLW,
     lookup_lw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
 )
     nlay, ncol = AtmosphericStates.get_dims(as)
     nlev = nlay + 1
-    tx = min(ncol, max_threads)
-    bx = cld(ncol, tx)
+    tx, bx = _configure_threadblock(ncol)
     args = (flux, flux_lw, src_lw, bcs_lw, op, nlay, ncol, as, lookup_lw, lookup_lw_cld)
     @cuda always_inline = true threads = (tx) blocks = (bx) rte_lw_noscat_solve_CUDA!(args...)
     return nothing

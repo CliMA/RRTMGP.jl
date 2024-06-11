@@ -19,29 +19,29 @@ import Logging
     include(joinpath(root_dir, "test", "gray_atm_utils.jl"))
     gray_atmos_lw_equil(ClimaComms.context(), OneScalar, NoScatLWRTE, FT; exfiltrate = true)
 end
-(; slv_lw, gray_as, max_threads) = Infiltrator.exfiltrated
+(; slv_lw, gray_as) = Infiltrator.exfiltrated
 @info "gray_atm lw"
-solve_lw!(slv_lw, gray_as, max_threads) # compile first
+solve_lw!(slv_lw, gray_as) # compile first
 device = ClimaComms.device(ClimaComms.context())
 trial = if device isa ClimaComms.CUDADevice
     using CUDA
-    @benchmark CUDA.@sync solve_lw!($slv_lw, $gray_as, $max_threads)
+    @benchmark CUDA.@sync solve_lw!($slv_lw, $gray_as)
 else
-    @benchmark solve_lw!($slv_lw, $gray_as, $max_threads)
+    @benchmark solve_lw!($slv_lw, $gray_as)
 end
 show(stdout, MIME("text/plain"), trial)
 println()
 
 gray_atmos_sw_test(ClimaComms.context(), OneScalar, NoScatSWRTE, FT, 1; exfiltrate = true)
-(; slv_sw, as, max_threads) = Infiltrator.exfiltrated
-solve_sw!(slv_sw, as, max_threads) # compile first
+(; slv_sw, as) = Infiltrator.exfiltrated
+solve_sw!(slv_sw, as) # compile first
 @info "gray_atm sw"
 device = ClimaComms.device(ClimaComms.context())
 trial = if device isa ClimaComms.CUDADevice
     using CUDA
-    @benchmark CUDA.@sync solve_sw!($slv_sw, $as, $max_threads)
+    @benchmark CUDA.@sync solve_sw!($slv_sw, $as)
 else
-    @benchmark solve_sw!($slv_sw, $as, $max_threads)
+    @benchmark solve_sw!($slv_sw, $as)
 end
 show(stdout, MIME("text/plain"), trial)
 println()
@@ -51,30 +51,28 @@ include(joinpath(root_dir, "test", "clear_sky_utils.jl"))
 context = ClimaComms.context()
 clear_sky(ClimaComms.context(), TwoStream, TwoStream, TwoStreamLWRTE, TwoStreamSWRTE, VmrGM, FT; exfiltrate = true)
 # end
-(; slv_lw, slv_sw, as, max_threads, lookup_sw, lookup_lw) = Infiltrator.exfiltrated
+(; slv_lw, slv_sw, as, lookup_sw, lookup_lw) = Infiltrator.exfiltrated
 
 @info "clear_sky lw"
-lookup_lw_cld = nothing
-solve_lw!(slv_lw, as, max_threads, lookup_lw, lookup_lw_cld) # compile first
+solve_lw!(slv_lw, as, lookup_lw) # compile first
 device = ClimaComms.device(ClimaComms.context())
 trial = if device isa ClimaComms.CUDADevice
     using CUDA
-    @benchmark CUDA.@sync solve_lw!($slv_lw, $as, $max_threads, $lookup_lw, $lookup_lw_cld)
+    @benchmark CUDA.@sync solve_lw!($slv_lw, $as, $lookup_lw)
 else
-    @benchmark solve_lw!($slv_lw, $as, $max_threads, $lookup_lw, $lookup_lw_cld)
+    @benchmark solve_lw!($slv_lw, $as, $lookup_lw)
 end
 show(stdout, MIME("text/plain"), trial)
 println()
 
 @info "clear_sky sw"
-lookup_sw_cld = nothing
-solve_sw!(slv_sw, as, max_threads, lookup_sw, lookup_sw_cld) # compile first
+solve_sw!(slv_sw, as, lookup_sw) # compile first
 device = ClimaComms.device(ClimaComms.context())
 trial = if device isa ClimaComms.CUDADevice
     using CUDA
-    @benchmark CUDA.@sync solve_sw!($slv_sw, $as, $max_threads, $lookup_sw, $lookup_sw_cld)
+    @benchmark CUDA.@sync solve_sw!($slv_sw, $as, $lookup_sw)
 else
-    @benchmark solve_sw!($slv_sw, $as, $max_threads, $lookup_sw, $lookup_sw_cld)
+    @benchmark solve_sw!($slv_sw, $as, $lookup_sw)
 end
 show(stdout, MIME("text/plain"), trial)
 println()
@@ -95,18 +93,18 @@ all_sky(
 )
 # end
 
-(; slv_lw, slv_sw, as, max_threads, lookup_sw, lookup_sw_cld, lookup_lw, lookup_lw_cld) = Infiltrator.exfiltrated
+(; slv_lw, slv_sw, as, lookup_sw, lookup_sw_cld, lookup_lw, lookup_lw_cld) = Infiltrator.exfiltrated
 
-solve_sw!(slv_sw, as, max_threads, lookup_sw, lookup_sw_cld) # compile first
-solve_lw!(slv_lw, as, max_threads, lookup_lw, lookup_lw_cld) # compile first
+solve_sw!(slv_sw, as, lookup_sw, lookup_sw_cld) # compile first
+solve_lw!(slv_lw, as, lookup_lw, lookup_lw_cld) # compile first
 
 @info "all_sky, lw, use_lut=true"
 device = ClimaComms.device(ClimaComms.context())
 trial = if device isa ClimaComms.CUDADevice
     using CUDA
-    @benchmark CUDA.@sync solve_lw!($slv_lw, $as, $max_threads, $lookup_lw, $lookup_lw_cld)
+    @benchmark CUDA.@sync solve_lw!($slv_lw, $as, $lookup_lw, $lookup_lw_cld)
 else
-    @benchmark solve_lw!($slv_lw, $as, $max_threads, $lookup_lw, $lookup_lw_cld)
+    @benchmark solve_lw!($slv_lw, $as, $lookup_lw, $lookup_lw_cld)
 end
 show(stdout, MIME("text/plain"), trial)
 println()
@@ -114,9 +112,9 @@ println()
 device = ClimaComms.device(ClimaComms.context())
 trial = if device isa ClimaComms.CUDADevice
     using CUDA
-    @benchmark CUDA.@sync solve_sw!($slv_sw, $as, $max_threads, $lookup_sw, $lookup_sw_cld)
+    @benchmark CUDA.@sync solve_sw!($slv_sw, $as, $lookup_sw, $lookup_sw_cld)
 else
-    @benchmark solve_sw!($slv_sw, $as, $max_threads, $lookup_sw, $lookup_sw_cld)
+    @benchmark solve_sw!($slv_sw, $as, $lookup_sw, $lookup_sw_cld)
 end
 show(stdout, MIME("text/plain"), trial)
 println()
@@ -135,18 +133,18 @@ all_sky(
 )
 # end
 
-(; slv_lw, slv_sw, as, max_threads, lookup_sw, lookup_sw_cld, lookup_lw, lookup_lw_cld) = Infiltrator.exfiltrated
+(; slv_lw, slv_sw, as, lookup_sw, lookup_sw_cld, lookup_lw, lookup_lw_cld) = Infiltrator.exfiltrated
 
-solve_sw!(slv_sw, as, max_threads, lookup_sw, lookup_sw_cld) # compile first
-solve_lw!(slv_lw, as, max_threads, lookup_lw, lookup_lw_cld) # compile first
+solve_sw!(slv_sw, as, lookup_sw, lookup_sw_cld) # compile first
+solve_lw!(slv_lw, as, lookup_lw, lookup_lw_cld) # compile first
 
 @info "all_sky, lw, use_lut=false"
 device = ClimaComms.device(ClimaComms.context())
 trial = if device isa ClimaComms.CUDADevice
     using CUDA
-    @benchmark CUDA.@sync solve_lw!($slv_lw, $as, $max_threads, $lookup_lw, $lookup_lw_cld)
+    @benchmark CUDA.@sync solve_lw!($slv_lw, $as, $lookup_lw, $lookup_lw_cld)
 else
-    @benchmark solve_lw!($slv_lw, $as, $max_threads, $lookup_lw, $lookup_lw_cld)
+    @benchmark solve_lw!($slv_lw, $as, $lookup_lw, $lookup_lw_cld)
 end
 show(stdout, MIME("text/plain"), trial)
 println()
@@ -154,9 +152,9 @@ println()
 device = ClimaComms.device(ClimaComms.context())
 trial = if device isa ClimaComms.CUDADevice
     using CUDA
-    @benchmark CUDA.@sync solve_sw!($slv_sw, $as, $max_threads, $lookup_sw, $lookup_sw_cld)
+    @benchmark CUDA.@sync solve_sw!($slv_sw, $as, $lookup_sw, $lookup_sw_cld)
 else
-    @benchmark solve_sw!($slv_sw, $as, $max_threads, $lookup_sw, $lookup_sw_cld)
+    @benchmark solve_sw!($slv_sw, $as, $lookup_sw, $lookup_sw_cld)
 end
 show(stdout, MIME("text/plain"), trial)
 println()

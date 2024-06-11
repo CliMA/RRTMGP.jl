@@ -1,8 +1,6 @@
 
 function setup_gray_as_pr_grid!(::ClimaComms.CUDADevice, ncol, args...)
-    max_threads = 256
-    tx = min(ncol, max_threads)
-    bx = cld(ncol, tx)
+    tx, bx = _configure_threadblock(ncol)
     @cuda always_inline = true threads = (tx) blocks = (bx) _setup_gray_as_pr_grid_kernel!(ncol, args...)
 end
 
