@@ -1,6 +1,5 @@
 module RTESolver
 
-using StaticArrays
 import ClimaComms
 using Adapt
 
