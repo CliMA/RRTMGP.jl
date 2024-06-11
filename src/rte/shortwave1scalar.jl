@@ -3,7 +3,6 @@ function rte_sw_noscat_solve!(
     flux_sw::FluxSW,
     op::OneScalar,
     bcs_sw::SwBCs,
-    max_threads,
     as::GrayAtmosphericState,
 )
     nlay, ncol = AtmosphericStates.get_dims(as)
@@ -31,7 +30,6 @@ function rte_sw_noscat_solve!(
     flux_sw::FluxSW,
     op::OneScalar,
     bcs_sw::SwBCs,
-    max_threads,
     as::AtmosphericState,
     lookup_sw::LookUpSW,
 )

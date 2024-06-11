@@ -44,7 +44,6 @@ function benchmark_all_sky(
     DA = ClimaComms.array_type(device)
     FTA1D = DA{FT, 1}
     FTA2D = DA{FT, 2}
-    max_threads = 256
     n_gauss_angles = 1
 
     lw_file = get_ref_filename(:lookup_tables, :clearsky, λ = :lw)             # lw lookup tables for gas optics
@@ -84,7 +83,6 @@ function benchmark_all_sky(
         use_lut,
         ncol,
         FT,
-        max_threads,
         param_set,
     )
     close(ds_in)
@@ -105,11 +103,11 @@ function benchmark_all_sky(
     swbcs = (cos_zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse)
     slv_sw = SLVSW(FT, DA, OPSW, context, nlay, ncol, swbcs...)
     #------calling solvers
-    solve_lw!(slv_lw, as, max_threads, lookup_lw, lookup_lw_cld)
-    trial_lw = @benchmark CUDA.@sync solve_lw!($slv_lw, $as, $max_threads, $lookup_lw, $lookup_lw_cld)
+    solve_lw!(slv_lw, as, lookup_lw, lookup_lw_cld)
+    trial_lw = @benchmark CUDA.@sync solve_lw!($slv_lw, $as, $lookup_lw, $lookup_lw_cld)
 
-    solve_sw!(slv_sw, as, max_threads, lookup_sw, lookup_sw_cld)
-    trial_sw = @benchmark CUDA.@sync solve_sw!($slv_sw, $as, $max_threads, $lookup_sw, $lookup_sw_cld)
+    solve_sw!(slv_sw, as, lookup_sw, lookup_sw_cld)
+    trial_sw = @benchmark CUDA.@sync solve_sw!($slv_sw, $as, $lookup_sw, $lookup_sw_cld)
     return trial_lw, trial_sw
 end
 

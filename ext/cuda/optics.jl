@@ -6,7 +6,6 @@ function compute_col_gas!(
     param_set::RP.ARP,
     vmr_h2o::Union{AbstractArray{FT, 2}, Nothing} = nothing,
     lat::Union{AbstractArray{FT, 1}, Nothing} = nothing,
-    max_threads::Int = Int(256),
 ) where {FT}
     nlay, ncol = size(col_dry)
     mol_m_dry = RP.molmass_dryair(param_set)
@@ -14,8 +13,7 @@ function compute_col_gas!(
     avogadro = RP.avogad(param_set)
     helmert1 = RP.grav(param_set)
     args = (p_lev, mol_m_dry, mol_m_h2o, avogadro, helmert1, vmr_h2o, lat)
-    tx = min(nlay * ncol, max_threads)
-    bx = cld(nlay * ncol, tx)
+    tx, bx = _configure_threadblock(nlay * ncol)
     @cuda always_inline = true threads = (tx) blocks = (bx) compute_col_gas_CUDA!(col_dry, args...)
     return nothing
 end

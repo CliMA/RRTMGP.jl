@@ -4,7 +4,6 @@ function rte_sw_2stream_solve!(
     op::TwoStream,
     bcs_sw::SwBCs,
     src_sw::SourceSW2Str,
-    max_threads,
     as::GrayAtmosphericState,
 )
     nlay, ncol = AtmosphericStates.get_dims(as)
@@ -41,7 +40,6 @@ function rte_sw_2stream_solve!(
     op::TwoStream,
     bcs_sw::SwBCs,
     src_sw::SourceSW2Str,
-    max_threads,
     as::AtmosphericState,
     lookup_sw::LookUpSW,
     lookup_sw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,

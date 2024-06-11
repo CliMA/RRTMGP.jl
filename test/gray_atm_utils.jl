@@ -55,7 +55,6 @@ function gray_atmos_lw_equil(
     sfc_emis = DA{FT}(undef, nbnd, ncol) # surface emissivity
     sfc_emis .= FT(1.0)
     inc_flux = nothing                      # incoming flux
-    max_threads = 256                  # maximum number of threads for KA kernels
 
     if ncol == 1
         lat = DA{FT}([0])                   # latitude
@@ -81,7 +80,7 @@ function gray_atmos_lw_equil(
     device = ClimaComms.device(context)
     for i in 1:nsteps
         # calling the long wave gray radiation solver
-        solve_lw!(slv_lw, gray_as, max_threads)
+        solve_lw!(slv_lw, gray_as)
         # computing heating rate
         compute_gray_heating_rate!(device, hr_lay, p_lev, ncol, nlay, flux_net, cp_d_, grav_)
         # updating t_lay and t_lev based on heating rate
@@ -117,9 +116,9 @@ function gray_atmos_lw_equil(
 
     @test maximum(t_error) < temp_toler
     if device isa ClimaComms.CPUSingleThreaded
-        JET.@test_opt solve_lw!(slv_lw, gray_as, max_threads)
-        @test (@allocated solve_lw!(slv_lw, gray_as, max_threads)) == 0
-        @test (@allocated solve_lw!(slv_lw, gray_as, max_threads)) ≤ 128
+        JET.@test_opt solve_lw!(slv_lw, gray_as)
+        @test (@allocated solve_lw!(slv_lw, gray_as)) == 0
+        @test (@allocated solve_lw!(slv_lw, gray_as)) ≤ 128
     end
 end
 
@@ -147,7 +146,6 @@ function gray_atmos_sw_test(
     n_gauss_angles = 1             # for non-scattering calculation
     sfc_emis = Array{FT}(undef, nbnd, ncol) # surface emissivity
     sfc_emis .= FT(1.0)
-    max_threads = 256            # maximum number of threads for KA kernels
     deg2rad = FT(π) / FT(180)
 
     cos_zenith = DA{FT, 1}(undef, ncol)   # cosine of solar zenith angle
@@ -177,7 +175,7 @@ function gray_atmos_sw_test(
     slv_sw = SLVSW(FT, DA, OPSW, context, nlay, ncol, swbcs...)
 
     exfiltrate && Infiltrator.@exfiltrate
-    solve_sw!(slv_sw, as, max_threads)
+    solve_sw!(slv_sw, as)
 
     τ = Array(slv_sw.op.τ)
     cos_zenith = Array(cos_zenith)
@@ -201,8 +199,8 @@ function gray_atmos_sw_test(
     @test rel_error < rel_toler
 
     if device isa ClimaComms.CPUSingleThreaded
-        JET.@test_opt solve_sw!(slv_sw, as, max_threads)
-        @test (@allocated solve_sw!(slv_sw, as, max_threads)) == 0
-        @test (@allocated solve_sw!(slv_sw, as, max_threads)) ≤ 256
+        JET.@test_opt solve_sw!(slv_sw, as)
+        @test (@allocated solve_sw!(slv_sw, as)) == 0
+        @test (@allocated solve_sw!(slv_sw, as)) ≤ 256
     end
 end

@@ -22,26 +22,25 @@ include("shortwave1scalar.jl")
 include("shortwave2stream.jl")
 
 """
-    solve_lw!((; context, flux, src, bcs, op)::NoScatLWRTE, as::GrayAtmosphericState, max_threads)
+    solve_lw!((; context, flux, src, bcs, op)::NoScatLWRTE, as::GrayAtmosphericState)
 
 Non-scattering RTE solver for the longwave problem, using gray optics.
 """
-solve_lw!((; context, flux, src, bcs, op)::NoScatLWRTE, as::GrayAtmosphericState, max_threads) =
-    rte_lw_noscat_solve!(context.device, flux, src, bcs, op, max_threads, as)
+solve_lw!((; context, flux, src, bcs, op)::NoScatLWRTE, as::GrayAtmosphericState) =
+    rte_lw_noscat_solve!(context.device, flux, src, bcs, op, as)
 
 """
-    solve_lw!((; context, flux, src, bcs, op)::TwoStreamLWRTE, as::GrayAtmosphericState, max_threads)
+    solve_lw!((; context, flux, src, bcs, op)::TwoStreamLWRTE, as::GrayAtmosphericState)
 
 `Two Stream` RTE solver for the longwave problem, using gray optics.
 """
-solve_lw!((; context, flux, src, bcs, op)::TwoStreamLWRTE, as::GrayAtmosphericState, max_threads) =
-    rte_lw_2stream_solve!(context.device, flux, src, bcs, op, max_threads, as)
+solve_lw!((; context, flux, src, bcs, op)::TwoStreamLWRTE, as::GrayAtmosphericState) =
+    rte_lw_2stream_solve!(context.device, flux, src, bcs, op, as)
 
 """
     solve_lw!(
         (; context, fluxb, flux, src, bcs, op)::NoScatLWRTE,
         as::AtmosphericState,
-        max_threads,
         lookup_lw::LookUpLW,
         lookup_lw_cld::Union{LookUpCld, PadeCld, Nothing},
     )
@@ -51,16 +50,17 @@ Non-scattering RTE solver for the longwave problem, using RRTMGP optics.
 solve_lw!(
     (; context, fluxb, flux, src, bcs, op)::NoScatLWRTE,
     as::AtmosphericState,
-    max_threads,
     lookup_lw::LookUpLW,
-    lookup_lw_cld::Union{LookUpCld, PadeCld, Nothing},
-) = rte_lw_noscat_solve!(context.device, fluxb, flux, src, bcs, op, max_threads, as, lookup_lw, lookup_lw_cld)
+    lookup_lw_cld::Union{LookUpCld, PadeCld},
+) = rte_lw_noscat_solve!(context.device, fluxb, flux, src, bcs, op, as, lookup_lw, lookup_lw_cld)
+
+solve_lw!((; context, fluxb, flux, src, bcs, op)::NoScatLWRTE, as::AtmosphericState, lookup_lw::LookUpLW) =
+    rte_lw_noscat_solve!(context.device, fluxb, flux, src, bcs, op, as, lookup_lw, nothing)
 
 """
     solve_lw!(
         (; context, fluxb, flux, src, bcs, op)::TwoStreamLWRTE,
         as::AtmosphericState,
-        max_threads,
         lookup_lw::LookUpLW,
         lookup_lw_cld::Union{LookUpCld, PadeCld, Nothing},
     )
@@ -70,54 +70,47 @@ solve_lw!(
 solve_lw!(
     (; context, fluxb, flux, src, bcs, op)::TwoStreamLWRTE,
     as::AtmosphericState,
-    max_threads,
     lookup_lw::LookUpLW,
-    lookup_lw_cld::Union{LookUpCld, PadeCld, Nothing},
-) = rte_lw_2stream_solve!(context.device, fluxb, flux, src, bcs, op, max_threads, as, lookup_lw, lookup_lw_cld)
+    lookup_lw_cld::Union{LookUpCld, PadeCld},
+) = rte_lw_2stream_solve!(context.device, fluxb, flux, src, bcs, op, as, lookup_lw, lookup_lw_cld)
 
+solve_lw!((; context, fluxb, flux, src, bcs, op)::TwoStreamLWRTE, as::AtmosphericState, lookup_lw::LookUpLW) =
+    rte_lw_2stream_solve!(context.device, fluxb, flux, src, bcs, op, as, lookup_lw)
 
 """
-    solve_sw!((; context, flux, bcs, op)::NoScatSWRTE, as::GrayAtmosphericState, max_threads)
+    solve_sw!((; context, flux, bcs, op)::NoScatSWRTE, as::GrayAtmosphericState)
 
 Non-scattering RTE solver for the shortwave problem, using gray optics.
 """
-solve_sw!((; context, flux, bcs, op)::NoScatSWRTE, as::GrayAtmosphericState, max_threads) =
-    rte_sw_noscat_solve!(context.device, flux, op, bcs, max_threads, as) # non-scattering solver, gray optics
+solve_sw!((; context, flux, bcs, op)::NoScatSWRTE, as::GrayAtmosphericState) =
+    rte_sw_noscat_solve!(context.device, flux, op, bcs, as) # non-scattering solver, gray optics
 
 """
-    solve_sw!((; context, flux, src, bcs, op)::TwoStreamSWRTE, as::GrayAtmosphericState, max_threads)
+    solve_sw!((; context, flux, src, bcs, op)::TwoStreamSWRTE, as::GrayAtmosphericState)
 
 `Two Stream` RTE solver for the shortwave problem, using gray optics.
 """
-solve_sw!((; context, flux, src, bcs, op)::TwoStreamSWRTE, as::GrayAtmosphericState, max_threads) =
-    rte_sw_2stream_solve!(context.device, flux, op, bcs, src, max_threads, as)
+solve_sw!((; context, flux, src, bcs, op)::TwoStreamSWRTE, as::GrayAtmosphericState) =
+    rte_sw_2stream_solve!(context.device, flux, op, bcs, src, as)
 
 """
     solve_sw!(
         (; context, fluxb, flux, bcs, op)::NoScatSWRTE,
         as::AtmosphericState,
-        max_threads,
         lookup_sw::LookUpSW,
-        lookup_sw_cld::Union{LookUpCld, PadeCld, Nothing},
     )
 
 Non-scattering RTE solver for the shortwave problem, using RRTMGP optics.
 """
-solve_sw!(
-    (; context, fluxb, flux, bcs, op)::NoScatSWRTE,
-    as::AtmosphericState,
-    max_threads,
-    lookup_sw::LookUpSW,
-    lookup_sw_cld::Union{LookUpCld, PadeCld, Nothing},
-) = rte_sw_noscat_solve!(context.device, fluxb, flux, op, bcs, max_threads, as, lookup_sw)
+solve_sw!((; context, fluxb, flux, bcs, op)::NoScatSWRTE, as::AtmosphericState, lookup_sw::LookUpSW) =
+    rte_sw_noscat_solve!(context.device, fluxb, flux, op, bcs, as, lookup_sw)
 
 """
     solve_sw!(
         (; context, fluxb, flux, src, bcs, op)::TwoStreamSWRTE,
         as::AtmosphericState,
-        max_threads,
         lookup_sw::LookUpSW,
-        lookup_sw_cld::Union{LookUpCld, PadeCld, Nothing},
+        lookup_sw_cld::Union{LookUpCld, PadeCld},
     )
 
 `Two Stream` RTE solver for the shortwave problem, using RRTMGP optics.
@@ -125,9 +118,10 @@ solve_sw!(
 solve_sw!(
     (; context, fluxb, flux, src, bcs, op)::TwoStreamSWRTE,
     as::AtmosphericState,
-    max_threads,
     lookup_sw::LookUpSW,
-    lookup_sw_cld::Union{LookUpCld, PadeCld, Nothing},
-) = rte_sw_2stream_solve!(context.device, fluxb, flux, op, bcs, src, max_threads, as, lookup_sw, lookup_sw_cld)
+    lookup_sw_cld::Union{LookUpCld, PadeCld},
+) = rte_sw_2stream_solve!(context.device, fluxb, flux, op, bcs, src, as, lookup_sw, lookup_sw_cld)
 
+solve_sw!((; context, fluxb, flux, src, bcs, op)::TwoStreamSWRTE, as::AtmosphericState, lookup_sw::LookUpSW) =
+    rte_sw_2stream_solve!(context.device, fluxb, flux, op, bcs, src, as, lookup_sw, nothing)
 end

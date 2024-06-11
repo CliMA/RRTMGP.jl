@@ -1,5 +1,4 @@
 
-
 function setup_rfmip_as(
     context,
     ds_lw_in,
@@ -8,7 +7,6 @@ function setup_rfmip_as(
     lookup_lw,
     ::Type{FT},
     ::Type{VMR},
-    max_threads,
     param_set,
 ) where {FT <: AbstractFloat, VMR}
     device = ClimaComms.device(context)
