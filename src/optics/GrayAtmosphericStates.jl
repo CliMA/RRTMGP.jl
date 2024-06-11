@@ -99,7 +99,7 @@ Adapt.@adapt_structure GrayAtmosphericState
 # view of layer temperatures [K]
 @inline getview_t_lay(as::GrayAtmosphericState) = as.t_lay
 @inline getview_t_lay(as::GrayAtmosphericState, gcol) = @inbounds view(as.t_lay, :, gcol)
-#---------------------------------------------------------------
+
 # This functions sets up a model temperature and pressure 
 # distributions for a gray atmosphere based on a pressure grid
 # see Schneider 2004, J. Atmos. Sci. (2004) 61 (12): 1317–1340.
@@ -164,73 +164,6 @@ function setup_gray_as_pr_grid!(device::ClimaComms.AbstractCPUDevice, ncol, args
     end
 end
 
-function setup_gray_as_alt_grid(
-    lat::FTA1D,
-    p0::FT,
-    zend::FT,
-    ncls::Int,
-    poly_order::Int,
-    param_set::RP.ARP,
-    ::Type{DA},
-) where {FT <: AbstractFloat, FTA1D <: AbstractArray{FT, 1}, DA}
-    ncol = length(lat)
-    nlev = Int(ncls + 1 + (poly_order - 1) * ncls)
-    nlay = Int(nlev - 1)
-    qm1 = poly_order + 1
-    zst = FT(0)
-    te = FT(300)                   # global mean surface temperature (K)
-    tt = FT(200)                   # skin temp at top of atmosphere (K)
-    Δt = FT(60)
-    α = FT(3.5)           # lapse rate of radiative equillibrium
-    τ₀ = FT(0.22)
-
-    p_lay = DA{FT}(undef, nlay, ncol)
-    p_lev = DA{FT}(undef, nlev, ncol)
-    t_lay = DA{FT}(undef, nlay, ncol)
-    t_lev = DA{FT}(undef, nlev, ncol)
-    z_lev = DA{FT}(undef, nlev, ncol)
-    t_sfc = DA{FT}(undef, ncol)       # surface temperature
-    d0 = DA{FT}(undef, ncol)       # optical depth (function of latitude)
-
-    pts, _ = GaussQuadrature.legendre(FT, poly_order + 1, GaussQuadrature.both)
-    pts = (pts .+ FT(1)) ./ FT(2)
-    Δz_cell = zend / ncls
-
-    @inbounds for icol in 1:ncol
-        #---------bot_at_1---------------------------------------
-        z_lev[1, icol] = zst
-        z_lev[nlev, icol] = zend
-
-        for icls in 1:ncls
-            for j in 1:(poly_order - 1)
-                z_lev[(icls - 1) * poly_order + 1 + j, icol] =
-                    z_lev[(icls - 1) * poly_order + 1, icol] + pts[1 + j] * Δz_cell
-            end
-            z_lev[icls * poly_order + 1, icol] = zst + icls * Δz_cell
-        end
-
-        ts = te + Δt * (FT(1 / 3) - sin(lat[icol] / FT(180) * FT(π))^2) # surface temp at a given latitude (K)
-        d0[icol] = FT((ts / tt)^4 - 1) # optical depth
-
-        p_lev[1, icol] = p0
-        t_lev[1, icol] = tt * (1 + d0[icol] * (p_lev[icol, 1] / p0)^α)^FT(0.25)
-
-        for ilay in 1:nlay
-            H = RP.R_d(param_set) * t_lev[ilay, icol] / RP.grav(param_set)
-            Δz_lay = abs(z_lev[ilay + 1, icol] - z_lev[ilay, icol])
-            p_lev[ilay + 1, icol] = p_lev[ilay, icol] * exp(-Δz_lay / H)
-            t_lev[ilay + 1, icol] = tt * (1 + d0[icol] * (p_lev[ilay + 1, icol] / p0)^α)^FT(0.25)
-
-            t_lay[ilay, icol] = FT(0.5) * (t_lev[ilay, icol] + t_lev[ilay + 1, icol])
-            p_lay[ilay, icol] = FT(0.5) * (p_lev[ilay, icol] + p_lev[ilay + 1, icol])
-        end
-        #--------------------------------------------------------
-        t_sfc[icol] = t_lev[1, icol]
-    end
-    return GrayAtmosphericState{FT, DA{FT, 1}, DA{FT, 2}}(p_lay, p_lev, t_lay, t_lev, z_lev, t_sfc, α, τ₀, d0)
-end
-
-#-------------------------------------------------------------------------
 function setup_gray_as_pr_grid_kernel!(
     p_lev::FTA2D,
     p_lay::FTA2D,
@@ -279,7 +212,5 @@ function setup_gray_as_pr_grid_kernel!(
         z_lev[ilay + 1, gcol] = Δz_lay + z_lev[ilay, gcol]
     end
     t_sfc[gcol] = t_lev[1, gcol]
-
-    #---------------------------------
+    return nothing
 end
-#-------------------------------------------------------------------------

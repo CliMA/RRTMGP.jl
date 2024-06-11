@@ -3,7 +3,6 @@ using Adapt
 import ClimaComms
 using ..AtmosphericStates
 using DocStringExtensions
-import GaussQuadrature
 using ..Sources
 using ..Fluxes
 using ..Optics

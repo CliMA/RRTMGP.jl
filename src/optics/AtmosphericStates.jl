@@ -2,7 +2,6 @@ module AtmosphericStates
 import ClimaComms
 using DocStringExtensions
 using Adapt
-using GaussQuadrature
 import ..Parameters as RP
 
 using ..Vmrs
@@ -12,7 +11,6 @@ export AbstractAtmosphericState,
     GrayAtmosphericState,
     CloudState,
     setup_gray_as_pr_grid,
-    setup_gray_as_alt_grid,
     MaxRandomOverlap,
     AbstractCloudMask,
     GrayOpticalThicknessSchneider2004,
