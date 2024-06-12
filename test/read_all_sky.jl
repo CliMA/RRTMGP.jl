@@ -1,6 +1,5 @@
 function ncol_ds_all_sky(use_lut)
-    lut_pade = use_lut ? :lut : :pade
-    flux_file = get_ref_filename(:comparison, :cloudysky, lut_pade = lut_pade)
+    flux_file = get_reference_filename(:gas_clouds, :lw, :flux_up)
     ds_comp = Dataset(flux_file, "r")
     return size(Array(ds_comp["lw_flux_up"]), 1)
 end
@@ -71,14 +70,14 @@ function setup_allsky_as(
     # Reading volume mixing ratios 
     vmrat = zeros(FT, ngas, nlay, ncol)
 
-    vmrat[idx_gases["h2o"], :, 1] .= Array{FT}(Array(ds_in["vmr_h2o"])[1, lay_ind])
-    vmrat[idx_gases["o3"], :, 1] .= Array{FT}(Array(ds_in["vmr_o3"])[1, lay_ind])
-    vmrat[idx_gases["co2"], :, 1] .= Array{FT}(Array(ds_in["vmr_co2"])[1, lay_ind])
-    vmrat[idx_gases["n2o"], :, 1] .= Array{FT}(Array(ds_in["vmr_n2o"])[1, lay_ind])
-    vmrat[idx_gases["co"], :, 1] .= Array{FT}(Array(ds_in["vmr_co"])[1, lay_ind])
-    vmrat[idx_gases["ch4"], :, 1] .= Array{FT}(Array(ds_in["vmr_ch4"])[1, lay_ind])
-    vmrat[idx_gases["o2"], :, 1] .= Array{FT}(Array(ds_in["vmr_o2"])[1, lay_ind])
-    vmrat[idx_gases["n2"], :, 1] .= Array{FT}(Array(ds_in["vmr_n2"])[1, lay_ind])
+    vmrat[idx_gases["h2o"], :, 1] .= Array{FT}(Array(ds_in["h2o"])[1, lay_ind])
+    vmrat[idx_gases["o3"], :, 1] .= Array{FT}(Array(ds_in["o3"])[1, lay_ind])
+    vmrat[idx_gases["co2"], :, 1] .= FT(348e-6)
+    vmrat[idx_gases["ch4"], :, 1] .= FT(1650e-9)
+    vmrat[idx_gases["n2o"], :, 1] .= FT(306e-9)
+    vmrat[idx_gases["n2"], :, 1] .= FT(0.7808)
+    vmrat[idx_gases["o2"], :, 1] .= FT(0.2095)
+    vmrat[idx_gases["co"], :, 1] .= FT(0)
 
     for icol in 2:ncol
         vmrat[:, :, icol] .= vmrat[:, :, 1]
@@ -173,16 +172,19 @@ end
 _orient_data(data, bot_at_1) = bot_at_1 ? data : reverse(data, dims = 1)
 
 function load_comparison_data(use_lut, bot_at_1, ncol)
-    lut_pade = use_lut ? :lut : :pade
-    flux_file = get_ref_filename(:comparison, :cloudysky, lut_pade = lut_pade) # flux files for comparison (LUT)
-    ds_comp = Dataset(flux_file, "r")
-    ncol_ds = size(Array(ds_comp["lw_flux_up"]), 1)
+    # Note, for this case, flux_up and flux_dn are stored in the same file!
+    flux_file_lw = get_reference_filename(:gas_clouds, :lw, :flux_up) # flux files for comparison (LUT) 
+    flux_file_sw = get_reference_filename(:gas_clouds, :sw, :flux_up) # flux files for comparison (LUT)
+    ds_comp_lw = Dataset(flux_file_lw, "r")
+    ds_comp_sw = Dataset(flux_file_sw, "r")
+    ncol_ds = size(Array(ds_comp_lw["lw_flux_up"]), 1)
     nrepeat = cld(ncol, ncol_ds)
-    comp_flux_up_lw = repeat(_orient_data(transpose(Array(ds_comp["lw_flux_up"])), bot_at_1), 1, nrepeat)
-    comp_flux_dn_lw = repeat(_orient_data(transpose(Array(ds_comp["lw_flux_dn"])), bot_at_1), 1, nrepeat)
-    comp_flux_up_sw = repeat(_orient_data(transpose(Array(ds_comp["sw_flux_up"])), bot_at_1), 1, nrepeat)
-    comp_flux_dn_sw = repeat(_orient_data(transpose(Array(ds_comp["sw_flux_dn"])), bot_at_1), 1, nrepeat)
-    close(ds_comp)
+    comp_flux_up_lw = repeat(_orient_data(transpose(Array(ds_comp_lw["lw_flux_up"])), bot_at_1), 1, nrepeat)
+    comp_flux_dn_lw = repeat(_orient_data(transpose(Array(ds_comp_lw["lw_flux_dn"])), bot_at_1), 1, nrepeat)
+    comp_flux_up_sw = repeat(_orient_data(transpose(Array(ds_comp_sw["sw_flux_up"])), bot_at_1), 1, nrepeat)
+    comp_flux_dn_sw = repeat(_orient_data(transpose(Array(ds_comp_sw["sw_flux_dn"])), bot_at_1), 1, nrepeat)
+    close(ds_comp_lw)
+    close(ds_comp_sw)
     nlev, ncol_ds = size(comp_flux_up_lw)
     return comp_flux_up_lw[:, 1:ncol],
     comp_flux_dn_lw[:, 1:ncol],

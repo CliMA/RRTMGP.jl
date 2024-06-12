@@ -1,9 +1,8 @@
 # Artifacts file for RRTMGP.jl
-
-[RRTMGPReferenceData]
-git-tree-sha1 = "4071bba1dc2393a280c744f33a77e69426579c30"
+[rrtmgp-data]
+git-tree-sha1 = "5080a733a316b74accf4d5897f5bf6641141c41d"
 lazy = true
 
-    [[RRTMGPReferenceData.download]]
-    url = "https://caltech.box.com/shared/static/wbtrwp44dyn08g7mozjf4fcyrexwbe6a.gz"
-    sha256 = "ec7ce0c6066b8e04f3112715339c379d67316e40180ad5a02019cee1319e73ee"
+    [[rrtmgp-data.download]]
+    url = "https://github.com/earth-system-radiation/rrtmgp-data/archive/refs/tags/v1.8.1.tar.gz"
+    sha256 = "8dcf7ba2442c7093e707a5d3c0c3c76b249eb8905d3478cb3fe87535b51455bb"

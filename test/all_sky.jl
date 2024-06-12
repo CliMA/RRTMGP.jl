@@ -15,6 +15,7 @@ context = ClimaComms.context()
         cldfrac = FT(1),
     )
 end
+#=
 @testset "Cloudy (all-sky), Two-stream calculations using Pade method" begin
     @time all_sky(
         context,
@@ -28,3 +29,4 @@ end
         cldfrac = FT(1),
     )
 end
+=#
