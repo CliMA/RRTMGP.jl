@@ -1,6 +1,7 @@
 module RTE
 using Adapt
 import ClimaComms
+using ..AngularDiscretizations
 using ..AtmosphericStates
 using DocStringExtensions
 using ..Sources
@@ -32,7 +33,7 @@ configurations for a non-scattering longwave simulation.
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct NoScatLWRTE{C, OP, SL <: SourceLWNoScat, BC <: LwBCs, FXBL, FXL <: FluxLW}
+struct NoScatLWRTE{C, OP, SL <: SourceLWNoScat, BC <: LwBCs, FXBL, FXL <: FluxLW, AD}
     "ClimaComms context"
     context::C
     "optical properties"
@@ -45,6 +46,8 @@ struct NoScatLWRTE{C, OP, SL <: SourceLWNoScat, BC <: LwBCs, FXBL, FXL <: FluxLW
     fluxb::FXBL
     "longwave fluxes"
     flux::FXL
+    "Angular discretization"
+    angle_disc::AD
 end
 Adapt.@adapt_structure NoScatLWRTE
 
@@ -64,7 +67,8 @@ function NoScatLWRTE(
     bcs = LwBCs(sfc_emis, inc_flux)
     fluxb = FluxLW(ncol, nlay, FT, DA)
     flux = FluxLW(ncol, nlay, FT, DA)
-    return NoScatLWRTE(context, op, src, bcs, fluxb, flux)
+    ad = AngularDiscretization(FT, DA, 1)
+    return NoScatLWRTE(context, op, src, bcs, fluxb, flux, ad)
 end
 
 """

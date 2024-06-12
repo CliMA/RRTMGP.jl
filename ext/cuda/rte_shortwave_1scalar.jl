@@ -17,7 +17,7 @@ function rte_sw_noscat_solve_CUDA!(flux_sw::FluxSW, op::OneScalar, bcs_sw::SwBCs
     gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
     nlev = nlay + 1
     n_gpt, igpt = 1, 1
-    FT = eltype(op.angle_disc.gauss_Ds)
+    FT = eltype(bcs_sw.cos_zenith)
     solar_frac = FT(1)
     if gcol ≤ ncol
         flux_up_sw = flux_sw.flux_up

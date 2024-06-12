@@ -31,22 +31,19 @@ calculations accounting for extinction and emission
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct OneScalar{D, V, AD <: AngularDiscretization} <: AbstractOpticalProps
+struct OneScalar{D, V} <: AbstractOpticalProps
     "storage for optical thickness"
     layerdata::D
     "view into optical depth"
     τ::V
-    "Angular discretization"
-    angle_disc::AD
 end
 Adapt.@adapt_structure OneScalar
 
 function OneScalar(::Type{FT}, ncol::Int, nlay::Int, ::Type{DA}) where {FT <: AbstractFloat, DA}
     layerdata = DA{FT, 3}(undef, 1, nlay, ncol)
     τ = view(layerdata, 1, :, :)
-    ad = AngularDiscretization(FT, DA, 1)
     V = typeof(τ)
-    return OneScalar{typeof(layerdata), V, typeof(ad)}(layerdata, τ, ad)
+    return OneScalar{typeof(layerdata), V}(layerdata, τ)
 end
 
 """

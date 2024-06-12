@@ -2,6 +2,7 @@ module RRTMGPCUDAExt
 
 import ClimaComms
 import RRTMGP.Parameters as RP
+import RRTMGP.AngularDiscretizations.AngularDiscretization
 import RRTMGP.Fluxes: FluxLW, FluxSW
 import RRTMGP.Fluxes: add_to_flux!
 import RRTMGP.Fluxes: set_flux_to_zero!
