@@ -46,12 +46,12 @@ function benchmark_all_sky(
     FTA2D = DA{FT, 2}
     n_gauss_angles = 1
 
-    lw_file = get_ref_filename(:lookup_tables, :clearsky, λ = :lw)             # lw lookup tables for gas optics
-    lw_cld_file = get_ref_filename(:lookup_tables, :cloudysky, λ = :lw)        # lw cloud lookup tables
-    sw_file = get_ref_filename(:lookup_tables, :clearsky, λ = :sw)             # sw lookup tables for gas optics
-    sw_cld_file = get_ref_filename(:lookup_tables, :cloudysky, λ = :sw)        # lw cloud lookup tables
+    lw_file = get_lookup_filename(:gas, :lw)          # lw lookup tables for gas optics
+    lw_cld_file = get_lookup_filename(:cloud, :lw)    # lw cloud lookup tables
+    sw_file = get_lookup_filename(:gas, :sw)          # sw lookup tables for gas optics
+    sw_cld_file = get_lookup_filename(:cloud, :sw)    # lw cloud lookup tables
 
-    input_file = get_ref_filename(:atmos_state, :cloudysky)                    # all-sky atmos state
+    input_file = get_input_filename(:gas_clouds, :lw) # all-sky atmos state
 
     #reading longwave gas optics lookup data
     ds_lw = Dataset(lw_file, "r")
@@ -114,7 +114,7 @@ end
 function generate_gpu_allsky_benchmarks(FT, npts)
     context = ClimaComms.context()
     # compute equivalent ncols for DYAMOND resolution
-    helems, nlevels, nlev_test, nq = 30, 64, 42, 4
+    helems, nlevels, nlev_test, nq = 30, 64, 73, 4
     ncols_dyamond = Int(ceil(helems * helems * 6 * nq * nq * (nlevels / nlev_test)))
     println("\n")
     printstyled("Running DYAMOND all-sky benchmark on $(context.device) device with $FT precision\n", color = 130)

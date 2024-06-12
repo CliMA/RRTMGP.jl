@@ -119,6 +119,7 @@ end
 show(stdout, MIME("text/plain"), trial)
 println()
 
+#=
 # @suppress_out begin
 all_sky(
     ClimaComms.context(),
@@ -158,3 +159,4 @@ else
 end
 show(stdout, MIME("text/plain"), trial)
 println()
+=#

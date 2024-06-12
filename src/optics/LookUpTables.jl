@@ -657,7 +657,13 @@ function LookUpSW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     rayl_lower = FTA3D(permutedims(Array(ds["rayl_lower"]), [2, 3, 1]))
     rayl_upper = FTA3D(permutedims(Array(ds["rayl_upper"]), [2, 3, 1]))
 
-    solar_src = Array(ds["solar_source"])
+    a_offset = FT(0.1495954)
+    b_offset = FT(0.00066696)
+    mg_index = FT(max(ds["mg_default"][], 0))
+    sb_index = FT(max(ds["sb_default"][], 0))
+    solar_src =
+        Array(ds["solar_source_quiet"]) .+ (mg_index - a_offset) .* Array(ds["solar_source_facular"]) .+
+        (sb_index - b_offset) .* Array(ds["solar_source_sunspot"])
     solar_src_tot = FT(sum(solar_src))
     solar_src_scaled = FTA1D(solar_src ./ solar_src_tot)
 

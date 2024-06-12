@@ -1,49 +1,72 @@
 # Dataset files
 
-# This function generates the file names for lookup table files, 
-# atmospheric state files and reference data file for comparing
-# results for test cases.
-# The following options are currently supported:
-# ftype ∈ (:lookup_tables, :atmos_state, :comparison)
-# optics_type ∈ (:clearsky, :cloudy)
-# opc ∈ (:OneScalar, :TwoStream, nothing)
-# λ ∈ (:lw, :sw, nothing)
-# flux_up_dn ∈ (:flux_up, :flux_dn, nothing)
+# This function generates the file names for lookup table files.
+function get_lookup_filename(optics_type, λ)
+    @assert optics_type ∈ (:gas, :cloud, :aerosol)
+    @assert λ ∈ (:lw, :sw)
+    dir = joinpath(artifact"rrtmgp-data", "rrtmgp-data-1.8.1")
 
-function get_ref_filename(ftype, optics_type; λ = nothing, opc = nothing, flux_up_dn = nothing, lut_pade = nothing)
-    @assert ftype ∈ (:lookup_tables, :atmos_state, :comparison) && optics_type ∈ (:clearsky, :cloudysky)
+    return optics_type == :gas ? joinpath(dir, "rrtmgp-gas-" * (λ == :lw ? "lw-g256.nc" : "sw-g224.nc")) :
+           (
+        optics_type == :cloud ? joinpath(dir, "rrtmgp-clouds-" * (λ == :lw ? "lw.nc" : "sw.nc")) :
+        joinpath(dir, "rrtmgp-aerosols-merra-" * (λ == :lw ? "lw.nc" : "sw.nc"))
+    )
+end
 
-    fname = String(optics_type)
+# This function generates the file names for input files for tests.
+function get_input_filename(problemtype, λ)
+    @assert problemtype ∈ (:gas, :gas_clouds, :gas_clouds_aerosols)
+    @assert λ ∈ (:lw, :sw)
 
-    if ftype == :lookup_tables
-        @assert λ ∈ (:lw, :sw)
-        fname *= "_" * String(λ)
-    elseif ftype == :atmos_state
-        fname *= "_as"
-    else #ftype == :comparison
-        if λ isa Symbol
-            @assert λ ∈ (:lw, :sw)
-            fname *= "_" * String(λ)
-        end
+    dir = joinpath(artifact"rrtmgp-data", "rrtmgp-data-1.8.1")
 
-        if flux_up_dn isa Symbol
-            @assert flux_up_dn ∈ (:flux_up, :flux_dn)
-            fname *= "_" * String(flux_up_dn)
-        end
-        if opc isa Symbol
-            @assert opc ∈ (:OneScalar, :TwoStream)
-            fname *= "_" * String(opc)
-        end
-        if lut_pade isa Symbol
-            @assert lut_pade ∈ (:lut, :pade)
-            fname *= "_" * String(lut_pade)
-        end
+    if problemtype == :gas
+        return joinpath(
+            dir,
+            "examples",
+            "rfmip-clear-sky",
+            "inputs",
+            "multiple_input4MIPs_radiation_RFMIP_UColorado-RFMIP-1-2_none.nc",
+        )
+    elseif problemtype == :gas_clouds
+        dir = joinpath(dir, "examples", "all-sky", "reference")
+        return λ == :lw ? joinpath(dir, "rrtmgp-allsky-lw-no-aerosols.nc") :
+               joinpath(dir, "rrtmgp-allsky-sw-no-aerosols.nc")
+    else # :gas_clouds_aerosols
+        dir = joinpath(dir, "examples", "all-sky", "reference")
+        return λ == :lw ? joinpath(dir, "rrtmgp-allsky-lw.nc") : joinpath(dir, "rrtmgp-allsky-sw.nc")
     end
-    if ftype == :lookup_tables
-        dir = RRTMGP.lookup_data()
-    else
-        dir = joinpath(artifact"RRTMGPReferenceData", "RRTMGPReferenceData", String(ftype))
-    end
+end
 
-    return joinpath(dir, fname * ".nc")
+# This function generates the reference files for comparison for various tests.
+function get_reference_filename(problemtype, λ, flux_up_dn)
+    @assert problemtype ∈ (:gas, :gas_clouds, :gas_clouds_aerosols)
+    @assert λ ∈ (:lw, :sw)
+    @assert flux_up_dn ∈ (:flux_up, :flux_dn)
+
+    dir = joinpath(artifact"rrtmgp-data", "rrtmgp-data-1.8.1")
+
+    if problemtype == :gas
+        dir = joinpath(dir, "examples", "rfmip-clear-sky", "reference")
+        if flux_up_dn == :flux_up
+            if λ == :lw
+                return joinpath(dir, "rlu_Efx_RTE-RRTMGP-181204_rad-irf_r1i1p1f1_gn.nc")
+            else # λ == :sw
+                return joinpath(dir, "rsu_Efx_RTE-RRTMGP-181204_rad-irf_r1i1p1f1_gn.nc")
+            end
+        else
+            if λ == :lw
+                return joinpath(dir, "rld_Efx_RTE-RRTMGP-181204_rad-irf_r1i1p1f1_gn.nc")
+            else # λ == :sw
+                return joinpath(dir, "rsd_Efx_RTE-RRTMGP-181204_rad-irf_r1i1p1f1_gn.nc")
+            end
+        end
+    elseif problemtype == :gas_clouds
+        dir = joinpath(dir, "examples", "all-sky", "reference")
+        return λ == :lw ? joinpath(dir, "rrtmgp-allsky-lw-no-aerosols.nc") :
+               joinpath(dir, "rrtmgp-allsky-sw-no-aerosols.nc")
+    else # :gas_clouds_aerosols
+        dir = joinpath(dir, "examples", "all-sky", "reference")
+        return λ == :lw ? joinpath(dir, "rrtmgp-allsky-lw.nc") : joinpath(dir, "rrtmgp-allsky-sw.nc")
+    end
 end
