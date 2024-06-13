@@ -4,18 +4,19 @@ function rte_lw_noscat_solve!(
     src_lw::SourceLWNoScat,
     bcs_lw::LwBCs,
     op::OneScalar,
+    angle_disc::AngularDiscretization,
     as::GrayAtmosphericState,
 )
     nlay, ncol = AtmosphericStates.get_dims(as)
     nlev = nlay + 1
     igpt, ibnd = 1, 1
     τ = op.τ
-    Ds = op.angle_disc.gauss_Ds
+    Ds = angle_disc.gauss_Ds
     (; flux_up, flux_dn, flux_net) = flux_lw
     @inbounds begin
         ClimaComms.@threaded device for gcol in 1:ncol
             compute_optical_props!(op, as, src_lw, gcol)
-            rte_lw_noscat!(src_lw, bcs_lw, op, gcol, flux_lw, igpt, ibnd, nlay, nlev)
+            rte_lw_noscat!(src_lw, bcs_lw, op, angle_disc, gcol, flux_lw, igpt, ibnd, nlay, nlev)
             for ilev in 1:nlev
                 flux_net[ilev, gcol] = flux_up[ilev, gcol] - flux_dn[ilev, gcol]
             end
@@ -31,6 +32,7 @@ function rte_lw_noscat_solve!(
     src_lw::SourceLWNoScat,
     bcs_lw::LwBCs,
     op::OneScalar,
+    angle_disc::AngularDiscretization,
     as::AtmosphericState,
     lookup_lw::LookUpLW,
     lookup_lw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
@@ -40,7 +42,7 @@ function rte_lw_noscat_solve!(
     (; major_gpt2bnd) = lookup_lw.band_data
     n_gpt = length(major_gpt2bnd)
     τ = op.τ
-    Ds = op.angle_disc.gauss_Ds
+    Ds = angle_disc.gauss_Ds
     flux_up_lw = flux_lw.flux_up
     flux_dn_lw = flux_lw.flux_dn
     flux_net_lw = flux_lw.flux_net
@@ -50,7 +52,7 @@ function rte_lw_noscat_solve!(
                 ibnd = major_gpt2bnd[igpt]
                 igpt == 1 && set_flux_to_zero!(flux_lw, gcol)
                 compute_optical_props!(op, as, src_lw, gcol, igpt, lookup_lw, lookup_lw_cld)
-                rte_lw_noscat!(src_lw, bcs_lw, op, gcol, flux, igpt, ibnd, nlay, nlev)
+                rte_lw_noscat!(src_lw, bcs_lw, op, angle_disc, gcol, flux, igpt, ibnd, nlay, nlev)
                 add_to_flux!(flux_lw, flux, gcol)
             end
         end
@@ -110,6 +112,7 @@ Transport for no-scattering longwave problem.
     src_lw::SourceLWNoScat,
     bcs_lw::LwBCs,
     op::OneScalar,
+    angle_disc::AngularDiscretization,
     gcol,
     flux::FluxLW,
     igpt,
@@ -123,9 +126,9 @@ Transport for no-scattering longwave problem.
     (; sfc_emis, inc_flux) = bcs_lw
     (; flux_up, flux_dn) = flux
 
-    Ds = op.angle_disc.gauss_Ds
-    w_μ = op.angle_disc.gauss_wts
-    n_μ = op.angle_disc.n_gauss_angles
+    Ds = angle_disc.gauss_Ds
+    w_μ = angle_disc.gauss_wts
+    n_μ = angle_disc.n_gauss_angles
     τ = op.τ
     FT = eltype(τ)
     τ_thresh = 100 * eps(FT) # or abs(eps(FT))?

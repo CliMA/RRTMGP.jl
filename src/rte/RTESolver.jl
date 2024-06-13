@@ -25,8 +25,8 @@ include("shortwave2stream.jl")
 
 Non-scattering RTE solver for the longwave problem, using gray optics.
 """
-solve_lw!((; context, flux, src, bcs, op)::NoScatLWRTE, as::GrayAtmosphericState) =
-    rte_lw_noscat_solve!(context.device, flux, src, bcs, op, as)
+solve_lw!((; context, flux, src, bcs, op, angle_disc)::NoScatLWRTE, as::GrayAtmosphericState) =
+    rte_lw_noscat_solve!(context.device, flux, src, bcs, op, angle_disc, as)
 
 """
     solve_lw!((; context, flux, src, bcs, op)::TwoStreamLWRTE, as::GrayAtmosphericState)
@@ -47,14 +47,14 @@ solve_lw!((; context, flux, src, bcs, op)::TwoStreamLWRTE, as::GrayAtmosphericSt
 Non-scattering RTE solver for the longwave problem, using RRTMGP optics.
 """
 solve_lw!(
-    (; context, fluxb, flux, src, bcs, op)::NoScatLWRTE,
+    (; context, fluxb, flux, src, bcs, op, angle_disc)::NoScatLWRTE,
     as::AtmosphericState,
     lookup_lw::LookUpLW,
     lookup_lw_cld::Union{LookUpCld, PadeCld},
-) = rte_lw_noscat_solve!(context.device, fluxb, flux, src, bcs, op, as, lookup_lw, lookup_lw_cld)
+) = rte_lw_noscat_solve!(context.device, fluxb, flux, src, bcs, op, angle_disc, as, lookup_lw, lookup_lw_cld)
 
-solve_lw!((; context, fluxb, flux, src, bcs, op)::NoScatLWRTE, as::AtmosphericState, lookup_lw::LookUpLW) =
-    rte_lw_noscat_solve!(context.device, fluxb, flux, src, bcs, op, as, lookup_lw, nothing)
+solve_lw!((; context, fluxb, flux, src, bcs, op, angle_disc)::NoScatLWRTE, as::AtmosphericState, lookup_lw::LookUpLW) =
+    rte_lw_noscat_solve!(context.device, fluxb, flux, src, bcs, op, angle_disc, as, lookup_lw, nothing)
 
 """
     solve_lw!(

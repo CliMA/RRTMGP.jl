@@ -9,7 +9,7 @@ function rte_sw_noscat_solve!(
     nlev = nlay + 1
     n_gpt, igpt = 1, 1
     cos_zenith = bcs_sw.cos_zenith
-    FT = eltype(op.angle_disc.gauss_Ds)
+    FT = eltype(cos_zenith)
     solar_frac = FT(1)
     @inbounds begin
         ClimaComms.@threaded device for gcol in 1:ncol
