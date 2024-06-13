@@ -282,7 +282,7 @@ function rte_sw_2stream!(
         flux_dn_ilevplus1 = flux_dn_ilev
         ilev -= 1
         if isnan(flux_dn[ilev, gcol])
-            @show flux_dn[ilev, gcol], ilev, gcol, τ_cum, μ₀, exp(-τ_cum / μ₀), denom, flux_dn_ilev, Tdif, Rdif, src_ilev, src_dn_ilev, flux_dn[nlev, gcol]
+            CUDA.@cuprint flux_dn[ilev, gcol], ilev, gcol, τ_cum, μ₀, exp(-τ_cum / μ₀), denom, flux_dn_ilev, Tdif, Rdif, src_ilev, src_dn_ilev, flux_dn[nlev, gcol]
         end
     end
     return nothing
