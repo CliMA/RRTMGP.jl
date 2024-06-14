@@ -143,7 +143,7 @@ Computes optical properties for the longwave problem.
     nlay = AtmosphericStates.get_nlay(as)
     (; vmr) = as
     (; t_planck) = lkp.planck
-    (; lay_source, lev_source_inc, lev_source_dec, sfc_source) = sf
+    (; lay_source, lev_source, sfc_source) = sf
     @inbounds begin
         t_sfc = as.t_sfc[gcol]
         ibnd = lkp.band_data.major_gpt2bnd[igpt]
@@ -152,7 +152,10 @@ Computes optical properties for the longwave problem.
         t_lev_col = view(as.t_lev, :, gcol)
         τ = view(op.τ, :, gcol)
 
+        lev_src_inc_prev = zero(t_sfc)
+        lev_src_dec_prev = zero(t_sfc)
         t_lev_dec = t_lev_col[1]
+
         for glay in 1:nlay
             col_dry, p_lay, t_lay = as_layerdata[1, glay], as_layerdata[2, glay], as_layerdata[3, glay]
             # compute gas optics
@@ -161,13 +164,19 @@ Computes optical properties for the longwave problem.
             t_lev_inc = t_lev_col[glay + 1]
 
             lay_source[glay, gcol] = interp1d(t_lay, t_planck, totplnk) * planckfrac
-            lev_source_inc[glay, gcol] = interp1d(t_lev_inc, t_planck, totplnk) * planckfrac
-            lev_source_dec[glay, gcol] = interp1d(t_lev_dec, t_planck, totplnk) * planckfrac
+            lev_src_inc = interp1d(t_lev_inc, t_planck, totplnk) * planckfrac
+            lev_src_dec = interp1d(t_lev_dec, t_planck, totplnk) * planckfrac
             if glay == 1
                 sfc_source[gcol] = interp1d(t_sfc, t_planck, totplnk) * planckfrac
+                lev_source[glay, gcol] = lev_src_dec
+            else
+                lev_source[glay, gcol] = sqrt(lev_src_inc_prev * lev_src_dec)
             end
+            lev_src_dec_prev = lev_src_dec
+            lev_src_inc_prev = lev_src_inc
             t_lev_dec = t_lev_inc
         end
+        lev_source[nlay + 1, gcol] = lev_src_inc_prev
     end
     return nothing
 end

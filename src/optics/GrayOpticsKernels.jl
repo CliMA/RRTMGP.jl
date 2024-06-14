@@ -14,7 +14,7 @@ Computes optical properties for the longwave gray radiation problem.
 function compute_optical_props!(op::OneScalar, as::GrayAtmosphericState, sf::SourceLWNoScat, gcol::Int)
     nlay = AtmosphericStates.get_nlay(as)
     (; p_lay, p_lev, t_lay, t_lev, otp) = as
-    (; lay_source, lev_source_inc, lev_source_dec, sfc_source) = sf
+    (; lay_source, lev_source, sfc_source) = sf
     τ = op.τ
     FT = eltype(τ)
     sbc = FT(RP.Stefan(sf.param_set))
@@ -25,7 +25,8 @@ function compute_optical_props!(op::OneScalar, as::GrayAtmosphericState, sf::Sou
         t_lev_dec = t_lev[1, gcol]
         t_sfc = as.t_sfc[gcol]
         sfc_source[gcol] = sbc * (t_sfc * t_sfc * t_sfc * t_sfc) / FT(π)   # computing sfc_source
-
+        lev_src_inc_prev = FT(0)
+        lev_src_dec_prev = FT(0)
         for glay in 1:nlay
             # compute optical thickness
             p_lev_glayplus1 = p_lev[glay + 1, gcol]
@@ -37,10 +38,18 @@ function compute_optical_props!(op::OneScalar, as::GrayAtmosphericState, sf::Sou
             t_lev_inc = t_lev[glay + 1, gcol]
             t_lay_loc = t_lay[glay, gcol]
             lay_source[glay, gcol] = sbc * (t_lay_loc * t_lay_loc * t_lay_loc * t_lay_loc) / FT(π)   # computing lay_source
-            lev_source_inc[glay, gcol] = sbc * (t_lev_inc * t_lev_inc * t_lev_inc * t_lev_inc) / FT(π)
-            lev_source_dec[glay, gcol] = sbc * (t_lev_dec * t_lev_dec * t_lev_dec * t_lev_dec) / FT(π)
+            lev_src_inc = sbc * (t_lev_inc * t_lev_inc * t_lev_inc * t_lev_inc) / FT(π)
+            lev_src_dec = sbc * (t_lev_dec * t_lev_dec * t_lev_dec * t_lev_dec) / FT(π)
+            if glay == 1
+                lev_source[glay, gcol] = lev_src_dec
+            else
+                lev_source[glay, gcol] = sqrt(lev_src_inc_prev * lev_src_dec)
+            end
+            lev_src_dec_prev = lev_src_dec
+            lev_src_inc_prev = lev_src_inc
             t_lev_dec = t_lev_inc
         end
+        lev_source[nlay + 1, gcol] = lev_src_inc_prev
     end
     return nothing
 end
