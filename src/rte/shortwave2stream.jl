@@ -119,6 +119,7 @@ function sw_2stream_coeffs(τ::FT, ssa::FT, g::FT, μ₀::FT) where {FT}
     α2 = γ1 * γ3 + γ2 * γ4                          # Eq. 17
     k = sqrt(max((γ1 - γ2) * (γ1 + γ2), k_min))
 
+    τ = max(τ, FT(0))
     exp_minusktau = exp(-τ * k)
     exp_minus2ktau = exp_minusktau * exp_minusktau
 
@@ -176,6 +177,7 @@ function get_flux_dn_dir(τ, μ₀, flux_dn_dir_top, lev)
     for ilev in nlay:-1:lev
         τ_sum += τ[ilev]
     end
+    τ_sum = max(τ_sum, zero(eltype(τ)))
     return flux_dn_dir_top * exp(-τ_sum / μ₀)
 end
 
@@ -220,6 +222,7 @@ function rte_sw_2stream!(
     for ilay in 1:nlay
         @inbounds τ_sum += τ[ilay, gcol]
     end
+    τ_sum = max(τ_sum, FT(0))
     # Direct-beam and source for diffuse radiation
     flux_dn_dir_top = toa_flux * solar_frac * μ₀
     flux_dn_dir_bot = flux_dn_dir_top * exp(-τ_sum / μ₀) # store value at surface
@@ -272,6 +275,7 @@ function rte_sw_2stream!(
         denom = FT(1) / (FT(1) - Rdif * albedo_ilev)  # Eq 10
         src_dn_ilev = Tdir * flux_dn_dir_top * exp(-τ_cum / μ₀)
         τ_cum += τ_ilev
+        τ_cum = max(τ_cum, FT(0))
         flux_dn_ilev = (Tdif * flux_dn_ilevplus1 + # Equation 13
                         Rdif * src_ilev +
                         src_dn_ilev) * denom
@@ -281,21 +285,21 @@ function rte_sw_2stream!(
         flux_dn[ilev, gcol] = flux_dn_ilev + flux_dn_dir_top * exp(-τ_cum / μ₀)
         flux_dn_ilevplus1 = flux_dn_ilev
         ilev -= 1
-        if isnan(flux_dn[ilev, gcol])
-            Base.get_extension(ClimaComms, :ClimaCommsCUDAExt).CUDA.@cuprint flux_dn[ilev, gcol],
-            ilev,
-            gcol,
-            τ_cum,
-            μ₀,
-            exp(-τ_cum / μ₀),
-            denom,
-            flux_dn_ilev,
-            Tdif,
-            Rdif,
-            src_ilev,
-            src_dn_ilev,
-            flux_dn[nlev, gcol]
-        end
+        # if isnan(flux_dn[ilev, gcol])
+        #     Base.get_extension(ClimaComms, :ClimaCommsCUDAExt).CUDA.@cuprint flux_dn[ilev, gcol],
+        #     ilev,
+        #     gcol,
+        #     τ_cum,
+        #     μ₀,
+        #     exp(-τ_cum / μ₀),
+        #     denom,
+        #     flux_dn_ilev,
+        #     Tdif,
+        #     Rdif,
+        #     src_ilev,
+        #     src_dn_ilev,
+        #     flux_dn[nlev, gcol]
+        # end
     end
     return nothing
 end
