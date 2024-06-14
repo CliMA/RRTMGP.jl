@@ -49,7 +49,23 @@ println()
 # @suppress_out begin
 include(joinpath(root_dir, "test", "clear_sky_utils.jl"))
 context = ClimaComms.context()
-clear_sky(ClimaComms.context(), TwoStream, TwoStream, TwoStreamLWRTE, TwoStreamSWRTE, VmrGM, FT; exfiltrate = true)
+
+toler_lw_noscat = Dict(Float64 => Float64(1e-4), Float32 => Float32(0.04))
+toler_lw_2stream = Dict(Float64 => Float64(4.5), Float32 => Float32(4.5))
+toler_sw = Dict(Float64 => Float64(1e-3), Float32 => Float32(0.04))
+
+clear_sky(
+    ClimaComms.context(),
+    TwoStream,
+    TwoStream,
+    TwoStreamLWRTE,
+    TwoStreamSWRTE,
+    VmrGM,
+    FT,
+    toler_lw_2stream,
+    toler_sw;
+    exfiltrate = true,
+)
 # end
 (; slv_lw, slv_sw, as, lookup_sw, lookup_lw) = Infiltrator.exfiltrated
 

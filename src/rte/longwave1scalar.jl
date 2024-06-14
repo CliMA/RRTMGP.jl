@@ -122,7 +122,7 @@ Transport for no-scattering longwave problem.
 )
     # setting references
     (; sfc_source) = src_lw
-    (; lay_source, lev_source_inc, lev_source_dec) = src_lw
+    (; lay_source, lev_source) = src_lw
     (; sfc_emis, inc_flux) = bcs_lw
     (; flux_up, flux_dn) = flux
 
@@ -147,9 +147,10 @@ Transport for no-scattering longwave problem.
     @inbounds while ilev ≥ 1
         τ_loc = τ[ilev, gcol] * Ds[1]
         trans = exp(-τ_loc)
-        lay_src, lev_src_dec = lay_source[ilev, gcol], lev_source_dec[ilev, gcol]
+        lay_src = lay_source[ilev, gcol]
         intensity_dn_ilev =
-            trans * intensity_dn_ilevplus1 + lw_noscat_source_dn(lev_src_dec, lay_src, τ_loc, trans, τ_thresh)
+            trans * intensity_dn_ilevplus1 +
+            lw_noscat_source_dn(lev_source[ilev, gcol], lay_src, τ_loc, trans, τ_thresh)
         intensity_dn_ilevplus1 = intensity_dn_ilev
         flux_dn[ilev, gcol] = intensity_dn_ilev * intensity_to_flux
         ilev -= 1
@@ -165,9 +166,10 @@ Transport for no-scattering longwave problem.
     @inbounds for ilev in 2:(nlay + 1)
         τ_loc = τ[ilev - 1, gcol] * Ds[1]
         trans = exp(-τ_loc)
-        lay_src, lev_src_inc = lay_source[ilev - 1, gcol], lev_source_inc[ilev - 1, gcol]
+        lay_src = lay_source[ilev - 1, gcol]
         intensity_up_ilev =
-            trans * intensity_up_ilevminus1 + lw_noscat_source_up(lev_src_inc, lay_src, τ_loc, trans, τ_thresh)
+            trans * intensity_up_ilevminus1 +
+            lw_noscat_source_up(lev_source[ilev, gcol], lay_src, τ_loc, trans, τ_thresh)
         intensity_up_ilevminus1 = intensity_up_ilev
         flux_up[ilev, gcol] = intensity_up_ilev * intensity_to_flux
     end

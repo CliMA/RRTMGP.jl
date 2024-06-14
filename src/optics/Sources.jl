@@ -24,36 +24,28 @@ and at the surface for no scattering calculations
 
 $(DocStringExtensions.FIELDS)
 """
-struct SourceLWNoScat{S, D, V, PS} <: AbstractSourceLW
+struct SourceLWNoScat{S, D, PS} <: AbstractSourceLW
     "Parameter set"
     param_set::PS
     "Surface source `[W/m2]` `(ncol)`"
     sfc_source::S
-    "storage for `lay_source`, `lev_source_inc` and `lev_source_dec` `(3, nlay, ncol)`"
-    layerdata::D
     "Planck source at layer average temperature `[W/m2]` `(nlay, ncol)`"
-    lay_source::V
-    "Planck source at layer edge in increasing ilay direction `[W/m2]` `(nlay, ncol)`, includes spectral weighting that accounts for state-dependent frequency to g-space mapping"
-    lev_source_inc::V
-    "Planck source at layer edge in decreasing ilay direction `[W/m2]` `(nlay, ncol)`, includes spectral weighting that accounts for state-dependent frequency to g-space mapping"
-    lev_source_dec::V
+    lay_source::D
+    "Planck level source at layer edges `[W/m2]` `(nlay+1, ncol)`, includes spectral weighting that accounts for state-dependent frequency to g-space mapping"
+    lev_source::D
 end
 Adapt.@adapt_structure SourceLWNoScat
 
 function SourceLWNoScat(param_set::RP.ARP, ::Type{FT}, ::Type{DA}, nlay::Int, ncol::Int) where {FT <: AbstractFloat, DA}
     sfc_source = DA{FT, 1}(undef, ncol)
-    layerdata = DA{FT, 3}(undef, 3, nlay, ncol)
-    lay_source = view(layerdata, 1, :, :)
-    lev_source_inc = view(layerdata, 2, :, :)
-    lev_source_dec = view(layerdata, 3, :, :)
+    lay_source = DA{FT, 2}(undef, nlay, ncol)
+    lev_source = DA{FT, 2}(undef, nlay + 1, ncol)
 
-    return SourceLWNoScat{typeof(sfc_source), typeof(layerdata), typeof(lay_source), typeof(param_set)}(
+    return SourceLWNoScat{typeof(sfc_source), typeof(lay_source), typeof(param_set)}(
         param_set,
         sfc_source,
-        layerdata,
         lay_source,
-        lev_source_inc,
-        lev_source_dec,
+        lev_source,
     )
 end
 
