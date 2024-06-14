@@ -15,6 +15,7 @@ printstyled("==========================\n\n", color = color1)
     context = ClimaComms.context()
     include("clear_sky_utils.jl")
     for FT in (Float32, Float64)
+        clear_sky(context, OneScalar, TwoStream, NoScatLWRTE, TwoStreamSWRTE, VmrGM, FT)
         clear_sky(context, TwoStream, TwoStream, TwoStreamLWRTE, TwoStreamSWRTE, VmrGM, FT)
     end
 end

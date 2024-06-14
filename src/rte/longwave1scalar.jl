@@ -133,7 +133,7 @@ Transport for no-scattering longwave problem.
     FT = eltype(τ)
     τ_thresh = 100 * eps(FT) # or abs(eps(FT))?
 
-    intensity_to_flux = FT(2) * FT(π) * w_μ[1]
+    intensity_to_flux = FT(π) * w_μ[1]
     flux_to_intensity = FT(1) / intensity_to_flux
 
     # Transport is for intensity
