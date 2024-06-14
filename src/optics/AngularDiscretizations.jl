@@ -8,9 +8,8 @@ export AngularDiscretization
 """
     AngularDiscretization{FT,FTA1D}
 
-Weights and angle secants for first order (k=1) Gaussian quadrature.
-Values from Table 2, Clough et al, 1992, doi:10.1029/92JD01419
-after Abramowitz & Stegun 1972, page 921
+Weights and angle secants for "Gauss-Jacobi-5" quadrature.
+Values from Table 1, R. J. Hogan 2023, doi:10.1002/qj.4598
 
 # Fields
 $(DocStringExtensions.FIELDS)
@@ -29,17 +28,17 @@ function AngularDiscretization(::Type{FT}, ::Type{DA}, n_gauss_angles::Int) wher
     max_gauss_pts = 4
     @assert 1 ≤ n_gauss_angles ≤ max_gauss_pts
     if n_gauss_angles == 1
-        gauss_Ds = DA{FT}([1.660000000000])
-        gauss_wts = DA{FT}([0.500000000000])
+        gauss_Ds = DA{FT}(FT(1) ./ [0.6096748751])
+        gauss_wts = DA{FT}([1])
     elseif n_gauss_angles == 2
-        gauss_Ds = DA{FT}(FT[1.183503430000 2.816496550000])
-        gauss_wts = DA{FT}([0.318041381700 0.181958618300])
+        gauss_Ds = DA{FT}(FT(1) ./ [0.2509907356, 0.7908473988])
+        gauss_wts = DA{FT}([0.2300253764, 0.7699746236])
     elseif n_gauss_angles == 3
-        gauss_Ds = DA{FT}([1.097198580000 1.693385070000 4.709416300000])
-        gauss_wts = DA{FT}([0.200931913700 0.229241106400 0.069826979900])
+        gauss_Ds = DA{FT}(FT(1) ./ [0.1024922169, 0.4417960320, 0.8633751621])
+        gauss_wts = DA{FT}([0.0437820218, 0.3875796738, 0.5686383044])
     else
-        gauss_Ds = DA{FT}([1.060562570000 1.382825600000 2.401481790000 7.155130240000])
-        gauss_wts = DA{FT}([0.135506913400 0.203464568000 0.129847547600 0.031180971000])
+        gauss_Ds = DA{FT}(FT(1) ./ [0.0454586727, 0.2322334416, 0.5740198775, 0.9030775973])
+        gauss_wts = DA{FT}([0.0092068785, 0.1285704278, 0.4323381850, 0.4298845087])
     end
 
     return AngularDiscretization{eltype(gauss_Ds), typeof(gauss_Ds)}(
