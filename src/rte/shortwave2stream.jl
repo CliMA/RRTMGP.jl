@@ -286,7 +286,7 @@ function rte_sw_2stream!(
         flux_dn_ilevplus1 = flux_dn_ilev
         ilev -= 1
         if isnan(flux_dn[ilev, gcol])
-            print(flux_dn[ilev, gcol],
+            my_print(flux_dn[ilev, gcol],
             ilev,
             gcol,
             τ_cum,
@@ -303,3 +303,5 @@ function rte_sw_2stream!(
     end
     return nothing
 end
+
+function my_print end
