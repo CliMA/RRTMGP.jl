@@ -283,25 +283,26 @@ function rte_sw_2stream!(
             flux_dn_ilev * albedo_ilev + # Equation 12
             src_ilev
         flux_dn[ilev, gcol] = flux_dn_ilev + flux_dn_dir_top * exp(-τ_cum / μ₀)
-        flux_dn_ilevplus1 = flux_dn_ilev
-        ilev -= 1
         if isnan(flux_dn[ilev, gcol])
-            my_print(flux_dn[ilev, gcol],
+            @show flux_dn[ilev, gcol],
             ilev,
-            gcol,
-            τ_cum,
-            μ₀,
-            exp(-τ_cum / μ₀),
-            denom,
             flux_dn_ilev,
+            flux_dn_dir_top,
+            exp(-τ_cum / μ₀),
             Tdif,
+            flux_dn_ilevplus1,
             Rdif,
             src_ilev,
             src_dn_ilev,
-            flux_dn[nlev, gcol])
+            denom,
+            τ_cum,
+            μ₀,
+            toa_flux,
+            solar_frac,
+            flux_dn[nlev, gcol]
         end
+        flux_dn_ilevplus1 = flux_dn_ilev
+        ilev -= 1
     end
     return nothing
 end
-
-function my_print end

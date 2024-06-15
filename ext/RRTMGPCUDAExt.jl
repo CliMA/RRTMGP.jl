@@ -33,7 +33,6 @@ import RRTMGP.RTESolver: rte_sw_2stream_solve!
 import RRTMGP.RTESolver: rte_sw_2stream!
 import RRTMGP.RTESolver: rte_sw_noscat!
 import RRTMGP.RTESolver: rte_sw_noscat_solve!
-import RRTMGP.RTESolver: my_print
 import CUDA: threadIdx, blockIdx, blockDim, @cuda
 
 include(joinpath("cuda", "gray_atmospheric_states.jl"))
@@ -43,7 +42,5 @@ include(joinpath("cuda", "rte_shortwave_1scalar.jl"))
 include(joinpath("cuda", "optics_gray_utils.jl"))
 include(joinpath("cuda", "rte_shortwave_2stream.jl"))
 include(joinpath("cuda", "rte_longwave_1scalar.jl"))
-
-my_print(args...) = CUDA.@cuprint(args...)
 
 end
