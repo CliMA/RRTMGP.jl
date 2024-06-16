@@ -155,7 +155,7 @@ Compute optical thickness, single scattering albedo, and asymmetry parameter.
     τ_minor = compute_τ_minor(lkp_minor, vmr, vmr_h2o, col_dry, p_lay, t_lay, jftemp..., jfη..., igpt, ibnd, glay, gcol)
     # τ_Rayleigh is zero for longwave
     τ = τ_major + τ_minor
-    return (τ, zero(τ), zero(τ), pfrac) # initializing asymmetry parameter
+    return (max(τ, zero(τ)), zero(τ), zero(τ), pfrac) # initializing asymmetry parameter
 end
 
 @inline function compute_gas_optics(lkp::LookUpSW, vmr, col_dry, igpt, ibnd, p_lay, t_lay, glay, gcol)
@@ -191,7 +191,7 @@ end
         ssa = FT(0)
     end
     #ssa = τ > 0 ? τ_ray / τ : zero(τ) # single scattering albedo
-    return (τ, ssa, zero(τ)) # initializing asymmetry parameter
+    return (max(τ, zero(τ)), ssa, zero(τ)) # initializing asymmetry parameter
 end
 
 """
