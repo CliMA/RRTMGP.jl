@@ -1,6 +1,14 @@
 RRTMGP.jl Release Notes
 ========================
 
+v0.15.0
+------
+- Solver struct has been split to allow for independent RTE solver schemes for longwave and shortwave problems ([#492]((https://github.com/CliMA/RRTMGP.jl/pull/492)))
+- Simplify arguments for solve_lw! and solve_sw!. ([#493]((https://github.com/CliMA/RRTMGP.jl/pull/493)))
+- Update Artifacts to use lookup tables and reference data from ([#495]((https://github.com/CliMA/RRTMGP.jl/pull/495)))
+- Move AngularDiscretization to `NoScatLWRTE` ([#496]((https://github.com/CliMA/RRTMGP.jl/pull/496)))
+- Update longwave secants and weights ([#498]((https://github.com/CliMA/RRTMGP.jl/pull/498)))
+
 v0.14.0
 ------
 
