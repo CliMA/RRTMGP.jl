@@ -1,4 +1,4 @@
-import CUDA
+function rrtmgp_cuprint end
 
 function rte_sw_2stream_solve!(
     device::ClimaComms.AbstractCPUDevice,
@@ -286,7 +286,7 @@ function rte_sw_2stream!(
             src_ilev
         flux_dn[ilev, gcol] = flux_dn_ilev + flux_dn_dir_top * exp(-τ_cum / μ₀)
         if isnan(flux_dn[ilev, gcol])
-            CUDA.@cuprint flux_dn[ilev, gcol],
+            rrtmgp_cuprint(flux_dn[ilev, gcol],
             ilev,
             flux_dn_ilev,
             flux_dn_dir_top,
@@ -301,7 +301,7 @@ function rte_sw_2stream!(
             μ₀,
             toa_flux,
             solar_frac,
-            flux_dn[nlev, gcol]
+            flux_dn[nlev, gcol])
         end
         flux_dn_ilevplus1 = flux_dn_ilev
         ilev -= 1

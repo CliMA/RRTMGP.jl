@@ -33,6 +33,7 @@ import RRTMGP.RTESolver: rte_sw_2stream_solve!
 import RRTMGP.RTESolver: rte_sw_2stream!
 import RRTMGP.RTESolver: rte_sw_noscat!
 import RRTMGP.RTESolver: rte_sw_noscat_solve!
+import RRTMGP.RTESolver: rrtmgp_cuprint
 import CUDA: threadIdx, blockIdx, blockDim, @cuda
 
 include(joinpath("cuda", "gray_atmospheric_states.jl"))
