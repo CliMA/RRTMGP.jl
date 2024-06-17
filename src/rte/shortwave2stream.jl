@@ -1,3 +1,5 @@
+import CUDA
+
 function rte_sw_2stream_solve!(
     device::ClimaComms.AbstractCPUDevice,
     flux_sw::FluxSW,
@@ -284,7 +286,7 @@ function rte_sw_2stream!(
             src_ilev
         flux_dn[ilev, gcol] = flux_dn_ilev + flux_dn_dir_top * exp(-τ_cum / μ₀)
         if isnan(flux_dn[ilev, gcol])
-            @show flux_dn[ilev, gcol],
+            CUDA.@cuprint flux_dn[ilev, gcol],
             ilev,
             flux_dn_ilev,
             flux_dn_dir_top,
