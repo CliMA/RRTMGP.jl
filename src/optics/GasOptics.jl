@@ -154,8 +154,8 @@ Compute optical thickness, single scattering albedo, and asymmetry parameter.
     lkp_minor = tropo == 1 ? lkp.minor_lower : lkp.minor_upper
     τ_minor = compute_τ_minor(lkp_minor, vmr, vmr_h2o, col_dry, p_lay, t_lay, jftemp..., jfη..., igpt, ibnd, glay, gcol)
     # τ_Rayleigh is zero for longwave
-    τ = τ_major + τ_minor
-    return (τ, zero(τ), zero(τ), pfrac) # initializing asymmetry parameter
+    τ = max(τ_major + τ_minor, zero(τ_major))
+    return (τ, zero(τ_major), zero(τ_major), pfrac) # initializing asymmetry parameter
 end
 
 @inline function compute_gas_optics(lkp::LookUpSW, vmr, col_dry, igpt, ibnd, p_lay, t_lay, glay, gcol)
@@ -184,8 +184,8 @@ end
     # compute τ_Rayleigh
     @inbounds rayleigh_coeff = tropo == 1 ? view(lkp.rayl_lower, :, :, igpt) : view(lkp.rayl_upper, :, :, igpt)
     τ_ray = compute_τ_rayleigh(rayleigh_coeff, col_dry, vmr_h2o, jftemp..., jfη..., igpt)
-    τ = τ_major + τ_minor + τ_ray
-    FT = eltype(τ)
+    FT = eltype(τ_major)
+    τ = max(τ_major + τ_minor + τ_ray, FT(0))
     ssa = τ_ray * (FT(1) / τ)# rewritten to ease register pressure
     if τ ≤ FT(0)
         ssa = FT(0)
