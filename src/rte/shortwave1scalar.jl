@@ -45,7 +45,7 @@ function rte_sw_noscat_solve!(
         for igpt in 1:n_gpt
             ClimaComms.@threaded device for gcol in 1:ncol
                 if cos_zenith[gcol] > 0
-                    compute_optical_props!(op, as, gcol, igpt, lookup_sw, lookup_sw_cld)
+                    compute_optical_props!(op, as, gcol, igpt, lookup_sw, nothing)
                     solar_frac = lookup_sw.solar_src_scaled[igpt]
                     rte_sw_noscat!(flux, op, bcs_sw, igpt, n_gpt, solar_frac, gcol, nlev)
                     if igpt == 1
