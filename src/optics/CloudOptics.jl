@@ -152,7 +152,7 @@ This function computes the `TwoStream` cloud liquid properties using the `LookUp
         fac = (re_liq - radliq_lwr - (loc - 1) * Δr_liq) / Δr_liq
         fc1 = FT(1) - fac
         @inbounds begin
-            τl = (fc1 * lut_extliq[loc] + fac * lut_extliq[loc + 1]) * cld_path_liq
+            τl = max((fc1 * lut_extliq[loc] + fac * lut_extliq[loc + 1]) * cld_path_liq, FT(0))
             τl_ssa = (fc1 * lut_ssaliq[loc] + fac * lut_ssaliq[loc + 1]) * τl
             τl_ssag = (fc1 * lut_asyliq[loc] + fac * lut_asyliq[loc + 1]) * τl_ssa
         end
@@ -193,7 +193,7 @@ This function computes the `TwoStream` cloud ice properties using the `LookUpTab
         fac = (re_ice - radice_lwr - (loc - 1) * Δr_ice) / Δr_ice
         fc1 = FT(1) - fac
         @inbounds begin
-            τi = (fc1 * lut_extice[loc] + fac * lut_extice[loc + 1]) * cld_path_ice
+            τi = max((fc1 * lut_extice[loc] + fac * lut_extice[loc + 1]) * cld_path_ice, FT(0))
             τi_ssa = (fc1 * lut_ssaice[loc] + fac * lut_ssaice[loc + 1]) * τi
             τi_ssag = (fc1 * lut_asyice[loc] + fac * lut_asyice[loc + 1]) * τi_ssa
         end
