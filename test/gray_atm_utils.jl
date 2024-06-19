@@ -24,13 +24,7 @@ import ClimaParams as CP
 """
 Example program to demonstrate the calculation of longwave radiative fluxes in a model gray atmosphere.
 """
-function gray_atmos_lw_equil(
-    context,
-    ::Type{OPLW},
-    ::Type{SLVLW},
-    ::Type{FT};
-    exfiltrate = false,
-) where {FT <: AbstractFloat, OPLW, SLVLW}
+function gray_atmos_lw_equil(context, ::Type{SLVLW}, ::Type{FT}; exfiltrate = false) where {FT <: AbstractFloat, SLVLW}
     device = ClimaComms.device(context)
     param_set = RRTMGPParameters(FT)
     ncol = if device isa ClimaComms.CUDADevice
@@ -64,7 +58,7 @@ function gray_atmos_lw_equil(
 
     otp = GrayOpticalThicknessSchneider2004(FT) # optical thickness parameters
     gray_as = setup_gray_as_pr_grid(context, nlay, lat, p0, pe, otp, param_set, DA)
-    slv_lw = SLVLW(FT, DA, OPLW, context, param_set, nlay, ncol, sfc_emis, inc_flux)
+    slv_lw = SLVLW(FT, DA, context, param_set, nlay, ncol, sfc_emis, inc_flux)
 
     (; flux_up, flux_dn, flux_net) = slv_lw.flux
     (; t_lay, p_lay, t_lev, p_lev) = gray_as
@@ -108,7 +102,7 @@ function gray_atmos_lw_equil(
     t_error = maximum(abs.(T_ex_lev .- gray_as.t_lev))
     color2 = :cyan
 
-    printstyled("\nGray atmosphere longwave test with ncol = $ncol, nlev = $nlev, OP = $OPLW\n", color = color2)
+    printstyled("\nGray atmosphere longwave test with ncol = $ncol, nlev = $nlev, solver = $SLVLW\n", color = color2)
     printstyled("device = $device\n", color = color2)
     printstyled("Integration time = $(FT(nsteps)/FT(24.0/tstep) / FT(365.0)) years\n\n", color = color2)
 
@@ -124,12 +118,11 @@ end
 
 function gray_atmos_sw_test(
     context,
-    ::Type{OPSW},
     ::Type{SLVSW},
     ::Type{FT},
     ncol::Int;
     exfiltrate = false,
-) where {FT <: AbstractFloat, OPSW, SLVSW}
+) where {FT <: AbstractFloat, SLVSW}
     param_set = RRTMGPParameters(FT)
     device = ClimaComms.device(context)
     DA = ClimaComms.array_type(device)
@@ -172,7 +165,7 @@ function gray_atmos_sw_test(
     as = setup_gray_as_pr_grid(context, nlay, lat, p0, pe, otp, param_set, DA) # init gray atmos state
 
     swbcs = (cos_zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse)
-    slv_sw = SLVSW(FT, DA, OPSW, context, nlay, ncol, swbcs...)
+    slv_sw = SLVSW(FT, DA, context, nlay, ncol, swbcs...)
 
     exfiltrate && Infiltrator.@exfiltrate
     solve_sw!(slv_sw, as)
@@ -191,7 +184,7 @@ function gray_atmos_sw_test(
 
     color2 = :cyan
 
-    printstyled("\nGray atmosphere shortwave test with ncol = $ncol, nlev = $nlev, OP = $OPSW\n", color = color2)
+    printstyled("\nGray atmosphere shortwave test with ncol = $ncol, nlev = $nlev, solver = $SLVSW\n", color = color2)
     printstyled("device = $device\n\n", color = color2)
 
     println("relative error = $rel_error")

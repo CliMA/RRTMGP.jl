@@ -28,15 +28,13 @@ include("read_all_sky.jl")
 
 function benchmark_all_sky(
     context,
-    ::Type{OPLW},
-    ::Type{OPSW},
     ::Type{SLVLW},
     ::Type{SLVSW},
     ::Type{FT};
     ncol = 128,# repeats col#1 ncol times per RRTMGP example 
     use_lut::Bool = true,
     cldfrac = FT(1),
-) where {FT <: AbstractFloat, OPLW, OPSW, SLVLW, SLVSW}
+) where {FT <: AbstractFloat, SLVLW, SLVSW}
     overrides = (; grav = 9.80665, molmass_dryair = 0.028964, molmass_water = 0.018016)
     param_set = RRTMGPParameters(FT, overrides)
 
@@ -97,11 +95,11 @@ function benchmark_all_sky(
 
     # Setting up longwave problem---------------------------------------
     inc_flux = nothing
-    slv_lw = SLVLW(FT, DA, OPLW, context, param_set, nlay, ncol, sfc_emis, inc_flux)
+    slv_lw = SLVLW(FT, DA, context, param_set, nlay, ncol, sfc_emis, inc_flux)
     # Setting up shortwave problem---------------------------------------
     inc_flux_diffuse = nothing
     swbcs = (cos_zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse)
-    slv_sw = SLVSW(FT, DA, OPSW, context, nlay, ncol, swbcs...)
+    slv_sw = SLVSW(FT, DA, context, nlay, ncol, swbcs...)
     #------calling solvers
     solve_lw!(slv_lw, as, lookup_lw, lookup_lw_cld)
     trial_lw = @benchmark CUDA.@sync solve_lw!($slv_lw, $as, $lookup_lw, $lookup_lw_cld)
@@ -111,13 +109,14 @@ function benchmark_all_sky(
     return trial_lw, trial_sw
 end
 
-function generate_gpu_allsky_benchmarks(FT, npts)
+function generate_gpu_allsky_benchmarks(FT, npts, ::Type{SLVLW}, ::Type{SLVSW}) where {SLVLW, SLVSW}
     context = ClimaComms.context()
     # compute equivalent ncols for DYAMOND resolution
     helems, nlevels, nlev_test, nq = 30, 64, 73, 4
     ncols_dyamond = Int(ceil(helems * helems * 6 * nq * nq * (nlevels / nlev_test)))
     println("\n")
     printstyled("Running DYAMOND all-sky benchmark on $(context.device) device with $FT precision\n", color = 130)
+    printstyled("Longwave solver = $SLVLW; Shortwave solver = $SLVSW\n", color = 130)
     printstyled("==============|====================================|==================================\n", color = 130)
     printstyled(
         "  ncols       |   median time for longwave solver  | median time for shortwave solver \n",
@@ -128,17 +127,7 @@ function generate_gpu_allsky_benchmarks(FT, npts)
         ncols = unsafe_trunc(Int, cld(ncols_dyamond, 2^(pts - 1)))
         ndof = ncols * nlev_test
         sz_per_fld_gb = ndof * sizeof(FT) / 1024 / 1024 / 1024
-        trial_lw, trial_sw = benchmark_all_sky(
-            context,
-            TwoStream,
-            TwoStream,
-            TwoStreamLWRTE,
-            TwoStreamSWRTE,
-            FT;
-            ncol = ncols,
-            use_lut = true,
-            cldfrac = FT(1),
-        )
+        trial_lw, trial_sw = benchmark_all_sky(context, SLVLW, SLVSW, FT; ncol = ncols, use_lut = true, cldfrac = FT(1))
         Printf.@printf(
             "%10i    |           %25s|       %25s \n",
             ncols,
@@ -150,5 +139,7 @@ function generate_gpu_allsky_benchmarks(FT, npts)
     return nothing
 end
 
-generate_gpu_allsky_benchmarks(Float64, 4)
-generate_gpu_allsky_benchmarks(Float32, 4)
+for FT in (Float32, Float64)
+    generate_gpu_allsky_benchmarks(FT, 4, NoScatLWRTE, TwoStreamSWRTE)
+    generate_gpu_allsky_benchmarks(FT, 4, TwoStreamLWRTE, TwoStreamSWRTE)
+end

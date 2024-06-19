@@ -35,14 +35,14 @@ function rte_lw_noscat_solve!(
     angle_disc::AngularDiscretization,
     as::AtmosphericState,
     lookup_lw::LookUpLW,
-    lookup_lw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
+    lookup_lw_cld::Union{LookUpCld, Nothing} = nothing,
 )
     nlay, ncol = AtmosphericStates.get_dims(as)
     nlev = nlay + 1
     (; major_gpt2bnd) = lookup_lw.band_data
     n_gpt = length(major_gpt2bnd)
-    τ = op.τ
-    Ds = angle_disc.gauss_Ds
+    cloud_state = as.cloud_state
+    bld_cld_mask = cloud_state isa CloudState
     flux_up_lw = flux_lw.flux_up
     flux_dn_lw = flux_lw.flux_dn
     flux_net_lw = flux_lw.flux_net
@@ -50,6 +50,13 @@ function rte_lw_noscat_solve!(
         for igpt in 1:n_gpt
             ClimaComms.@threaded device for gcol in 1:ncol
                 ibnd = major_gpt2bnd[igpt]
+                if bld_cld_mask
+                    Optics.build_cloud_mask!(
+                        view(cloud_state.mask_lw, :, gcol),
+                        view(cloud_state.cld_frac, :, gcol),
+                        cloud_state.mask_type,
+                    )
+                end
                 igpt == 1 && set_flux_to_zero!(flux_lw, gcol)
                 compute_optical_props!(op, as, src_lw, gcol, igpt, lookup_lw, lookup_lw_cld)
                 rte_lw_noscat!(src_lw, bcs_lw, op, angle_disc, gcol, flux, igpt, ibnd, nlay, nlev)

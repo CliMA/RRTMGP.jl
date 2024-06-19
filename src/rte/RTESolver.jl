@@ -50,7 +50,7 @@ solve_lw!(
     (; context, fluxb, flux, src, bcs, op, angle_disc)::NoScatLWRTE,
     as::AtmosphericState,
     lookup_lw::LookUpLW,
-    lookup_lw_cld::Union{LookUpCld, PadeCld},
+    lookup_lw_cld::LookUpCld,
 ) = rte_lw_noscat_solve!(context.device, fluxb, flux, src, bcs, op, angle_disc, as, lookup_lw, lookup_lw_cld)
 
 solve_lw!((; context, fluxb, flux, src, bcs, op, angle_disc)::NoScatLWRTE, as::AtmosphericState, lookup_lw::LookUpLW) =

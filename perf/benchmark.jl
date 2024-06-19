@@ -17,7 +17,7 @@ import Logging
 @info "------------------------------------------------- Benchmark: gray_atm"
 @suppress_out begin
     include(joinpath(root_dir, "test", "gray_atm_utils.jl"))
-    gray_atmos_lw_equil(ClimaComms.context(), OneScalar, NoScatLWRTE, FT; exfiltrate = true)
+    gray_atmos_lw_equil(ClimaComms.context(), NoScatLWRTE, FT; exfiltrate = true)
 end
 (; slv_lw, gray_as) = Infiltrator.exfiltrated
 @info "gray_atm lw"
@@ -32,7 +32,7 @@ end
 show(stdout, MIME("text/plain"), trial)
 println()
 
-gray_atmos_sw_test(ClimaComms.context(), OneScalar, NoScatSWRTE, FT, 1; exfiltrate = true)
+gray_atmos_sw_test(ClimaComms.context(), NoScatSWRTE, FT, 1; exfiltrate = true)
 (; slv_sw, as) = Infiltrator.exfiltrated
 solve_sw!(slv_sw, as) # compile first
 @info "gray_atm sw"
@@ -56,8 +56,6 @@ toler_sw = Dict(Float64 => Float64(1e-3), Float32 => Float32(0.04))
 
 clear_sky(
     ClimaComms.context(),
-    TwoStream,
-    TwoStream,
     TwoStreamLWRTE,
     TwoStreamSWRTE,
     VmrGM,
@@ -96,13 +94,18 @@ println()
 @info "------------------------------------------------- Benchmark: all_sky"
 # @suppress_out begin
 include(joinpath(root_dir, "test", "all_sky_utils.jl"))
+
+toler_lw_noscat = Dict(Float64 => Float64(1e-5), Float32 => Float32(0.05))
+toler_lw_2stream = Dict(Float64 => Float64(5), Float32 => Float32(5))
+toler_sw = Dict(Float64 => Float64(1e-5), Float32 => Float32(0.06))
+
 all_sky(
     ClimaComms.context(),
-    TwoStream,
-    TwoStream,
     TwoStreamLWRTE,
     TwoStreamSWRTE,
-    FT;
+    FT,
+    toler_lw_2stream,
+    toler_sw;
     use_lut = true,
     cldfrac = FT(1),
     exfiltrate = true,

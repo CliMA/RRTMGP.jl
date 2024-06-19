@@ -51,7 +51,7 @@ function rte_lw_noscat_solve!(
     angle_disc::AngularDiscretization,
     as::AtmosphericState,
     lookup_lw::LookUpLW,
-    lookup_lw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
+    lookup_lw_cld::Union{LookUpCld, Nothing} = nothing,
 )
     nlay, ncol = AtmosphericStates.get_dims(as)
     nlev = nlay + 1
@@ -72,7 +72,7 @@ function rte_lw_noscat_solve_CUDA!(
     ncol,
     as::AtmosphericState,
     lookup_lw::LookUpLW,
-    lookup_lw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
+    lookup_lw_cld::Union{LookUpCld, Nothing} = nothing,
 )
     gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
     nlev = nlay + 1
@@ -84,8 +84,16 @@ function rte_lw_noscat_solve_CUDA!(
         flux_up_lw = flux_lw.flux_up
         flux_dn_lw = flux_lw.flux_dn
         flux_net_lw = flux_lw.flux_net
+        cloud_state = as.cloud_state
         @inbounds for igpt in 1:n_gpt
             ibnd = major_gpt2bnd[igpt]
+            if cloud_state isa CloudState
+                Optics.build_cloud_mask!(
+                    view(cloud_state.mask_lw, :, gcol),
+                    view(cloud_state.cld_frac, :, gcol),
+                    cloud_state.mask_type,
+                )
+            end
             igpt == 1 && set_flux_to_zero!(flux_lw, gcol)
             compute_optical_props!(op, as, src_lw, gcol, igpt, lookup_lw, lookup_lw_cld)
             rte_lw_noscat!(src_lw, bcs_lw, op, angle_disc, gcol, flux, igpt, ibnd, nlay, nlev)

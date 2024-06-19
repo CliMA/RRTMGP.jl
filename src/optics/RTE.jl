@@ -33,7 +33,7 @@ configurations for a non-scattering longwave simulation.
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct NoScatLWRTE{C, OP, SL <: SourceLWNoScat, BC <: LwBCs, FXBL, FXL <: FluxLW, AD}
+struct NoScatLWRTE{C, OP <: OneScalar, SL <: SourceLWNoScat, BC <: LwBCs, FXBL, FXL <: FluxLW, AD}
     "ClimaComms context"
     context::C
     "optical properties"
@@ -51,18 +51,8 @@ struct NoScatLWRTE{C, OP, SL <: SourceLWNoScat, BC <: LwBCs, FXBL, FXL <: FluxLW
 end
 Adapt.@adapt_structure NoScatLWRTE
 
-function NoScatLWRTE(
-    ::Type{FT},
-    ::Type{DA},
-    ::Type{OP},
-    context,
-    param_set,
-    nlay,
-    ncol,
-    sfc_emis,
-    inc_flux,
-) where {FT, DA, OP}
-    op = OP(FT, ncol, nlay, DA)
+function NoScatLWRTE(::Type{FT}, ::Type{DA}, context, param_set, nlay, ncol, sfc_emis, inc_flux) where {FT, DA}
+    op = OneScalar(FT, ncol, nlay, DA)
     src = SourceLWNoScat(param_set, FT, DA, nlay, ncol)
     bcs = LwBCs(sfc_emis, inc_flux)
     fluxb = FluxLW(ncol, nlay, FT, DA)
@@ -106,8 +96,6 @@ function TwoStreamLWRTE(::Type{FT}, ::Type{DA}, context, param_set, nlay, ncol, 
     return TwoStreamLWRTE(context, op, src, bcs, fluxb, flux)
 end
 
-TwoStreamLWRTE(::Type{FT}, ::Type{DA}, ::Type{OP}, args...) where {FT, DA, OP} = TwoStreamLWRTE(FT, DA, args...)
-
 """
     NoScatSWRTE(::Type{FT}, ::Type{DA}, context, nlay, ncol, swbcs...)
 
@@ -139,8 +127,6 @@ function NoScatSWRTE(::Type{FT}, ::Type{DA}, context, nlay, ncol, swbcs...) wher
     flux = FluxSW(ncol, nlay, FT, DA)
     return NoScatSWRTE(context, op, bcs, fluxb, flux)
 end
-
-NoScatSWRTE(::Type{FT}, ::Type{DA}, ::Type{OP}, args...) where {FT, DA, OP} = NoScatSWRTE(FT, DA, args...)
 
 """
     TwoStreamSWRTE(::Type{FT}, ::Type{DA}, context, nlay, ncol, swbcs...)
@@ -177,5 +163,4 @@ function TwoStreamSWRTE(::Type{FT}, ::Type{DA}, context, nlay, ncol, swbcs...) w
     return TwoStreamSWRTE(context, op, src, bcs, fluxb, flux)
 end
 
-TwoStreamSWRTE(::Type{FT}, ::Type{DA}, ::Type{OP}, args...) where {FT, DA, OP} = TwoStreamSWRTE(FT, DA, args...)
 end

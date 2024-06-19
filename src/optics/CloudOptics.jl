@@ -1,4 +1,3 @@
-
 """
     add_cloud_optics_2stream!(
         τ,
@@ -51,6 +50,56 @@ to the TwoStream gas optics properties.
                 end
                 # compute cloud optical optics
                 τ[glay], ssa[glay], g[glay] = increment_2stream(τ[glay], ssa[glay], g[glay], τ_cl, ssa_cl, g_cl)
+            end
+        end
+    end
+    return nothing
+end
+
+@inline function add_cloud_optics_1scalar!(
+    τ,
+    cld_mask,
+    cld_r_eff_liq,
+    cld_r_eff_ice,
+    cld_path_liq,
+    cld_path_ice,
+    ice_rgh,
+    lkp_cld::LookUpCld,
+    ibnd;
+)
+    @inbounds begin
+        nlay = length(τ)
+        lut_extliq, lut_ssaliq, lut_asyliq = LookUpTables.getview_liqdata(lkp_cld, ibnd)
+        lut_extice, lut_ssaice, lut_asyice = LookUpTables.getview_icedata(lkp_cld, ibnd, ice_rgh)
+        _, _, nsize_liq, nsize_ice, _ = lkp_cld.dims
+        radliq_lwr, radliq_upr, _, radice_lwr, radice_upr, _ = lkp_cld.bounds
+
+        for glay in 1:nlay
+            if cld_mask[glay]
+                # cloud liquid particles
+                τl, τl_ssa, _ = compute_lookup_cld_liq_props(
+                    nsize_liq,
+                    radliq_lwr,
+                    radliq_upr,
+                    lut_extliq,
+                    lut_ssaliq,
+                    lut_asyliq,
+                    cld_r_eff_liq[glay],
+                    cld_path_liq[glay],
+                )
+                # cloud ice particles
+                τi, τi_ssa, _ = compute_lookup_cld_ice_props(
+                    nsize_ice,
+                    radice_lwr,
+                    radice_upr,
+                    lut_extice,
+                    lut_ssaice,
+                    lut_asyice,
+                    cld_r_eff_ice[glay],
+                    cld_path_ice[glay],
+                )
+                # add cloud optical optics
+                τ[glay] += (τl - τl_ssa) + (τi - τi_ssa)
             end
         end
     end
