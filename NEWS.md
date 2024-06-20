@@ -3,8 +3,12 @@ RRTMGP.jl Release Notes
 
 main
 ------
+
+v0.16.0
+------
 - Fix undefined variable in `rte_sw_noscat_solve!` ([#504](https://github.com/CliMA/RRTMGP.jl/pull/504))
 - Add support for OneScalar cloud optics. ([#505](https://github.com/CliMA/RRTMGP.jl/pull/505))
+- Rename `rte_lw_noscat!` and simplify the input arguments ([#506](https://github.com/CliMA/RRTMGP.jl/pull/506))
 
 v0.15.1
 ------
