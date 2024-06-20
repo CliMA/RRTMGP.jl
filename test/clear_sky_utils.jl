@@ -28,8 +28,6 @@ include("read_rfmip_clear_sky.jl")
 #---------------------------------------------------------------
 function clear_sky(
     context,
-    ::Type{OPLW},
-    ::Type{OPSW},
     ::Type{SLVLW},
     ::Type{SLVSW},
     ::Type{VMR},
@@ -37,13 +35,11 @@ function clear_sky(
     toler_lw,
     toler_sw;
     exfiltrate = false,
-) where {FT, OPLW, OPSW, SLVLW, SLVSW, VMR}
+) where {FT, SLVLW, SLVSW, VMR}
     overrides = (; grav = 9.80665, molmass_dryair = 0.028964, molmass_water = 0.018016)
     param_set = RRTMGPParameters(FT, overrides)
     device = ClimaComms.device(context)
     DA = ClimaComms.array_type(device)
-    op_lw = Symbol(OPLW)
-    op_sw = Symbol(OPSW)
 
     lw_file = get_lookup_filename(:gas, :lw) # lw lookup tables for gas optics
     sw_file = get_lookup_filename(:gas, :sw) # sw lookup tables for gas optics
@@ -78,13 +74,13 @@ function clear_sky(
 
     # setting up longwave problem
     inc_flux = nothing
-    slv_lw = SLVLW(FT, DA, OPLW, context, param_set, nlay, ncol, sfc_emis, inc_flux)
+    slv_lw = SLVLW(FT, DA, context, param_set, nlay, ncol, sfc_emis, inc_flux)
 
     # setting up shortwave problem
     sfc_alb_diffuse = DA{FT, 2}(deepcopy(sfc_alb_direct))
     inc_flux_diffuse = nothing
     swbcs = (cos_zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse)
-    slv_sw = SLVSW(FT, DA, OPSW, context, nlay, ncol, swbcs...)
+    slv_sw = SLVSW(FT, DA, context, nlay, ncol, swbcs...)
     #--------------------------------------------------
     # initializing RTE solver
     exfiltrate && Infiltrator.@exfiltrate
@@ -134,10 +130,7 @@ function clear_sky(
     max_rel_err_flux_net_lw = maximum(rel_err_flux_net_lw)
 
     color2 = :cyan
-    printstyled(
-        "Clear-sky longwave test with ncol = $ncol, nlev = $nlev, OP = $OPLW, Solver = $SLVLW, FT = $FT\n",
-        color = color2,
-    )
+    printstyled("Clear-sky longwave test with ncol = $ncol, nlev = $nlev, Solver = $SLVLW, FT = $FT\n", color = color2)
     printstyled("device = $device\n\n", color = color2)
     println("L∞ error in flux_up           = $max_err_flux_up_lw")
     println("L∞ error in flux_dn           = $max_err_flux_dn_lw")
@@ -190,10 +183,7 @@ function clear_sky(
 
     max_rel_err_flux_net_sw = maximum(rel_err_flux_net_sw)
 
-    printstyled(
-        "Clear-sky shortwave test with ncol = $ncol, nlev = $nlev, OP = $OPSW, Solver = $SLVSW, FT = $FT\n",
-        color = color2,
-    )
+    printstyled("Clear-sky shortwave test with ncol = $ncol, nlev = $nlev, Solver = $SLVSW, FT = $FT\n", color = color2)
     printstyled("device = $device\n\n", color = color2)
     println("L∞ error in flux_up           = $max_err_flux_up_sw")
     println("L∞ error in flux_dn           = $max_err_flux_dn_sw")

@@ -138,7 +138,7 @@ Computes optical properties for the longwave problem.
     gcol::Int,
     igpt::Int,
     lkp::LookUpLW,
-    lkp_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
+    lkp_cld::Union{LookUpCld, Nothing} = nothing,
 )
     nlay = AtmosphericStates.get_nlay(as)
     (; vmr) = as
@@ -177,6 +177,26 @@ Computes optical properties for the longwave problem.
             t_lev_dec = t_lev_inc
         end
         lev_source[nlay + 1, gcol] = lev_src_inc_prev
+        if !isnothing(lkp_cld)
+            cloud_state = as.cloud_state
+            cld_r_eff_liq = view(cloud_state.cld_r_eff_liq, :, gcol)
+            cld_r_eff_ice = view(cloud_state.cld_r_eff_ice, :, gcol)
+            cld_path_liq = view(cloud_state.cld_path_liq, :, gcol)
+            cld_path_ice = view(cloud_state.cld_path_ice, :, gcol)
+            cld_mask = view(cloud_state.mask_lw, :, gcol)
+
+            add_cloud_optics_1scalar!(
+                τ,
+                cld_mask,
+                cld_r_eff_liq,
+                cld_r_eff_ice,
+                cld_path_liq,
+                cld_path_ice,
+                cloud_state.ice_rgh,
+                lkp_cld,
+                ibnd;
+            )
+        end
     end
     return nothing
 end
