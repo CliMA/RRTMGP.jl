@@ -11,12 +11,13 @@ function rte_lw_noscat_solve!(
     nlev = nlay + 1
     igpt, ibnd = 1, 1
     τ = op.τ
-    Ds = angle_disc.gauss_Ds
+    Ds = angle_disc.gauss_Ds[1]
+    w_μ = angle_disc.gauss_wts[1]
     (; flux_up, flux_dn, flux_net) = flux_lw
     @inbounds begin
         ClimaComms.@threaded device for gcol in 1:ncol
             compute_optical_props!(op, as, src_lw, gcol)
-            rte_lw_noscat!(src_lw, bcs_lw, op, angle_disc, gcol, flux_lw, igpt, ibnd, nlay, nlev)
+            rte_lw_noscat_one_angle!(src_lw, bcs_lw, op, Ds, w_μ, gcol, flux_lw, igpt, ibnd, nlay, nlev)
             for ilev in 1:nlev
                 flux_net[ilev, gcol] = flux_up[ilev, gcol] - flux_dn[ilev, gcol]
             end
@@ -40,6 +41,8 @@ function rte_lw_noscat_solve!(
     nlay, ncol = AtmosphericStates.get_dims(as)
     nlev = nlay + 1
     (; major_gpt2bnd) = lookup_lw.band_data
+    Ds = angle_disc.gauss_Ds[1]
+    w_μ = angle_disc.gauss_wts[1]
     n_gpt = length(major_gpt2bnd)
     cloud_state = as.cloud_state
     bld_cld_mask = cloud_state isa CloudState
@@ -59,7 +62,7 @@ function rte_lw_noscat_solve!(
                 end
                 igpt == 1 && set_flux_to_zero!(flux_lw, gcol)
                 compute_optical_props!(op, as, src_lw, gcol, igpt, lookup_lw, lookup_lw_cld)
-                rte_lw_noscat!(src_lw, bcs_lw, op, angle_disc, gcol, flux, igpt, ibnd, nlay, nlev)
+                rte_lw_noscat_one_angle!(src_lw, bcs_lw, op, Ds, w_μ, gcol, flux, igpt, ibnd, nlay, nlev)
                 add_to_flux!(flux_lw, flux, gcol)
             end
         end
@@ -101,46 +104,45 @@ See Clough et al., 1992, doi: 10.1029/92JD01419, Eq 13
 end
 
 """
-    rte_lw_noscat!(
-        src_lw::SourceLWNoScat{FT},
-        bcs_lw::LwBCs{FT},
-        op::OneScalar{FT},
-        gcol,
+    rte_lw_noscat_one_angle!(
+        src_lw::SourceLWNoScat,
+        bcs_lw::LwBCs,
+        op::OneScalar,
+        Ds::FT,
+        w_μ::FT,
+        gcol::Int,
         flux::FluxLW,
-        igpt,
-        ibnd,
-        nlay,
-        nlev,
-    ) where {FT<:AbstractFloat}
+        igpt::Int,
+        ibnd::Int,
+        nlay::Int,
+        nlev::Int,
+    ) where {FT}
 
 Transport for no-scattering longwave problem.
 """
-@inline function rte_lw_noscat!(
+@inline function rte_lw_noscat_one_angle!(
     src_lw::SourceLWNoScat,
     bcs_lw::LwBCs,
     op::OneScalar,
-    angle_disc::AngularDiscretization,
-    gcol,
+    Ds::FT,
+    w_μ::FT,
+    gcol::Int,
     flux::FluxLW,
-    igpt,
-    ibnd,
-    nlay,
-    nlev,
-)
+    igpt::Int,
+    ibnd::Int,
+    nlay::Int,
+    nlev::Int,
+) where {FT}
     # setting references
     (; sfc_source) = src_lw
     (; lay_source, lev_source) = src_lw
     (; sfc_emis, inc_flux) = bcs_lw
     (; flux_up, flux_dn) = flux
 
-    Ds = angle_disc.gauss_Ds
-    w_μ = angle_disc.gauss_wts
-    n_μ = angle_disc.n_gauss_angles
     τ = op.τ
-    FT = eltype(τ)
     τ_thresh = 100 * eps(FT) # or abs(eps(FT))?
 
-    intensity_to_flux = FT(π) * w_μ[1]
+    intensity_to_flux = FT(π) * w_μ
     flux_to_intensity = FT(1) / intensity_to_flux
 
     # Transport is for intensity
@@ -152,7 +154,7 @@ Transport for no-scattering longwave problem.
     # Downward propagation
     ilev = nlay
     @inbounds while ilev ≥ 1
-        τ_loc = τ[ilev, gcol] * Ds[1]
+        τ_loc = τ[ilev, gcol] * Ds
         trans = exp(-τ_loc)
         lay_src = lay_source[ilev, gcol]
         intensity_dn_ilev =
@@ -171,7 +173,7 @@ Transport for no-scattering longwave problem.
 
     # Upward propagation
     @inbounds for ilev in 2:(nlay + 1)
-        τ_loc = τ[ilev - 1, gcol] * Ds[1]
+        τ_loc = τ[ilev - 1, gcol] * Ds
         trans = exp(-τ_loc)
         lay_src = lay_source[ilev - 1, gcol]
         intensity_up_ilev =

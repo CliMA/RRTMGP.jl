@@ -29,11 +29,12 @@ function rte_lw_noscat_solve_CUDA!(
     nlev = nlay + 1
     igpt, ibnd = 1, 1
     τ = op.τ
-    Ds = angle_disc.gauss_Ds
+    Ds = angle_disc.gauss_Ds[1]
+    w_μ = angle_disc.gauss_wts[1]
     (; flux_up, flux_dn, flux_net) = flux_lw
     if gcol ≤ ncol
         compute_optical_props!(op, as, src_lw, gcol)
-        rte_lw_noscat!(src_lw, bcs_lw, op, angle_disc, gcol, flux_lw, igpt, ibnd, nlay, nlev)
+        rte_lw_noscat_one_angle!(src_lw, bcs_lw, op, Ds, w_μ, gcol, flux_lw, igpt, ibnd, nlay, nlev)
         @inbounds for ilev in 1:nlev
             flux_net[ilev, gcol] = flux_up[ilev, gcol] - flux_dn[ilev, gcol]
         end
@@ -79,7 +80,8 @@ function rte_lw_noscat_solve_CUDA!(
     (; major_gpt2bnd) = lookup_lw.band_data
     n_gpt = length(major_gpt2bnd)
     τ = op.τ
-    Ds = angle_disc.gauss_Ds
+    Ds = angle_disc.gauss_Ds[1]
+    w_μ = angle_disc.gauss_wts[1]
     if gcol ≤ ncol
         flux_up_lw = flux_lw.flux_up
         flux_dn_lw = flux_lw.flux_dn
@@ -96,7 +98,7 @@ function rte_lw_noscat_solve_CUDA!(
             end
             igpt == 1 && set_flux_to_zero!(flux_lw, gcol)
             compute_optical_props!(op, as, src_lw, gcol, igpt, lookup_lw, lookup_lw_cld)
-            rte_lw_noscat!(src_lw, bcs_lw, op, angle_disc, gcol, flux, igpt, ibnd, nlay, nlev)
+            rte_lw_noscat_one_angle!(src_lw, bcs_lw, op, Ds, w_μ, gcol, flux, igpt, ibnd, nlay, nlev)
             add_to_flux!(flux_lw, flux, gcol)
         end
         @inbounds begin
