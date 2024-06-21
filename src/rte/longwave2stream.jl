@@ -1,3 +1,4 @@
+function rrtmgp_cuprint end
 
 function rte_lw_2stream_solve!(
     device::ClimaComms.AbstractCPUDevice,
@@ -222,6 +223,26 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
             flux_dn_ilev * albedo_ilev + # Equation 12
             src_ilev
         flux_dn[ilev, gcol] = flux_dn_ilev
+        if isnan(flux_dn[ilev, gcol])
+            rrtmgp_cuprint(
+                flux_dn[ilev, gcol],
+                ilev,
+                flux_dn_ilev,
+                Tdif,
+                flux_dn_ilevplus1,
+                Rdif,
+                src_ilev,
+                src_dn,
+                denom,
+                Rdif,
+                albedo_ilev,
+                τ_lay, 
+                ssa_lay, 
+                g_lay,
+                lev_src_bot,
+                lev_src_top,
+            )
+        end
         flux_dn_ilevplus1 = flux_dn_ilev
         lev_src_top = lev_src_bot
         ilev -= 1
