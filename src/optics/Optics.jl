@@ -244,7 +244,7 @@ end
                 sfc_source[gcol] = interp1d(t_sfc, t_planck, totplnk) * planckfrac
                 lev_source[glay, gcol] = lev_src_dec
             else
-                lev_source[glay, gcol] = sqrt(lev_src_inc_prev * lev_src_dec)
+                lev_source[glay, gcol] = sqrt(max(lev_src_inc_prev * lev_src_dec, 0))
             end
             lev_src_dec_prev = lev_src_dec
             lev_src_inc_prev = lev_src_inc
