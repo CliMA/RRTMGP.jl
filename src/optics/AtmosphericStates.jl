@@ -10,6 +10,7 @@ export AbstractAtmosphericState,
     AtmosphericState,
     GrayAtmosphericState,
     CloudState,
+    AerosolState,
     setup_gray_as_pr_grid,
     MaxRandomOverlap,
     AbstractCloudMask,
@@ -35,12 +36,12 @@ Atmospheric conditions, used to compute optical properties.
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct AtmosphericState{FTA1D, FTA1DN, FTA2D, D, VMR, CLD} <: AbstractAtmosphericState
+struct AtmosphericState{FTA1D, FTA1DN, FTA2D, D, VMR, CLD, AER} <: AbstractAtmosphericState
     "longitude, in degrees (`ncol`), optional"
     lon::FTA1DN
     "latitude, in degrees (`ncol`), optional"
     lat::FTA1DN
-    "storage for col_dry [`molecules per cm^2 of dry air`], play `[Pa, mb]`, tlay `[K]`; `(3, nlay, ncol)`"
+    "storage for col_dry [`molecules per cm^2 of dry air`], play `[Pa, mb]`, tlay `[K]`, rel_hum; `(4, nlay, ncol)`"
     layerdata::D
     "Level pressures `[Pa, mb]`; `(nlay+1,ncol)`"
     p_lev::FTA2D
@@ -52,6 +53,8 @@ struct AtmosphericState{FTA1D, FTA1DN, FTA2D, D, VMR, CLD} <: AbstractAtmospheri
     vmr::VMR
     "cloud state"
     cloud_state::CLD
+    "aerosol state"
+    aerosol_state::AER
 end
 Adapt.@adapt_structure AtmosphericState
 
@@ -75,6 +78,10 @@ Adapt.@adapt_structure AtmosphericState
 # view of layer temperatures [K]
 @inline getview_t_lay(as::AtmosphericState) = @inbounds view(as.layerdata, 3, :, :)
 @inline getview_t_lay(as::AtmosphericState, gcol) = @inbounds view(as.layerdata, 3, :, gcol)
+
+# view of relative humidity
+@inline getview_rel_hum(as::AtmosphericState) = @inbounds view(as.layerdata, 4, :, :)
+@inline getview_rel_hum(as::AtmosphericState, gcol) = @inbounds view(as.layerdata, 4, :, gcol)
 
 """
     CloudState{CD, CF, CM, CMT}
@@ -102,4 +109,20 @@ struct CloudState{CD, CF, CM, CMT}
     ice_rgh::Int
 end
 Adapt.@adapt_structure CloudState
+
+"""
+    AerosolState{I, D}
+
+Aerosol state, used to compute optical properties.
+"""
+struct AerosolState{I, D}
+    "aerosol type"
+    aero_type::I
+    "aerosol size (microns)"
+    aero_size::D
+    "aerosol mass column (kg/m2)"
+    aero_mass::D
+end
+Adapt.@adapt_structure AerosolState
+
 end

@@ -49,11 +49,12 @@ function rte_lw_2stream_solve!(
     as::AtmosphericState,
     lookup_lw::LookUpLW,
     lookup_lw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
+    lookup_lw_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
 )
     nlay, ncol = AtmosphericStates.get_dims(as)
     nlev = nlay + 1
     tx, bx = _configure_threadblock(ncol)
-    args = (flux, flux_lw, src_lw, bcs_lw, op, nlay, ncol, as, lookup_lw, lookup_lw_cld)
+    args = (flux, flux_lw, src_lw, bcs_lw, op, nlay, ncol, as, lookup_lw, lookup_lw_cld, lookup_lw_aero)
     @cuda always_inline = true threads = (tx) blocks = (bx) rte_lw_2stream_solve_CUDA!(args...)
     return nothing
 end
@@ -68,7 +69,8 @@ function rte_lw_2stream_solve_CUDA!(
     ncol,
     as::AtmosphericState,
     lookup_lw::LookUpLW,
-    lookup_lw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
+    lookup_lw_cld::Union{LookUpCld, PadeCld, Nothing},
+    lookup_lw_aero::Union{LookUpAerosolMerra, Nothing},
 )
     gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
     nlev = nlay + 1
@@ -89,7 +91,7 @@ function rte_lw_2stream_solve_CUDA!(
                     cloud_state.mask_type,
                 )
             end
-            compute_optical_props!(op, as, src_lw, gcol, igpt, lookup_lw, lookup_lw_cld)
+            compute_optical_props!(op, as, src_lw, gcol, igpt, lookup_lw, lookup_lw_cld, lookup_lw_aero)
             rte_lw_2stream!(op, flux, src_lw, bcs_lw, gcol, igpt, ibnd, nlev, ncol)
             if igpt == 1
                 map!(x -> x, view(flux_up_lw, :, gcol), view(flux_up, :, gcol))

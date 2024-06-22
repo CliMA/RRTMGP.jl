@@ -15,17 +15,20 @@ import RRTMGP.Optics
 import RRTMGP.Optics: compute_optical_props!
 import RRTMGP.Optics: compute_col_gas!
 import RRTMGP.Optics: compute_col_gas_kernel!
+import RRTMGP.Optics: compute_relative_humidity!
+import RRTMGP.Optics: compute_relative_humidity_kernel!
 import RRTMGP.AtmosphericStates: setup_gray_as_pr_grid!
 import RRTMGP.AtmosphericStates: setup_gray_as_pr_grid_kernel!
 import RRTMGP.AtmosphericStates: GrayAtmosphericState
 import RRTMGP.AtmosphericStates: AtmosphericState
 import RRTMGP.AtmosphericStates: CloudState
+import RRTMGP.AtmosphericStates: AerosolState
 import RRTMGP.AtmosphericStates
 import RRTMGP.GrayUtils: update_profile_lw!
 import RRTMGP.GrayUtils: compute_gray_heating_rate!
 import RRTMGP.GrayUtils: compute_gray_heating_rate_kernel!
 import RRTMGP.GrayUtils: update_profile_lw_kernel!
-import RRTMGP.LookUpTables: LookUpLW, LookUpCld, PadeCld, LookUpSW
+import RRTMGP.LookUpTables: LookUpLW, LookUpCld, PadeCld, LookUpSW, LookUpAerosolMerra
 import RRTMGP.RTESolver: rte_lw_noscat_solve!
 import RRTMGP.RTESolver: rte_lw_noscat_one_angle!
 import RRTMGP.RTESolver: rte_lw_2stream_solve!

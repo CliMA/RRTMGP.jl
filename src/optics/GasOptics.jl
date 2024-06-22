@@ -36,6 +36,43 @@ function compute_col_gas_kernel!(
     m_air = (mol_m_dry + mol_m_h2o * vmr_h2o_glaygcol)
     # Hydrostatic equation
     col_gas[glay, gcol] = (Δp * avogadro / (m2_to_cm2 * m_air * g0)) # molecules/cm^2
+    return nothing
+end
+
+"""
+compute_relative_humidity_kernel!(
+    rh::AbstractArray{FT, 2},
+    p_lay::AbstractArray{FT, 2},
+    t_lay::AbstractArray{FT, 2},
+    vmr_h2o::AbstractArray{FT, 2},
+    mwd::FT,
+    t_ref::FT,
+    q_lay_min::FT,
+    glay::Int,
+    gcol::Int,
+) where {FT}
+
+This function computes the relative humidity.
+"""
+function compute_relative_humidity_kernel!(
+    rh::AbstractArray{FT, 2},
+    p_lay::AbstractArray{FT, 2},
+    t_lay::AbstractArray{FT, 2},
+    vmr_h2o::AbstractArray{FT, 2},
+    mwd::FT,
+    t_ref::FT,
+    q_lay_min::FT,
+    glay::Int,
+    gcol::Int,
+) where {FT}
+    mmr_h2o =
+    # Convert h2o vmr to mmr
+        mmr_h2o = vmr_h2o[glay, gcol] * mwd
+    q_lay = mmr_h2o / (FT(1) + mmr_h2o)
+    q_tmp = max(q_lay_min, q_lay)
+    es_tmp = exp((FT(17.67) * (t_lay[glay, gcol] - t_ref)) / (t_lay[glay, gcol] - FT(29.65)))
+    rh[glay, gcol] = max(FT(0.01) * (FT(0.263) * p_lay[glay, gcol] * q_tmp) / es_tmp, FT(0))
+    return nothing
 end
 
 """

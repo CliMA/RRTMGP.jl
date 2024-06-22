@@ -53,11 +53,12 @@ function rte_lw_noscat_solve!(
     as::AtmosphericState,
     lookup_lw::LookUpLW,
     lookup_lw_cld::Union{LookUpCld, Nothing} = nothing,
+    lookup_lw_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
 )
     nlay, ncol = AtmosphericStates.get_dims(as)
     nlev = nlay + 1
     tx, bx = _configure_threadblock(ncol)
-    args = (flux, flux_lw, src_lw, bcs_lw, op, angle_disc, nlay, ncol, as, lookup_lw, lookup_lw_cld)
+    args = (flux, flux_lw, src_lw, bcs_lw, op, angle_disc, nlay, ncol, as, lookup_lw, lookup_lw_cld, lookup_lw_aero)
     @cuda always_inline = true threads = (tx) blocks = (bx) rte_lw_noscat_solve_CUDA!(args...)
     return nothing
 end
@@ -73,7 +74,8 @@ function rte_lw_noscat_solve_CUDA!(
     ncol,
     as::AtmosphericState,
     lookup_lw::LookUpLW,
-    lookup_lw_cld::Union{LookUpCld, Nothing} = nothing,
+    lookup_lw_cld::Union{LookUpCld, Nothing},
+    lookup_lw_aero::Union{LookUpAerosolMerra, Nothing},
 )
     gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
     nlev = nlay + 1
@@ -97,7 +99,7 @@ function rte_lw_noscat_solve_CUDA!(
                 )
             end
             igpt == 1 && set_flux_to_zero!(flux_lw, gcol)
-            compute_optical_props!(op, as, src_lw, gcol, igpt, lookup_lw, lookup_lw_cld)
+            compute_optical_props!(op, as, src_lw, gcol, igpt, lookup_lw, lookup_lw_cld, lookup_lw_aero)
             rte_lw_noscat_one_angle!(src_lw, bcs_lw, op, Ds, w_μ, gcol, flux, igpt, ibnd, nlay, nlev)
             add_to_flux!(flux_lw, flux, gcol)
         end

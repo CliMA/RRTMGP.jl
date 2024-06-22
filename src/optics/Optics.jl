@@ -13,7 +13,7 @@ using ..Sources
 using ..AngularDiscretizations
 import ..Parameters as RP
 
-export AbstractOpticalProps, OneScalar, TwoStream, compute_col_gas!, compute_optical_props!
+export AbstractOpticalProps, OneScalar, TwoStream, compute_col_gas!, compute_relative_humidity!, compute_optical_props!
 
 """
     AbstractOpticalProps
@@ -117,6 +117,44 @@ function compute_col_gas!(
     return nothing
 end
 
+"""
+    compute_relative_humidity!(
+        device::ClimaComms.AbstractCPUDevice,
+        rh::AbstractArray{FT, 2},
+        p_lay::AbstractArray{FT, 2},
+        t_lay::AbstractArray{FT, 2},
+        param_set::RP.ARP,
+        vmr_h2o::Union{AbstractArray{FT, 2}, Nothing} = nothing,
+    ) where {FT}
+
+This function computes the relative humidity.
+
+"""
+function compute_relative_humidity!(
+    device::ClimaComms.AbstractCPUDevice,
+    rh::AbstractArray{FT, 2},
+    p_lay::AbstractArray{FT, 2},
+    t_lay::AbstractArray{FT, 2},
+    param_set::RP.ARP,
+    vmr_h2o::AbstractArray{FT, 2},
+) where {FT}
+    nlay, ncol = size(p_lay)
+    # ratio of water to dry air molecular weights
+    mwd = RP.molmass_water(param_set) / RP.molmass_dryair(param_set)
+    t_ref = FT(273.16) # reference temperature (K)
+    q_lay_min = FT(1e-7) # minimum water mass mixing ratio
+
+    args = (rh, p_lay, t_lay, vmr_h2o, mwd, t_ref, q_lay_min)
+    @inbounds begin
+        ClimaComms.@threaded device for icnt in 1:(nlay * ncol)
+            gcol = cld(icnt, nlay)
+            glay = (icnt % nlay == 0) ? nlay : (icnt % nlay)
+            compute_relative_humidity_kernel!(args..., glay, gcol)
+        end
+    end
+    return nothing
+end
+
 
 """
     compute_optical_props!(
@@ -127,6 +165,7 @@ end
         igpt::Int,
         lkp::LookUpLW{FT},
         lkp_cld::Union{LookUpCld,PadeCld,Nothing} = nothing,
+        lkp_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
     ) where {FT<:AbstractFloat}
 
 Computes optical properties for the longwave problem.
@@ -139,6 +178,7 @@ Computes optical properties for the longwave problem.
     igpt::Int,
     lkp::LookUpLW,
     lkp_cld::Union{LookUpCld, Nothing} = nothing,
+    lkp_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
 )
     nlay = AtmosphericStates.get_nlay(as)
     (; vmr) = as
@@ -197,6 +237,14 @@ Computes optical properties for the longwave problem.
                 ibnd;
             )
         end
+        if !isnothing(lkp_aero)
+            aero_type = view(as.aerosol_state.aero_type, :, gcol)
+            aero_size = view(as.aerosol_state.aero_size, :, gcol)
+            aero_mass = view(as.aerosol_state.aero_mass, :, gcol)
+            rel_hum = AtmosphericStates.getview_rel_hum(as, gcol)
+
+            add_aerosol_optics_1scalar!(τ, aero_type, aero_size, aero_mass, rel_hum, lkp_aero, ibnd)
+        end
     end
     return nothing
 end
@@ -209,6 +257,7 @@ end
     igpt::Int,
     lkp::LookUpLW,
     lkp_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
+    lkp_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
 )
     nlay = AtmosphericStates.get_nlay(as)
     (; vmr) = as
@@ -275,6 +324,14 @@ end
             delta_scaling = false,
         )
     end
+    if !isnothing(lkp_aero)
+        aero_type = view(as.aerosol_state.aero_type, :, gcol)
+        aero_size = view(as.aerosol_state.aero_size, :, gcol)
+        aero_mass = view(as.aerosol_state.aero_mass, :, gcol)
+        rel_hum = AtmosphericStates.getview_rel_hum(as, gcol)
+
+        add_aerosol_optics_2stream!(τ, ssa, g, aero_type, aero_size, aero_mass, rel_hum, lkp_aero, ibnd)
+    end
     return nothing
 end
 
@@ -296,6 +353,7 @@ Computes optical properties for the shortwave problem.
     gcol::Int,
     igpt::Int,
     lkp::LookUpSW,
+    ::Nothing,
     ::Nothing,
 )
     nlay = AtmosphericStates.get_nlay(as)
@@ -321,6 +379,7 @@ end
     igpt::Int,
     lkp::LookUpSW,
     lkp_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
+    lkp_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
 )
     nlay = AtmosphericStates.get_nlay(as)
     (; vmr) = as
@@ -360,12 +419,32 @@ end
             delta_scaling = true,
         )
     end
+    if !isnothing(lkp_aero)
+        aero_type = view(as.aerosol_state.aero_type, :, gcol)
+        aero_size = view(as.aerosol_state.aero_size, :, gcol)
+        aero_mass = view(as.aerosol_state.aero_mass, :, gcol)
+        rel_hum = AtmosphericStates.getview_rel_hum(as, gcol)
+
+        add_aerosol_optics_2stream!(
+            τ,
+            ssa,
+            g,
+            aero_type,
+            aero_size,
+            aero_mass,
+            rel_hum,
+            lkp_aero,
+            ibnd,
+            delta_scaling = true,
+        )
+    end
     return nothing
 end
 
 include("OpticsUtils.jl")
 include("GasOptics.jl")
 include("CloudOptics.jl")
+include("AerosolOptics.jl")
 include("GrayOpticsKernels.jl")
 
 end

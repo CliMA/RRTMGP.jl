@@ -33,6 +33,7 @@ function rte_lw_2stream_solve!(
     as::AtmosphericState,
     lookup_lw::LookUpLW,
     lookup_lw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
+    lookup_lw_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
 )
     nlay, ncol = AtmosphericStates.get_dims(as)
     nlev = nlay + 1
@@ -53,7 +54,7 @@ function rte_lw_2stream_solve!(
                     view(cloud_state.cld_frac, :, gcol),
                     cloud_state.mask_type,
                 )
-                compute_optical_props!(op, as, src_lw, gcol, igpt, lookup_lw, lookup_lw_cld)
+                compute_optical_props!(op, as, src_lw, gcol, igpt, lookup_lw, lookup_lw_cld, lookup_lw_aero)
                 rte_lw_2stream!(op, flux, src_lw, bcs_lw, gcol, igpt, ibnd, nlev, ncol)
                 if igpt == 1
                     map!(x -> x, view(flux_up_lw, :, gcol), view(flux_up, :, gcol))

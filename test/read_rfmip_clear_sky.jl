@@ -50,6 +50,7 @@ function setup_rfmip_as(
 
     t_sfc = DA{FT, 1}(ds_lw_in["surface_temperature"][:, exp_no])
     col_dry = DA{FT, 2}(undef, nlay, ncol)
+    rel_hum = DA{FT, 2}(undef, nlay, ncol)
 
     # Reading volume mixing ratios 
 
@@ -101,16 +102,18 @@ function setup_rfmip_as(
     # FORTRAN RRTMGP test case.
     device = ClimaComms.device(context)
     compute_col_gas!(device, p_lev, col_dry, param_set, vmr_h2o, lat) # the example skips lat based gravity calculation
+    compute_relative_humidity!(device, rel_hum, p_lay, t_lay, param_set, vmr_h2o) # compute relative humidity
 
-    layerdata = similar(p_lay, 3, nlay, ncol)
+    layerdata = similar(p_lay, 4, nlay, ncol)
     layerdata[1, :, :] .= col_dry
     layerdata[2, :, :] .= p_lay
     layerdata[3, :, :] .= t_lay
+    layerdata[4, :, :] .= rel_hum
 
     vmr = VMR(vmr_h2o, vmr_o3, FTA1D(vmrat))
     #------------------
     return (
-        AtmosphericState(lon, lat, layerdata, p_lev, t_lev, t_sfc, vmr, nothing),
+        AtmosphericState(lon, lat, layerdata, p_lev, t_lev, t_sfc, vmr, nothing, nothing),
         sfc_emis,
         sfc_alb,
         cos_zenith,
