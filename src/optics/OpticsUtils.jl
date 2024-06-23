@@ -14,6 +14,14 @@ perform 1D linear interpolation.
     return @inbounds (y[loc] * (FT(1) - factor) + y[loc + 1] * factor)
 end
 
+@inline function interp1d_loc_factor(xi::FT, x::AbstractArray{FT, 1}) where {FT <: AbstractFloat}
+    @inbounds Δx = x[2] - x[1]
+    n = length(x)
+    loc = loc_lower(xi, Δx, n, x)
+    @inbounds factor = (xi - x[loc]) / Δx
+    return loc, factor
+end
+
 """
     interp2d(
         fη1::FT,

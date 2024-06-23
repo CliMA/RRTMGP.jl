@@ -37,6 +37,7 @@ function rte_lw_noscat_solve!(
     as::AtmosphericState,
     lookup_lw::LookUpLW,
     lookup_lw_cld::Union{LookUpCld, Nothing} = nothing,
+    lookup_lw_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
 )
     nlay, ncol = AtmosphericStates.get_dims(as)
     nlev = nlay + 1
@@ -61,7 +62,7 @@ function rte_lw_noscat_solve!(
                     )
                 end
                 igpt == 1 && set_flux_to_zero!(flux_lw, gcol)
-                compute_optical_props!(op, as, src_lw, gcol, igpt, lookup_lw, lookup_lw_cld)
+                compute_optical_props!(op, as, src_lw, gcol, igpt, lookup_lw, lookup_lw_cld, lookup_lw_aero)
                 rte_lw_noscat_one_angle!(src_lw, bcs_lw, op, Ds, w_μ, gcol, flux, igpt, ibnd, nlay, nlev)
                 add_to_flux!(flux_lw, flux, gcol)
             end

@@ -66,12 +66,13 @@ function rte_sw_2stream_solve!(
     as::AtmosphericState,
     lookup_sw::LookUpSW,
     lookup_sw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
+    lookup_sw_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
 )
     nlay, ncol = AtmosphericStates.get_dims(as)
     nlev = nlay + 1
     n_gpt = length(lookup_sw.solar_src_scaled)
     tx, bx = _configure_threadblock(ncol)
-    args = (flux, flux_sw, op, bcs_sw, src_sw, nlay, ncol, as, lookup_sw, lookup_sw_cld)
+    args = (flux, flux_sw, op, bcs_sw, src_sw, nlay, ncol, as, lookup_sw, lookup_sw_cld, lookup_sw_aero)
     @cuda always_inline = true threads = (tx) blocks = (bx) rte_sw_2stream_solve_CUDA!(args...)
     return nothing
 end
@@ -87,6 +88,7 @@ function rte_sw_2stream_solve_CUDA!(
     as::AtmosphericState,
     lookup_sw::LookUpSW,
     lookup_sw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
+    lookup_sw_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
 )
     gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
     nlev = nlay + 1
@@ -111,7 +113,7 @@ function rte_sw_2stream_solve_CUDA!(
                     )
                 end
                 # compute optical properties
-                compute_optical_props!(op, as, gcol, igpt, lookup_sw, lookup_sw_cld)
+                compute_optical_props!(op, as, gcol, igpt, lookup_sw, lookup_sw_cld, lookup_sw_aero)
                 solar_frac = lookup_sw.solar_src_scaled[igpt]
                 ibnd = lookup_sw.band_data.major_gpt2bnd[igpt]
                 # rte shortwave solver

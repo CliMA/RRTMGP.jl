@@ -3,7 +3,8 @@ module LookUpTables
 using DocStringExtensions
 using Adapt
 
-export AbstractLookUp, LookUpLW, LookUpSW, LookUpCld, PadeCld, LookUpMinor, ReferencePoints, LookUpPlanck, BandData
+export AbstractLookUp,
+    LookUpLW, LookUpSW, LookUpCld, PadeCld, LookUpAerosolMerra, LookUpMinor, ReferencePoints, LookUpPlanck, BandData
 
 """
     AbstractLookUp
@@ -921,6 +922,74 @@ function PadeCld(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
         pade_sizreg_asyice,
         bnd_lims_wn,
     ))
+end
+
+"""
+    LookUpAerosolMerra{D, B, R, D2, D3, D4, W} <: AbstractLookUp
+
+Merra lookup table for aersols. 
+
+This struct stores the lookup tables for determing extinction coeffient,
+single-scattering albedo, and asymmetry parameter g as a function of aerosol
+particle size, relative humidity and band. Data is provided for dust, sea salt,
+sulfate, black carbon (hydrophobic and hydrophilic) and organic carbon 
+(hydrophobic and hydrophilic).
+
+
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
+struct LookUpAerosolMerra{D, D1, D2, D3, D4, W} <: AbstractLookUp
+    "`nband`, `nval`, `nbin`, `nrh`, `pair`"
+    dims::D
+    "beginning and ending limit for each MERRA aerosol size bin (microns)"
+    size_bin_limits::D2
+    "relative humidity levels for MERRA hydrophilic aerosols"
+    rh_levels::D1
+    "dust `(nval, nbin, nband)`"
+    dust::D3
+    "sea salt `(nval, nrh, nbin, nband)`"
+    sea_salt::D4
+    "sulfate `(nval, nrh, nband)`"
+    sulfate::D3
+    "black carbon - hydrophobic `(nval, nband)`"
+    black_carbon::D2
+    "black carbon - hydrophilic `(nval, nhr, nband)`"
+    black_carbon_rh::D3
+    "organic carbon - hydrophobic `(nval, nband)`"
+    organic_carbon::D2
+    "organic carbon - hydrophilic `(nval, nhr, nband)`"
+    organic_carbon_rh::D3
+    "beginning and ending wavenumber for each band (`2, nband`) cm⁻¹"
+    bnd_lims_wn::W
+end
+Adapt.@adapt_structure LookUpAerosolMerra
+
+function LookUpAerosolMerra(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
+    dims = DA([Int(ds.dim["nband"]), Int(ds.dim["nval"]), Int(ds.dim["nbin"]), Int(ds.dim["nrh"]), Int(ds.dim["pair"])])
+    size_bin_limits = DA{FT}(Array(ds["merra_aero_bin_lims"]))
+    rh_levels = DA{FT}(Array(ds["aero_rh"]))
+    dust = DA(Array{FT}(ds["aero_dust_tbl"]))
+    sea_salt = DA{FT}(Array(ds["aero_salt_tbl"]))
+    sulfate = DA{FT}(Array(ds["aero_sulf_tbl"]))
+    black_carbon = DA{FT}(Array(ds["aero_bcar_tbl"]))
+    black_carbon_rh = DA{FT}(Array(ds["aero_bcar_rh_tbl"]))
+    organic_carbon = DA{FT}(Array(ds["aero_ocar_tbl"]))
+    organic_carbon_rh = DA{FT}(Array(ds["aero_ocar_rh_tbl"]))
+    bnd_lims_wn = DA{FT}(Array(ds["bnd_limits_wavenumber"]))
+    return LookUpAerosolMerra(
+        dims,
+        size_bin_limits,
+        rh_levels,
+        dust,
+        sea_salt,
+        sulfate,
+        black_carbon,
+        black_carbon_rh,
+        organic_carbon,
+        organic_carbon_rh,
+        bnd_lims_wn,
+    )
 end
 
 end

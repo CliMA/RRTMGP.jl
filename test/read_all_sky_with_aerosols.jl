@@ -1,10 +1,10 @@
 function ncol_ds_all_sky(use_lut)
-    flux_file = get_reference_filename(:gas_clouds, :lw, :flux_up)
+    flux_file = get_reference_filename(:gas_clouds_aerosols, :lw, :flux_up)
     ds_comp = Dataset(flux_file, "r")
     return size(Array(ds_comp["lw_flux_up"]), 1)
 end
 
-function setup_allsky_as(
+function setup_allsky_with_aerosols_as(
     context,
     ds_in,
     idx_gases,
@@ -78,6 +78,20 @@ function setup_allsky_as(
     vmrat[idx_gases["n2"], :, 1] .= FT(0.7808)
     vmrat[idx_gases["o2"], :, 1] .= FT(0.2095)
     vmrat[idx_gases["co"], :, 1] .= FT(0)
+
+    # Reading aerosol data
+    aero_type_ref = Array{Int}(transpose(Array(ds_in["aero_type"])[:, lay_ind]))
+    aero_size_ref = Array{FT}(transpose(Array(ds_in["aero_size"])[:, lay_ind]))
+    aero_mass_ref = Array{FT}(transpose(Array(ds_in["aero_mass"])[:, lay_ind]))
+    ncol_ref = size(aero_type_ref, 2)
+    # repeat the input data to set problem size to ncols
+    nrepeat = Int(fld(ncol, ncol_ref))
+    rem = Int(ncol % ncol_ref)
+    aero_type = DA(hcat(repeat(aero_type_ref, 1, nrepeat), aero_type_ref[:, 1:rem]))
+    aero_size = DA(hcat(repeat(aero_size_ref, 1, nrepeat), aero_size_ref[:, 1:rem]))
+    aero_mass = DA(hcat(repeat(aero_mass_ref, 1, nrepeat), aero_mass_ref[:, 1:rem]))
+
+    aerosol_state = AerosolState(aero_type, aero_size, aero_mass)
 
     for icol in 2:ncol
         vmrat[:, :, icol] .= vmrat[:, :, 1]
@@ -162,7 +176,7 @@ function setup_allsky_as(
         ice_rgh,
     )
     return (
-        AtmosphericState(lon, lat, layerdata, p_lev, t_lev, t_sfc, vmr, cloud_state, nothing),
+        AtmosphericState(lon, lat, layerdata, p_lev, t_lev, t_sfc, vmr, cloud_state, aerosol_state),
         sfc_emis,
         sfc_alb_direct,
         sfc_alb_diffuse,
@@ -176,21 +190,25 @@ _orient_data(data, bot_at_1) = bot_at_1 ? data : reverse(data, dims = 1)
 
 function load_comparison_data(use_lut, bot_at_1, ncol)
     # Note, for this case, flux_up and flux_dn are stored in the same file!
-    flux_file_lw = get_reference_filename(:gas_clouds, :lw, :flux_up) # flux files for comparison (LUT) 
-    flux_file_sw = get_reference_filename(:gas_clouds, :sw, :flux_up) # flux files for comparison (LUT)
+    flux_file_lw = get_reference_filename(:gas_clouds_aerosols, :lw, :flux_up) # flux files for comparison (LUT) 
+    flux_file_sw = get_reference_filename(:gas_clouds_aerosols, :sw, :flux_up) # flux files for comparison (LUT)
     ds_comp_lw = Dataset(flux_file_lw, "r")
     ds_comp_sw = Dataset(flux_file_sw, "r")
     ncol_ds = size(Array(ds_comp_lw["lw_flux_up"]), 1)
-    nrepeat = cld(ncol, ncol_ds)
-    comp_flux_up_lw = repeat(_orient_data(transpose(Array(ds_comp_lw["lw_flux_up"])), bot_at_1), 1, nrepeat)
-    comp_flux_dn_lw = repeat(_orient_data(transpose(Array(ds_comp_lw["lw_flux_dn"])), bot_at_1), 1, nrepeat)
-    comp_flux_up_sw = repeat(_orient_data(transpose(Array(ds_comp_sw["sw_flux_up"])), bot_at_1), 1, nrepeat)
-    comp_flux_dn_sw = repeat(_orient_data(transpose(Array(ds_comp_sw["sw_flux_dn"])), bot_at_1), 1, nrepeat)
+    nrepeat = fld(ncol, ncol_ds)
+    rem = Int(ncol % ncol_ds)
+
+    comp_flux_up_lw_ref = _orient_data(transpose(Array(ds_comp_lw["lw_flux_up"])), bot_at_1)
+    comp_flux_dn_lw_ref = _orient_data(transpose(Array(ds_comp_lw["lw_flux_dn"])), bot_at_1)
+    comp_flux_up_sw_ref = _orient_data(transpose(Array(ds_comp_sw["sw_flux_up"])), bot_at_1)
+    comp_flux_dn_sw_ref = _orient_data(transpose(Array(ds_comp_sw["sw_flux_dn"])), bot_at_1)
     close(ds_comp_lw)
     close(ds_comp_sw)
-    nlev, ncol_ds = size(comp_flux_up_lw)
-    return comp_flux_up_lw[:, 1:ncol],
-    comp_flux_dn_lw[:, 1:ncol],
-    comp_flux_up_sw[:, 1:ncol],
-    comp_flux_dn_sw[:, 1:ncol]
+
+    comp_flux_up_lw = hcat(repeat(comp_flux_up_lw_ref, 1, nrepeat), comp_flux_up_lw_ref[:, 1:rem])
+    comp_flux_dn_lw = hcat(repeat(comp_flux_dn_lw_ref, 1, nrepeat), comp_flux_dn_lw_ref[:, 1:rem])
+    comp_flux_up_sw = hcat(repeat(comp_flux_up_sw_ref, 1, nrepeat), comp_flux_up_sw_ref[:, 1:rem])
+    comp_flux_dn_sw = hcat(repeat(comp_flux_dn_sw_ref, 1, nrepeat), comp_flux_dn_sw_ref[:, 1:rem])
+
+    return comp_flux_up_lw, comp_flux_dn_lw, comp_flux_up_sw, comp_flux_dn_sw
 end

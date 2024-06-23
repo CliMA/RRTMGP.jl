@@ -9,11 +9,13 @@ AbstractOpticalProps
 OneScalar
 TwoStream
 compute_col_gas!
+compute_relative_humidity!
 compute_optical_props!
 ```
 
 ```@docs
 compute_col_gas_kernel!
+compute_relative_humidity_kernel!
 compute_interp_frac_temp
 compute_interp_frac_press
 compute_interp_frac_η
@@ -29,6 +31,11 @@ compute_lookup_cld_liq_props
 compute_lookup_cld_ice_props
 compute_pade_cld_props
 pade_eval
+```
+
+```@docs
+add_aerosol_optics_1scalar!
+add_aerosol_optics_2stream!
 ```
 
 ```@docs

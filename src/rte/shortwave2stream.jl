@@ -43,6 +43,7 @@ function rte_sw_2stream_solve!(
     as::AtmosphericState,
     lookup_sw::LookUpSW,
     lookup_sw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
+    lookup_sw_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
 )
     nlay, ncol = AtmosphericStates.get_dims(as)
     nlev = nlay + 1
@@ -65,7 +66,7 @@ function rte_sw_2stream_solve!(
                         cloud_state.mask_type,
                     )
                     # compute optical properties
-                    compute_optical_props!(op, as, gcol, igpt, lookup_sw, lookup_sw_cld)
+                    compute_optical_props!(op, as, gcol, igpt, lookup_sw, lookup_sw_cld, lookup_sw_aero)
                     solar_frac = lookup_sw.solar_src_scaled[igpt]
                     ibnd = lookup_sw.band_data.major_gpt2bnd[igpt]
                     # call rte shortwave solver
