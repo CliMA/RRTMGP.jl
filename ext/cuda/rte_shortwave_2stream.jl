@@ -1,3 +1,9 @@
+import CUDA
+
+function rrtmgp_cuprint(args...)
+    CUDA.@cuprint args...
+end
+
 function rte_sw_2stream_solve!(
     device::ClimaComms.CUDADevice,
     flux_sw::FluxSW,
