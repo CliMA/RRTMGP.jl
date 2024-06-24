@@ -4,6 +4,10 @@ RRTMGP.jl Release Notes
 main
 ------
 
+v0.17.0
+-----
+- Add support for aerosol optics ([#510](https://github.com/CliMA/RRTMGP.jl/pull/510))
+
 v0.16.0
 ------
 - Fix undefined variable in `rte_sw_noscat_solve!` ([#504](https://github.com/CliMA/RRTMGP.jl/pull/504))
