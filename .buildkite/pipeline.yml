@@ -60,6 +60,15 @@ steps:
           slurm_ntasks: 1
           slurm_mem_per_cpu: 6G
 
+      - label: "Flame Graph: Gray Atm compilation"
+        command: "julia --color=yes --project=test perf/flame_compilation.jl gray_atm.jl"
+        artifact_paths: "flame_graphs/gray_atm_compilation/*"
+        agents:
+          slurm_ntasks: 1
+          slurm_gres: "gpu:1"
+          slurm_mem_per_cpu: 20G
+          timeout_in_minutes: 1440
+
       - label: "Flame Graph: Clear Sky"
         command: "julia --color=yes --project=test perf/flame.jl clear_sky.jl"
         artifact_paths: "flame_graphs/clear_sky/*"
