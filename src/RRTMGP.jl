@@ -24,8 +24,4 @@ include(joinpath("optics", "RTE.jl"))
 
 include(joinpath("rte", "RTESolver.jl"))
 
-if !isdefined(Base, :get_extension)
-    include(joinpath("..", "ext", "CreateParametersExt.jl"))
-end
-
 end # module
