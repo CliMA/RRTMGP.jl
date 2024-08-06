@@ -20,6 +20,7 @@ using RRTMGP.RTE
 using RRTMGP.RTESolver
 import RRTMGP.Parameters.RRTMGPParameters
 import ClimaParams as CP
+using RRTMGP.ArtifactPaths
 
 # overriding some parameters to match with RRTMGP FORTRAN code
 
