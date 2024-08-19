@@ -441,10 +441,10 @@ end
     return nothing
 end
 
-include("OpticsUtils.jl")
-include("GasOptics.jl")
-include("CloudOptics.jl")
-include("AerosolOptics.jl")
-include("GrayOpticsKernels.jl")
+include("optics_utils.jl")
+include("gas_optics.jl")
+include("cloud_optics.jl")
+include("aerosol_optics.jl")
+include("gray_optics_kernels.jl")
 
 end
