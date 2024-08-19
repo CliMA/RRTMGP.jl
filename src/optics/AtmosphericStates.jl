@@ -20,7 +20,7 @@ export AbstractAtmosphericState,
 
 abstract type AbstractAtmosphericState end
 
-include("GrayAtmosphericStates.jl")
+include("gray_atmospheric_states.jl")
 
 abstract type AbstractCloudMask end
 
