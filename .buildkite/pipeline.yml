@@ -103,7 +103,15 @@ steps:
           slurm_ntasks: 1
           slurm_gres: "gpu:1"
 
-      - label: "GPU All-sky DYAMOND benchmark"
+      - label: "GPU clear-sky DYAMOND benchmark"
+        command: "julia --color=yes --project=test test/clear_sky_dyamond_gpu_benchmark.jl"
+        env:
+          CLIMACOMMS_DEVICE: "CUDA"
+        agents:
+          slurm_ntasks: 1
+          slurm_gres: "gpu:1"
+
+      - label: "GPU all-sky DYAMOND benchmark"
         command: "julia --color=yes --project=test test/all_sky_dyamond_gpu_benchmark.jl"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
@@ -111,3 +119,10 @@ steps:
           slurm_ntasks: 1
           slurm_gres: "gpu:1"
 
+      - label: "GPU all-sky with aerosols DYAMOND benchmark"
+        command: "julia --color=yes --project=test test/all_sky_with_aerosols_dyamond_gpu_benchmark.jl"
+        env:
+          CLIMACOMMS_DEVICE: "CUDA"
+        agents:
+          slurm_ntasks: 1
+          slurm_gres: "gpu:1"

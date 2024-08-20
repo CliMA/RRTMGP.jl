@@ -35,6 +35,7 @@ function clear_sky(
     ::Type{FT},
     toler_lw,
     toler_sw;
+    ncol = 100,
     exfiltrate = false,
 ) where {FT, SLVLW, SLVSW, VMR}
     overrides = (; grav = 9.80665, molmass_dryair = 0.028964, molmass_water = 0.018016)
@@ -45,13 +46,8 @@ function clear_sky(
     lw_file = get_lookup_filename(:gas, :lw) # lw lookup tables for gas optics
     sw_file = get_lookup_filename(:gas, :sw) # sw lookup tables for gas optics
     input_file = get_input_filename(:gas, :lw) # clear-sky atmos state
-    # reference data files for comparison
-    flux_up_file_lw = get_reference_filename(:gas, :lw, :flux_up)
-    flux_dn_file_lw = get_reference_filename(:gas, :lw, :flux_dn)
-    flux_up_file_sw = get_reference_filename(:gas, :sw, :flux_up)
-    flux_dn_file_sw = get_reference_filename(:gas, :sw, :flux_dn)
 
-    exp_no = 1
+    expt_no = 1
     n_gauss_angles = 1
 
     # reading longwave lookup data
@@ -66,11 +62,11 @@ function clear_sky(
 
     # reading rfmip data to atmospheric state
     ds_lw_in = Dataset(input_file, "r")
-    (as, sfc_emis, sfc_alb_direct, cos_zenith, toa_flux) =
-        setup_rfmip_as(context, ds_lw_in, idx_gases, exp_no, lookup_lw, FT, VMR, param_set)
+    (as, sfc_emis, sfc_alb_direct, cos_zenith, toa_flux, bot_at_1) =
+        setup_rfmip_as(context, ds_lw_in, idx_gases, expt_no, lookup_lw, ncol, FT, VMR, param_set)
     close(ds_lw_in)
 
-    nlay, ncol = AtmosphericStates.get_dims(as)
+    nlay, _ = AtmosphericStates.get_dims(as)
     nlev = nlay + 1
 
     # setting up longwave problem
@@ -83,7 +79,7 @@ function clear_sky(
     swbcs = (cos_zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse)
     slv_sw = SLVSW(FT, DA, context, nlay, ncol, swbcs...)
     #--------------------------------------------------
-    # initializing RTE solver
+    # calling longwave and shortwave solvers
     exfiltrate && Infiltrator.@exfiltrate
     solve_lw!(slv_lw, as, lookup_lw)
     if device isa ClimaComms.CPUSingleThreaded
@@ -100,15 +96,7 @@ function clear_sky(
     end
 
     # comparing longwave fluxes with data from RRTMGP FORTRAN code
-    flip_ind = nlev:-1:1
-
-    ds_flux_up_lw = Dataset(flux_up_file_lw, "r")
-    comp_flux_up_lw = Array(ds_flux_up_lw["rlu"])[flip_ind, :, exp_no]
-    close(ds_flux_up_lw)
-
-    ds_flux_dn_lw = Dataset(flux_dn_file_lw, "r")
-    comp_flux_dn_lw = Array(ds_flux_dn_lw["rld"])[flip_ind, :, exp_no]
-    close(ds_flux_dn_lw)
+    comp_flux_up_lw, comp_flux_dn_lw, comp_flux_up_sw, comp_flux_dn_sw = load_comparison_data(expt_no, bot_at_1, ncol)
 
     comp_flux_net_lw = comp_flux_up_lw .- comp_flux_dn_lw
 
@@ -139,14 +127,6 @@ function clear_sky(
     println("L∞ relative error in flux_net = $(max_rel_err_flux_net_lw * 100) %\n")
 
     # comparing shortwave fluxes with data from RRTMGP FORTRAN code
-    ds_flux_up_sw = Dataset(flux_up_file_sw, "r")
-    comp_flux_up_sw = Array(ds_flux_up_sw["rsu"])[flip_ind, :, exp_no]
-    close(ds_flux_up_sw)
-
-    ds_flux_dn_sw = Dataset(flux_dn_file_sw, "r")
-    comp_flux_dn_sw = Array(ds_flux_dn_sw["rsd"])[flip_ind, :, exp_no]
-    close(ds_flux_dn_sw)
-
     comp_flux_net_sw = comp_flux_up_sw .- comp_flux_dn_sw
 
     flux_up_sw = Array(slv_sw.flux.flux_up)
