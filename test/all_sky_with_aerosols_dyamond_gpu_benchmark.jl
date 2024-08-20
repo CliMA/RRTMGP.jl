@@ -1,9 +1,10 @@
 using Test
 using Pkg.Artifacts
 using NCDatasets
+using Statistics
+using BenchmarkTools
+using Printf
 
-import JET
-import Infiltrator
 import ClimaComms
 @static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
 
@@ -26,29 +27,27 @@ using RRTMGP.ArtifactPaths
 include("reference_files.jl")
 include("read_all_sky_with_aerosols.jl")
 
-function all_sky_with_aerosols(
+function benchmark_all_sky_with_aerosols(
     context,
     ::Type{SLVLW},
     ::Type{SLVSW},
-    ::Type{FT},
-    toler_lw,
-    toler_sw;
+    ::Type{FT};
     ncol = 128,# repeats col#1 ncol times per RRTMGP example 
     use_lut::Bool = true,
     cldfrac = FT(1),
-    exfiltrate = false,
 ) where {FT <: AbstractFloat, SLVLW, SLVSW}
     overrides = (; grav = 9.80665, molmass_dryair = 0.028964, molmass_water = 0.018016)
     param_set = RRTMGPParameters(FT, overrides)
 
     device = ClimaComms.device(context)
     DA = ClimaComms.array_type(device)
+    FTA1D = DA{FT, 1}
+    FTA2D = DA{FT, 2}
     n_gauss_angles = 1
 
     lw_file = get_lookup_filename(:gas, :lw)          # lw lookup tables for gas optics
     lw_cld_file = get_lookup_filename(:cloud, :lw)    # lw cloud lookup tables
     lw_aero_file = get_lookup_filename(:aerosol, :lw) # lw aerosol lookup tables
-
     sw_file = get_lookup_filename(:gas, :sw)          # sw lookup tables for gas optics
     sw_cld_file = get_lookup_filename(:cloud, :sw)    # sw cloud lookup tables
     sw_aero_file = get_lookup_filename(:aerosol, :sw) # sw aerosol lookup tables
@@ -76,7 +75,6 @@ function all_sky_with_aerosols(
     ds_sw_cld = Dataset(sw_cld_file, "r")
     lookup_sw_cld = use_lut ? LookUpCld(ds_sw_cld, FT, DA) : PadeCld(ds_sw_cld, FT, DA)
     close(ds_sw_cld)
-
     # reading shortwave aerosol lookup data
     ds_sw_aero = Dataset(sw_aero_file, "r")
     lookup_sw_aero = LookUpAerosolMerra(ds_sw_aero, FT, DA)
@@ -111,80 +109,48 @@ function all_sky_with_aerosols(
     slv_sw = SLVSW(FT, DA, context, nlay, ncol, swbcs...)
     #------calling solvers
     solve_lw!(slv_lw, as, lookup_lw, lookup_lw_cld, lookup_lw_aero)
+    trial_lw = @benchmark CUDA.@sync solve_lw!($slv_lw, $as, $lookup_lw, $lookup_lw_cld, $lookup_lw_aero)
+
     solve_sw!(slv_sw, as, lookup_sw, lookup_sw_cld, lookup_sw_aero)
-    #------------------------------------------------------------------
-    # comparison
-    method = use_lut ? "Lookup Table Interpolation method" : "PADE method"
-    comp_flux_up_lw, comp_flux_dn_lw, comp_flux_up_sw, comp_flux_dn_sw = load_comparison_data(use_lut, bot_at_1, ncol)
+    trial_sw = @benchmark CUDA.@sync solve_sw!($slv_sw, $as, $lookup_sw, $lookup_sw_cld, $lookup_sw_aero)
+    return trial_lw, trial_sw
+end
 
-    comp_flux_net_lw = comp_flux_up_lw .- comp_flux_dn_lw
-    comp_flux_net_sw = comp_flux_up_sw .- comp_flux_dn_sw
-
-    flux_up_lw = Array(slv_lw.flux.flux_up)
-    flux_dn_lw = Array(slv_lw.flux.flux_dn)
-    flux_net_lw = Array(slv_lw.flux.flux_net)
-
-    max_err_flux_up_lw = maximum(abs.(flux_up_lw .- comp_flux_up_lw))
-    max_err_flux_dn_lw = maximum(abs.(flux_dn_lw .- comp_flux_dn_lw))
-    max_err_flux_net_lw = maximum(abs.(flux_net_lw .- comp_flux_net_lw))
-
-    rel_err_flux_net_lw = abs.(flux_net_lw .- comp_flux_net_lw)
-
-    for gcol in 1:ncol, glev in 1:nlev
-        den = abs(comp_flux_net_lw[glev, gcol])
-        if den > 10 * eps(FT)
-            rel_err_flux_net_lw[glev, gcol] /= den
-        end
-    end
-    max_rel_err_flux_net_lw = maximum(rel_err_flux_net_lw)
-    color2 = :cyan
-    printstyled("Cloudy-sky longwave test with ncol = $ncol, nlev = $nlev, Solver = $SLVLW, FT = $FT\n", color = color2)
-    printstyled("device = $device\n", color = color2)
-    printstyled("$method\n\n", color = color2)
-    println("L∞ error in flux_up           = $max_err_flux_up_lw")
-    println("L∞ error in flux_dn           = $max_err_flux_dn_lw")
-    println("L∞ error in flux_net          = $max_err_flux_net_lw")
-    println("L∞ relative error in flux_net = $(max_rel_err_flux_net_lw * 100) %\n")
-
-    flux_up_sw = Array(slv_sw.flux.flux_up)
-    flux_dn_sw = Array(slv_sw.flux.flux_dn)
-    flux_dn_dir_sw = Array(slv_sw.flux.flux_dn_dir)
-    flux_net_sw = Array(slv_sw.flux.flux_net)
-
-    max_err_flux_up_sw = maximum(abs.(flux_up_sw .- comp_flux_up_sw))
-    max_err_flux_dn_sw = maximum(abs.(flux_dn_sw .- comp_flux_dn_sw))
-    max_err_flux_net_sw = maximum(abs.(flux_net_sw .- comp_flux_net_sw))
-
-    rel_err_flux_net_sw = abs.(flux_net_sw .- comp_flux_net_sw)
-
-    for gcol in 1:ncol, glev in 1:nlev
-        den = abs(comp_flux_net_sw[glev, gcol])
-        if den > 10 * eps(FT)
-            rel_err_flux_net_sw[glev, gcol] /= den
-        end
-    end
-    max_rel_err_flux_net_sw = maximum(rel_err_flux_net_sw)
-
+function generate_gpu_all_sky_with_aerosols_benchmarks(FT, npts, ::Type{SLVLW}, ::Type{SLVSW}) where {SLVLW, SLVSW}
+    context = ClimaComms.context()
+    # compute equivalent ncols for DYAMOND resolution
+    helems, nlevels, nlev_test, nq = 30, 64, 73, 4
+    ncols_dyamond = Int(ceil(helems * helems * 6 * nq * nq * (nlevels / nlev_test)))
+    println("\n")
     printstyled(
-        "Cloudy-sky shortwave test with ncol = $ncol, nlev = $nlev, Solver = $SLVSW, FT = $FT\n",
-        color = color2,
+        "Running DYAMOND all-sky with aerosols benchmark on $(context.device) device with $FT precision\n",
+        color = 130,
     )
-    printstyled("device = $device\n", color = color2)
-    printstyled("$method\n\n", color = color2)
-    println("L∞ error in flux_up           = $max_err_flux_up_sw")
-    println("L∞ error in flux_dn           = $max_err_flux_dn_sw")
-    println("L∞ error in flux_net          = $max_err_flux_net_sw")
-    println("L∞ relative error in flux_net = $(max_rel_err_flux_net_sw * 100) %\n")
-
-    # The reference results for the longwave solver are generated using a non-scattering solver,
-    # which differ from the results generated by the TwoStream currently used.
-    @test max_err_flux_up_lw ≤ toler_lw[FT]
-    @test max_err_flux_dn_lw ≤ toler_lw[FT]
-    @test max_err_flux_net_lw ≤ toler_lw[FT]
-
-    @test max_err_flux_up_sw ≤ toler_sw[FT]
-    @test max_err_flux_dn_sw ≤ toler_sw[FT]
-    @test max_err_flux_net_sw ≤ toler_sw[FT]
-
+    printstyled("Longwave solver = $SLVLW; Shortwave solver = $SLVSW\n", color = 130)
+    printstyled("==============|====================================|==================================\n", color = 130)
+    printstyled(
+        "  ncols       |   median time for longwave solver  | median time for shortwave solver \n",
+        color = :green,
+    )
+    printstyled("==============|====================================|==================================\n", color = 130)
+    for pts in 1:npts
+        ncols = unsafe_trunc(Int, cld(ncols_dyamond, 2^(pts - 1)))
+        ndof = ncols * nlev_test
+        sz_per_fld_gb = ndof * sizeof(FT) / 1024 / 1024 / 1024
+        trial_lw, trial_sw =
+            benchmark_all_sky_with_aerosols(context, SLVLW, SLVSW, FT; ncol = ncols, use_lut = true, cldfrac = FT(1))
+        Printf.@printf(
+            "%10i    |           %25s|       %25s \n",
+            ncols,
+            Statistics.median(trial_lw),
+            Statistics.median(trial_sw)
+        )
+    end
+    printstyled("==============|====================================|==================================\n", color = 130)
     return nothing
+end
+
+for FT in (Float32, Float64)
+    generate_gpu_all_sky_with_aerosols_benchmarks(FT, 4, NoScatLWRTE, TwoStreamSWRTE)
+    generate_gpu_all_sky_with_aerosols_benchmarks(FT, 4, TwoStreamLWRTE, TwoStreamSWRTE)
 end

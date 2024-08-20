@@ -87,12 +87,6 @@ function all_sky(
     close(ds_in)
     nlay, ncol = AtmosphericStates.get_dims(as)
     nlev = nlay + 1
-    #---reading comparison files -----------------------------------
-    if bot_at_1
-        flip_ind = 1:nlev
-    else
-        flip_ind = nlev:-1:1
-    end
     # Setting up longwave problem---------------------------------------
     inc_flux = nothing
     slv_lw = SLVLW(FT, DA, context, param_set, nlay, ncol, sfc_emis, inc_flux)
