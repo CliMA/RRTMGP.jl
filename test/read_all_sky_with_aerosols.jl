@@ -8,6 +8,8 @@ function setup_allsky_with_aerosols_as(
     context,
     ds_in,
     idx_gases,
+    idx_aerosol,
+    idx_aerosize,
     lkp_lw,
     lkp_sw,
     lkp_lw_cld,
@@ -84,14 +86,30 @@ function setup_allsky_with_aerosols_as(
     aero_size_ref = Array{FT}(transpose(Array(ds_in["aero_size"])[:, lay_ind]))
     aero_mass_ref = Array{FT}(transpose(Array(ds_in["aero_mass"])[:, lay_ind]))
     ncol_ref = size(aero_type_ref, 2)
+    n_aerosols = length(idx_aerosol)
+    n_aerosize = maximum(values(idx_aerosize)) # only dust and sea salt particles need aerosize
+    #------------------------------
+    aero_mask = zeros(Bool, nlay, ncol_ref)
+    aero_mass = zeros(FT, n_aerosols, nlay, ncol_ref)
+    aero_size = zeros(FT, n_aerosize, nlay, ncol_ref)
+    for icol in 1:ncol_ref, ilay in 1:nlay
+        aerotyperef = aero_type_ref[ilay, icol]
+        if aerotyperef > 0
+            aero_mask[ilay, icol] = true
+            aero_mass[aerotyperef, ilay, icol] = aero_mass_ref[ilay, icol]
+            aerosizeref = get(idx_aerosize, aerotyperef, 0)
+            if aerosizeref ≠ 0
+                aero_size[aerosizeref, ilay, icol] = aero_size_ref[ilay, icol]
+            end
+        end
+    end
     # repeat the input data to set problem size to ncols
-    nrepeat = Int(fld(ncol, ncol_ref))
-    rem = Int(ncol % ncol_ref)
-    aero_type = DA(hcat(repeat(aero_type_ref, 1, nrepeat), aero_type_ref[:, 1:rem]))
-    aero_size = DA(hcat(repeat(aero_size_ref, 1, nrepeat), aero_size_ref[:, 1:rem]))
-    aero_mass = DA(hcat(repeat(aero_mass_ref, 1, nrepeat), aero_mass_ref[:, 1:rem]))
-
-    aerosol_state = AerosolState(aero_type, aero_size, aero_mass)
+    nrepeat = Int(cld(ncol, ncol_ref))
+    aerosol_state = AerosolState(
+        DA(repeat(aero_mask, 1, nrepeat)[:, 1:ncol]),
+        DA(repeat(aero_size, 1, 1, nrepeat)[:, :, 1:ncol]),
+        DA(repeat(aero_mass, 1, 1, nrepeat)[:, :, 1:ncol]),
+    )
 
     for icol in 2:ncol
         vmrat[:, :, icol] .= vmrat[:, :, 1]
