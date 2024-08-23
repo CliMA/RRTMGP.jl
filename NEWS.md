@@ -4,6 +4,11 @@ RRTMGP.jl Release Notes
 main
 ------
 
+v0.18.0
+-----
+- Add support for multiple aerosol types ([#523](https://github.com/CliMA/RRTMGP.jl/pull/523))
+
+
 v0.17.0
 -----
 - Add support for aerosol optics ([#510](https://github.com/CliMA/RRTMGP.jl/pull/510))
