@@ -36,6 +36,13 @@ pade_eval
 ```@docs
 add_aerosol_optics_1scalar!
 add_aerosol_optics_2stream!
+compute_lookup_aerosol
+compute_lookup_dust_props
+compute_lookup_sea_salt_props
+compute_lookup_sulfate_props
+compute_lookup_black_carbon_props
+compute_lookup_organic_carbon_props
+locate_merra_size_bin
 ```
 
 ```@docs

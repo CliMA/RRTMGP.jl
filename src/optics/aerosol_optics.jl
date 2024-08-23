@@ -1,7 +1,7 @@
 """
     add_aerosol_optics_1scalar!(
         τ,
-        aero_type,
+        aero_mask,
         aero_size,
         aero_mass,
         rel_hum,
@@ -14,7 +14,7 @@ to the exising `OneScalar` optics properties.
 """
 @inline function add_aerosol_optics_1scalar!(
     τ,
-    aero_type,
+    aero_mask,
     aero_size,
     aero_mass,
     rel_hum,
@@ -25,16 +25,9 @@ to the exising `OneScalar` optics properties.
     @inbounds begin
         nlay = length(τ)
         for glay in 1:nlay
-            aero_type_lay = aero_type[glay]
-            if aero_type_lay ≠ 0
-                τ_aero, τ_ssa_aero, τ_ssag_aero = compute_lookup_aerosol(
-                    lkp_aero,
-                    ibnd,
-                    aero_type_lay,
-                    aero_mass[glay],
-                    aero_size[glay],
-                    rel_hum[glay],
-                )
+            if aero_mask[glay]
+                τ_aero, τ_ssa_aero, τ_ssag_aero =
+                    compute_lookup_aerosol(lkp_aero, ibnd, aero_mass, aero_size, rel_hum[glay], glay)
                 τ[glay] += (τ_aero - τ_ssa_aero)
             end
         end
@@ -47,7 +40,7 @@ end
         τ,
         ssa,
         g,
-        aero_type,
+        aero_mask,
         aero_size,
         aero_mass,
         rel_hum,
@@ -63,7 +56,7 @@ to the exising `TwoStream` optics properties.
     τ,
     ssa,
     g,
-    aero_type,
+    aero_mask,
     aero_size,
     aero_mass,
     rel_hum,
@@ -75,52 +68,89 @@ to the exising `TwoStream` optics properties.
         nlay = length(τ)
         FT = eltype(τ)
         for glay in 1:nlay
-            aero_type_lay = aero_type[glay]
-            if aero_type_lay > 0
-                τ_aero, τ_ssa_aero, τ_ssag_aero = compute_lookup_aerosol(
-                    lkp_aero,
-                    ibnd,
-                    aero_type_lay,
-                    aero_mass[glay],
-                    aero_size[glay],
-                    rel_hum[glay],
-                )
+            if aero_mask[glay]
+                τ_aero, τ_ssa_aero, τ_ssag_aero =
+                    compute_lookup_aerosol(lkp_aero, ibnd, aero_mass, aero_size, rel_hum[glay], glay)
                 g_aero = τ_ssag_aero / max(eps(FT), τ_ssa_aero)
                 ssa_aero = τ_ssa_aero / max(eps(FT), τ_aero)
                 if delta_scaling # delta scaling is applied for shortwave problem
                     τ_aero, ssa_aero, g_aero = delta_scale(τ_aero, ssa_aero, g_aero)
                 end
                 τ[glay], ssa[glay], g[glay] = increment_2stream(τ[glay], ssa[glay], g[glay], τ_aero, ssa_aero, g_aero)
-
             end
         end
     end
     return nothing
 end
 
-function compute_lookup_aerosol(lkp_aero, ibnd::Int, aerotype::Int, aeromass::FT, aerosize::FT, rh::FT) where {FT}
-    cargs = (lkp_aero, ibnd, aeromass) # common args
-    return aerotype == 1 ? compute_lookup_dust_props(cargs..., aerosize) :
-           (
-        aerotype == 2 ? compute_lookup_sea_salt_props(cargs..., aerosize, rh) :
-        (
-            aerotype == 3 ? compute_lookup_sulfate_props(cargs..., rh) :
-            (
-                aerotype == 4 ? compute_lookup_black_carbon_props(cargs...) :
-                (
-                    aerotype == 5 ? compute_lookup_black_carbon_props(cargs..., rh) :
-                    (
-                        aerotype == 6 ? compute_lookup_organic_carbon_props(cargs...) :
-                        (aerotype == 7 ? compute_lookup_organic_carbon_props(cargs..., rh) : (FT(0), FT(0), FT(0)))
-                    )
-                )
-            )
-        )
-    )
+"""
+    compute_lookup_aerosol(lkp_aero, ibnd::Int, aero_mass, aero_size, rh::FT, glay) where {FT}
+
+Compute cumulative aerosol optical properties for various aerosol particles given the aerosol lookup table (`lkp_aero`), 
+band number (`ibnd`), aerosol mass (`aeromass`), aerosol size (`aerosize`), and relative humidity (`rh`).
+"""
+function compute_lookup_aerosol(lkp_aero, ibnd::Int, aero_mass, aero_size, rh::FT, glay) where {FT}
+    τ_cum, τ_ssa_cum, τ_ssag_cum = FT(0), FT(0), FT(0)
+
+    if aero_mass[1, glay] > FT(0)
+        τ, τ_ssa, τ_ssag = compute_lookup_dust_props(lkp_aero, ibnd, aero_mass[1, glay], aero_size[1, glay])
+        τ_cum += τ
+        τ_ssa_cum += τ_ssa
+        τ_ssag_cum += τ_ssag
+    end
+
+    if aero_mass[2, glay] > FT(0)
+        τ, τ_ssa, τ_ssag = compute_lookup_sea_salt_props(lkp_aero, ibnd, aero_mass[2, glay], aero_size[2, glay], rh)
+        τ_cum += τ
+        τ_ssa_cum += τ_ssa
+        τ_ssag_cum += τ_ssag
+    end
+
+    if aero_mass[3, glay] > FT(0)
+        τ, τ_ssa, τ_ssag = compute_lookup_sulfate_props(lkp_aero, ibnd, aero_mass[3, glay], rh)
+        τ_cum += τ
+        τ_ssa_cum += τ_ssa
+        τ_ssag_cum += τ_ssag
+    end
+
+    if aero_mass[4, glay] > FT(0)
+        τ, τ_ssa, τ_ssag = compute_lookup_black_carbon_props(lkp_aero, ibnd, aero_mass[4, glay], rh)
+        τ_cum += τ
+        τ_ssa_cum += τ_ssa
+        τ_ssag_cum += τ_ssag
+    end
+
+    if aero_mass[5, glay] > FT(0)
+        τ, τ_ssa, τ_ssag = compute_lookup_black_carbon_props(lkp_aero, ibnd, aero_mass[5, glay])
+        τ_cum += τ
+        τ_ssa_cum += τ_ssa
+        τ_ssag_cum += τ_ssag
+    end
+
+    if aero_mass[6, glay] > FT(0)
+        τ, τ_ssa, τ_ssag = compute_lookup_organic_carbon_props(lkp_aero, ibnd, aero_mass[6, glay], rh)
+        τ_cum += τ
+        τ_ssa_cum += τ_ssa
+        τ_ssag_cum += τ_ssag
+    end
+
+    if aero_mass[7, glay] > FT(0)
+        τ, τ_ssa, τ_ssag = compute_lookup_organic_carbon_props(lkp_aero, ibnd, aero_mass[7, glay])
+        τ_cum += τ
+        τ_ssa_cum += τ_ssa
+        τ_ssag_cum += τ_ssag
+    end
+
+    return τ_cum, τ_ssa_cum, τ_ssag_cum
 end
 
+"""
+    compute_lookup_dust_props(lkp_aero, ibnd, aeromass::FT, aerosize::FT) where {FT}
 
-function compute_lookup_dust_props(lkp_aero, ibnd::Int, aeromass::FT, aerosize::FT) where {FT}
+Compute aerosol optical properties for dust particles given the aerosol lookup table (`lkp_aero`), 
+band number (`ibnd`), aerosol mass (`aeromass`) and aerosol size (`aerosize`).
+"""
+function compute_lookup_dust_props(lkp_aero, ibnd, aeromass::FT, aerosize::FT) where {FT}
     (; size_bin_limits, dust) = lkp_aero
     bin = locate_merra_size_bin(size_bin_limits, aerosize)
     τ = aeromass * dust[1, bin, ibnd]
@@ -129,11 +159,31 @@ function compute_lookup_dust_props(lkp_aero, ibnd::Int, aeromass::FT, aerosize::
     return τ, τ_ssa, τ_ssag
 end
 
-function compute_lookup_sea_salt_props(lkp_aero, ibnd::Int, aeromass::FT, aerosize::FT, rh::FT) where {FT}
-    return (FT(0), FT(0), FT(0))
+"""
+    compute_lookup_sea_salt_props(lkp_aero, ibnd, aeromass::FT, aerosize::FT, rh::FT) where {FT}
+
+Compute aerosol optical properties for sea salt particles given the aerosol lookup table (`lkp_aero`), 
+band number (`ibnd`), aerosol mass (`aeromass`), aerosol size (`aerosize`), and relative humidity (`rh`).
+"""
+function compute_lookup_sea_salt_props(lkp_aero, ibnd, aeromass::FT, aerosize::FT, rh::FT) where {FT}
+    (; size_bin_limits, rh_levels, sea_salt) = lkp_aero
+    @inbounds begin
+        bin = locate_merra_size_bin(size_bin_limits, aerosize)
+        loc, factor = interp1d_loc_factor(rh, rh_levels)
+        τ = aeromass * (sea_salt[1, loc, bin, ibnd] * (FT(1) - factor) + sea_salt[1, loc + 1, bin, ibnd] * factor)
+        τ_ssa = τ * (sea_salt[2, loc, bin, ibnd] * (FT(1) - factor) + sea_salt[2, loc + 1, bin, ibnd] * factor)
+        τ_ssag = τ_ssa * (sea_salt[3, loc, bin, ibnd] * (FT(1) - factor) + sea_salt[3, loc + 1, bin, ibnd] * factor)
+    end
+    return τ, τ_ssa, τ_ssag
 end
 
-function compute_lookup_sulfate_props(lkp_aero, ibnd::Int, aeromass::FT, rh::FT) where {FT}
+"""
+    compute_lookup_sulfate_props(lkp_aero, ibnd, aeromass::FT, rh::FT) where {FT}
+
+Compute aerosol optical properties for sulfate particles given the aerosol lookup table (`lkp_aero`), 
+band number (`ibnd`), aerosol mass (`aeromass`), and relative humidity (`rh`).
+"""
+function compute_lookup_sulfate_props(lkp_aero, ibnd, aeromass::FT, rh::FT) where {FT}
     (; rh_levels, sulfate) = lkp_aero
     @inbounds begin
         loc, factor = interp1d_loc_factor(rh, rh_levels)
@@ -144,7 +194,13 @@ function compute_lookup_sulfate_props(lkp_aero, ibnd::Int, aeromass::FT, rh::FT)
     return τ, τ_ssa, τ_ssag
 end
 
-function compute_lookup_black_carbon_props(lkp_aero, ibnd::Int, aeromass::FT) where {FT}
+"""
+    compute_lookup_black_carbon_props(lkp_aero, ibnd, aeromass::FT) where {FT}
+
+Compute aerosol optical properties for hydrophobic black carbon particles given the aerosol lookup table (`lkp_aero`), 
+band number (`ibnd`), and aerosol mass (`aeromass`).
+"""
+function compute_lookup_black_carbon_props(lkp_aero, ibnd, aeromass::FT) where {FT}
     (; black_carbon) = lkp_aero
     τ = aeromass * black_carbon[1, ibnd]
     τ_ssa = τ * black_carbon[2, ibnd]
@@ -152,7 +208,13 @@ function compute_lookup_black_carbon_props(lkp_aero, ibnd::Int, aeromass::FT) wh
     return τ, τ_ssa, τ_ssag
 end
 
-function compute_lookup_black_carbon_props(lkp_aero, ibnd::Int, aeromass::FT, rh::FT) where {FT}
+"""
+    compute_lookup_black_carbon_props(lkp_aero, ibnd, aeromass::FT, rh::FT) where {FT}
+
+Compute aerosol optical properties for hydrophilic black carbon particles given the aerosol lookup table (`lkp_aero`), 
+band number (`ibnd`), aerosol mass (`aeromass`), and relative humidity (`rh`).
+"""
+function compute_lookup_black_carbon_props(lkp_aero, ibnd, aeromass::FT, rh::FT) where {FT}
     (; rh_levels, black_carbon_rh) = lkp_aero
     @inbounds begin
         loc, factor = interp1d_loc_factor(rh, rh_levels)
@@ -163,7 +225,13 @@ function compute_lookup_black_carbon_props(lkp_aero, ibnd::Int, aeromass::FT, rh
     return τ, τ_ssa, τ_ssag
 end
 
-function compute_lookup_organic_carbon_props(lkp_aero, ibnd::Int, aeromass::FT) where {FT}
+"""
+    compute_lookup_organic_carbon_props(lkp_aero, ibnd, aeromass)
+
+Compute aerosol optical properties for hydrophobic organic carbon particles given the aerosol lookup table (`lkp_aero`), 
+band number (`ibnd`), and aerosol mass (`aeromass`).
+"""
+function compute_lookup_organic_carbon_props(lkp_aero, ibnd, aeromass)
     (; organic_carbon) = lkp_aero
     τ = aeromass * organic_carbon[1, ibnd]
     τ_ssa = τ * organic_carbon[2, ibnd]
@@ -171,7 +239,13 @@ function compute_lookup_organic_carbon_props(lkp_aero, ibnd::Int, aeromass::FT) 
     return τ, τ_ssa, τ_ssag
 end
 
-function compute_lookup_organic_carbon_props(lkp_aero, ibnd::Int, aeromass::FT, rh::FT) where {FT}
+"""
+    compute_lookup_organic_carbon_props(lkp_aero, ibnd, aeromass::FT, rh::FT) where {FT}
+
+Compute aerosol optical properties for hydrophilic organic carbon particles given the aerosol lookup table (`lkp_aero`), 
+band number (`ibnd`), aerosol mass (`aeromass`), and relative humidity (`rh`).
+"""
+function compute_lookup_organic_carbon_props(lkp_aero, ibnd, aeromass::FT, rh::FT) where {FT}
     (; rh_levels, organic_carbon_rh) = lkp_aero
     @inbounds begin
         loc, factor = interp1d_loc_factor(rh, rh_levels)
@@ -185,6 +259,11 @@ function compute_lookup_organic_carbon_props(lkp_aero, ibnd::Int, aeromass::FT, 
     return τ, τ_ssa, τ_ssag
 end
 
+"""
+    locate_merra_size_bin(size_bin_limits, aerosize)
+
+Locate merra bin number for a given aerosol size (`aerosize`).
+"""
 function locate_merra_size_bin(size_bin_limits, aerosize)
     nbins = size(size_bin_limits, 2)
     bin = 1

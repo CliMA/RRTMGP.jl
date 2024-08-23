@@ -64,7 +64,7 @@ function benchmark_all_sky_with_aerosols(
     close(ds_lw_cld)
     # reading longwave aerosol lookup data
     ds_lw_aero = Dataset(lw_aero_file, "r")
-    lookup_lw_aero = LookUpAerosolMerra(ds_lw_aero, FT, DA)
+    lookup_lw_aero, idx_aerosol, idx_aerosize = LookUpAerosolMerra(ds_lw_aero, FT, DA)
     close(ds_lw_aero)
 
     #reading shortwave gas optics lookup data
@@ -77,7 +77,7 @@ function benchmark_all_sky_with_aerosols(
     close(ds_sw_cld)
     # reading shortwave aerosol lookup data
     ds_sw_aero = Dataset(sw_aero_file, "r")
-    lookup_sw_aero = LookUpAerosolMerra(ds_sw_aero, FT, DA)
+    lookup_sw_aero, _, _ = LookUpAerosolMerra(ds_sw_aero, FT, DA)
     close(ds_sw_aero)
 
     # reading input file 
@@ -86,6 +86,8 @@ function benchmark_all_sky_with_aerosols(
         context,
         ds_in,
         idx_gases,
+        idx_aerosol,
+        idx_aerosize,
         lookup_lw,
         lookup_sw,
         lookup_lw_cld,

@@ -65,7 +65,7 @@ function all_sky_with_aerosols(
     close(ds_lw_cld)
     # reading longwave aerosol lookup data
     ds_lw_aero = Dataset(lw_aero_file, "r")
-    lookup_lw_aero = LookUpAerosolMerra(ds_lw_aero, FT, DA)
+    lookup_lw_aero, idx_aerosol, idx_aerosize = LookUpAerosolMerra(ds_lw_aero, FT, DA)
     close(ds_lw_aero)
 
     #reading shortwave gas optics lookup data
@@ -79,7 +79,7 @@ function all_sky_with_aerosols(
 
     # reading shortwave aerosol lookup data
     ds_sw_aero = Dataset(sw_aero_file, "r")
-    lookup_sw_aero = LookUpAerosolMerra(ds_sw_aero, FT, DA)
+    lookup_sw_aero, _, _ = LookUpAerosolMerra(ds_sw_aero, FT, DA)
     close(ds_sw_aero)
 
     # reading input file 
@@ -88,6 +88,8 @@ function all_sky_with_aerosols(
         context,
         ds_in,
         idx_gases,
+        idx_aerosol,
+        idx_aerosize,
         lookup_lw,
         lookup_sw,
         lookup_lw_cld,
@@ -102,17 +104,16 @@ function all_sky_with_aerosols(
 
     nlay, _ = AtmosphericStates.get_dims(as)
     nlev = nlay + 1
-    # Setting up longwave problem---------------------------------------
+    # Setting up longwave problem
     inc_flux = nothing
     slv_lw = SLVLW(FT, DA, context, param_set, nlay, ncol, sfc_emis, inc_flux)
-    # Setting up shortwave problem---------------------------------------
+    # Setting up shortwave problem
     inc_flux_diffuse = nothing
     swbcs = (cos_zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse)
     slv_sw = SLVSW(FT, DA, context, nlay, ncol, swbcs...)
-    #------calling solvers
+    # calling solvers
     solve_lw!(slv_lw, as, lookup_lw, lookup_lw_cld, lookup_lw_aero)
     solve_sw!(slv_sw, as, lookup_sw, lookup_sw_cld, lookup_sw_aero)
-    #------------------------------------------------------------------
     # comparison
     method = use_lut ? "Lookup Table Interpolation method" : "PADE method"
     comp_flux_up_lw, comp_flux_dn_lw, comp_flux_up_sw, comp_flux_dn_sw = load_comparison_data(use_lut, bot_at_1, ncol)
@@ -138,7 +139,10 @@ function all_sky_with_aerosols(
     end
     max_rel_err_flux_net_lw = maximum(rel_err_flux_net_lw)
     color2 = :cyan
-    printstyled("Cloudy-sky longwave test with ncol = $ncol, nlev = $nlev, Solver = $SLVLW, FT = $FT\n", color = color2)
+    printstyled(
+        "Cloudy-sky with aerosols longwave test with ncol = $ncol, nlev = $nlev, Solver = $SLVLW, FT = $FT\n",
+        color = color2,
+    )
     printstyled("device = $device\n", color = color2)
     printstyled("$method\n\n", color = color2)
     println("L∞ error in flux_up           = $max_err_flux_up_lw")
@@ -166,7 +170,7 @@ function all_sky_with_aerosols(
     max_rel_err_flux_net_sw = maximum(rel_err_flux_net_sw)
 
     printstyled(
-        "Cloudy-sky shortwave test with ncol = $ncol, nlev = $nlev, Solver = $SLVSW, FT = $FT\n",
+        "Cloudy-sky with aerosols shortwave test with ncol = $ncol, nlev = $nlev, Solver = $SLVSW, FT = $FT\n",
         color = color2,
     )
     printstyled("device = $device\n", color = color2)

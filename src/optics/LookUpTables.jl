@@ -925,7 +925,7 @@ function PadeCld(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
 end
 
 """
-    LookUpAerosolMerra{D, B, R, D2, D3, D4, W} <: AbstractLookUp
+    LookUpAerosolMerra{D, D1, D2, D3, D4, W} <: AbstractLookUp
 
 Merra lookup table for aersols. 
 
@@ -952,14 +952,14 @@ struct LookUpAerosolMerra{D, D1, D2, D3, D4, W} <: AbstractLookUp
     sea_salt::D4
     "sulfate `(nval, nrh, nband)`"
     sulfate::D3
-    "black carbon - hydrophobic `(nval, nband)`"
-    black_carbon::D2
     "black carbon - hydrophilic `(nval, nhr, nband)`"
     black_carbon_rh::D3
-    "organic carbon - hydrophobic `(nval, nband)`"
-    organic_carbon::D2
+    "black carbon - hydrophobic `(nval, nband)`"
+    black_carbon::D2
     "organic carbon - hydrophilic `(nval, nhr, nband)`"
     organic_carbon_rh::D3
+    "organic carbon - hydrophobic `(nval, nband)`"
+    organic_carbon::D2
     "beginning and ending wavenumber for each band (`2, nband`) cm⁻¹"
     bnd_lims_wn::W
 end
@@ -972,11 +972,24 @@ function LookUpAerosolMerra(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFlo
     dust = DA(Array{FT}(ds["aero_dust_tbl"]))
     sea_salt = DA{FT}(Array(ds["aero_salt_tbl"]))
     sulfate = DA{FT}(Array(ds["aero_sulf_tbl"]))
-    black_carbon = DA{FT}(Array(ds["aero_bcar_tbl"]))
     black_carbon_rh = DA{FT}(Array(ds["aero_bcar_rh_tbl"]))
-    organic_carbon = DA{FT}(Array(ds["aero_ocar_tbl"]))
+    black_carbon = DA{FT}(Array(ds["aero_bcar_tbl"]))
     organic_carbon_rh = DA{FT}(Array(ds["aero_ocar_rh_tbl"]))
+    organic_carbon = DA{FT}(Array(ds["aero_ocar_tbl"]))
     bnd_lims_wn = DA{FT}(Array(ds["bnd_limits_wavenumber"]))
+    # map aerosol name to aerosol idx
+    idx_aerosol = Dict(
+        "dust" => 1,
+        "sea_salt" => 2,
+        "sulfate" => 3,
+        "black_carbon_rh" => 4,
+        "black_carbon" => 5,
+        "organic_carbon_rh" => 6,
+        "organic_carbon" => 7,
+    )
+    # map aerosol idx to its aeromass idx
+    # please note that only "dust" and "sea salt" need aerosol sizes
+    idx_aerosize = Dict(1 => 1, 2 => 2)
     return LookUpAerosolMerra(
         dims,
         size_bin_limits,
@@ -984,12 +997,14 @@ function LookUpAerosolMerra(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFlo
         dust,
         sea_salt,
         sulfate,
-        black_carbon,
         black_carbon_rh,
-        organic_carbon,
+        black_carbon,
         organic_carbon_rh,
+        organic_carbon,
         bnd_lims_wn,
-    )
+    ),
+    idx_aerosol,
+    idx_aerosize
 end
 
 end
