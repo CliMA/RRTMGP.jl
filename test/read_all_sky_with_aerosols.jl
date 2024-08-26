@@ -89,13 +89,11 @@ function setup_allsky_with_aerosols_as(
     n_aerosols = length(idx_aerosol)
     n_aerosize = maximum(values(idx_aerosize)) # only dust and sea salt particles need aerosize
     #------------------------------
-    aero_mask = zeros(Bool, nlay, ncol_ref)
     aero_mass = zeros(FT, n_aerosols, nlay, ncol_ref)
     aero_size = zeros(FT, n_aerosize, nlay, ncol_ref)
     for icol in 1:ncol_ref, ilay in 1:nlay
         aerotyperef = aero_type_ref[ilay, icol]
         if aerotyperef > 0
-            aero_mask[ilay, icol] = true
             aero_mass[aerotyperef, ilay, icol] = aero_mass_ref[ilay, icol]
             aerosizeref = get(idx_aerosize, aerotyperef, 0)
             if aerosizeref ≠ 0
@@ -106,7 +104,6 @@ function setup_allsky_with_aerosols_as(
     # repeat the input data to set problem size to ncols
     nrepeat = Int(cld(ncol, ncol_ref))
     aerosol_state = AerosolState(
-        DA(repeat(aero_mask, 1, nrepeat)[:, 1:ncol]),
         DA(repeat(aero_size, 1, 1, nrepeat)[:, :, 1:ncol]),
         DA(repeat(aero_mass, 1, 1, nrepeat)[:, :, 1:ncol]),
     )

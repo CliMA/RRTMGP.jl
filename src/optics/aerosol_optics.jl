@@ -1,31 +1,23 @@
 """
     add_aerosol_optics_1scalar!(
         τ,
-        aero_mask,
         aero_size,
         aero_mass,
         rel_hum,
-        lkp_aero::LookUpAerosolMerra,
+        lkp_aero,
         ibnd,
     )
 
 This function computes the `OneScalar` aerosol optics properties and adds them
 to the exising `OneScalar` optics properties.
 """
-@inline function add_aerosol_optics_1scalar!(
-    τ,
-    aero_mask,
-    aero_size,
-    aero_mass,
-    rel_hum,
-    lkp_aero::LookUpAerosolMerra,
-    ibnd,
-)
+@inline function add_aerosol_optics_1scalar!(τ, aero_size, aero_mass, rel_hum, lkp_aero, ibnd)
     FT = eltype(τ)
     @inbounds begin
         nlay = length(τ)
         for glay in 1:nlay
-            if aero_mask[glay]
+            aero_mask = _aero_mask(view(aero_mass, :, glay))
+            if aero_mask
                 τ_aero, τ_ssa_aero, τ_ssag_aero =
                     compute_lookup_aerosol(lkp_aero, ibnd, aero_mass, aero_size, rel_hum[glay], glay)
                 τ[glay] += (τ_aero - τ_ssa_aero)
@@ -40,11 +32,10 @@ end
         τ,
         ssa,
         g,
-        aero_mask,
         aero_size,
         aero_mass,
         rel_hum,
-        lkp_aero::LookUpAerosolMerra,
+        lkp_aero,
         ibnd;
         delta_scaling = false,
     )
@@ -56,11 +47,10 @@ to the exising `TwoStream` optics properties.
     τ,
     ssa,
     g,
-    aero_mask,
     aero_size,
     aero_mass,
     rel_hum,
-    lkp_aero::LookUpAerosolMerra,
+    lkp_aero,
     ibnd;
     delta_scaling = false,
 )
@@ -68,7 +58,8 @@ to the exising `TwoStream` optics properties.
         nlay = length(τ)
         FT = eltype(τ)
         for glay in 1:nlay
-            if aero_mask[glay]
+            aero_mask = _aero_mask(view(aero_mass, :, glay))
+            if aero_mask
                 τ_aero, τ_ssa_aero, τ_ssag_aero =
                     compute_lookup_aerosol(lkp_aero, ibnd, aero_mass, aero_size, rel_hum[glay], glay)
                 g_aero = τ_ssag_aero / max(eps(FT), τ_ssa_aero)
@@ -153,9 +144,11 @@ band number (`ibnd`), aerosol mass (`aeromass`) and aerosol size (`aerosize`).
 function compute_lookup_dust_props(lkp_aero, ibnd, aeromass::FT, aerosize::FT) where {FT}
     (; size_bin_limits, dust) = lkp_aero
     bin = locate_merra_size_bin(size_bin_limits, aerosize)
-    τ = aeromass * dust[1, bin, ibnd]
-    τ_ssa = τ * dust[2, bin, ibnd]
-    τ_ssag = τ_ssa * dust[3, bin, ibnd]
+    @inbounds begin
+        τ = aeromass * dust[1, bin, ibnd]
+        τ_ssa = τ * dust[2, bin, ibnd]
+        τ_ssag = τ_ssa * dust[3, bin, ibnd]
+    end
     return τ, τ_ssa, τ_ssag
 end
 
@@ -202,9 +195,11 @@ band number (`ibnd`), and aerosol mass (`aeromass`).
 """
 function compute_lookup_black_carbon_props(lkp_aero, ibnd, aeromass::FT) where {FT}
     (; black_carbon) = lkp_aero
-    τ = aeromass * black_carbon[1, ibnd]
-    τ_ssa = τ * black_carbon[2, ibnd]
-    τ_ssag = τ_ssa * black_carbon[3, ibnd]
+    @inbounds begin
+        τ = aeromass * black_carbon[1, ibnd]
+        τ_ssa = τ * black_carbon[2, ibnd]
+        τ_ssag = τ_ssa * black_carbon[3, ibnd]
+    end
     return τ, τ_ssa, τ_ssag
 end
 
@@ -233,9 +228,11 @@ band number (`ibnd`), and aerosol mass (`aeromass`).
 """
 function compute_lookup_organic_carbon_props(lkp_aero, ibnd, aeromass)
     (; organic_carbon) = lkp_aero
-    τ = aeromass * organic_carbon[1, ibnd]
-    τ_ssa = τ * organic_carbon[2, ibnd]
-    τ_ssag = τ_ssa * organic_carbon[3, ibnd]
+    @inbounds begin
+        τ = aeromass * organic_carbon[1, ibnd]
+        τ_ssa = τ * organic_carbon[2, ibnd]
+        τ_ssag = τ_ssa * organic_carbon[3, ibnd]
+    end
     return τ, τ_ssa, τ_ssag
 end
 
@@ -267,11 +264,24 @@ Locate merra bin number for a given aerosol size (`aerosize`).
 function locate_merra_size_bin(size_bin_limits, aerosize)
     nbins = size(size_bin_limits, 2)
     bin = 1
-    for ibin in 1:nbins
-        if size_bin_limits[1, ibin] ≤ aerosize ≤ size_bin_limits[2, ibin]
-            bin = ibin
-            break
+    @inbounds begin
+        for ibin in 1:nbins
+            if size_bin_limits[1, ibin] ≤ aerosize ≤ size_bin_limits[2, ibin]
+                bin = ibin
+                break
+            end
         end
     end
     return bin
+end
+
+function _aero_mask(aero_mass_layer::AbstractArray{FT, 1}) where {FT}
+    aero_mask = false
+    for aeromass in aero_mass_layer
+        if aeromass > FT(0)
+            aero_mask = true
+            break
+        end
+    end
+    return aero_mask
 end
