@@ -1,3 +1,5 @@
+function rrtmgp_cuprint end
+
 function rte_sw_2stream_solve!(
     device::ClimaComms.AbstractCPUDevice,
     flux_sw::FluxSW,
@@ -124,8 +126,10 @@ function sw_2stream_coeffs(τ::FT, ssa::FT, g::FT, μ₀::FT) where {FT}
     # Refactored to avoid rounding errors when k, gamma1 are of very different magnitudes
     RT_term = FT(1) / (k * (FT(1) + exp_minus2ktau) + γ1 * (FT(1) - exp_minus2ktau))
 
-    Rdif = RT_term * γ2 * (FT(1) - exp_minus2ktau) # Eqn. 25
-    Tdif = RT_term * FT(2) * k * exp_minusktau     # Eqn. 26
+    Rdif_unconstrained = RT_term * γ2 * (FT(1) - exp_minus2ktau) # Eqn. 25
+    Tdif_unconstrained = RT_term * FT(2) * k * exp_minusktau     # Eqn. 26
+    Rdif = max(FT(0), min(Rdif_unconstrained, FT(1)))
+    Tdif = max(FT(0), min(Tdif_unconstrained, (FT(1) - Rdif)))
 
     # Transmittance of direct, unscattered beam. Also used below
     T₀ = Tnoscat = exp(-τ / μ₀)
@@ -237,7 +241,7 @@ function rte_sw_2stream!(
     @inbounds for ilev in 1:nlay
         τ_ilev, ssa_ilev, g_ilev = τ[ilev, gcol], ssa[ilev, gcol], g[ilev, gcol]
         (Rdir, Tdir, _, Rdif, Tdif) = sw_2stream_coeffs(τ_ilev, ssa_ilev, g_ilev, μ₀)
-        denom = FT(1) / (FT(1) - Rdif * albedo_ilev)  # Eq 10
+        denom = FT(1) / max(FT(1) - Rdif * albedo_ilev, eps(FT))  # Eq 10
         albedo_ilevplus1 = Rdif + Tdif * Tdif * albedo_ilev * denom # Equation 9
         # 
         # Equation 11 -- source is emitted upward radiation at top of layer plus
@@ -250,8 +254,25 @@ function rte_sw_2stream!(
         src_dn_ilev = Tdir * flux_dn_dir_ilevplus1 #flux_dn_dir[ilev + 1]
         src_ilevplus1 = src_up_ilev + Tdif * denom * (src_ilev + albedo_ilev * src_dn_ilev)
         albedo[ilev + 1, gcol], src[ilev + 1, gcol] = albedo_ilevplus1, src_ilevplus1
+
+        # if isinf(albedo_ilevplus1)
+        #     rrtmgp_cuprint(albedo_ilevplus1,     # inf
+        #     ilev,                                # 16
+        #     Rdif,                                # 1.000000
+        #     Tdif,                                # 0.000000
+        #     albedo_ilev,                         # 1.000000                     
+        #     denom,                               # inf                         
+        #     src_ilevplus1,                       # inf
+        #     src_up_ilev,                         # 0.136936
+        #     src_ilev,                            # 0.158741
+        #     src_dn_ilev,                         # 0.000000
+        #     src_dn_ilev,                         # 0.000000
+        #     )
+        # end
+
         albedo_ilev = albedo_ilevplus1
         src_ilev = src_ilevplus1
+
     end
     # Eq 12, at the top of the domain upwelling diffuse is due to ...
     @inbounds flux_up[nlev, gcol] =
@@ -268,7 +289,7 @@ function rte_sw_2stream!(
         τ_ilev, ssa_ilev, g_ilev = τ[ilev, gcol], ssa[ilev, gcol], g[ilev, gcol]
         albedo_ilev, src_ilev = albedo[ilev, gcol], src[ilev, gcol]
         (_, Tdir, _, Rdif, Tdif) = sw_2stream_coeffs(τ_ilev, ssa_ilev, g_ilev, μ₀)
-        denom = FT(1) / (FT(1) - Rdif * albedo_ilev)  # Eq 10
+        denom = FT(1) / max(FT(1) - Rdif * albedo_ilev, eps(FT))  # Eq 10
         src_dn_ilev = Tdir * flux_dn_dir_top * exp(-τ_cum / μ₀)
         τ_cum += τ_ilev
         flux_dn_ilev = (Tdif * flux_dn_ilevplus1 + # Equation 13
@@ -278,6 +299,30 @@ function rte_sw_2stream!(
             flux_dn_ilev * albedo_ilev + # Equation 12
             src_ilev
         flux_dn[ilev, gcol] = flux_dn_ilev + flux_dn_dir_top * exp(-τ_cum / μ₀)
+
+        # 1262.860229
+        # 16
+        # 1262.226807
+        # 0.000000
+        # 0.000033
+        # 1.000000
+        # 0.000150
+        # 0.000000
+        # 8388608.000000
+
+        if flux_dn[ilev, gcol] > 1000
+            rrtmgp_cuprint(flux_dn[ilev, gcol],
+            ilev,
+            flux_dn_ilev,
+            Tdif,
+            flux_dn_ilevplus1,
+            Rdif,
+            src_ilev,
+            src_dn_ilev,
+            denom,
+            )
+        end
+
         flux_dn_ilevplus1 = flux_dn_ilev
         ilev -= 1
     end
