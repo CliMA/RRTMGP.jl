@@ -300,28 +300,18 @@ function rte_sw_2stream!(
             src_ilev
         flux_dn[ilev, gcol] = flux_dn_ilev + flux_dn_dir_top * exp(-τ_cum / μ₀)
 
-        # 1262.860229
-        # 16
-        # 1262.226807
-        # 0.000000
-        # 0.000033
-        # 1.000000
-        # 0.000150
-        # 0.000000
-        # 8388608.000000
-
-        if flux_dn[ilev, gcol] > 1000
-            rrtmgp_cuprint(flux_dn[ilev, gcol],
-            ilev,
-            flux_dn_ilev,
-            Tdif,
-            flux_dn_ilevplus1,
-            Rdif,
-            src_ilev,
-            src_dn_ilev,
-            denom,
-            )
-        end
+        # if flux_dn[ilev, gcol] > 1000
+        #     rrtmgp_cuprint(flux_dn[ilev, gcol], # 1262.860229
+        #     ilev,                               # 16
+        #     flux_dn_ilev,                       # 1262.226807
+        #     Tdif,                               # 0.000000
+        #     flux_dn_ilevplus1,                  # 0.000033
+        #     Rdif,                               # 1.000000
+        #     src_ilev,                           # 0.000150
+        #     src_dn_ilev,                        # 0.000000
+        #     denom,                              # 8388608.000000
+        #     )
+        # end
 
         flux_dn_ilevplus1 = flux_dn_ilev
         ilev -= 1

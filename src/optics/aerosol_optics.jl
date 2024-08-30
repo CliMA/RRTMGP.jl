@@ -91,7 +91,7 @@ function compute_lookup_aerosol(lkp_aero, ibnd::Int, aero_mass, aero_size, rh::F
     end
 
     if aero_mass[2, glay] > FT(0)
-        τ, τ_ssa, τ_ssag = compute_lookup_sea_salt_props(lkp_aero, ibnd, aero_mass[2, glay], aero_size[2, glay], rh)
+        τ, τ_ssa, τ_ssag = compute_lookup_sea_salt_props(lkp_aero, ibnd, aero_mass[2, glay], aero_size[2, glay], rh * 0)
         τ_cum += τ
         τ_ssa_cum += τ_ssa
         τ_ssag_cum += τ_ssag
