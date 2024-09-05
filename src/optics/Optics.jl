@@ -203,11 +203,11 @@ Computes optical properties for the longwave problem.
             # compute longwave source terms
             t_lev_inc = t_lev_col[glay + 1]
 
-            lay_source[glay, gcol] = interp1d(t_lay, t_planck, totplnk) * planckfrac
-            lev_src_inc = interp1d(t_lev_inc, t_planck, totplnk) * planckfrac
-            lev_src_dec = interp1d(t_lev_dec, t_planck, totplnk) * planckfrac
+            lay_source[glay, gcol] = interp1d_equispaced(t_lay, t_planck, totplnk) * planckfrac
+            lev_src_inc = interp1d_equispaced(t_lev_inc, t_planck, totplnk) * planckfrac
+            lev_src_dec = interp1d_equispaced(t_lev_dec, t_planck, totplnk) * planckfrac
             if glay == 1
-                sfc_source[gcol] = interp1d(t_sfc, t_planck, totplnk) * planckfrac
+                sfc_source[gcol] = interp1d_equispaced(t_sfc, t_planck, totplnk) * planckfrac
                 lev_source[glay, gcol] = lev_src_dec
             else
                 lev_source[glay, gcol] = sqrt(lev_src_inc_prev * lev_src_dec)
@@ -286,10 +286,10 @@ end
             # compute longwave source terms
             t_lev_inc = t_lev_col[glay + 1]
 
-            lev_src_inc = interp1d(t_lev_inc, t_planck, totplnk) * planckfrac
-            lev_src_dec = interp1d(t_lev_dec, t_planck, totplnk) * planckfrac
+            lev_src_inc = interp1d_equispaced(t_lev_inc, t_planck, totplnk) * planckfrac
+            lev_src_dec = interp1d_equispaced(t_lev_dec, t_planck, totplnk) * planckfrac
             if glay == 1
-                sfc_source[gcol] = interp1d(t_sfc, t_planck, totplnk) * planckfrac
+                sfc_source[gcol] = interp1d_equispaced(t_sfc, t_planck, totplnk) * planckfrac
                 lev_source[glay, gcol] = lev_src_dec
             else
                 lev_source[glay, gcol] = sqrt(lev_src_inc_prev * lev_src_dec)

@@ -1,12 +1,39 @@
 
-@inline loc_lower(xi, Δx, n, x) = @inbounds max(min(unsafe_trunc(Int, (xi - x[1]) / Δx) + 1, n - 1), 1)
+"""
+    loc_lower(xi, Δx, n, x)
+
+Return the location of the left (lower) point of the interval in which `xi` is located in vector `x`.
+This function assumes `Δx` is uniform.
+"""
+@inline function loc_lower(xi, Δx, n, x)
+    @inbounds xi ≤ x[1] && return 1
+    @inbounds xi >= x[n] && return n - 1
+    return @inbounds unsafe_trunc(Int, (xi - x[1]) / Δx) + 1
+end
 
 """
-    interp1d(xi::FT, x, y) where {FT<:AbstractFloat}
+    function loc_lower(xi, x)
 
-perform 1D linear interpolation.
+Return the location of the left (lower) point of the interval in which `xi` is located in vector `x`.
 """
-@inline function interp1d(xi::FT, x, y) where {FT <: AbstractFloat}
+@inline function loc_lower(xi, x)
+    @inbounds xi ≤ x[1] && return 1
+    @inbounds for (i, xval) in enumerate(x)
+        xi < xval && return i - 1
+    end
+    return length(x) - 1
+end
+
+"""
+    interp1d_equispaced(xi::FT, x, y) where {FT<:AbstractFloat}
+
+Perform 1D linear interpolation. This function assumes `x` to be uniformly spaced.
+"""
+@inline function interp1d_equispaced(xi::FT, x, y) where {FT <: AbstractFloat}
+    # xi ∉ [x]
+    xi < x[1] && return y[1]
+    xi > x[end] && return y[end]
+    # xi ∈ [x]
     @inbounds Δx = x[2] - x[1]
     n = length(x)
     loc = loc_lower(xi, Δx, n, x)
@@ -14,11 +41,18 @@ perform 1D linear interpolation.
     return @inbounds (y[loc] * (FT(1) - factor) + y[loc + 1] * factor)
 end
 
+"""
+    function interp1d_loc_factor(xi::FT, x::AbstractArray{FT, 1}) where {FT <: AbstractFloat}
+
+Computes the weights for linear interpolation. This works with non-uniformly spaced `x`.
+"""
 @inline function interp1d_loc_factor(xi::FT, x::AbstractArray{FT, 1}) where {FT <: AbstractFloat}
-    @inbounds Δx = x[2] - x[1]
-    n = length(x)
-    loc = loc_lower(xi, Δx, n, x)
-    @inbounds factor = (xi - x[loc]) / Δx
+    # xi ∉ [x]
+    xi < x[1] && return (1, FT(0))
+    xi > x[end] && return (length(x) - 1, FT(1))
+    # xi ∈ [x]
+    loc = loc_lower(xi, x)
+    @inbounds factor = (xi - x[loc]) / (x[loc + 1] - x[loc])
     return loc, factor
 end
 
