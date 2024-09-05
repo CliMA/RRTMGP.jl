@@ -51,9 +51,11 @@ compute_gray_optical_thickness_sw
 ```
 
 ```@docs
-interp1d
+interp1d_equispaced
 interp2d
 interp3d
 increment_2stream
 delta_scale
+loc_lower
+interp1d_loc_factor
 ```

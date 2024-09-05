@@ -98,6 +98,11 @@ printstyled("=================================\n\n", color = color1)
     end
 end
 
+printstyled("\n\nOptics utilities tests\n", color = color1)
+printstyled("==============\n\n", color = color1)
+include("optics_utils.jl")
+printstyled("****************************************************************\n", color = color1)
+
 printstyled("\n\nAqua tests\n", color = color1)
 printstyled("==============\n\n", color = color1)
 @testset "Aqua" begin
