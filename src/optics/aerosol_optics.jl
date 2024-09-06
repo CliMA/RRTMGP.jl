@@ -1,6 +1,7 @@
 """
     add_aerosol_optics_1scalar!(
         τ,
+        aero_mask,
         aero_size,
         aero_mass,
         rel_hum,
@@ -11,13 +12,12 @@
 This function computes the `OneScalar` aerosol optics properties and adds them
 to the exising `OneScalar` optics properties.
 """
-@inline function add_aerosol_optics_1scalar!(τ, aero_size, aero_mass, rel_hum, lkp_aero, ibnd)
+@inline function add_aerosol_optics_1scalar!(τ, aero_mask, aero_size, aero_mass, rel_hum, lkp_aero, ibnd)
     FT = eltype(τ)
     @inbounds begin
         nlay = length(τ)
         for glay in 1:nlay
-            aero_mask = _aero_mask(view(aero_mass, :, glay))
-            if aero_mask
+            if aero_mask[glay]
                 τ_aero, τ_ssa_aero, τ_ssag_aero =
                     compute_lookup_aerosol(lkp_aero, ibnd, aero_mass, aero_size, rel_hum[glay], glay)
                 τ[glay] += (τ_aero - τ_ssa_aero)
@@ -32,6 +32,7 @@ end
         τ,
         ssa,
         g,
+        aero_mask,
         aero_size,
         aero_mass,
         rel_hum,
@@ -47,6 +48,7 @@ to the exising `TwoStream` optics properties.
     τ,
     ssa,
     g,
+    aero_mask,
     aero_size,
     aero_mass,
     rel_hum,
@@ -58,8 +60,7 @@ to the exising `TwoStream` optics properties.
         nlay = length(τ)
         FT = eltype(τ)
         for glay in 1:nlay
-            aero_mask = _aero_mask(view(aero_mass, :, glay))
-            if aero_mask
+            if aero_mask[glay]
                 τ_aero, τ_ssa_aero, τ_ssag_aero =
                     compute_lookup_aerosol(lkp_aero, ibnd, aero_mass, aero_size, rel_hum[glay], glay)
                 g_aero = τ_ssag_aero / max(eps(FT), τ_ssa_aero)
@@ -284,4 +285,22 @@ function _aero_mask(aero_mass_layer::AbstractArray{FT, 1}) where {FT}
         end
     end
     return aero_mask
+end
+
+function compute_aero_mask!(aeromask::AbstractArray{B, 1}, aeromass::AbstractArray{FT, 2}) where {B, FT}
+    nlay = length(aeromask)
+    naerosols = size(aeromass, 1)
+    @inbounds begin
+        for ilay in 1:nlay
+            mask = false
+            for iaero in 1:naerosols
+                if aeromass[iaero, ilay] > zero(FT)
+                    mask = true
+                    break
+                end
+            end
+            aeromask[ilay] = mask
+        end
+    end
+    return nothing
 end

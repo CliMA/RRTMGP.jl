@@ -49,7 +49,7 @@ function rte_sw_2stream_solve!(
     nlev = nlay + 1
     n_gpt = length(lookup_sw.solar_src_scaled)
     @inbounds begin
-        cloud_state = as.cloud_state
+        (; cloud_state, aerosol_state) = as
         bld_cld_mask = cloud_state isa CloudState
         flux_up_sw = flux_sw.flux_up
         flux_dn_sw = flux_sw.flux_dn
@@ -57,6 +57,14 @@ function rte_sw_2stream_solve!(
         (; flux_up, flux_dn) = flux
         cos_zenith = bcs_sw.cos_zenith
         FT = eltype(flux_up)
+        if aerosol_state isa AerosolState
+            ClimaComms.@threaded device for gcol in 1:ncol
+                Optics.compute_aero_mask!(
+                    view(aerosol_state.aero_mask, :, gcol),
+                    view(aerosol_state.aero_mass, :, :, gcol),
+                )
+            end
+        end
         for igpt in 1:n_gpt
             ClimaComms.@threaded device for gcol in 1:ncol
                 if cos_zenith[gcol] > 0

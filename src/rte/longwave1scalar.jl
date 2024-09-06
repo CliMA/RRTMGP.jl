@@ -45,12 +45,21 @@ function rte_lw_noscat_solve!(
     Ds = angle_disc.gauss_Ds[1]
     w_μ = angle_disc.gauss_wts[1]
     n_gpt = length(major_gpt2bnd)
-    cloud_state = as.cloud_state
+    (; cloud_state, aerosol_state) = as
     bld_cld_mask = cloud_state isa CloudState
+
     flux_up_lw = flux_lw.flux_up
     flux_dn_lw = flux_lw.flux_dn
     flux_net_lw = flux_lw.flux_net
     @inbounds begin
+        if aerosol_state isa AerosolState
+            ClimaComms.@threaded device for gcol in 1:ncol
+                Optics.compute_aero_mask!(
+                    view(aerosol_state.aero_mask, :, gcol),
+                    view(aerosol_state.aero_mass, :, :, gcol),
+                )
+            end
+        end
         for igpt in 1:n_gpt
             ClimaComms.@threaded device for gcol in 1:ncol
                 ibnd = major_gpt2bnd[igpt]

@@ -81,7 +81,10 @@ function rte_lw_2stream_solve_CUDA!(
         flux_dn_lw = flux_lw.flux_dn
         flux_net_lw = flux_lw.flux_net
         (; flux_up, flux_dn) = flux
-        cloud_state = as.cloud_state
+        (; cloud_state, aerosol_state) = as
+        if aerosol_state isa AerosolState
+            Optics.compute_aero_mask!(view(aerosol_state.aero_mask, :, gcol), view(aerosol_state.aero_mass, :, :, gcol))
+        end
         @inbounds for igpt in 1:n_gpt
             ibnd = major_gpt2bnd[igpt]
             if cloud_state isa CloudState
