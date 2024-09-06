@@ -100,9 +100,15 @@ function rte_sw_2stream_solve_CUDA!(
         flux_up = flux.flux_up
         flux_dn = flux.flux_dn
         FT = eltype(flux_up)
-        cloud_state = as.cloud_state
+        (; cloud_state, aerosol_state) = as
         μ₀ = bcs_sw.cos_zenith[gcol]
         @inbounds begin
+            if aerosol_state isa AerosolState
+                Optics.compute_aero_mask!(
+                    view(aerosol_state.aero_mask, :, gcol),
+                    view(aerosol_state.aero_mass, :, :, gcol),
+                )
+            end
             for igpt in 1:n_gpt
                 # set cloud mask, if applicable
                 if cloud_state isa CloudState

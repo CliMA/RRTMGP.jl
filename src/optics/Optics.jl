@@ -238,11 +238,12 @@ Computes optical properties for the longwave problem.
             )
         end
         if !isnothing(lkp_aero)
+            aero_mask = view(as.aerosol_state.aero_mask, :, gcol)
             aero_size = view(as.aerosol_state.aero_size, :, :, gcol)
             aero_mass = view(as.aerosol_state.aero_mass, :, :, gcol)
             rel_hum = AtmosphericStates.getview_rel_hum(as, gcol)
 
-            add_aerosol_optics_1scalar!(τ, aero_size, aero_mass, rel_hum, lkp_aero, ibnd)
+            add_aerosol_optics_1scalar!(τ, aero_mask, aero_size, aero_mass, rel_hum, lkp_aero, ibnd)
         end
     end
     return nothing
@@ -324,11 +325,12 @@ end
         )
     end
     if !isnothing(lkp_aero)
+        aero_mask = view(as.aerosol_state.aero_mask, :, gcol)
         aero_size = view(as.aerosol_state.aero_size, :, :, gcol)
         aero_mass = view(as.aerosol_state.aero_mass, :, :, gcol)
         rel_hum = AtmosphericStates.getview_rel_hum(as, gcol)
 
-        add_aerosol_optics_2stream!(τ, ssa, g, aero_size, aero_mass, rel_hum, lkp_aero, ibnd)
+        add_aerosol_optics_2stream!(τ, ssa, g, aero_mask, aero_size, aero_mass, rel_hum, lkp_aero, ibnd)
     end
     return nothing
 end
@@ -418,11 +420,23 @@ end
         )
     end
     if !isnothing(lkp_aero)
+        aero_mask = view(as.aerosol_state.aero_mask, :, gcol)
         aero_size = view(as.aerosol_state.aero_size, :, :, gcol)
         aero_mass = view(as.aerosol_state.aero_mass, :, :, gcol)
         rel_hum = AtmosphericStates.getview_rel_hum(as, gcol)
 
-        add_aerosol_optics_2stream!(τ, ssa, g, aero_size, aero_mass, rel_hum, lkp_aero, ibnd, delta_scaling = true)
+        add_aerosol_optics_2stream!(
+            τ,
+            ssa,
+            g,
+            aero_mask,
+            aero_size,
+            aero_mass,
+            rel_hum,
+            lkp_aero,
+            ibnd,
+            delta_scaling = true,
+        )
     end
     return nothing
 end

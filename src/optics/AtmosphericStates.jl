@@ -111,11 +111,13 @@ end
 Adapt.@adapt_structure CloudState
 
 """
-    AerosolState{D}
+    AerosolState{B, D}
 
 Aerosol state, used to compute optical properties.
 """
-struct AerosolState{D}
+struct AerosolState{B, D}
+    "aerosol mask, = true if any aerosol is present"
+    aero_mask::B
     "aerosol size (microns)"
     aero_size::D
     "aerosol mass column (kg/m2)"
