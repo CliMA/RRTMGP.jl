@@ -4,10 +4,16 @@ RRTMGP.jl Release Notes
 main
 ------
 
+v0.19.0
+-----
+- Compute aero_mask internally and store the array.
+  ([#528](https://github.com/CliMA/RRTMGP.jl/pull/528))
+- Support 1D interpolation on non-uniform grid and fix relative humidity interpolation.
+  ([#527](https://github.com/CliMA/RRTMGP.jl/pull/527))
+
 v0.18.0
 -----
 - Add support for multiple aerosol types ([#523](https://github.com/CliMA/RRTMGP.jl/pull/523))
-
 
 v0.17.0
 -----
