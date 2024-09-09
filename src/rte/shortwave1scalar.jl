@@ -54,6 +54,8 @@ function rte_sw_noscat_solve!(
                     else
                         for ilev in 1:nlev
                             flux_up_sw[ilev, gcol] += flux_up[ilev, gcol]
+                        end
+                        for ilev in 1:nlev
                             flux_dn_sw[ilev, gcol] += flux_dn[ilev, gcol]
                         end
                     end

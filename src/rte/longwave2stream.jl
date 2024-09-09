@@ -69,8 +69,10 @@ function rte_lw_2stream_solve!(
                     map!(x -> x, view(flux_dn_lw, :, gcol), view(flux_dn, :, gcol))
                 else
                     for ilev in 1:nlev
-                        @inbounds flux_up_lw[ilev, gcol] += flux_up[ilev, gcol]
-                        @inbounds flux_dn_lw[ilev, gcol] += flux_dn[ilev, gcol]
+                        flux_up_lw[ilev, gcol] += flux_up[ilev, gcol]
+                    end
+                    for ilev in 1:nlev
+                        flux_dn_lw[ilev, gcol] += flux_dn[ilev, gcol]
                     end
                 end
             end
