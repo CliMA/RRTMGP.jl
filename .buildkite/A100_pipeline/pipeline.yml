@@ -1,0 +1,132 @@
+agents:
+  queue: clima
+  modules: climacommon/2024_04_05
+
+env:
+  OPENBLAS_NUM_THREADS: 1
+  JULIA_NVTX_CALLBACKS: gc
+  JULIA_MAX_NUM_PRECOMPILE_FILES: 100
+  SLURM_KILL_BAD_EXIT: 1
+
+steps:
+  - label: "init test environments :computer:"
+    key: "init_env"
+    command:
+
+      - echo "--- Instantiate test environment"
+      - "julia --project=test -e 'using Pkg; Pkg.develop(path=\".\")'"
+      - "julia --project=test -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
+      - "julia --project=test -e 'using Pkg; Pkg.precompile()'"
+      - "julia --project=test -e 'using Pkg; Pkg.status()'"
+
+    agents:
+      slurm_mem: 16G 
+      slurm_gpus: 1
+      slurm_cpus_per_task: 4
+
+  - wait
+
+  - group: "Unit tests"
+    steps:
+
+      - label: "CPU unit tests"
+        command: "julia --color=yes --project=test test/runtests.jl"
+        agents:
+          slurm_ntasks: 1
+          slurm_mem_per_cpu: 6G
+
+      - label: "Threaded CPU unit tests"
+        command: "julia --threads 8 --color=yes --project=test test/runtests.jl"
+        agents:
+          slurm_cpus_per_task: 8
+          slurm_mem_per_cpu: 6G
+
+      - label: "GPU unit tests"
+        command: "julia --color=yes --project=test test/runtests.jl"
+        env:
+          CLIMACOMMS_DEVICE: "CUDA"
+        agents:
+          slurm_ntasks: 1
+          slurm_gres: "gpu:1"
+          slurm_exclusive:
+
+  - group: "Flame graphs"
+    steps:
+
+      - label: "Flame Graph: Gray Atm"
+        command: "julia --color=yes --project=test perf/flame.jl gray_atm.jl"
+        artifact_paths: "flame_graphs/gray_atm/*"
+        agents:
+          slurm_ntasks: 1
+          slurm_mem_per_cpu: 6G
+
+      - label: "Flame Graph: Clear Sky"
+        command: "julia --color=yes --project=test perf/flame.jl clear_sky.jl"
+        artifact_paths: "flame_graphs/clear_sky/*"
+        agents:
+          slurm_ntasks: 1
+          slurm_mem_per_cpu: 6G
+
+      - label: "Flame Graph: All Sky"
+        command: "julia --color=yes --project=test perf/flame.jl all_sky.jl"
+        artifact_paths: "flame_graphs/all_sky/*"
+        agents:
+          slurm_ntasks: 1
+          slurm_mem_per_cpu: 6G
+
+  - group: "Benchmarks"
+    steps:
+  
+      - label: "Benchmarks"
+        command: "julia --color=yes --project=test perf/benchmark.jl"
+        agents:
+          slurm_ntasks: 1
+          slurm_mem_per_cpu: 6G
+  
+      - label: "Benchmarks (Float32)"
+        command: "julia --color=yes --project=test perf/benchmark.jl Float32"
+        agents:
+          slurm_ntasks: 1
+          slurm_mem_per_cpu: 6G
+
+      - label: "Threaded benchmarks"
+        command: "julia --threads=8 --color=yes --project=test perf/benchmark.jl"
+        agents:
+          slurm_cpus_per_task: 8
+          slurm_mem_per_cpu: 6G
+
+      - label: "GPU benchmarks"
+        command: "julia --color=yes --project=test perf/benchmark.jl"
+        env:
+          CLIMACOMMS_DEVICE: "CUDA"
+        agents:
+          slurm_ntasks: 1
+          slurm_gres: "gpu:1"
+          slurm_exclusive:
+
+      - label: "GPU clear-sky DYAMOND benchmark"
+        command: "julia --color=yes --project=test test/clear_sky_dyamond_gpu_benchmark.jl"
+        env:
+          CLIMACOMMS_DEVICE: "CUDA"
+        agents:
+          slurm_ntasks: 1
+          slurm_gres: "gpu:1"
+          slurm_exclusive:
+
+      - label: "GPU all-sky DYAMOND benchmark"
+        command: "julia --color=yes --project=test test/all_sky_dyamond_gpu_benchmark.jl"
+        env:
+          CLIMACOMMS_DEVICE: "CUDA"
+        agents:
+          slurm_ntasks: 1
+          slurm_gres: "gpu:1"
+          slurm_exclusive:
+
+      - label: "GPU all-sky with aerosols DYAMOND benchmark"
+        command: "julia --color=yes --project=test test/all_sky_with_aerosols_dyamond_gpu_benchmark.jl"
+        env:
+          CLIMACOMMS_DEVICE: "CUDA"
+        agents:
+          slurm_ntasks: 1
+          slurm_gres: "gpu:1"
+          slurm_exclusive:
