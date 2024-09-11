@@ -32,7 +32,7 @@ function compute_optical_props!(op::OneScalar, as::GrayAtmosphericState, sf::Sou
             p_lev_glayplus1 = p_lev[glay + 1, gcol]
             Δp = p_lev_glayplus1 - p_lev_glay
             p = p_lay[glay, gcol]
-            τ[glay, gcol] = compute_gray_optical_thickness_lw(otp, p0, Δp, p, lat)
+            τ[gcol, glay] = compute_gray_optical_thickness_lw(otp, p0, Δp, p, lat)
             p_lev_glay = p_lev_glayplus1
             # compute longwave source terms
             t_lev_inc = t_lev[glay + 1, gcol]
@@ -74,7 +74,7 @@ function compute_optical_props!(op::TwoStream, as::GrayAtmosphericState, sf::Sou
             p_lev_glayplus1 = p_lev[glay + 1, gcol]
             Δp = p_lev_glayplus1 - p_lev_glay
             p = p_lay[glay, gcol]
-            τ[glay, gcol] = compute_gray_optical_thickness_lw(otp, p0, Δp, p, lat)
+            τ[gcol, glay] = compute_gray_optical_thickness_lw(otp, p0, Δp, p, lat)
             p_lev_glay = p_lev_glayplus1
             # compute longwave source terms
             t_lev_inc = t_lev[glay + 1, gcol]
@@ -92,8 +92,8 @@ function compute_optical_props!(op::TwoStream, as::GrayAtmosphericState, sf::Sou
         lev_source[nlay + 1, gcol] = lev_src_inc_prev
     end
     zeroval = zero(FT)
-    map!(x -> zeroval, view(ssa, :, gcol), view(ssa, :, gcol))
-    map!(x -> zeroval, view(g, :, gcol), view(g, :, gcol))
+    map!(x -> zeroval, view(ssa, gcol, :), view(ssa, gcol, :))
+    map!(x -> zeroval, view(g, gcol, :), view(g, gcol, :))
     return nothing
 end
 
@@ -118,15 +118,15 @@ function compute_optical_props!(op::AbstractOpticalProps, as::GrayAtmosphericSta
         @inbounds p_lev_glayplus1 = p_lev[glay + 1, gcol]
         @inbounds Δp = p_lev_glayplus1 - p_lev_glay
         @inbounds p = p_lay[glay, gcol]
-        @inbounds τ[glay, gcol] = compute_gray_optical_thickness_sw(otp, p0, Δp, p, lat)
+        @inbounds τ[gcol, glay] = compute_gray_optical_thickness_sw(otp, p0, Δp, p, lat)
         p_lev_glay = p_lev_glayplus1
     end
     if op isa TwoStream
         (; ssa, g) = op
         FT = eltype(τ)
         zeroval = zero(FT)
-        map!(x -> zeroval, view(ssa, :, gcol), view(ssa, :, gcol))
-        map!(x -> zeroval, view(g, :, gcol), view(g, :, gcol))
+        map!(x -> zeroval, view(ssa, gcol, :), view(ssa, gcol, :))
+        map!(x -> zeroval, view(g, gcol, :), view(g, gcol, :))
     end
     return nothing
 end
