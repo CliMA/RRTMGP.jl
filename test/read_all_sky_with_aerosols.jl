@@ -226,5 +226,8 @@ function load_comparison_data(use_lut, bot_at_1, ncol)
     comp_flux_up_sw = hcat(repeat(comp_flux_up_sw_ref, 1, nrepeat), comp_flux_up_sw_ref[:, 1:rem])
     comp_flux_dn_sw = hcat(repeat(comp_flux_dn_sw_ref, 1, nrepeat), comp_flux_dn_sw_ref[:, 1:rem])
 
-    return comp_flux_up_lw, comp_flux_dn_lw, comp_flux_up_sw, comp_flux_dn_sw
+    return Array(transpose(comp_flux_up_lw)),
+    Array(transpose(comp_flux_dn_lw)),
+    Array(transpose(comp_flux_up_sw)),
+    Array(transpose(comp_flux_dn_sw))
 end

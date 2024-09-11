@@ -49,12 +49,12 @@ function rte_sw_noscat_solve!(
                     solar_frac = lookup_sw.solar_src_scaled[igpt]
                     rte_sw_noscat!(flux, op, bcs_sw, igpt, n_gpt, solar_frac, gcol, nlev)
                     if igpt == 1
-                        map!(x -> x, view(flux_up_sw, :, gcol), view(flux_up, :, gcol))
-                        map!(x -> x, view(flux_dn_sw, :, gcol), view(flux_dn, :, gcol))
+                        map!(x -> x, view(flux_up_sw, gcol, :), view(flux_up, gcol, :))
+                        map!(x -> x, view(flux_dn_sw, gcol, :), view(flux_dn, gcol, :))
                     else
                         for ilev in 1:nlev
-                            flux_up_sw[ilev, gcol] += flux_up[ilev, gcol]
-                            flux_dn_sw[ilev, gcol] += flux_dn[ilev, gcol]
+                            flux_up_sw[gcol, ilev] += flux_up[gcol, ilev]
+                            flux_dn_sw[gcol, ilev] += flux_dn[gcol, ilev]
                         end
                     end
                 else
@@ -65,7 +65,7 @@ function rte_sw_noscat_solve!(
         ClimaComms.@threaded device for gcol in 1:ncol
             if cos_zenith[gcol] > 0
                 for ilev in 1:nlev
-                    flux_net_sw[ilev, gcol] = flux_up_sw[ilev, gcol] - flux_dn_sw[ilev, gcol]
+                    flux_net_sw[gcol, ilev] = flux_up_sw[gcol, ilev] - flux_dn_sw[gcol, ilev]
                 end
             end
         end
@@ -100,11 +100,11 @@ function rte_sw_noscat!(
     τ = op.τ
     (; flux_dn_dir, flux_net) = flux
     # downward propagation
-    @inbounds flux_dn_dir[nlev, gcol] = toa_flux[gcol] * solar_frac * cos_zenith[gcol]
+    @inbounds flux_dn_dir[gcol, nlev] = toa_flux[gcol] * solar_frac * cos_zenith[gcol]
     ilev = nlev - 1
     @inbounds while ilev ≥ 1
-        flux_dn_dir[ilev, gcol] = flux_dn_dir[ilev + 1, gcol] * exp(-τ[ilev, gcol] / cos_zenith[gcol])
-        flux_net[ilev, gcol] = -flux_dn_dir[ilev, gcol]
+        flux_dn_dir[gcol, ilev] = flux_dn_dir[gcol, ilev + 1] * exp(-τ[ilev, gcol] / cos_zenith[gcol])
+        flux_net[gcol, ilev] = -flux_dn_dir[gcol, ilev]
         ilev -= 1
     end
 end

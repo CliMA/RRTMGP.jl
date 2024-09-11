@@ -36,7 +36,7 @@ function rte_lw_noscat_solve_CUDA!(
         compute_optical_props!(op, as, src_lw, gcol)
         rte_lw_noscat_one_angle!(src_lw, bcs_lw, op, Ds, w_μ, gcol, flux_lw, igpt, ibnd, nlay, nlev)
         @inbounds for ilev in 1:nlev
-            flux_net[ilev, gcol] = flux_up[ilev, gcol] - flux_dn[ilev, gcol]
+            flux_net[gcol, ilev] = flux_up[gcol, ilev] - flux_dn[gcol, ilev]
         end
     end
     return nothing
@@ -108,7 +108,7 @@ function rte_lw_noscat_solve_CUDA!(
         end
         @inbounds begin
             for ilev in 1:nlev
-                flux_net_lw[ilev, gcol] = flux_up_lw[ilev, gcol] - flux_dn_lw[ilev, gcol]
+                flux_net_lw[gcol, ilev] = flux_up_lw[gcol, ilev] - flux_dn_lw[gcol, ilev]
             end
         end
     end

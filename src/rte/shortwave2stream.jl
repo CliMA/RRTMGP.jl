@@ -23,7 +23,7 @@ function rte_sw_2stream_solve!(
                 # call shortwave rte solver
                 rte_sw_2stream!(op, src_sw, bcs_sw, flux_sw, solar_frac, igpt, n_gpt, ibnd, nlev, gcol)
                 for ilev in 1:nlev
-                    flux_net_sw[ilev, gcol] = flux_up_sw[ilev, gcol] - flux_dn_sw[ilev, gcol]
+                    flux_net_sw[gcol, ilev] = flux_up_sw[gcol, ilev] - flux_dn_sw[gcol, ilev]
                 end
             else
                 set_flux_to_zero!(flux_sw, gcol)
@@ -80,12 +80,12 @@ function rte_sw_2stream_solve!(
                     # call rte shortwave solver
                     rte_sw_2stream!(op, src_sw, bcs_sw, flux, solar_frac, igpt, n_gpt, ibnd, nlev, gcol)
                     if igpt == 1
-                        map!(x -> x, view(flux_up_sw, :, gcol), view(flux_up, :, gcol))
-                        map!(x -> x, view(flux_dn_sw, :, gcol), view(flux_dn, :, gcol))
+                        map!(x -> x, view(flux_up_sw, gcol, :), view(flux_up, gcol, :))
+                        map!(x -> x, view(flux_dn_sw, gcol, :), view(flux_dn, gcol, :))
                     else
                         for ilev in 1:nlev
-                            @inbounds flux_up_sw[ilev, gcol] += flux_up[ilev, gcol]
-                            @inbounds flux_dn_sw[ilev, gcol] += flux_dn[ilev, gcol]
+                            @inbounds flux_up_sw[gcol, ilev] += flux_up[gcol, ilev]
+                            @inbounds flux_dn_sw[gcol, ilev] += flux_dn[gcol, ilev]
                         end
                     end
                 else
@@ -97,7 +97,7 @@ function rte_sw_2stream_solve!(
         ClimaComms.@threaded device for gcol in 1:ncol
             if cos_zenith[gcol] > 0
                 for ilev in 1:nlev
-                    flux_net_sw[ilev, gcol] = flux_up_sw[ilev, gcol] - flux_dn_sw[ilev, gcol]
+                    flux_net_sw[gcol, ilev] = flux_up_sw[gcol, ilev] - flux_dn_sw[gcol, ilev]
                 end
             end
         end
@@ -230,10 +230,10 @@ function rte_sw_2stream!(
     # Direct-beam and source for diffuse radiation
     flux_dn_dir_top = toa_flux * solar_frac * μ₀
     flux_dn_dir_bot = flux_dn_dir_top * exp(-τ_sum / μ₀) # store value at surface
-    @inbounds flux_dn_dir[1, gcol] = flux_dn_dir_bot # store value at surface
+    @inbounds flux_dn_dir[gcol, 1] = flux_dn_dir_bot # store value at surface
     sfc_source = flux_dn_dir_bot * sfc_alb_direct
 
-    @inbounds flux_dn[nlev, gcol] = FT(0) # set to incoming flux when provided?
+    @inbounds flux_dn[gcol, nlev] = FT(0) # set to incoming flux when provided?
     # Albedo of lowest level is the surface albedo...
     @inbounds surface_albedo = albedo[1, gcol] = bcs_sw.sfc_alb_diffuse[ibnd, gcol]
     # ... and source of diffuse radiation is surface emission
@@ -262,13 +262,13 @@ function rte_sw_2stream!(
         src_ilev = src_ilevplus1
     end
     # Eq 12, at the top of the domain upwelling diffuse is due to ...
-    @inbounds flux_up[nlev, gcol] =
-        flux_dn[nlev, gcol] * albedo[nlev, gcol] + # ... reflection of incident diffuse and
+    @inbounds flux_up[gcol, nlev] =
+        flux_dn[gcol, nlev] * albedo[nlev, gcol] + # ... reflection of incident diffuse and
         src[nlev, gcol]                          # scattering by the direct beam below
 
     # From the top of the atmosphere downward -- compute fluxes
-    @inbounds flux_dn_ilevplus1 = flux_dn[nlev, gcol]
-    @inbounds flux_dn[nlev, gcol] += flux_dn_dir_top
+    @inbounds flux_dn_ilevplus1 = flux_dn[gcol, nlev]
+    @inbounds flux_dn[gcol, nlev] += flux_dn_dir_top
     τ_cum = FT(0)
 
     ilev = nlay
@@ -282,10 +282,10 @@ function rte_sw_2stream!(
         flux_dn_ilev = (Tdif * flux_dn_ilevplus1 + # Equation 13
                         Rdif * src_ilev +
                         src_dn_ilev) * denom
-        flux_up[ilev, gcol] =
+        flux_up[gcol, ilev] =
             flux_dn_ilev * albedo_ilev + # Equation 12
             src_ilev
-        flux_dn[ilev, gcol] = flux_dn_ilev + flux_dn_dir_top * exp(-τ_cum / μ₀)
+        flux_dn[gcol, ilev] = flux_dn_ilev + flux_dn_dir_top * exp(-τ_cum / μ₀)
         flux_dn_ilevplus1 = flux_dn_ilev
         ilev -= 1
     end
