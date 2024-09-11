@@ -103,7 +103,7 @@ function rte_sw_noscat!(
     @inbounds flux_dn_dir[gcol, nlev] = toa_flux[gcol] * solar_frac * cos_zenith[gcol]
     ilev = nlev - 1
     @inbounds while ilev ≥ 1
-        flux_dn_dir[gcol, ilev] = flux_dn_dir[gcol, ilev + 1] * exp(-τ[ilev, gcol] / cos_zenith[gcol])
+        flux_dn_dir[gcol, ilev] = flux_dn_dir[gcol, ilev + 1] * exp(-τ[gcol, ilev] / cos_zenith[gcol])
         flux_net[gcol, ilev] = -flux_dn_dir[gcol, ilev]
         ilev -= 1
     end

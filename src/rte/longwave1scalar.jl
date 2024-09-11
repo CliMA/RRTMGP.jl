@@ -164,7 +164,7 @@ Transport for no-scattering longwave problem.
     # Downward propagation
     ilev = nlay
     @inbounds while ilev ≥ 1
-        τ_loc = τ[ilev, gcol] * Ds
+        τ_loc = τ[gcol, ilev] * Ds
         trans = exp(-τ_loc)
         lay_src = lay_source[ilev, gcol]
         intensity_dn_ilev =
@@ -183,7 +183,7 @@ Transport for no-scattering longwave problem.
 
     # Upward propagation
     @inbounds for ilev in 2:(nlay + 1)
-        τ_loc = τ[ilev - 1, gcol] * Ds
+        τ_loc = τ[gcol, ilev - 1] * Ds
         trans = exp(-τ_loc)
         lay_src = lay_source[ilev - 1, gcol]
         intensity_up_ilev =

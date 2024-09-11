@@ -225,7 +225,7 @@ function rte_sw_2stream!(
     end
     τ_sum = FT(0)
     for ilay in 1:nlay
-        @inbounds τ_sum += τ[ilay, gcol]
+        @inbounds τ_sum += τ[gcol, ilay]
     end
     # Direct-beam and source for diffuse radiation
     flux_dn_dir_top = toa_flux * solar_frac * μ₀
@@ -243,7 +243,7 @@ function rte_sw_2stream!(
     τ_cum = τ_sum
     albedo_ilev, src_ilev = surface_albedo, sfc_source
     @inbounds for ilev in 1:nlay
-        τ_ilev, ssa_ilev, g_ilev = τ[ilev, gcol], ssa[ilev, gcol], g[ilev, gcol]
+        τ_ilev, ssa_ilev, g_ilev = τ[gcol, ilev], ssa[gcol, ilev], g[gcol, ilev]
         (Rdir, Tdir, _, Rdif, Tdif) = sw_2stream_coeffs(τ_ilev, ssa_ilev, g_ilev, μ₀)
         denom = FT(1) / (FT(1) - Rdif * albedo_ilev)  # Eq 10
         albedo_ilevplus1 = Rdif + Tdif * Tdif * albedo_ilev * denom # Equation 9
@@ -273,7 +273,7 @@ function rte_sw_2stream!(
 
     ilev = nlay
     @inbounds while ilev ≥ 1
-        τ_ilev, ssa_ilev, g_ilev = τ[ilev, gcol], ssa[ilev, gcol], g[ilev, gcol]
+        τ_ilev, ssa_ilev, g_ilev = τ[gcol, ilev], ssa[gcol, ilev], g[gcol, ilev]
         albedo_ilev, src_ilev = albedo[ilev, gcol], src[ilev, gcol]
         (_, Tdir, _, Rdif, Tdif) = sw_2stream_coeffs(τ_ilev, ssa_ilev, g_ilev, μ₀)
         denom = FT(1) / (FT(1) - Rdif * albedo_ilev)  # Eq 10

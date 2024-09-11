@@ -32,15 +32,15 @@ calculations accounting for extinction and emission
 $(DocStringExtensions.FIELDS)
 """
 struct OneScalar{D, V} <: AbstractOpticalProps
-    "storage for optical thickness"
+    "storage for optical thickness `(1, ncol, nlay)`"
     layerdata::D
-    "view into optical depth"
+    "view into optical depth `(ncol, nlay)`"
     τ::V
 end
 Adapt.@adapt_structure OneScalar
 
 function OneScalar(::Type{FT}, ncol::Int, nlay::Int, ::Type{DA}) where {FT <: AbstractFloat, DA}
-    layerdata = DA{FT, 3}(undef, 1, nlay, ncol)
+    layerdata = DA{FT, 3}(undef, 1, ncol, nlay)
     τ = view(layerdata, 1, :, :)
     V = typeof(τ)
     return OneScalar{typeof(layerdata), V}(layerdata, τ)
@@ -56,7 +56,7 @@ calculations accounting for extinction and emission
 $(DocStringExtensions.FIELDS)
 """
 struct TwoStream{D, V} <: AbstractOpticalProps
-    "storage for optical depth, single scattering albedo and asymmerty parameter"
+    "storage for optical depth, single scattering albedo and asymmerty parameter `(3, ncol, nlay)`"
     layerdata::D
     "view into optical depth"
     τ::V
@@ -68,7 +68,7 @@ end
 Adapt.@adapt_structure TwoStream
 
 function TwoStream(::Type{FT}, ncol::Int, nlay::Int, ::Type{DA}) where {FT <: AbstractFloat, DA}
-    layerdata = DA{FT, 3}(zeros(3, nlay, ncol))
+    layerdata = DA{FT, 3}(zeros(3, ncol, nlay))
     V = typeof(view(layerdata, 1, :, :))
     return TwoStream{typeof(layerdata), V}(
         layerdata,
@@ -190,7 +190,7 @@ Computes optical properties for the longwave problem.
         totplnk = view(lkp.planck.tot_planck, :, ibnd)
         as_layerdata = AtmosphericStates.getview_layerdata(as, gcol)
         t_lev_col = view(as.t_lev, :, gcol)
-        τ = view(op.τ, :, gcol)
+        τ = view(op.τ, gcol, :)
 
         lev_src_inc_prev = zero(t_sfc)
         lev_src_dec_prev = zero(t_sfc)
@@ -269,9 +269,9 @@ end
         totplnk = view(lkp.planck.tot_planck, :, ibnd)
         as_layerdata = AtmosphericStates.getview_layerdata(as, gcol)
         t_lev_col = view(as.t_lev, :, gcol)
-        τ = view(op.τ, :, gcol)
-        ssa = view(op.ssa, :, gcol)
-        g = view(op.g, :, gcol)
+        τ = view(op.τ, gcol, :)
+        ssa = view(op.ssa, gcol, :)
+        g = view(op.g, gcol, :)
     end
 
     lev_src_inc_prev = zero(t_sfc)
@@ -362,7 +362,7 @@ Computes optical properties for the shortwave problem.
         ibnd = lkp.band_data.major_gpt2bnd[igpt]
         t_sfc = as.t_sfc[gcol]
         as_layerdata = AtmosphericStates.getview_layerdata(as, gcol)
-        τ = view(op.τ, :, gcol)
+        τ = view(op.τ, gcol, :)
     end
     @inbounds for glay in 1:nlay
         col_dry, p_lay, t_lay = as_layerdata[1, glay], as_layerdata[2, glay], as_layerdata[3, glay]
@@ -387,9 +387,9 @@ end
         ibnd = lkp.band_data.major_gpt2bnd[igpt]
         t_sfc = as.t_sfc[gcol]
         as_layerdata = AtmosphericStates.getview_layerdata(as, gcol)
-        τ = view(op.τ, :, gcol)
-        ssa = view(op.ssa, :, gcol)
-        g = view(op.g, :, gcol)
+        τ = view(op.τ, gcol, :)
+        ssa = view(op.ssa, gcol, :)
+        g = view(op.g, gcol, :)
     end
     @inbounds for glay in 1:nlay
         col_dry, p_lay, t_lay = as_layerdata[1, glay], as_layerdata[2, glay], as_layerdata[3, glay]

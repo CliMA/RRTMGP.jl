@@ -176,7 +176,7 @@ function gray_atmos_sw_test(
     toa_flux = Array(toa_flux)
 
     # testing with exact solution
-    ot_tot = sum(τ[:, 1]) / cos_zenith[1]
+    ot_tot = sum(τ[1, :]) / cos_zenith[1]
     exact = (toa_flux[1] * cos_zenith[1]) * exp(-ot_tot)
 
     rel_toler = FT(0.001)

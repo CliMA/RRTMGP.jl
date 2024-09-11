@@ -196,7 +196,7 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
     @inbounds lev_src_bot = lev_source[1, gcol]
     @inbounds for ilev in 1:nlay
         lev_src_top = lev_source[ilev + 1, gcol]
-        τ_lay, ssa_lay, g_lay = τ[ilev, gcol], ssa[ilev, gcol], g[ilev, gcol]
+        τ_lay, ssa_lay, g_lay = τ[gcol, ilev], ssa[gcol, ilev], g[gcol, ilev]
         Rdif, Tdif, src_up, src_dn = lw_2stream_coeffs(τ_lay, ssa_lay, g_lay, lev_src_bot, lev_src_top)
         denom = FT(1) / (FT(1) - Rdif * albedo_ilev)  # Eq 10
         albedo_ilevplus1 = Rdif + Tdif * Tdif * albedo_ilev * denom # Equation 9
@@ -220,7 +220,7 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
     ilev = nlay
     @inbounds while ilev ≥ 1
         lev_src_bot, albedo_ilev, src_ilev = lev_source[ilev, gcol], albedo[ilev, gcol], src[ilev, gcol]
-        τ_lay, ssa_lay, g_lay = τ[ilev, gcol], ssa[ilev, gcol], g[ilev, gcol]
+        τ_lay, ssa_lay, g_lay = τ[gcol, ilev], ssa[gcol, ilev], g[gcol, ilev]
         Rdif, Tdif, _, src_dn = lw_2stream_coeffs(τ_lay, ssa_lay, g_lay, lev_src_bot, lev_src_top)
 
         denom = FT(1) / (FT(1) - Rdif * albedo_ilev)  # Eq 10
