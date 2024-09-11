@@ -32,7 +32,7 @@ function rte_lw_2stream_solve_CUDA!(
         rte_lw_2stream!(op, flux_lw, src_lw, bcs_lw, gcol, igpt, ibnd, nlev, ncol)
         @inbounds begin
             for ilev in 1:nlev
-                flux_net[ilev, gcol] = flux_up[ilev, gcol] - flux_dn[ilev, gcol]
+                flux_net[gcol, ilev] = flux_up[gcol, ilev] - flux_dn[gcol, ilev]
             end
         end
     end
@@ -97,18 +97,18 @@ function rte_lw_2stream_solve_CUDA!(
             compute_optical_props!(op, as, src_lw, gcol, igpt, lookup_lw, lookup_lw_cld, lookup_lw_aero)
             rte_lw_2stream!(op, flux, src_lw, bcs_lw, gcol, igpt, ibnd, nlev, ncol)
             if igpt == 1
-                map!(x -> x, view(flux_up_lw, :, gcol), view(flux_up, :, gcol))
-                map!(x -> x, view(flux_dn_lw, :, gcol), view(flux_dn, :, gcol))
+                map!(x -> x, view(flux_up_lw, gcol, :), view(flux_up, gcol, :))
+                map!(x -> x, view(flux_dn_lw, gcol, :), view(flux_dn, gcol, :))
             else
                 for ilev in 1:nlev
-                    @inbounds flux_up_lw[ilev, gcol] += flux_up[ilev, gcol]
-                    @inbounds flux_dn_lw[ilev, gcol] += flux_dn[ilev, gcol]
+                    @inbounds flux_up_lw[gcol, ilev] += flux_up[gcol, ilev]
+                    @inbounds flux_dn_lw[gcol, ilev] += flux_dn[gcol, ilev]
                 end
             end
         end
         @inbounds begin
             for ilev in 1:nlev
-                flux_net_lw[ilev, gcol] = flux_up_lw[ilev, gcol] - flux_dn_lw[ilev, gcol]
+                flux_net_lw[gcol, ilev] = flux_up_lw[gcol, ilev] - flux_dn_lw[gcol, ilev]
             end
         end
     end

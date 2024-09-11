@@ -19,7 +19,7 @@ function rte_lw_noscat_solve!(
             compute_optical_props!(op, as, src_lw, gcol)
             rte_lw_noscat_one_angle!(src_lw, bcs_lw, op, Ds, w_μ, gcol, flux_lw, igpt, ibnd, nlay, nlev)
             for ilev in 1:nlev
-                flux_net[ilev, gcol] = flux_up[ilev, gcol] - flux_dn[ilev, gcol]
+                flux_net[gcol, ilev] = flux_up[gcol, ilev] - flux_dn[gcol, ilev]
             end
         end
     end
@@ -78,7 +78,7 @@ function rte_lw_noscat_solve!(
         end
         ClimaComms.@threaded device for gcol in 1:ncol
             for ilev in 1:nlev
-                flux_net_lw[ilev, gcol] = flux_up_lw[ilev, gcol] - flux_dn_lw[ilev, gcol]
+                flux_net_lw[gcol, ilev] = flux_up_lw[gcol, ilev] - flux_dn_lw[gcol, ilev]
             end
         end
     end
@@ -158,7 +158,7 @@ Transport for no-scattering longwave problem.
     # Transport is for intensity
     #   convert flux at top of domain to intensity assuming azimuthal isotropy
     intensity_dn_ilevplus1 = isnothing(inc_flux) ? FT(0) : inc_flux[gcol, igpt] * flux_to_intensity
-    @inbounds flux_dn[nlev, gcol] = intensity_dn_ilevplus1 * intensity_to_flux
+    @inbounds flux_dn[gcol, nlev] = intensity_dn_ilevplus1 * intensity_to_flux
 
     # Top of domain is index nlev
     # Downward propagation
@@ -171,15 +171,15 @@ Transport for no-scattering longwave problem.
             trans * intensity_dn_ilevplus1 +
             lw_noscat_source_dn(lev_source[ilev, gcol], lay_src, τ_loc, trans, τ_thresh)
         intensity_dn_ilevplus1 = intensity_dn_ilev
-        flux_dn[ilev, gcol] = intensity_dn_ilev * intensity_to_flux
+        flux_dn[gcol, ilev] = intensity_dn_ilev * intensity_to_flux
         ilev -= 1
     end
 
     # Surface reflection and emission
     @inbounds intensity_up_ilevminus1 =
         intensity_dn_ilevplus1 * (FT(1) - sfc_emis[ibnd, gcol]) + sfc_emis[ibnd, gcol] * sfc_source[gcol]
-    #flux_dn[1, gcol] * (FT(1) - sfc_emis[ibnd, gcol]) + sfc_emis[ibnd, gcol] * sfc_source[gcol]
-    @inbounds flux_up[1, gcol] = intensity_up_ilevminus1 * intensity_to_flux
+    #flux_dn[gcol, 1] * (FT(1) - sfc_emis[ibnd, gcol]) + sfc_emis[ibnd, gcol] * sfc_source[gcol]
+    @inbounds flux_up[gcol, 1] = intensity_up_ilevminus1 * intensity_to_flux
 
     # Upward propagation
     @inbounds for ilev in 2:(nlay + 1)
@@ -190,7 +190,7 @@ Transport for no-scattering longwave problem.
             trans * intensity_up_ilevminus1 +
             lw_noscat_source_up(lev_source[ilev, gcol], lay_src, τ_loc, trans, τ_thresh)
         intensity_up_ilevminus1 = intensity_up_ilev
-        flux_up[ilev, gcol] = intensity_up_ilev * intensity_to_flux
+        flux_up[gcol, ilev] = intensity_up_ilev * intensity_to_flux
     end
     return nothing
 end

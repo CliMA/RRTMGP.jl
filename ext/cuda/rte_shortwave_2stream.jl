@@ -38,18 +38,18 @@ function rte_sw_2stream_solve_CUDA!(
             # call shortwave rte solver
             rte_sw_2stream!(op, src_sw, bcs_sw, flux_sw, solar_frac, igpt, n_gpt, ibnd, nlev, gcol)
             for ilev in 1:nlev
-                flux_net_sw[ilev, gcol] = flux_up_sw[ilev, gcol] - flux_dn_sw[ilev, gcol]
+                flux_net_sw[gcol, ilev] = flux_up_sw[gcol, ilev] - flux_dn_sw[gcol, ilev]
             end
         end
         if μ₀ ≤ 0 # zero out columns with zenith angle ≥ π/2
             for ilev in 1:nlev
-                flux_up_sw[ilev, gcol] = FT(0)
+                flux_up_sw[gcol, ilev] = FT(0)
             end
             for ilev in 1:nlev
-                flux_dn_sw[ilev, gcol] = FT(0)
+                flux_dn_sw[gcol, ilev] = FT(0)
             end
             for ilev in 1:nlev
-                flux_net_sw[ilev, gcol] = FT(0)
+                flux_net_sw[gcol, ilev] = FT(0)
             end
         end
     end
@@ -125,25 +125,25 @@ function rte_sw_2stream_solve_CUDA!(
                 # rte shortwave solver
                 rte_sw_2stream!(op, src_sw, bcs_sw, flux, solar_frac, igpt, n_gpt, ibnd, nlev, gcol)
                 if igpt == 1
-                    map!(x -> x, view(flux_up_sw, :, gcol), view(flux_up, :, gcol))
-                    map!(x -> x, view(flux_dn_sw, :, gcol), view(flux_dn, :, gcol))
+                    map!(x -> x, view(flux_up_sw, gcol, :), view(flux_up, gcol, :))
+                    map!(x -> x, view(flux_dn_sw, gcol, :), view(flux_dn, gcol, :))
                 else
                     for ilev in 1:nlev
-                        flux_up_sw[ilev, gcol] += flux_up[ilev, gcol]
-                        flux_dn_sw[ilev, gcol] += flux_dn[ilev, gcol]
+                        flux_up_sw[gcol, ilev] += flux_up[gcol, ilev]
+                        flux_dn_sw[gcol, ilev] += flux_dn[gcol, ilev]
                     end
                 end
             end
             if μ₀ ≤ 0 # zero out columns with zenith angle ≥ π/2
                 for ilev in 1:nlev
-                    flux_up_sw[ilev, gcol] = FT(0)
+                    flux_up_sw[gcol, ilev] = FT(0)
                 end
                 for ilev in 1:nlev
-                    flux_dn_sw[ilev, gcol] = FT(0)
+                    flux_dn_sw[gcol, ilev] = FT(0)
                 end
             end
             for ilev in 1:nlev
-                flux_net_sw[ilev, gcol] = flux_up_sw[ilev, gcol] - flux_dn_sw[ilev, gcol]
+                flux_net_sw[gcol, ilev] = flux_up_sw[gcol, ilev] - flux_dn_sw[gcol, ilev]
             end
         end
     end

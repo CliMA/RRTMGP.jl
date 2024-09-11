@@ -151,10 +151,12 @@ function load_comparison_data(expt_no, bot_at_1, ncol)
     flux_dn_file_lw = get_reference_filename(:gas, :lw, :flux_dn)
     flux_up_file_sw = get_reference_filename(:gas, :sw, :flux_up)
     flux_dn_file_sw = get_reference_filename(:gas, :sw, :flux_dn)
+
     ds_comp_lw_up = Dataset(flux_up_file_lw, "r")
     ds_comp_lw_dn = Dataset(flux_dn_file_lw, "r")
     ds_comp_sw_up = Dataset(flux_up_file_sw, "r")
     ds_comp_sw_dn = Dataset(flux_dn_file_sw, "r")
+
     ncol_ds = size(Array(ds_comp_lw_up["rlu"]), 2)
     nrepeat = cld(ncol, ncol_ds)
 
@@ -162,13 +164,16 @@ function load_comparison_data(expt_no, bot_at_1, ncol)
     comp_flux_dn_lw = repeat(_orient_data(Array(ds_comp_lw_dn["rld"][:, :, expt_no]), bot_at_1), 1, nrepeat)
     comp_flux_up_sw = repeat(_orient_data(Array(ds_comp_sw_up["rsu"][:, :, expt_no]), bot_at_1), 1, nrepeat)
     comp_flux_dn_sw = repeat(_orient_data(Array(ds_comp_sw_dn["rsd"][:, :, expt_no]), bot_at_1), 1, nrepeat)
+
     close(ds_comp_lw_up)
     close(ds_comp_lw_dn)
     close(ds_comp_sw_up)
     close(ds_comp_sw_dn)
+
     nlev, ncol_ds = size(comp_flux_up_lw)
-    return comp_flux_up_lw[:, 1:ncol],
-    comp_flux_dn_lw[:, 1:ncol],
-    comp_flux_up_sw[:, 1:ncol],
-    comp_flux_dn_sw[:, 1:ncol]
+
+    return Array(transpose(comp_flux_up_lw[:, 1:ncol])),
+    Array(transpose(comp_flux_dn_lw[:, 1:ncol])),
+    Array(transpose(comp_flux_up_sw[:, 1:ncol])),
+    Array(transpose(comp_flux_dn_sw[:, 1:ncol]))
 end

@@ -189,8 +189,8 @@ function load_comparison_data(use_lut, bot_at_1, ncol)
     close(ds_comp_lw)
     close(ds_comp_sw)
     nlev, ncol_ds = size(comp_flux_up_lw)
-    return comp_flux_up_lw[:, 1:ncol],
-    comp_flux_dn_lw[:, 1:ncol],
-    comp_flux_up_sw[:, 1:ncol],
-    comp_flux_dn_sw[:, 1:ncol]
+    return Array(transpose(comp_flux_up_lw[:, 1:ncol])),
+    Array(transpose(comp_flux_dn_lw[:, 1:ncol])),
+    Array(transpose(comp_flux_up_sw[:, 1:ncol])),
+    Array(transpose(comp_flux_dn_sw[:, 1:ncol]))
 end
