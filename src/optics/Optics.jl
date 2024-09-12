@@ -101,7 +101,7 @@ function compute_col_gas!(
     lat::Union{AbstractArray{FT, 1}, Nothing} = nothing,
     max_threads::Int = Int(256),
 ) where {FT}
-    nlay, ncol = size(col_dry)
+    ncol, nlay = size(col_dry)
     mol_m_dry = RP.molmass_dryair(param_set)
     mol_m_h2o = RP.molmass_water(param_set)
     avogadro = RP.avogad(param_set)
@@ -138,7 +138,7 @@ function compute_relative_humidity!(
     param_set::RP.ARP,
     vmr_h2o::AbstractArray{FT, 2},
 ) where {FT}
-    nlay, ncol = size(p_lay)
+    ncol, nlay = size(p_lay)
     # ratio of water to dry air molecular weights
     mwd = RP.molmass_water(param_set) / RP.molmass_dryair(param_set)
     t_ref = FT(273.16) # reference temperature (K)
@@ -189,7 +189,7 @@ Computes optical properties for the longwave problem.
         ibnd = lkp.band_data.major_gpt2bnd[igpt]
         totplnk = view(lkp.planck.tot_planck, :, ibnd)
         as_layerdata = AtmosphericStates.getview_layerdata(as, gcol)
-        t_lev_col = view(as.t_lev, :, gcol)
+        t_lev_col = view(as.t_lev, gcol, :)
         τ = view(op.τ, gcol, :)
 
         lev_src_inc_prev = zero(t_sfc)
@@ -268,7 +268,7 @@ end
         ibnd = lkp.band_data.major_gpt2bnd[igpt]
         totplnk = view(lkp.planck.tot_planck, :, ibnd)
         as_layerdata = AtmosphericStates.getview_layerdata(as, gcol)
-        t_lev_col = view(as.t_lev, :, gcol)
+        t_lev_col = view(as.t_lev, gcol, :)
         τ = view(op.τ, gcol, :)
         ssa = view(op.ssa, gcol, :)
         g = view(op.g, gcol, :)

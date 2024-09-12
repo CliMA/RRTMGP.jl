@@ -7,7 +7,7 @@ function compute_col_gas!(
     vmr_h2o::Union{AbstractArray{FT, 2}, Nothing} = nothing,
     lat::Union{AbstractArray{FT, 1}, Nothing} = nothing,
 ) where {FT}
-    nlay, ncol = size(col_dry)
+    ncol, nlay = size(col_dry)
     mol_m_dry = RP.molmass_dryair(param_set)
     mol_m_h2o = RP.molmass_water(param_set)
     avogadro = RP.avogad(param_set)
@@ -20,7 +20,7 @@ end
 
 function compute_col_gas_CUDA!(col_dry, args...)
     glx = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
-    nlay, ncol = size(col_dry)
+    ncol, nlay = size(col_dry)
     if glx ≤ nlay * ncol
         glay = (glx % nlay == 0) ? nlay : (glx % nlay)
         gcol = cld(glx, nlay)
@@ -37,7 +37,7 @@ function compute_relative_humidity!(
     param_set::RP.ARP,
     vmr_h2o::AbstractArray{FT, 2},
 ) where {FT}
-    nlay, ncol = size(p_lay)
+    ncol, nlay = size(p_lay)
     # ratio of water to dry air molecular weights
     mwd = RP.molmass_water(param_set) / RP.molmass_dryair(param_set)
     t_ref = FT(273.16) # reference temperature (K)
@@ -51,7 +51,7 @@ end
 
 function compute_relative_humidity_CUDA!(rh, args...)
     glx = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
-    nlay, ncol = size(rh)
+    ncol, nlay = size(rh)
     if glx ≤ nlay * ncol
         glay = (glx % nlay == 0) ? nlay : (glx % nlay)
         gcol = cld(glx, nlay)

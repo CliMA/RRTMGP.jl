@@ -60,14 +60,14 @@ function setup_rfmip_as(
     t_lev = Array(ds_lw_in["temp_level"])[lev_ind, :, expt_no]
     t_lay = Array(ds_lw_in["temp_layer"])[lay_ind, :, expt_no]
 
-    p_lev = FTA2D(repeat(p_lev, 1, nrepeat)[:, 1:ncol])
-    p_lay = FTA2D(repeat(p_lay, 1, nrepeat)[:, 1:ncol])
-    t_lev = FTA2D(repeat(t_lev, 1, nrepeat)[:, 1:ncol])
-    t_lay = FTA2D(repeat(t_lay, 1, nrepeat)[:, 1:ncol])
+    p_lev = FTA2D(transpose(repeat(p_lev, 1, nrepeat)[:, 1:ncol]))
+    p_lay = FTA2D(transpose(repeat(p_lay, 1, nrepeat)[:, 1:ncol]))
+    t_lev = FTA2D(transpose(repeat(t_lev, 1, nrepeat)[:, 1:ncol]))
+    t_lay = FTA2D(transpose(repeat(t_lay, 1, nrepeat)[:, 1:ncol]))
 
     t_sfc = FTA1D(repeat(ds_lw_in["surface_temperature"][:, expt_no], nrepeat)[1:ncol])
-    col_dry = FTA2D(undef, nlay, ncol)
-    rel_hum = FTA2D(undef, nlay, ncol)
+    col_dry = FTA2D(undef, ncol, nlay)
+    rel_hum = FTA2D(undef, ncol, nlay)
 
     # Reading volume mixing ratios 
 
@@ -126,7 +126,7 @@ function setup_rfmip_as(
     compute_col_gas!(device, p_lev, col_dry, param_set, vmr_h2o, lat) # the example skips lat based gravity calculation
     compute_relative_humidity!(device, rel_hum, p_lay, t_lay, param_set, vmr_h2o) # compute relative humidity
 
-    layerdata = similar(p_lay, 4, nlay, ncol)
+    layerdata = similar(p_lay, 4, ncol, nlay)
     layerdata[1, :, :] .= col_dry
     layerdata[2, :, :] .= p_lay
     layerdata[3, :, :] .= t_lay

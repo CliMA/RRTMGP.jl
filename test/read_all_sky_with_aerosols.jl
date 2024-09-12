@@ -61,10 +61,10 @@ function setup_allsky_with_aerosols_as(
     t_lay = Array{FT}(reshape(Array(ds_in["t_lay"])[1, lay_ind], nlay, 1))
     t_sfc = Array{FT}(reshape([t_lev[1, 1]], 1))
 
-    p_lev = repeat(p_lev, 1, ncol)
-    p_lay = repeat(p_lay, 1, ncol)
-    t_lev = repeat(t_lev, 1, ncol)
-    t_lay = repeat(t_lay, 1, ncol)
+    p_lev = transpose(repeat(p_lev, 1, ncol))
+    p_lay = transpose(repeat(p_lay, 1, ncol))
+    t_lev = transpose(repeat(t_lev, 1, ncol))
+    t_lay = transpose(repeat(t_lay, 1, ncol))
     t_sfc = repeat(t_sfc, ncol)
     #col_dry = DA{FT,2}(transpose(Array(ds_in["col_dry"])[:, lay_ind]))
     #col_dry from the dataset not used in the FORTRAN RRTMGP example
@@ -113,8 +113,8 @@ function setup_allsky_with_aerosols_as(
         vmrat[:, :, icol] .= vmrat[:, :, 1]
     end
     vmr = Vmr(DA(vmrat))
-    col_dry = DA{FT, 2}(undef, nlay, ncol)
-    rel_hum = DA{FT, 2}(undef, nlay, ncol)
+    col_dry = DA{FT, 2}(undef, ncol, nlay)
+    rel_hum = DA{FT, 2}(undef, ncol, nlay)
     vmr_h2o = view(vmr.vmr, idx_gases["h2o"], :, :)
 
     cld_frac = zeros(FT, nlay, ncol)
@@ -142,13 +142,13 @@ function setup_allsky_with_aerosols_as(
     ncol_ds = ncol_ds_all_sky(use_lut)
     for icol in 1:ncol, ilay in 1:nlay
         icol_ds = icol % ncol_ds == 0 ? ncol_ds : icol % ncol_ds
-        if p_lay[ilay, icol] > FT(10000) && p_lay[ilay, icol] < FT(90000) && icol_ds % 3 ≠ 0
+        if p_lay[icol, ilay] > FT(10000) && p_lay[icol, ilay] < FT(90000) && icol_ds % 3 ≠ 0
             cld_frac[ilay, icol] = cldfrac
-            if t_lay[ilay, icol] > FT(263)
+            if t_lay[icol, ilay] > FT(263)
                 cld_path_liq[ilay, icol] = FT(10)
                 cld_r_eff_liq[ilay, icol] = r_eff_liq
             end
-            if t_lay[ilay, icol] < FT(273)
+            if t_lay[icol, ilay] < FT(273)
                 cld_path_ice[ilay, icol] = FT(10)
                 cld_r_eff_ice[ilay, icol] = r_eff_ice
             end
@@ -164,7 +164,7 @@ function setup_allsky_with_aerosols_as(
     compute_col_gas!(device, p_lev, col_dry, param_set, vmr_h2o, lat) # the example skips lat based gravity calculation
     compute_relative_humidity!(device, rel_hum, p_lay, t_lay, param_set, vmr_h2o) # compute relative humidity
 
-    layerdata = similar(p_lay, 4, nlay, ncol)
+    layerdata = similar(p_lay, 4, ncol, nlay)
     layerdata[1, :, :] .= col_dry
     layerdata[2, :, :] .= p_lay
     layerdata[3, :, :] .= t_lay
