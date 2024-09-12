@@ -186,16 +186,16 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
     @inbounds flux_dn[gcol, nlev] = flux_dn_ilevplus1
     # Albedo of lowest level is the surface albedo...
     @inbounds albedo_ilev = FT(1) - sfc_emis[ibnd, gcol]
-    @inbounds albedo[1, gcol] = albedo_ilev
+    @inbounds albedo[gcol, 1] = albedo_ilev
     # ... and source of diffuse radiation is surface emission
     @inbounds src_ilev = FT(π) * sfc_emis[ibnd, gcol] * sfc_source[gcol]
-    @inbounds src[1, gcol] = src_ilev#FT(π) * sfc_emis[ibnd, gcol] * sfc_source[gcol]
+    @inbounds src[gcol, 1] = src_ilev#FT(π) * sfc_emis[ibnd, gcol] * sfc_source[gcol]
 
     # From bottom to top of atmosphere --
     #   compute albedo and source of upward radiation
-    @inbounds lev_src_bot = lev_source[1, gcol]
+    @inbounds lev_src_bot = lev_source[gcol, 1]
     @inbounds for ilev in 1:nlay
-        lev_src_top = lev_source[ilev + 1, gcol]
+        lev_src_top = lev_source[gcol, ilev + 1]
         τ_lay, ssa_lay, g_lay = τ[gcol, ilev], ssa[gcol, ilev], g[gcol, ilev]
         Rdif, Tdif, src_up, src_dn = lw_2stream_coeffs(τ_lay, ssa_lay, g_lay, lev_src_bot, lev_src_top)
         denom = FT(1) / (FT(1) - Rdif * albedo_ilev)  # Eq 10
@@ -205,21 +205,21 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
         # radiation emitted at bottom of layer,
         # transmitted through the layer and reflected from layers below (Tdiff*src*albedo)
         src_ilevplus1 = src_up + Tdif * denom * (src_ilev + albedo_ilev * src_dn)
-        albedo[ilev + 1, gcol], src[ilev + 1, gcol] = albedo_ilevplus1, src_ilevplus1
+        albedo[gcol, ilev + 1], src[gcol, ilev + 1] = albedo_ilevplus1, src_ilevplus1
         lev_src_bot = lev_src_top
         albedo_ilev, src_ilev = albedo_ilevplus1, src_ilevplus1
     end
 
     # Eq 12, at the top of the domain upwelling diffuse is due to ...
     @inbounds flux_up[gcol, nlev] =
-        flux_dn_ilevplus1 * albedo[nlev, gcol] + # ... reflection of incident diffuse and
-        src[nlev, gcol]                          # scattering by the direct beam below
+        flux_dn_ilevplus1 * albedo[gcol, nlev] + # ... reflection of incident diffuse and
+        src[gcol, nlev]                          # scattering by the direct beam below
 
     # From the top of the atmosphere downward -- compute fluxes
-    @inbounds lev_src_top = lev_source[nlay + 1, gcol]
+    @inbounds lev_src_top = lev_source[gcol, nlay + 1]
     ilev = nlay
     @inbounds while ilev ≥ 1
-        lev_src_bot, albedo_ilev, src_ilev = lev_source[ilev, gcol], albedo[ilev, gcol], src[ilev, gcol]
+        lev_src_bot, albedo_ilev, src_ilev = lev_source[gcol, ilev], albedo[gcol, ilev], src[gcol, ilev]
         τ_lay, ssa_lay, g_lay = τ[gcol, ilev], ssa[gcol, ilev], g[gcol, ilev]
         Rdif, Tdif, _, src_dn = lw_2stream_coeffs(τ_lay, ssa_lay, g_lay, lev_src_bot, lev_src_top)
 
