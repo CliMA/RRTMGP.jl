@@ -85,23 +85,23 @@ function update_profile_lw_kernel!(
     @inbounds begin
         # updating t_lay based on heating rate
         for glay in 1:nlay
-            t_lay[glay, gcol] += Δt * hr_lay[glay, gcol]
+            t_lay[gcol, glay] += Δt * hr_lay[gcol, glay]
         end
         # compute t_lev from t_lay
         for glev in 2:(nlay - 1)
-            t_lev[glev, gcol] =
-                ft_1by3 * t_lay[glev - 1, gcol] + ft_5by6 * t_lay[glev, gcol] - ft_1by6 * t_lay[glev + 1, gcol]
+            t_lev[gcol, glev] =
+                ft_1by3 * t_lay[gcol, glev - 1] + ft_5by6 * t_lay[gcol, glev] - ft_1by6 * t_lay[gcol, glev + 1]
         end
 
-        t_lev[nlay, gcol] =
-            ft_1by3 * t_lay[nlay, gcol] + ft_5by6 * t_lay[nlay - 1, gcol] - ft_1by6 * t_lay[nlay - 2, gcol]
+        t_lev[gcol, nlay] =
+            ft_1by3 * t_lay[gcol, nlay] + ft_5by6 * t_lay[gcol, nlay - 1] - ft_1by6 * t_lay[gcol, nlay - 2]
 
-        t_lev[1, gcol] = FT(2) * t_lay[1, gcol] - t_lev[2, gcol]
+        t_lev[gcol, 1] = FT(2) * t_lay[gcol, 1] - t_lev[gcol, 2]
 
-        t_lev[nlay + 1, gcol] = FT(2) * t_lay[nlay, gcol] - t_lev[nlay, gcol]
+        t_lev[gcol, nlay + 1] = FT(2) * t_lay[gcol, nlay] - t_lev[gcol, nlay]
 
         for glev in 1:nlev
-            T_ex_lev[glev, gcol] = sqrt(sqrt((flux_dn[gcol, glev] + (flux_net[gcol, glev] * ft_1by2)) / sbc))
+            T_ex_lev[gcol, glev] = sqrt(sqrt((flux_dn[gcol, glev] + (flux_net[gcol, glev] * ft_1by2)) / sbc))
         end
 
         for glev in 2:nlev
@@ -145,8 +145,8 @@ end
 
 function compute_gray_heating_rate_kernel!(hr_lay, flux_net, p_lev, grav_, cp_d_, nlay, gcol)
     for ilay in 1:nlay
-        @inbounds hr_lay[ilay, gcol] =
-            grav_ * (flux_net[gcol, ilay + 1] - flux_net[gcol, ilay]) / (p_lev[ilay + 1, gcol] - p_lev[ilay, gcol]) /
+        @inbounds hr_lay[gcol, ilay] =
+            grav_ * (flux_net[gcol, ilay + 1] - flux_net[gcol, ilay]) / (p_lev[gcol, ilay + 1] - p_lev[gcol, ilay]) /
             cp_d_
     end
     return nothing
