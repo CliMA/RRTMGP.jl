@@ -203,20 +203,20 @@ Computes optical properties for the longwave problem.
             # compute longwave source terms
             t_lev_inc = t_lev_col[glay + 1]
 
-            lay_source[glay, gcol] = interp1d_equispaced(t_lay, t_planck, totplnk) * planckfrac
+            lay_source[gcol, glay] = interp1d_equispaced(t_lay, t_planck, totplnk) * planckfrac
             lev_src_inc = interp1d_equispaced(t_lev_inc, t_planck, totplnk) * planckfrac
             lev_src_dec = interp1d_equispaced(t_lev_dec, t_planck, totplnk) * planckfrac
             if glay == 1
                 sfc_source[gcol] = interp1d_equispaced(t_sfc, t_planck, totplnk) * planckfrac
-                lev_source[glay, gcol] = lev_src_dec
+                lev_source[gcol, glay] = lev_src_dec
             else
-                lev_source[glay, gcol] = sqrt(lev_src_inc_prev * lev_src_dec)
+                lev_source[gcol, glay] = sqrt(lev_src_inc_prev * lev_src_dec)
             end
             lev_src_dec_prev = lev_src_dec
             lev_src_inc_prev = lev_src_inc
             t_lev_dec = t_lev_inc
         end
-        lev_source[nlay + 1, gcol] = lev_src_inc_prev
+        lev_source[gcol, nlay + 1] = lev_src_inc_prev
         if !isnothing(lkp_cld)
             cloud_state = as.cloud_state
             cld_r_eff_liq = view(cloud_state.cld_r_eff_liq, :, gcol)
@@ -291,15 +291,15 @@ end
             lev_src_dec = interp1d_equispaced(t_lev_dec, t_planck, totplnk) * planckfrac
             if glay == 1
                 sfc_source[gcol] = interp1d_equispaced(t_sfc, t_planck, totplnk) * planckfrac
-                lev_source[glay, gcol] = lev_src_dec
+                lev_source[gcol, glay] = lev_src_dec
             else
-                lev_source[glay, gcol] = sqrt(lev_src_inc_prev * lev_src_dec)
+                lev_source[gcol, glay] = sqrt(lev_src_inc_prev * lev_src_dec)
             end
             lev_src_dec_prev = lev_src_dec
             lev_src_inc_prev = lev_src_inc
             t_lev_dec = t_lev_inc
         end
-        lev_source[nlay + 1, gcol] = lev_src_inc_prev
+        lev_source[gcol, nlay + 1] = lev_src_inc_prev
     end
     if !isnothing(lkp_cld) # clouds need TwoStream optics
         cloud_state = as.cloud_state
