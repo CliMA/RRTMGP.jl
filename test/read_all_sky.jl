@@ -68,19 +68,19 @@ function setup_allsky_as(
     #col_dry from the dataset not used in the FORTRAN RRTMGP example
 
     # Reading volume mixing ratios 
-    vmrat = zeros(FT, ngas, nlay, ncol)
+    vmrat = zeros(FT, ngas, ncol, nlay)
 
-    vmrat[idx_gases["h2o"], :, 1] .= Array{FT}(Array(ds_in["h2o"])[1, lay_ind])
-    vmrat[idx_gases["o3"], :, 1] .= Array{FT}(Array(ds_in["o3"])[1, lay_ind])
-    vmrat[idx_gases["co2"], :, 1] .= FT(348e-6)
-    vmrat[idx_gases["ch4"], :, 1] .= FT(1650e-9)
-    vmrat[idx_gases["n2o"], :, 1] .= FT(306e-9)
-    vmrat[idx_gases["n2"], :, 1] .= FT(0.7808)
-    vmrat[idx_gases["o2"], :, 1] .= FT(0.2095)
-    vmrat[idx_gases["co"], :, 1] .= FT(0)
+    vmrat[idx_gases["h2o"], 1, :] .= Array{FT}(Array(ds_in["h2o"])[1, lay_ind])
+    vmrat[idx_gases["o3"], 1, :] .= Array{FT}(Array(ds_in["o3"])[1, lay_ind])
+    vmrat[idx_gases["co2"], 1, :] .= FT(348e-6)
+    vmrat[idx_gases["ch4"], 1, :] .= FT(1650e-9)
+    vmrat[idx_gases["n2o"], 1, :] .= FT(306e-9)
+    vmrat[idx_gases["n2"], 1, :] .= FT(0.7808)
+    vmrat[idx_gases["o2"], 1, :] .= FT(0.2095)
+    vmrat[idx_gases["co"], 1, :] .= FT(0)
 
     for icol in 2:ncol
-        vmrat[:, :, icol] .= vmrat[:, :, 1]
+        vmrat[:, icol, :] .= vmrat[:, 1, :]
     end
     vmr = Vmr(DA(vmrat))
     col_dry = DA{FT, 2}(undef, ncol, nlay)
