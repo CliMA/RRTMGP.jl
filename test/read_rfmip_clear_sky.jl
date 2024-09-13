@@ -73,8 +73,8 @@ function setup_rfmip_as(
 
     vmr_h2o = (Array(ds_lw_in["water_vapor"])[lay_ind, :, expt_no]) # vmr of H2O and O3
     vmr_o3 = (Array(ds_lw_in["ozone"])[lay_ind, :, expt_no])       # vary with height
-    vmr_h2o = FTA2D(repeat(vmr_h2o, 1, nrepeat)[:, 1:ncol])
-    vmr_o3 = FTA2D(repeat(vmr_o3, 1, nrepeat)[:, 1:ncol])
+    vmr_h2o = FTA2D(transpose(repeat(vmr_h2o, 1, nrepeat)[:, 1:ncol]))
+    vmr_o3 = FTA2D(transpose(repeat(vmr_o3, 1, nrepeat)[:, 1:ncol]))
 
     vmrat = zeros(FT, ngas)
 
