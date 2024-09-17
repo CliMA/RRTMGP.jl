@@ -48,9 +48,6 @@ function rte_lw_noscat_solve!(
     (; cloud_state, aerosol_state) = as
     bld_cld_mask = cloud_state isa CloudState
 
-    flux_up_lw = flux_lw.flux_up
-    flux_dn_lw = flux_lw.flux_dn
-    flux_net_lw = flux_lw.flux_net
     @inbounds begin
         if aerosol_state isa AerosolState
             ClimaComms.@threaded device for gcol in 1:ncol
@@ -61,8 +58,8 @@ function rte_lw_noscat_solve!(
             end
         end
         for igpt in 1:n_gpt
+            ibnd = major_gpt2bnd[igpt]
             ClimaComms.@threaded device for gcol in 1:ncol
-                ibnd = major_gpt2bnd[igpt]
                 if bld_cld_mask
                     Optics.build_cloud_mask!(
                         view(cloud_state.mask_lw, :, gcol),
@@ -70,16 +67,13 @@ function rte_lw_noscat_solve!(
                         cloud_state.mask_type,
                     )
                 end
-                igpt == 1 && set_flux_to_zero!(flux_lw, gcol)
                 compute_optical_props!(op, as, src_lw, gcol, igpt, lookup_lw, lookup_lw_cld, lookup_lw_aero)
                 rte_lw_noscat_one_angle!(src_lw, bcs_lw, op, Ds, w_μ, gcol, flux, igpt, ibnd, nlay, nlev)
-                add_to_flux!(flux_lw, flux, gcol)
+                igpt == 1 ? set_flux!(flux_lw, flux, gcol) : add_to_flux!(flux_lw, flux, gcol)
             end
         end
         ClimaComms.@threaded device for gcol in 1:ncol
-            for ilev in 1:nlev
-                flux_net_lw[gcol, ilev] = flux_up_lw[gcol, ilev] - flux_dn_lw[gcol, ilev]
-            end
+            compute_net_flux!(flux_lw, gcol)
         end
     end
     return nothing
@@ -178,11 +172,10 @@ Transport for no-scattering longwave problem.
     # Surface reflection and emission
     @inbounds intensity_up_ilevminus1 =
         intensity_dn_ilevplus1 * (FT(1) - sfc_emis[ibnd, gcol]) + sfc_emis[ibnd, gcol] * sfc_source[gcol]
-    #flux_dn[gcol, 1] * (FT(1) - sfc_emis[ibnd, gcol]) + sfc_emis[ibnd, gcol] * sfc_source[gcol]
     @inbounds flux_up[gcol, 1] = intensity_up_ilevminus1 * intensity_to_flux
 
     # Upward propagation
-    @inbounds for ilev in 2:(nlay + 1)
+    @inbounds for ilev in 2:nlev
         τ_loc = τ[gcol, ilev - 1] * Ds
         trans = exp(-τ_loc)
         lay_src = lay_source[gcol, ilev - 1]

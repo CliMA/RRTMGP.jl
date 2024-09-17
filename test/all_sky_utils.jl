@@ -95,6 +95,7 @@ function all_sky(
     swbcs = (cos_zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse)
     slv_sw = SLVSW(FT, DA, context, nlay, ncol, swbcs...)
     #------calling solvers
+    exfiltrate && Infiltrator.@exfiltrate
     solve_lw!(slv_lw, as, lookup_lw, lookup_lw_cld)
     if device isa ClimaComms.CPUSingleThreaded
         JET.@test_opt solve_lw!(slv_lw, as, lookup_lw, lookup_lw_cld)
@@ -102,7 +103,6 @@ function all_sky(
         @test (@allocated solve_lw!(slv_lw, as, lookup_lw, lookup_lw_cld)) ≤ 224
     end
 
-    exfiltrate && Infiltrator.@exfiltrate
     solve_sw!(slv_sw, as, lookup_sw, lookup_sw_cld)
     if device isa ClimaComms.CPUSingleThreaded
         JET.@test_opt solve_sw!(slv_sw, as, lookup_sw, lookup_sw_cld)
