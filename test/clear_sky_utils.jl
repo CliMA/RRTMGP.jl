@@ -85,14 +85,12 @@ function clear_sky(
     if device isa ClimaComms.CPUSingleThreaded
         JET.@test_opt solve_lw!(slv_lw, as, lookup_lw)
         @test (@allocated solve_lw!(slv_lw, as, lookup_lw)) == 0
-        @test (@allocated solve_lw!(slv_lw, as, lookup_lw)) ≤ 448
     end
 
     solve_sw!(slv_sw, as, lookup_sw)
     if device isa ClimaComms.CPUSingleThreaded
         JET.@test_opt solve_sw!(slv_sw, as, lookup_sw)
         @test (@allocated solve_sw!(slv_sw, as, lookup_sw)) == 0
-        @test (@allocated solve_sw!(slv_sw, as, lookup_sw)) ≤ 448
     end
 
     # comparing longwave fluxes with data from RRTMGP FORTRAN code

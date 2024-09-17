@@ -112,7 +112,6 @@ function gray_atmos_lw_equil(context, ::Type{SLVLW}, ::Type{FT}; exfiltrate = fa
     if device isa ClimaComms.CPUSingleThreaded
         JET.@test_opt solve_lw!(slv_lw, gray_as)
         @test (@allocated solve_lw!(slv_lw, gray_as)) == 0
-        @test (@allocated solve_lw!(slv_lw, gray_as)) ≤ 128
     end
 end
 

@@ -26,7 +26,8 @@ function rte_sw_2stream_solve!(
                     flux_net_sw[gcol, ilev] = flux_up_sw[gcol, ilev] - flux_dn_sw[gcol, ilev]
                 end
             else
-                set_flux_to_zero!(flux_sw, gcol)
+                set_flux!(flux_sw, FT(0), gcol)
+                set_net_flux!(flux_sw, FT(0), gcol)
             end
         end
     end
@@ -56,7 +57,7 @@ function rte_sw_2stream_solve!(
         flux_net_sw = flux_sw.flux_net
         (; flux_up, flux_dn) = flux
         cos_zenith = bcs_sw.cos_zenith
-        FT = eltype(flux_up)
+        FT = eltype(cos_zenith)
         if aerosol_state isa AerosolState
             ClimaComms.@threaded device for gcol in 1:ncol
                 Optics.compute_aero_mask!(
@@ -79,26 +80,17 @@ function rte_sw_2stream_solve!(
                     ibnd = lookup_sw.band_data.major_gpt2bnd[igpt]
                     # call rte shortwave solver
                     rte_sw_2stream!(op, src_sw, bcs_sw, flux, solar_frac, igpt, n_gpt, ibnd, nlev, gcol)
-                    if igpt == 1
-                        map!(x -> x, view(flux_up_sw, gcol, :), view(flux_up, gcol, :))
-                        map!(x -> x, view(flux_dn_sw, gcol, :), view(flux_dn, gcol, :))
-                    else
-                        for ilev in 1:nlev
-                            @inbounds flux_up_sw[gcol, ilev] += flux_up[gcol, ilev]
-                            @inbounds flux_dn_sw[gcol, ilev] += flux_dn[gcol, ilev]
-                        end
-                    end
-                else
-                    set_flux_to_zero!(flux_sw, gcol)
+                    igpt == 1 ? set_flux!(flux_sw, flux, gcol) : add_to_flux!(flux_sw, flux, gcol)
                 end
             end
         end
 
         ClimaComms.@threaded device for gcol in 1:ncol
             if cos_zenith[gcol] > 0
-                for ilev in 1:nlev
-                    flux_net_sw[gcol, ilev] = flux_up_sw[gcol, ilev] - flux_dn_sw[gcol, ilev]
-                end
+                compute_net_flux!(flux_sw, gcol)
+            else
+                set_flux!(flux_sw, FT(0), gcol)
+                set_net_flux!(flux_sw, FT(0), gcol)
             end
         end
     end
