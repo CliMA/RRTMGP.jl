@@ -3,7 +3,6 @@ import ClimaComms
 @static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
 
 import JET
-import Infiltrator
 using RRTMGP
 using RRTMGP.AngularDiscretizations
 using RRTMGP.Fluxes
@@ -19,12 +18,8 @@ import ClimaParams as CP
 
 # overriding ClimaParams as different precision is needed by RRTMGP
 
-#using Plots
 
-"""
-Example program to demonstrate the calculation of longwave radiative fluxes in a model gray atmosphere.
-"""
-function gray_atmos_lw_equil(context, ::Type{SLVLW}, ::Type{FT}; exfiltrate = false) where {FT <: AbstractFloat, SLVLW}
+function setup_gray_atmos_lw_equil_test(context, ::Type{SLVLW}, ::Type{FT}) where {FT <: AbstractFloat, SLVLW}
     device = ClimaComms.device(context)
     param_set = RRTMGPParameters(FT)
     ncol = if device isa ClimaComms.CUDADevice
@@ -38,14 +33,6 @@ function gray_atmos_lw_equil(context, ::Type{SLVLW}, ::Type{FT}; exfiltrate = fa
     pe = FT(9000)                           # TOA pressure (Pa)
     nbnd, ngpt = 1, 1                       # # of nbands/g-points (=1 for gray radiation)
     nlev = nlay + 1                         # # of layers
-    tb = FT(320)                            # surface temperature
-    tstep = 6.0                             # timestep in hours
-    Δt = FT(60 * 60 * tstep)                # timestep in seconds
-    ndays = 365 * 40                        # # of simulation days
-    nsteps = ndays * (24 / tstep)           # number of timesteps
-    temp_toler = FT(0.1)                    # tolerance for temperature (Kelvin)
-    flux_grad_toler = FT(1e-5)              # tolerance for flux gradient
-    n_gauss_angles = 1                   # for non-scattering calculation
     sfc_emis = DA{FT}(undef, nbnd, ncol) # surface emissivity
     sfc_emis .= FT(1.0)
     inc_flux = nothing                      # incoming flux
@@ -60,6 +47,23 @@ function gray_atmos_lw_equil(context, ::Type{SLVLW}, ::Type{FT}; exfiltrate = fa
     gray_as = setup_gray_as_pr_grid(context, nlay, lat, p0, pe, otp, param_set, DA)
     slv_lw = SLVLW(FT, DA, context, param_set, nlay, ncol, sfc_emis, inc_flux)
 
+    return gray_as, slv_lw, (DA, param_set, nlev, nlay, ncol)
+end
+
+"""
+Example program to demonstrate the calculation of longwave radiative fluxes in a model gray atmosphere.
+"""
+function gray_atmos_lw_equil(context, ::Type{SLVLW}, ::Type{FT}) where {FT <: AbstractFloat, SLVLW}
+    gray_as, slv_lw, (DA, param_set, nlev, nlay, ncol) = setup_gray_atmos_lw_equil_test(context, SLVLW, FT)
+
+    tb = FT(320)                            # surface temperature
+    tstep = 6.0                             # timestep in hours
+    Δt = FT(60 * 60 * tstep)                # timestep in seconds
+    ndays = 365 * 40                        # # of simulation days
+    nsteps = ndays * (24 / tstep)           # number of timesteps
+    temp_toler = FT(0.1)                    # tolerance for temperature (Kelvin)
+    flux_grad_toler = FT(1e-5)              # tolerance for flux gradient
+
     (; flux_up, flux_dn, flux_net) = slv_lw.flux
     (; t_lay, p_lay, t_lev, p_lev) = gray_as
     sbc = FT(RRTMGP.Parameters.Stefan(param_set))
@@ -70,7 +74,6 @@ function gray_atmos_lw_equil(context, ::Type{SLVLW}, ::Type{FT}; exfiltrate = fa
     T_ex_lev = DA{FT}(undef, ncol, nlev)
     flux_grad = DA{FT}(undef, ncol, nlay)
     flux_grad_err = FT(0)
-    exfiltrate && Infiltrator.@exfiltrate
     device = ClimaComms.device(context)
     for i in 1:nsteps
         # calling the long wave gray radiation solver
@@ -115,13 +118,7 @@ function gray_atmos_lw_equil(context, ::Type{SLVLW}, ::Type{FT}; exfiltrate = fa
     end
 end
 
-function gray_atmos_sw_test(
-    context,
-    ::Type{SLVSW},
-    ::Type{FT},
-    ncol::Int;
-    exfiltrate = false,
-) where {FT <: AbstractFloat, SLVSW}
+function setup_gray_atmos_sw_test(context, ::Type{SLVSW}, ::Type{FT}, ncol::Int) where {FT <: AbstractFloat, SLVSW}
     param_set = RRTMGPParameters(FT)
     device = ClimaComms.device(context)
     DA = ClimaComms.array_type(device)
@@ -135,7 +132,6 @@ function gray_atmos_sw_test(
     Δt = FT(60 * 60 * tstep)          # timestep in seconds
     ndays = 365 * 40                  # # of simulation days
     nsteps = ndays * (24 / tstep)     # number of timesteps
-    n_gauss_angles = 1             # for non-scattering calculation
     sfc_emis = Array{FT}(undef, nbnd, ncol) # surface emissivity
     sfc_emis .= FT(1.0)
     deg2rad = FT(π) / FT(180)
@@ -166,7 +162,19 @@ function gray_atmos_sw_test(
     swbcs = (cos_zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse)
     slv_sw = SLVSW(FT, DA, context, nlay, ncol, swbcs...)
 
-    exfiltrate && Infiltrator.@exfiltrate
+    return as, slv_sw, (device, param_set, nlev, nlay, ncol, cos_zenith, toa_flux)
+end
+
+function gray_atmos_sw_test(context, ::Type{SLVSW}, ::Type{FT}, ncol::Int) where {FT <: AbstractFloat, SLVSW}
+    as, slv_sw, (device, param_set, nlev, nlay, ncol, cos_zenith, toa_flux) =
+        setup_gray_atmos_sw_test(context, SLVSW, FT, ncol)
+
+    tb = FT(320)                      # surface temperature
+    tstep = 6.0                       # timestep in hours
+    Δt = FT(60 * 60 * tstep)          # timestep in seconds
+    ndays = 365 * 40                  # # of simulation days
+    nsteps = ndays * (24 / tstep)     # number of timesteps
+
     solve_sw!(slv_sw, as)
 
     τ = Array(slv_sw.op.τ)
