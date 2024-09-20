@@ -3,7 +3,6 @@ using Pkg.Artifacts
 using NCDatasets
 
 import JET
-import Infiltrator
 import ClimaComms
 @static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
 
@@ -26,17 +25,16 @@ using RRTMGP.ArtifactPaths
 include("reference_files.jl")
 include("read_all_sky.jl")
 
-function all_sky(
+function setup_all_sky_test(
     context,
     ::Type{SLVLW},
     ::Type{SLVSW},
     ::Type{FT},
     toler_lw,
-    toler_sw;
-    ncol = 128,# repeats col#1 ncol times per RRTMGP example 
-    use_lut::Bool = true,
-    cldfrac = FT(1),
-    exfiltrate = false,
+    toler_sw,
+    ncol,# repeats col#1 ncol times per RRTMGP example 
+    use_lut::Bool,
+    cldfrac,
 ) where {FT <: AbstractFloat, SLVLW, SLVSW}
     overrides = (; grav = 9.80665, molmass_dryair = 0.028964, molmass_water = 0.018016)
     param_set = RRTMGPParameters(FT, overrides)
@@ -94,8 +92,24 @@ function all_sky(
     inc_flux_diffuse = nothing
     swbcs = (cos_zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse)
     slv_sw = SLVSW(FT, DA, context, nlay, ncol, swbcs...)
+
+    return device, as, lookup_lw, lookup_lw_cld, lookup_sw, lookup_sw_cld, slv_lw, slv_sw, (bot_at_1, nlev)
+end
+
+function all_sky(
+    context,
+    ::Type{SLVLW},
+    ::Type{SLVSW},
+    ::Type{FT},
+    toler_lw,
+    toler_sw;
+    ncol = 128,# repeats col#1 ncol times per RRTMGP example 
+    use_lut::Bool = true,
+    cldfrac = FT(1),
+) where {FT <: AbstractFloat, SLVLW, SLVSW}
+    device, as, lookup_lw, lookup_lw_cld, lookup_sw, lookup_sw_cld, slv_lw, slv_sw, (bot_at_1, nlev) =
+        setup_all_sky_test(context, SLVLW, SLVSW, FT, toler_lw, toler_sw, ncol, use_lut, cldfrac)
     #------calling solvers
-    exfiltrate && Infiltrator.@exfiltrate
     solve_lw!(slv_lw, as, lookup_lw, lookup_lw_cld)
     if device isa ClimaComms.CPUSingleThreaded
         JET.@test_opt solve_lw!(slv_lw, as, lookup_lw, lookup_lw_cld)

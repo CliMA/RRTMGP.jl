@@ -5,8 +5,6 @@ import JET
 import ClimaComms
 @static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
 
-import Infiltrator
-
 using RRTMGP
 using RRTMGP.Vmrs
 using RRTMGP.LookUpTables
@@ -26,17 +24,16 @@ using RRTMGP.ArtifactPaths
 
 include("reference_files.jl")
 include("read_rfmip_clear_sky.jl")
-#---------------------------------------------------------------
-function clear_sky(
+
+function setup_clear_sky_test(
     context,
     ::Type{SLVLW},
     ::Type{SLVSW},
     ::Type{VMR},
     ::Type{FT},
     toler_lw,
-    toler_sw;
+    toler_sw,
     ncol = 100,
-    exfiltrate = false,
 ) where {FT, SLVLW, SLVSW, VMR}
     overrides = (; grav = 9.80665, molmass_dryair = 0.028964, molmass_water = 0.018016)
     param_set = RRTMGPParameters(FT, overrides)
@@ -78,9 +75,24 @@ function clear_sky(
     inc_flux_diffuse = nothing
     swbcs = (cos_zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse)
     slv_sw = SLVSW(FT, DA, context, nlay, ncol, swbcs...)
+
+    return device, as, lookup_lw, lookup_sw, slv_lw, slv_sw, (bot_at_1, nlev, expt_no, cos_zenith)
+end
+#---------------------------------------------------------------
+function clear_sky(
+    context,
+    ::Type{SLVLW},
+    ::Type{SLVSW},
+    ::Type{VMR},
+    ::Type{FT},
+    toler_lw,
+    toler_sw;
+    ncol = 100,
+) where {FT, SLVLW, SLVSW, VMR}
+    device, as, lookup_lw, lookup_sw, slv_lw, slv_sw, (bot_at_1, nlev, expt_no, cos_zenith) =
+        setup_clear_sky_test(context, SLVLW, SLVSW, VMR, FT, toler_lw, toler_sw, ncol)
     #--------------------------------------------------
     # calling longwave and shortwave solvers
-    exfiltrate && Infiltrator.@exfiltrate
     solve_lw!(slv_lw, as, lookup_lw)
     if device isa ClimaComms.CPUSingleThreaded
         JET.@test_opt solve_lw!(slv_lw, as, lookup_lw)

@@ -3,7 +3,6 @@ using Pkg.Artifacts
 using NCDatasets
 
 import JET
-import Infiltrator
 import ClimaComms
 @static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
 
@@ -36,7 +35,6 @@ function all_sky_with_aerosols(
     ncol = 128,# repeats col#1 ncol times per RRTMGP example 
     use_lut::Bool = true,
     cldfrac = FT(1),
-    exfiltrate = false,
 ) where {FT <: AbstractFloat, SLVLW, SLVSW}
     overrides = (; grav = 9.80665, molmass_dryair = 0.028964, molmass_water = 0.018016)
     param_set = RRTMGPParameters(FT, overrides)
