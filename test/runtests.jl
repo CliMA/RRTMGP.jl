@@ -98,6 +98,22 @@ printstyled("=================================\n\n", color = color1)
     end
 end
 
+printstyled("\n\nRRTMGP cloudy-sky (gas + clouds) reproducibility tests\n", color = color1)
+printstyled("=================================\n\n", color = color1)
+@testset "RRTMGP cloudy-sky (gas + clouds) reproducibility tests" begin
+    include("all_sky_reproducibility_test.jl")
+    context = ClimaComms.context()
+    DA = ClimaComms.array_type(context.device)
+    ncol = 128
+    use_lut = true
+
+    all_sky_reproducibility_test(context, NoScatLWRTE, TwoStreamSWRTE, Float32, ncol, use_lut)
+    all_sky_reproducibility_test(context, TwoStreamLWRTE, TwoStreamSWRTE, Float32, ncol, use_lut)
+
+    all_sky_reproducibility_test(context, NoScatLWRTE, TwoStreamSWRTE, Float64, ncol, use_lut)
+    all_sky_reproducibility_test(context, TwoStreamLWRTE, TwoStreamSWRTE, Float64, ncol, use_lut)
+end
+
 printstyled("\n\nOptics utilities tests\n", color = color1)
 printstyled("==============\n\n", color = color1)
 include("optics_utils.jl")

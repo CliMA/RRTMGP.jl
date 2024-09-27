@@ -87,17 +87,8 @@ toler_sw = Dict(Float64 => Float64(1e-5), Float32 => Float32(0.06))
 use_lut = true
 cldfrac = FT(1)
 ncol = 128
-device, as, lookup_lw, lookup_lw_cld, lookup_sw, lookup_sw_cld, slv_lw, slv_sw, _ = setup_all_sky_test(
-    ClimaComms.context(),
-    TwoStreamLWRTE,
-    TwoStreamSWRTE,
-    FT,
-    toler_lw_2stream,
-    toler_sw,
-    ncol,
-    use_lut,
-    cldfrac,
-)
+device, as, lookup_lw, lookup_lw_cld, lookup_sw, lookup_sw_cld, slv_lw, slv_sw, _ =
+    setup_all_sky_test(ClimaComms.context(), TwoStreamLWRTE, TwoStreamSWRTE, FT, ncol, use_lut, cldfrac)
 
 solve_sw!(slv_sw, as, lookup_sw, lookup_sw_cld) # compile first
 solve_lw!(slv_lw, as, lookup_lw, lookup_lw_cld) # compile first
