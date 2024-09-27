@@ -30,8 +30,6 @@ function setup_all_sky_test(
     ::Type{SLVLW},
     ::Type{SLVSW},
     ::Type{FT},
-    toler_lw,
-    toler_sw,
     ncol,# repeats col#1 ncol times per RRTMGP example 
     use_lut::Bool,
     cldfrac,
@@ -42,35 +40,11 @@ function setup_all_sky_test(
     device = ClimaComms.device(context)
     DA = ClimaComms.array_type(device)
     n_gauss_angles = 1
-
-    lw_file = get_lookup_filename(:gas, :lw)          # lw lookup tables for gas optics
-    lw_cld_file = get_lookup_filename(:cloud, :lw)    # lw cloud lookup tables
-    sw_file = get_lookup_filename(:gas, :sw)          # sw lookup tables for gas optics
-    sw_cld_file = get_lookup_filename(:cloud, :sw)    # lw cloud lookup tables
-
-    input_file = get_input_filename(:gas_clouds, :lw) # all-sky atmos state
-
-    #reading longwave gas optics lookup data
-    ds_lw = Dataset(lw_file, "r")
-    lookup_lw, idx_gases = LookUpLW(ds_lw, FT, DA)
-    close(ds_lw)
-    # reading longwave cloud lookup data
-    ds_lw_cld = Dataset(lw_cld_file, "r")
-    lookup_lw_cld = use_lut ? LookUpCld(ds_lw_cld, FT, DA) : PadeCld(ds_lw_cld, FT, DA)
-    close(ds_lw_cld)
-    #reading shortwave gas optics lookup data
-    ds_sw = Dataset(sw_file, "r")
-    lookup_sw, idx_gases = LookUpSW(ds_sw, FT, DA)
-    close(ds_sw)
-    # reading longwave cloud lookup data
-    ds_sw_cld = Dataset(sw_cld_file, "r")
-    lookup_sw_cld = use_lut ? LookUpCld(ds_sw_cld, FT, DA) : PadeCld(ds_sw_cld, FT, DA)
-    close(ds_sw_cld)
-    # reading input file 
-    ds_in = Dataset(input_file, "r")
+    # read lookup_data
+    lookup_lw, lookup_sw, lookup_lw_cld, lookup_sw_cld, idx_gases = read_all_sky_lookup_files(DA, FT, use_lut)
+    # reading atmospheric state and boundary conditions
     as, sfc_emis, sfc_alb_direct, sfc_alb_diffuse, cos_zenith, toa_flux, bot_at_1 = setup_allsky_as(
         context,
-        ds_in,
         idx_gases,
         lookup_lw,
         lookup_sw,
@@ -82,7 +56,6 @@ function setup_all_sky_test(
         FT,
         param_set,
     )
-    close(ds_in)
     nlay, ncol = AtmosphericStates.get_dims(as)
     nlev = nlay + 1
     # Setting up longwave problem---------------------------------------
@@ -108,7 +81,7 @@ function all_sky(
     cldfrac = FT(1),
 ) where {FT <: AbstractFloat, SLVLW, SLVSW}
     device, as, lookup_lw, lookup_lw_cld, lookup_sw, lookup_sw_cld, slv_lw, slv_sw, (bot_at_1, nlev) =
-        setup_all_sky_test(context, SLVLW, SLVSW, FT, toler_lw, toler_sw, ncol, use_lut, cldfrac)
+        setup_all_sky_test(context, SLVLW, SLVSW, FT, ncol, use_lut, cldfrac)
     #------calling solvers
     solve_lw!(slv_lw, as, lookup_lw, lookup_lw_cld)
     if device isa ClimaComms.CPUSingleThreaded

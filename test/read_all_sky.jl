@@ -1,12 +1,37 @@
-function ncol_ds_all_sky(use_lut)
+function read_all_sky_lookup_files(::Type{DA}, ::Type{FT}, use_lut) where {DA, FT}
+    lw_file = get_lookup_filename(:gas, :lw)          # lw lookup tables for gas optics
+    lw_cld_file = get_lookup_filename(:cloud, :lw)    # lw cloud lookup tables
+    sw_file = get_lookup_filename(:gas, :sw)          # sw lookup tables for gas optics
+    sw_cld_file = get_lookup_filename(:cloud, :sw)    # lw cloud lookup tables
+
+    #reading longwave gas optics lookup data
+    ds_lw = Dataset(lw_file, "r")
+    lookup_lw, idx_gases = LookUpLW(ds_lw, FT, DA)
+    close(ds_lw)
+    # reading longwave cloud lookup data
+    ds_lw_cld = Dataset(lw_cld_file, "r")
+    lookup_lw_cld = use_lut ? LookUpCld(ds_lw_cld, FT, DA) : PadeCld(ds_lw_cld, FT, DA)
+    close(ds_lw_cld)
+    #reading shortwave gas optics lookup data
+    ds_sw = Dataset(sw_file, "r")
+    lookup_sw, idx_gases = LookUpSW(ds_sw, FT, DA)
+    close(ds_sw)
+    # reading longwave cloud lookup data
+    ds_sw_cld = Dataset(sw_cld_file, "r")
+    lookup_sw_cld = use_lut ? LookUpCld(ds_sw_cld, FT, DA) : PadeCld(ds_sw_cld, FT, DA)
+    close(ds_sw_cld)
+
+    return lookup_lw, lookup_sw, lookup_lw_cld, lookup_sw_cld, idx_gases
+end
+
+function size_ds_all_sky(use_lut)
     flux_file = get_reference_filename(:gas_clouds, :lw, :flux_up)
     ds_comp = Dataset(flux_file, "r")
-    return size(Array(ds_comp["lw_flux_up"]), 1)
+    return size(Array(ds_comp["lw_flux_up"]), 2), size(Array(ds_comp["lw_flux_up"]), 1)
 end
 
 function setup_allsky_as(
     context,
-    ds_in,
     idx_gases,
     lkp_lw,
     lkp_sw,
@@ -22,6 +47,11 @@ function setup_allsky_as(
     device = ClimaComms.device(context)
     DA = ClimaComms.array_type(device)
     deg2rad = FT(π) / FT(180)
+
+    # reading input file 
+    input_file = get_input_filename(:gas_clouds, :lw) # all-sky atmos state
+    ds_in = Dataset(input_file, "r")
+
     nlay = Int(ds_in.dim["lay"])
     #ncol = Int(ds_in.dim["col"]) # col#1 repeated 128 times, per RRTMGP example
     nlev = nlay + 1
@@ -79,6 +109,8 @@ function setup_allsky_as(
     vmrat[idx_gases["o2"], 1, :] .= FT(0.2095)
     vmrat[idx_gases["co"], 1, :] .= FT(0)
 
+    close(ds_in)
+
     for icol in 2:ncol
         vmrat[:, icol, :] .= vmrat[:, 1, :]
     end
@@ -109,7 +141,7 @@ function setup_allsky_as(
     # and not very close to the ground (< 900 hPa), and
     # put them in 2/3 of the columns since that's roughly the
     # total cloudiness of earth
-    ncol_ds = ncol_ds_all_sky(use_lut)
+    _, ncol_ds = size_ds_all_sky(use_lut)
     for icol in 1:ncol, ilay in 1:nlay
         icol_ds = icol % ncol_ds == 0 ? ncol_ds : icol % ncol_ds
         if p_lay[icol, ilay] > FT(10000) && p_lay[icol, ilay] < FT(90000) && icol_ds % 3 ≠ 0
