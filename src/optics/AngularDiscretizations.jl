@@ -6,7 +6,7 @@ using Adapt
 export AngularDiscretization
 
 """
-    AngularDiscretization{D}
+    AngularDiscretization{FT,FTA1D}
 
 Weights and angle secants for "Gauss-Jacobi-5" quadrature.
 Values from Table 1, R. J. Hogan 2023, doi:10.1002/qj.4598
@@ -14,13 +14,13 @@ Values from Table 1, R. J. Hogan 2023, doi:10.1002/qj.4598
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct AngularDiscretization{D}
+struct AngularDiscretization{FT <: AbstractFloat, FTA1D <: AbstractArray{FT, 1}}
     "number of quadrature angles"
     n_gauss_angles::Int
     "quadrature secants / secant of propagation angle"
-    gauss_Ds::D
+    gauss_Ds::FTA1D
     "quadrature weights"
-    gauss_wts::D
+    gauss_wts::FTA1D
 end
 Adapt.@adapt_structure AngularDiscretization
 
@@ -41,7 +41,7 @@ function AngularDiscretization(::Type{FT}, ::Type{DA}, n_gauss_angles::Int) wher
         gauss_wts = DA{FT}([0.0092068785, 0.1285704278, 0.4323381850, 0.4298845087])
     end
 
-    return AngularDiscretization(
+    return AngularDiscretization{eltype(gauss_Ds), typeof(gauss_Ds)}(
         n_gauss_angles,
         gauss_Ds, # Diffusivity angle, not Gaussian angle
         gauss_wts,

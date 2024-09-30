@@ -60,21 +60,21 @@ function setup_rfmip_as(
     t_lev = Array(ds_lw_in["temp_level"])[lev_ind, :, expt_no]
     t_lay = Array(ds_lw_in["temp_layer"])[lay_ind, :, expt_no]
 
-    p_lev = FTA2D(transpose(repeat(p_lev, 1, nrepeat)[:, 1:ncol]))
-    p_lay = FTA2D(transpose(repeat(p_lay, 1, nrepeat)[:, 1:ncol]))
-    t_lev = FTA2D(transpose(repeat(t_lev, 1, nrepeat)[:, 1:ncol]))
-    t_lay = FTA2D(transpose(repeat(t_lay, 1, nrepeat)[:, 1:ncol]))
+    p_lev = FTA2D(repeat(p_lev, 1, nrepeat)[:, 1:ncol])
+    p_lay = FTA2D(repeat(p_lay, 1, nrepeat)[:, 1:ncol])
+    t_lev = FTA2D(repeat(t_lev, 1, nrepeat)[:, 1:ncol])
+    t_lay = FTA2D(repeat(t_lay, 1, nrepeat)[:, 1:ncol])
 
     t_sfc = FTA1D(repeat(ds_lw_in["surface_temperature"][:, expt_no], nrepeat)[1:ncol])
-    col_dry = FTA2D(undef, ncol, nlay)
-    rel_hum = FTA2D(undef, ncol, nlay)
+    col_dry = FTA2D(undef, nlay, ncol)
+    rel_hum = FTA2D(undef, nlay, ncol)
 
     # Reading volume mixing ratios 
 
     vmr_h2o = (Array(ds_lw_in["water_vapor"])[lay_ind, :, expt_no]) # vmr of H2O and O3
     vmr_o3 = (Array(ds_lw_in["ozone"])[lay_ind, :, expt_no])       # vary with height
-    vmr_h2o = FTA2D(transpose(repeat(vmr_h2o, 1, nrepeat)[:, 1:ncol]))
-    vmr_o3 = FTA2D(transpose(repeat(vmr_o3, 1, nrepeat)[:, 1:ncol]))
+    vmr_h2o = FTA2D(repeat(vmr_h2o, 1, nrepeat)[:, 1:ncol])
+    vmr_o3 = FTA2D(repeat(vmr_o3, 1, nrepeat)[:, 1:ncol])
 
     vmrat = zeros(FT, ngas)
 
@@ -126,7 +126,7 @@ function setup_rfmip_as(
     compute_col_gas!(device, p_lev, col_dry, param_set, vmr_h2o, lat) # the example skips lat based gravity calculation
     compute_relative_humidity!(device, rel_hum, p_lay, t_lay, param_set, vmr_h2o) # compute relative humidity
 
-    layerdata = similar(p_lay, 4, ncol, nlay)
+    layerdata = similar(p_lay, 4, nlay, ncol)
     layerdata[1, :, :] .= col_dry
     layerdata[2, :, :] .= p_lay
     layerdata[3, :, :] .= t_lay
@@ -151,12 +151,10 @@ function load_comparison_data(expt_no, bot_at_1, ncol)
     flux_dn_file_lw = get_reference_filename(:gas, :lw, :flux_dn)
     flux_up_file_sw = get_reference_filename(:gas, :sw, :flux_up)
     flux_dn_file_sw = get_reference_filename(:gas, :sw, :flux_dn)
-
     ds_comp_lw_up = Dataset(flux_up_file_lw, "r")
     ds_comp_lw_dn = Dataset(flux_dn_file_lw, "r")
     ds_comp_sw_up = Dataset(flux_up_file_sw, "r")
     ds_comp_sw_dn = Dataset(flux_dn_file_sw, "r")
-
     ncol_ds = size(Array(ds_comp_lw_up["rlu"]), 2)
     nrepeat = cld(ncol, ncol_ds)
 
@@ -164,16 +162,13 @@ function load_comparison_data(expt_no, bot_at_1, ncol)
     comp_flux_dn_lw = repeat(_orient_data(Array(ds_comp_lw_dn["rld"][:, :, expt_no]), bot_at_1), 1, nrepeat)
     comp_flux_up_sw = repeat(_orient_data(Array(ds_comp_sw_up["rsu"][:, :, expt_no]), bot_at_1), 1, nrepeat)
     comp_flux_dn_sw = repeat(_orient_data(Array(ds_comp_sw_dn["rsd"][:, :, expt_no]), bot_at_1), 1, nrepeat)
-
     close(ds_comp_lw_up)
     close(ds_comp_lw_dn)
     close(ds_comp_sw_up)
     close(ds_comp_sw_dn)
-
     nlev, ncol_ds = size(comp_flux_up_lw)
-
-    return Array(transpose(comp_flux_up_lw[:, 1:ncol])),
-    Array(transpose(comp_flux_dn_lw[:, 1:ncol])),
-    Array(transpose(comp_flux_up_sw[:, 1:ncol])),
-    Array(transpose(comp_flux_dn_sw[:, 1:ncol]))
+    return comp_flux_up_lw[:, 1:ncol],
+    comp_flux_dn_lw[:, 1:ncol],
+    comp_flux_up_sw[:, 1:ncol],
+    comp_flux_dn_sw[:, 1:ncol]
 end

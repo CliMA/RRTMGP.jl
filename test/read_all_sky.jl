@@ -1,37 +1,12 @@
-function read_all_sky_lookup_files(::Type{DA}, ::Type{FT}, use_lut) where {DA, FT}
-    lw_file = get_lookup_filename(:gas, :lw)          # lw lookup tables for gas optics
-    lw_cld_file = get_lookup_filename(:cloud, :lw)    # lw cloud lookup tables
-    sw_file = get_lookup_filename(:gas, :sw)          # sw lookup tables for gas optics
-    sw_cld_file = get_lookup_filename(:cloud, :sw)    # lw cloud lookup tables
-
-    #reading longwave gas optics lookup data
-    ds_lw = Dataset(lw_file, "r")
-    lookup_lw, idx_gases = LookUpLW(ds_lw, FT, DA)
-    close(ds_lw)
-    # reading longwave cloud lookup data
-    ds_lw_cld = Dataset(lw_cld_file, "r")
-    lookup_lw_cld = use_lut ? LookUpCld(ds_lw_cld, FT, DA) : PadeCld(ds_lw_cld, FT, DA)
-    close(ds_lw_cld)
-    #reading shortwave gas optics lookup data
-    ds_sw = Dataset(sw_file, "r")
-    lookup_sw, idx_gases = LookUpSW(ds_sw, FT, DA)
-    close(ds_sw)
-    # reading longwave cloud lookup data
-    ds_sw_cld = Dataset(sw_cld_file, "r")
-    lookup_sw_cld = use_lut ? LookUpCld(ds_sw_cld, FT, DA) : PadeCld(ds_sw_cld, FT, DA)
-    close(ds_sw_cld)
-
-    return lookup_lw, lookup_sw, lookup_lw_cld, lookup_sw_cld, idx_gases
-end
-
-function size_ds_all_sky(use_lut)
+function ncol_ds_all_sky(use_lut)
     flux_file = get_reference_filename(:gas_clouds, :lw, :flux_up)
     ds_comp = Dataset(flux_file, "r")
-    return size(Array(ds_comp["lw_flux_up"]), 2), size(Array(ds_comp["lw_flux_up"]), 1)
+    return size(Array(ds_comp["lw_flux_up"]), 1)
 end
 
 function setup_allsky_as(
     context,
+    ds_in,
     idx_gases,
     lkp_lw,
     lkp_sw,
@@ -47,11 +22,6 @@ function setup_allsky_as(
     device = ClimaComms.device(context)
     DA = ClimaComms.array_type(device)
     deg2rad = FT(π) / FT(180)
-
-    # reading input file 
-    input_file = get_input_filename(:gas_clouds, :lw) # all-sky atmos state
-    ds_in = Dataset(input_file, "r")
-
     nlay = Int(ds_in.dim["lay"])
     #ncol = Int(ds_in.dim["col"]) # col#1 repeated 128 times, per RRTMGP example
     nlev = nlay + 1
@@ -89,34 +59,32 @@ function setup_allsky_as(
     t_lay = Array{FT}(reshape(Array(ds_in["t_lay"])[1, lay_ind], nlay, 1))
     t_sfc = Array{FT}(reshape([t_lev[1, 1]], 1))
 
-    p_lev = transpose(repeat(p_lev, 1, ncol))
-    p_lay = transpose(repeat(p_lay, 1, ncol))
-    t_lev = transpose(repeat(t_lev, 1, ncol))
-    t_lay = transpose(repeat(t_lay, 1, ncol))
+    p_lev = repeat(p_lev, 1, ncol)
+    p_lay = repeat(p_lay, 1, ncol)
+    t_lev = repeat(t_lev, 1, ncol)
+    t_lay = repeat(t_lay, 1, ncol)
     t_sfc = repeat(t_sfc, ncol)
     #col_dry = DA{FT,2}(transpose(Array(ds_in["col_dry"])[:, lay_ind]))
     #col_dry from the dataset not used in the FORTRAN RRTMGP example
 
     # Reading volume mixing ratios 
-    vmrat = zeros(FT, ngas, ncol, nlay)
+    vmrat = zeros(FT, ngas, nlay, ncol)
 
-    vmrat[idx_gases["h2o"], 1, :] .= Array{FT}(Array(ds_in["h2o"])[1, lay_ind])
-    vmrat[idx_gases["o3"], 1, :] .= Array{FT}(Array(ds_in["o3"])[1, lay_ind])
-    vmrat[idx_gases["co2"], 1, :] .= FT(348e-6)
-    vmrat[idx_gases["ch4"], 1, :] .= FT(1650e-9)
-    vmrat[idx_gases["n2o"], 1, :] .= FT(306e-9)
-    vmrat[idx_gases["n2"], 1, :] .= FT(0.7808)
-    vmrat[idx_gases["o2"], 1, :] .= FT(0.2095)
-    vmrat[idx_gases["co"], 1, :] .= FT(0)
-
-    close(ds_in)
+    vmrat[idx_gases["h2o"], :, 1] .= Array{FT}(Array(ds_in["h2o"])[1, lay_ind])
+    vmrat[idx_gases["o3"], :, 1] .= Array{FT}(Array(ds_in["o3"])[1, lay_ind])
+    vmrat[idx_gases["co2"], :, 1] .= FT(348e-6)
+    vmrat[idx_gases["ch4"], :, 1] .= FT(1650e-9)
+    vmrat[idx_gases["n2o"], :, 1] .= FT(306e-9)
+    vmrat[idx_gases["n2"], :, 1] .= FT(0.7808)
+    vmrat[idx_gases["o2"], :, 1] .= FT(0.2095)
+    vmrat[idx_gases["co"], :, 1] .= FT(0)
 
     for icol in 2:ncol
-        vmrat[:, icol, :] .= vmrat[:, 1, :]
+        vmrat[:, :, icol] .= vmrat[:, :, 1]
     end
     vmr = Vmr(DA(vmrat))
-    col_dry = DA{FT, 2}(undef, ncol, nlay)
-    rel_hum = DA{FT, 2}(undef, ncol, nlay)
+    col_dry = DA{FT, 2}(undef, nlay, ncol)
+    rel_hum = DA{FT, 2}(undef, nlay, ncol)
     vmr_h2o = view(vmr.vmr, idx_gases["h2o"], :, :)
 
     cld_frac = zeros(FT, nlay, ncol)
@@ -141,16 +109,16 @@ function setup_allsky_as(
     # and not very close to the ground (< 900 hPa), and
     # put them in 2/3 of the columns since that's roughly the
     # total cloudiness of earth
-    _, ncol_ds = size_ds_all_sky(use_lut)
+    ncol_ds = ncol_ds_all_sky(use_lut)
     for icol in 1:ncol, ilay in 1:nlay
         icol_ds = icol % ncol_ds == 0 ? ncol_ds : icol % ncol_ds
-        if p_lay[icol, ilay] > FT(10000) && p_lay[icol, ilay] < FT(90000) && icol_ds % 3 ≠ 0
+        if p_lay[ilay, icol] > FT(10000) && p_lay[ilay, icol] < FT(90000) && icol_ds % 3 ≠ 0
             cld_frac[ilay, icol] = cldfrac
-            if t_lay[icol, ilay] > FT(263)
+            if t_lay[ilay, icol] > FT(263)
                 cld_path_liq[ilay, icol] = FT(10)
                 cld_r_eff_liq[ilay, icol] = r_eff_liq
             end
-            if t_lay[icol, ilay] < FT(273)
+            if t_lay[ilay, icol] < FT(273)
                 cld_path_ice[ilay, icol] = FT(10)
                 cld_r_eff_ice[ilay, icol] = r_eff_ice
             end
@@ -166,7 +134,7 @@ function setup_allsky_as(
     compute_col_gas!(device, p_lev, col_dry, param_set, vmr_h2o, lat) # the example skips lat based gravity calculation
     compute_relative_humidity!(device, rel_hum, p_lay, t_lay, param_set, vmr_h2o) # compute relative humidity
 
-    layerdata = similar(p_lay, 4, ncol, nlay)
+    layerdata = similar(p_lay, 4, nlay, ncol)
     layerdata[1, :, :] .= col_dry
     layerdata[2, :, :] .= p_lay
     layerdata[3, :, :] .= t_lay
@@ -221,8 +189,8 @@ function load_comparison_data(use_lut, bot_at_1, ncol)
     close(ds_comp_lw)
     close(ds_comp_sw)
     nlev, ncol_ds = size(comp_flux_up_lw)
-    return Array(transpose(comp_flux_up_lw[:, 1:ncol])),
-    Array(transpose(comp_flux_dn_lw[:, 1:ncol])),
-    Array(transpose(comp_flux_up_sw[:, 1:ncol])),
-    Array(transpose(comp_flux_dn_sw[:, 1:ncol]))
+    return comp_flux_up_lw[:, 1:ncol],
+    comp_flux_dn_lw[:, 1:ncol],
+    comp_flux_up_sw[:, 1:ncol],
+    comp_flux_dn_sw[:, 1:ncol]
 end

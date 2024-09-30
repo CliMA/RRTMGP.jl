@@ -27,9 +27,14 @@ function rte_lw_2stream_solve_CUDA!(
     nlev = nlay + 1
     igpt, ibnd = 1, 1
     if gcol ≤ ncol
+        (; flux_up, flux_dn, flux_net) = flux_lw
         compute_optical_props!(op, as, src_lw, gcol)
         rte_lw_2stream!(op, flux_lw, src_lw, bcs_lw, gcol, igpt, ibnd, nlev, ncol)
-        compute_net_flux!(flux_lw, gcol)
+        @inbounds begin
+            for ilev in 1:nlev
+                flux_net[ilev, gcol] = flux_up[ilev, gcol] - flux_dn[ilev, gcol]
+            end
+        end
     end
     return nothing
 end
@@ -72,6 +77,10 @@ function rte_lw_2stream_solve_CUDA!(
     (; major_gpt2bnd) = lookup_lw.band_data
     n_gpt = length(major_gpt2bnd)
     if gcol ≤ ncol
+        flux_up_lw = flux_lw.flux_up
+        flux_dn_lw = flux_lw.flux_dn
+        flux_net_lw = flux_lw.flux_net
+        (; flux_up, flux_dn) = flux
         (; cloud_state, aerosol_state) = as
         if aerosol_state isa AerosolState
             Optics.compute_aero_mask!(view(aerosol_state.aero_mask, :, gcol), view(aerosol_state.aero_mass, :, :, gcol))
@@ -87,9 +96,21 @@ function rte_lw_2stream_solve_CUDA!(
             end
             compute_optical_props!(op, as, src_lw, gcol, igpt, lookup_lw, lookup_lw_cld, lookup_lw_aero)
             rte_lw_2stream!(op, flux, src_lw, bcs_lw, gcol, igpt, ibnd, nlev, ncol)
-            igpt == 1 ? set_flux!(flux_lw, flux, gcol) : add_to_flux!(flux_lw, flux, gcol)
+            if igpt == 1
+                map!(x -> x, view(flux_up_lw, :, gcol), view(flux_up, :, gcol))
+                map!(x -> x, view(flux_dn_lw, :, gcol), view(flux_dn, :, gcol))
+            else
+                for ilev in 1:nlev
+                    @inbounds flux_up_lw[ilev, gcol] += flux_up[ilev, gcol]
+                    @inbounds flux_dn_lw[ilev, gcol] += flux_dn[ilev, gcol]
+                end
+            end
         end
-        compute_net_flux!(flux_lw, gcol)
+        @inbounds begin
+            for ilev in 1:nlev
+                flux_net_lw[ilev, gcol] = flux_up_lw[ilev, gcol] - flux_dn_lw[ilev, gcol]
+            end
+        end
     end
     return nothing
 end

@@ -29,17 +29,17 @@ struct SourceLWNoScat{S, D, PS} <: AbstractSourceLW
     param_set::PS
     "Surface source `[W/m2]` `(ncol)`"
     sfc_source::S
-    "Planck source at layer average temperature `[W/m2]` `(ncol, nlay)`"
+    "Planck source at layer average temperature `[W/m2]` `(nlay, ncol)`"
     lay_source::D
-    "Planck level source at layer edges `[W/m2]` `(ncol,  nlay+1)`, includes spectral weighting that accounts for state-dependent frequency to g-space mapping"
+    "Planck level source at layer edges `[W/m2]` `(nlay+1, ncol)`, includes spectral weighting that accounts for state-dependent frequency to g-space mapping"
     lev_source::D
 end
 Adapt.@adapt_structure SourceLWNoScat
 
 function SourceLWNoScat(param_set::RP.ARP, ::Type{FT}, ::Type{DA}, nlay::Int, ncol::Int) where {FT <: AbstractFloat, DA}
     sfc_source = DA{FT, 1}(undef, ncol)
-    lay_source = DA{FT, 2}(undef, ncol, nlay)
-    lev_source = DA{FT, 2}(undef, ncol, nlay + 1)
+    lay_source = DA{FT, 2}(undef, nlay, ncol)
+    lev_source = DA{FT, 2}(undef, nlay + 1, ncol)
 
     return SourceLWNoScat{typeof(sfc_source), typeof(lay_source), typeof(param_set)}(
         param_set,
@@ -64,20 +64,20 @@ struct SourceLW2Str{S, D, V, PS} <: AbstractSourceLW
     param_set::PS
     "Surface source `[W/m2]` `(ncol)`"
     sfc_source::S
-    "storage for level source, albedo and src `(3, ncol, nlay+1)`"
+    "storage for level source, albedo and src `(3, nlay+1, ncol)`"
     leveldata::D
-    "level source `[W/m2]` `(ncol, nlay+1)`, used in 2 stream calculations"
+    "level source `[W/m2]` `(nlay+1, ncol)`, used in 2 stream calculations"
     lev_source::V
-    "temporary storage array, used in 2 stream calculations `(ncol, nlay + 1)`"
+    "temporary storage array, used in 2 stream calculations `(nlay + 1, ncol)`"
     albedo::V
-    "temporary storage array, used in 2 stream calculations `(ncol, nlay + 1)`"
+    "temporary storage array, used in 2 stream calculations `(nlay + 1, ncol)`"
     src::V
 end
 Adapt.@adapt_structure SourceLW2Str
 
 function SourceLW2Str(param_set::RP.ARP, ::Type{FT}, ::Type{DA}, nlay::Int, ncol::Int) where {FT <: AbstractFloat, DA}
     sfc_source = DA{FT, 1}(undef, ncol) # sfc_source
-    leveldata = DA{FT, 3}(undef, 3, ncol, nlay + 1)
+    leveldata = DA{FT, 3}(undef, 3, nlay + 1, ncol)
     lev_source = view(leveldata, 1, :, :) # lev_source
     albedo = view(leveldata, 2, :, :) # albedo
     src = view(leveldata, 3, :, :) # src
@@ -120,18 +120,18 @@ $(DocStringExtensions.FIELDS)
 struct SourceSW2Str{S, D, V}
     "surface source `(ncol)`"
     sfc_source::S
-    "storage for albedo and src `(2, ncol, nlay + 1)`"
+    "storage for albedo and src `(2, nlay + 1, ncol)`"
     leveldata::D
-    "albedo `(ncol, nlay + 1)`"
+    "albedo `(nlay + 1, ncol)`"
     albedo::V
-    "temporary storage array, used in 2 stream calculations `(ncol, nlay + 1)`"
+    "temporary storage array, used in 2 stream calculations `(nlay + 1, ncol)`"
     src::V
 end
 Adapt.@adapt_structure SourceSW2Str
 
 function SourceSW2Str(::Type{FT}, ::Type{DA}, nlay::Int, ncol::Int) where {FT <: AbstractFloat, DA}
     sfc_source = DA{FT, 1}(undef, ncol)
-    leveldata = DA{FT, 3}(undef, 2, ncol, nlay + 1)
+    leveldata = DA{FT, 3}(undef, 2, nlay + 1, ncol)
     albedo = view(leveldata, 1, :, :)
     src = view(leveldata, 2, :, :)
 

@@ -3,6 +3,7 @@ using Pkg.Artifacts
 using NCDatasets
 
 import JET
+import Infiltrator
 import ClimaComms
 @static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
 
@@ -25,14 +26,17 @@ using RRTMGP.ArtifactPaths
 include("reference_files.jl")
 include("read_all_sky.jl")
 
-function setup_all_sky_test(
+function all_sky(
     context,
     ::Type{SLVLW},
     ::Type{SLVSW},
     ::Type{FT},
-    ncol,# repeats col#1 ncol times per RRTMGP example 
-    use_lut::Bool,
-    cldfrac,
+    toler_lw,
+    toler_sw;
+    ncol = 128,# repeats col#1 ncol times per RRTMGP example 
+    use_lut::Bool = true,
+    cldfrac = FT(1),
+    exfiltrate = false,
 ) where {FT <: AbstractFloat, SLVLW, SLVSW}
     overrides = (; grav = 9.80665, molmass_dryair = 0.028964, molmass_water = 0.018016)
     param_set = RRTMGPParameters(FT, overrides)
@@ -40,11 +44,35 @@ function setup_all_sky_test(
     device = ClimaComms.device(context)
     DA = ClimaComms.array_type(device)
     n_gauss_angles = 1
-    # read lookup_data
-    lookup_lw, lookup_sw, lookup_lw_cld, lookup_sw_cld, idx_gases = read_all_sky_lookup_files(DA, FT, use_lut)
-    # reading atmospheric state and boundary conditions
+
+    lw_file = get_lookup_filename(:gas, :lw)          # lw lookup tables for gas optics
+    lw_cld_file = get_lookup_filename(:cloud, :lw)    # lw cloud lookup tables
+    sw_file = get_lookup_filename(:gas, :sw)          # sw lookup tables for gas optics
+    sw_cld_file = get_lookup_filename(:cloud, :sw)    # lw cloud lookup tables
+
+    input_file = get_input_filename(:gas_clouds, :lw) # all-sky atmos state
+
+    #reading longwave gas optics lookup data
+    ds_lw = Dataset(lw_file, "r")
+    lookup_lw, idx_gases = LookUpLW(ds_lw, FT, DA)
+    close(ds_lw)
+    # reading longwave cloud lookup data
+    ds_lw_cld = Dataset(lw_cld_file, "r")
+    lookup_lw_cld = use_lut ? LookUpCld(ds_lw_cld, FT, DA) : PadeCld(ds_lw_cld, FT, DA)
+    close(ds_lw_cld)
+    #reading shortwave gas optics lookup data
+    ds_sw = Dataset(sw_file, "r")
+    lookup_sw, idx_gases = LookUpSW(ds_sw, FT, DA)
+    close(ds_sw)
+    # reading longwave cloud lookup data
+    ds_sw_cld = Dataset(sw_cld_file, "r")
+    lookup_sw_cld = use_lut ? LookUpCld(ds_sw_cld, FT, DA) : PadeCld(ds_sw_cld, FT, DA)
+    close(ds_sw_cld)
+    # reading input file 
+    ds_in = Dataset(input_file, "r")
     as, sfc_emis, sfc_alb_direct, sfc_alb_diffuse, cos_zenith, toa_flux, bot_at_1 = setup_allsky_as(
         context,
+        ds_in,
         idx_gases,
         lookup_lw,
         lookup_sw,
@@ -56,6 +84,7 @@ function setup_all_sky_test(
         FT,
         param_set,
     )
+    close(ds_in)
     nlay, ncol = AtmosphericStates.get_dims(as)
     nlev = nlay + 1
     # Setting up longwave problem---------------------------------------
@@ -65,23 +94,6 @@ function setup_all_sky_test(
     inc_flux_diffuse = nothing
     swbcs = (cos_zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse)
     slv_sw = SLVSW(FT, DA, context, nlay, ncol, swbcs...)
-
-    return device, as, lookup_lw, lookup_lw_cld, lookup_sw, lookup_sw_cld, slv_lw, slv_sw, (bot_at_1, nlev)
-end
-
-function all_sky(
-    context,
-    ::Type{SLVLW},
-    ::Type{SLVSW},
-    ::Type{FT},
-    toler_lw,
-    toler_sw;
-    ncol = 128,# repeats col#1 ncol times per RRTMGP example 
-    use_lut::Bool = true,
-    cldfrac = FT(1),
-) where {FT <: AbstractFloat, SLVLW, SLVSW}
-    device, as, lookup_lw, lookup_lw_cld, lookup_sw, lookup_sw_cld, slv_lw, slv_sw, (bot_at_1, nlev) =
-        setup_all_sky_test(context, SLVLW, SLVSW, FT, ncol, use_lut, cldfrac)
     #------calling solvers
     solve_lw!(slv_lw, as, lookup_lw, lookup_lw_cld)
     if device isa ClimaComms.CPUSingleThreaded
@@ -90,6 +102,7 @@ function all_sky(
         @test (@allocated solve_lw!(slv_lw, as, lookup_lw, lookup_lw_cld)) ≤ 224
     end
 
+    exfiltrate && Infiltrator.@exfiltrate
     solve_sw!(slv_sw, as, lookup_sw, lookup_sw_cld)
     if device isa ClimaComms.CPUSingleThreaded
         JET.@test_opt solve_sw!(slv_sw, as, lookup_sw, lookup_sw_cld)
@@ -114,9 +127,9 @@ function all_sky(
     rel_err_flux_net_lw = abs.(flux_net_lw .- comp_flux_net_lw)
 
     for gcol in 1:ncol, glev in 1:nlev
-        den = abs(comp_flux_net_lw[gcol, glev])
+        den = abs(comp_flux_net_lw[glev, gcol])
         if den > 10 * eps(FT)
-            rel_err_flux_net_lw[gcol, glev] /= den
+            rel_err_flux_net_lw[glev, gcol] /= den
         end
     end
     max_rel_err_flux_net_lw = maximum(rel_err_flux_net_lw)
@@ -141,9 +154,9 @@ function all_sky(
     rel_err_flux_net_sw = abs.(flux_net_sw .- comp_flux_net_sw)
 
     for gcol in 1:ncol, glev in 1:nlev
-        den = abs(comp_flux_net_sw[gcol, glev])
+        den = abs(comp_flux_net_sw[glev, gcol])
         if den > 10 * eps(FT)
-            rel_err_flux_net_sw[gcol, glev] /= den
+            rel_err_flux_net_sw[glev, gcol] /= den
         end
     end
     max_rel_err_flux_net_sw = maximum(rel_err_flux_net_sw)

@@ -69,15 +69,15 @@ struct GrayAtmosphericState{
 } <: AbstractAtmosphericState
     "latitude, in degrees, for each column; `(ncol,)`"
     lat::FTA1D
-    "Layer pressures `[Pa, mb]`; `(ncol, nlay)`"
+    "Layer pressures `[Pa, mb]`; `(nlay, ncol)`"
     p_lay::FTA2D
-    "Level pressures `[Pa, mb]`; `(ncol, nlay+1)`"
+    "Level pressures `[Pa, mb]`; `(nlay+1, ncol)`"
     p_lev::FTA2D
-    "Layer temperatures `[K]`; `(ncol, nlay)`"
+    "Layer temperatures `[K]`; `(nlay, ncol)`"
     t_lay::FTA2D
-    "Level temperatures `[K]`; `(ncol, nlay+1)`"
+    "Level temperatures `[K]`; `(nlay+1,ncol)`"
     t_lev::FTA2D
-    "Level Altitude `[m]`; `(ncol, nlay+1)`"
+    "Level Altitude `[m]`; `(nlay+1,ncol)`"
     z_lev::FTA2D
     "Surface temperatures `[K]`; `(ncol)`"
     t_sfc::FTA1D
@@ -86,19 +86,19 @@ struct GrayAtmosphericState{
 end
 Adapt.@adapt_structure GrayAtmosphericState
 # Number of layers
-@inline get_nlay(as::GrayAtmosphericState) = size(as.p_lay, 2)
+@inline get_nlay(as::GrayAtmosphericState) = size(as.p_lay, 1)
 # Number of columns
-@inline get_ncol(as::GrayAtmosphericState) = size(as.p_lay, 1)
+@inline get_ncol(as::GrayAtmosphericState) = size(as.p_lay, 2)
 # Number of layers and columns
-@inline get_dims(as::GrayAtmosphericState) = (size(as.p_lay, 2), size(as.p_lay, 1))
+@inline get_dims(as::GrayAtmosphericState) = size(as.p_lay)
 
 # view of layer pressures [Pa, mb]
 @inline getview_p_lay(as::GrayAtmosphericState) = as.p_lay
-@inline getview_p_lay(as::GrayAtmosphericState, gcol) = @inbounds view(as.p_lay, gcol, :)
+@inline getview_p_lay(as::GrayAtmosphericState, gcol) = @inbounds view(as.p_lay, :, gcol)
 
 # view of layer temperatures [K]
 @inline getview_t_lay(as::GrayAtmosphericState) = as.t_lay
-@inline getview_t_lay(as::GrayAtmosphericState, gcol) = @inbounds view(as.t_lay, gcol, :)
+@inline getview_t_lay(as::GrayAtmosphericState, gcol) = @inbounds view(as.t_lay, :, gcol)
 
 # This functions sets up a model temperature and pressure 
 # distributions for a gray atmosphere based on a pressure grid
@@ -118,11 +118,11 @@ function setup_gray_as_pr_grid(
 ) where {FT <: AbstractFloat, FTA1D <: AbstractArray{FT, 1}, DA}
     nlev = Int(nlay + 1)
     ncol = length(lat)
-    p_lay = DA{FT}(undef, ncol, nlay) # layer mean pressure
-    p_lev = DA{FT}(undef, ncol, nlev) # level pressure
-    t_lay = DA{FT}(undef, ncol, nlay) # layer mean temperature
-    t_lev = DA{FT}(undef, ncol, nlev) # level temperature
-    z_lev = DA{FT}(undef, ncol, nlev) # level altitude
+    p_lay = DA{FT}(undef, nlay, ncol) # layer mean pressure
+    p_lev = DA{FT}(undef, nlev, ncol) # level pressure
+    t_lay = DA{FT}(undef, nlay, ncol) # layer mean temperature
+    t_lev = DA{FT}(undef, nlev, ncol) # level temperature
+    z_lev = DA{FT}(undef, nlev, ncol) # level altitude
     t_sfc = DA{FT}(undef, ncol)       # surface temperature
     efac = log(p0 / pe) / nlay       # multiplication factor for each pressure step
     d0 = DA{FT}(undef, ncol)       # optical depth (function of latitude)
@@ -192,25 +192,25 @@ function setup_gray_as_pr_grid_kernel!(
     nlev = nlay + 1
 
     #---bot_at_1------------------------------
-    p_lev[gcol, 1] = p0
-    t_lev[gcol, 1] = tt * (FT(1) + d0[gcol] * (p_lev[gcol, 1] / p0)^α)^FT(0.25)
-    z_lev[gcol, 1] = FT(0)
+    p_lev[1, gcol] = p0
+    t_lev[1, gcol] = tt * (FT(1) + d0[gcol] * (p_lev[1, gcol] / p0)^α)^FT(0.25)
+    z_lev[1, gcol] = FT(0)
 
     @inbounds for ilay in 1:nlay
         #                if step == "linear"
-        p_lev[gcol, ilay + 1] = p_lev[gcol, ilay] - Δp
+        p_lev[ilay + 1, gcol] = p_lev[ilay, gcol] - Δp
         #                else
-        #                    p_lev[gcol, ilay+1] = p_lev[gcol, ilay] * exp(-efac)
+        #                    p_lev[ilay+1, gcol] = p_lev[ilay, gcol] * exp(-efac)
         #                end
-        p_lay[gcol, ilay] = (p_lev[gcol, ilay] + p_lev[gcol, ilay + 1]) * FT(0.5)
+        p_lay[ilay, gcol] = (p_lev[ilay, gcol] + p_lev[ilay + 1, gcol]) * FT(0.5)
 
-        t_lev[gcol, ilay + 1] = tt * (FT(1) + d0[gcol] * (p_lev[gcol, ilay + 1] / p0)^α)^FT(0.25)
-        t_lay[gcol, ilay] = tt * (FT(1) + d0[gcol] * (p_lay[gcol, ilay] / p0)^α)^FT(0.25)
+        t_lev[ilay + 1, gcol] = tt * (FT(1) + d0[gcol] * (p_lev[ilay + 1, gcol] / p0)^α)^FT(0.25)
+        t_lay[ilay, gcol] = tt * (FT(1) + d0[gcol] * (p_lay[ilay, gcol] / p0)^α)^FT(0.25)
 
-        H = r_d * t_lay[gcol, ilay] / grav_
-        Δz_lay = H * log(p_lev[gcol, ilay] / p_lev[gcol, ilay + 1])
-        z_lev[gcol, ilay + 1] = Δz_lay + z_lev[gcol, ilay]
+        H = r_d * t_lay[ilay, gcol] / grav_
+        Δz_lay = H * log(p_lev[ilay, gcol] / p_lev[ilay + 1, gcol])
+        z_lev[ilay + 1, gcol] = Δz_lay + z_lev[ilay, gcol]
     end
-    t_sfc[gcol] = t_lev[gcol, 1]
+    t_sfc[gcol] = t_lev[1, gcol]
     return nothing
 end

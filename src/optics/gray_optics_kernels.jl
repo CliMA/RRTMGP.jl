@@ -20,36 +20,36 @@ function compute_optical_props!(op::OneScalar, as::GrayAtmosphericState, sf::Sou
     sbc = FT(RP.Stefan(sf.param_set))
     @inbounds begin
         lat = as.lat[gcol]
-        p0 = p_lev[gcol, 1]
-        p_lev_glay = p_lev[gcol, 1]
-        t_lev_dec = t_lev[gcol, 1]
+        p0 = p_lev[1, gcol]
+        p_lev_glay = p_lev[1, gcol]
+        t_lev_dec = t_lev[1, gcol]
         t_sfc = as.t_sfc[gcol]
         sfc_source[gcol] = sbc * (t_sfc * t_sfc * t_sfc * t_sfc) / FT(π)   # computing sfc_source
         lev_src_inc_prev = FT(0)
         lev_src_dec_prev = FT(0)
         for glay in 1:nlay
             # compute optical thickness
-            p_lev_glayplus1 = p_lev[gcol, glay + 1]
+            p_lev_glayplus1 = p_lev[glay + 1, gcol]
             Δp = p_lev_glayplus1 - p_lev_glay
-            p = p_lay[gcol, glay]
-            τ[gcol, glay] = compute_gray_optical_thickness_lw(otp, p0, Δp, p, lat)
+            p = p_lay[glay, gcol]
+            τ[glay, gcol] = compute_gray_optical_thickness_lw(otp, p0, Δp, p, lat)
             p_lev_glay = p_lev_glayplus1
             # compute longwave source terms
-            t_lev_inc = t_lev[gcol, glay + 1]
-            t_lay_loc = t_lay[gcol, glay]
-            lay_source[gcol, glay] = sbc * (t_lay_loc * t_lay_loc * t_lay_loc * t_lay_loc) / FT(π)   # computing lay_source
+            t_lev_inc = t_lev[glay + 1, gcol]
+            t_lay_loc = t_lay[glay, gcol]
+            lay_source[glay, gcol] = sbc * (t_lay_loc * t_lay_loc * t_lay_loc * t_lay_loc) / FT(π)   # computing lay_source
             lev_src_inc = sbc * (t_lev_inc * t_lev_inc * t_lev_inc * t_lev_inc) / FT(π)
             lev_src_dec = sbc * (t_lev_dec * t_lev_dec * t_lev_dec * t_lev_dec) / FT(π)
             if glay == 1
-                lev_source[gcol, glay] = lev_src_dec
+                lev_source[glay, gcol] = lev_src_dec
             else
-                lev_source[gcol, glay] = sqrt(lev_src_inc_prev * lev_src_dec)
+                lev_source[glay, gcol] = sqrt(lev_src_inc_prev * lev_src_dec)
             end
             lev_src_dec_prev = lev_src_dec
             lev_src_inc_prev = lev_src_inc
             t_lev_dec = t_lev_inc
         end
-        lev_source[gcol, nlay + 1] = lev_src_inc_prev
+        lev_source[nlay + 1, gcol] = lev_src_inc_prev
     end
     return nothing
 end
@@ -63,37 +63,37 @@ function compute_optical_props!(op::TwoStream, as::GrayAtmosphericState, sf::Sou
     sbc = FT(RP.Stefan(sf.param_set))
     @inbounds begin
         lat = as.lat[gcol]
-        p0 = p_lev[gcol, 1]
-        p_lev_glay = p_lev[gcol, 1]
-        t_lev_dec = t_lev[gcol, 1]
+        p0 = p_lev[1, gcol]
+        p_lev_glay = p_lev[1, gcol]
+        t_lev_dec = t_lev[1, gcol]
         t_sfc = as.t_sfc[gcol]
         sfc_source[gcol] = sbc * (t_sfc * t_sfc * t_sfc * t_sfc) / FT(π)   # computing sfc_source
         lev_src_inc_prev = FT(0)
         lev_src_dec_prev = FT(0)
         for glay in 1:nlay
-            p_lev_glayplus1 = p_lev[gcol, glay + 1]
+            p_lev_glayplus1 = p_lev[glay + 1, gcol]
             Δp = p_lev_glayplus1 - p_lev_glay
-            p = p_lay[gcol, glay]
-            τ[gcol, glay] = compute_gray_optical_thickness_lw(otp, p0, Δp, p, lat)
+            p = p_lay[glay, gcol]
+            τ[glay, gcol] = compute_gray_optical_thickness_lw(otp, p0, Δp, p, lat)
             p_lev_glay = p_lev_glayplus1
             # compute longwave source terms
-            t_lev_inc = t_lev[gcol, glay + 1]
+            t_lev_inc = t_lev[glay + 1, gcol]
             lev_src_inc = sbc * (t_lev_inc * t_lev_inc * t_lev_inc * t_lev_inc) / FT(π)
             lev_src_dec = sbc * (t_lev_dec * t_lev_dec * t_lev_dec * t_lev_dec) / FT(π)
             if glay == 1
-                lev_source[gcol, glay] = lev_src_dec
+                lev_source[glay, gcol] = lev_src_dec
             else
-                lev_source[gcol, glay] = sqrt(lev_src_inc_prev * lev_src_dec)
+                lev_source[glay, gcol] = sqrt(lev_src_inc_prev * lev_src_dec)
             end
             lev_src_dec_prev = lev_src_dec
             lev_src_inc_prev = lev_src_inc
             t_lev_dec = t_lev_inc
         end
-        lev_source[gcol, nlay + 1] = lev_src_inc_prev
+        lev_source[nlay + 1, gcol] = lev_src_inc_prev
     end
     zeroval = zero(FT)
-    map!(x -> zeroval, view(ssa, gcol, :), view(ssa, gcol, :))
-    map!(x -> zeroval, view(g, gcol, :), view(g, gcol, :))
+    map!(x -> zeroval, view(ssa, :, gcol), view(ssa, :, gcol))
+    map!(x -> zeroval, view(g, :, gcol), view(g, :, gcol))
     return nothing
 end
 
@@ -112,21 +112,21 @@ function compute_optical_props!(op::AbstractOpticalProps, as::GrayAtmosphericSta
     (; p_lay, p_lev, otp) = as
     τ = op.τ
     @inbounds lat = as.lat[gcol]
-    @inbounds p0 = p_lev[gcol, 1]
-    @inbounds p_lev_glay = p_lev[gcol, 1]
+    @inbounds p0 = p_lev[1, gcol]
+    @inbounds p_lev_glay = p_lev[1, gcol]
     for glay in 1:nlay
-        @inbounds p_lev_glayplus1 = p_lev[gcol, glay + 1]
+        @inbounds p_lev_glayplus1 = p_lev[glay + 1, gcol]
         @inbounds Δp = p_lev_glayplus1 - p_lev_glay
-        @inbounds p = p_lay[gcol, glay]
-        @inbounds τ[gcol, glay] = compute_gray_optical_thickness_sw(otp, p0, Δp, p, lat)
+        @inbounds p = p_lay[glay, gcol]
+        @inbounds τ[glay, gcol] = compute_gray_optical_thickness_sw(otp, p0, Δp, p, lat)
         p_lev_glay = p_lev_glayplus1
     end
     if op isa TwoStream
         (; ssa, g) = op
         FT = eltype(τ)
         zeroval = zero(FT)
-        map!(x -> zeroval, view(ssa, gcol, :), view(ssa, gcol, :))
-        map!(x -> zeroval, view(g, gcol, :), view(g, gcol, :))
+        map!(x -> zeroval, view(ssa, :, gcol), view(ssa, :, gcol))
+        map!(x -> zeroval, view(g, :, gcol), view(g, :, gcol))
     end
     return nothing
 end
