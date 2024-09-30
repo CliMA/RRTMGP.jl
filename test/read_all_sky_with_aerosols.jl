@@ -61,30 +61,25 @@ function setup_allsky_with_aerosols_as(
     t_lay = Array{FT}(reshape(Array(ds_in["t_lay"])[1, lay_ind], nlay, 1))
     t_sfc = Array{FT}(reshape([t_lev[1, 1]], 1))
 
-    p_lev = transpose(repeat(p_lev, 1, ncol))
-    p_lay = transpose(repeat(p_lay, 1, ncol))
-    t_lev = transpose(repeat(t_lev, 1, ncol))
-    t_lay = transpose(repeat(t_lay, 1, ncol))
+    p_lev = repeat(p_lev, 1, ncol)
+    p_lay = repeat(p_lay, 1, ncol)
+    t_lev = repeat(t_lev, 1, ncol)
+    t_lay = repeat(t_lay, 1, ncol)
     t_sfc = repeat(t_sfc, ncol)
     #col_dry = DA{FT,2}(transpose(Array(ds_in["col_dry"])[:, lay_ind]))
     #col_dry from the dataset not used in the FORTRAN RRTMGP example
 
     # Reading volume mixing ratios 
-    vmrat = zeros(FT, ngas, ncol, nlay)
+    vmrat = zeros(FT, ngas, nlay, ncol)
 
-    vmrat[idx_gases["h2o"], 1, :] .= Array{FT}(Array(ds_in["h2o"])[1, lay_ind])
-    vmrat[idx_gases["o3"], 1, :] .= Array{FT}(Array(ds_in["o3"])[1, lay_ind])
-    vmrat[idx_gases["co2"], 1, :] .= FT(348e-6)
-    vmrat[idx_gases["ch4"], 1, :] .= FT(1650e-9)
-    vmrat[idx_gases["n2o"], 1, :] .= FT(306e-9)
-    vmrat[idx_gases["n2"], 1, :] .= FT(0.7808)
-    vmrat[idx_gases["o2"], 1, :] .= FT(0.2095)
-    vmrat[idx_gases["co"], 1, :] .= FT(0)
-
-    for icol in 2:ncol
-        vmrat[:, icol, :] .= vmrat[:, 1, :]
-    end
-    vmr = Vmr(DA(vmrat))
+    vmrat[idx_gases["h2o"], :, 1] .= Array{FT}(Array(ds_in["h2o"])[1, lay_ind])
+    vmrat[idx_gases["o3"], :, 1] .= Array{FT}(Array(ds_in["o3"])[1, lay_ind])
+    vmrat[idx_gases["co2"], :, 1] .= FT(348e-6)
+    vmrat[idx_gases["ch4"], :, 1] .= FT(1650e-9)
+    vmrat[idx_gases["n2o"], :, 1] .= FT(306e-9)
+    vmrat[idx_gases["n2"], :, 1] .= FT(0.7808)
+    vmrat[idx_gases["o2"], :, 1] .= FT(0.2095)
+    vmrat[idx_gases["co"], :, 1] .= FT(0)
 
     # Reading aerosol data
     aero_type_ref = Array{Int}(transpose(Array(ds_in["aero_type"])[:, lay_ind]))
@@ -114,8 +109,12 @@ function setup_allsky_with_aerosols_as(
         DA(repeat(aero_mass, 1, 1, nrepeat)[:, :, 1:ncol]),
     )
 
-    col_dry = DA{FT, 2}(undef, ncol, nlay)
-    rel_hum = DA{FT, 2}(undef, ncol, nlay)
+    for icol in 2:ncol
+        vmrat[:, :, icol] .= vmrat[:, :, 1]
+    end
+    vmr = Vmr(DA(vmrat))
+    col_dry = DA{FT, 2}(undef, nlay, ncol)
+    rel_hum = DA{FT, 2}(undef, nlay, ncol)
     vmr_h2o = view(vmr.vmr, idx_gases["h2o"], :, :)
 
     cld_frac = zeros(FT, nlay, ncol)
@@ -143,13 +142,13 @@ function setup_allsky_with_aerosols_as(
     ncol_ds = ncol_ds_all_sky(use_lut)
     for icol in 1:ncol, ilay in 1:nlay
         icol_ds = icol % ncol_ds == 0 ? ncol_ds : icol % ncol_ds
-        if p_lay[icol, ilay] > FT(10000) && p_lay[icol, ilay] < FT(90000) && icol_ds % 3 ≠ 0
+        if p_lay[ilay, icol] > FT(10000) && p_lay[ilay, icol] < FT(90000) && icol_ds % 3 ≠ 0
             cld_frac[ilay, icol] = cldfrac
-            if t_lay[icol, ilay] > FT(263)
+            if t_lay[ilay, icol] > FT(263)
                 cld_path_liq[ilay, icol] = FT(10)
                 cld_r_eff_liq[ilay, icol] = r_eff_liq
             end
-            if t_lay[icol, ilay] < FT(273)
+            if t_lay[ilay, icol] < FT(273)
                 cld_path_ice[ilay, icol] = FT(10)
                 cld_r_eff_ice[ilay, icol] = r_eff_ice
             end
@@ -165,7 +164,7 @@ function setup_allsky_with_aerosols_as(
     compute_col_gas!(device, p_lev, col_dry, param_set, vmr_h2o, lat) # the example skips lat based gravity calculation
     compute_relative_humidity!(device, rel_hum, p_lay, t_lay, param_set, vmr_h2o) # compute relative humidity
 
-    layerdata = similar(p_lay, 4, ncol, nlay)
+    layerdata = similar(p_lay, 4, nlay, ncol)
     layerdata[1, :, :] .= col_dry
     layerdata[2, :, :] .= p_lay
     layerdata[3, :, :] .= t_lay
@@ -227,8 +226,5 @@ function load_comparison_data(use_lut, bot_at_1, ncol)
     comp_flux_up_sw = hcat(repeat(comp_flux_up_sw_ref, 1, nrepeat), comp_flux_up_sw_ref[:, 1:rem])
     comp_flux_dn_sw = hcat(repeat(comp_flux_dn_sw_ref, 1, nrepeat), comp_flux_dn_sw_ref[:, 1:rem])
 
-    return Array(transpose(comp_flux_up_lw)),
-    Array(transpose(comp_flux_dn_lw)),
-    Array(transpose(comp_flux_up_sw)),
-    Array(transpose(comp_flux_dn_sw))
+    return comp_flux_up_lw, comp_flux_dn_lw, comp_flux_up_sw, comp_flux_dn_sw
 end

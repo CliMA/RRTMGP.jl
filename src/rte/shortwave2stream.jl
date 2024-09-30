@@ -23,11 +23,10 @@ function rte_sw_2stream_solve!(
                 # call shortwave rte solver
                 rte_sw_2stream!(op, src_sw, bcs_sw, flux_sw, solar_frac, igpt, n_gpt, ibnd, nlev, gcol)
                 for ilev in 1:nlev
-                    flux_net_sw[gcol, ilev] = flux_up_sw[gcol, ilev] - flux_dn_sw[gcol, ilev]
+                    flux_net_sw[ilev, gcol] = flux_up_sw[ilev, gcol] - flux_dn_sw[ilev, gcol]
                 end
             else
-                set_flux!(flux_sw, FT(0), gcol)
-                set_net_flux!(flux_sw, FT(0), gcol)
+                set_flux_to_zero!(flux_sw, gcol)
             end
         end
     end
@@ -57,7 +56,7 @@ function rte_sw_2stream_solve!(
         flux_net_sw = flux_sw.flux_net
         (; flux_up, flux_dn) = flux
         cos_zenith = bcs_sw.cos_zenith
-        FT = eltype(cos_zenith)
+        FT = eltype(flux_up)
         if aerosol_state isa AerosolState
             ClimaComms.@threaded device for gcol in 1:ncol
                 Optics.compute_aero_mask!(
@@ -80,17 +79,26 @@ function rte_sw_2stream_solve!(
                     ibnd = lookup_sw.band_data.major_gpt2bnd[igpt]
                     # call rte shortwave solver
                     rte_sw_2stream!(op, src_sw, bcs_sw, flux, solar_frac, igpt, n_gpt, ibnd, nlev, gcol)
-                    igpt == 1 ? set_flux!(flux_sw, flux, gcol) : add_to_flux!(flux_sw, flux, gcol)
+                    if igpt == 1
+                        map!(x -> x, view(flux_up_sw, :, gcol), view(flux_up, :, gcol))
+                        map!(x -> x, view(flux_dn_sw, :, gcol), view(flux_dn, :, gcol))
+                    else
+                        for ilev in 1:nlev
+                            @inbounds flux_up_sw[ilev, gcol] += flux_up[ilev, gcol]
+                            @inbounds flux_dn_sw[ilev, gcol] += flux_dn[ilev, gcol]
+                        end
+                    end
+                else
+                    set_flux_to_zero!(flux_sw, gcol)
                 end
             end
         end
 
         ClimaComms.@threaded device for gcol in 1:ncol
             if cos_zenith[gcol] > 0
-                compute_net_flux!(flux_sw, gcol)
-            else
-                set_flux!(flux_sw, FT(0), gcol)
-                set_net_flux!(flux_sw, FT(0), gcol)
+                for ilev in 1:nlev
+                    flux_net_sw[ilev, gcol] = flux_up_sw[ilev, gcol] - flux_dn_sw[ilev, gcol]
+                end
             end
         end
     end
@@ -217,25 +225,25 @@ function rte_sw_2stream!(
     end
     τ_sum = FT(0)
     for ilay in 1:nlay
-        @inbounds τ_sum += τ[gcol, ilay]
+        @inbounds τ_sum += τ[ilay, gcol]
     end
     # Direct-beam and source for diffuse radiation
     flux_dn_dir_top = toa_flux * solar_frac * μ₀
     flux_dn_dir_bot = flux_dn_dir_top * exp(-τ_sum / μ₀) # store value at surface
-    @inbounds flux_dn_dir[gcol, 1] = flux_dn_dir_bot # store value at surface
+    @inbounds flux_dn_dir[1, gcol] = flux_dn_dir_bot # store value at surface
     sfc_source = flux_dn_dir_bot * sfc_alb_direct
 
-    @inbounds flux_dn[gcol, nlev] = FT(0) # set to incoming flux when provided?
+    @inbounds flux_dn[nlev, gcol] = FT(0) # set to incoming flux when provided?
     # Albedo of lowest level is the surface albedo...
-    @inbounds surface_albedo = albedo[gcol, 1] = bcs_sw.sfc_alb_diffuse[ibnd, gcol]
+    @inbounds surface_albedo = albedo[1, gcol] = bcs_sw.sfc_alb_diffuse[ibnd, gcol]
     # ... and source of diffuse radiation is surface emission
-    @inbounds src[gcol, 1] = sfc_source
+    @inbounds src[1, gcol] = sfc_source
     # From bottom to top of atmosphere --
     #   compute albedo and source of upward radiation
     τ_cum = τ_sum
     albedo_ilev, src_ilev = surface_albedo, sfc_source
     @inbounds for ilev in 1:nlay
-        τ_ilev, ssa_ilev, g_ilev = τ[gcol, ilev], ssa[gcol, ilev], g[gcol, ilev]
+        τ_ilev, ssa_ilev, g_ilev = τ[ilev, gcol], ssa[ilev, gcol], g[ilev, gcol]
         (Rdir, Tdir, _, Rdif, Tdif) = sw_2stream_coeffs(τ_ilev, ssa_ilev, g_ilev, μ₀)
         denom = FT(1) / (FT(1) - Rdif * albedo_ilev)  # Eq 10
         albedo_ilevplus1 = Rdif + Tdif * Tdif * albedo_ilev * denom # Equation 9
@@ -249,24 +257,24 @@ function rte_sw_2stream!(
         src_up_ilev = Rdir * flux_dn_dir_ilevplus1 #flux_dn_dir[ilev + 1]
         src_dn_ilev = Tdir * flux_dn_dir_ilevplus1 #flux_dn_dir[ilev + 1]
         src_ilevplus1 = src_up_ilev + Tdif * denom * (src_ilev + albedo_ilev * src_dn_ilev)
-        albedo[gcol, ilev + 1], src[gcol, ilev + 1] = albedo_ilevplus1, src_ilevplus1
+        albedo[ilev + 1, gcol], src[ilev + 1, gcol] = albedo_ilevplus1, src_ilevplus1
         albedo_ilev = albedo_ilevplus1
         src_ilev = src_ilevplus1
     end
     # Eq 12, at the top of the domain upwelling diffuse is due to ...
-    @inbounds flux_up[gcol, nlev] =
-        flux_dn[gcol, nlev] * albedo[gcol, nlev] + # ... reflection of incident diffuse and
-        src[gcol, nlev]                          # scattering by the direct beam below
+    @inbounds flux_up[nlev, gcol] =
+        flux_dn[nlev, gcol] * albedo[nlev, gcol] + # ... reflection of incident diffuse and
+        src[nlev, gcol]                          # scattering by the direct beam below
 
     # From the top of the atmosphere downward -- compute fluxes
-    @inbounds flux_dn_ilevplus1 = flux_dn[gcol, nlev]
-    @inbounds flux_dn[gcol, nlev] += flux_dn_dir_top
+    @inbounds flux_dn_ilevplus1 = flux_dn[nlev, gcol]
+    @inbounds flux_dn[nlev, gcol] += flux_dn_dir_top
     τ_cum = FT(0)
 
     ilev = nlay
     @inbounds while ilev ≥ 1
-        τ_ilev, ssa_ilev, g_ilev = τ[gcol, ilev], ssa[gcol, ilev], g[gcol, ilev]
-        albedo_ilev, src_ilev = albedo[gcol, ilev], src[gcol, ilev]
+        τ_ilev, ssa_ilev, g_ilev = τ[ilev, gcol], ssa[ilev, gcol], g[ilev, gcol]
+        albedo_ilev, src_ilev = albedo[ilev, gcol], src[ilev, gcol]
         (_, Tdir, _, Rdif, Tdif) = sw_2stream_coeffs(τ_ilev, ssa_ilev, g_ilev, μ₀)
         denom = FT(1) / (FT(1) - Rdif * albedo_ilev)  # Eq 10
         src_dn_ilev = Tdir * flux_dn_dir_top * exp(-τ_cum / μ₀)
@@ -274,10 +282,10 @@ function rte_sw_2stream!(
         flux_dn_ilev = (Tdif * flux_dn_ilevplus1 + # Equation 13
                         Rdif * src_ilev +
                         src_dn_ilev) * denom
-        flux_up[gcol, ilev] =
+        flux_up[ilev, gcol] =
             flux_dn_ilev * albedo_ilev + # Equation 12
             src_ilev
-        flux_dn[gcol, ilev] = flux_dn_ilev + flux_dn_dir_top * exp(-τ_cum / μ₀)
+        flux_dn[ilev, gcol] = flux_dn_ilev + flux_dn_dir_top * exp(-τ_cum / μ₀)
         flux_dn_ilevplus1 = flux_dn_ilev
         ilev -= 1
     end

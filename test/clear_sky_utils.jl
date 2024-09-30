@@ -5,6 +5,8 @@ import JET
 import ClimaComms
 @static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
 
+import Infiltrator
+
 using RRTMGP
 using RRTMGP.Vmrs
 using RRTMGP.LookUpTables
@@ -24,16 +26,17 @@ using RRTMGP.ArtifactPaths
 
 include("reference_files.jl")
 include("read_rfmip_clear_sky.jl")
-
-function setup_clear_sky_test(
+#---------------------------------------------------------------
+function clear_sky(
     context,
     ::Type{SLVLW},
     ::Type{SLVSW},
     ::Type{VMR},
     ::Type{FT},
     toler_lw,
-    toler_sw,
+    toler_sw;
     ncol = 100,
+    exfiltrate = false,
 ) where {FT, SLVLW, SLVSW, VMR}
     overrides = (; grav = 9.80665, molmass_dryair = 0.028964, molmass_water = 0.018016)
     param_set = RRTMGPParameters(FT, overrides)
@@ -75,34 +78,21 @@ function setup_clear_sky_test(
     inc_flux_diffuse = nothing
     swbcs = (cos_zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse)
     slv_sw = SLVSW(FT, DA, context, nlay, ncol, swbcs...)
-
-    return device, as, lookup_lw, lookup_sw, slv_lw, slv_sw, (bot_at_1, nlev, expt_no, cos_zenith)
-end
-#---------------------------------------------------------------
-function clear_sky(
-    context,
-    ::Type{SLVLW},
-    ::Type{SLVSW},
-    ::Type{VMR},
-    ::Type{FT},
-    toler_lw,
-    toler_sw;
-    ncol = 100,
-) where {FT, SLVLW, SLVSW, VMR}
-    device, as, lookup_lw, lookup_sw, slv_lw, slv_sw, (bot_at_1, nlev, expt_no, cos_zenith) =
-        setup_clear_sky_test(context, SLVLW, SLVSW, VMR, FT, toler_lw, toler_sw, ncol)
     #--------------------------------------------------
     # calling longwave and shortwave solvers
+    exfiltrate && Infiltrator.@exfiltrate
     solve_lw!(slv_lw, as, lookup_lw)
     if device isa ClimaComms.CPUSingleThreaded
         JET.@test_opt solve_lw!(slv_lw, as, lookup_lw)
         @test (@allocated solve_lw!(slv_lw, as, lookup_lw)) == 0
+        @test (@allocated solve_lw!(slv_lw, as, lookup_lw)) ≤ 448
     end
 
     solve_sw!(slv_sw, as, lookup_sw)
     if device isa ClimaComms.CPUSingleThreaded
         JET.@test_opt solve_sw!(slv_sw, as, lookup_sw)
         @test (@allocated solve_sw!(slv_sw, as, lookup_sw)) == 0
+        @test (@allocated solve_sw!(slv_sw, as, lookup_sw)) ≤ 448
     end
 
     # comparing longwave fluxes with data from RRTMGP FORTRAN code
@@ -121,9 +111,9 @@ function clear_sky(
     rel_err_flux_net_lw = abs.(flux_net_lw .- comp_flux_net_lw)
 
     for gcol in 1:ncol, glev in 1:nlev
-        den = abs(comp_flux_net_lw[gcol, glev])
+        den = abs(comp_flux_net_lw[glev, gcol])
         if den > 10 * eps(FT)
-            rel_err_flux_net_lw[gcol, glev] /= den
+            rel_err_flux_net_lw[glev, gcol] /= den
         end
     end
     max_rel_err_flux_net_lw = maximum(rel_err_flux_net_lw)
@@ -149,8 +139,8 @@ function clear_sky(
     nnightcol = 0
     for gcol in 1:ncol
         if cos_zenith[gcol] ≤ 0
-            test_flux_up_sw = maximum(abs.(flux_up_sw[gcol, :])) ≈ FT(0)
-            test_flux_dn_sw = maximum(abs.(flux_dn_sw[gcol, :])) ≈ FT(0)
+            test_flux_up_sw = maximum(abs.(flux_up_sw[:, gcol])) ≈ FT(0)
+            test_flux_dn_sw = maximum(abs.(flux_dn_sw[:, gcol])) ≈ FT(0)
             if !(test_flux_up_sw && test_flux_dn_sw)
                 test_night_cols = false
             end
@@ -166,9 +156,9 @@ function clear_sky(
     rel_err_flux_net_sw = abs.(flux_net_sw .- comp_flux_net_sw)
 
     for gcol in 1:ncol, glev in 1:nlev
-        den = abs(comp_flux_net_sw[gcol, glev])
+        den = abs(comp_flux_net_sw[glev, gcol])
         if den > 10 * eps(FT)
-            rel_err_flux_net_sw[gcol, glev] /= den
+            rel_err_flux_net_sw[glev, gcol] /= den
         end
     end
 

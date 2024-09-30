@@ -31,10 +31,13 @@ function rte_lw_noscat_solve_CUDA!(
     τ = op.τ
     Ds = angle_disc.gauss_Ds[1]
     w_μ = angle_disc.gauss_wts[1]
+    (; flux_up, flux_dn, flux_net) = flux_lw
     if gcol ≤ ncol
         compute_optical_props!(op, as, src_lw, gcol)
         rte_lw_noscat_one_angle!(src_lw, bcs_lw, op, Ds, w_μ, gcol, flux_lw, igpt, ibnd, nlay, nlev)
-        compute_net_flux!(flux_lw, gcol)
+        @inbounds for ilev in 1:nlev
+            flux_net[ilev, gcol] = flux_up[ilev, gcol] - flux_dn[ilev, gcol]
+        end
     end
     return nothing
 end
@@ -82,6 +85,9 @@ function rte_lw_noscat_solve_CUDA!(
     Ds = angle_disc.gauss_Ds[1]
     w_μ = angle_disc.gauss_wts[1]
     if gcol ≤ ncol
+        flux_up_lw = flux_lw.flux_up
+        flux_dn_lw = flux_lw.flux_dn
+        flux_net_lw = flux_lw.flux_net
         (; cloud_state, aerosol_state) = as
         if aerosol_state isa AerosolState
             Optics.compute_aero_mask!(view(aerosol_state.aero_mask, :, gcol), view(aerosol_state.aero_mass, :, :, gcol))
@@ -95,11 +101,16 @@ function rte_lw_noscat_solve_CUDA!(
                     cloud_state.mask_type,
                 )
             end
+            igpt == 1 && set_flux_to_zero!(flux_lw, gcol)
             compute_optical_props!(op, as, src_lw, gcol, igpt, lookup_lw, lookup_lw_cld, lookup_lw_aero)
             rte_lw_noscat_one_angle!(src_lw, bcs_lw, op, Ds, w_μ, gcol, flux, igpt, ibnd, nlay, nlev)
-            igpt == 1 ? set_flux!(flux_lw, flux, gcol) : add_to_flux!(flux_lw, flux, gcol)
+            add_to_flux!(flux_lw, flux, gcol)
         end
-        compute_net_flux!(flux_lw, gcol)
+        @inbounds begin
+            for ilev in 1:nlev
+                flux_net_lw[ilev, gcol] = flux_up_lw[ilev, gcol] - flux_dn_lw[ilev, gcol]
+            end
+        end
     end
     return nothing
 end
