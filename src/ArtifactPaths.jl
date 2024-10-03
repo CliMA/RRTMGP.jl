@@ -18,17 +18,25 @@ shortwave and longwave solvers.
 - `:lw` (longwave) and `:sw` (shortwave) wavelength types are supported.
 
 These artifacts are obtained from "Pincus, R., Mlawer, E. J., Delamere, J., Iacono, M. J., & Pernak, R. (2023). RRTMGP data (Version 1.7) [Data set]. https://github.com/earth-system-radiation/rrtmgp-data" 
+
+The file "rrtmgp-sw-inputs-aerosol-optics.nc" overrides the lookup table available from the artifacts. This table corrects an error in the array ordering for the aerosol optics lookup table for the shortwave sea-salt data (‘aero_salt_tbl’). This file is provided by Michael Iacono at Atmospheric and Environmental Research, via personal communication. This file is expected to replace the currently existing lookup table in the `rrtmgp-data` repository in their next public release.
 """
 function get_lookup_filename(optics_type::Symbol, λ::Symbol)
     @assert optics_type ∈ (:gas, :cloud, :aerosol)
     @assert λ ∈ (:lw, :sw)
     basedir = get_artifact_path()
+    currdir = @__DIR__
+    config = (optics_type, λ)
 
-    return optics_type == :gas ? joinpath(basedir, "rrtmgp-gas-" * (λ == :lw ? "lw-g256.nc" : "sw-g224.nc")) :
-           (
-        optics_type == :cloud ? joinpath(basedir, "rrtmgp-clouds-" * (λ == :lw ? "lw.nc" : "sw.nc")) :
-        joinpath(basedir, "rrtmgp-aerosols-merra-" * (λ == :lw ? "lw.nc" : "sw.nc"))
-    )
+    config == (:gas, :lw) && return joinpath(basedir, "rrtmgp-gas-lw-g256.nc")
+    config == (:gas, :sw) && return joinpath(basedir, "rrtmgp-gas-sw-g224.nc")
+
+    config == (:cloud, :lw) && return joinpath(basedir, "rrtmgp-clouds-lw.nc")
+    config == (:cloud, :sw) && return joinpath(basedir, "rrtmgp-clouds-sw.nc")
+
+    config == (:aerosol, :lw) && return joinpath(basedir, "rrtmgp-aerosols-merra-lw.nc")
+    #config == (:aerosol, :sw)
+    return joinpath(currdir, "../lookup_tables/aerosol/rrtmgp-sw-inputs-aerosol-optics.nc")
 end
 
 """
