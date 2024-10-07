@@ -65,9 +65,8 @@ function compute_relative_humidity_kernel!(
     glay::Int,
     gcol::Int,
 ) where {FT}
-    mmr_h2o =
     # Convert h2o vmr to mmr
-        mmr_h2o = vmr_h2o[glay, gcol] * mwd
+    mmr_h2o = vmr_h2o[glay, gcol] * mwd
     q_lay = mmr_h2o / (FT(1) + mmr_h2o)
     q_tmp = max(q_lay_min, q_lay)
     es_tmp = exp((FT(17.67) * (t_lay[glay, gcol] - t_ref)) / (t_lay[glay, gcol] - FT(29.65)))
