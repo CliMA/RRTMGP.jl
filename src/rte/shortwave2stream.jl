@@ -81,9 +81,9 @@ function rte_sw_2stream_solve!(
                     # call rte shortwave solver
                     rte_sw_2stream!(op, src_sw, bcs_sw, flux, solar_frac, igpt, n_gpt, ibnd, nlev, gcol)
                     if igpt == 1
-                        map!(x -> x, view(flux_up_sw, :, gcol), view(flux_up, :, gcol))
-                        map!(x -> x, view(flux_dn_sw, :, gcol), view(flux_dn, :, gcol))
-                        map!(x -> x, view(flux_dn_dir_sw, :, gcol), view(flux_dn_dir, :, gcol))
+                        view(flux_up_sw, :, gcol) .= view(flux_up, :, gcol)
+                        view(flux_dn_sw, :, gcol) .= view(flux_dn, :, gcol)
+                        view(flux_dn_dir_sw, :, gcol) .= view(flux_dn_dir, :, gcol)
                     else
                         for ilev in 1:nlev
                             @inbounds flux_up_sw[ilev, gcol] += flux_up[ilev, gcol]

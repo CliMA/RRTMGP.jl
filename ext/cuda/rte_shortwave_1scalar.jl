@@ -81,8 +81,9 @@ function rte_sw_noscat_solve_CUDA!(
                 solar_frac = lookup_sw.solar_src_scaled[igpt]
                 rte_sw_noscat!(flux, op, bcs_sw, igpt, n_gpt, solar_frac, gcol, nlev)
                 if igpt == 1
-                    map!(x -> x, view(flux_up_sw, :, gcol), view(flux_up, :, gcol))
-                    map!(x -> x, view(flux_dn_sw, :, gcol), view(flux_dn, :, gcol))
+                    view(flux_up_sw, :, gcol) .= view(flux_up, :, gcol)
+                    view(flux_dn_sw, :, gcol) .= view(flux_dn, :, gcol)
+                    view(flux_dn_dir_sw, :, gcol) .= view(flux_dn_dir, :, gcol)
                 else
                     for ilev in 1:nlev
                         flux_up_sw[ilev, gcol] += flux_up[ilev, gcol]

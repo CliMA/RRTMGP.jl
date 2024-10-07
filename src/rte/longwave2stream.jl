@@ -65,8 +65,8 @@ function rte_lw_2stream_solve!(
                 compute_optical_props!(op, as, src_lw, gcol, igpt, lookup_lw, lookup_lw_cld, lookup_lw_aero)
                 rte_lw_2stream!(op, flux, src_lw, bcs_lw, gcol, igpt, ibnd, nlev, ncol)
                 if igpt == 1
-                    map!(x -> x, view(flux_up_lw, :, gcol), view(flux_up, :, gcol))
-                    map!(x -> x, view(flux_dn_lw, :, gcol), view(flux_dn, :, gcol))
+                    view(flux_up_lw, :, gcol) .= view(flux_up, :, gcol)
+                    view(flux_dn_lw, :, gcol) .= view(flux_dn, :, gcol)
                 else
                     for ilev in 1:nlev
                         @inbounds flux_up_lw[ilev, gcol] += flux_up[ilev, gcol]
