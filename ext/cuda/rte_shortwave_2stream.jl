@@ -96,9 +96,11 @@ function rte_sw_2stream_solve_CUDA!(
     if gcol ≤ ncol
         flux_up_sw = flux_sw.flux_up
         flux_dn_sw = flux_sw.flux_dn
+        flux_dn_dir_sw = flux_sw.flux_dn_dir
         flux_net_sw = flux_sw.flux_net
         flux_up = flux.flux_up
         flux_dn = flux.flux_dn
+        flux_dn_dir = flux.flux_dn_dir
         FT = eltype(flux_up)
         (; cloud_state, aerosol_state) = as
         μ₀ = bcs_sw.cos_zenith[gcol]
@@ -127,11 +129,13 @@ function rte_sw_2stream_solve_CUDA!(
                 if igpt == 1
                     map!(x -> x, view(flux_up_sw, :, gcol), view(flux_up, :, gcol))
                     map!(x -> x, view(flux_dn_sw, :, gcol), view(flux_dn, :, gcol))
+                    map!(x -> x, view(flux_dn_dir_sw, :, gcol), view(flux_dn_dir, :, gcol))
                 else
                     for ilev in 1:nlev
                         flux_up_sw[ilev, gcol] += flux_up[ilev, gcol]
                         flux_dn_sw[ilev, gcol] += flux_dn[ilev, gcol]
                     end
+                    flux_dn_dir_sw[1, gcol] += flux_dn_dir[1, gcol]
                 end
             end
             if μ₀ ≤ 0 # zero out columns with zenith angle ≥ π/2
