@@ -70,8 +70,10 @@ function rte_sw_noscat_solve_CUDA!(
         flux_up_sw = flux_sw.flux_up
         flux_dn_sw = flux_sw.flux_dn
         flux_net_sw = flux_sw.flux_net
+        flux_dn_dir_sw = flux_sw.flux_dn_dir
         flux_up = flux.flux_up
         flux_dn = flux.flux_dn
+        flux_dn_dir = flux.flux_dn_dir
         μ₀ = bcs_sw.cos_zenith[gcol]
         @inbounds begin
             for igpt in 1:n_gpt
@@ -85,6 +87,7 @@ function rte_sw_noscat_solve_CUDA!(
                     for ilev in 1:nlev
                         flux_up_sw[ilev, gcol] += flux_up[ilev, gcol]
                         flux_dn_sw[ilev, gcol] += flux_dn[ilev, gcol]
+                        flux_dn_dir_sw[ilev, gcol] += flux_dn_dir[ilev, gcol]
                     end
                 end
             end

@@ -53,8 +53,9 @@ function rte_sw_2stream_solve!(
         bld_cld_mask = cloud_state isa CloudState
         flux_up_sw = flux_sw.flux_up
         flux_dn_sw = flux_sw.flux_dn
+        flux_dn_dir_sw = flux_sw.flux_dn_dir
         flux_net_sw = flux_sw.flux_net
-        (; flux_up, flux_dn) = flux
+        (; flux_up, flux_dn, flux_dn_dir) = flux
         cos_zenith = bcs_sw.cos_zenith
         FT = eltype(flux_up)
         if aerosol_state isa AerosolState
@@ -82,10 +83,12 @@ function rte_sw_2stream_solve!(
                     if igpt == 1
                         map!(x -> x, view(flux_up_sw, :, gcol), view(flux_up, :, gcol))
                         map!(x -> x, view(flux_dn_sw, :, gcol), view(flux_dn, :, gcol))
+                        map!(x -> x, view(flux_dn_dir_sw, :, gcol), view(flux_dn_dir, :, gcol))
                     else
                         for ilev in 1:nlev
                             @inbounds flux_up_sw[ilev, gcol] += flux_up[ilev, gcol]
                             @inbounds flux_dn_sw[ilev, gcol] += flux_dn[ilev, gcol]
+                            @inbounds flux_dn_dir_sw[ilev, gcol] += flux_dn_dir[ilev, gcol]
                         end
                     end
                 else
