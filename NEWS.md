@@ -4,6 +4,16 @@ RRTMGP.jl Release Notes
 main
 ------
 
+### Bug fixes
+
+#### Fix  `flux_dn_dir` for non-gray radiation
+
+Prior to this release, `flux_dn_dir` was not correctly set in the two stream
+case for non-gray radiation, leading to incorrect values (whatever was in the
+memory at initialization). Now, the variable is correctly accumulated over for
+every g-point. Note, however, that only the value at the surface (`[1, :]`) is
+updated. PR [#550](https://github.com/CliMA/RRTMGP.jl/pull/550).
+
 v0.19.0
 -----
 - Compute aero_mask internally and store the array.

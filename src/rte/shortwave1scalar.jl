@@ -38,8 +38,9 @@ function rte_sw_noscat_solve!(
     n_gpt = length(lookup_sw.solar_src_scaled)
     flux_up_sw = flux_sw.flux_up
     flux_dn_sw = flux_sw.flux_dn
+    flux_dn_dir_sw = flux_sw.flux_dn_dir
     flux_net_sw = flux_sw.flux_net
-    (; flux_up, flux_dn) = flux
+    (; flux_up, flux_dn, flux_dn_dir) = flux
     cos_zenith = bcs_sw.cos_zenith
     @inbounds begin
         for igpt in 1:n_gpt
@@ -51,11 +52,13 @@ function rte_sw_noscat_solve!(
                     if igpt == 1
                         map!(x -> x, view(flux_up_sw, :, gcol), view(flux_up, :, gcol))
                         map!(x -> x, view(flux_dn_sw, :, gcol), view(flux_dn, :, gcol))
+                        map!(x -> x, view(flux_dn_dir_sw, :, gcol), view(flux_dn_dir, :, gcol))
                     else
                         for ilev in 1:nlev
                             flux_up_sw[ilev, gcol] += flux_up[ilev, gcol]
                             flux_dn_sw[ilev, gcol] += flux_dn[ilev, gcol]
                         end
+                        flux_dn_dir_sw[1, gcol] += flux_dn_dir[1, gcol]
                     end
                 else
                     set_flux_to_zero!(flux_sw, gcol)
