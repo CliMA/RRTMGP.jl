@@ -1,6 +1,6 @@
 agents:
   queue: clima
-  modules: climacommon/2024_04_05
+  modules: climacommon/2024_10_09
 
 env:
   OPENBLAS_NUM_THREADS: 1
