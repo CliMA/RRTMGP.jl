@@ -4,6 +4,9 @@ RRTMGP.jl Release Notes
 main
 ------
 
+v0.19.1
+-----
+
 ### Bug fixes
 
 #### Fix  `flux_dn_dir` for non-gray radiation
@@ -13,6 +16,17 @@ case for non-gray radiation, leading to incorrect values (whatever was in the
 memory at initialization). Now, the variable is correctly accumulated over for
 every g-point. Note, however, that only the value at the surface (`[1, :]`) is
 updated. PR [#550](https://github.com/CliMA/RRTMGP.jl/pull/550).
+
+#### Fix aerosol lookup table
+
+Starting with this release, RRTGMP.jl will use an aerosol look up table that is internally stored, as opposed
+to downloading it from the `rrtgmp-data` repository. The reason for this change is that the data distributed 
+with `rrtgmp-data` contains an an error in the array ordering for the aerosol optics lookup table for sea-salt (‘aero_salt_tbl’). 
+This error was fixed in the internal table. `RRTGMP.jl` will revert to using `rrtgmp-data` 
+once the repository updates their tables. PR [#548](https://github.com/CliMA/RRTMGP.jl/pull/548/).
+This new lookup table fixes an error in the array ordering for the aerosol optics 
+lookup table for the shortwave sea-salt data (‘aero_salt_tbl’).
+PR [#548](https://github.com/CliMA/RRTMGP.jl/pull/548/).
 
 v0.19.0
 -----
