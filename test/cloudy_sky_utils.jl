@@ -24,9 +24,9 @@ using RRTMGP.ArtifactPaths
 # overriding some parameters to match with RRTMGP FORTRAN code
 
 include("reference_files.jl")
-include("read_all_sky.jl")
+include("read_cloudy_sky.jl")
 
-function all_sky(
+function cloudy_sky(
     context,
     ::Type{SLVLW},
     ::Type{SLVSW},
@@ -70,7 +70,7 @@ function all_sky(
     close(ds_sw_cld)
     # reading input file 
     ds_in = Dataset(input_file, "r")
-    as, sfc_emis, sfc_alb_direct, sfc_alb_diffuse, cos_zenith, toa_flux, bot_at_1 = setup_allsky_as(
+    as, sfc_emis, sfc_alb_direct, sfc_alb_diffuse, cos_zenith, toa_flux, bot_at_1 = setup_cloudy_sky_as(
         context,
         ds_in,
         idx_gases,

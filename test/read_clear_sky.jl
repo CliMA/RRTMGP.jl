@@ -4,7 +4,7 @@ function ncol_ds_clear_sky()
     return size(Array(ds_comp["rlu"]), 2)
 end
 
-function setup_rfmip_as(
+function setup_clear_sky_as(
     context,
     ds_lw_in,
     idx_gases,

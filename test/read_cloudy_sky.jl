@@ -4,7 +4,7 @@ function ncol_ds_all_sky(use_lut)
     return size(Array(ds_comp["lw_flux_up"]), 1)
 end
 
-function setup_allsky_as(
+function setup_cloudy_sky_as(
     context,
     ds_in,
     idx_gases,
