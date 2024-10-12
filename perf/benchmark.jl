@@ -91,15 +91,15 @@ end
 show(stdout, MIME("text/plain"), trial)
 println()
 
-@info "------------------------------------------------- Benchmark: all_sky"
+@info "------------------------------------------------- Benchmark: cloudy_sky"
 # @suppress_out begin
-include(joinpath(root_dir, "test", "all_sky_utils.jl"))
+include(joinpath(root_dir, "test", "cloudy_sky_utils.jl"))
 
 toler_lw_noscat = Dict(Float64 => Float64(1e-5), Float32 => Float32(0.05))
 toler_lw_2stream = Dict(Float64 => Float64(5), Float32 => Float32(5))
 toler_sw = Dict(Float64 => Float64(1e-5), Float32 => Float32(0.06))
 
-all_sky(
+cloudy_sky(
     ClimaComms.context(),
     TwoStreamLWRTE,
     TwoStreamSWRTE,
@@ -117,7 +117,7 @@ all_sky(
 solve_sw!(slv_sw, as, lookup_sw, lookup_sw_cld) # compile first
 solve_lw!(slv_lw, as, lookup_lw, lookup_lw_cld) # compile first
 
-@info "all_sky, lw, use_lut=true"
+@info "cloudy_sky, lw, use_lut=true"
 device = ClimaComms.device(ClimaComms.context())
 trial = if device isa ClimaComms.CUDADevice
     using CUDA
@@ -127,7 +127,7 @@ else
 end
 show(stdout, MIME("text/plain"), trial)
 println()
-@info "all_sky, sw, use_lut=true"
+@info "cloudy_sky, sw, use_lut=true"
 device = ClimaComms.device(ClimaComms.context())
 trial = if device isa ClimaComms.CUDADevice
     using CUDA
@@ -137,45 +137,3 @@ else
 end
 show(stdout, MIME("text/plain"), trial)
 println()
-
-#=
-# @suppress_out begin
-all_sky(
-    ClimaComms.context(),
-    TwoStream,
-    TwoStream,
-    TwoStreamLWRTE,
-    TwoStreamSWRTE,
-    FT;
-    use_lut = false,
-    cldfrac = FT(1),
-    exfiltrate = true,
-)
-# end
-
-(; slv_lw, slv_sw, as, lookup_sw, lookup_sw_cld, lookup_lw, lookup_lw_cld) = Infiltrator.exfiltrated
-
-solve_sw!(slv_sw, as, lookup_sw, lookup_sw_cld) # compile first
-solve_lw!(slv_lw, as, lookup_lw, lookup_lw_cld) # compile first
-
-@info "all_sky, lw, use_lut=false"
-device = ClimaComms.device(ClimaComms.context())
-trial = if device isa ClimaComms.CUDADevice
-    using CUDA
-    @benchmark CUDA.@sync solve_lw!($slv_lw, $as, $lookup_lw, $lookup_lw_cld)
-else
-    @benchmark solve_lw!($slv_lw, $as, $lookup_lw, $lookup_lw_cld)
-end
-show(stdout, MIME("text/plain"), trial)
-println()
-@info "all_sky, sw, use_lut=false"
-device = ClimaComms.device(ClimaComms.context())
-trial = if device isa ClimaComms.CUDADevice
-    using CUDA
-    @benchmark CUDA.@sync solve_sw!($slv_sw, $as, $lookup_sw, $lookup_sw_cld)
-else
-    @benchmark solve_sw!($slv_sw, $as, $lookup_sw, $lookup_sw_cld)
-end
-show(stdout, MIME("text/plain"), trial)
-println()
-=#

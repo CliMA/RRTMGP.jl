@@ -68,8 +68,8 @@ steps:
           slurm_mem_per_cpu: 6G
 
       - label: "Flame Graph: All Sky"
-        command: "julia --color=yes --project=test perf/flame.jl all_sky.jl"
-        artifact_paths: "flame_graphs/all_sky/*"
+        command: "julia --color=yes --project=test perf/flame.jl cloudy_sky.jl"
+        artifact_paths: "flame_graphs/cloudy_sky/*"
         agents:
           slurm_ntasks: 1
           slurm_mem_per_cpu: 6G
@@ -112,7 +112,7 @@ steps:
           slurm_gres: "gpu:1"
 
       - label: "GPU all-sky DYAMOND benchmark"
-        command: "julia --color=yes --project=test test/all_sky_dyamond_gpu_benchmark.jl"
+        command: "julia --color=yes --project=test test/cloudy_sky_dyamond_gpu_benchmark.jl"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
         agents:

@@ -25,7 +25,7 @@ using RRTMGP.ArtifactPaths
 # overriding some parameters to match with RRTMGP FORTRAN code
 
 include("reference_files.jl")
-include("read_rfmip_clear_sky.jl")
+include("read_clear_sky.jl")
 #---------------------------------------------------------------
 function clear_sky(
     context,
@@ -63,7 +63,7 @@ function clear_sky(
     # reading rfmip data to atmospheric state
     ds_lw_in = Dataset(input_file, "r")
     (as, sfc_emis, sfc_alb_direct, cos_zenith, toa_flux, bot_at_1) =
-        setup_rfmip_as(context, ds_lw_in, idx_gases, expt_no, lookup_lw, ncol, FT, VMR, param_set)
+        setup_clear_sky_as(context, ds_lw_in, idx_gases, expt_no, lookup_lw, ncol, FT, VMR, param_set)
     close(ds_lw_in)
 
     nlay, _ = AtmosphericStates.get_dims(as)

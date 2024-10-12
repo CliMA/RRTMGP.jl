@@ -35,9 +35,9 @@ printstyled("=================================\n\n", color = color1)
     toler_lw_2stream = Dict(Float64 => Float64(5), Float32 => Float32(5))
     toler_sw = Dict(Float64 => Float64(1e-5), Float32 => Float32(0.06))
 
-    include("all_sky_utils.jl")
+    include("cloudy_sky_utils.jl")
     for FT in (Float32, Float64)
-        all_sky(
+        cloudy_sky(
             context,
             NoScatLWRTE,
             TwoStreamSWRTE,
@@ -48,7 +48,7 @@ printstyled("=================================\n\n", color = color1)
             use_lut = true,
             cldfrac = FT(1),
         )
-        all_sky(
+        cloudy_sky(
             context,
             TwoStreamLWRTE,
             TwoStreamSWRTE,
