@@ -22,19 +22,29 @@ jobs:
       matrix:
         package:
           - 'ClimaAtmos.jl'
+          - 'ClimaCoupler.jl'
+        version:
+          - '1.10'
+          - '1.11'
     steps:
       - uses: actions/checkout@v4
       - uses: julia-actions/setup-julia@v2
         with:
-          version: '1.10'
+          version: ${{ matrix.version }}
       - uses: julia-actions/cache@v2
       - uses: julia-actions/julia-buildpkg@v1
       - uses: actions/checkout@v4
         with:
           repository: 'CliMA/${{ matrix.package }}'
           path: ${{ matrix.package }}
-      - run: |
+      - if: matrix.package != 'ClimaCoupler.jl'
+        run: |
           julia --color=yes --project=${{ matrix.package }} -e 'using Pkg; Pkg.instantiate()'
           julia --color=yes --project=${{ matrix.package }} -e 'using Pkg; Pkg.develop(; path = ".")'
           julia --color=yes --project=${{ matrix.package }} -e 'using Pkg; Pkg.test()'
 
+      - if: matrix.package == 'ClimaCoupler.jl'
+        run: |
+          julia --color=yes --project=ClimaCoupler.jl/experiments/ClimaEarth -e 'using Pkg; Pkg.instantiate()'
+          julia --color=yes --project=ClimaCoupler.jl/experiments/ClimaEarth -e 'using Pkg; Pkg.develop(; path = ".")'
+          julia --color=yes --project=ClimaCoupler.jl/experiments/ClimaEarth ClimaCoupler.jl/experiments/ClimaEarth/test/runtests.jl
