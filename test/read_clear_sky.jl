@@ -55,10 +55,10 @@ function setup_clear_sky_as(
 
     p_lev[lev_ind[end], :] .= lookup_lw.p_ref_min
 
-    p_lev = p_lev[lev_ind, :]
-    p_lay = Array(ds_lw_in["pres_layer"])[lay_ind, :]
-    t_lev = Array(ds_lw_in["temp_level"])[lev_ind, :, expt_no]
-    t_lay = Array(ds_lw_in["temp_layer"])[lay_ind, :, expt_no]
+    p_lev = p_lev[lev_ind, :] * FT(0.98)
+    p_lay = Array(ds_lw_in["pres_layer"])[lay_ind, :] * FT(0.98)
+    t_lev = Array(ds_lw_in["temp_level"])[lev_ind, :, expt_no] * FT(0.98)
+    t_lay = Array(ds_lw_in["temp_layer"])[lay_ind, :, expt_no] * FT(0.98)
 
     p_lev = FTA2D(repeat(p_lev, 1, nrepeat)[:, 1:ncol])
     p_lay = FTA2D(repeat(p_lay, 1, nrepeat)[:, 1:ncol])
@@ -116,6 +116,7 @@ function setup_clear_sky_as(
         FT(ds_lw_in["hfc134a_GM"][expt_no]) * parse(FT, ds_lw_in["hfc134a_GM"].attrib["units"])
 
     vmrat[idx_gases["cf4"]] = FT(ds_lw_in["cf4_GM"][expt_no]) * parse(FT, ds_lw_in["hfc23_GM"].attrib["units"])
+    vmrat[idx_gases["no2"]] = 0
 
     #    vmr[idx_gases["no2"]] = FT(ds_lw_in["no2_GM"][expt_no]) *                # missing from input file
     #                                         parse(FT, ds_lw_in["hfc32_GM"].attrib["units"])
