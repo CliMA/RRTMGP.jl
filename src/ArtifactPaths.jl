@@ -31,12 +31,11 @@ function get_lookup_filename(optics_type::Symbol, λ::Symbol)
     config == (:gas, :lw) && return joinpath(basedir, "rrtmgp-gas-lw-g256.nc")
     config == (:gas, :sw) && return joinpath(basedir, "rrtmgp-gas-sw-g224.nc")
 
-    config == (:cloud, :lw) && return joinpath(basedir, "rrtmgp-clouds-lw.nc")
-    config == (:cloud, :sw) && return joinpath(basedir, "rrtmgp-clouds-sw.nc")
+    config == (:cloud, :lw) && return joinpath(basedir, "rrtmgp-clouds-lw-bnd.nc")
+    config == (:cloud, :sw) && return joinpath(basedir, "rrtmgp-clouds-sw-bnd.nc")
 
     config == (:aerosol, :lw) && return joinpath(basedir, "rrtmgp-aerosols-merra-lw.nc")
-    #config == (:aerosol, :sw)
-    return joinpath(currdir, "../lookup_tables/aerosol/rrtmgp-sw-inputs-aerosol-optics.nc")
+    config == (:aerosol, :sw) && return joinpath(basedir, "rrtmgp-aerosols-merra-sw.nc")
 end
 
 """

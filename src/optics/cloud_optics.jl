@@ -11,10 +11,10 @@
 )
     @inbounds begin
         nlay = length(τ)
-        lut_extliq, lut_ssaliq, lut_asyliq = LookUpTables.getview_liqdata(lkp_cld, ibnd)
-        lut_extice, lut_ssaice, lut_asyice = LookUpTables.getview_icedata(lkp_cld, ibnd, ice_rgh)
+        extliq, ssaliq, asyliq = LookUpTables.getview_liqdata(lkp_cld, ibnd)
+        extice, ssaice, asyice = LookUpTables.getview_icedata(lkp_cld, ibnd, ice_rgh)
         _, _, nsize_liq, nsize_ice, _ = lkp_cld.dims
-        radliq_lwr, radliq_upr, _, radice_lwr, radice_upr, _ = lkp_cld.bounds
+        radliq_lwr, radliq_upr, radice_lwr, radice_upr = lkp_cld.bounds
 
         for glay in 1:nlay
             if cld_mask[glay]
@@ -23,9 +23,9 @@
                     nsize_liq,
                     radliq_lwr,
                     radliq_upr,
-                    lut_extliq,
-                    lut_ssaliq,
-                    lut_asyliq,
+                    extliq,
+                    ssaliq,
+                    asyliq,
                     cld_r_eff_liq[glay],
                     cld_path_liq[glay],
                 )
@@ -34,9 +34,9 @@
                     nsize_ice,
                     radice_lwr,
                     radice_upr,
-                    lut_extice,
-                    lut_ssaice,
-                    lut_asyice,
+                    extice,
+                    ssaice,
+                    asyice,
                     cld_r_eff_ice[glay],
                     cld_path_ice[glay],
                 )
@@ -82,10 +82,10 @@ to the TwoStream gas optics properties.
 )
     nlay = length(τ)
     FT = eltype(τ)
-    lut_extliq, lut_ssaliq, lut_asyliq = LookUpTables.getview_liqdata(lkp_cld, ibnd)
-    lut_extice, lut_ssaice, lut_asyice = LookUpTables.getview_icedata(lkp_cld, ibnd, ice_rgh)
+    extliq, ssaliq, asyliq = LookUpTables.getview_liqdata(lkp_cld, ibnd)
+    extice, ssaice, asyice = LookUpTables.getview_icedata(lkp_cld, ibnd, ice_rgh)
     _, _, nsize_liq, nsize_ice, _ = lkp_cld.dims
-    radliq_lwr, radliq_upr, _, radice_lwr, radice_upr, _ = lkp_cld.bounds
+    radliq_lwr, radliq_upr, radice_lwr, radice_upr = lkp_cld.bounds
     @inbounds begin
         for glay in 1:nlay
             if cld_mask[glay]
@@ -94,9 +94,9 @@ to the TwoStream gas optics properties.
                     nsize_liq,
                     radliq_lwr,
                     radliq_upr,
-                    lut_extliq,
-                    lut_ssaliq,
-                    lut_asyliq,
+                    extliq,
+                    ssaliq,
+                    asyliq,
                     cld_r_eff_liq[glay],
                     cld_path_liq[glay],
                 )
@@ -105,9 +105,9 @@ to the TwoStream gas optics properties.
                     nsize_ice,
                     radice_lwr,
                     radice_upr,
-                    lut_extice,
-                    lut_ssaice,
-                    lut_asyice,
+                    extice,
+                    ssaice,
+                    asyice,
                     cld_r_eff_ice[glay],
                     cld_path_ice[glay],
                 )
@@ -133,9 +133,9 @@ end
         nsize_liq,
         radliq_lwr,
         radliq_upr,
-        lut_extliq,
-        lut_ssaliq,
-        lut_asyliq,
+        extliq,
+        ssaliq,
+        asyliq,
         re_liq,
         cld_path_liq,
     )
@@ -146,9 +146,9 @@ This function computes the `TwoStream` cloud liquid properties using the `LookUp
     nsize_liq,
     radliq_lwr,
     radliq_upr,
-    lut_extliq,
-    lut_ssaliq,
-    lut_asyliq,
+    extliq,
+    ssaliq,
+    asyliq,
     re_liq,
     cld_path_liq,
 )
@@ -161,9 +161,9 @@ This function computes the `TwoStream` cloud liquid properties using the `LookUp
         fac = (re_liq - radliq_lwr - (loc - 1) * Δr_liq) / Δr_liq
         fc1 = FT(1) - fac
         @inbounds begin
-            τl = max((fc1 * lut_extliq[loc] + fac * lut_extliq[loc + 1]) * cld_path_liq, FT(0))
-            τl_ssa = (fc1 * lut_ssaliq[loc] + fac * lut_ssaliq[loc + 1]) * τl
-            τl_ssag = (fc1 * lut_asyliq[loc] + fac * lut_asyliq[loc + 1]) * τl_ssa
+            τl = max((fc1 * extliq[loc] + fac * extliq[loc + 1]) * cld_path_liq, FT(0))
+            τl_ssa = (fc1 * ssaliq[loc] + fac * ssaliq[loc + 1]) * τl
+            τl_ssag = (fc1 * asyliq[loc] + fac * asyliq[loc + 1]) * τl_ssa
         end
     end
     return (τl, τl_ssa, τl_ssag)
@@ -174,9 +174,9 @@ end
         nsize_ice,
         radice_lwr,
         radice_upr,
-        lut_extice,
-        lut_ssaice,
-        lut_asyice,
+        extice,
+        ssaice,
+        asyice,
         re_ice,
         cld_path_ice,
     )
@@ -187,9 +187,9 @@ This function computes the `TwoStream` cloud ice properties using the `LookUpTab
     nsize_ice,
     radice_lwr,
     radice_upr,
-    lut_extice,
-    lut_ssaice,
-    lut_asyice,
+    extice,
+    ssaice,
+    asyice,
     re_ice,
     cld_path_ice,
 )
@@ -202,9 +202,9 @@ This function computes the `TwoStream` cloud ice properties using the `LookUpTab
         fac = (re_ice - radice_lwr - (loc - 1) * Δr_ice) / Δr_ice
         fc1 = FT(1) - fac
         @inbounds begin
-            τi = max((fc1 * lut_extice[loc] + fac * lut_extice[loc + 1]) * cld_path_ice, FT(0))
-            τi_ssa = (fc1 * lut_ssaice[loc] + fac * lut_ssaice[loc + 1]) * τi
-            τi_ssag = (fc1 * lut_asyice[loc] + fac * lut_asyice[loc + 1]) * τi_ssa
+            τi = max((fc1 * extice[loc] + fac * extice[loc + 1]) * cld_path_ice, FT(0))
+            τi_ssa = (fc1 * ssaice[loc] + fac * ssaice[loc + 1]) * τi
+            τi_ssag = (fc1 * asyice[loc] + fac * asyice[loc + 1]) * τi_ssa
         end
     end
     return (τi, τi_ssa, τi_ssag)
