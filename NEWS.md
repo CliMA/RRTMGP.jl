@@ -3,6 +3,7 @@ RRTMGP.jl Release Notes
 
 main
 ------
+- Remove pade approximation. PR [#563](https://github.com/CliMA/RRTMGP.jl/pull/563)
 
 v0.19.1
 -----

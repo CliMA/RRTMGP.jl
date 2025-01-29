@@ -16,7 +16,6 @@ toler_sw = Dict(Float64 => Float64(1e-5), Float32 => Float32(0.06))
         toler_lw_noscat,
         toler_sw;
         ncol = 128,
-        use_lut = true,
         cldfrac = FT(1),
     )
 end
@@ -30,7 +29,6 @@ end
         toler_lw_2stream,
         toler_sw;
         ncol = 128,
-        use_lut = true,
         cldfrac = FT(1),
     )
 end

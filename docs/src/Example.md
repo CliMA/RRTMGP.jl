@@ -61,7 +61,7 @@ Here are the vertical profiles of downward longwave (`flux_dn_lw`) and shortwave
 
 ```julia
 julia> include("test/all_sky.jl")
-julia> all_sky(TwoStream, Float64, Int, DA, use_lut = true, cldfrac = Float64(1))
+julia> all_sky(TwoStream, Float64, Int, DA, cldfrac = Float64(1))
 calling longwave solver; ncol = 128
   1.357532 seconds (141.42 k allocations: 7.896 MiB, 25.54% compilation time: 100% of which was recompilation)
 calling shortwave solver; ncol = 128

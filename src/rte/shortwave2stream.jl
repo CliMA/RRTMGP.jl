@@ -42,7 +42,7 @@ function rte_sw_2stream_solve!(
     src_sw::SourceSW2Str,
     as::AtmosphericState,
     lookup_sw::LookUpSW,
-    lookup_sw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
+    lookup_sw_cld::Union{LookUpCld, Nothing} = nothing,
     lookup_sw_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
 )
     nlay, ncol = AtmosphericStates.get_dims(as)

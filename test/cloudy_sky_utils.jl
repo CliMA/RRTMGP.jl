@@ -33,8 +33,7 @@ function cloudy_sky(
     ::Type{FT},
     toler_lw,
     toler_sw;
-    ncol = 128,# repeats col#1 ncol times per RRTMGP example 
-    use_lut::Bool = true,
+    ncol = 128, # repeats col#1 ncol times per RRTMGP example 
     cldfrac = FT(1),
     exfiltrate = false,
 ) where {FT <: AbstractFloat, SLVLW, SLVSW}
@@ -58,7 +57,7 @@ function cloudy_sky(
     close(ds_lw)
     # reading longwave cloud lookup data
     ds_lw_cld = Dataset(lw_cld_file, "r")
-    lookup_lw_cld = use_lut ? LookUpCld(ds_lw_cld, FT, DA) : PadeCld(ds_lw_cld, FT, DA)
+    lookup_lw_cld = LookUpCld(ds_lw_cld, FT, DA)
     close(ds_lw_cld)
     #reading shortwave gas optics lookup data
     ds_sw = Dataset(sw_file, "r")
@@ -66,7 +65,7 @@ function cloudy_sky(
     close(ds_sw)
     # reading longwave cloud lookup data
     ds_sw_cld = Dataset(sw_cld_file, "r")
-    lookup_sw_cld = use_lut ? LookUpCld(ds_sw_cld, FT, DA) : PadeCld(ds_sw_cld, FT, DA)
+    lookup_sw_cld = LookUpCld(ds_sw_cld, FT, DA)
     close(ds_sw_cld)
     # reading input file 
     ds_in = Dataset(input_file, "r")
@@ -79,7 +78,6 @@ function cloudy_sky(
         lookup_lw_cld,
         lookup_sw_cld,
         cldfrac,
-        use_lut,
         ncol,
         FT,
         param_set,
@@ -110,8 +108,8 @@ function cloudy_sky(
     end
     #-------------
     # comparison
-    method = use_lut ? "Lookup Table Interpolation method" : "PADE method"
-    comp_flux_up_lw, comp_flux_dn_lw, comp_flux_up_sw, comp_flux_dn_sw = load_comparison_data(use_lut, bot_at_1, ncol)
+    method = "Lookup Table Interpolation method"
+    comp_flux_up_lw, comp_flux_dn_lw, comp_flux_up_sw, comp_flux_dn_sw = load_comparison_data(bot_at_1, ncol)
 
     comp_flux_net_lw = comp_flux_up_lw .- comp_flux_dn_lw
     comp_flux_net_sw = comp_flux_up_sw .- comp_flux_dn_sw

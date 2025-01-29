@@ -33,7 +33,6 @@ function benchmark_all_sky_with_aerosols(
     ::Type{SLVSW},
     ::Type{FT};
     ncol = 128,# repeats col#1 ncol times per RRTMGP example 
-    use_lut::Bool = true,
     cldfrac = FT(1),
 ) where {FT <: AbstractFloat, SLVLW, SLVSW}
     overrides = (; grav = 9.80665, molmass_dryair = 0.028964, molmass_water = 0.018016)
@@ -60,7 +59,7 @@ function benchmark_all_sky_with_aerosols(
     close(ds_lw)
     # reading longwave cloud lookup data
     ds_lw_cld = Dataset(lw_cld_file, "r")
-    lookup_lw_cld = use_lut ? LookUpCld(ds_lw_cld, FT, DA) : PadeCld(ds_lw_cld, FT, DA)
+    lookup_lw_cld = LookUpCld(ds_lw_cld, FT, DA)
     close(ds_lw_cld)
     # reading longwave aerosol lookup data
     ds_lw_aero = Dataset(lw_aero_file, "r")
@@ -73,7 +72,7 @@ function benchmark_all_sky_with_aerosols(
     close(ds_sw)
     # reading longwave cloud lookup data
     ds_sw_cld = Dataset(sw_cld_file, "r")
-    lookup_sw_cld = use_lut ? LookUpCld(ds_sw_cld, FT, DA) : PadeCld(ds_sw_cld, FT, DA)
+    lookup_sw_cld = LookUpCld(ds_sw_cld, FT, DA)
     close(ds_sw_cld)
     # reading shortwave aerosol lookup data
     ds_sw_aero = Dataset(sw_aero_file, "r")
@@ -93,7 +92,6 @@ function benchmark_all_sky_with_aerosols(
         lookup_lw_cld,
         lookup_sw_cld,
         cldfrac,
-        use_lut,
         ncol,
         FT,
         param_set,
@@ -139,8 +137,7 @@ function generate_gpu_all_sky_with_aerosols_benchmarks(FT, npts, ::Type{SLVLW}, 
         ncols = unsafe_trunc(Int, cld(ncols_dyamond, 2^(pts - 1)))
         ndof = ncols * nlev_test
         sz_per_fld_gb = ndof * sizeof(FT) / 1024 / 1024 / 1024
-        trial_lw, trial_sw =
-            benchmark_all_sky_with_aerosols(context, SLVLW, SLVSW, FT; ncol = ncols, use_lut = true, cldfrac = FT(1))
+        trial_lw, trial_sw = benchmark_all_sky_with_aerosols(context, SLVLW, SLVSW, FT; ncol = ncols, cldfrac = FT(1))
         Printf.@printf(
             "%10i    |           %25s|       %25s \n",
             ncols,

@@ -28,7 +28,7 @@ import RRTMGP.GrayUtils: update_profile_lw!
 import RRTMGP.GrayUtils: compute_gray_heating_rate!
 import RRTMGP.GrayUtils: compute_gray_heating_rate_kernel!
 import RRTMGP.GrayUtils: update_profile_lw_kernel!
-import RRTMGP.LookUpTables: LookUpLW, LookUpCld, PadeCld, LookUpSW, LookUpAerosolMerra
+import RRTMGP.LookUpTables: LookUpLW, LookUpCld, LookUpSW, LookUpAerosolMerra
 import RRTMGP.RTESolver: rte_lw_noscat_solve!
 import RRTMGP.RTESolver: rte_lw_noscat_one_angle!
 import RRTMGP.RTESolver: rte_lw_2stream_solve!

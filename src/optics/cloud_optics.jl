@@ -1,61 +1,3 @@
-"""
-    add_cloud_optics_2stream!(
-        τ,
-        ssa,
-        g,
-        cld_mask,
-        cld_r_eff_liq,
-        cld_r_eff_ice,
-        cld_path_liq,
-        cld_path_ice,
-        ice_rgh,
-        lkp_cld,
-        ibnd;
-        delta_scaling = false,
-    )
-
-This function computes the TwoStream clouds optics properties and adds them
-to the TwoStream gas optics properties.
-"""
-@inline function add_cloud_optics_2stream!(
-    τ,
-    ssa,
-    g,
-    cld_mask,
-    cld_r_eff_liq,
-    cld_r_eff_ice,
-    cld_path_liq,
-    cld_path_ice,
-    ice_rgh,
-    lkp_cld::PadeCld,
-    ibnd;
-    delta_scaling = false,
-)
-    nlay = length(τ)
-    @inbounds begin
-        for glay in 1:nlay
-            if cld_mask[glay]
-                # compute cloud optical optics
-                τ_cl, ssa_cl, g_cl = compute_pade_cld_props(
-                    lkp_cld,
-                    cld_r_eff_liq[glay],
-                    cld_r_eff_ice[glay],
-                    ice_rgh,
-                    cld_path_liq[glay],
-                    cld_path_ice[glay],
-                    ibnd,
-                )
-                if delta_scaling # delta scaling is applied for shortwave problem
-                    τ_cl, ssa_cl, g_cl = delta_scale(τ_cl, ssa_cl, g_cl)
-                end
-                # compute cloud optical optics
-                τ[glay], ssa[glay], g[glay] = increment_2stream(τ[glay], ssa[glay], g[glay], τ_cl, ssa_cl, g_cl)
-            end
-        end
-    end
-    return nothing
-end
-
 @inline function add_cloud_optics_1scalar!(
     τ,
     cld_mask,
@@ -106,6 +48,24 @@ end
     return nothing
 end
 
+"""
+    add_cloud_optics_2stream!(
+        τ,
+        ssa,
+        g,
+        cld_mask,
+        cld_r_eff_liq,
+        cld_r_eff_ice,
+        cld_path_liq,
+        cld_path_ice,
+        ice_rgh,
+        lkp_cld,
+        ibnd;
+        delta_scaling = false,
+    )
+This function computes the TwoStream clouds optics properties and adds them
+to the TwoStream gas optics properties.
+"""
 @inline function add_cloud_optics_2stream!(
     τ,
     ssa,
@@ -248,127 +208,6 @@ This function computes the `TwoStream` cloud ice properties using the `LookUpTab
         end
     end
     return (τi, τi_ssa, τi_ssag)
-end
-
-"""
-    compute_pade_cld_props(
-        lkp_cld::PadeCld,
-        re_liq::FT,
-        re_ice::FT,
-        ice_rgh::Int,
-        cld_path_liq::FT,
-        cld_path_ice::FT,
-        ibnd::UInt8,
-    ) where {FT}
-
-This function computes the `TwoSteam` cloud optics properties using the pade method.
-"""
-function compute_pade_cld_props(
-    lkp_cld::PadeCld,
-    re_liq::FT,
-    re_ice::FT,
-    ice_rgh::Int,
-    cld_path_liq::FT,
-    cld_path_ice::FT,
-    ibnd::Int,
-) where {FT}
-    τl, τl_ssa, τl_ssag = FT(0), FT(0), FT(0)
-    τi, τi_ssa, τi_ssag = FT(0), FT(0), FT(0)
-
-    (;
-        pade_extliq,
-        pade_ssaliq,
-        pade_asyliq,
-        pade_extice,
-        pade_ssaice,
-        pade_asyice,
-        pade_sizreg_extliq,
-        pade_sizreg_ssaliq,
-        pade_sizreg_asyliq,
-        pade_sizreg_extice,
-        pade_sizreg_ssaice,
-        pade_sizreg_asyice,
-    ) = lkp_cld
-    m_ext, m_ssa_g = 3, 3
-    n_ext, n_ssa_g = 3, 2
-    # Finds index into size regime table
-    # This works only if there are precisely three size regimes (four bounds) and it's
-    # previously guaranteed that size_bounds(1) <= size <= size_bounds(4)
-    if cld_path_liq > eps(FT)
-        @inbounds begin
-            irad = Int(min(floor((re_liq - pade_sizreg_extliq[2]) / pade_sizreg_extliq[3]) + 2, 3))
-            τl = pade_eval(ibnd, re_liq, irad, m_ext, n_ext, pade_extliq) * cld_path_liq
-
-            irad = Int(min(floor((re_liq - pade_sizreg_ssaliq[2]) / pade_sizreg_ssaliq[3]) + 2, 3))
-            τl_ssa = (FT(1) - max(FT(0), pade_eval(ibnd, re_liq, irad, m_ssa_g, n_ssa_g, pade_ssaliq))) * τl
-
-            irad = Int(min(floor((re_liq - pade_sizreg_asyliq[2]) / pade_sizreg_asyliq[3]) + 2, 3))
-            τl_ssag = pade_eval(ibnd, re_liq, irad, m_ssa_g, n_ssa_g, pade_asyliq) * τl_ssa
-        end
-    end
-
-    if cld_path_ice > eps(FT)
-        @inbounds begin
-            irad = Int(min(floor((re_ice - pade_sizreg_extice[2]) / pade_sizreg_extice[3]) + 2, 3))
-
-            τi = pade_eval(ibnd, re_ice, irad, m_ext, n_ext, pade_extice, ice_rgh) * cld_path_ice
-
-            irad = Int(min(floor((re_ice - pade_sizreg_ssaice[2]) / pade_sizreg_ssaice[3]) + 2, 3))
-            τi_ssa = (FT(1) - max(FT(0), pade_eval(ibnd, re_ice, irad, m_ssa_g, n_ssa_g, pade_ssaice, ice_rgh))) * τi
-
-            irad = Int(min(floor((re_ice - pade_sizreg_asyice[2]) / pade_sizreg_asyice[3]) + 2, 3))
-            τi_ssag = pade_eval(ibnd, re_ice, irad, m_ssa_g, n_ssa_g, pade_asyice, ice_rgh) * τi_ssa
-        end
-    end
-
-    τ = τl + τi
-    τ_ssa = τl_ssa + τi_ssa
-    τ_ssag = (τl_ssag + τi_ssag) / max(eps(FT), τ_ssa)
-    τ_ssa /= max(eps(FT), τ)
-
-    return (τ, τ_ssa, τ_ssag)
-end
-
-
-"""
-    pade_eval(
-        ibnd,
-        re,
-        irad,
-        m,
-        n,
-        pade_coeffs,
-        irgh::Union{Int,Nothing} = nothing,
-    )
-
-Evaluate Pade approximant of order [m/n]
-"""
-function pade_eval(ibnd, re, irad, m, n, pade_coeffs, irgh::Union{Int, Nothing} = nothing)
-    FT = eltype(re)
-    if irgh isa Int
-        coeffs = view(pade_coeffs, :, :, :, irgh)
-
-    else
-        coeffs = pade_coeffs
-    end
-
-    @inbounds denom = coeffs[ibnd, irad, n + m]
-    i = (n + m - 1)
-    @inbounds while i ≥ (1 + m)
-        denom = coeffs[ibnd, irad, i] + re * denom
-        i -= 1
-    end
-    denom = FT(1) + re * denom
-
-    @inbounds numer = coeffs[ibnd, irad, m]
-    i = (m - 1)
-    @inbounds while i ≥ 2
-        numer = coeffs[ibnd, irad, i] + re * numer
-        i -= 1
-    end
-    @inbounds numer = coeffs[ibnd, irad, 1] + re * numer
-
-    return (numer / denom)
 end
 
 """
