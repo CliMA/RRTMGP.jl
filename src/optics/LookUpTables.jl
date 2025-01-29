@@ -876,17 +876,22 @@ function LookUpAerosolMerra(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFlo
     bnd_lims_wn = DA{FT}(Array(ds["bnd_limits_wavenumber"]))
     # map aerosol name to aerosol idx
     idx_aerosol = Dict(
-        "dust" => 1,
-        "sea_salt" => 2,
+        "dust1" => 1,
+        "sea_salt1" => 2,
         "sulfate" => 3,
         "black_carbon_rh" => 4,
         "black_carbon" => 5,
         "organic_carbon_rh" => 6,
         "organic_carbon" => 7,
+        map(i -> Pair("dust$i", i + 6), 2:5)...,
+        map(i -> Pair("sea_salt$i", i + 10), 2:5)...,
     )
     # map aerosol idx to its aeromass idx
     # please note that only "dust" and "sea salt" need aerosol sizes
-    idx_aerosize = Dict(1 => 1, 2 => 2)
+    idx_aerosol_keys = filter(collect(keys(idx_aerosol))) do k
+        occursin("dust", k) || occursin("sea_salt", k)
+    end
+    idx_aerosize = Dict(map(k -> Pair(idx_aerosol[k], idx_aerosol[k]), idx_aerosol_keys))
     return LookUpAerosolMerra(
         dims,
         size_bin_limits,

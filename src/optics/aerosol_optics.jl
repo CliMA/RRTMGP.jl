@@ -84,18 +84,29 @@ band number (`ibnd`), aerosol mass (`aeromass`), aerosol size (`aerosize`), and 
 function compute_lookup_aerosol(lkp_aero, ibnd::Int, aero_mass, aero_size, rh::FT, glay) where {FT}
     τ_cum, τ_ssa_cum, τ_ssag_cum = FT(0), FT(0), FT(0)
 
-    if aero_mass[1, glay] > FT(0)
-        τ, τ_ssa, τ_ssag = compute_lookup_dust_props(lkp_aero, ibnd, aero_mass[1, glay], aero_size[1, glay])
-        τ_cum += τ
-        τ_ssa_cum += τ_ssa
-        τ_ssag_cum += τ_ssag
+    for i_aero_size in (1, 8, 9, 10, 11)
+        if aero_mass[i_aero_size, glay] > FT(0)
+            τ, τ_ssa, τ_ssag =
+                compute_lookup_dust_props(lkp_aero, ibnd, aero_mass[i_aero_size, glay], aero_size[i_aero_size, glay])
+            τ_cum += τ
+            τ_ssa_cum += τ_ssa
+            τ_ssag_cum += τ_ssag
+        end
     end
 
-    if aero_mass[2, glay] > FT(0)
-        τ, τ_ssa, τ_ssag = compute_lookup_sea_salt_props(lkp_aero, ibnd, aero_mass[2, glay], aero_size[2, glay], rh)
-        τ_cum += τ
-        τ_ssa_cum += τ_ssa
-        τ_ssag_cum += τ_ssag
+    for i_aero_size in (2, 12, 13, 14, 15)
+        if aero_mass[i_aero_size, glay] > FT(0)
+            τ, τ_ssa, τ_ssag = compute_lookup_sea_salt_props(
+                lkp_aero,
+                ibnd,
+                aero_mass[i_aero_size, glay],
+                aero_size[i_aero_size, glay],
+                rh,
+            )
+            τ_cum += τ
+            τ_ssa_cum += τ_ssa
+            τ_ssag_cum += τ_ssag
+        end
     end
 
     if aero_mass[3, glay] > FT(0)
