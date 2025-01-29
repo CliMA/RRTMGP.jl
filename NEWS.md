@@ -4,6 +4,11 @@ RRTMGP.jl Release Notes
 main
 ------
 
+v0.20.0
+------
+- Add five size bins of dust and sea salt aerosols.
+PR [#564](https://github.com/CliMA/RRTMGP.jl/pull/564)
+
 v0.19.2
 -----
 - Update cloud optics to the latest version of rrtmgp-data.
