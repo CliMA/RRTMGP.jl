@@ -106,7 +106,6 @@ cloudy_sky(
     FT,
     toler_lw_2stream,
     toler_sw;
-    use_lut = true,
     cldfrac = FT(1),
     exfiltrate = true,
 )
@@ -117,7 +116,7 @@ cloudy_sky(
 solve_sw!(slv_sw, as, lookup_sw, lookup_sw_cld) # compile first
 solve_lw!(slv_lw, as, lookup_lw, lookup_lw_cld) # compile first
 
-@info "cloudy_sky, lw, use_lut=true"
+@info "cloudy_sky, lw"
 device = ClimaComms.device(ClimaComms.context())
 trial = if device isa ClimaComms.CUDADevice
     using CUDA
@@ -127,7 +126,7 @@ else
 end
 show(stdout, MIME("text/plain"), trial)
 println()
-@info "cloudy_sky, sw, use_lut=true"
+@info "cloudy_sky, sw"
 device = ClimaComms.device(ClimaComms.context())
 trial = if device isa ClimaComms.CUDADevice
     using CUDA

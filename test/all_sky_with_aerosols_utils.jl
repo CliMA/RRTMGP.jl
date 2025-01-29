@@ -34,7 +34,6 @@ function all_sky_with_aerosols(
     toler_lw,
     toler_sw;
     ncol = 128,# repeats col#1 ncol times per RRTMGP example 
-    use_lut::Bool = true,
     cldfrac = FT(1),
     exfiltrate = false,
 ) where {FT <: AbstractFloat, SLVLW, SLVSW}
@@ -61,7 +60,7 @@ function all_sky_with_aerosols(
     close(ds_lw)
     # reading longwave cloud lookup data
     ds_lw_cld = Dataset(lw_cld_file, "r")
-    lookup_lw_cld = use_lut ? LookUpCld(ds_lw_cld, FT, DA) : PadeCld(ds_lw_cld, FT, DA)
+    lookup_lw_cld = LookUpCld(ds_lw_cld, FT, DA)
     close(ds_lw_cld)
     # reading longwave aerosol lookup data
     ds_lw_aero = Dataset(lw_aero_file, "r")
@@ -74,7 +73,7 @@ function all_sky_with_aerosols(
     close(ds_sw)
     # reading longwave cloud lookup data
     ds_sw_cld = Dataset(sw_cld_file, "r")
-    lookup_sw_cld = use_lut ? LookUpCld(ds_sw_cld, FT, DA) : PadeCld(ds_sw_cld, FT, DA)
+    lookup_sw_cld = LookUpCld(ds_sw_cld, FT, DA)
     close(ds_sw_cld)
 
     # reading shortwave aerosol lookup data
@@ -95,7 +94,6 @@ function all_sky_with_aerosols(
         lookup_lw_cld,
         lookup_sw_cld,
         cldfrac,
-        use_lut,
         ncol,
         FT,
         param_set,
@@ -115,8 +113,8 @@ function all_sky_with_aerosols(
     solve_lw!(slv_lw, as, lookup_lw, lookup_lw_cld, lookup_lw_aero)
     solve_sw!(slv_sw, as, lookup_sw, lookup_sw_cld, lookup_sw_aero)
     # comparison
-    method = use_lut ? "Lookup Table Interpolation method" : "PADE method"
-    comp_flux_up_lw, comp_flux_dn_lw, comp_flux_up_sw, comp_flux_dn_sw = load_comparison_data(use_lut, bot_at_1, ncol)
+    method = "Lookup Table Interpolation method"
+    comp_flux_up_lw, comp_flux_dn_lw, comp_flux_up_sw, comp_flux_dn_sw = load_comparison_data(bot_at_1, ncol)
 
     comp_flux_net_lw = comp_flux_up_lw .- comp_flux_dn_lw
     comp_flux_net_sw = comp_flux_up_sw .- comp_flux_dn_sw

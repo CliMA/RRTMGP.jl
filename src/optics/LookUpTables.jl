@@ -4,7 +4,7 @@ using DocStringExtensions
 using Adapt
 
 export AbstractLookUp,
-    LookUpLW, LookUpSW, LookUpCld, PadeCld, LookUpAerosolMerra, LookUpMinor, ReferencePoints, LookUpPlanck, BandData
+    LookUpLW, LookUpSW, LookUpCld, LookUpAerosolMerra, LookUpMinor, ReferencePoints, LookUpPlanck, BandData
 
 """
     AbstractLookUp
@@ -823,105 +823,6 @@ end
         # LUT ice asymmetry parameter (`nsize_ice, nband, nrghice`)
         view(icedata, (n * 2 + 1):(n * 3), ibnd, ice_rgh),
     )
-end
-
-"""
-    PadeCld{FTA1D, FTA2D, FTA3D, FTA4D} <: AbstractLookUp
-
-Pade coefficients for cloud optics.
-
-This struct stores the Pade coefficients for determing extinction coeffient,
-single-scattering albedo, and asymmetry parameter g as a function of effective radius.
-We compute the optical depth tau (=exintinction coeff * condensed water path)
-and the products tau*ssa and tau*ssa*g for liquid and ice cloud separately.
-These are used to determine the optical properties of ice and water cloud together.
-
-# Fields
-$(DocStringExtensions.FIELDS)
-"""
-struct PadeCld{FTA1D, FTA2D, FTA3D, FTA4D} <: AbstractLookUp
-    "pade coefficients for liquid extinction (`nband, nsizereg, ncoeff_ext`)"
-    pade_extliq::FTA3D
-    "pade coefficients for liquid single scattening albedo (`nband, nsizereg, ncoeff_ssa_g`)"
-    pade_ssaliq::FTA3D
-    "pade coefficients for liquid asymmetry paramter (`nband, nsizereg, ncoeff_ssa_g`)"
-    pade_asyliq::FTA3D
-    "pade coefficients for ice extinction (`nband, nsizereg, ncoeff_ext, nrghice`)"
-    pade_extice::FTA4D
-    "pade coefficients for ice single scattening albedo (`nband, nsizereg, ncoeff_ssa_g, nrghice`)"
-    pade_ssaice::FTA4D
-    "pade coefficients for ice asymmetry paramter (`nband, nsizereg, ncoeff_ssa_g, nrghice`)"
-    pade_asyice::FTA4D
-    "pade size regime boundaries for liquid extinction coefficient for pade interpolation (`nbound`) μm"
-    pade_sizreg_extliq::FTA1D
-    "pade size regime boundaries for liquid single scattering albedo for pade interpolation (`nbound`) μm"
-    pade_sizreg_ssaliq::FTA1D
-    "pade size regime boundaries for liquid asymmetry parameter for pade interpolation (`nbound`) μm"
-    pade_sizreg_asyliq::FTA1D
-    "pade size regime boundaries for ice extinction coefficient for pade interpolation (`nbound`) μm"
-    pade_sizreg_extice::FTA1D
-    "pade size regime boundaries for ice single scattering albedo for pade interpolation (`nbound`) μm"
-    pade_sizreg_ssaice::FTA1D
-    "pade size regime boundaries for ice asymmetry parameter for pade interpolation (`nbound`) μm"
-    pade_sizreg_asyice::FTA1D
-    "beginning and ending wavenumber for each band (`2, nband`) cm⁻¹"
-    bnd_lims_wn::FTA2D
-end
-Adapt.@adapt_structure PadeCld
-
-# number of bands for Pade approximation
-get_nband(lkp::PadeCld) = size(lkp.pade_extliq, 1)
-# number of size regimes for Pade approximation
-get_nsizereg(lkp::PadeCld) = size(lkp.pade_extliq, 2)
-# number of extinction coefficients for pade approximation
-get_ncoeff_ext(lkp::PadeCld) = size(lkp.pade_extliq, 3)
-# number of ssa/g coefficients for pade approximation
-get_ncoeff_ssa_g(lkp::PadeCld) = size(lkp.pade_ssaliq, 3)
-# number of size regime boundaries for pade interpolation
-get_nbound(lkp::PadeCld) = size(lkp.pade_sizreg_extliq, 1)
-
-function PadeCld(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
-    FTA1D = DA{FT, 1}
-    FTA2D = DA{FT, 2}
-    FTA3D = DA{FT, 3}
-    FTA4D = DA{FT, 4}
-
-    nsizereg = Int(ds.dim["nsizereg"])
-    @assert nsizereg == 3 # RRTMGP pade approximation assumes exactly (3) size regimes
-
-    pade_extliq = FTA3D(Array(ds["pade_extliq"]))
-    pade_ssaliq = FTA3D(Array(ds["pade_ssaliq"]))
-    pade_asyliq = FTA3D(Array(ds["pade_asyliq"]))
-
-    pade_extice = FTA4D(Array(ds["pade_extice"]))
-    pade_ssaice = FTA4D(Array(ds["pade_ssaice"]))
-    pade_asyice = FTA4D(Array(ds["pade_asyice"]))
-
-    pade_sizreg_extliq = FTA1D(Array(ds["pade_sizreg_extliq"]))
-    pade_sizreg_ssaliq = FTA1D(Array(ds["pade_sizreg_ssaliq"]))
-    pade_sizreg_asyliq = FTA1D(Array(ds["pade_sizreg_asyliq"]))
-
-    pade_sizreg_extice = FTA1D(Array(ds["pade_sizreg_extice"]))
-    pade_sizreg_ssaice = FTA1D(Array(ds["pade_sizreg_ssaice"]))
-    pade_sizreg_asyice = FTA1D(Array(ds["pade_sizreg_asyice"]))
-
-    bnd_lims_wn = FTA2D(Array(ds["bnd_limits_wavenumber"]))
-
-    return (PadeCld{FTA1D, FTA2D, FTA3D, FTA4D}(
-        pade_extliq,
-        pade_ssaliq,
-        pade_asyliq,
-        pade_extice,
-        pade_ssaice,
-        pade_asyice,
-        pade_sizreg_extliq,
-        pade_sizreg_ssaliq,
-        pade_sizreg_asyliq,
-        pade_sizreg_extice,
-        pade_sizreg_ssaice,
-        pade_sizreg_asyice,
-        bnd_lims_wn,
-    ))
 end
 
 """

@@ -41,7 +41,7 @@ solve_lw!((; context, flux, src, bcs, op)::TwoStreamLWRTE, as::GrayAtmosphericSt
         (; context, fluxb, flux, src, bcs, op)::NoScatLWRTE,
         as::AtmosphericState,
         lookup_lw::LookUpLW,
-        lookup_lw_cld::Union{LookUpCld, PadeCld, Nothing},
+        lookup_lw_cld::Union{LookUpCld, Nothing},
         lookup_lw_aero::Union{LookUpAerosolMerra, Nothing},
     )
 
@@ -72,7 +72,7 @@ solve_lw!(
         (; context, fluxb, flux, src, bcs, op)::TwoStreamLWRTE,
         as::AtmosphericState,
         lookup_lw::LookUpLW,
-        lookup_lw_cld::Union{LookUpCld, PadeCld, Nothing},
+        lookup_lw_cld::Union{LookUpCld, Nothing},
         lookup_lw_aero::Union{LookUpAerosolMerra, Nothing},
     )
 
@@ -82,7 +82,7 @@ solve_lw!(
     (; context, fluxb, flux, src, bcs, op)::TwoStreamLWRTE,
     as::AtmosphericState,
     lookup_lw::LookUpLW,
-    lookup_lw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
+    lookup_lw_cld::Union{LookUpCld, Nothing} = nothing,
     lookup_lw_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
 ) = rte_lw_2stream_solve!(context.device, fluxb, flux, src, bcs, op, as, lookup_lw, lookup_lw_cld, lookup_lw_aero)
 
@@ -119,7 +119,7 @@ solve_sw!((; context, fluxb, flux, bcs, op)::NoScatSWRTE, as::AtmosphericState, 
         (; context, fluxb, flux, src, bcs, op)::TwoStreamSWRTE,
         as::AtmosphericState,
         lookup_sw::LookUpSW,
-        lookup_sw_cld::Union{LookUpCld, PadeCld, Nothing},
+        lookup_sw_cld::Union{LookUpCld, Nothing},
         lookup_sw_aero::Union{LookUpAerosolMerra, Nothing},
     )
 
@@ -129,7 +129,7 @@ solve_sw!(
     (; context, fluxb, flux, src, bcs, op)::TwoStreamSWRTE,
     as::AtmosphericState,
     lookup_sw::LookUpSW,
-    lookup_sw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
+    lookup_sw_cld::Union{LookUpCld, Nothing} = nothing,
     lookup_sw_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
 ) = rte_sw_2stream_solve!(context.device, fluxb, flux, op, bcs, src, as, lookup_sw, lookup_sw_cld, lookup_sw_aero)
 

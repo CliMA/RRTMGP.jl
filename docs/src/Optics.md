@@ -96,9 +96,6 @@ The lookup tables for the spectral map between ``\nu`` and ``g`` are stored in n
 
 ## Cloud optics
 
-!!! note
-    Cloud optics can be calculated using either lookup tables or Pade approximations. Only the lookup table method is documented here.
-
 `compute_cld_props` computes the optical properties of clouds, which is a combination of contributions from liquid and ice particles. The optical thickness (``\tau``), single scattering albedo (``\omega_0``), and asymmetry parameter (``g``) for clouds are:
 
 ```math

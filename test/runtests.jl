@@ -37,28 +37,8 @@ printstyled("=================================\n\n", color = color1)
 
     include("cloudy_sky_utils.jl")
     for FT in (Float32, Float64)
-        cloudy_sky(
-            context,
-            NoScatLWRTE,
-            TwoStreamSWRTE,
-            FT,
-            toler_lw_noscat,
-            toler_sw;
-            ncol = 128,
-            use_lut = true,
-            cldfrac = FT(1),
-        )
-        cloudy_sky(
-            context,
-            TwoStreamLWRTE,
-            TwoStreamSWRTE,
-            FT,
-            toler_lw_2stream,
-            toler_sw;
-            ncol = 128,
-            use_lut = true,
-            cldfrac = FT(1),
-        )
+        cloudy_sky(context, NoScatLWRTE, TwoStreamSWRTE, FT, toler_lw_noscat, toler_sw; ncol = 128, cldfrac = FT(1))
+        cloudy_sky(context, TwoStreamLWRTE, TwoStreamSWRTE, FT, toler_lw_2stream, toler_sw; ncol = 128, cldfrac = FT(1))
     end
 end
 
@@ -81,7 +61,6 @@ printstyled("=================================\n\n", color = color1)
             toler_lw_noscat,
             toler_sw;
             ncol = 128,
-            use_lut = true,
             cldfrac = FT(1),
         )
         all_sky_with_aerosols(
@@ -92,7 +71,6 @@ printstyled("=================================\n\n", color = color1)
             toler_lw_2stream,
             toler_sw;
             ncol = 128,
-            use_lut = true,
             cldfrac = FT(1),
         )
     end

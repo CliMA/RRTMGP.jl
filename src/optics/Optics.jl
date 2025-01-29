@@ -164,7 +164,7 @@ end
         gcol::Int,
         igpt::Int,
         lkp::LookUpLW{FT},
-        lkp_cld::Union{LookUpCld,PadeCld,Nothing} = nothing,
+        lkp_cld::Union{LookUpCld,Nothing} = nothing,
         lkp_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
     ) where {FT<:AbstractFloat}
 
@@ -256,7 +256,7 @@ end
     gcol::Int,
     igpt::Int,
     lkp::LookUpLW,
-    lkp_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
+    lkp_cld::Union{LookUpCld, Nothing} = nothing,
     lkp_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
 )
     nlay = AtmosphericStates.get_nlay(as)
@@ -342,7 +342,7 @@ end
         gcol::Int,
         igpt::Int,
         lkp::LookUpSW,
-        lkp_cld::Union{LookUpCld,PadeCld,Nothing} = nothing,
+        lkp_cld::Union{LookUpCld,Nothing} = nothing,
     )
 
 Computes optical properties for the shortwave problem.
@@ -378,7 +378,7 @@ end
     gcol::Int,
     igpt::Int,
     lkp::LookUpSW,
-    lkp_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
+    lkp_cld::Union{LookUpCld, Nothing} = nothing,
     lkp_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
 )
     nlay = AtmosphericStates.get_nlay(as)

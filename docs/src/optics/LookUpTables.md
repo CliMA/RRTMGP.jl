@@ -12,7 +12,6 @@ BandData
 LookUpLW
 LookUpSW
 LookUpCld
-PadeCld
 LookUpAerosolMerra
 AbstractLookUp
 ```

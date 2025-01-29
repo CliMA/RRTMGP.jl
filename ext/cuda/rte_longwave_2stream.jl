@@ -48,7 +48,7 @@ function rte_lw_2stream_solve!(
     op::TwoStream,
     as::AtmosphericState,
     lookup_lw::LookUpLW,
-    lookup_lw_cld::Union{LookUpCld, PadeCld, Nothing} = nothing,
+    lookup_lw_cld::Union{LookUpCld, Nothing} = nothing,
     lookup_lw_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
 )
     nlay, ncol = AtmosphericStates.get_dims(as)
@@ -69,7 +69,7 @@ function rte_lw_2stream_solve_CUDA!(
     ncol,
     as::AtmosphericState,
     lookup_lw::LookUpLW,
-    lookup_lw_cld::Union{LookUpCld, PadeCld, Nothing},
+    lookup_lw_cld::Union{LookUpCld, Nothing},
     lookup_lw_aero::Union{LookUpAerosolMerra, Nothing},
 )
     gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id

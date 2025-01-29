@@ -1,4 +1,4 @@
-function ncol_ds_all_sky(use_lut)
+function ncol_ds_all_sky()
     flux_file = get_reference_filename(:gas_clouds_aerosols, :lw, :flux_up)
     ds_comp = Dataset(flux_file, "r")
     return size(Array(ds_comp["lw_flux_up"]), 1)
@@ -15,7 +15,6 @@ function setup_allsky_with_aerosols_as(
     lkp_lw_cld,
     lkp_sw_cld,
     cldfrac,
-    use_lut,
     ncol,
     FT,
     param_set,
@@ -125,21 +124,15 @@ function setup_allsky_with_aerosols_as(
     cld_path_liq = zeros(FT, nlay, ncol)
     cld_path_ice = zeros(FT, nlay, ncol)
 
-    if use_lut
-        radliq_lwr, radliq_upr, _, radice_lwr, radice_upr, _ = Array(lkp_lw_cld.bounds)
-        r_eff_liq = (radliq_lwr + radliq_upr) / FT(2)
-        r_eff_ice = (radice_lwr + radice_upr) / FT(2)
-    else
-        pade_sizreg_extliq = Array(lkp_lw_cld.pade_sizreg_extliq) # TODO temp fix to avoid scalar indexing on GPU
-        pade_sizreg_extice = Array(lkp_lw_cld.pade_sizreg_extice)
-        r_eff_liq = sum(extrema(pade_sizreg_extliq)) / FT(2)
-        r_eff_ice = sum(extrema(pade_sizreg_extice)) / FT(2)
-    end
+    radliq_lwr, radliq_upr, _, radice_lwr, radice_upr, _ = Array(lkp_lw_cld.bounds)
+    r_eff_liq = (radliq_lwr + radliq_upr) / FT(2)
+    r_eff_ice = (radice_lwr + radice_upr) / FT(2)
+
     # Restrict clouds to troposphere (> 100 hPa = 100*100 Pa)
     # and not very close to the ground (< 900 hPa), and
     # put them in 2/3 of the columns since that's roughly the
     # total cloudiness of earth
-    ncol_ds = ncol_ds_all_sky(use_lut)
+    ncol_ds = ncol_ds_all_sky()
     for icol in 1:ncol, ilay in 1:nlay
         icol_ds = icol % ncol_ds == 0 ? ncol_ds : icol % ncol_ds
         if p_lay[ilay, icol] > FT(10000) && p_lay[ilay, icol] < FT(90000) && icol_ds % 3 ≠ 0
@@ -204,7 +197,7 @@ end
 
 _orient_data(data, bot_at_1) = bot_at_1 ? data : reverse(data, dims = 1)
 
-function load_comparison_data(use_lut, bot_at_1, ncol)
+function load_comparison_data(bot_at_1, ncol)
     # Note, for this case, flux_up and flux_dn are stored in the same file!
     flux_file_lw = get_reference_filename(:gas_clouds_aerosols, :lw, :flux_up) # flux files for comparison (LUT) 
     flux_file_sw = get_reference_filename(:gas_clouds_aerosols, :sw, :flux_up) # flux files for comparison (LUT)
