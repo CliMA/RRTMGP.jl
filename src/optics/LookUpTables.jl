@@ -772,17 +772,13 @@ function LookUpCld(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
         FT(ds["radliq_lwr"][]),
         # liquid particle size upper bound for LUT interpolation
         FT(ds["radliq_upr"][]),
-        # factor for calculating LUT interpolation for liquid particle
-        FT(ds["radliq_fac"][]),
         # ice particle size lower bound for LUT interpolation
-        FT(ds["radice_lwr"][]),
+        FT(ds["diamice_lwr"][]) / 2,
         # ice particle size upper bound for LUT interpolation
-        FT(ds["radice_upr"][]),
-        # factor for calculating LUT interpolation for ice particle
-        FT(ds["radice_fac"][]),
+        FT(ds["diamice_upr"][]) / 2,
     ])
-    liqdata = DA(vcat(Array(ds["lut_extliq"]), Array(ds["lut_ssaliq"]), Array(ds["lut_asyliq"])))
-    icedata = DA(vcat(Array(ds["lut_extice"]), Array(ds["lut_ssaice"]), Array(ds["lut_asyice"])))
+    liqdata = DA(vcat(Array(ds["extliq"]), Array(ds["ssaliq"]), Array(ds["asyliq"])))
+    icedata = DA(vcat(Array(ds["extice"]), Array(ds["ssaice"]), Array(ds["asyice"])))
     bnd_lims_wn = DA(Array(ds["bnd_limits_wavenumber"]))
     return LookUpCld(dims, bounds, liqdata, icedata, bnd_lims_wn)
 end

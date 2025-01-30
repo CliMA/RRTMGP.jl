@@ -94,7 +94,7 @@ function setup_cloudy_sky_as(
     cld_path_liq = zeros(FT, nlay, ncol)
     cld_path_ice = zeros(FT, nlay, ncol)
 
-    radliq_lwr, radliq_upr, _, radice_lwr, radice_upr, _ = Array(lkp_lw_cld.bounds)
+    radliq_lwr, radliq_upr, radice_lwr, radice_upr = Array(lkp_lw_cld.bounds)
     r_eff_liq = (radliq_lwr + radliq_upr) / FT(2)
     r_eff_ice = (radice_lwr + radice_upr) / FT(2)
 

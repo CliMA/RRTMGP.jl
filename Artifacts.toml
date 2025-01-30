@@ -1,7 +1,15 @@
 # Artifacts file for RRTMGP.jl
+
 [rrtmgp-data]
-git-tree-sha1 = "5080a733a316b74accf4d5897f5bf6641141c41d"
+git-tree-sha1 = "d601aa60f46f03d12db9841833c7b25bd4dcd785"
 
     [[rrtmgp-data.download]]
-    url = "https://github.com/earth-system-radiation/rrtmgp-data/archive/refs/tags/v1.8.1.tar.gz"
+    sha256 = "e0f868c32efbbe6c0a5bd9b764718f74d9f53b476f65a0d806988bbc83dd13c1"
+    url = "https://github.com/earth-system-radiation/rrtmgp-data/archive/refs/tags/v1.9.tar.gz"
+
+[rrtmgp-data-v181]
+git-tree-sha1 = "5080a733a316b74accf4d5897f5bf6641141c41d"
+
+    [[rrtmgp-data-v181.download]]
     sha256 = "8dcf7ba2442c7093e707a5d3c0c3c76b249eb8905d3478cb3fe87535b51455bb"
+    url = "https://github.com/earth-system-radiation/rrtmgp-data/archive/refs/tags/v1.8.1.tar.gz"
