@@ -3,8 +3,12 @@ RRTMGP.jl Release Notes
 
 main
 ------
-Update cloud optics to the latest version of rrtmgp-data.
+
+v0.19.2
+-----
+- Update cloud optics to the latest version of rrtmgp-data.
 PR [#562](https://github.com/CliMA/RRTMGP.jl/pull/562)
+- Remove pade approximation. PR [#563](https://github.com/CliMA/RRTMGP.jl/pull/563)
 
 v0.19.1
 -----
