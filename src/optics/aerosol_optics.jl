@@ -282,6 +282,7 @@ function locate_merra_size_bin(size_bin_limits, aerosize)
                 bin = ibin
                 break
             end
+            bin = nbins
         end
     end
     return bin
