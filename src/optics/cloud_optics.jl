@@ -157,6 +157,7 @@ This function computes the `TwoStream` cloud liquid properties using the `LookUp
     # cloud liquid particles
     if cld_path_liq > eps(FT)
         Δr_liq = (radliq_upr - radliq_lwr) / FT(nsize_liq - 1)
+        re_liq = max(min(re_liq, radliq_upr), radliq_lwr)
         loc = Int(max(min(unsafe_trunc(Int, (re_liq - radliq_lwr) / Δr_liq) + 1, nsize_liq - 1), 1))
         fac = (re_liq - radliq_lwr - (loc - 1) * Δr_liq) / Δr_liq
         fc1 = FT(1) - fac
@@ -198,6 +199,7 @@ This function computes the `TwoStream` cloud ice properties using the `LookUpTab
     # cloud ice particles
     if cld_path_ice > eps(FT)
         Δr_ice = (radice_upr - radice_lwr) / FT(nsize_ice - 1)
+        re_ice = max(min(re_ice, radice_upr), radice_lwr)
         loc = Int(max(min(unsafe_trunc(Int, (re_ice - radice_lwr) / Δr_ice) + 1, nsize_ice - 1), 1))
         fac = (re_ice - radice_lwr - (loc - 1) * Δr_ice) / Δr_ice
         fc1 = FT(1) - fac
@@ -229,7 +231,7 @@ function build_cloud_mask!(
         finish = _get_finish(cld_frac) # last cloudy layer
         # set cloud mask for non-cloudy layers
         _mask_outer_non_cloudy_layers!(cld_mask, start, finish)
-        # RRTMG uses random_arr[finish] > (FT(1) - cld_frac[finish]), 
+        # RRTMG uses random_arr[finish] > (FT(1) - cld_frac[finish]),
         # we change > to >= to address edge cases
         @inbounds cld_frac_ilayplus1 = cld_frac[finish]
         random_ilayplus1 = Random.rand()
