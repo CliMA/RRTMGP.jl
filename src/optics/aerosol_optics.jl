@@ -1,26 +1,47 @@
 """
     add_aerosol_optics_1scalar!(
         τ,
+        aod_ext,
+        aod_sca,
         aero_mask,
         aero_size,
         aero_mass,
         rel_hum,
         lkp_aero,
         ibnd,
+        iband_550nm
     )
 
 This function computes the `OneScalar` aerosol optics properties and adds them
 to the exising `OneScalar` optics properties.
 """
-@inline function add_aerosol_optics_1scalar!(τ, aero_mask, aero_size, aero_mass, rel_hum, lkp_aero, ibnd)
+@inline function add_aerosol_optics_1scalar!(
+    τ,
+    aod_ext,
+    aod_sca,
+    aero_mask,
+    aero_size,
+    aero_mass,
+    rel_hum,
+    lkp_aero,
+    ibnd,
+    iband_550nm,
+)
     FT = eltype(τ)
     @inbounds begin
+        collect_aod = !isnothing(aod_ext) && (ibnd == iband_550nm)
         nlay = length(τ)
+        collect_aod && (aod_ext[] = 0)
+        collect_aod && (aod_sca[] = 0)
         for glay in 1:nlay
             if aero_mask[glay]
                 τ_aero, τ_ssa_aero, τ_ssag_aero =
                     compute_lookup_aerosol(lkp_aero, ibnd, aero_mass, aero_size, rel_hum[glay], glay)
                 τ[glay] += (τ_aero - τ_ssa_aero)
+                if collect_aod
+                    aod_ext[] += τ_aero
+                    aod_sca[] += τ_ssa_aero
+                end
             end
         end
     end
@@ -32,39 +53,55 @@ end
         τ,
         ssa,
         g,
+        aod_ext,
+        aod_sca,
         aero_mask,
         aero_size,
         aero_mass,
         rel_hum,
         lkp_aero,
-        ibnd;
+        ibnd,
+        iband_550nm;
         delta_scaling = false,
     )
 
 This function computes the `TwoStream` aerosol optics properties and adds them
-to the exising `TwoStream` optics properties.
+to the exising `TwoStream` optics properties:
+
+ - `aod_ext` total aerosol optical depth
+ - `aod_sca` scattering component of aerosol optical depth
 """
 @inline function add_aerosol_optics_2stream!(
     τ,
     ssa,
     g,
+    aod_ext,
+    aod_sca,
     aero_mask,
     aero_size,
     aero_mass,
     rel_hum,
     lkp_aero,
-    ibnd;
+    ibnd,
+    iband_550nm;
     delta_scaling = false,
 )
     @inbounds begin
+        collect_aod = !isnothing(aod_ext) && (ibnd == iband_550nm)
         nlay = length(τ)
         FT = eltype(τ)
+        collect_aod && (aod_ext[] = 0)
+        collect_aod && (aod_sca[] = 0)
         for glay in 1:nlay
             if aero_mask[glay]
                 τ_aero, τ_ssa_aero, τ_ssag_aero =
                     compute_lookup_aerosol(lkp_aero, ibnd, aero_mass, aero_size, rel_hum[glay], glay)
                 g_aero = τ_ssag_aero / max(eps(FT), τ_ssa_aero)
                 ssa_aero = τ_ssa_aero / max(eps(FT), τ_aero)
+                if collect_aod
+                    aod_ext[] += τ_aero
+                    aod_sca[] += τ_ssa_aero
+                end
                 if delta_scaling # delta scaling is applied for shortwave problem
                     τ_aero, ssa_aero, g_aero = delta_scale(τ_aero, ssa_aero, g_aero)
                 end

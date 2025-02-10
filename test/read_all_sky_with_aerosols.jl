@@ -103,6 +103,8 @@ function setup_allsky_with_aerosols_as(
     # repeat the input data to set problem size to ncols
     nrepeat = Int(cld(ncol, ncol_ref))
     aerosol_state = AerosolState(
+        DA{FT}(undef, ncol),
+        DA{FT}(undef, ncol),
         DA{Bool}(undef, nlay, ncol),
         DA(repeat(aero_size, 1, 1, nrepeat)[:, :, 1:ncol]),
         DA(repeat(aero_mass, 1, 1, nrepeat)[:, :, 1:ncol]),

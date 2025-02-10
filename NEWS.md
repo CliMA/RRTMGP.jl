@@ -4,6 +4,11 @@ RRTMGP.jl Release Notes
 main
 ------
 
+v0.21.0
+------
+- Aerosol optical depth was added to the `AerosolState`
+  PR [#567](https://github.com/CliMA/RRTMGP.jl/pulls/567)
+
 v0.20.1
 ------
 - Clip effective radius by the look-up table range

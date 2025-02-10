@@ -238,12 +238,26 @@ Computes optical properties for the longwave problem.
             )
         end
         if !isnothing(lkp_aero)
+            aod_sw_ext = nothing
+            aod_sw_sca = nothing
+            iband_550nm = nothing
             aero_mask = view(as.aerosol_state.aero_mask, :, gcol)
             aero_size = view(as.aerosol_state.aero_size, :, :, gcol)
             aero_mass = view(as.aerosol_state.aero_mass, :, :, gcol)
             rel_hum = AtmosphericStates.getview_rel_hum(as, gcol)
 
-            add_aerosol_optics_1scalar!(τ, aero_mask, aero_size, aero_mass, rel_hum, lkp_aero, ibnd)
+            add_aerosol_optics_1scalar!(
+                τ,
+                aod_sw_ext,
+                aod_sw_sca,
+                aero_mask,
+                aero_size,
+                aero_mass,
+                rel_hum,
+                lkp_aero,
+                ibnd,
+                iband_550nm,
+            )
         end
     end
     return nothing
@@ -325,12 +339,28 @@ end
         )
     end
     if !isnothing(lkp_aero)
+        aod_sw_ext = nothing
+        aod_sw_sca = nothing
+        iband_550nm = nothing
         aero_mask = view(as.aerosol_state.aero_mask, :, gcol)
         aero_size = view(as.aerosol_state.aero_size, :, :, gcol)
         aero_mass = view(as.aerosol_state.aero_mass, :, :, gcol)
         rel_hum = AtmosphericStates.getview_rel_hum(as, gcol)
 
-        add_aerosol_optics_2stream!(τ, ssa, g, aero_mask, aero_size, aero_mass, rel_hum, lkp_aero, ibnd)
+        add_aerosol_optics_2stream!(
+            τ,
+            ssa,
+            g,
+            aod_sw_ext,
+            aod_sw_sca,
+            aero_mask,
+            aero_size,
+            aero_mass,
+            rel_hum,
+            lkp_aero,
+            ibnd,
+            iband_550nm,
+        )
     end
     return nothing
 end
@@ -420,6 +450,9 @@ end
         )
     end
     if !isnothing(lkp_aero)
+        (; iband_550nm) = lkp_aero
+        aod_sw_ext = view(as.aerosol_state.aod_sw_ext, gcol)
+        aod_sw_sca = view(as.aerosol_state.aod_sw_sca, gcol)
         aero_mask = view(as.aerosol_state.aero_mask, :, gcol)
         aero_size = view(as.aerosol_state.aero_size, :, :, gcol)
         aero_mass = view(as.aerosol_state.aero_mass, :, :, gcol)
@@ -429,12 +462,15 @@ end
             τ,
             ssa,
             g,
+            aod_sw_ext,
+            aod_sw_sca,
             aero_mask,
             aero_size,
             aero_mass,
             rel_hum,
             lkp_aero,
             ibnd,
+            iband_550nm,
             delta_scaling = true,
         )
     end

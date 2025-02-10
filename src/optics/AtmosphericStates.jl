@@ -111,11 +111,15 @@ end
 Adapt.@adapt_structure CloudState
 
 """
-    AerosolState{B, D}
+    AerosolState{A, B, D}
 
 Aerosol state, used to compute optical properties.
 """
-struct AerosolState{B, D}
+struct AerosolState{A, B, D}
+    "shortwave aerosol optical depth"
+    aod_sw_ext::A
+    "shortwave aerosol optical depth (scattering component)"
+    aod_sw_sca::A
     "aerosol mask, = true if any aerosol is present"
     aero_mask::B
     "aerosol size (microns)"

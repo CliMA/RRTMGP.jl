@@ -188,5 +188,9 @@ function all_sky_with_aerosols(
     @test max_err_flux_dn_sw ≤ toler_sw[FT]
     @test max_err_flux_net_sw ≤ toler_sw[FT]
 
+    @test minimum(as.aerosol_state.aod_sw_ext) >= 0
+    @test minimum(as.aerosol_state.aod_sw_sca) >= 0
+    @test minimum(as.aerosol_state.aod_sw_ext .- as.aerosol_state.aod_sw_sca) >= 0
+
     return nothing
 end
