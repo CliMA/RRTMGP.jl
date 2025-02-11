@@ -4,6 +4,11 @@ RRTMGP.jl Release Notes
 main
 ------
 
+v0.20.1
+------
+- Clip effective radius by the look-up table range
+PR [#568](https://github.com/CliMA/RRTMGP.jl/pull/568)
+
 v0.20.0
 ------
 - Add five size bins of dust and sea salt aerosols.
@@ -31,11 +36,11 @@ updated. PR [#550](https://github.com/CliMA/RRTMGP.jl/pull/550).
 #### Fix aerosol lookup table
 
 Starting with this release, RRTGMP.jl will use an aerosol look up table that is internally stored, as opposed
-to downloading it from the `rrtgmp-data` repository. The reason for this change is that the data distributed 
-with `rrtgmp-data` contains an an error in the array ordering for the aerosol optics lookup table for sea-salt (‘aero_salt_tbl’). 
-This error was fixed in the internal table. `RRTGMP.jl` will revert to using `rrtgmp-data` 
+to downloading it from the `rrtgmp-data` repository. The reason for this change is that the data distributed
+with `rrtgmp-data` contains an an error in the array ordering for the aerosol optics lookup table for sea-salt (‘aero_salt_tbl’).
+This error was fixed in the internal table. `RRTGMP.jl` will revert to using `rrtgmp-data`
 once the repository updates their tables. PR [#548](https://github.com/CliMA/RRTMGP.jl/pull/548/).
-This new lookup table fixes an error in the array ordering for the aerosol optics 
+This new lookup table fixes an error in the array ordering for the aerosol optics
 lookup table for the shortwave sea-salt data (‘aero_salt_tbl’).
 PR [#548](https://github.com/CliMA/RRTMGP.jl/pull/548/).
 
