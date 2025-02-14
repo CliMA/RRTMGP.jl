@@ -859,6 +859,8 @@ struct LookUpAerosolMerra{D, D1, D2, D3, D4, W} <: AbstractLookUp
     organic_carbon::D2
     "beginning and ending wavenumber for each band (`2, nband`) cm⁻¹"
     bnd_lims_wn::W
+    "Band number index corresponding to 550 nm"
+    iband_550nm::Int
 end
 Adapt.@adapt_structure LookUpAerosolMerra
 
@@ -873,7 +875,13 @@ function LookUpAerosolMerra(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFlo
     black_carbon = DA{FT}(Array(ds["aero_bcar_tbl"]))
     organic_carbon_rh = DA{FT}(Array(ds["aero_ocar_rh_tbl"]))
     organic_carbon = DA{FT}(Array(ds["aero_ocar_tbl"]))
-    bnd_lims_wn = DA{FT}(Array(ds["bnd_limits_wavenumber"]))
+    bnd_lims_wn = Array(ds["bnd_limits_wavenumber"])
+
+    iband_550nm = findfirst(1:size(bnd_lims_wn, 2)) do i
+        1 / (bnd_lims_wn[2, i] * 100) ≤ 550 * 1e-9 ≤ 1 / (bnd_lims_wn[1, i] * 100) # bnd_lims_wn is in cm⁻¹
+    end
+    iband_550nm = isnothing(iband_550nm) ? 0 : iband_550nm
+
     # map aerosol name to aerosol idx
     idx_aerosol = Dict(
         "dust1" => 1,
@@ -903,7 +911,8 @@ function LookUpAerosolMerra(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFlo
         black_carbon,
         organic_carbon_rh,
         organic_carbon,
-        bnd_lims_wn,
+        DA{FT}(bnd_lims_wn),
+        iband_550nm,
     ),
     idx_aerosol,
     idx_aerosize
