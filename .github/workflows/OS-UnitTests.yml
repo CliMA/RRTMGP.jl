@@ -36,7 +36,7 @@ jobs:
 
     # https://discourse.julialang.org/t/recommendation-cache-julia-artifacts-in-ci-services/35484
     - name: Cache artifacts
-      uses: actions/cache@v1
+      uses: actions/cache@v4
       env:
         cache-name: cache-artifacts
       with:
