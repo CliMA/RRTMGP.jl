@@ -660,8 +660,8 @@ function LookUpSW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
 
     a_offset = FT(0.1495954)
     b_offset = FT(0.00066696)
-    mg_index = FT(max(ds["mg_default"][], 0))
-    sb_index = FT(max(ds["sb_default"][], 0))
+    mg_index = FT(max(ds["mg_default"][1], 0))
+    sb_index = FT(max(ds["sb_default"][1], 0))
     solar_src =
         Array(ds["solar_source_quiet"]) .+ (mg_index - a_offset) .* Array(ds["solar_source_facular"]) .+
         (sb_index - b_offset) .* Array(ds["solar_source_sunspot"])
@@ -769,13 +769,13 @@ function LookUpCld(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     ])
     bounds = DA([
         # liquid particle size lower bound for LUT interpolation
-        FT(ds["radliq_lwr"][]),
+        FT(ds["radliq_lwr"][1]),
         # liquid particle size upper bound for LUT interpolation
-        FT(ds["radliq_upr"][]),
+        FT(ds["radliq_upr"][1]),
         # ice particle size lower bound for LUT interpolation
-        FT(ds["diamice_lwr"][]) / 2,
+        FT(ds["diamice_lwr"][1]) / 2,
         # ice particle size upper bound for LUT interpolation
-        FT(ds["diamice_upr"][]) / 2,
+        FT(ds["diamice_upr"][1]) / 2,
     ])
     liqdata = DA(vcat(Array(ds["extliq"]), Array(ds["ssaliq"]), Array(ds["asyliq"])))
     icedata = DA(vcat(Array(ds["extice"]), Array(ds["ssaice"]), Array(ds["asyice"])))
@@ -824,12 +824,12 @@ end
 """
     LookUpAerosolMerra{D, D1, D2, D3, D4, W} <: AbstractLookUp
 
-Merra lookup table for aersols. 
+Merra lookup table for aersols.
 
 This struct stores the lookup tables for determing extinction coeffient,
 single-scattering albedo, and asymmetry parameter g as a function of aerosol
 particle size, relative humidity and band. Data is provided for dust, sea salt,
-sulfate, black carbon (hydrophobic and hydrophilic) and organic carbon 
+sulfate, black carbon (hydrophobic and hydrophilic) and organic carbon
 (hydrophobic and hydrophilic).
 
 
