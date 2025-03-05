@@ -146,9 +146,9 @@ function LookUpLW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     n_contrib_lower = Int(ds.dim["contributors_lower"])
     n_contrib_upper = Int(ds.dim["contributors_upper"])
 
-    p_ref_tropo = FT(Array(ds["press_ref_trop"])[1])
-    t_ref_absrb = FT(Array(ds["absorption_coefficient_ref_T"])[1]) # not currently used
-    p_ref_absrb = FT(Array(ds["absorption_coefficient_ref_P"])[1]) # not currently used
+    p_ref_tropo = FT(ds["press_ref_trop"][1])
+    t_ref_absrb = FT(ds["absorption_coefficient_ref_T"][1]) # not currently used
+    p_ref_absrb = FT(ds["absorption_coefficient_ref_P"][1]) # not currently used
 
     gases_major = STA(undef, n_maj_absrb)
     gases_minor = STA(undef, n_min_absrb)
@@ -470,9 +470,9 @@ function LookUpSW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     n_contrib_lower = Int(ds.dim["contributors_lower"])
     n_contrib_upper = Int(ds.dim["contributors_upper"])
 
-    p_ref_tropo = FT(Array(ds["press_ref_trop"])[1])
-    t_ref_absrb = FT(Array(ds["absorption_coefficient_ref_T"])[1]) # not currently used
-    p_ref_absrb = FT(Array(ds["absorption_coefficient_ref_P"])[1]) # not currently used
+    p_ref_tropo = FT(ds["press_ref_trop"][1])
+    t_ref_absrb = FT(ds["absorption_coefficient_ref_T"][1]) # not currently used
+    p_ref_absrb = FT(ds["absorption_coefficient_ref_P"][1]) # not currently used
 
     gases_major = STA(undef, n_maj_absrb)
     gases_minor = STA(undef, n_min_absrb)
