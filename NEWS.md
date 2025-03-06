@@ -4,6 +4,9 @@ RRTMGP.jl Release Notes
 main
 ------
 
+v0.21.1
+------
+
 v0.21.0
 ------
 - Aerosol optical depth was added to the `AerosolState`
