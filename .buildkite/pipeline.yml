@@ -1,6 +1,7 @@
 agents:
-  queue: new-central
-  modules: climacommon/2024_10_08
+  queue: clima
+  slurm_mem: 8G
+  modules: climacommon/2024_12_16 nsight-systems/2024.6.1
 
 env:
   JULIA_LOAD_PATH: "${JULIA_LOAD_PATH}:${BUILDKITE_BUILD_CHECKOUT_PATH}/.buildkite"
@@ -8,6 +9,8 @@ env:
   JULIA_NVTX_CALLBACKS: gc
   JULIA_MAX_NUM_PRECOMPILE_FILES: 100
   SLURM_KILL_BAD_EXIT: 1
+
+timeout_in_minutes: 1440
 
 steps:
   - label: "init test environments :computer:"
@@ -21,7 +24,7 @@ steps:
       - "julia --project=test -e 'using Pkg; Pkg.status()'"
 
     agents:
-      slurm_mem: 16G 
+      slurm_mem: 16G
       slurm_gpus: 1
       slurm_cpus_per_task: 4
 
@@ -60,6 +63,15 @@ steps:
           slurm_ntasks: 1
           slurm_mem_per_cpu: 6G
 
+      - label: "Flame Graph: Gray Atm compilation"
+        command: "julia --color=yes --project=test perf/flame_compilation.jl gray_atm.jl"
+        artifact_paths: "flame_graphs/gray_atm_compilation/*"
+        agents:
+          slurm_ntasks: 1
+          slurm_gpus: 1
+          slurm_mem_per_cpu: 20G
+          slurm_time: 12:00:00
+
       - label: "Flame Graph: Clear Sky"
         command: "julia --color=yes --project=test perf/flame.jl clear_sky.jl"
         artifact_paths: "flame_graphs/clear_sky/*"
@@ -76,13 +88,13 @@ steps:
 
   - group: "Benchmarks"
     steps:
-  
+
       - label: "Benchmarks"
         command: "julia --color=yes --project=test perf/benchmark.jl"
         agents:
           slurm_ntasks: 1
           slurm_mem_per_cpu: 6G
-  
+
       - label: "Benchmarks (Float32)"
         command: "julia --color=yes --project=test perf/benchmark.jl Float32"
         agents:
