@@ -13,14 +13,11 @@ function rte_lw_noscat_solve!(
     τ = op.τ
     Ds = angle_disc.gauss_Ds[1]
     w_μ = angle_disc.gauss_wts[1]
-    (; flux_up, flux_dn, flux_net) = flux_lw
     @inbounds begin
         ClimaComms.@threaded device for gcol in 1:ncol
             compute_optical_props!(op, as, src_lw, gcol)
             rte_lw_noscat_one_angle!(src_lw, bcs_lw, op, Ds, w_μ, gcol, flux_lw, igpt, ibnd, nlay, nlev)
-            for ilev in 1:nlev
-                flux_net[gcol, ilev] = flux_up[gcol, ilev] - flux_dn[gcol, ilev]
-            end
+            compute_net_flux!(flux_lw, gcol)
         end
     end
     return nothing
