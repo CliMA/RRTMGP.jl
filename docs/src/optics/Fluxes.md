@@ -7,6 +7,8 @@ CurrentModule = RRTMGP.Fluxes
 ```@docs
 FluxLW
 FluxSW
-set_flux_to_zero!
+set_flux!
+set_net_flux!
+compute_net_flux!
 add_to_flux!
 ```

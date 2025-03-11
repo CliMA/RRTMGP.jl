@@ -5,7 +5,9 @@ import RRTMGP.Parameters as RP
 import RRTMGP.AngularDiscretizations.AngularDiscretization
 import RRTMGP.Fluxes: FluxLW, FluxSW
 import RRTMGP.Fluxes: add_to_flux!
-import RRTMGP.Fluxes: set_flux_to_zero!
+import RRTMGP.Fluxes: set_flux!
+import RRTMGP.Fluxes: compute_net_flux!
+import RRTMGP.Fluxes: set_net_flux!
 import RRTMGP.Sources: SourceLWNoScat
 import RRTMGP.Sources: SourceLW2Str
 import RRTMGP.Sources: SourceSW2Str

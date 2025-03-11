@@ -16,7 +16,7 @@ function rte_lw_2stream_solve!(
             compute_optical_props!(op, as, src_lw, gcol)
             rte_lw_2stream!(op, flux_lw, src_lw, bcs_lw, gcol, igpt, ibnd, nlev, ncol)
             for ilev in 1:nlev
-                flux_net[ilev, gcol] = flux_up[ilev, gcol] - flux_dn[ilev, gcol]
+                flux_net[gcol, ilev] = flux_up[gcol, ilev] - flux_dn[gcol, ilev]
             end
         end
     end
@@ -41,10 +41,6 @@ function rte_lw_2stream_solve!(
     n_gpt = length(major_gpt2bnd)
     (; cloud_state, aerosol_state) = as
     bld_cld_mask = cloud_state isa CloudState
-    flux_up_lw = flux_lw.flux_up
-    flux_dn_lw = flux_lw.flux_dn
-    flux_net_lw = flux_lw.flux_net
-    (; flux_up, flux_dn) = flux
     @inbounds begin
         if aerosol_state isa AerosolState
             ClimaComms.@threaded device for gcol in 1:ncol
@@ -55,8 +51,8 @@ function rte_lw_2stream_solve!(
             end
         end
         for igpt in 1:n_gpt
+            ibnd = major_gpt2bnd[igpt]
             ClimaComms.@threaded device for gcol in 1:ncol
-                ibnd = major_gpt2bnd[igpt]
                 bld_cld_mask && Optics.build_cloud_mask!(
                     view(cloud_state.mask_lw, :, gcol),
                     view(cloud_state.cld_frac, :, gcol),
@@ -64,21 +60,11 @@ function rte_lw_2stream_solve!(
                 )
                 compute_optical_props!(op, as, src_lw, gcol, igpt, lookup_lw, lookup_lw_cld, lookup_lw_aero)
                 rte_lw_2stream!(op, flux, src_lw, bcs_lw, gcol, igpt, ibnd, nlev, ncol)
-                if igpt == 1
-                    map!(x -> x, view(flux_up_lw, :, gcol), view(flux_up, :, gcol))
-                    map!(x -> x, view(flux_dn_lw, :, gcol), view(flux_dn, :, gcol))
-                else
-                    for ilev in 1:nlev
-                        @inbounds flux_up_lw[ilev, gcol] += flux_up[ilev, gcol]
-                        @inbounds flux_dn_lw[ilev, gcol] += flux_dn[ilev, gcol]
-                    end
-                end
+                igpt == 1 ? set_flux!(flux_lw, flux, gcol) : add_to_flux!(flux_lw, flux, gcol)
             end
         end
         ClimaComms.@threaded device for gcol in 1:ncol
-            for ilev in 1:nlev
-                flux_net_lw[ilev, gcol] = flux_up_lw[ilev, gcol] - flux_dn_lw[ilev, gcol]
-            end
+            compute_net_flux!(flux_lw, gcol)
         end
     end
     return nothing
@@ -183,7 +169,7 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
     (; inc_flux, sfc_emis) = bcs_lw
     FT = eltype(τ)
     @inbounds flux_dn_ilevplus1 = isnothing(inc_flux) ? FT(0) : inc_flux[gcol, igpt]
-    @inbounds flux_dn[nlev, gcol] = flux_dn_ilevplus1
+    @inbounds flux_dn[gcol, nlev] = flux_dn_ilevplus1
     # Albedo of lowest level is the surface albedo...
     @inbounds albedo_ilev = FT(1) - sfc_emis[ibnd, gcol]
     @inbounds albedo[1, gcol] = albedo_ilev
@@ -211,7 +197,7 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
     end
 
     # Eq 12, at the top of the domain upwelling diffuse is due to ...
-    @inbounds flux_up[nlev, gcol] =
+    @inbounds flux_up[gcol, nlev] =
         flux_dn_ilevplus1 * albedo[nlev, gcol] + # ... reflection of incident diffuse and
         src[nlev, gcol]                          # scattering by the direct beam below
 
@@ -227,10 +213,10 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
         flux_dn_ilev = (Tdif * flux_dn_ilevplus1 + # Equation 13
                         Rdif * src_ilev +
                         src_dn) * denom
-        flux_up[ilev, gcol] =
+        flux_up[gcol, ilev] =
             flux_dn_ilev * albedo_ilev + # Equation 12
             src_ilev
-        flux_dn[ilev, gcol] = flux_dn_ilev
+        flux_dn[gcol, ilev] = flux_dn_ilev
         flux_dn_ilevplus1 = flux_dn_ilev
         lev_src_top = lev_src_bot
         ilev -= 1

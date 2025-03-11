@@ -68,7 +68,8 @@ function gray_atmos_lw_equil(context, ::Type{SLVLW}, ::Type{FT}; exfiltrate = fa
     #----------------------------------------------------
     hr_lay = DA{FT}(undef, nlay, ncol)
     T_ex_lev = DA{FT}(undef, nlev, ncol)
-    flux_grad = DA{FT}(undef, nlay, ncol)
+    #flux_grad = DA{FT}(undef, nlay, ncol)
+    flux_grad = DA{FT}(undef, ncol, nlay)
     flux_grad_err = FT(0)
     exfiltrate && Infiltrator.@exfiltrate
     device = ClimaComms.device(context)
