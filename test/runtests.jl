@@ -5,6 +5,10 @@ color1 = 130
 printstyled("\n\nRRTMGP gray radiation tests\n", color = color1)
 printstyled("===============================\n\n", color = color1)
 
+@testset "Datalayouts tests" begin
+    include("datalayouts.jl")
+end
+
 @testset "RRTMGP gray radiation tests" begin
     include("gray_atm.jl")
 end

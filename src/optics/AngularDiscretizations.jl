@@ -2,6 +2,8 @@ module AngularDiscretizations
 
 using DocStringExtensions
 using Adapt
+using ClimaComms
+import ..RRTMGPGridParams
 
 export AngularDiscretization
 
@@ -23,6 +25,9 @@ struct AngularDiscretization{FT <: AbstractFloat, FTA1D <: AbstractArray{FT, 1}}
     gauss_wts::FTA1D
 end
 Adapt.@adapt_structure AngularDiscretization
+
+AngularDiscretization(grid_params::RRTMGPGridParams, n_gauss_angles::Int) =
+    AngularDiscretization(eltype(grid_params), ClimaComms.array_type(grid_params), n_gauss_angles)
 
 function AngularDiscretization(::Type{FT}, ::Type{DA}, n_gauss_angles::Int) where {FT <: AbstractFloat, DA}
     max_gauss_pts = 4
