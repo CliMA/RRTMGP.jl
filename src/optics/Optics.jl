@@ -9,6 +9,7 @@ using ..Vmrs
 import ..pow_fast
 using ..LookUpTables
 using ..AtmosphericStates
+import ..RRTMGPGridParams
 using ..Sources
 using ..AngularDiscretizations
 import ..Parameters as RP
@@ -43,8 +44,20 @@ function OneScalar(::Type{FT}, ncol::Int, nlay::Int, ::Type{DA}) where {FT <: Ab
     layerdata = DA{FT, 3}(undef, 1, nlay, ncol)
     τ = view(layerdata, 1, :, :)
     V = typeof(τ)
+    @warn "Please use OneScalar with RRTMGPGridParams instead."
     return OneScalar{typeof(layerdata), V}(layerdata, τ)
 end
+
+function OneScalar(grid_params::RRTMGPGridParams)
+    (; ncol, nlay) = grid_params
+    DA = ClimaComms.array_type(grid_params)
+    FT = eltype(grid_params)
+    layerdata = DA{FT, 3}(undef, 1, nlay, ncol)
+    τ = view(layerdata, 1, :, :)
+    V = typeof(τ)
+    return OneScalar{typeof(layerdata), V}(layerdata, τ)
+end
+
 
 """
     TwoStream{FTA2D} <: AbstractOpticalProps
@@ -70,6 +83,7 @@ Adapt.@adapt_structure TwoStream
 function TwoStream(::Type{FT}, ncol::Int, nlay::Int, ::Type{DA}) where {FT <: AbstractFloat, DA}
     layerdata = DA{FT, 3}(zeros(3, nlay, ncol))
     V = typeof(view(layerdata, 1, :, :))
+    @warn "Please use TwoStream with RRTMGPGridParams instead"
     return TwoStream{typeof(layerdata), V}(
         layerdata,
         view(layerdata, 1, :, :),
@@ -77,6 +91,21 @@ function TwoStream(::Type{FT}, ncol::Int, nlay::Int, ::Type{DA}) where {FT <: Ab
         view(layerdata, 3, :, :),
     )
 end
+
+function TwoStream(grid_params::RRTMGPGridParams)
+    (; ncol, nlay) = grid_params
+    DA = ClimaComms.array_type(grid_params)
+    FT = eltype(grid_params)
+    layerdata = DA{FT, 3}(zeros(3, nlay, ncol))
+    V = typeof(view(layerdata, 1, :, :))
+    return TwoStream{typeof(layerdata), V}(
+        layerdata,
+        view(layerdata, 1, :, :),
+        view(layerdata, 2, :, :),
+        view(layerdata, 3, :, :),
+    )
+end
+
 
 """
     compute_col_gas!(

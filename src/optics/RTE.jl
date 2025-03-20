@@ -7,6 +7,7 @@ using DocStringExtensions
 using ..Sources
 using ..Fluxes
 using ..Optics
+import ..RRTMGPGridParams
 using ..BCs
 
 import ..Parameters as RP
@@ -26,7 +27,7 @@ export NoScatLWRTE, TwoStreamLWRTE, NoScatSWRTE, TwoStreamSWRTE
         inc_flux,
     )
 
-A high-level RRTMGP data structure storing the optical 
+A high-level RRTMGP data structure storing the optical
 properties, sources, boundary conditions and fluxes
 configurations for a non-scattering longwave simulation.
 
@@ -51,20 +52,27 @@ struct NoScatLWRTE{C, OP <: OneScalar, SL <: SourceLWNoScat, BC <: LwBCs, FXBL, 
 end
 Adapt.@adapt_structure NoScatLWRTE
 
-function NoScatLWRTE(::Type{FT}, ::Type{DA}, context, param_set, nlay, ncol, sfc_emis, inc_flux) where {FT, DA}
-    op = OneScalar(FT, ncol, nlay, DA)
-    src = SourceLWNoScat(param_set, FT, DA, nlay, ncol)
+function NoScatLWRTE(::Type{FT}, ::Type{DA}, context, params, nlay, ncol, sfc_emis, inc_flux) where {FT, DA}
+    grid_params = RRTMGPGridParams(FT; context, nlay, ncol)
+    @warn "Please call NoScatLWRTE with RRTMGPGridParams instead"
+    return NoScatLWRTE(grid_params; params, sfc_emis, inc_flux)
+end
+
+function NoScatLWRTE(grid_params::RRTMGPGridParams; params, sfc_emis, inc_flux)
+    (; context) = grid_params
+    op = OneScalar(grid_params)
+    src = SourceLWNoScat(grid_params; params)
     bcs = LwBCs(sfc_emis, inc_flux)
-    fluxb = FluxLW(ncol, nlay, FT, DA)
-    flux = FluxLW(ncol, nlay, FT, DA)
-    ad = AngularDiscretization(FT, DA, 1)
+    fluxb = FluxLW(grid_params)
+    flux = FluxLW(grid_params)
+    ad = AngularDiscretization(grid_params, 1)
     return NoScatLWRTE(context, op, src, bcs, fluxb, flux, ad)
 end
 
 """
     TwoStreamLWRTE(::Type{FT}, ::Type{DA}, context, param_set, nlay, ncol, sfc_emis, inc_flux)
 
-A high-level RRTMGP data structure storing the optical 
+A high-level RRTMGP data structure storing the optical
 properties, sources, boundary conditions and fluxes
 configurations for a `2-stream` longwave simulation.
 
@@ -87,19 +95,26 @@ struct TwoStreamLWRTE{C, OP <: TwoStream, SL <: SourceLW2Str, BC <: LwBCs, FXBL,
 end
 Adapt.@adapt_structure TwoStreamLWRTE
 
-function TwoStreamLWRTE(::Type{FT}, ::Type{DA}, context, param_set, nlay, ncol, sfc_emis, inc_flux) where {FT, DA}
-    op = TwoStream(FT, ncol, nlay, DA)
-    src = SourceLW2Str(param_set, FT, DA, nlay, ncol)
+function TwoStreamLWRTE(::Type{FT}, ::Type{DA}, context, params, nlay, ncol, sfc_emis, inc_flux) where {FT, DA}
+    grid_params = RRTMGPGridParams(FT; context, nlay, ncol)
+    @warn "Please call TwoStreamLWRTE with RRTMGPGridParams instead."
+    return TwoStreamLWRTE(grid_params; params, sfc_emis, inc_flux)
+end
+
+function TwoStreamLWRTE(grid_params::RRTMGPGridParams; params, sfc_emis, inc_flux)
+    (; context) = grid_params
+    op = TwoStream(grid_params)
+    src = SourceLW2Str(grid_params; params)
     bcs = LwBCs(sfc_emis, inc_flux)
-    fluxb = FluxLW(ncol, nlay, FT, DA)
-    flux = FluxLW(ncol, nlay, FT, DA)
+    fluxb = FluxLW(grid_params)
+    flux = FluxLW(grid_params)
     return TwoStreamLWRTE(context, op, src, bcs, fluxb, flux)
 end
 
 """
     NoScatSWRTE(::Type{FT}, ::Type{DA}, context, nlay, ncol, swbcs...)
 
-A high-level RRTMGP data structure storing the optical 
+A high-level RRTMGP data structure storing the optical
 properties, sources, boundary conditions and fluxes
 configurations for a non-scattering shortwave simulation.
 
@@ -121,17 +136,32 @@ end
 Adapt.@adapt_structure NoScatSWRTE
 
 function NoScatSWRTE(::Type{FT}, ::Type{DA}, context, nlay, ncol, swbcs...) where {FT, DA}
-    op = OneScalar(FT, ncol, nlay, DA)
-    bcs = SwBCs(swbcs...)
-    fluxb = FluxSW(ncol, nlay, FT, DA)
-    flux = FluxSW(ncol, nlay, FT, DA)
+    grid_params = RRTMGPGridParams(FT; context, nlay, ncol)
+    @warn "Please call NoScatSWRTE with RRTMGPGridParams instead"
+    (cos_zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse) = swbcs
+    return NoScatSWRTE(grid_params; cos_zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse)
+end
+
+function NoScatSWRTE(
+    grid_params::RRTMGPGridParams;
+    cos_zenith,
+    toa_flux,
+    sfc_alb_direct,
+    inc_flux_diffuse,
+    sfc_alb_diffuse,
+)
+    (; context) = grid_params
+    op = OneScalar(grid_params)
+    bcs = SwBCs(cos_zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse)
+    fluxb = FluxSW(grid_params)
+    flux = FluxSW(grid_params)
     return NoScatSWRTE(context, op, bcs, fluxb, flux)
 end
 
 """
     TwoStreamSWRTE(::Type{FT}, ::Type{DA}, context, nlay, ncol, swbcs...)
 
-A high-level RRTMGP data structure storing the optical 
+A high-level RRTMGP data structure storing the optical
 properties, sources, boundary conditions and fluxes
 configurations for a `2-stream` shortwave simulation.
 
@@ -155,12 +185,28 @@ end
 Adapt.@adapt_structure TwoStreamSWRTE
 
 function TwoStreamSWRTE(::Type{FT}, ::Type{DA}, context, nlay, ncol, swbcs...) where {FT, DA}
-    op = TwoStream(FT, ncol, nlay, DA)
-    src = SourceSW2Str(FT, DA, nlay, ncol)
-    bcs = SwBCs(swbcs...)
-    fluxb = FluxSW(ncol, nlay, FT, DA)
-    flux = FluxSW(ncol, nlay, FT, DA)
+    grid_params = RRTMGPGridParams(FT; context, nlay, ncol)
+    (cos_zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse) = swbcs
+    @warn "Please call TwoStreamSWRTE with RRTMGPGridParams instead."
+    return TwoStreamSWRTE(grid_params; cos_zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse)
+end
+
+function TwoStreamSWRTE(
+    grid_params::RRTMGPGridParams;
+    cos_zenith,
+    toa_flux,
+    sfc_alb_direct,
+    inc_flux_diffuse,
+    sfc_alb_diffuse,
+)
+    (; context) = grid_params
+    op = TwoStream(grid_params)
+    src = SourceSW2Str(grid_params)
+    bcs = SwBCs(cos_zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse)
+    fluxb = FluxSW(grid_params)
+    flux = FluxSW(grid_params)
     return TwoStreamSWRTE(context, op, src, bcs, fluxb, flux)
 end
+
 
 end
