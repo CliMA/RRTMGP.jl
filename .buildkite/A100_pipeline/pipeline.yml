@@ -1,6 +1,6 @@
 agents:
   queue: clima
-  modules: climacommon/2024_10_08
+  modules: climacommon/2024_12_16 nsight-systems/2024.6.1
 
 env:
   OPENBLAS_NUM_THREADS: 1
@@ -105,7 +105,12 @@ steps:
           slurm_exclusive:
 
       - label: "GPU clear-sky DYAMOND benchmark"
-        command: "julia --color=yes --project=test test/clear_sky_dyamond_gpu_benchmark.jl"
+        command:
+          - mkdir -p clear_sky_dyamond_gpu_benchmark
+          - >
+            nsys profile --trace=nvtx,cuda,osrt --output=clear_sky_dyamond_gpu_benchmark/report
+            julia --color=yes --project=test test/clear_sky_dyamond_gpu_benchmark.jl
+        artifact_paths: "clear_sky_dyamond_gpu_benchmark/*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
         agents:
@@ -114,7 +119,12 @@ steps:
           slurm_exclusive:
 
       - label: "GPU cloudy-sky DYAMOND benchmark"
-        command: "julia --color=yes --project=test test/cloudy_sky_dyamond_gpu_benchmark.jl"
+        command:
+          - mkdir -p cloudy_sky_dyamond_gpu_benchmark
+          - >
+            nsys profile --trace=nvtx,cuda,osrt --output=cloudy_sky_dyamond_gpu_benchmark/report
+            julia --color=yes --project=test test/cloudy_sky_dyamond_gpu_benchmark.jl
+        artifact_paths: "cloudy_sky_dyamond_gpu_benchmark/*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
         agents:
@@ -123,7 +133,12 @@ steps:
           slurm_exclusive:
 
       - label: "GPU all-sky with aerosols DYAMOND benchmark"
-        command: "julia --color=yes --project=test test/all_sky_with_aerosols_dyamond_gpu_benchmark.jl"
+        command:
+          - mkdir -p all_sky_with_aerosols_dyamond_gpu_benchmark
+          - >
+            nsys profile --trace=nvtx,cuda,osrt --output=all_sky_with_aerosols_dyamond_gpu_benchmark/report
+            julia --color=yes --project=test test/all_sky_with_aerosols_dyamond_gpu_benchmark.jl
+        artifact_paths: "all_sky_with_aerosols_dyamond_gpu_benchmark/*"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
         agents:
