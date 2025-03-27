@@ -125,9 +125,9 @@ function cloudy_sky(
     rel_err_flux_net_lw = abs.(flux_net_lw .- comp_flux_net_lw)
 
     for gcol in 1:ncol, glev in 1:nlev
-        den = abs(comp_flux_net_lw[glev, gcol])
+        den = abs(comp_flux_net_lw[gcol, glev])
         if den > 10 * eps(FT)
-            rel_err_flux_net_lw[glev, gcol] /= den
+            rel_err_flux_net_lw[gcol, glev] /= den
         end
     end
     max_rel_err_flux_net_lw = maximum(rel_err_flux_net_lw)
@@ -152,9 +152,9 @@ function cloudy_sky(
     rel_err_flux_net_sw = abs.(flux_net_sw .- comp_flux_net_sw)
 
     for gcol in 1:ncol, glev in 1:nlev
-        den = abs(comp_flux_net_sw[glev, gcol])
+        den = abs(comp_flux_net_sw[gcol, glev])
         if den > 10 * eps(FT)
-            rel_err_flux_net_sw[glev, gcol] /= den
+            rel_err_flux_net_sw[gcol, glev] /= den
         end
     end
     max_rel_err_flux_net_sw = maximum(rel_err_flux_net_sw)

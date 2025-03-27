@@ -37,20 +37,11 @@ function rte_sw_2stream_solve_CUDA!(
             compute_optical_props!(op, as, gcol)
             # call shortwave rte solver
             rte_sw_2stream!(op, src_sw, bcs_sw, flux_sw, solar_frac, igpt, n_gpt, ibnd, nlev, gcol)
-            for ilev in 1:nlev
-                flux_net_sw[ilev, gcol] = flux_up_sw[ilev, gcol] - flux_dn_sw[ilev, gcol]
-            end
+            compute_net_flux!(flux_sw, gcol)
         end
         if μ₀ ≤ 0 # zero out columns with zenith angle ≥ π/2
-            for ilev in 1:nlev
-                flux_up_sw[ilev, gcol] = FT(0)
-            end
-            for ilev in 1:nlev
-                flux_dn_sw[ilev, gcol] = FT(0)
-            end
-            for ilev in 1:nlev
-                flux_net_sw[ilev, gcol] = FT(0)
-            end
+            set_flux!(flux_sw, FT(0), gcol)
+            set_net_flux!(flux_sw, FT(0), gcol)
         end
     end
     return nothing
@@ -101,9 +92,9 @@ function rte_sw_2stream_solve_CUDA!(
         flux_up = flux.flux_up
         flux_dn = flux.flux_dn
         flux_dn_dir = flux.flux_dn_dir
-        FT = eltype(flux_up)
         (; cloud_state, aerosol_state) = as
         μ₀ = bcs_sw.cos_zenith[gcol]
+        FT = eltype(μ₀)
         @inbounds begin
             if aerosol_state isa AerosolState
                 Optics.compute_aero_mask!(
@@ -126,29 +117,11 @@ function rte_sw_2stream_solve_CUDA!(
                 ibnd = lookup_sw.band_data.major_gpt2bnd[igpt]
                 # rte shortwave solver
                 rte_sw_2stream!(op, src_sw, bcs_sw, flux, solar_frac, igpt, n_gpt, ibnd, nlev, gcol)
-                if igpt == 1
-                    map!(x -> x, view(flux_up_sw, :, gcol), view(flux_up, :, gcol))
-                    map!(x -> x, view(flux_dn_sw, :, gcol), view(flux_dn, :, gcol))
-                    map!(x -> x, view(flux_dn_dir_sw, :, gcol), view(flux_dn_dir, :, gcol))
-                else
-                    for ilev in 1:nlev
-                        flux_up_sw[ilev, gcol] += flux_up[ilev, gcol]
-                        flux_dn_sw[ilev, gcol] += flux_dn[ilev, gcol]
-                    end
-                    flux_dn_dir_sw[1, gcol] += flux_dn_dir[1, gcol]
-                end
+                igpt == 1 ? set_flux!(flux_sw, flux, gcol) : add_to_flux!(flux_sw, flux, gcol)
             end
-            if μ₀ ≤ 0 # zero out columns with zenith angle ≥ π/2
-                for ilev in 1:nlev
-                    flux_up_sw[ilev, gcol] = FT(0)
-                end
-                for ilev in 1:nlev
-                    flux_dn_sw[ilev, gcol] = FT(0)
-                end
-            end
-            for ilev in 1:nlev
-                flux_net_sw[ilev, gcol] = flux_up_sw[ilev, gcol] - flux_dn_sw[ilev, gcol]
-            end
+            # zero out columns with zenith angle ≥ π/2
+            μ₀ ≤ 0 && set_flux!(flux_sw, FT(0), gcol)
+            compute_net_flux!(flux_sw, gcol)
         end
     end
     return nothing
