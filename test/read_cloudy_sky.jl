@@ -30,7 +30,7 @@ function setup_cloudy_sky_as(
     #---no lat / long information for this
     lon = nothing
     lat = nothing
-    # The example only reads the first column and 
+    # The example only reads the first column and
     # replicates it ncol times.
 
     sfc_emis = DA{FT, 2}(undef, nbnd_lw, ncol)
@@ -66,7 +66,7 @@ function setup_cloudy_sky_as(
     #col_dry = DA{FT,2}(transpose(Array(ds_in["col_dry"])[:, lay_ind]))
     #col_dry from the dataset not used in the FORTRAN RRTMGP example
 
-    # Reading volume mixing ratios 
+    # Reading volume mixing ratios
     vmrat = zeros(FT, ngas, nlay, ncol)
 
     vmrat[idx_gases["h2o"], :, 1] .= Array{FT}(Array(ds_in["h2o"])[1, lay_ind])
@@ -169,7 +169,7 @@ _orient_data(data, bot_at_1) = bot_at_1 ? data : reverse(data, dims = 1)
 
 function load_comparison_data(bot_at_1, ncol)
     # Note, for this case, flux_up and flux_dn are stored in the same file!
-    flux_file_lw = get_reference_filename(:gas_clouds, :lw, :flux_up) # flux files for comparison (LUT) 
+    flux_file_lw = get_reference_filename(:gas_clouds, :lw, :flux_up) # flux files for comparison (LUT)
     flux_file_sw = get_reference_filename(:gas_clouds, :sw, :flux_up) # flux files for comparison (LUT)
     ds_comp_lw = Dataset(flux_file_lw, "r")
     ds_comp_sw = Dataset(flux_file_sw, "r")

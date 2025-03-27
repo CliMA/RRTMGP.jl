@@ -2,6 +2,7 @@ module BCs
 
 using DocStringExtensions
 using Adapt
+import ..RRTMGPGridParams
 
 export LwBCs, SwBCs
 

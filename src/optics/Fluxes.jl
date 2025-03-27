@@ -2,6 +2,8 @@ module Fluxes
 
 using Adapt
 using DocStringExtensions
+using ClimaComms
+import ..RRTMGPGridParams
 
 export AbstractFlux, FluxLW, FluxSW, set_flux_to_zero!, add_to_flux!
 
@@ -28,6 +30,17 @@ FluxLW(flux_up, flux_dn, flux_net) = FluxLW{eltype(flux_up), typeof(flux_up)}(fl
 Adapt.@adapt_structure FluxLW
 
 function FluxLW(ncol::Int, nlay::Int, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
+    @warn "Please use the FluxLW with RRTMGPGridParams"
+    flux_up = DA{FT}(undef, nlay + 1, ncol)
+    flux_dn = DA{FT}(undef, nlay + 1, ncol)
+    flux_net = DA{FT}(undef, nlay + 1, ncol)
+    return FluxLW{FT, typeof(flux_net)}(flux_up, flux_dn, flux_net)
+end
+
+function FluxLW(grid_params::RRTMGPGridParams)
+    (; ncol, nlay) = grid_params
+    DA = ClimaComms.array_type(grid_params)
+    FT = eltype(grid_params)
     flux_up = DA{FT}(undef, nlay + 1, ncol)
     flux_dn = DA{FT}(undef, nlay + 1, ncol)
     flux_net = DA{FT}(undef, nlay + 1, ncol)
@@ -57,6 +70,18 @@ FluxSW(flux_up, flux_dn, flux_net, flux_dn_dir) =
 Adapt.@adapt_structure FluxSW
 
 function FluxSW(ncol::Int, nlay::Int, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
+    @warn "Please use the FluxSW with RRTMGPGridParams"
+    flux_up = DA{FT}(undef, nlay + 1, ncol)
+    flux_dn = DA{FT}(undef, nlay + 1, ncol)
+    flux_net = DA{FT}(undef, nlay + 1, ncol)
+    flux_dn_dir = DA{FT}(undef, nlay + 1, ncol)
+    return FluxSW{FT, typeof(flux_net)}(flux_up, flux_dn, flux_net, flux_dn_dir)
+end
+
+function FluxSW(grid_params::RRTMGPGridParams)
+    (; nlay, ncol) = grid_params
+    FT = eltype(grid_params)
+    DA = ClimaComms.array_type(grid_params)
     flux_up = DA{FT}(undef, nlay + 1, ncol)
     flux_dn = DA{FT}(undef, nlay + 1, ncol)
     flux_net = DA{FT}(undef, nlay + 1, ncol)

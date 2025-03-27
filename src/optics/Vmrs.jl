@@ -1,6 +1,7 @@
 module Vmrs
 using DocStringExtensions
 using Adapt
+import ..RRTMGPGridParams
 
 export AbstractVmr, Vmr, VmrGM, init_vmr, get_vmr
 
@@ -29,6 +30,26 @@ end
 VmrGM(vmr_h2o, vmr_o3, vmr) = VmrGM{eltype(vmr_h2o), typeof(vmr), typeof(vmr_h2o)}(vmr_h2o, vmr_o3, vmr)
 Adapt.@adapt_structure VmrGM
 
+"""
+    VolumeMixingRatioGlobalMean
+
+Returns the VmrGM struct given:
+ - `grid_params::RRTMGPGridParams` grid parameters
+ - `vmr_h2o` volume mixing ratio of h2o
+ - `vmr_h2o` volume mixing ratio of o3
+ - `vmr_h2o` volume mixing ratio of ?
+"""
+function VolumeMixingRatioGlobalMean(
+    grid_params::RRTMGPGridParams;
+    vmr_h2o::AbstractArray{FT, 2},
+    vmr_o3::AbstractArray{FT, 2},
+    vmr::AbstractArray{FT, 1},
+) where {FT}
+    DA = ClimaComms.array_type(grid_params)
+    @assert FT == eltype(grid_params)
+    return VmrGM{FT, typeof(vmr), typeof(vmr_h2o)}(vmr_h2o, vmr_o3, vmr)
+end
+
 function VmrGM(
     ::Type{FT},
     ::Type{DA},
@@ -36,6 +57,7 @@ function VmrGM(
     vmr_o3::FTA2D,
     vmr::FTA1D,
 ) where {FT <: AbstractFloat, FTA1D <: AbstractArray{FT, 1}, FTA2D <: AbstractArray{FT, 2}, DA}
+    @warn "Please use VolumeMixingRatioGlobalMean with RRTMGPGridParams instead."
     return VmrGM{FT, typeof(vmr), typeof(vmr_h2o)}(vmr_h2o, vmr_o3, vmr)
 end
 
