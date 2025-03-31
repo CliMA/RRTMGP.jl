@@ -115,11 +115,11 @@ function SourceLW2Str(grid_params::RRTMGPGridParams; params::RP.ARP)
     (; ncol, nlay) = grid_params
     DA = ClimaComms.array_type(grid_params)
     FT = eltype(grid_params)
-    sfc_source = DA{FT, 1}(undef, ncol) # sfc_source
+    sfc_source = DA{FT, 1}(undef, ncol)
     leveldata = DA{FT, 3}(undef, 3, nlay + 1, ncol)
-    lev_source = view(leveldata, 1, :, :) # lev_source
-    albedo = view(leveldata, 2, :, :) # albedo
-    src = view(leveldata, 3, :, :) # src
+    lev_source = view(leveldata, 1, :, :)
+    albedo = view(leveldata, 2, :, :)
+    src = view(leveldata, 3, :, :)
 
     return SourceLW2Str{typeof(sfc_source), typeof(leveldata), typeof(lev_source), typeof(params)}(
         params,

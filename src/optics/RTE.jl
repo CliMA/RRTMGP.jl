@@ -80,7 +80,7 @@ configurations for a `2-stream` longwave simulation.
 $(DocStringExtensions.FIELDS)
 """
 struct TwoStreamLWRTE{C, OP <: TwoStream, SL <: SourceLW2Str, BC <: LwBCs, FXBL, FXL <: FluxLW}
-    "ClimaComms device"
+    "ClimaComms context"
     context::C
     "optical properties"
     op::OP
@@ -102,9 +102,7 @@ function TwoStreamLWRTE(::Type{FT}, ::Type{DA}, context, params, nlay, ncol, sfc
 end
 
 function TwoStreamLWRTE(grid_params::RRTMGPGridParams; params, sfc_emis, inc_flux)
-    (; ncol, nlay, context) = grid_params
-    DA = ClimaComms.array_type(grid_params)
-    FT = eltype(grid_params)
+    (; context) = grid_params
     op = TwoStream(grid_params)
     src = SourceLW2Str(grid_params; params)
     bcs = LwBCs(sfc_emis, inc_flux)
@@ -152,9 +150,7 @@ function NoScatSWRTE(
     inc_flux_diffuse,
     sfc_alb_diffuse,
 )
-    (; ncol, nlay, context) = grid_params
-    DA = ClimaComms.array_type(grid_params)
-    FT = eltype(grid_params)
+    (; context) = grid_params
     op = OneScalar(grid_params)
     bcs = SwBCs(cos_zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse)
     fluxb = FluxSW(grid_params)
@@ -203,9 +199,7 @@ function TwoStreamSWRTE(
     inc_flux_diffuse,
     sfc_alb_diffuse,
 )
-    (; ncol, nlay, context) = grid_params
-    DA = ClimaComms.array_type(grid_params)
-    FT = eltype(grid_params)
+    (; context) = grid_params
     op = TwoStream(grid_params)
     src = SourceSW2Str(grid_params)
     bcs = SwBCs(cos_zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse)

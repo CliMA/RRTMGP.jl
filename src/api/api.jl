@@ -57,9 +57,7 @@ function RRTMGPSolver(
     center_z = nothing,
     face_z = nothing,
 )
-    (; context, ncol, nlay) = grid_params
-    FT = eltype(grid_params)
-    DA = ClimaComms.array_type(grid_params)
+    (; context) = grid_params
 
     src_lw = op_lw isa OneScalar ? SourceLWNoScat(grid_params; params) : SourceLW2Str(grid_params; params)
     src_sw = op_sw isa OneScalar ? nothing : SourceSW2Str(grid_params)
