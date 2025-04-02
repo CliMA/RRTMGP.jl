@@ -6,7 +6,7 @@ import ..Vmrs
 include("getters.jl")
 optical_thickness_parameter(s::RRTMGPSolver) = nothing                                          # not yet used
 
-extra_layer(s::RRTMGPSolver) = s.grid_params.extra_layer
+isothermal_boundary_layer(s::RRTMGPSolver) = s.grid_params.isothermal_boundary_layer
 
 """
     domain_view(gp::RRTMGPGridParams, data::RRTMGPData{NVCOrder})
@@ -18,23 +18,23 @@ function domain_view end
 
 @inline domain_view(_, data::RRTMGPData) = data
 @inline domain_view(gp::RRTMGPGridParams, data::RRTMGPData{NVCOrder}) =
-    domain_view(gp.extra_layer, data)
+    domain_view(gp.isothermal_boundary_layer, data)
 
 @inline domain_view(s::RRTMGPSolver, data::RRTMGPData{NVCOrder}) =
-    domain_view(extra_layer(s), data)
+    domain_view(isothermal_boundary_layer(s), data)
 
-function domain_view(extra_layer::Bool, data::RRTMGPData{NVCOrder})
+function domain_view(isothermal_boundary_layer::Bool, data::RRTMGPData{NVCOrder})
     nlay = size(parent(data), 2)
-    if extra_layer
+    if isothermal_boundary_layer
         RRTMGPData{NVCOrder}(view(parent(data), :, 1:nlay-1, :))
     else
         RRTMGPData{NVCOrder}(view(parent(data), :, 1:nlay, :))
     end
 end
 
-function domain_view(extra_layer::Bool, data::RRTMGPData{VCOrder})
+function domain_view(isothermal_boundary_layer::Bool, data::RRTMGPData{VCOrder})
     nlay = size(parent(data), 1)
-    if extra_layer
+    if isothermal_boundary_layer
         RRTMGPData{VCOrder}(view(parent(data), 1:nlay-1, :))
     else
         RRTMGPData{VCOrder}(view(parent(data), 1:nlay, :))

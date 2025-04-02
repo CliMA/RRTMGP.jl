@@ -100,18 +100,15 @@ function lookup_tables(
     nbnd_sw = RRTMGP.LookUpTables.get_n_bnd(lookup_sw)
     ngas_sw = RRTMGP.LookUpTables.get_n_gases(lookup_sw)
 
+    clear_sky_lookups =
+        lookup_tables(
+            ClearSkyRadiation(radiation_method.aerosol_radiation),
+            device,
+            FT
+        )
     lookups = (;
-        idx_aerosize_lw,
-        idx_aerosize_sw,
-        idx_aerosol_lw,
-        idx_aerosol_sw,
-        idx_gases_lw,
-        idx_gases_sw,
-        lookup_lw,
-        lookup_lw_aero,
+        clear_sky_lookups.lookups...,
         lookup_lw_cld,
-        lookup_sw,
-        lookup_sw_aero,
         lookup_sw_cld,
     )
 

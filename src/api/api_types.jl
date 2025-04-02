@@ -15,16 +15,16 @@ struct RRTMGPGridParams{FT, C}
     context::C
     nlay::Int
     ncol::Int
-    extra_layer::Bool # for isothermal boundary layer
+    isothermal_boundary_layer::Bool # for isothermal boundary layer
 end
 function RRTMGPGridParams(
     ::Type{FT};
     context::ClimaComms.AbstractCommsContext,
     nlay::Int,
     ncol::Int,
-    extra_layer::Bool = false,
+    isothermal_boundary_layer::Bool = false,
 ) where {FT}
-    return RRTMGPGridParams{FT, typeof(context)}(context, nlay, ncol, extra_layer)
+    return RRTMGPGridParams{FT, typeof(context)}(context, nlay, ncol, isothermal_boundary_layer)
 end
 
 # Overload some methods for convenience:

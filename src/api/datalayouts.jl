@@ -129,19 +129,14 @@ Base.copyto!(data::RRTMGPData, array::AbstractArray) = Base.copyto!(parent(data)
 
 Base.@propagate_inbounds Base.getindex(data::RRTMGPData, I::CartesianIndex) = Base.getindex(parent(data), I.I...)
 
-Base.@propagate_inbounds Base.getindex(data::RRTMGPData{NVCOrder}, i, v, c) = Base.getindex(parent(data), i, v, c)
-Base.@propagate_inbounds Base.getindex(data::RRTMGPData{VCOrder}, v, c) = Base.getindex(parent(data), v, c)
-Base.@propagate_inbounds Base.getindex(data::RRTMGPData{NCOrder}, i, c) = Base.getindex(parent(data), i, c)
-Base.@propagate_inbounds Base.getindex(data::RRTMGPData{NOrder}, i) = Base.getindex(parent(data), i)
+Base.@propagate_inbounds Base.getindex(data::RRTMGPData, indices...) =
+    Base.getindex(parent(data), indices...)
 
-Base.@propagate_inbounds Base.setindex!(data::RRTMGPData{NVCOrder}, X, I::CartesianIndex) =
+Base.@propagate_inbounds Base.setindex!(data::RRTMGPData, X, I::CartesianIndex) =
     Base.setindex!(parent(data), X, I.I...)
 
-Base.@propagate_inbounds Base.setindex!(data::RRTMGPData{NVCOrder}, X, i, v, c) =
-    Base.setindex!(parent(data), X, i, v, c)
-Base.@propagate_inbounds Base.setindex!(data::RRTMGPData{VCOrder}, X, v, c) = Base.setindex!(parent(data), X, v, c)
-Base.@propagate_inbounds Base.setindex!(data::RRTMGPData{NCOrder}, X, i, c) = Base.setindex!(parent(data), X, i, c)
-Base.@propagate_inbounds Base.setindex!(data::RRTMGPData{NOrder}, X, i) = Base.setindex!(parent(data), X, i)
+Base.@propagate_inbounds Base.setindex!(data::RRTMGPData, X, indices...) =
+    Base.setindex!(parent(data), X, indices...)
 
 Base.fill!(data::RRTMGPData, value::Number) = fill!(parent(data), value)
 
@@ -155,7 +150,7 @@ Base.fill!(data::RRTMGPData, value::Number) = fill!(parent(data), value)
 Sets `data` in the domain to `value` (excludes extra layer).
 """
 function set_domain!(data::RRTMGPData, value, gp::RRTMGPGridParams)
-    set_cols!(domain_view(gp.extra_layer, data), value)
+    set_cols!(domain_view(gp.isothermal_boundary_layer, data), value)
     return data
 end
 
