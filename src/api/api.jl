@@ -131,7 +131,7 @@ update_lw_fluxes!(s::RRTMGPSolver, ::AllSkyRadiation) = RTESolver.solve_lw!(
 )
 function update_lw_fluxes!(s::RRTMGPSolver, ::AllSkyRadiationWithClearSkyDiagnostics)
     as = atmospheric_state(s)
-    lookups = lookup_tables(s)
+    lookups = _lookup_tables(s)
     lw_solver = longwave_solver(s)
     RTESolver.solve_lw!(lw_solver, as, lookups.lookup_lw, nothing, lookups.lookup_lw_aero)
     parent(clear_lw_flux_up(s)) .= parent(lw_flux_up(s))
@@ -163,7 +163,7 @@ update_sw_fluxes!(s::RRTMGPSolver, ::AllSkyRadiation) = RTESolver.solve_sw!(
     _lookup_tables(s).lookups.lookup_sw_aero,
 )
 function update_sw_fluxes!(s::RRTMGPSolver, ::AllSkyRadiationWithClearSkyDiagnostics)
-    lookups = lookup_tables(s)
+    lookups = _lookup_tables(s)
     sw_solver = shortwave_solver(s)
     as = atmospheric_state(s)
     RTESolver.solve_sw!(sw_solver, as, lookups.lookup_sw, nothing, lookups.lookup_sw_aero)
