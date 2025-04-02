@@ -9,6 +9,7 @@ import ClimaComms
 @static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
 
 using RRTMGP
+using RRTMGP: RRTMGPGridParams
 using RRTMGP.Vmrs
 using RRTMGP.LookUpTables
 using RRTMGP.AtmosphericStates
@@ -32,7 +33,7 @@ function benchmark_all_sky_with_aerosols(
     ::Type{SLVLW},
     ::Type{SLVSW},
     ::Type{FT};
-    ncol = 128,# repeats col#1 ncol times per RRTMGP example 
+    ncol = 128,# repeats col#1 ncol times per RRTMGP example
     cldfrac = FT(1),
 ) where {FT <: AbstractFloat, SLVLW, SLVSW}
     overrides = (; grav = 9.80665, molmass_dryair = 0.028964, molmass_water = 0.018016)
@@ -54,32 +55,32 @@ function benchmark_all_sky_with_aerosols(
     input_file = get_input_filename(:gas_clouds_aerosols, :lw) # all-sky atmos state
 
     #reading longwave gas optics lookup data
-    ds_lw = Dataset(lw_file, "r")
-    lookup_lw, idx_gases = LookUpLW(ds_lw, FT, DA)
-    close(ds_lw)
+    lookup_lw, idx_gases = Dataset(lw_file, "r") do ds
+        LookUpLW(ds, FT, DA)
+    end
     # reading longwave cloud lookup data
-    ds_lw_cld = Dataset(lw_cld_file, "r")
-    lookup_lw_cld = LookUpCld(ds_lw_cld, FT, DA)
-    close(ds_lw_cld)
+    lookup_lw_cld = Dataset(lw_cld_file, "r") do ds
+        LookUpCld(ds, FT, DA)
+    end
     # reading longwave aerosol lookup data
-    ds_lw_aero = Dataset(lw_aero_file, "r")
-    lookup_lw_aero, idx_aerosol, idx_aerosize = LookUpAerosolMerra(ds_lw_aero, FT, DA)
-    close(ds_lw_aero)
+    lookup_lw_aero, idx_aerosol, idx_aerosize = Dataset(lw_aero_file, "r") do ds
+        LookUpAerosolMerra(ds, FT, DA)
+    end
 
     #reading shortwave gas optics lookup data
-    ds_sw = Dataset(sw_file, "r")
-    lookup_sw, idx_gases = LookUpSW(ds_sw, FT, DA)
-    close(ds_sw)
+    lookup_sw, idx_gases = Dataset(sw_file, "r") do ds
+        LookUpSW(ds, FT, DA)
+    end
     # reading longwave cloud lookup data
-    ds_sw_cld = Dataset(sw_cld_file, "r")
-    lookup_sw_cld = LookUpCld(ds_sw_cld, FT, DA)
-    close(ds_sw_cld)
+    lookup_sw_cld = Dataset(sw_cld_file, "r") do ds
+        LookUpCld(ds, FT, DA)
+    end
     # reading shortwave aerosol lookup data
-    ds_sw_aero = Dataset(sw_aero_file, "r")
-    lookup_sw_aero, _, _ = LookUpAerosolMerra(ds_sw_aero, FT, DA)
-    close(ds_sw_aero)
+    lookup_sw_aero, _, _ = Dataset(sw_aero_file, "r") do ds
+        LookUpAerosolMerra(ds, FT, DA)
+    end
 
-    # reading input file 
+    # reading input file
     ds_in = Dataset(input_file, "r")
     as, sfc_emis, sfc_alb_direct, sfc_alb_diffuse, cos_zenith, toa_flux, bot_at_1 = setup_allsky_with_aerosols_as(
         context,
@@ -100,13 +101,14 @@ function benchmark_all_sky_with_aerosols(
 
     nlay, _ = AtmosphericStates.get_dims(as)
     nlev = nlay + 1
+    grid_params = RRTMGPGridParams(FT; context, nlay, ncol)
     # Setting up longwave problem---------------------------------------
     inc_flux = nothing
-    slv_lw = SLVLW(FT, DA, context, param_set, nlay, ncol, sfc_emis, inc_flux)
+    slv_lw = SLVLW(grid_params; params = param_set, sfc_emis, inc_flux)
     # Setting up shortwave problem---------------------------------------
     inc_flux_diffuse = nothing
-    swbcs = (cos_zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse)
-    slv_sw = SLVSW(FT, DA, context, nlay, ncol, swbcs...)
+    swbcs = (; cos_zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse)
+    slv_sw = SLVSW(grid_params; swbcs...)
     #------calling solvers
     solve_lw!(slv_lw, as, lookup_lw, lookup_lw_cld, lookup_lw_aero)
     trial_lw = @benchmark CUDA.@sync solve_lw!($slv_lw, $as, $lookup_lw, $lookup_lw_cld, $lookup_lw_aero)

@@ -21,6 +21,7 @@ makedocs(;
         "Optics" => "Optics.md",
         "Example" => "Example.md",
         "API" => Any[
+            "API" => "api.md"
             "Angular Discretization" => "optics/AngularDiscretizations.md"
             "Artifacts" => "ArtifactPaths.md"
             "Atmospheric State" => "optics/AtmosphericStates.md"

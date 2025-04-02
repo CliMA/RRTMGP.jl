@@ -8,6 +8,7 @@ import ClimaComms
 import Infiltrator
 
 using RRTMGP
+using RRTMGP: RRTMGPGridParams
 using RRTMGP.Vmrs
 using RRTMGP.LookUpTables
 using RRTMGP.AtmosphericStates
@@ -51,14 +52,14 @@ function clear_sky(
     n_gauss_angles = 1
 
     # reading longwave lookup data
-    ds_lw = Dataset(lw_file, "r")
-    lookup_lw, idx_gases = LookUpLW(ds_lw, FT, DA)
-    close(ds_lw)
+    lookup_lw, idx_gases = Dataset(lw_file, "r") do ds
+        LookUpLW(ds, FT, DA)
+    end
 
     # reading shortwave lookup data
-    ds_sw = Dataset(sw_file, "r")
-    lookup_sw, idx_gases = LookUpSW(ds_sw, FT, DA)
-    close(ds_sw)
+    lookup_sw, idx_gases = Dataset(sw_file, "r") do ds
+        LookUpSW(ds, FT, DA)
+    end
 
     # reading rfmip data to atmospheric state
     ds_lw_in = Dataset(input_file, "r")
@@ -68,16 +69,17 @@ function clear_sky(
 
     nlay, _ = AtmosphericStates.get_dims(as)
     nlev = nlay + 1
+    grid_params = RRTMGPGridParams(FT; context, nlay, ncol)
 
     # setting up longwave problem
     inc_flux = nothing
-    slv_lw = SLVLW(FT, DA, context, param_set, nlay, ncol, sfc_emis, inc_flux)
+    slv_lw = SLVLW(grid_params; params = param_set, sfc_emis, inc_flux)
 
     # setting up shortwave problem
     sfc_alb_diffuse = DA{FT, 2}(deepcopy(sfc_alb_direct))
     inc_flux_diffuse = nothing
-    swbcs = (cos_zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse)
-    slv_sw = SLVSW(FT, DA, context, nlay, ncol, swbcs...)
+    swbcs = (; cos_zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse)
+    slv_sw = SLVSW(grid_params; swbcs...)
     #--------------------------------------------------
     # calling longwave and shortwave solvers
     exfiltrate && Infiltrator.@exfiltrate
