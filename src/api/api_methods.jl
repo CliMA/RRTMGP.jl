@@ -129,17 +129,17 @@ gas_names_sw() = [
     "hfc125"
 ]
 
-for (i, aname) in enumerate(gas_names_sw())
-    sname = Symbol(aname)
+for gname in gas_names_sw()
+    sname = Symbol(gname)
     # Double interpolation needed here: 1 for @eval, second for doc string
     @eval begin
         """
-            volume_mixing_ratio_$($(aname))(s::RRTMGPSolver)
+            volume_mixing_ratio_$($(gname))(s::RRTMGPSolver)
 
-        Returns the volume moxing ratio for $($(aname)).
+        Returns the volume moxing ratio for $($(gname)).
         """
         $(Symbol(:volume_mixing_ratio_, sname))(s::RRTMGPSolver) =
-            return get_vmr(s.as.vmr, s.lookups.idx_gases_sw[aname])
+            return get_vmr(s.as.vmr, s.lookups.idx_gases_sw[gname])
     end
 end
 
