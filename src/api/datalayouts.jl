@@ -129,14 +129,12 @@ Base.copyto!(data::RRTMGPData, array::AbstractArray) = Base.copyto!(parent(data)
 
 Base.@propagate_inbounds Base.getindex(data::RRTMGPData, I::CartesianIndex) = Base.getindex(parent(data), I.I...)
 
-Base.@propagate_inbounds Base.getindex(data::RRTMGPData, indices...) =
-    Base.getindex(parent(data), indices...)
+Base.@propagate_inbounds Base.getindex(data::RRTMGPData, indices...) = Base.getindex(parent(data), indices...)
 
 Base.@propagate_inbounds Base.setindex!(data::RRTMGPData, X, I::CartesianIndex) =
     Base.setindex!(parent(data), X, I.I...)
 
-Base.@propagate_inbounds Base.setindex!(data::RRTMGPData, X, indices...) =
-    Base.setindex!(parent(data), X, indices...)
+Base.@propagate_inbounds Base.setindex!(data::RRTMGPData, X, indices...) = Base.setindex!(parent(data), X, indices...)
 
 Base.fill!(data::RRTMGPData, value::Number) = fill!(parent(data), value)
 
