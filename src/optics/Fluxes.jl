@@ -5,7 +5,7 @@ using DocStringExtensions
 using ClimaComms
 import ..RRTMGPGridParams
 
-export AbstractFlux, FluxLW, FluxSW, set_flux_to_zero!, add_to_flux!
+export AbstractFlux, FluxLW, FluxSW, set_flux_to_zero!, add_to_flux!, apply_metric_scaling!
 
 abstract type AbstractFlux{FT <: AbstractFloat, FTA2D <: AbstractArray{FT, 2}} end
 
@@ -213,6 +213,26 @@ function add_to_flux!(flux1::FluxSW, flux2::FluxSW, gcol)
         flux_dn_dir1[ilev, gcol] += flux_dn_dir2[ilev, gcol]
     end
     return nothing
+end
+
+"""
+    apply_metric_scaling!(flux::Union{FluxLW, FluxSW}, metric_scaling)
+
+Apply metric scaling factor for longwave radiative fluxes. This accounts for geometric expansion of 
+grid columns with increasing altitude when deep-atmosphere metric terms are used. Requires
+`flux_up`, `flux_dn` and `flux_net` to be available in `flux`. The metric scaling factor is 
+an optional argument that has a value `nothing` when shallow atmosphere approximations
+are used (in which case this function returns nothing).
+"""
+function apply_metric_scaling!(flux::AbstractFlux, metric_scaling::AbstractArray)
+    flux.flux_up .= flux.flux_up .* metric_scaling
+    flux.flux_dn .= flux.flux_dn .* metric_scaling
+    flux.flux_net .= flux.flux_net .* metric_scaling
+    flux isa FluxSW && (flux.flux_dn_dir .= flux.flux_dn_dir .* metric_scaling)
+    return nothing
+end
+function apply_metric_scaling!(flux::Union{FluxLW, FluxSW}, metric_scaling::Nothing)
+    nothing
 end
 
 end
