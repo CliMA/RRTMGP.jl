@@ -81,11 +81,12 @@ function benchmark_clear_sky(
     swbcs = (; cos_zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse)
     slv_sw = SLVSW(grid_params; swbcs...)
     #------calling solvers
-    solve_lw!(slv_lw, as, lookup_lw)
-    trial_lw = @benchmark CUDA.@sync solve_lw!($slv_lw, $as, $lookup_lw)
+    metric_scaling = DA(one.(slv_sw.flux.flux_up) * FT(1))
+    solve_lw!(slv_lw, as, lookup_lw, metric_scaling)
+    trial_lw = @benchmark CUDA.@sync solve_lw!($slv_lw, $as, $lookup_lw, $metric_scaling)
 
-    solve_sw!(slv_sw, as, lookup_sw)
-    trial_sw = @benchmark CUDA.@sync solve_sw!($slv_sw, $as, $lookup_sw)
+    solve_sw!(slv_sw, as, lookup_sw, metric_scaling)
+    trial_sw = @benchmark CUDA.@sync solve_sw!($slv_sw, $as, $lookup_sw, $metric_scaling)
     return trial_lw, trial_sw
 end
 

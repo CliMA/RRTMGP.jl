@@ -133,8 +133,14 @@ function all_sky_with_aerosols(
     #---------------- Exercise new api (end)
 
     # calling solvers
-    solve_lw!(slv_lw, as, lookup_lw, lookup_lw_cld, lookup_lw_aero)
-    solve_sw!(slv_sw, as, lookup_sw, lookup_sw_cld, lookup_sw_aero)
+
+    # unity metric scaling - i.e. shallow atmosphere approximation (no column expansion with height)
+    # test scaling factors (e.g. when applying corrections to metric terms for deep atmospheres)
+    # first, test do-nothing op eg. shallow atmospheres
+    metric_scaling = nothing
+    solve_lw!(slv_lw, as, lookup_lw, lookup_lw_cld, lookup_lw_aero, metric_scaling)
+    solve_sw!(slv_sw, as, lookup_sw, lookup_sw_cld, lookup_sw_aero, metric_scaling)
+
     # comparison
     method = "Lookup Table Interpolation method"
     comp_flux_up_lw, comp_flux_dn_lw, comp_flux_up_sw, comp_flux_dn_sw = load_comparison_data(bot_at_1, ncol)
@@ -214,6 +220,46 @@ function all_sky_with_aerosols(
     @test minimum(as.aerosol_state.aod_sw_ext) >= 0
     @test minimum(as.aerosol_state.aod_sw_sca) >= 0
     @test minimum(as.aerosol_state.aod_sw_ext .- as.aerosol_state.aod_sw_sca) >= 0
+
+    # New problem instance for metric scaling test
+    # Setting up longwave problem
+
+    # Set up test variables
+    test_flux_up_sw = deepcopy(DA(slv_sw.flux.flux_up))
+    test_flux_dn_sw = deepcopy(DA(slv_sw.flux.flux_dn))
+    test_flux_dn_dir_sw = deepcopy(DA(slv_sw.flux.flux_dn_dir))
+    test_flux_net_sw = deepcopy(DA(slv_sw.flux.flux_net))
+
+    test_flux_up_lw = deepcopy(DA(slv_lw.flux.flux_up))
+    test_flux_dn_lw = deepcopy(DA(slv_lw.flux.flux_dn))
+    test_flux_net_lw = deepcopy(DA(slv_lw.flux.flux_net))
+    # Set up problem 
+    inc_flux = nothing
+    slv_lw = SLVLW(FT, DA, context, param_set, nlay, ncol, sfc_emis, inc_flux)
+    # Setting up shortwave problem
+    inc_flux_diffuse = nothing
+    swbcs = (cos_zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse)
+    slv_sw = SLVSW(FT, DA, context, nlay, ncol, swbcs...)
+
+    metric_scaling = DA(one.(slv_sw.flux.flux_up) * FT(2))
+    solve_lw!(slv_lw, as, lookup_lw, lookup_lw_cld, lookup_lw_aero, metric_scaling)
+    solve_sw!(slv_sw, as, lookup_sw, lookup_sw_cld, lookup_sw_aero, metric_scaling)
+
+    flux_up_sw = DA(slv_sw.flux.flux_up)
+    flux_dn_sw = DA(slv_sw.flux.flux_dn)
+    flux_net_sw = DA(slv_sw.flux.flux_net)
+    flux_up_lw = DA(slv_lw.flux.flux_up)
+    flux_dn_lw = DA(slv_lw.flux.flux_dn)
+    flux_net_lw = DA(slv_lw.flux.flux_net)
+    flux_dn_dir_sw = DA(slv_sw.flux.flux_dn_dir)
+
+    @test all(test_flux_up_sw == flux_up_sw .* metric_scaling)
+    @test all(test_flux_dn_sw == flux_dn_sw .* metric_scaling)
+    @test all(test_flux_net_sw == flux_net_sw .* metric_scaling)
+    @test all(test_flux_up_lw == flux_up_lw .* metric_scaling)
+    @test all(test_flux_dn_lw == flux_dn_lw .* metric_scaling)
+    @test all(test_flux_net_lw == flux_net_lw .* metric_scaling)
+    @test all(test_flux_dn_dir_sw[1, :] == flux_dn_dir_sw[1, :] .* metric_scaling[1, :])
 
     return nothing
 end
