@@ -45,6 +45,8 @@ struct AtmosphericState{FTA1D, FTA1DN, FTA2D, D, VMR, CLD, AER} <: AbstractAtmos
     layerdata::D
     "Level pressures `[Pa, mb]`; `(nlay+1,ncol)`"
     p_lev::FTA2D
+    "Level metric scaling (e.g. area expansion in deep atmospheres, unity in shallow atmospheres)"
+    metric_scaling::FTA2D
     "Level temperatures `[K]`; `(nlay+1,ncol)`"
     t_lev::FTA2D
     "Surface temperatures `[K]`; `(ncol)`"
