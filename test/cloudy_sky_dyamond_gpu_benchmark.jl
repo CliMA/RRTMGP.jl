@@ -9,6 +9,7 @@ import ClimaComms
 @static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
 
 using RRTMGP
+using RRTMGP: RRTMGPGridParams
 using RRTMGP.Vmrs
 using RRTMGP.LookUpTables
 using RRTMGP.AtmosphericStates
@@ -32,16 +33,13 @@ function benchmark_all_sky(
     ::Type{SLVLW},
     ::Type{SLVSW},
     ::Type{FT};
-    ncol = 128,# repeats col#1 ncol times per RRTMGP example 
+    ncol = 128,# repeats col#1 ncol times per RRTMGP example
     cldfrac = FT(1),
 ) where {FT <: AbstractFloat, SLVLW, SLVSW}
     overrides = (; grav = 9.80665, molmass_dryair = 0.028964, molmass_water = 0.018016)
     param_set = RRTMGPParameters(FT, overrides)
-
     device = ClimaComms.device(context)
     DA = ClimaComms.array_type(device)
-    FTA1D = DA{FT, 1}
-    FTA2D = DA{FT, 2}
     n_gauss_angles = 1
 
     lw_file = get_lookup_filename(:gas, :lw)          # lw lookup tables for gas optics
@@ -52,22 +50,22 @@ function benchmark_all_sky(
     input_file = get_input_filename(:gas_clouds, :lw) # all-sky atmos state
 
     #reading longwave gas optics lookup data
-    ds_lw = Dataset(lw_file, "r")
-    lookup_lw, idx_gases = LookUpLW(ds_lw, FT, DA)
-    close(ds_lw)
+    lookup_lw, idx_gases = Dataset(lw_file, "r") do ds
+        LookUpLW(ds, FT, DA)
+    end
     # reading longwave cloud lookup data
-    ds_lw_cld = Dataset(lw_cld_file, "r")
-    lookup_lw_cld = LookUpCld(ds_lw_cld, FT, DA)
-    close(ds_lw_cld)
+    lookup_lw_cld = Dataset(lw_cld_file, "r") do ds
+        LookUpCld(ds, FT, DA)
+    end
     #reading shortwave gas optics lookup data
-    ds_sw = Dataset(sw_file, "r")
-    lookup_sw, idx_gases = LookUpSW(ds_sw, FT, DA)
-    close(ds_sw)
+    lookup_sw, idx_gases = Dataset(sw_file, "r") do ds
+        LookUpSW(ds, FT, DA)
+    end
     # reading longwave cloud lookup data
-    ds_sw_cld = Dataset(sw_cld_file, "r")
-    lookup_sw_cld = LookUpCld(ds_sw_cld, FT, DA)
-    close(ds_sw_cld)
-    # reading input file 
+    lookup_sw_cld = Dataset(sw_cld_file, "r") do ds
+        LookUpCld(ds, FT, DA)
+    end
+    # reading input file
     ds_in = Dataset(input_file, "r")
     as, sfc_emis, sfc_alb_direct, sfc_alb_diffuse, cos_zenith, toa_flux, bot_at_1 = setup_cloudy_sky_as(
         context,
@@ -85,6 +83,7 @@ function benchmark_all_sky(
     close(ds_in)
     nlay, ncol = AtmosphericStates.get_dims(as)
     nlev = nlay + 1
+    grid_params = RRTMGPGridParams(FT; context, nlay, ncol)
     #---reading comparison files -----------------------------------
     if bot_at_1
         flip_ind = 1:nlev
@@ -94,11 +93,11 @@ function benchmark_all_sky(
 
     # Setting up longwave problem---------------------------------------
     inc_flux = nothing
-    slv_lw = SLVLW(FT, DA, context, param_set, nlay, ncol, sfc_emis, inc_flux)
+    slv_lw = SLVLW(grid_params; params = param_set, sfc_emis, inc_flux)
     # Setting up shortwave problem---------------------------------------
     inc_flux_diffuse = nothing
-    swbcs = (cos_zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse)
-    slv_sw = SLVSW(FT, DA, context, nlay, ncol, swbcs...)
+    swbcs = (; cos_zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse)
+    slv_sw = SLVSW(grid_params; swbcs...)
     #------calling solvers
     solve_lw!(slv_lw, as, lookup_lw, lookup_lw_cld)
     trial_lw = @benchmark CUDA.@sync solve_lw!($slv_lw, $as, $lookup_lw, $lookup_lw_cld)

@@ -5,6 +5,7 @@ import ClimaComms
 import JET
 import Infiltrator
 using RRTMGP
+using RRTMGP: RRTMGPGridParams
 using RRTMGP.AngularDiscretizations
 using RRTMGP.Fluxes
 using RRTMGP.RTE
@@ -49,6 +50,7 @@ function gray_atmos_lw_equil(context, ::Type{SLVLW}, ::Type{FT}; exfiltrate = fa
     sfc_emis = DA{FT}(undef, nbnd, ncol) # surface emissivity
     sfc_emis .= FT(1.0)
     inc_flux = nothing                      # incoming flux
+    grid_params = RRTMGPGridParams(FT; context, nlay, ncol)
 
     if ncol == 1
         lat = DA{FT}([0])                   # latitude
@@ -58,7 +60,7 @@ function gray_atmos_lw_equil(context, ::Type{SLVLW}, ::Type{FT}; exfiltrate = fa
 
     otp = GrayOpticalThicknessSchneider2004(FT) # optical thickness parameters
     gray_as = setup_gray_as_pr_grid(context, nlay, lat, p0, pe, otp, param_set, DA)
-    slv_lw = SLVLW(FT, DA, context, param_set, nlay, ncol, sfc_emis, inc_flux)
+    slv_lw = SLVLW(grid_params; params = param_set, sfc_emis, inc_flux)
 
     (; flux_up, flux_dn, flux_net) = slv_lw.flux
     (; t_lay, p_lay, t_lev, p_lev) = gray_as
@@ -140,6 +142,7 @@ function gray_atmos_sw_test(
     sfc_emis = Array{FT}(undef, nbnd, ncol) # surface emissivity
     sfc_emis .= FT(1.0)
     deg2rad = FT(π) / FT(180)
+    grid_params = RRTMGPGridParams(FT; context, nlay, ncol)
 
     cos_zenith = DA{FT, 1}(undef, ncol)   # cosine of solar zenith angle
     toa_flux = DA{FT, 1}(undef, ncol) # top of atmosphere flux
@@ -164,8 +167,8 @@ function gray_atmos_sw_test(
 
     as = setup_gray_as_pr_grid(context, nlay, lat, p0, pe, otp, param_set, DA) # init gray atmos state
 
-    swbcs = (cos_zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse)
-    slv_sw = SLVSW(FT, DA, context, nlay, ncol, swbcs...)
+    swbcs = (; cos_zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse)
+    slv_sw = SLVSW(grid_params; swbcs...)
 
     exfiltrate && Infiltrator.@exfiltrate
     solve_sw!(slv_sw, as)
