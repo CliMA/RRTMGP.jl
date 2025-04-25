@@ -110,11 +110,14 @@ function benchmark_all_sky_with_aerosols(
     swbcs = (; cos_zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse)
     slv_sw = SLVSW(grid_params; swbcs...)
     #------calling solvers
-    solve_lw!(slv_lw, as, lookup_lw, lookup_lw_cld, lookup_lw_aero)
-    trial_lw = @benchmark CUDA.@sync solve_lw!($slv_lw, $as, $lookup_lw, $lookup_lw_cld, $lookup_lw_aero)
+    metric_scaling = DA(one.(slv_sw.flux.flux_up))
+    solve_lw!(slv_lw, as, lookup_lw, lookup_lw_cld, lookup_lw_aero, metric_scaling)
+    trial_lw =
+        @benchmark CUDA.@sync solve_lw!($slv_lw, $as, $lookup_lw, $lookup_lw_cld, $lookup_lw_aero, $metric_scaling)
 
-    solve_sw!(slv_sw, as, lookup_sw, lookup_sw_cld, lookup_sw_aero)
-    trial_sw = @benchmark CUDA.@sync solve_sw!($slv_sw, $as, $lookup_sw, $lookup_sw_cld, $lookup_sw_aero)
+    solve_sw!(slv_sw, as, lookup_sw, lookup_sw_cld, lookup_sw_aero, metric_scaling)
+    trial_sw =
+        @benchmark CUDA.@sync solve_sw!($slv_sw, $as, $lookup_sw, $lookup_sw_cld, $lookup_sw_aero, $metric_scaling)
     return trial_lw, trial_sw
 end
 

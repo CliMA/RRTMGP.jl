@@ -95,18 +95,19 @@ function cloudy_sky(
     swbcs = (; cos_zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse)
     slv_sw = SLVSW(grid_params; swbcs...)
     #------calling solvers
-    solve_lw!(slv_lw, as, lookup_lw, lookup_lw_cld)
+    metric_scaling = DA(one.(slv_sw.flux.flux_up))
+    solve_lw!(slv_lw, as, lookup_lw, lookup_lw_cld, nothing, metric_scaling)
     if device isa ClimaComms.CPUSingleThreaded
-        JET.@test_opt solve_lw!(slv_lw, as, lookup_lw, lookup_lw_cld)
-        #@test (@allocated solve_lw!(slv_lw, as, lookup_lw, lookup_lw_cld)) == 0
-        @test (@allocated solve_lw!(slv_lw, as, lookup_lw, lookup_lw_cld)) ≤ 448
+        JET.@test_opt solve_lw!(slv_lw, as, lookup_lw, lookup_lw_cld, nothing, metric_scaling)
+        #@test (@allocated solve_lw!(slv_lw, as, lookup_lw, lookup_lw_cld, nothing, metric_scaling)) == 0
+        @test (@allocated solve_lw!(slv_lw, as, lookup_lw, lookup_lw_cld, nothing, metric_scaling)) ≤ 448
     end
 
     exfiltrate && Infiltrator.@exfiltrate
-    solve_sw!(slv_sw, as, lookup_sw, lookup_sw_cld)
+    solve_sw!(slv_sw, as, lookup_sw, lookup_sw_cld, nothing, metric_scaling)
     if device isa ClimaComms.CPUSingleThreaded
-        JET.@test_opt solve_sw!(slv_sw, as, lookup_sw, lookup_sw_cld)
-        @test (@allocated solve_sw!(slv_sw, as, lookup_sw, lookup_sw_cld)) ≤ 368
+        JET.@test_opt solve_sw!(slv_sw, as, lookup_sw, lookup_sw_cld, nothing, metric_scaling)
+        @test (@allocated solve_sw!(slv_sw, as, lookup_sw, lookup_sw_cld, nothing, metric_scaling)) ≤ 368
     end
     #-------------
     # comparison

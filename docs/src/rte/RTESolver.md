@@ -5,6 +5,7 @@ CurrentModule = RRTMGP.RTESolver
 ```
 
 ```@docs
+apply_metric_scaling!
 solve_lw!
 solve_sw!
 ```
