@@ -1,56 +1,49 @@
-name: OS Unit Tests
-
+name: test-os
 on:
-  pull_request:
   push:
     tags: '*'
+  pull_request:
+  merge_group:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Needed to allow julia-actions/cache to delete old caches that it has created
+permissions:
+  actions: write
+  contents: read
+
 jobs:
-  test-os:
-    timeout-minutes: 30
+  test:
+    name: ci ${{ matrix.version }} - ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: ${{ matrix.timeout }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
-
-    runs-on: ${{ matrix.os }}
-
-    # Workaround for OSX MPICH issue:
-    # https://github.com/pmodels/mpich/issues/4710
-    env:
-      MPICH_INTERFACE_HOSTNAME: "localhost"
-      CLIMATEMACHINE_TEST_RUNMPI_LOCALHOST: "true"
-
+        version:
+          - '1.10'
+          - '1.11'
+        os:
+          - ubuntu-latest
+          - macOS-latest
+          - windows-latest
+        include:
+          - version: '1.10'
+            timeout: 30
+          - version: '1.11'
+            timeout: 45
     steps:
-    - name: Cancel Previous Runs
-      uses: styfle/cancel-workflow-action@0.4.0
-      with:
-        access_token: ${{ github.token }}
-
-    - name: Checkout
-      uses: actions/checkout@v2.2.0
-
-    - name: Set up Julia
-      uses: julia-actions/setup-julia@v1
-      with:
-        version: '1.10'
-
-    # https://discourse.julialang.org/t/recommendation-cache-julia-artifacts-in-ci-services/35484
-    - name: Cache artifacts
-      uses: actions/cache@v4
-      env:
-        cache-name: cache-artifacts
-      with:
-        path: ~/.julia/artifacts 
-        key: ${{ runner.os }}-test-${{ env.cache-name }}-${{ hashFiles('**/Project.toml') }}
-        restore-keys: |
-          ${{ runner.os }}-test-${{ env.cache-name }}-
-          ${{ runner.os }}-test-
-          ${{ runner.os }}-
-
-    - name: Install Project Packages
-      run: |
-        julia --project=@. -e 'using Pkg; Pkg.instantiate()'
-
-    - name: Run Unit Tests
-      run: |
-        julia --project=@. -e 'using Pkg; Pkg.test()'
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: ${{ matrix.version }}
+      - uses: julia-actions/cache@v2
+      - uses: julia-actions/julia-buildpkg@v1
+      - uses: julia-actions/julia-runtest@v1
+      - uses: julia-actions/julia-processcoverage@v1
+      - uses: codecov/codecov-action@v5
+        with:
+          file: lcov.info
+          token: ${{secrets.CODECOV_TOKEN}}
