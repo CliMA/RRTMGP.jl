@@ -1,4 +1,4 @@
-name: OS Unit Tests
+name: test-os
 on:
   push:
     tags: '*'
