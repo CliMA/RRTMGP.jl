@@ -45,7 +45,9 @@ function lookup_tables(radiation_method::ClearSkyRadiation, device::ClimaComms.A
     else
         (nothing, nothing, nothing)
     end
-    @assert sort(collect(keys(idx_aerosol_sw))) == sort(RRTMGP.aerosol_names())
+    if !isnothing(idx_aerosol_sw)
+        @assert sort(collect(keys(idx_aerosol_sw))) == sort(RRTMGP.aerosol_names())
+    end
 
     lookups = (;
         idx_aerosize_lw,
