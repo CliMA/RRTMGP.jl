@@ -1,7 +1,7 @@
 name = "RRTMGP"
 uuid = "a01a1ee8-cea4-48fc-987c-fc7878d79da1"
 authors = ["Climate Modeling Alliance"]
-version = "0.21.3"
+version = "0.21.4"
 
 [deps]
 Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
@@ -25,7 +25,7 @@ Adapt = "3.3, 4"
 Artifacts = "1"
 CUDA = "4, 5"
 ClimaComms = "0.5.1, 0.6"
-ClimaParams = "0.10"
+ClimaParams = "0.10, 0.11"
 DocStringExtensions = "0.8, 0.9"
 NCDatasets = "0.14.2"
 Random = "1"
