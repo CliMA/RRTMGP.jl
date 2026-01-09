@@ -41,5 +41,5 @@ julia> using RRTMGP
 # Acknowledgments
 
  - [Robert Pincus](https://github.com/RobertPincus) for his invaluable help. 
- - THe authors of the [Fortran implementation](https://github.com/earth-system-radiation/rte-rrtmgp) of RTE-RRTMGP on which this code is based
+ - The authors of the [Fortran implementation](https://github.com/earth-system-radiation/rte-rrtmgp) of RTE-RRTMGP on which this code is based
  - NASA for images of the sun (for our [logo](https://clima.github.io/RRTMGP.jl/latest/assets/logo.png))
