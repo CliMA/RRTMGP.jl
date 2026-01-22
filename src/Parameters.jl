@@ -22,4 +22,6 @@ end
 R_d(ps::ARP) = gas_constant(ps) / molmass_dryair(ps)
 cp_d(ps::ARP) = R_d(ps) / kappa_d(ps)
 
+Base.eltype(::RRTMGPParameters{FT}) where {FT} = FT
+
 end # module
