@@ -4,8 +4,10 @@ RRTMGP.jl Release Notes
 main
 ------
 
-v0.21.1
+v0.21.7
 ------
+- Fix edge case cos_zenith = 0 in shortwave solver
+  PR [#595](https://github.com/CliMA/RRTMGP.jl/pull/595)
 
 v0.21.0
 ------
