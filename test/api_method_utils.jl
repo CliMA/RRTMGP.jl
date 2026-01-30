@@ -27,7 +27,7 @@ const api_methods = [
     :face_z,
     :clear_sw_flux,
     :cos_zenith,
-    :weighted_irradiance,
+    :toa_flux,
     :direct_sw_surface_albedo,
     :diffuse_sw_surface_albedo,
     :latitude,
