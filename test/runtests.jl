@@ -80,6 +80,12 @@ printstyled("=================================\n\n", color = color1)
     end
 end
 
+printstyled("\n\ncos_zenith edge cases tests\n", color = color1)
+printstyled("=================================\n\n", color = color1)
+@testset "cos_zenith edge cases tests" begin
+    include("cos_zenith_edge_cases.jl")
+end
+
 printstyled("\n\nOptics utilities tests\n", color = color1)
 printstyled("==============\n\n", color = color1)
 include("optics_utils.jl")
