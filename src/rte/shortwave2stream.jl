@@ -18,14 +18,14 @@ function rte_sw_2stream_solve!(
         flux_net_sw = flux_sw.flux_net
 
         ClimaComms.@threaded device for gcol in 1:ncol
-            if cos_zenith[gcol] > 0 # zero out columns with zenith angle ≥ π/2
-                compute_optical_props!(op, as, gcol)
+            compute_optical_props!(op, as, gcol)
+            if cos_zenith[gcol] > 0 
                 # call shortwave rte solver
                 rte_sw_2stream!(op, src_sw, bcs_sw, flux_sw, solar_frac, igpt, n_gpt, ibnd, nlev, gcol)
                 for ilev in 1:nlev
                     flux_net_sw[ilev, gcol] = flux_up_sw[ilev, gcol] - flux_dn_sw[ilev, gcol]
                 end
-            else
+            else # zero out columns with zenith angle ≥ π/2
                 set_flux_to_zero!(flux_sw, gcol)
             end
         end
@@ -67,15 +67,15 @@ function rte_sw_2stream_solve!(
             end
         end
         for igpt in 1:n_gpt
-            ClimaComms.@threaded device for gcol in 1:ncol
+            ClimaComms.@threaded device for gcol in 1:ncol   
+                bld_cld_mask && Optics.build_cloud_mask!(
+                    view(cloud_state.mask_sw, :, gcol),
+                    view(cloud_state.cld_frac, :, gcol),
+                    cloud_state.mask_type,
+                )
+                # compute optical properties
+                compute_optical_props!(op, as, gcol, igpt, lookup_sw, lookup_sw_cld, lookup_sw_aero)
                 if cos_zenith[gcol] > 0
-                    bld_cld_mask && Optics.build_cloud_mask!(
-                        view(cloud_state.mask_sw, :, gcol),
-                        view(cloud_state.cld_frac, :, gcol),
-                        cloud_state.mask_type,
-                    )
-                    # compute optical properties
-                    compute_optical_props!(op, as, gcol, igpt, lookup_sw, lookup_sw_cld, lookup_sw_aero)
                     solar_frac = lookup_sw.solar_src_scaled[igpt]
                     ibnd = lookup_sw.band_data.major_gpt2bnd[igpt]
                     # call rte shortwave solver
@@ -91,7 +91,7 @@ function rte_sw_2stream_solve!(
                         end
                         @inbounds flux_dn_dir_sw[1, gcol] += flux_dn_dir[1, gcol]
                     end
-                else
+                else # zero out columns with zenith angle ≥ π/2
                     set_flux_to_zero!(flux_sw, gcol)
                 end
             end
@@ -139,7 +139,7 @@ function sw_2stream_coeffs(τ::FT, ssa::FT, g::FT, μ₀::FT) where {FT}
     Tdif = RT_term * FT(2) * k * exp_minusktau     # Eqn. 26
 
     # Transmittance of direct, unscattered beam. Also used below
-    T₀ = Tnoscat = exp(-τ / μ₀)
+    T₀ = Tnoscat = exp(-τ / max(μ₀, eps(FT)))
 
     # Direct reflect and transmission
     k_μ = k * μ₀
@@ -186,7 +186,7 @@ function get_flux_dn_dir(τ, μ₀, flux_dn_dir_top, lev)
     for ilev in nlay:-1:lev
         τ_sum += τ[ilev]
     end
-    return flux_dn_dir_top * exp(-τ_sum / μ₀)
+    return flux_dn_dir_top * exp(-τ_sum / max(μ₀, eps(eltype(τ))))
 end
 
 """
@@ -232,7 +232,7 @@ function rte_sw_2stream!(
     end
     # Direct-beam and source for diffuse radiation
     flux_dn_dir_top = toa_flux * solar_frac * μ₀
-    flux_dn_dir_bot = flux_dn_dir_top * exp(-τ_sum / μ₀) # store value at surface
+    flux_dn_dir_bot = flux_dn_dir_top * exp(-τ_sum / max(μ₀, eps(FT))) # store value at surface
     @inbounds flux_dn_dir[1, gcol] = flux_dn_dir_bot # store value at surface
     sfc_source = flux_dn_dir_bot * sfc_alb_direct
 
@@ -256,7 +256,7 @@ function rte_sw_2stream!(
         # transmitted through the layer and reflected from layers below (Tdiff*src*albedo)
         τ_cum -= τ_ilev
         τ_cum = max(τ_cum, FT(0))
-        flux_dn_dir_ilevplus1 = flux_dn_dir_top * exp(-τ_cum / μ₀)
+        flux_dn_dir_ilevplus1 = flux_dn_dir_top * exp(-τ_cum / max(μ₀, eps(FT)))
         src_up_ilev = Rdir * flux_dn_dir_ilevplus1 #flux_dn_dir[ilev + 1]
         src_dn_ilev = Tdir * flux_dn_dir_ilevplus1 #flux_dn_dir[ilev + 1]
         src_ilevplus1 = src_up_ilev + Tdif * denom * (src_ilev + albedo_ilev * src_dn_ilev)
@@ -280,7 +280,7 @@ function rte_sw_2stream!(
         albedo_ilev, src_ilev = albedo[ilev, gcol], src[ilev, gcol]
         (_, Tdir, _, Rdif, Tdif) = sw_2stream_coeffs(τ_ilev, ssa_ilev, g_ilev, μ₀)
         denom = FT(1) / (FT(1) - Rdif * albedo_ilev)  # Eq 10
-        src_dn_ilev = Tdir * flux_dn_dir_top * exp(-τ_cum / μ₀)
+        src_dn_ilev = Tdir * flux_dn_dir_top * exp(-τ_cum / max(μ₀, eps(FT)))
         τ_cum += τ_ilev
         flux_dn_ilev = (Tdif * flux_dn_ilevplus1 + # Equation 13
                         Rdif * src_ilev +
@@ -288,7 +288,7 @@ function rte_sw_2stream!(
         flux_up[ilev, gcol] =
             flux_dn_ilev * albedo_ilev + # Equation 12
             src_ilev
-        flux_dn[ilev, gcol] = flux_dn_ilev + flux_dn_dir_top * exp(-τ_cum / μ₀)
+        flux_dn[ilev, gcol] = flux_dn_ilev + flux_dn_dir_top * exp(-τ_cum / max(μ₀, eps(FT)))
         flux_dn_ilevplus1 = flux_dn_ilev
         ilev -= 1
     end
