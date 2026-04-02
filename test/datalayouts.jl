@@ -5,7 +5,7 @@ using Revise; include("test/datalayouts.jl")
 using RRTMGP: RRTMGPGridParams
 using RRTMGP
 using ClimaComms
-ClimaComms.@import_required_backends
+@static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
 using Test
 using Random
 Random.seed!(1234)
