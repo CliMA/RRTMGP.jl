@@ -21,10 +21,10 @@ RRTMGPNCDatasetsExt = "NCDatasets"
 RRTMGPCUDAExt = "CUDA"
 
 [compat]
-Adapt = "3.3, 4"
+Adapt = "4"
 Artifacts = "1"
-CUDA = "4, 5"
-ClimaComms = "0.5.1, 0.6"
+CUDA = "5.9"
+ClimaComms = "0.5.4, 0.6"
 ClimaParams = "1"
 DocStringExtensions = "0.8, 0.9"
 NCDatasets = "0.14.2"
