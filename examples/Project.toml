@@ -1,0 +1,8 @@
+[deps]
+CanopyOptics = "a18e34a6-5dbe-4f38-a44b-e5141852e7a7"
+ClimaComms = "3a4d1b5c-c61d-41fd-a00a-5873ba7a1b0d"
+ClimaParams = "5c42b081-d73a-476f-9059-fd94b934656c"
+Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
+NCDatasets = "85f8d34a-cbdd-5861-8df4-14fed0d494ab"
+RRTMGP = "a01a1ee8-cea4-48fc-987c-fc7878d79da1"
+Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
