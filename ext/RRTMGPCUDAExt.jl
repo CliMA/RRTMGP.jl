@@ -37,6 +37,10 @@ import RRTMGP.RTESolver: rte_sw_2stream_solve!
 import RRTMGP.RTESolver: rte_sw_2stream!
 import RRTMGP.RTESolver: rte_sw_noscat!
 import RRTMGP.RTESolver: rte_sw_noscat_solve!
+import RRTMGP.RTESolver: rte_sw_2stream_canopy_solve!
+import RRTMGP.RTESolver: rte_lw_2stream_canopy_solve!
+import RRTMGP.Canopy: CanopyState, fill_canopy_sw_optics!, fill_canopy_lw_optics!
+import RRTMGP.Canopy: fill_canopy_lw_sources!, canopy_sw_2stream_coeffs, planck_interp
 import CUDA: threadIdx, blockIdx, blockDim, @cuda
 
 _max_threads_cuda() = 256
@@ -56,6 +60,8 @@ include(joinpath("cuda", "rte_shortwave_1scalar.jl"))
 include(joinpath("cuda", "optics_gray_utils.jl"))
 include(joinpath("cuda", "rte_shortwave_2stream.jl"))
 include(joinpath("cuda", "rte_longwave_1scalar.jl"))
+include(joinpath("cuda", "rte_shortwave_2stream_canopy.jl"))
+include(joinpath("cuda", "rte_longwave_2stream_canopy.jl"))
 
 
 end

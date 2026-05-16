@@ -12,6 +12,7 @@ using ..Sources
 using ..RTE
 using ..Optics
 using ..LookUpTables
+using ..Canopy
 
 export solve_lw!, solve_sw!
 
@@ -19,6 +20,8 @@ include("longwave1scalar.jl")
 include("longwave2stream.jl")
 include("shortwave1scalar.jl")
 include("shortwave2stream.jl")
+include("sw_canopy_solve.jl")
+include("lw_canopy_solve.jl")
 
 
 """
@@ -194,6 +197,53 @@ function solve_sw!(
     metric_scaling::M = nothing,
 ) where {M}
     rte_sw_2stream_solve!(context.device, fluxb, flux, op, bcs, src, as, lookup_sw, lookup_sw_cld, lookup_sw_aero)
+    apply_metric_scaling!(flux, metric_scaling)
+end
+
+"""
+    solve_sw!(canopy_rte::TwoStreamSWCanopyRTE, as, lookup_sw, ...)
+
+`Two Stream` RTE solver for the shortwave problem with coupled canopy.
+
+Uses physically-computed `beta_dir` for canopy layers and standard PIFM
+coefficients for atmospheric layers.
+"""
+function solve_sw!(
+    (; context, op_atm, op_exp, src_exp, bcs, fluxb, flux, canopy)::TwoStreamSWCanopyRTE,
+    as::AtmosphericState,
+    lookup_sw::LookUpSW,
+    lookup_sw_cld::Union{LookUpCld, Nothing} = nothing,
+    lookup_sw_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
+    metric_scaling::M = nothing;
+    rad_output::Union{CanopyRadiationOutput, Nothing} = nothing,
+) where {M}
+    rte_sw_2stream_canopy_solve!(
+        context.device, fluxb, flux, op_atm, op_exp, bcs, src_exp,
+        as, lookup_sw, lookup_sw_cld, lookup_sw_aero, canopy, rad_output,
+    )
+    apply_metric_scaling!(flux, metric_scaling)
+end
+
+"""
+    solve_lw!(canopy_rte::TwoStreamLWCanopyRTE, as, lookup_lw, ...)
+
+`Two Stream` RTE solver for the longwave problem with coupled canopy.
+
+Uses standard LW 2-stream coefficients with temperature-scaled Planck sources
+for canopy layers.
+"""
+function solve_lw!(
+    (; context, op_atm, op_exp, src_atm, src_exp, bcs, fluxb, flux, canopy)::TwoStreamLWCanopyRTE,
+    as::AtmosphericState,
+    lookup_lw::LookUpLW,
+    lookup_lw_cld::Union{LookUpCld, Nothing} = nothing,
+    lookup_lw_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
+    metric_scaling::M = nothing,
+) where {M}
+    rte_lw_2stream_canopy_solve!(
+        context.device, fluxb, flux, op_atm, op_exp, bcs,
+        src_atm, src_exp, as, lookup_lw, lookup_lw_cld, lookup_lw_aero, canopy,
+    )
     apply_metric_scaling!(flux, metric_scaling)
 end
 

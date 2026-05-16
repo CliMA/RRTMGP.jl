@@ -12,7 +12,10 @@ using ..BCs
 
 import ..Parameters as RP
 
-export NoScatLWRTE, TwoStreamLWRTE, NoScatSWRTE, TwoStreamSWRTE
+using ..Canopy
+
+export NoScatLWRTE, TwoStreamLWRTE, NoScatSWRTE, TwoStreamSWRTE,
+    TwoStreamSWCanopyRTE, TwoStreamLWCanopyRTE
 
 """
     NoScatLWRTE(
@@ -206,6 +209,131 @@ function TwoStreamSWRTE(
     fluxb = FluxSW(grid_params)
     flux = FluxSW(grid_params)
     return TwoStreamSWRTE(context, op, src, bcs, fluxb, flux)
+end
+
+
+"""
+    TwoStreamSWCanopyRTE
+
+A high-level RRTMGP data structure for `2-stream` shortwave simulation
+with coupled atmosphere-canopy radiative transfer.
+
+Carries two sets of optical properties: `op_atm` (atmospheric dimensions for
+`compute_optical_props!`) and `op_exp` (expanded column = atmosphere + canopy).
+
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
+struct TwoStreamSWCanopyRTE{C, OPA <: TwoStream, OPE <: TwoStream, SSA, SSE, BC <: SwBCs, FXBS, FXS <: FluxSW, CS <: CanopyState}
+    "ClimaComms context"
+    context::C
+    "atmospheric optical properties (nlay_atm layers)"
+    op_atm::OPA
+    "expanded column optical properties (nlay_atm + ncanlay layers)"
+    op_exp::OPE
+    "atmospheric shortwave source workspace"
+    src_atm::SSA
+    "expanded column shortwave source"
+    src_exp::SSE
+    "shortwave boundary conditions (soil albedos)"
+    bcs::BC
+    "temporary storage for per-gpoint fluxes (expanded dims)"
+    fluxb::FXBS
+    "accumulated shortwave fluxes (expanded dims)"
+    flux::FXS
+    "canopy state"
+    canopy::CS
+end
+Adapt.@adapt_structure TwoStreamSWCanopyRTE
+
+function TwoStreamSWCanopyRTE(
+    grid_params::RRTMGPGridParams;
+    canopy::CanopyState,
+    cos_zenith,
+    toa_flux,
+    inc_flux_diffuse = nothing,
+)
+    (; context) = grid_params
+    FT = eltype(grid_params)
+    nlay_atm = grid_params.nlay
+    ncol = grid_params.ncol
+    ncanlay = canopy.ncanlay
+
+    # Atmospheric-dimension workspace
+    op_atm = TwoStream(grid_params)
+    src_atm = SourceSW2Str(grid_params)
+
+    # Expanded-dimension workspace (atm + canopy)
+    grid_exp = RRTMGPGridParams(FT; context, nlay = nlay_atm + ncanlay, ncol)
+    op_exp = TwoStream(grid_exp)
+    src_exp = SourceSW2Str(grid_exp)
+    fluxb = FluxSW(grid_exp)
+    flux = FluxSW(grid_exp)
+
+    # BCs use soil albedos from canopy state
+    bcs = SwBCs(cos_zenith, toa_flux, canopy.soil_alb_direct, inc_flux_diffuse, canopy.soil_alb_diffuse)
+
+    return TwoStreamSWCanopyRTE(context, op_atm, op_exp, src_atm, src_exp, bcs, fluxb, flux, canopy)
+end
+
+
+"""
+    TwoStreamLWCanopyRTE
+
+A high-level RRTMGP data structure for `2-stream` longwave simulation
+with coupled atmosphere-canopy radiative transfer.
+
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
+struct TwoStreamLWCanopyRTE{C, OPA <: TwoStream, OPE <: TwoStream, SLA, SLE, BC <: LwBCs, FXBL, FXL <: FluxLW, CS <: CanopyState}
+    "ClimaComms context"
+    context::C
+    "atmospheric optical properties (nlay_atm layers)"
+    op_atm::OPA
+    "expanded column optical properties (nlay_atm + ncanlay layers)"
+    op_exp::OPE
+    "atmospheric longwave source"
+    src_atm::SLA
+    "expanded column longwave source"
+    src_exp::SLE
+    "longwave boundary conditions (soil emissivity)"
+    bcs::BC
+    "temporary storage for per-gpoint fluxes (expanded dims)"
+    fluxb::FXBL
+    "accumulated longwave fluxes (expanded dims)"
+    flux::FXL
+    "canopy state"
+    canopy::CS
+end
+Adapt.@adapt_structure TwoStreamLWCanopyRTE
+
+function TwoStreamLWCanopyRTE(
+    grid_params::RRTMGPGridParams;
+    canopy::CanopyState,
+    params,
+)
+    (; context) = grid_params
+    FT = eltype(grid_params)
+    nlay_atm = grid_params.nlay
+    ncol = grid_params.ncol
+    ncanlay = canopy.ncanlay
+
+    # Atmospheric-dimension workspace
+    op_atm = TwoStream(grid_params)
+    src_atm = SourceLW2Str(grid_params; params)
+
+    # Expanded-dimension workspace
+    grid_exp = RRTMGPGridParams(FT; context, nlay = nlay_atm + ncanlay, ncol)
+    op_exp = TwoStream(grid_exp)
+    src_exp = SourceLW2Str(grid_exp; params)
+    fluxb = FluxLW(grid_exp)
+    flux = FluxLW(grid_exp)
+
+    # BCs use soil emissivity from canopy state
+    bcs = LwBCs(canopy.soil_emis, nothing)
+
+    return TwoStreamLWCanopyRTE(context, op_atm, op_exp, src_atm, src_exp, bcs, fluxb, flux, canopy)
 end
 
 
