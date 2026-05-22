@@ -45,7 +45,12 @@ function rte_lw_2stream_solve!(
     flux_dn_lw = flux_lw.flux_dn
     flux_net_lw = flux_lw.flux_net
     (; flux_up, flux_dn) = flux
+    FT = eltype(flux_up)
     @inbounds begin
+        # initialize LW cloud cover accumulator
+        if bld_cld_mask && !isnothing(cloud_state.cld_cover_lw)
+            cloud_state.cld_cover_lw .= FT(0)
+        end
         if aerosol_state isa AerosolState
             ClimaComms.@threaded device for gcol in 1:ncol
                 Optics.compute_aero_mask!(
@@ -62,6 +67,11 @@ function rte_lw_2stream_solve!(
                     view(cloud_state.cld_frac, :, gcol),
                     cloud_state.mask_type,
                 )
+                # accumulate LW cloud cover
+                if bld_cld_mask && !isnothing(cloud_state.cld_cover_lw)
+                    cloud_state.cld_cover_lw[gcol] +=
+                        any(view(cloud_state.mask_lw, :, gcol)) ? FT(1) : FT(0)
+                end
                 compute_optical_props!(op, as, src_lw, gcol, igpt, lookup_lw, lookup_lw_cld, lookup_lw_aero)
                 rte_lw_2stream!(op, flux, src_lw, bcs_lw, gcol, igpt, ibnd, nlev, ncol)
                 if igpt == 1
@@ -73,6 +83,12 @@ function rte_lw_2stream_solve!(
                         @inbounds flux_dn_lw[ilev, gcol] += flux_dn[ilev, gcol]
                     end
                 end
+            end
+        end
+        # normalize LW cloud cover by number of g-points
+        if bld_cld_mask && !isnothing(cloud_state.cld_cover_lw)
+            ClimaComms.@threaded device for gcol in 1:ncol
+                cloud_state.cld_cover_lw[gcol] /= n_gpt
             end
         end
         ClimaComms.@threaded device for gcol in 1:ncol

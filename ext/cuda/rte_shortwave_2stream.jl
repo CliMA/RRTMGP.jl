@@ -104,6 +104,7 @@ function rte_sw_2stream_solve_CUDA!(
         FT = eltype(flux_up)
         (; cloud_state, aerosol_state) = as
         μ₀ = bcs_sw.cos_zenith[gcol]
+        n_cloudy_gpts = 0  # thread-local counter for cloud cover
         @inbounds begin
             if aerosol_state isa AerosolState
                 Optics.compute_aero_mask!(
@@ -119,6 +120,8 @@ function rte_sw_2stream_solve_CUDA!(
                         view(cloud_state.cld_frac, :, gcol),
                         cloud_state.mask_type,
                     )
+                    # count g-points with any cloudy layer
+                    n_cloudy_gpts += any(view(cloud_state.mask_sw, :, gcol)) ? 1 : 0
                 end
                 # compute optical properties
                 compute_optical_props!(op, as, gcol, igpt, lookup_sw, lookup_sw_cld, lookup_sw_aero)
@@ -148,6 +151,10 @@ function rte_sw_2stream_solve_CUDA!(
             end
             for ilev in 1:nlev
                 flux_net_sw[ilev, gcol] = flux_up_sw[ilev, gcol] - flux_dn_sw[ilev, gcol]
+            end
+            # write out SW cloud cover
+            if cloud_state isa CloudState && !isnothing(cloud_state.cld_cover_sw)
+                cloud_state.cld_cover_sw[gcol] = FT(n_cloudy_gpts) / n_gpt
             end
         end
     end

@@ -182,4 +182,11 @@ function cloudy_sky(
     @test max_err_flux_up_sw ≤ toler_sw[FT]
     @test max_err_flux_dn_sw ≤ toler_sw[FT]
     @test max_err_flux_net_sw ≤ toler_sw[FT]
+
+    cld_cover_sw = Array(as.cloud_state.cld_cover_sw)
+    cld_cover_lw = Array(as.cloud_state.cld_cover_lw)
+    @test minimum(cld_cover_sw) >= 0
+    @test maximum(cld_cover_sw) <= 1
+    @test minimum(cld_cover_lw) >= 0
+    @test maximum(cld_cover_lw) <= 1
 end

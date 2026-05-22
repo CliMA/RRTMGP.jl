@@ -84,11 +84,11 @@ Adapt.@adapt_structure AtmosphericState
 @inline getview_rel_hum(as::AtmosphericState, gcol) = @inbounds view(as.layerdata, 4, :, gcol)
 
 """
-    CloudState{CD, CF, CM, CMT}
+    CloudState{CD, CF, CC, CM, CMT}
 
 Cloud state, used to compute optical properties.
 """
-struct CloudState{CD, CF, CM, CMT}
+struct CloudState{CD, CF, CC, CM, CMT}
     "effective radius of cloud liquid particles"
     cld_r_eff_liq::CD
     "effective radius of cloud ice particles"
@@ -99,6 +99,10 @@ struct CloudState{CD, CF, CM, CMT}
     cld_path_ice::CD
     "cloud fraction"
     cld_frac::CF
+    "McICA effective SW cloud cover `[0, 1]` `(ncol,)`; `nothing` if unused"
+    cld_cover_sw::CC
+    "McICA effective LW cloud cover `[0, 1]` `(ncol,)`; `nothing` if unused"
+    cld_cover_lw::CC
     "cloud mask (longwave), = true if clouds are present"
     mask_lw::CM
     "cloud mask (shortwave), = true if clouds are present"
@@ -109,6 +113,36 @@ struct CloudState{CD, CF, CM, CMT}
     ice_rgh::Int
 end
 Adapt.@adapt_structure CloudState
+
+# Backward-compatible constructor: callers that don't allocate cld_cover arrays
+# can use the old 9-argument form and both covers default to `nothing`. Remove
+# this in the next breaking release.
+function CloudState(
+    cld_r_eff_liq,
+    cld_r_eff_ice,
+    cld_path_liq,
+    cld_path_ice,
+    cld_frac,
+    mask_lw,
+    mask_sw,
+    mask_type,
+    ice_rgh,
+)
+    return CloudState(
+        cld_r_eff_liq,
+        cld_r_eff_ice,
+        cld_path_liq,
+        cld_path_ice,
+        cld_frac,
+        nothing,
+        nothing,
+        mask_lw,
+        mask_sw,
+        mask_type,
+        Int(ice_rgh),
+    )
+end
+
 
 """
     AerosolState{A, B, D}

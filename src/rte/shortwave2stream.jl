@@ -58,6 +58,10 @@ function rte_sw_2stream_solve!(
         (; flux_up, flux_dn, flux_dn_dir) = flux
         cos_zenith = bcs_sw.cos_zenith
         FT = eltype(flux_up)
+        # initialize cloud cover accumulator
+        if bld_cld_mask && !isnothing(cloud_state.cld_cover_sw)
+            cloud_state.cld_cover_sw .= FT(0)
+        end
         if aerosol_state isa AerosolState
             ClimaComms.@threaded device for gcol in 1:ncol
                 Optics.compute_aero_mask!(
@@ -73,6 +77,11 @@ function rte_sw_2stream_solve!(
                     view(cloud_state.cld_frac, :, gcol),
                     cloud_state.mask_type,
                 )
+                # accumulate cloud cover: count g-points with any cloudy layer
+                if bld_cld_mask && !isnothing(cloud_state.cld_cover_sw)
+                    cloud_state.cld_cover_sw[gcol] +=
+                        any(view(cloud_state.mask_sw, :, gcol)) ? FT(1) : FT(0)
+                end
                 # compute optical properties
                 compute_optical_props!(op, as, gcol, igpt, lookup_sw, lookup_sw_cld, lookup_sw_aero)
                 if cos_zenith[gcol] > 0
@@ -97,6 +106,12 @@ function rte_sw_2stream_solve!(
             end
         end
 
+        # normalize cloud cover by number of g-points
+        if bld_cld_mask && !isnothing(cloud_state.cld_cover_sw)
+            ClimaComms.@threaded device for gcol in 1:ncol
+                cloud_state.cld_cover_sw[gcol] /= n_gpt
+            end
+        end
         ClimaComms.@threaded device for gcol in 1:ncol
             if cos_zenith[gcol] > 0
                 for ilev in 1:nlev

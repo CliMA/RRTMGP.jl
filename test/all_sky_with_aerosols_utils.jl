@@ -221,6 +221,13 @@ function all_sky_with_aerosols(
     @test minimum(as.aerosol_state.aod_sw_sca) >= 0
     @test minimum(as.aerosol_state.aod_sw_ext .- as.aerosol_state.aod_sw_sca) >= 0
 
+    cld_cover_sw = Array(as.cloud_state.cld_cover_sw)
+    cld_cover_lw = Array(as.cloud_state.cld_cover_lw)
+    @test minimum(cld_cover_sw) >= 0
+    @test maximum(cld_cover_sw) <= 1
+    @test minimum(cld_cover_lw) >= 0
+    @test maximum(cld_cover_lw) <= 1
+
     # New problem instance for metric scaling test
     # Setting up longwave problem
 
