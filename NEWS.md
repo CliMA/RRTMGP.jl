@@ -4,6 +4,11 @@ RRTMGP.jl Release Notes
 main
 ------
 
+v0.21.9
+------
+- Add cloud cover from McICA
+  PR [#599](https://github.com/CliMA/RRTMGP.jl/pull/599)
+
 v0.21.7
 ------
 - Fix edge case cos_zenith = 0 in shortwave solver

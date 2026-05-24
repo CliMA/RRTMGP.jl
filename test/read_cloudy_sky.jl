@@ -149,6 +149,8 @@ function setup_cloudy_sky_as(
         cld_path_liq,
         cld_path_ice,
         cld_frac,
+        DA{FT}(undef, ncol), # cld_cover_sw
+        DA{FT}(undef, ncol), # cld_cover_lw
         cld_mask_lw,
         cld_mask_sw,
         MaxRandomOverlap(),

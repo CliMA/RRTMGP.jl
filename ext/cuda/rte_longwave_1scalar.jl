@@ -89,6 +89,8 @@ function rte_lw_noscat_solve_CUDA!(
         flux_dn_lw = flux_lw.flux_dn
         flux_net_lw = flux_lw.flux_net
         (; cloud_state, aerosol_state) = as
+        FT = eltype(flux_up_lw)
+        n_cloudy_gpts = 0  # thread-local counter for LW cloud cover
         if aerosol_state isa AerosolState
             Optics.compute_aero_mask!(view(aerosol_state.aero_mask, :, gcol), view(aerosol_state.aero_mass, :, :, gcol))
         end
@@ -100,6 +102,8 @@ function rte_lw_noscat_solve_CUDA!(
                     view(cloud_state.cld_frac, :, gcol),
                     cloud_state.mask_type,
                 )
+                # count g-points with any cloudy layer
+                n_cloudy_gpts += any(view(cloud_state.mask_lw, :, gcol)) ? 1 : 0
             end
             igpt == 1 && set_flux_to_zero!(flux_lw, gcol)
             compute_optical_props!(op, as, src_lw, gcol, igpt, lookup_lw, lookup_lw_cld, lookup_lw_aero)
@@ -109,6 +113,10 @@ function rte_lw_noscat_solve_CUDA!(
         @inbounds begin
             for ilev in 1:nlev
                 flux_net_lw[ilev, gcol] = flux_up_lw[ilev, gcol] - flux_dn_lw[ilev, gcol]
+            end
+            # write out LW cloud cover
+            if cloud_state isa CloudState && !isnothing(cloud_state.cld_cover_lw)
+                cloud_state.cld_cover_lw[gcol] = FT(n_cloudy_gpts) / n_gpt
             end
         end
     end

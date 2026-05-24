@@ -51,7 +51,12 @@ function rte_lw_noscat_solve!(
     flux_up_lw = flux_lw.flux_up
     flux_dn_lw = flux_lw.flux_dn
     flux_net_lw = flux_lw.flux_net
+    FT = eltype(flux_up_lw)
     @inbounds begin
+        # initialize LW cloud cover accumulator
+        if bld_cld_mask && !isnothing(cloud_state.cld_cover_lw)
+            cloud_state.cld_cover_lw .= FT(0)
+        end
         if aerosol_state isa AerosolState
             ClimaComms.@threaded device for gcol in 1:ncol
                 Optics.compute_aero_mask!(
@@ -69,11 +74,22 @@ function rte_lw_noscat_solve!(
                         view(cloud_state.cld_frac, :, gcol),
                         cloud_state.mask_type,
                     )
+                    # accumulate LW cloud cover
+                    if !isnothing(cloud_state.cld_cover_lw)
+                        cloud_state.cld_cover_lw[gcol] +=
+                            any(view(cloud_state.mask_lw, :, gcol)) ? FT(1) : FT(0)
+                    end
                 end
                 igpt == 1 && set_flux_to_zero!(flux_lw, gcol)
                 compute_optical_props!(op, as, src_lw, gcol, igpt, lookup_lw, lookup_lw_cld, lookup_lw_aero)
                 rte_lw_noscat_one_angle!(src_lw, bcs_lw, op, Ds, w_μ, gcol, flux, igpt, ibnd, nlay, nlev)
                 add_to_flux!(flux_lw, flux, gcol)
+            end
+        end
+        # normalize LW cloud cover by number of g-points
+        if bld_cld_mask && !isnothing(cloud_state.cld_cover_lw)
+            ClimaComms.@threaded device for gcol in 1:ncol
+                cloud_state.cld_cover_lw[gcol] /= n_gpt
             end
         end
         ClimaComms.@threaded device for gcol in 1:ncol
