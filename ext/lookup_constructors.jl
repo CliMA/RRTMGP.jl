@@ -158,7 +158,16 @@ function LookUpLW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     kminor_start_lower = IA1D(Array(ds["kminor_start_lower"])) # not currently used
     kminor_start_upper = IA1D(Array(ds["kminor_start_upper"])) # not currently used
     planck_fraction = FTA4D(permutedims(Array(ds["plank_fraction"]), [2, 3, 4, 1]))
-    t_planck = FTA1D(Array(ds["temperature_Planck"]))
+    # Some reduced-resolution files (e.g. rrtmgp-gas-lw-g128.nc) store
+    # `temperature_Planck` as a 0-based index coordinate (0..195) instead of the
+    # physical temperatures (160..355 K). `totplnk` is on the standard 160 K-based
+    # grid in both cases, so reconstruct physical temperatures when the stored
+    # axis is clearly non-physical (avoids interp1d_equispaced clamping to 355 K).
+    t_planck_raw = Array(ds["temperature_Planck"])
+    if minimum(t_planck_raw) < 100  # not physical temperatures -> index coordinate
+        t_planck_raw = t_planck_raw .- minimum(t_planck_raw) .+ 160
+    end
+    t_planck = FTA1D(t_planck_raw)
 
     tot_planck = FTA2D(Array(ds["totplnk"]))
 
