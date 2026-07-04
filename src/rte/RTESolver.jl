@@ -106,15 +106,28 @@ Additionally, takes an optional argument `metric_scaling` which scales the resul
 corresponding factor to account for column expansion in `deep-atmosphere` configurations.
 """
 function solve_lw!(
-    (; context, fluxb, flux, src, bcs, op)::TwoStreamLWRTE,
+    (; context, fluxb, flux, band_flux, src, bcs, op)::TwoStreamLWRTE,
     as::AtmosphericState,
     lookup_lw::LookUpLW,
     lookup_lw_cld::Union{LookUpCld, Nothing} = nothing,
     lookup_lw_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
     metric_scaling::M = nothing,
 ) where {M}
-    rte_lw_2stream_solve!(context.device, fluxb, flux, src, bcs, op, as, lookup_lw, lookup_lw_cld, lookup_lw_aero)
+    rte_lw_2stream_solve!(
+        context.device,
+        fluxb,
+        flux,
+        band_flux,
+        src,
+        bcs,
+        op,
+        as,
+        lookup_lw,
+        lookup_lw_cld,
+        lookup_lw_aero,
+    )
     apply_metric_scaling!(flux, metric_scaling)
+    apply_metric_scaling!(band_flux, metric_scaling)
 end
 
 """
@@ -186,15 +199,28 @@ Additionally, takes an optional argument `metric_scaling` which scales the resul
 corresponding factor to account for column expansion in `deep-atmosphere` configurations.
 """
 function solve_sw!(
-    (; context, fluxb, flux, src, bcs, op)::TwoStreamSWRTE,
+    (; context, fluxb, flux, band_flux, src, bcs, op)::TwoStreamSWRTE,
     as::AtmosphericState,
     lookup_sw::LookUpSW,
     lookup_sw_cld::Union{LookUpCld, Nothing} = nothing,
     lookup_sw_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
     metric_scaling::M = nothing,
 ) where {M}
-    rte_sw_2stream_solve!(context.device, fluxb, flux, op, bcs, src, as, lookup_sw, lookup_sw_cld, lookup_sw_aero)
+    rte_sw_2stream_solve!(
+        context.device,
+        fluxb,
+        flux,
+        band_flux,
+        op,
+        bcs,
+        src,
+        as,
+        lookup_sw,
+        lookup_sw_cld,
+        lookup_sw_aero,
+    )
     apply_metric_scaling!(flux, metric_scaling)
+    apply_metric_scaling!(band_flux, metric_scaling)
 end
 
 end

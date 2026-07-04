@@ -1,7 +1,10 @@
 
 function setup_gray_as_pr_grid!(::ClimaComms.CUDADevice, ncol, args...)
     tx, bx = _configure_threadblock(ncol)
-    @cuda always_inline = true threads = (tx) blocks = (bx) _setup_gray_as_pr_grid_kernel!(ncol, args...)
+    @cuda always_inline = true threads = (tx) blocks = (bx) _setup_gray_as_pr_grid_kernel!(
+        ncol,
+        args...,
+    )
 end
 
 function _setup_gray_as_pr_grid_kernel!(ncol, args...)

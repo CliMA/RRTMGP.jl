@@ -46,7 +46,10 @@ end
 
 Computes the weights for linear interpolation. This works with non-uniformly spaced `x`.
 """
-@inline function interp1d_loc_factor(xi::FT, x::AbstractArray{FT, 1}) where {FT <: AbstractFloat}
+@inline function interp1d_loc_factor(
+    xi::FT,
+    x::AbstractArray{FT, 1},
+) where {FT <: AbstractFloat}
     # xi ∉ [x]
     xi < x[1] && return (1, FT(0))
     xi > x[end] && return (length(x) - 1, FT(1))
@@ -77,7 +80,15 @@ Perform 2D linear interpolation.
 
 `fminor[2, 2] = fη2 * ftemp`
 """
-@inline function interp2d(fη1::FT, fη2::FT, ftemp::FT, coeff::FTA2D, jη1::Int, jη2::Int, jtemp::Int) where {FT, FTA2D}
+@inline function interp2d(
+    fη1::FT,
+    fη2::FT,
+    ftemp::FT,
+    coeff::FTA2D,
+    jη1::Int,
+    jη2::Int,
+    jtemp::Int,
+) where {FT, FTA2D}
     return @inbounds (FT(1) - fη1) * (1 - ftemp) * coeff[jη1, jtemp] +
                      fη1 * (1 - ftemp) * coeff[jη1 + 1, jtemp] +
                      (FT(1) - fη2) * ftemp * coeff[jη2, jtemp + 1] +
@@ -138,13 +149,32 @@ where,
     omfη1 = FT(1) - fη1
     omfη2 = FT(1) - fη2
     return @inbounds s1 * (
-        omfpress * (omftemp * (omfη1 * coeff[jη1, jpresst - 1, jtemp] + fη1 * coeff[jη1 + 1, jpresst - 1, jtemp])) +
-        fpress * (omftemp * (omfη1 * coeff[jη1, jpresst, jtemp] + fη1 * coeff[jη1 + 1, jpresst, jtemp]))
+        omfpress * (
+            omftemp * (
+                omfη1 * coeff[jη1, jpresst - 1, jtemp] +
+                fη1 * coeff[jη1 + 1, jpresst - 1, jtemp]
+            )
+        ) +
+        fpress * (
+            omftemp * (
+                omfη1 * coeff[jη1, jpresst, jtemp] +
+                fη1 * coeff[jη1 + 1, jpresst, jtemp]
+            )
+        )
     ) +
                      s2 * (
-        omfpress *
-        (ftemp * (omfη2 * coeff[jη2, jpresst - 1, jtemp + 1] + fη2 * coeff[jη2 + 1, jpresst - 1, jtemp + 1])) +
-        fpress * (ftemp * (omfη2 * coeff[jη2, jpresst, jtemp + 1] + fη2 * coeff[jη2 + 1, jpresst, jtemp + 1]))
+        omfpress * (
+            ftemp * (
+                omfη2 * coeff[jη2, jpresst - 1, jtemp + 1] +
+                fη2 * coeff[jη2 + 1, jpresst - 1, jtemp + 1]
+            )
+        ) +
+        fpress * (
+            ftemp * (
+                omfη2 * coeff[jη2, jpresst, jtemp + 1] +
+                fη2 * coeff[jη2 + 1, jpresst, jtemp + 1]
+            )
+        )
     )
 end
 """
@@ -154,7 +184,14 @@ Increment TwoStream optical properties `τ1`, `ssa1` and `g1`
 with `τ2`, `ssa2` and `g2`. Here `τ` is the optical thickness,
 `ssa` is the single-scattering albedo, and `g` is the symmetry parameter.
 """
-function increment_2stream(τ1::FT, ssa1::FT, g1::FT, τ2::FT, ssa2::FT, g2::FT) where {FT}
+function increment_2stream(
+    τ1::FT,
+    ssa1::FT,
+    g1::FT,
+    τ2::FT,
+    ssa2::FT,
+    g2::FT,
+) where {FT}
     τ = τ1 + τ2
     ssa = τ1 * ssa1 + τ2 * ssa2
     ssag = (τ1 * ssa1 * g1 + τ2 * ssa2 * g2) / max(eps(FT), ssa)

@@ -2,15 +2,24 @@ using Test
 
 color1 = 130
 
-printstyled("\n\nRRTMGP gray radiation tests\n", color = color1)
-printstyled("===============================\n\n", color = color1)
+@testset "Aerosol name map tests" begin
+    include("aerosol_name_map.jl")
+end
 
-@testset "Datalayouts tests" begin
-    include("datalayouts.jl")
+@testset "Grid adaptation tests" begin
+    include("grid_adaptation.jl")
 end
 
 @testset "RRTMGP gray radiation tests" begin
     include("gray_atm.jl")
+end
+
+@testset "RRTMGP standalone tests" begin
+    include("standalone.jl")
+end
+
+@testset "Flux-getter scalar-indexing guard (GPU)" begin
+    include("scalar_indexing.jl")
 end
 
 printstyled("\n\nRRTMGP clear-sky tests \n", color = color1)
@@ -25,8 +34,24 @@ printstyled("==========================\n\n", color = color1)
     include("clear_sky_utils.jl")
 
     for FT in (Float32, Float64)
-        clear_sky(context, NoScatLWRTE, TwoStreamSWRTE, VmrGM, FT, toler_lw_noscat, toler_sw)
-        clear_sky(context, TwoStreamLWRTE, TwoStreamSWRTE, VmrGM, FT, toler_lw_2stream, toler_sw)
+        clear_sky(
+            context,
+            NoScatLWRTE,
+            TwoStreamSWRTE,
+            VmrGM,
+            FT,
+            toler_lw_noscat,
+            toler_sw,
+        )
+        clear_sky(
+            context,
+            TwoStreamLWRTE,
+            TwoStreamSWRTE,
+            VmrGM,
+            FT,
+            toler_lw_2stream,
+            toler_sw,
+        )
     end
 end
 
@@ -41,12 +66,44 @@ printstyled("=================================\n\n", color = color1)
 
     include("cloudy_sky_utils.jl")
     for FT in (Float32, Float64)
-        cloudy_sky(context, NoScatLWRTE, TwoStreamSWRTE, FT, toler_lw_noscat, toler_sw; ncol = 128, cldfrac = FT(1))
-        cloudy_sky(context, TwoStreamLWRTE, TwoStreamSWRTE, FT, toler_lw_2stream, toler_sw; ncol = 128, cldfrac = FT(1))
+        cloudy_sky(
+            context,
+            NoScatLWRTE,
+            TwoStreamSWRTE,
+            FT,
+            toler_lw_noscat,
+            toler_sw;
+            ncol = 128,
+            cldfrac = FT(1),
+        )
+        cloudy_sky(
+            context,
+            TwoStreamLWRTE,
+            TwoStreamSWRTE,
+            FT,
+            toler_lw_2stream,
+            toler_sw;
+            ncol = 128,
+            cldfrac = FT(1),
+        )
     end
 end
 
-printstyled("\n\nRRTMGP all-sky (gas + clouds + aerosols) tests\n", color = color1)
+printstyled(
+    "\n\nRRTMGP partial cloud fraction reproducibility tests\n",
+    color = color1,
+)
+printstyled("=================================\n\n", color = color1)
+@testset "RRTMGP partial cloud fraction reproducibility tests" begin
+    include("partial_cloud_fraction.jl")
+    context = ClimaComms.context()
+    partial_cloud_fraction_test(context, Float64)
+end
+
+printstyled(
+    "\n\nRRTMGP all-sky (gas + clouds + aerosols) tests\n",
+    color = color1,
+)
 printstyled("=================================\n\n", color = color1)
 @testset "RRTMGP all-sky (gas + clouds + aerosols) tests" begin
     context = ClimaComms.context()
@@ -89,11 +146,17 @@ end
 printstyled("\n\nOptics utilities tests\n", color = color1)
 printstyled("==============\n\n", color = color1)
 include("optics_utils.jl")
-printstyled("****************************************************************\n", color = color1)
+printstyled(
+    "****************************************************************\n",
+    color = color1,
+)
 
 printstyled("\n\nAqua tests\n", color = color1)
 printstyled("==============\n\n", color = color1)
 @testset "Aqua" begin
     include("aqua.jl")
 end
-printstyled("****************************************************************\n", color = color1)
+printstyled(
+    "****************************************************************\n",
+    color = color1,
+)

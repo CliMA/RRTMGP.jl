@@ -3,6 +3,92 @@ RRTMGP.jl Release Notes
 
 main
 ------
+- **Breaking:** removed the deprecated positional-argument constructors (the ones that
+  warned "use ... with `RRTMGPGridParams`"): the old signatures of `OneScalar`, `TwoStream`,
+  `FluxLW`, `FluxSW`, `SourceLWNoScat`, `SourceLW2Str`, `SourceSW2Str`, `NoScatLWRTE`,
+  `TwoStreamLWRTE`, `NoScatSWRTE`, `TwoStreamSWRTE`, and `VmrGM`, plus `source_func_longwave`,
+  `source_func_shortwave`, and `init_vmr`. Construct these with `RRTMGPGridParams` (and
+  `VolumeMixingRatioGlobalMean` for `VmrGM`).
+- **Breaking:** removed the internal `RRTMGPData{Order}` data-layout types and helpers
+  (`NVCData`/`VCData`/`NCData`/`NData`, `set_cols!`/`set_domain!`/`domain_view`, the index-order
+  tags) — they were unused by the getter-based API. This also drops the `LinearAlgebra`
+  dependency.
+- Removed `@fastmath` from the longwave kernels (kept for shortwave), so the non-scattering
+  longwave flux matches CPU/GPU to the tight test tolerance again; the shortwave performance
+  gain is retained.
+- **Breaking:** the public API is now centered on `RRTMGPSolver` plus named getters
+  (`layer_temperature`, `level_pressure`, `net_flux`, ...) built on the functional
+  `solve_lw!`/`solve_sw!` core, with the grid-adaptation helpers (`interpolate_levels!`,
+  `add_isothermal_boundary_layer!`, `clip!`, `update_concentrations!`) lifted in from
+  ClimaAtmos. Standalone entry points `solve_gray`/`default_parameters`/`heating_rate`
+  need no NetCDF lookup tables.
+- **Breaking:** aerosol names must now be canonical (`sulfate`, `sea_salt1`,
+  `black_carbon_rh`, ...); the host-specific short-name aliases (`so4`, `ss1`, ...) and
+  `aerosol_aliases()` were removed — hosts map their own names to the canonical ones.
+- **Breaking:** the Layer-2 deep-atmosphere getter/kwarg was renamed
+  `deep_atmosphere_scaling` → `deep_atmosphere_inverse_scaling` (the caller passes the
+  multiplicative inverse; the low-level `metric_scaling` argument is unchanged).
+- Added optional spectrally-resolved (per-band) fluxes: construct with
+  `spectral_fluxes = true`, then read `spectral_{lw,sw}_flux_{up,dn,net}` and the band
+  edges `{lw,sw}_band_bounds`.
+- `RRTMGPSolver` and its optics/source workspaces are now `Adapt`-able via custom
+  overloads that preserve the packed-buffer view topology across device transfers, so
+  checkpoint restores stay zero-allocation.
+- **Breaking:** `RRTMGPGridParams` now takes `domain_nlay` (the physical layer count)
+  instead of `nlay`, and adds the isothermal boundary layer internally; the stored `nlay`
+  field is the total. Callers no longer compute `domain_nlay + 1` themselves.
+- **Breaking:** `update_fluxes!`/`update_net_fluxes!` now return `nothing` (previously
+  `net_flux(s)`); read results via the getters after the call. This keeps them
+  allocation-free and type-stable.
+- **Breaking:** the `RRTMGPSolver` output-buffer fields were renamed `net_flux`/
+  `clear_net_flux` → `net_flux_buffer`/`clear_net_flux_buffer`, to disambiguate from the
+  `net_flux(s)`/`clear_net_flux(s)` getters (the field is the full boundary-extended
+  buffer; the getter is the domain-masked view).
+- Flux buffers are stored `(nlev, ncol)`. (An intermediate `(ncol, nlev)` layout was tried
+  for GPU coalescence, then reverted; getters and fields are `(nlev, ncol)` as before —
+  relevant only if you tracked the intermediate branch.)
+- The getter data-exchange contract (layout, domain masking, writability, "views into
+  solver-owned buffers") is now documented on the "The getter contract" docs page.
+- Wrong-mode getters now raise informative errors instead of failing with
+  `getproperty(::Nothing, ...)` or a `NamedTuple` field error: the `clear_*` flux getters
+  (require `AllSkyRadiationWithClearSkyDiagnostics`), `{lw,sw}_band_bounds` (require a
+  spectral method), and the aerosol getters (require `aerosol_radiation = true`).
+  `clear_net_flux` previously returned `nothing` on other solvers; it now errors too.
+- `volume_mixing_ratio(s, "h2o_self")`/`"h2o_frgn"` with the global-mean (`VmrGM`) storage
+  now return the water-vapor field, matching the solver kernels (they share the h2o slot);
+  previously they silently returned the unused well-mixed slot (`0`).
+- Fixed `Vmrs.VolumeMixingRatioGlobalMean` (threw an `UndefVarError`) and
+  `domain_view(grid_params, ::RRTMGPData{VCOrder})`, which skipped the boundary-layer mask
+  (the `Bool`-first form was unaffected).
+- The `RRTMGPSolver` constructor now checks up front that `center_z`/`face_z` are provided
+  when the interpolation/extrapolation scheme requires altitudes (`BestFit`,
+  `HydrostaticBottom`), instead of a `MethodError` at solve time.
+
+### Migration
+
+Updating a host adapter (ClimaAtmos/ClimaCoupler) for the changes above:
+
+```diff
+  # Grid params: pass the physical domain layer count; RRTMGP adds the boundary layer.
+- nlay = domain_nlay + Int(add_isothermal_boundary_layer)
+- gp = RRTMGPGridParams(FT; context, nlay, ncol, isothermal_boundary_layer)
++ gp = RRTMGPGridParams(FT; context, domain_nlay, ncol, isothermal_boundary_layer)
++ nlay = gp.nlay        # total, if you still need it (e.g. for state allocation)
+
+  # update_fluxes! no longer returns the flux — read it from a getter afterward.
+- F = update_fluxes!(solver, seed)
++ update_fluxes!(solver, seed)
++ F = net_flux(solver)
+
+  # The net_flux struct field was renamed; prefer the getter.
+- solver.net_flux            # full (nlev, ncol) buffer
++ net_flux(solver)           # domain-masked view (recommended), or
++ solver.net_flux_buffer     # the raw full buffer
+
+  # Deep-atmosphere scaling kwarg renamed (pass the multiplicative inverse).
+- deep_atmosphere_scaling = ms
++ deep_atmosphere_inverse_scaling = ms
+```
 
 v0.21.9
 ------

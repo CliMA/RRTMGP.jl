@@ -10,7 +10,9 @@ function rte_lw_2stream_solve!(
     nlev = nlay + 1
     tx, bx = _configure_threadblock(ncol)
     args = (flux_lw, src_lw, bcs_lw, op, nlay, ncol, as)
-    @cuda always_inline = true threads = (tx) blocks = (bx) rte_lw_2stream_solve_CUDA!(args...)
+    @cuda always_inline = true threads = (tx) blocks = (bx) rte_lw_2stream_solve_CUDA!(
+        args...,
+    )
     return nothing
 end
 
@@ -29,7 +31,17 @@ function rte_lw_2stream_solve_CUDA!(
     if gcol ≤ ncol
         (; flux_up, flux_dn, flux_net) = flux_lw
         compute_optical_props!(op, as, src_lw, gcol)
-        rte_lw_2stream!(op, flux_lw, src_lw, bcs_lw, gcol, igpt, ibnd, nlev, ncol)
+        rte_lw_2stream!(
+            op,
+            flux_lw,
+            src_lw,
+            bcs_lw,
+            gcol,
+            igpt,
+            ibnd,
+            nlev,
+            ncol,
+        )
         @inbounds begin
             for ilev in 1:nlev
                 flux_net[ilev, gcol] = flux_up[ilev, gcol] - flux_dn[ilev, gcol]
@@ -43,6 +55,7 @@ function rte_lw_2stream_solve!(
     device::ClimaComms.CUDADevice,
     flux::FluxLW,
     flux_lw::FluxLW,
+    band_flux,
     src_lw::SourceLW2Str,
     bcs_lw::LwBCs,
     op::TwoStream,
@@ -53,15 +66,32 @@ function rte_lw_2stream_solve!(
 )
     nlay, ncol = AtmosphericStates.get_dims(as)
     nlev = nlay + 1
+    set_band_flux_to_zero!(band_flux)
     tx, bx = _configure_threadblock(ncol)
-    args = (flux, flux_lw, src_lw, bcs_lw, op, nlay, ncol, as, lookup_lw, lookup_lw_cld, lookup_lw_aero)
-    @cuda always_inline = true threads = (tx) blocks = (bx) rte_lw_2stream_solve_CUDA!(args...)
+    args = (
+        flux,
+        flux_lw,
+        band_flux,
+        src_lw,
+        bcs_lw,
+        op,
+        nlay,
+        ncol,
+        as,
+        lookup_lw,
+        lookup_lw_cld,
+        lookup_lw_aero,
+    )
+    @cuda always_inline = true threads = (tx) blocks = (bx) rte_lw_2stream_solve_CUDA!(
+        args...,
+    )
     return nothing
 end
 
 function rte_lw_2stream_solve_CUDA!(
     flux::FluxLW,
     flux_lw::FluxLW,
+    band_flux,
     src_lw::SourceLW2Str,
     bcs_lw::LwBCs,
     op::TwoStream,
@@ -82,9 +112,12 @@ function rte_lw_2stream_solve_CUDA!(
         flux_net_lw = flux_lw.flux_net
         (; flux_up, flux_dn) = flux
         FT = eltype(flux_up)
-        (; cloud_state, aerosol_state) = as   
+        (; cloud_state, aerosol_state) = as
         if aerosol_state isa AerosolState
-            Optics.compute_aero_mask!(view(aerosol_state.aero_mask, :, gcol), view(aerosol_state.aero_mass, :, :, gcol))
+            Optics.compute_aero_mask!(
+                view(aerosol_state.aero_mask, :, gcol),
+                view(aerosol_state.aero_mass, :, :, gcol),
+            )
         end
         n_cloudy_gpts = 0  # thread-local counter for LW cloud cover
         @inbounds for igpt in 1:n_gpt
@@ -98,24 +131,49 @@ function rte_lw_2stream_solve_CUDA!(
                 # count g-points with any cloudy layer
                 n_cloudy_gpts += any(view(cloud_state.mask_lw, :, gcol)) ? 1 : 0
             end
-            compute_optical_props!(op, as, src_lw, gcol, igpt, lookup_lw, lookup_lw_cld, lookup_lw_aero)
-            rte_lw_2stream!(op, flux, src_lw, bcs_lw, gcol, igpt, ibnd, nlev, ncol)
+            compute_optical_props!(
+                op,
+                as,
+                src_lw,
+                gcol,
+                igpt,
+                lookup_lw,
+                lookup_lw_cld,
+                lookup_lw_aero,
+            )
+            rte_lw_2stream!(
+                op,
+                flux,
+                src_lw,
+                bcs_lw,
+                gcol,
+                igpt,
+                ibnd,
+                nlev,
+                ncol,
+            )
             if igpt == 1
-                map!(x -> x, view(flux_up_lw, :, gcol), view(flux_up, :, gcol))
-                map!(x -> x, view(flux_dn_lw, :, gcol), view(flux_dn, :, gcol))
+                for ilev in 1:nlev
+                    flux_up_lw[ilev, gcol] = flux_up[ilev, gcol]
+                    flux_dn_lw[ilev, gcol] = flux_dn[ilev, gcol]
+                end
             else
                 for ilev in 1:nlev
                     @inbounds flux_up_lw[ilev, gcol] += flux_up[ilev, gcol]
                     @inbounds flux_dn_lw[ilev, gcol] += flux_dn[ilev, gcol]
                 end
             end
+            # retain this g-point's contribution in its band (no-op when off)
+            accumulate_band_flux!(band_flux, flux_up, flux_dn, gcol, ibnd, nlev)
         end
         @inbounds begin
             for ilev in 1:nlev
-                flux_net_lw[ilev, gcol] = flux_up_lw[ilev, gcol] - flux_dn_lw[ilev, gcol]
+                flux_net_lw[ilev, gcol] =
+                    flux_up_lw[ilev, gcol] - flux_dn_lw[ilev, gcol]
             end
             # write out LW cloud cover
-            if cloud_state isa CloudState && !isnothing(cloud_state.cld_cover_lw)
+            if cloud_state isa CloudState &&
+               !isnothing(cloud_state.cld_cover_lw)
                 cloud_state.cld_cover_lw[gcol] = FT(n_cloudy_gpts) / n_gpt
             end
         end

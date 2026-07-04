@@ -39,10 +39,22 @@ function _update_profile_lw_kernel!(sbc, ncol, args...)
     return nothing
 end
 
-function compute_gray_heating_rate!(device::ClimaComms.CUDADevice, hr_lay, p_lev, ncol, nlay, flux_net, cp_d_, grav_)
+function compute_gray_heating_rate!(
+    device::ClimaComms.CUDADevice,
+    hr_lay,
+    p_lev,
+    ncol,
+    nlay,
+    flux_net,
+    cp_d_,
+    grav_,
+)
     args = (hr_lay, flux_net, p_lev, grav_, cp_d_, nlay)
     tx, bx = _configure_threadblock(ncol)
-    @cuda always_inline = true threads = (tx) blocks = (bx) compute_gray_heating_rate_CUDA!(ncol, args...)
+    @cuda always_inline = true threads = (tx) blocks = (bx) compute_gray_heating_rate_CUDA!(
+        ncol,
+        args...,
+    )
     return nothing
 end
 

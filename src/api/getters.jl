@@ -1,7 +1,21 @@
+#####
+##### Layer-2 getters: the host data-exchange contract
+#####
+#
+# Named getters over an `RRTMGPSolver`. Every getter carrying a vertical dimension returns a
+# domain-masked `view` into a solver-owned buffer (physical dimension first, `ncol` last), so
+# a host reads and writes RRTMGP's buffers without touching the packed layout -- which is how
+# RRTMGP stays free of ClimaCore. The full contract (layout, boundary-layer masking,
+# writability, and the two deliberate exceptions: the well-mixed `volume_mixing_ratio` scalar
+# and the allocating `spectral_*_flux_net`) is documented in `docs/src/getters.md`.
+
+import ..AtmosphericStates: getview_p_lay, getview_t_lay, getview_rel_hum
+import ..Vmrs
+
 #! format: off
 
-maybe_transpose(x) = transpose(x)
-maybe_transpose(x::Nothing) = x
+_maybe_transpose(x) = transpose(x)
+_maybe_transpose(x::Nothing) = x
 
 # TODO: this is not user-facing yet in that `lookup_tables` still returns a
 # NamedTuple, and we should probably make a dedicated struct for this.
@@ -13,43 +27,298 @@ _shortwave_solver(s::RRTMGPSolver) = s.sws
 _longwave_solver(s::RRTMGPSolver) = s.lws
 _atmospheric_state(s::RRTMGPSolver) = s.as
 
+# Return the domain-only view of a vertical (dim-1) array, excluding the extra
+# isothermal boundary layer/level when one is present. Every getter that carries a
+# vertical dimension is wrapped in this, so callers see arrays sized to the physical
+# domain rather than RRTMGP's internal boundary-extended arrays. `nothing` passes
+# through (for optional fields such as `deep_atmosphere_inverse_scaling` and
+# `center_z`/`face_z`). Internal code that needs the full (boundary-extended) array
+# uses the raw fields, or `parent(getter(s))`.
+#
+# This ALWAYS returns a `view` (spanning the whole array when there is no boundary
+# layer) rather than branching to the bare array, so both cases share one concrete
+# return type. That type stability is what keeps the getters -- and the Layer-2
+# `update_fluxes!`/`update_net_fluxes!` broadcasts built on them -- allocation-free and
+# JET-clean (see the @allocated/@test_opt tests in test/standalone.jl). `Int(bl)` ∈ {0,1}.
+_domain_view(s::RRTMGPSolver, x) = _domain_view(s.grid_params.isothermal_boundary_layer, x)
+_domain_view(::Bool, ::Nothing) = nothing
+_domain_view(isothermal_boundary_layer::Bool, x::AbstractArray) =
+    view(x, 1:(size(x, 1) - Int(isothermal_boundary_layer)), :)
+# 3D variant for per-band `(nlev, ncol, n_bnd)` fluxes (mask the vertical dim only).
+_domain_view(isothermal_boundary_layer::Bool, x::AbstractArray{<:Any, 3}) =
+    view(x, 1:(size(x, 1) - Int(isothermal_boundary_layer)), :, :)
+
+# The clear-sky flux workspaces exist only on `AllSkyRadiationWithClearSkyDiagnostics`
+# solvers; give the `clear_*` getters an informative error elsewhere (instead of a
+# cryptic `getproperty(::Nothing, ...)`).
+_require_clear_sky(::Nothing) = error(
+    "clear-sky diagnostic fluxes were not retained; construct the `RRTMGPSolver` \
+     with `AllSkyRadiationWithClearSkyDiagnostics`.",
+)
+_require_clear_sky(x) = x
+
 # Potentially views
-top_of_atmosphere_lw_flux_dn(s::RRTMGPSolver)         = maybe_transpose(s.lws.bcs.inc_flux)
-top_of_atmosphere_diffuse_sw_flux_dn(s::RRTMGPSolver) = maybe_transpose(s.sws.bcs.inc_flux_diffuse)
-lw_flux_up(s::RRTMGPSolver)                           = s.lws.flux.flux_up
-lw_flux_dn(s::RRTMGPSolver)                           = s.lws.flux.flux_dn
-lw_flux_net(s::RRTMGPSolver)                          = s.lws.flux.flux_net
-clear_lw_flux_up(s::RRTMGPSolver)                     = s.clear_flux_lw.flux_up
-clear_lw_flux_dn(s::RRTMGPSolver)                     = s.clear_flux_lw.flux_dn
-clear_lw_flux(s::RRTMGPSolver)                        = s.clear_flux_lw.flux_net
+top_of_atmosphere_lw_flux_dn(s::RRTMGPSolver)         = _maybe_transpose(s.lws.bcs.inc_flux)
+top_of_atmosphere_diffuse_sw_flux_dn(s::RRTMGPSolver) = _maybe_transpose(s.sws.bcs.inc_flux_diffuse)
+lw_flux_up(s::RRTMGPSolver)                           = _domain_view(s, s.lws.flux.flux_up)
+lw_flux_dn(s::RRTMGPSolver)                           = _domain_view(s, s.lws.flux.flux_dn)
+lw_flux_net(s::RRTMGPSolver)                          = _domain_view(s, s.lws.flux.flux_net)
+clear_lw_flux_up(s::RRTMGPSolver)                     = _domain_view(s, _require_clear_sky(s.clear_flux_lw).flux_up)
+clear_lw_flux_dn(s::RRTMGPSolver)                     = _domain_view(s, _require_clear_sky(s.clear_flux_lw).flux_dn)
+clear_lw_flux(s::RRTMGPSolver)                        = _domain_view(s, _require_clear_sky(s.clear_flux_lw).flux_net)
 surface_emissivity(s::RRTMGPSolver)                   = s.lws.bcs.sfc_emis
-sw_flux_up(s::RRTMGPSolver)                           = s.sws.flux.flux_up
-sw_flux_dn(s::RRTMGPSolver)                           = s.sws.flux.flux_dn
-sw_flux_net(s::RRTMGPSolver)                          = s.sws.flux.flux_net
-sw_direct_flux_dn(s::RRTMGPSolver)                    = s.sws.flux.flux_dn_dir
-clear_sw_flux_up(s::RRTMGPSolver)                     = s.clear_flux_sw.flux_up
-clear_sw_flux_dn(s::RRTMGPSolver)                     = s.clear_flux_sw.flux_dn
-clear_sw_direct_flux_dn(s::RRTMGPSolver)              = s.clear_flux_sw.flux_dn_dir
-clear_sw_flux(s::RRTMGPSolver)                        = s.clear_flux_sw.flux_net
-cloud_liquid_effective_radius(s::RRTMGPSolver)        = s.as.cloud_state.cld_r_eff_liq
-cloud_ice_effective_radius(s::RRTMGPSolver)           = s.as.cloud_state.cld_r_eff_ice
-cloud_liquid_water_path(s::RRTMGPSolver)              = s.as.cloud_state.cld_path_liq
-cloud_ice_water_path(s::RRTMGPSolver)                 = s.as.cloud_state.cld_path_ice
-cloud_fraction(s::RRTMGPSolver)                       = s.as.cloud_state.cld_frac
+sw_flux_up(s::RRTMGPSolver)                           = _domain_view(s, s.sws.flux.flux_up)
+sw_flux_dn(s::RRTMGPSolver)                           = _domain_view(s, s.sws.flux.flux_dn)
+sw_flux_net(s::RRTMGPSolver)                          = _domain_view(s, s.sws.flux.flux_net)
+# NOTE: for spectral (non-gray) two-stream shortwave, the solvers accumulate the direct
+# beam only at the surface row `[1, :]` (see PR #550); rows above are not updated.
+sw_direct_flux_dn(s::RRTMGPSolver)                    = _domain_view(s, s.sws.flux.flux_dn_dir)
+clear_sw_flux_up(s::RRTMGPSolver)                     = _domain_view(s, _require_clear_sky(s.clear_flux_sw).flux_up)
+clear_sw_flux_dn(s::RRTMGPSolver)                     = _domain_view(s, _require_clear_sky(s.clear_flux_sw).flux_dn)
+clear_sw_direct_flux_dn(s::RRTMGPSolver)              = _domain_view(s, _require_clear_sky(s.clear_flux_sw).flux_dn_dir)
+clear_sw_flux(s::RRTMGPSolver)                        = _domain_view(s, _require_clear_sky(s.clear_flux_sw).flux_net)
+cloud_liquid_effective_radius(s::RRTMGPSolver)        = _domain_view(s, s.as.cloud_state.cld_r_eff_liq)
+cloud_ice_effective_radius(s::RRTMGPSolver)           = _domain_view(s, s.as.cloud_state.cld_r_eff_ice)
+cloud_liquid_water_path(s::RRTMGPSolver)              = _domain_view(s, s.as.cloud_state.cld_path_liq)
+cloud_ice_water_path(s::RRTMGPSolver)                 = _domain_view(s, s.as.cloud_state.cld_path_ice)
+cloud_fraction(s::RRTMGPSolver)                       = _domain_view(s, s.as.cloud_state.cld_frac)
 sw_cloud_cover(s::RRTMGPSolver)                       = s.as.cloud_state.cld_cover_sw
 lw_cloud_cover(s::RRTMGPSolver)                       = s.as.cloud_state.cld_cover_lw
 aod_sw_extinction(s::RRTMGPSolver)                    = s.as.aerosol_state.aod_sw_ext
 aod_sw_scattering(s::RRTMGPSolver)                    = s.as.aerosol_state.aod_sw_sca
-center_z(s::RRTMGPSolver)                             = s.center_z
-face_z(s::RRTMGPSolver)                               = s.face_z
+center_z(s::RRTMGPSolver)                             = _domain_view(s, s.center_z)
+face_z(s::RRTMGPSolver)                               = _domain_view(s, s.face_z)
 cos_zenith(s::RRTMGPSolver)                           = s.sws.bcs.cos_zenith
 toa_flux(s::RRTMGPSolver)                             = s.sws.bcs.toa_flux
 direct_sw_surface_albedo(s::RRTMGPSolver)             = s.sws.bcs.sfc_alb_direct
 diffuse_sw_surface_albedo(s::RRTMGPSolver)            = s.sws.bcs.sfc_alb_diffuse
 latitude(s::RRTMGPSolver)                             = s.as.lat
 surface_temperature(s::RRTMGPSolver)                  = s.as.t_sfc
-pressure(s::RRTMGPSolver)                             = getview_p_lay(s.as)
-temperature(s::RRTMGPSolver)                          = getview_t_lay(s.as)
-relative_humidity(s::RRTMGPSolver)                    = getview_rel_hum(s.as)
-
+layer_pressure(s::RRTMGPSolver)                       = _domain_view(s, getview_p_lay(s.as))
+layer_temperature(s::RRTMGPSolver)                    = _domain_view(s, getview_t_lay(s.as))
+layer_relative_humidity(s::RRTMGPSolver)              = _domain_view(s, getview_rel_hum(s.as))
+level_pressure(s::RRTMGPSolver)                       = _domain_view(s, s.as.p_lev)
+level_temperature(s::RRTMGPSolver)                    = _domain_view(s, s.as.t_lev)
+net_flux(s::RRTMGPSolver)                             = _domain_view(s, s.net_flux_buffer)
+clear_net_flux(s::RRTMGPSolver)                       = _domain_view(s, _require_clear_sky(s.clear_net_flux_buffer))
+deep_atmosphere_inverse_scaling(s::RRTMGPSolver)      = _domain_view(s, s.deep_atmosphere_inverse_scaling)
 #! format: on
+
+"""
+    radiation_method(s::RRTMGPSolver)
+
+Return the radiation method the solver was constructed with: `GrayRadiation`,
+`ClearSkyRadiation`, `AllSkyRadiation`, or `AllSkyRadiationWithClearSkyDiagnostics`.
+"""
+radiation_method(s::RRTMGPSolver) = _radiation_method(s)
+
+# Gray radiation carries no spectral lookup tables; raise an informative error for
+# getters that need them (band bounds, gas indices) instead of a NamedTuple field error.
+function _require_spectral_lookups(s::RRTMGPSolver)
+    lookups = _lookup_tables(s).lookups
+    hasproperty(lookups, :lookup_lw) || error(
+        "spectral lookup tables are not present on this solver (gray radiation); \
+         construct it with a spectral radiation method (e.g. `ClearSkyRadiation`).",
+    )
+    return lookups
+end
+
+# The aerosol index map exists only when the solver was built with aerosol optics.
+function _require_aerosol_lookups(s::RRTMGPSolver)
+    lookups = _lookup_tables(s).lookups
+    hasproperty(lookups, :idx_aerosol_sw) || error(
+        "aerosol lookup tables are not present on this solver; construct it with a \
+         radiation method with `aerosol_radiation = true`.",
+    )
+    return lookups
+end
+
+# Internal helpers for the optional per-band flux buffers.
+_require_band_flux(::Nothing) = error(
+    "spectral fluxes were not retained; construct the `RRTMGPSolver` with `spectral_fluxes = true`.",
+)
+_require_band_flux(band::Fluxes.FluxBand) = band
+_solver_band_flux(ws) =
+    hasproperty(ws, :band_flux) ? _require_band_flux(ws.band_flux) :
+    error("spectral fluxes require a two-stream, non-gray solver.")
+_band_net(band::Fluxes.FluxBand) = band.flux_up .- band.flux_dn
+
+"""
+    spectral_lw_flux_up(s::RRTMGPSolver)
+    spectral_lw_flux_dn(s::RRTMGPSolver)
+    spectral_lw_flux_net(s::RRTMGPSolver)
+    spectral_sw_flux_up(s::RRTMGPSolver)
+    spectral_sw_flux_dn(s::RRTMGPSolver)
+    spectral_sw_flux_net(s::RRTMGPSolver)
+
+Return the spectrally-resolved (per-band) up/down/net longwave or shortwave flux [W/m²] as
+a domain-masked `(nlev, ncol, n_bnd)` array. The solver must have been constructed with
+`spectral_fluxes = true` (otherwise an informative error is raised); this is supported only
+for two-stream, non-gray radiation. Band `b`'s slice `[:, :, b]` has the same layout as the
+broadband fluxes, and summing over the band dimension recovers them. Use
+[`lw_band_bounds`](@ref) / [`sw_band_bounds`](@ref) to identify each band's wavenumber range.
+
+The `up`/`dn` getters are views into the retained per-band buffers. The `net` getters instead
+allocate a fresh array each call (`up − dn` is not stored separately), so — unlike the other
+vertical getters — they are outside the zero-allocation/view contract.
+"""
+spectral_lw_flux_up(s::RRTMGPSolver) =
+    _domain_view(s, _solver_band_flux(s.lws).flux_up)
+spectral_lw_flux_dn(s::RRTMGPSolver) =
+    _domain_view(s, _solver_band_flux(s.lws).flux_dn)
+spectral_lw_flux_net(s::RRTMGPSolver) =
+    _domain_view(s, _band_net(_solver_band_flux(s.lws)))
+spectral_sw_flux_up(s::RRTMGPSolver) =
+    _domain_view(s, _solver_band_flux(s.sws).flux_up)
+spectral_sw_flux_dn(s::RRTMGPSolver) =
+    _domain_view(s, _solver_band_flux(s.sws).flux_dn)
+spectral_sw_flux_net(s::RRTMGPSolver) =
+    _domain_view(s, _band_net(_solver_band_flux(s.sws)))
+
+"""
+    lw_band_bounds(s::RRTMGPSolver)
+
+Return the `(2, n_bnd)` lower/upper wavenumber edges [cm⁻¹] of the longwave bands,
+identifying the spectral range of each band in the per-band fluxes (e.g.
+[`spectral_lw_flux_up`](@ref)).
+"""
+lw_band_bounds(s::RRTMGPSolver) =
+    _require_spectral_lookups(s).lookup_lw.band_data.bnd_lims_wn
+
+"""
+    sw_band_bounds(s::RRTMGPSolver)
+
+Return the `(2, n_bnd)` lower/upper wavenumber edges [cm⁻¹] of the shortwave bands,
+identifying the spectral range of each band in the per-band fluxes (e.g.
+[`spectral_sw_flux_up`](@ref RRTMGP.spectral_lw_flux_up)).
+"""
+sw_band_bounds(s::RRTMGPSolver) =
+    _require_spectral_lookups(s).lookup_sw.band_data.bnd_lims_wn
+
+"""
+    optical_thickness_parameter(s::RRTMGPSolver)
+
+For a gray-radiation solver, return the gray optical-thickness parameters (an
+`AbstractGrayOpticalThickness`, e.g. `GrayOpticalThicknessOGorman2008`) the atmospheric
+state was built with; `nothing` for lookup-table (non-gray) radiation, which has no such
+parameter.
+"""
+optical_thickness_parameter(s::RRTMGPSolver) =
+    hasproperty(_atmospheric_state(s), :otp) ? _atmospheric_state(s).otp : nothing
+
+isothermal_boundary_layer(s::RRTMGPSolver) = s.grid_params.isothermal_boundary_layer
+
+"""
+    aerosol_radius(s::RRTMGPSolver, name::String)
+
+Return the aerosol radius for the given aerosol name.
+
+Available names are:
+$(aerosol_names_docs())
+"""
+function aerosol_radius(s::RRTMGPSolver, name::AbstractString)
+    lookups = _require_aerosol_lookups(s) # informative error before field access
+    return _domain_view(s, view(
+        s.as.aerosol_state.aero_size,
+        lookups.idx_aerosol_sw[canonical_aerosol_name(name)],
+        :,
+        :
+    ))
+end
+
+"""
+    aerosol_column_mass_density(s::RRTMGPSolver, name::String)
+
+Return the aerosol column mass density [kg/m²] for the given aerosol name.
+
+Available names are:
+$(aerosol_names_docs())
+"""
+function aerosol_column_mass_density(s::RRTMGPSolver, name::AbstractString)
+    lookups = _require_aerosol_lookups(s) # informative error before field access
+    return _domain_view(s, view(
+        s.as.aerosol_state.aero_mass,
+        lookups.idx_aerosol_sw[canonical_aerosol_name(name)],
+        :,
+        :
+    ))
+end
+
+"""
+    gas_names_sw()
+
+Return a vector containing the gas names in the shortwave lookup tables.
+
+This should be the same list of gases returned from the following code,
+and is tested in `lookup_tables`
+```julia
+function gas_names_sw_from_artifacts()
+   artifact(t, b, n) =
+       NC.Dataset(RRTMGP.ArtifactPaths.get_lookup_filename(t, b)) do ds
+           getproperty(RRTMGP.LookUpTables, n)(ds, Float64, Array)
+       end
+   _, idx_gases_sw = artifact(:gas, :sw, :LookUpSW)
+   return keys(idx_gases_sw)
+end
+```
+"""
+gas_names_sw() = [
+    "h2o",
+    "cfc11",
+    "h2o_self",
+    "co2",
+    "cfc12",
+    "hfc134a",
+    "cfc22",
+    "ch4",
+    "hfc23",
+    "ccl4",
+    "hfc143a",
+    "co",
+    "no2",
+    "n2",
+    "o2",
+    "o3",
+    "h2o_frgn",
+    "hfc32",
+    "n2o",
+    "cf4",
+    "hfc125"
+]
+gas_names_sw_docs() = map(x->"`$x`", gas_names_sw())
+
+"""
+    volume_mixing_ratio(s::RRTMGPSolver, name::AbstractString)
+
+Return the volume mixing ratio for gas `name`. `"h2o"` and `"o3"` vary by layer
+and column (a domain-masked `(nlay, ncol)` view); with the global-mean `VmrGM`
+storage every other (well-mixed) gas is a single scalar.
+
+Unlike the array getters, a well-mixed scalar is returned as a **host `Number`
+copied off the device** (not a device view), so each call triggers a device→host
+synchronization on the GPU. Read these once at setup, not inside a timestep loop.
+
+Available names are:
+$(gas_names_sw_docs())
+"""
+volume_mixing_ratio(s::RRTMGPSolver, name::AbstractString) =
+    _volume_mixing_ratio(s, _atmospheric_state(s).vmr, name)
+
+function _volume_mixing_ratio(
+    s::RRTMGPSolver,
+    vmr::Vmrs.VmrGM,
+    name::AbstractString,
+)
+    name == "h2o" && return _domain_view(s, vmr.vmr_h2o)
+    name == "o3" && return _domain_view(s, vmr.vmr_o3)
+    idx = _lookup_tables(s).lookups.idx_gases_sw[name]
+    # The water-vapor continuum pseudo-gases ("h2o_self"/"h2o_frgn") share the h2o
+    # slot: the loader maps them to `idx_h2o` and `get_vmr` maps index 1 to `vmr_h2o`,
+    # so return the h2o field rather than the (unused) well-mixed slot 1.
+    idx == 1 && return _domain_view(s, vmr.vmr_h2o)
+    # A well-mixed gas is a single value; return it as a host scalar. (A 0-d device
+    # view would scalar-index the GPU when read.)
+    return only(Array(view(vmr.vmr, idx:idx)))
+end
+_volume_mixing_ratio(s::RRTMGPSolver, vmr::Vmrs.Vmr, name::AbstractString) =
+    _domain_view(s, view(vmr.vmr, _lookup_tables(s).lookups.idx_gases_sw[name], :, :))

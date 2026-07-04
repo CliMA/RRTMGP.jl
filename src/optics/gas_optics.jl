@@ -28,7 +28,8 @@ function compute_col_gas_kernel!(
     helmert2 = FT(0.02586)  # second constant of Helmert formula
     m2_to_cm2 = FT(100 * 100) # m^2 to cm^2
     g0 =
-        lat isa AbstractArray ? helmert1 - helmert2 * cos(FT(2) * FT(π) * lat[gcol] / FT(180)) : # acceleration due to gravity [m/s^2]
+        lat isa AbstractArray ?
+        helmert1 - helmert2 * cos(FT(2) * FT(π) * lat[gcol] / FT(180)) : # acceleration due to gravity [m/s^2]
         helmert1
     Δp = p_lev[glay, gcol] - p_lev[glay + 1, gcol]
     vmr_h2o_glaygcol = vmr_h2o isa AbstractArray ? vmr_h2o[glay, gcol] : FT(0)
@@ -69,8 +70,12 @@ function compute_relative_humidity_kernel!(
     mmr_h2o = vmr_h2o[glay, gcol] * mwd
     q_lay = mmr_h2o / (FT(1) + mmr_h2o)
     q_tmp = max(q_lay_min, q_lay)
-    es_tmp = exp((FT(17.67) * (t_lay[glay, gcol] - t_ref)) / (t_lay[glay, gcol] - FT(29.65)))
-    rh[glay, gcol] = max(FT(0.01) * (FT(0.263) * p_lay[glay, gcol] * q_tmp) / es_tmp, FT(0))
+    es_tmp = exp(
+        (FT(17.67) * (t_lay[glay, gcol] - t_ref)) /
+        (t_lay[glay, gcol] - FT(29.65)),
+    )
+    rh[glay, gcol] =
+        max(FT(0.01) * (FT(0.263) * p_lay[glay, gcol] * q_tmp) / es_tmp, FT(0))
     return nothing
 end
 
@@ -102,7 +107,15 @@ Compute interpolation fraction for pressure.
     @inbounds Δ_ln_p_ref = ln_p_ref[1] - ln_p_ref[2]
     n_p_ref = length(ln_p_ref)
     log_p_lay = log(p_lay)
-    @inbounds jpress = Int(min(max(unsafe_trunc(Int, (ln_p_ref[1] - log_p_lay) / Δ_ln_p_ref) + 1, 1), n_p_ref - 1) + 1)
+    @inbounds jpress = Int(
+        min(
+            max(
+                unsafe_trunc(Int, (ln_p_ref[1] - log_p_lay) / Δ_ln_p_ref) + 1,
+                1,
+            ),
+            n_p_ref - 1,
+        ) + 1,
+    )
     @inbounds fpress = (ln_p_ref[jpress - 1] - log_p_lay) / Δ_ln_p_ref
     return (jpress + tropo - 1, fpress)
 end
@@ -120,10 +133,19 @@ end
 
 Compute interpolation fraction for binary species parameter.
 """
-@inline function compute_interp_frac_η(n_η, ig, vmr_ref, (vmr1, vmr2), tropo, jtemp)
+@inline function compute_interp_frac_η(
+    n_η,
+    ig,
+    vmr_ref,
+    (vmr1, vmr2),
+    tropo,
+    jtemp,
+)
     FT = eltype(vmr1)
     itemp = 1
-    @inbounds η_half = vmr_ref[tropo, ig[1] + 1, jtemp + itemp - 1] / vmr_ref[tropo, ig[2] + 1, jtemp + itemp - 1]
+    @inbounds η_half =
+        vmr_ref[tropo, ig[1] + 1, jtemp + itemp - 1] /
+        vmr_ref[tropo, ig[2] + 1, jtemp + itemp - 1]
     col_mix1 = vmr1 + η_half * vmr2
     η = vmr1 * (FT(1) / col_mix1) # rewritten to ease register pressure
     if col_mix1 ≤ FT(0)
@@ -135,7 +157,9 @@ Compute interpolation fraction for binary species parameter.
     fη1 = loc_η - unsafe_trunc(Int, loc_η)
 
     itemp = 2
-    @inbounds η_half = vmr_ref[tropo, ig[1] + 1, jtemp + itemp - 1] / vmr_ref[tropo, ig[2] + 1, jtemp + itemp - 1]
+    @inbounds η_half =
+        vmr_ref[tropo, ig[1] + 1, jtemp + itemp - 1] /
+        vmr_ref[tropo, ig[2] + 1, jtemp + itemp - 1]
     col_mix2 = vmr1 + η_half * vmr2
     η = vmr1 * (FT(1) / col_mix2) # rewritten to ease register pressure
     if col_mix2 ≤ FT(0)
@@ -163,7 +187,17 @@ end
 
 Compute optical thickness, single scattering albedo, and asymmetry parameter.
 """
-@inline function compute_gas_optics(lkp::LookUpLW, vmr, col_dry, igpt, ibnd, p_lay, t_lay, glay, gcol)
+@inline function compute_gas_optics(
+    lkp::LookUpLW,
+    vmr,
+    col_dry,
+    igpt,
+    ibnd,
+    p_lay,
+    t_lay,
+    glay,
+    gcol,
+)
     # upper/lower troposphere
     tropo = p_lay > lkp.p_ref_tropo ? 1 : 2
     # volume mixing ratio of h2o
@@ -179,22 +213,53 @@ Compute optical thickness, single scattering albedo, and asymmetry parameter.
     @inbounds vmr1 = get_vmr(vmr, ig[1], glay, gcol)
     @inbounds vmr2 = get_vmr(vmr, ig[2], glay, gcol)
 
-    jfη, col_mix = compute_interp_frac_η(n_η, ig, lkp.ref_points.vmr_ref, (vmr1, vmr2), tropo, jftemp[1])
+    jfη, col_mix = compute_interp_frac_η(
+        n_η,
+        ig,
+        lkp.ref_points.vmr_ref,
+        (vmr1, vmr2),
+        tropo,
+        jftemp[1],
+    )
     # compute Planck fraction
     @inbounds planck_fraction = view(lkp.planck.planck_fraction, :, :, :, igpt)
     pfrac = interp3d(jfη..., jftemp..., jfpress..., planck_fraction)
 
     # computing τ_major
-    τ_major = interp3d(jfη..., jftemp..., jfpress..., kmajor, col_mix...) * col_dry
+    τ_major =
+        interp3d(jfη..., jftemp..., jfpress..., kmajor, col_mix...) * col_dry
     # computing τ_minor
     lkp_minor = tropo == 1 ? lkp.minor_lower : lkp.minor_upper
-    τ_minor = compute_τ_minor(lkp_minor, vmr, vmr_h2o, col_dry, p_lay, t_lay, jftemp..., jfη..., igpt, ibnd, glay, gcol)
+    τ_minor = compute_τ_minor(
+        lkp_minor,
+        vmr,
+        vmr_h2o,
+        col_dry,
+        p_lay,
+        t_lay,
+        jftemp...,
+        jfη...,
+        igpt,
+        ibnd,
+        glay,
+        gcol,
+    )
     # τ_Rayleigh is zero for longwave
     τ = max(τ_major + τ_minor, zero(τ_major))
     return (τ, zero(τ_major), zero(τ_major), pfrac) # initializing asymmetry parameter
 end
 
-@inline function compute_gas_optics(lkp::LookUpSW, vmr, col_dry, igpt, ibnd, p_lay, t_lay, glay, gcol)
+@inline function compute_gas_optics(
+    lkp::LookUpSW,
+    vmr,
+    col_dry,
+    igpt,
+    ibnd,
+    p_lay,
+    t_lay,
+    glay,
+    gcol,
+)
     # upper/lower troposphere
     tropo = p_lay > lkp.p_ref_tropo ? 1 : 2
     # volume mixing ratio of h2o
@@ -210,16 +275,46 @@ end
     @inbounds vmr1 = get_vmr(vmr, ig[1], glay, gcol)
     @inbounds vmr2 = get_vmr(vmr, ig[2], glay, gcol)
 
-    jfη, col_mix = compute_interp_frac_η(n_η, ig, lkp.ref_points.vmr_ref, (vmr1, vmr2), tropo, jftemp[1])
+    jfη, col_mix = compute_interp_frac_η(
+        n_η,
+        ig,
+        lkp.ref_points.vmr_ref,
+        (vmr1, vmr2),
+        tropo,
+        jftemp[1],
+    )
 
     # computing τ_major
-    τ_major = interp3d(jfη..., jftemp..., jfpress..., kmajor, col_mix...) * col_dry
+    τ_major =
+        interp3d(jfη..., jftemp..., jfpress..., kmajor, col_mix...) * col_dry
     # computing τ_minor
     lkp_minor = tropo == 1 ? lkp.minor_lower : lkp.minor_upper
-    τ_minor = compute_τ_minor(lkp_minor, vmr, vmr_h2o, col_dry, p_lay, t_lay, jftemp..., jfη..., igpt, ibnd, glay, gcol)
+    τ_minor = compute_τ_minor(
+        lkp_minor,
+        vmr,
+        vmr_h2o,
+        col_dry,
+        p_lay,
+        t_lay,
+        jftemp...,
+        jfη...,
+        igpt,
+        ibnd,
+        glay,
+        gcol,
+    )
     # compute τ_Rayleigh
-    @inbounds rayleigh_coeff = tropo == 1 ? view(lkp.rayl_lower, :, :, igpt) : view(lkp.rayl_upper, :, :, igpt)
-    τ_ray = compute_τ_rayleigh(rayleigh_coeff, col_dry, vmr_h2o, jftemp..., jfη..., igpt)
+    @inbounds rayleigh_coeff =
+        tropo == 1 ? view(lkp.rayl_lower, :, :, igpt) :
+        view(lkp.rayl_upper, :, :, igpt)
+    τ_ray = compute_τ_rayleigh(
+        rayleigh_coeff,
+        col_dry,
+        vmr_h2o,
+        jftemp...,
+        jfη...,
+        igpt,
+    )
     FT = eltype(τ_major)
     τ = max(τ_major + τ_minor + τ_ray, FT(0))
     ssa = τ_ray * (FT(1) / τ)# rewritten to ease register pressure
@@ -281,7 +376,10 @@ Compute optical thickness contributions from minor gases.
             density_fact = pa2hpa * p_lay / t_lay
 
             for i in 0:(n - 1)
-                idx_gas, idx_scaling_gas, scales_with_density, scale_by_complement =
+                idx_gas,
+                idx_scaling_gas,
+                scales_with_density,
+                scale_by_complement =
                     LookUpTables.get_minor_gas_data(lkp_minor, st_bnd + i)
 
                 vmr_imnr = get_vmr(vmr, idx_gas, glay, gcol)
@@ -291,13 +389,27 @@ Compute optical thickness contributions from minor gases.
                         scaling *= density_fact
                         if idx_scaling_gas > 0
                             if scale_by_complement == 1
-                                scaling *= (FT(1) - get_vmr(vmr, idx_scaling_gas, glay, gcol) * dry_fact)
+                                scaling *= (
+                                    FT(1) -
+                                    get_vmr(vmr, idx_scaling_gas, glay, gcol) * dry_fact
+                                )
                             else
-                                scaling *= get_vmr(vmr, idx_scaling_gas, glay, gcol) * dry_fact
+                                scaling *=
+                                    get_vmr(vmr, idx_scaling_gas, glay, gcol) *
+                                    dry_fact
                             end
                         end
                     end
-                    τ_minor += interp2d(fη1, fη2, ftemp, view(kminor, :, :, st_gpt + i), jη1, jη2, jtemp) * scaling
+                    τ_minor +=
+                        interp2d(
+                            fη1,
+                            fη2,
+                            ftemp,
+                            view(kminor, :, :, st_gpt + i),
+                            jη1,
+                            jη2,
+                            jtemp,
+                        ) * scaling
                 end
             end
         end
@@ -332,4 +444,7 @@ Compute Rayleigh scattering optical depths for shortwave problem
     fη1::FT,
     fη2::FT,
     igpt::Int,
-) where {FT <: AbstractFloat} = interp2d(fη1, fη2, ftemp, rayleigh_coeff, jη1, jη2, jtemp) * (vmr_h2o + FT(1)) * col_dry
+) where {FT <: AbstractFloat} =
+    interp2d(fη1, fη2, ftemp, rayleigh_coeff, jη1, jη2, jtemp) *
+    (vmr_h2o + FT(1)) *
+    col_dry

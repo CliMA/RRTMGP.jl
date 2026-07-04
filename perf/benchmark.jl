@@ -17,9 +17,13 @@ import Logging
 @info "------------------------------------------------- Benchmark: gray_atm"
 @suppress_out begin
     include(joinpath(root_dir, "test", "gray_atm_utils.jl"))
-    gray_atmos_lw_equil(ClimaComms.context(), NoScatLWRTE, FT; exfiltrate = true)
+    global gray_lw_result = gray_atmos_lw_equil(
+        ClimaComms.context(),
+        NoScatLWRTE,
+        FT,
+    )
 end
-(; slv_lw, gray_as) = Infiltrator.exfiltrated
+(; slv_lw, gray_as) = gray_lw_result
 @info "gray_atm lw"
 solve_lw!(slv_lw, gray_as) # compile first
 device = ClimaComms.device(ClimaComms.context())
@@ -32,8 +36,7 @@ end
 show(stdout, MIME("text/plain"), trial)
 println()
 
-gray_atmos_sw_test(ClimaComms.context(), NoScatSWRTE, FT, 1; exfiltrate = true)
-(; slv_sw, as) = Infiltrator.exfiltrated
+(; slv_sw, as) = gray_atmos_sw_test(ClimaComms.context(), NoScatSWRTE, FT, 1)
 solve_sw!(slv_sw, as) # compile first
 @info "gray_atm sw"
 device = ClimaComms.device(ClimaComms.context())
@@ -54,18 +57,15 @@ toler_lw_noscat = Dict(Float64 => Float64(1e-4), Float32 => Float32(0.04))
 toler_lw_2stream = Dict(Float64 => Float64(4.5), Float32 => Float32(4.5))
 toler_sw = Dict(Float64 => Float64(1e-3), Float32 => Float32(0.04))
 
-clear_sky(
+(; slv_lw, slv_sw, as, lookup_sw, lookup_lw) = clear_sky(
     ClimaComms.context(),
     TwoStreamLWRTE,
     TwoStreamSWRTE,
     VmrGM,
     FT,
     toler_lw_2stream,
-    toler_sw;
-    exfiltrate = true,
+    toler_sw,
 )
-# end
-(; slv_lw, slv_sw, as, lookup_sw, lookup_lw) = Infiltrator.exfiltrated
 
 @info "clear_sky lw"
 solve_lw!(slv_lw, as, lookup_lw) # compile first
@@ -99,7 +99,7 @@ toler_lw_noscat = Dict(Float64 => Float64(1e-5), Float32 => Float32(0.05))
 toler_lw_2stream = Dict(Float64 => Float64(5), Float32 => Float32(5))
 toler_sw = Dict(Float64 => Float64(1e-5), Float32 => Float32(0.06))
 
-cloudy_sky(
+(; slv_lw, slv_sw, as, lookup_sw, lookup_sw_cld, lookup_lw, lookup_lw_cld) = cloudy_sky(
     ClimaComms.context(),
     TwoStreamLWRTE,
     TwoStreamSWRTE,
@@ -107,11 +107,7 @@ cloudy_sky(
     toler_lw_2stream,
     toler_sw;
     cldfrac = FT(1),
-    exfiltrate = true,
 )
-# end
-
-(; slv_lw, slv_sw, as, lookup_sw, lookup_sw_cld, lookup_lw, lookup_lw_cld) = Infiltrator.exfiltrated
 
 solve_sw!(slv_sw, as, lookup_sw, lookup_sw_cld) # compile first
 solve_lw!(slv_lw, as, lookup_lw, lookup_lw_cld) # compile first

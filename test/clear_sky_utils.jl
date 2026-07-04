@@ -5,7 +5,6 @@ import JET
 import ClimaComms
 @static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
 
-import Infiltrator
 
 using RRTMGP
 using RRTMGP: RRTMGPGridParams
@@ -37,9 +36,9 @@ function clear_sky(
     toler_lw,
     toler_sw;
     ncol = 100,
-    exfiltrate = false,
 ) where {FT, SLVLW, SLVSW, VMR}
-    overrides = (; grav = 9.80665, molmass_dryair = 0.028964, molmass_water = 0.018016)
+    overrides =
+        (; grav = 9.80665, molmass_dryair = 0.028964, molmass_water = 0.018016)
     param_set = RRTMGPParameters(FT, overrides)
     device = ClimaComms.device(context)
     DA = ClimaComms.array_type(device)
@@ -64,12 +63,22 @@ function clear_sky(
     # reading rfmip data to atmospheric state
     ds_lw_in = Dataset(input_file, "r")
     (as, sfc_emis, sfc_alb_direct, cos_zenith, toa_flux, bot_at_1) =
-        setup_clear_sky_as(context, ds_lw_in, idx_gases, expt_no, lookup_lw, ncol, FT, VMR, param_set)
+        setup_clear_sky_as(
+            context,
+            ds_lw_in,
+            idx_gases,
+            expt_no,
+            lookup_lw,
+            ncol,
+            FT,
+            VMR,
+            param_set,
+        )
     close(ds_lw_in)
 
     nlay, _ = AtmosphericStates.get_dims(as)
     nlev = nlay + 1
-    grid_params = RRTMGPGridParams(FT; context, nlay, ncol)
+    grid_params = RRTMGPGridParams(FT; context, domain_nlay = nlay, ncol)
 
     # setting up longwave problem
     inc_flux = nothing
@@ -78,28 +87,68 @@ function clear_sky(
     # setting up shortwave problem
     sfc_alb_diffuse = DA{FT, 2}(deepcopy(sfc_alb_direct))
     inc_flux_diffuse = nothing
-    swbcs = (; cos_zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse)
+    swbcs = (;
+        cos_zenith,
+        toa_flux,
+        sfc_alb_direct,
+        inc_flux_diffuse,
+        sfc_alb_diffuse,
+    )
     slv_sw = SLVSW(grid_params; swbcs...)
     #--------------------------------------------------
     # calling longwave and shortwave solvers
-    exfiltrate && Infiltrator.@exfiltrate
-    metric_scaling = DA(one.(slv_sw.flux.flux_up))
+    metric_scaling = DA(one.(as.p_lev))
     solve_lw!(slv_lw, as, lookup_lw, nothing, nothing, metric_scaling)
     if device isa ClimaComms.CPUSingleThreaded
-        JET.@test_opt solve_lw!(slv_lw, as, lookup_lw, nothing, nothing, metric_scaling)
-        @test (@allocated solve_lw!(slv_lw, as, lookup_lw, nothing, nothing, metric_scaling)) == 0
-        @test (@allocated solve_lw!(slv_lw, as, lookup_lw, nothing, nothing, metric_scaling)) ≤ 448
+        JET.@test_opt solve_lw!(
+            slv_lw,
+            as,
+            lookup_lw,
+            nothing,
+            nothing,
+            metric_scaling,
+        )
+        @test (@allocated solve_lw!(
+            slv_lw,
+            as,
+            lookup_lw,
+            nothing,
+            nothing,
+            metric_scaling,
+        )) == 0
     end
 
     solve_sw!(slv_sw, as, lookup_sw, nothing, nothing, metric_scaling)
     if device isa ClimaComms.CPUSingleThreaded
-        JET.@test_opt solve_sw!(slv_sw, as, lookup_sw, nothing, nothing, metric_scaling)
-        @test (@allocated solve_sw!(slv_sw, as, lookup_sw, nothing, nothing, metric_scaling)) == 0
-        @test (@allocated solve_sw!(slv_sw, as, lookup_sw, nothing, nothing, metric_scaling)) ≤ 448
+        JET.@test_opt solve_sw!(
+            slv_sw,
+            as,
+            lookup_sw,
+            nothing,
+            nothing,
+            metric_scaling,
+        )
+        @test (@allocated solve_sw!(
+            slv_sw,
+            as,
+            lookup_sw,
+            nothing,
+            nothing,
+            metric_scaling,
+        )) == 0
+        @test (@allocated solve_sw!(
+            slv_sw,
+            as,
+            lookup_sw,
+            nothing,
+            nothing,
+            metric_scaling,
+        )) ≤ 448
     end
 
     # comparing longwave fluxes with data from RRTMGP FORTRAN code
-    comp_flux_up_lw, comp_flux_dn_lw, comp_flux_up_sw, comp_flux_dn_sw = load_comparison_data(expt_no, bot_at_1, ncol)
+    comp_flux_up_lw, comp_flux_dn_lw, comp_flux_up_sw, comp_flux_dn_sw =
+        load_comparison_data(expt_no, bot_at_1, ncol)
 
     comp_flux_net_lw = comp_flux_up_lw .- comp_flux_dn_lw
 
@@ -122,12 +171,17 @@ function clear_sky(
     max_rel_err_flux_net_lw = maximum(rel_err_flux_net_lw)
 
     color2 = :cyan
-    printstyled("Clear-sky longwave test with ncol = $ncol, nlev = $nlev, Solver = $SLVLW, FT = $FT\n", color = color2)
+    printstyled(
+        "Clear-sky longwave test with ncol = $ncol, nlev = $nlev, Solver = $SLVLW, FT = $FT\n",
+        color = color2,
+    )
     printstyled("device = $device\n\n", color = color2)
     println("L∞ error in flux_up           = $max_err_flux_up_lw")
     println("L∞ error in flux_dn           = $max_err_flux_dn_lw")
     println("L∞ error in flux_net          = $max_err_flux_net_lw")
-    println("L∞ relative error in flux_net = $(max_rel_err_flux_net_lw * 100) %\n")
+    println(
+        "L∞ relative error in flux_net = $(max_rel_err_flux_net_lw * 100) %\n",
+    )
 
     # comparing shortwave fluxes with data from RRTMGP FORTRAN code
     comp_flux_net_sw = comp_flux_up_sw .- comp_flux_dn_sw
@@ -167,12 +221,17 @@ function clear_sky(
 
     max_rel_err_flux_net_sw = maximum(rel_err_flux_net_sw)
 
-    printstyled("Clear-sky shortwave test with ncol = $ncol, nlev = $nlev, Solver = $SLVSW, FT = $FT\n", color = color2)
+    printstyled(
+        "Clear-sky shortwave test with ncol = $ncol, nlev = $nlev, Solver = $SLVSW, FT = $FT\n",
+        color = color2,
+    )
     printstyled("device = $device\n\n", color = color2)
     println("L∞ error in flux_up           = $max_err_flux_up_sw")
     println("L∞ error in flux_dn           = $max_err_flux_dn_sw")
     println("L∞ error in flux_net          = $max_err_flux_net_sw")
-    println("L∞ relative error in flux_net = $(max_rel_err_flux_net_sw * 100) %\n")
+    println(
+        "L∞ relative error in flux_net = $(max_rel_err_flux_net_sw * 100) %\n",
+    )
 
     # Note: The reference results for the longwave solver are generated using a non-scattering solver with rescaling,
     # which differ from the results generated by the TwoStream currently used. Due to the above difference, 
@@ -184,4 +243,5 @@ function clear_sky(
     @test max_err_flux_up_sw ≤ toler_sw[FT]
     @test max_err_flux_dn_sw ≤ toler_sw[FT]
     @test max_err_flux_net_sw ≤ toler_sw[FT]
+    return (; slv_lw, slv_sw, as, lookup_sw, lookup_lw)
 end

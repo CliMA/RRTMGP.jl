@@ -137,7 +137,9 @@ function setup_allsky_with_aerosols_as(
     ncol_ds = ncol_ds_all_sky()
     for icol in 1:ncol, ilay in 1:nlay
         icol_ds = icol % ncol_ds == 0 ? ncol_ds : icol % ncol_ds
-        if p_lay[ilay, icol] > FT(10000) && p_lay[ilay, icol] < FT(90000) && icol_ds % 3 ≠ 0
+        if p_lay[ilay, icol] > FT(10000) &&
+           p_lay[ilay, icol] < FT(90000) &&
+           icol_ds % 3 ≠ 0
             cld_frac[ilay, icol] = cldfrac
             if t_lay[ilay, icol] > FT(263)
                 cld_path_liq[ilay, icol] = FT(10)
@@ -157,7 +159,14 @@ function setup_allsky_with_aerosols_as(
 
     device = ClimaComms.device(context)
     compute_col_gas!(device, p_lev, col_dry, param_set, vmr_h2o, lat) # the example skips lat based gravity calculation
-    compute_relative_humidity!(device, rel_hum, p_lay, t_lay, param_set, vmr_h2o) # compute relative humidity
+    compute_relative_humidity!(
+        device,
+        rel_hum,
+        p_lay,
+        t_lay,
+        param_set,
+        vmr_h2o,
+    ) # compute relative humidity
 
     layerdata = similar(p_lay, 4, nlay, ncol)
     layerdata[1, :, :] .= col_dry
@@ -189,7 +198,17 @@ function setup_allsky_with_aerosols_as(
         ice_rgh,
     )
     return (
-        AtmosphericState(lon, lat, layerdata, p_lev, t_lev, t_sfc, vmr, cloud_state, aerosol_state),
+        AtmosphericState(
+            lon,
+            lat,
+            layerdata,
+            p_lev,
+            t_lev,
+            t_sfc,
+            vmr,
+            cloud_state,
+            aerosol_state,
+        ),
         sfc_emis,
         sfc_alb_direct,
         sfc_alb_diffuse,
@@ -211,17 +230,33 @@ function load_comparison_data(bot_at_1, ncol)
     nrepeat = fld(ncol, ncol_ds)
     rem = Int(ncol % ncol_ds)
 
-    comp_flux_up_lw_ref = _orient_data(transpose(Array(ds_comp_lw["lw_flux_up"])), bot_at_1)
-    comp_flux_dn_lw_ref = _orient_data(transpose(Array(ds_comp_lw["lw_flux_dn"])), bot_at_1)
-    comp_flux_up_sw_ref = _orient_data(transpose(Array(ds_comp_sw["sw_flux_up"])), bot_at_1)
-    comp_flux_dn_sw_ref = _orient_data(transpose(Array(ds_comp_sw["sw_flux_dn"])), bot_at_1)
+    comp_flux_up_lw_ref =
+        _orient_data(transpose(Array(ds_comp_lw["lw_flux_up"])), bot_at_1)
+    comp_flux_dn_lw_ref =
+        _orient_data(transpose(Array(ds_comp_lw["lw_flux_dn"])), bot_at_1)
+    comp_flux_up_sw_ref =
+        _orient_data(transpose(Array(ds_comp_sw["sw_flux_up"])), bot_at_1)
+    comp_flux_dn_sw_ref =
+        _orient_data(transpose(Array(ds_comp_sw["sw_flux_dn"])), bot_at_1)
     close(ds_comp_lw)
     close(ds_comp_sw)
 
-    comp_flux_up_lw = hcat(repeat(comp_flux_up_lw_ref, 1, nrepeat), comp_flux_up_lw_ref[:, 1:rem])
-    comp_flux_dn_lw = hcat(repeat(comp_flux_dn_lw_ref, 1, nrepeat), comp_flux_dn_lw_ref[:, 1:rem])
-    comp_flux_up_sw = hcat(repeat(comp_flux_up_sw_ref, 1, nrepeat), comp_flux_up_sw_ref[:, 1:rem])
-    comp_flux_dn_sw = hcat(repeat(comp_flux_dn_sw_ref, 1, nrepeat), comp_flux_dn_sw_ref[:, 1:rem])
+    comp_flux_up_lw = hcat(
+        repeat(comp_flux_up_lw_ref, 1, nrepeat),
+        comp_flux_up_lw_ref[:, 1:rem],
+    )
+    comp_flux_dn_lw = hcat(
+        repeat(comp_flux_dn_lw_ref, 1, nrepeat),
+        comp_flux_dn_lw_ref[:, 1:rem],
+    )
+    comp_flux_up_sw = hcat(
+        repeat(comp_flux_up_sw_ref, 1, nrepeat),
+        comp_flux_up_sw_ref[:, 1:rem],
+    )
+    comp_flux_dn_sw = hcat(
+        repeat(comp_flux_dn_sw_ref, 1, nrepeat),
+        comp_flux_dn_sw_ref[:, 1:rem],
+    )
 
     return comp_flux_up_lw, comp_flux_dn_lw, comp_flux_up_sw, comp_flux_dn_sw
 end

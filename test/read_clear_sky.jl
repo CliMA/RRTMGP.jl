@@ -34,10 +34,18 @@ function setup_clear_sky_as(
     lat = nothing # to be consistent with the FORTRAN RRTMGP test case.
 
     # all bands use same emissivity
-    sfc_emis = repeat(reshape(Array{FT}(Array(ds_lw_in["surface_emissivity"])), 1, :), nbnd_lw, 1)
+    sfc_emis = repeat(
+        reshape(Array{FT}(Array(ds_lw_in["surface_emissivity"])), 1, :),
+        nbnd_lw,
+        1,
+    )
     sfc_emis = FTA2D(repeat(sfc_emis, 1, nrepeat)[:, 1:ncol])
     # all bands use same albedo
-    sfc_alb = repeat(reshape(Array{FT}(Array(ds_lw_in["surface_albedo"])), 1, :), nbnd_lw, 1)
+    sfc_alb = repeat(
+        reshape(Array{FT}(Array(ds_lw_in["surface_albedo"])), 1, :),
+        nbnd_lw,
+        1,
+    )
     sfc_alb = FTA2D(repeat(sfc_alb, 1, nrepeat)[:, 1:ncol])
     #--------------------------------------------------------------
     zenith = Array{FT, 1}(deg2rad .* Array(ds_lw_in["solar_zenith_angle"]))
@@ -65,7 +73,9 @@ function setup_clear_sky_as(
     t_lev = FTA2D(repeat(t_lev, 1, nrepeat)[:, 1:ncol])
     t_lay = FTA2D(repeat(t_lay, 1, nrepeat)[:, 1:ncol])
 
-    t_sfc = FTA1D(repeat(ds_lw_in["surface_temperature"][:, expt_no], nrepeat)[1:ncol])
+    t_sfc = FTA1D(
+        repeat(ds_lw_in["surface_temperature"][:, expt_no], nrepeat)[1:ncol],
+    )
     col_dry = FTA2D(undef, nlay, ncol)
     rel_hum = FTA2D(undef, nlay, ncol)
 
@@ -79,43 +89,68 @@ function setup_clear_sky_as(
     vmrat = zeros(FT, ngas)
 
     vmrat[idx_gases["co2"]] =
-        FT(ds_lw_in["carbon_dioxide_GM"][expt_no]) * parse(FT, ds_lw_in["carbon_dioxide_GM"].attrib["units"])
+        FT(ds_lw_in["carbon_dioxide_GM"][expt_no]) *
+        parse(FT, ds_lw_in["carbon_dioxide_GM"].attrib["units"])
 
     vmrat[idx_gases["n2o"]] =
-        FT(ds_lw_in["nitrous_oxide_GM"][expt_no]) * parse(FT, ds_lw_in["nitrous_oxide_GM"].attrib["units"])
+        FT(ds_lw_in["nitrous_oxide_GM"][expt_no]) *
+        parse(FT, ds_lw_in["nitrous_oxide_GM"].attrib["units"])
 
     vmrat[idx_gases["co"]] =
-        FT(ds_lw_in["carbon_monoxide_GM"][expt_no]) * parse(FT, ds_lw_in["carbon_monoxide_GM"].attrib["units"])
+        FT(ds_lw_in["carbon_monoxide_GM"][expt_no]) *
+        parse(FT, ds_lw_in["carbon_monoxide_GM"].attrib["units"])
 
-    vmrat[idx_gases["ch4"]] = FT(ds_lw_in["methane_GM"][expt_no]) * parse(FT, ds_lw_in["methane_GM"].attrib["units"])
+    vmrat[idx_gases["ch4"]] =
+        FT(ds_lw_in["methane_GM"][expt_no]) *
+        parse(FT, ds_lw_in["methane_GM"].attrib["units"])
 
-    vmrat[idx_gases["o2"]] = FT(ds_lw_in["oxygen_GM"][expt_no]) * parse(FT, ds_lw_in["oxygen_GM"].attrib["units"])
+    vmrat[idx_gases["o2"]] =
+        FT(ds_lw_in["oxygen_GM"][expt_no]) *
+        parse(FT, ds_lw_in["oxygen_GM"].attrib["units"])
 
-    vmrat[idx_gases["n2"]] = FT(ds_lw_in["nitrogen_GM"][expt_no]) * parse(FT, ds_lw_in["nitrogen_GM"].attrib["units"])
+    vmrat[idx_gases["n2"]] =
+        FT(ds_lw_in["nitrogen_GM"][expt_no]) *
+        parse(FT, ds_lw_in["nitrogen_GM"].attrib["units"])
 
     vmrat[idx_gases["ccl4"]] =
         FT(ds_lw_in["carbon_tetrachloride_GM"][expt_no]) *
         parse(FT, ds_lw_in["carbon_tetrachloride_GM"].attrib["units"])
 
-    vmrat[idx_gases["cfc11"]] = FT(ds_lw_in["cfc11_GM"][expt_no]) * parse(FT, ds_lw_in["cfc11_GM"].attrib["units"])
+    vmrat[idx_gases["cfc11"]] =
+        FT(ds_lw_in["cfc11_GM"][expt_no]) *
+        parse(FT, ds_lw_in["cfc11_GM"].attrib["units"])
 
-    vmrat[idx_gases["cfc12"]] = FT(ds_lw_in["cfc12_GM"][expt_no]) * parse(FT, ds_lw_in["cfc12_GM"].attrib["units"])
+    vmrat[idx_gases["cfc12"]] =
+        FT(ds_lw_in["cfc12_GM"][expt_no]) *
+        parse(FT, ds_lw_in["cfc12_GM"].attrib["units"])
 
-    vmrat[idx_gases["cfc22"]] = FT(ds_lw_in["hcfc22_GM"][expt_no]) * parse(FT, ds_lw_in["hcfc22_GM"].attrib["units"])
+    vmrat[idx_gases["cfc22"]] =
+        FT(ds_lw_in["hcfc22_GM"][expt_no]) *
+        parse(FT, ds_lw_in["hcfc22_GM"].attrib["units"])
 
     vmrat[idx_gases["hfc143a"]] =
-        FT(ds_lw_in["hfc143a_GM"][expt_no]) * parse(FT, ds_lw_in["hfc143a_GM"].attrib["units"])
+        FT(ds_lw_in["hfc143a_GM"][expt_no]) *
+        parse(FT, ds_lw_in["hfc143a_GM"].attrib["units"])
 
-    vmrat[idx_gases["hfc125"]] = FT(ds_lw_in["hfc125_GM"][expt_no]) * parse(FT, ds_lw_in["hfc125_GM"].attrib["units"])
+    vmrat[idx_gases["hfc125"]] =
+        FT(ds_lw_in["hfc125_GM"][expt_no]) *
+        parse(FT, ds_lw_in["hfc125_GM"].attrib["units"])
 
-    vmrat[idx_gases["hfc23"]] = FT(ds_lw_in["hfc23_GM"][expt_no]) * parse(FT, ds_lw_in["hfc23_GM"].attrib["units"])
+    vmrat[idx_gases["hfc23"]] =
+        FT(ds_lw_in["hfc23_GM"][expt_no]) *
+        parse(FT, ds_lw_in["hfc23_GM"].attrib["units"])
 
-    vmrat[idx_gases["hfc32"]] = FT(ds_lw_in["hfc32_GM"][expt_no]) * parse(FT, ds_lw_in["hfc32_GM"].attrib["units"])
+    vmrat[idx_gases["hfc32"]] =
+        FT(ds_lw_in["hfc32_GM"][expt_no]) *
+        parse(FT, ds_lw_in["hfc32_GM"].attrib["units"])
 
     vmrat[idx_gases["hfc134a"]] =
-        FT(ds_lw_in["hfc134a_GM"][expt_no]) * parse(FT, ds_lw_in["hfc134a_GM"].attrib["units"])
+        FT(ds_lw_in["hfc134a_GM"][expt_no]) *
+        parse(FT, ds_lw_in["hfc134a_GM"].attrib["units"])
 
-    vmrat[idx_gases["cf4"]] = FT(ds_lw_in["cf4_GM"][expt_no]) * parse(FT, ds_lw_in["hfc23_GM"].attrib["units"])
+    vmrat[idx_gases["cf4"]] =
+        FT(ds_lw_in["cf4_GM"][expt_no]) *
+        parse(FT, ds_lw_in["hfc23_GM"].attrib["units"])
 
     #    vmr[idx_gases["no2"]] = FT(ds_lw_in["no2_GM"][expt_no]) *                # missing from input file
     #                                         parse(FT, ds_lw_in["hfc32_GM"].attrib["units"])
@@ -124,7 +159,14 @@ function setup_clear_sky_as(
     # FORTRAN RRTMGP test case.
     device = ClimaComms.device(context)
     compute_col_gas!(device, p_lev, col_dry, param_set, vmr_h2o, lat) # the example skips lat based gravity calculation
-    compute_relative_humidity!(device, rel_hum, p_lay, t_lay, param_set, vmr_h2o) # compute relative humidity
+    compute_relative_humidity!(
+        device,
+        rel_hum,
+        p_lay,
+        t_lay,
+        param_set,
+        vmr_h2o,
+    ) # compute relative humidity
 
     layerdata = similar(p_lay, 4, nlay, ncol)
     layerdata[1, :, :] .= col_dry
@@ -135,7 +177,17 @@ function setup_clear_sky_as(
     vmr = VMR(vmr_h2o, vmr_o3, FTA1D(vmrat))
     #------------------
     return (
-        AtmosphericState(lon, lat, layerdata, p_lev, t_lev, t_sfc, vmr, nothing, nothing),
+        AtmosphericState(
+            lon,
+            lat,
+            layerdata,
+            p_lev,
+            t_lev,
+            t_sfc,
+            vmr,
+            nothing,
+            nothing,
+        ),
         sfc_emis,
         sfc_alb,
         cos_zenith,
@@ -158,10 +210,26 @@ function load_comparison_data(expt_no, bot_at_1, ncol)
     ncol_ds = size(Array(ds_comp_lw_up["rlu"]), 2)
     nrepeat = cld(ncol, ncol_ds)
 
-    comp_flux_up_lw = repeat(_orient_data(Array(ds_comp_lw_up["rlu"][:, :, expt_no]), bot_at_1), 1, nrepeat)
-    comp_flux_dn_lw = repeat(_orient_data(Array(ds_comp_lw_dn["rld"][:, :, expt_no]), bot_at_1), 1, nrepeat)
-    comp_flux_up_sw = repeat(_orient_data(Array(ds_comp_sw_up["rsu"][:, :, expt_no]), bot_at_1), 1, nrepeat)
-    comp_flux_dn_sw = repeat(_orient_data(Array(ds_comp_sw_dn["rsd"][:, :, expt_no]), bot_at_1), 1, nrepeat)
+    comp_flux_up_lw = repeat(
+        _orient_data(Array(ds_comp_lw_up["rlu"][:, :, expt_no]), bot_at_1),
+        1,
+        nrepeat,
+    )
+    comp_flux_dn_lw = repeat(
+        _orient_data(Array(ds_comp_lw_dn["rld"][:, :, expt_no]), bot_at_1),
+        1,
+        nrepeat,
+    )
+    comp_flux_up_sw = repeat(
+        _orient_data(Array(ds_comp_sw_up["rsu"][:, :, expt_no]), bot_at_1),
+        1,
+        nrepeat,
+    )
+    comp_flux_dn_sw = repeat(
+        _orient_data(Array(ds_comp_sw_dn["rsd"][:, :, expt_no]), bot_at_1),
+        1,
+        nrepeat,
+    )
     close(ds_comp_lw_up)
     close(ds_comp_lw_dn)
     close(ds_comp_sw_up)

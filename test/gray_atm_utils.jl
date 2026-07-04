@@ -3,7 +3,7 @@ import ClimaComms
 @static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
 
 import JET
-import Infiltrator
+
 using RRTMGP
 using RRTMGP: RRTMGPGridParams
 using RRTMGP.AngularDiscretizations
@@ -25,7 +25,11 @@ import ClimaParams as CP
 """
 Example program to demonstrate the calculation of longwave radiative fluxes in a model gray atmosphere.
 """
-function gray_atmos_lw_equil(context, ::Type{SLVLW}, ::Type{FT}; exfiltrate = false) where {FT <: AbstractFloat, SLVLW}
+function gray_atmos_lw_equil(
+    context,
+    ::Type{SLVLW},
+    ::Type{FT};
+) where {FT <: AbstractFloat, SLVLW}
     device = ClimaComms.device(context)
     param_set = RRTMGPParameters(FT)
     ncol = if device isa ClimaComms.CUDADevice
@@ -50,7 +54,7 @@ function gray_atmos_lw_equil(context, ::Type{SLVLW}, ::Type{FT}; exfiltrate = fa
     sfc_emis = DA{FT}(undef, nbnd, ncol) # surface emissivity
     sfc_emis .= FT(1.0)
     inc_flux = nothing                      # incoming flux
-    grid_params = RRTMGPGridParams(FT; context, nlay, ncol)
+    grid_params = RRTMGPGridParams(FT; context, domain_nlay = nlay, ncol)
 
     if ncol == 1
         lat = DA{FT}([0])                   # latitude
@@ -59,7 +63,8 @@ function gray_atmos_lw_equil(context, ::Type{SLVLW}, ::Type{FT}; exfiltrate = fa
     end
 
     otp = GrayOpticalThicknessSchneider2004(FT) # optical thickness parameters
-    gray_as = setup_gray_as_pr_grid(context, nlay, lat, p0, pe, otp, param_set, DA)
+    gray_as =
+        setup_gray_as_pr_grid(context, nlay, lat, p0, pe, otp, param_set, DA)
     slv_lw = SLVLW(grid_params; params = param_set, sfc_emis, inc_flux)
 
     (; flux_up, flux_dn, flux_net) = slv_lw.flux
@@ -72,13 +77,22 @@ function gray_atmos_lw_equil(context, ::Type{SLVLW}, ::Type{FT}; exfiltrate = fa
     T_ex_lev = DA{FT}(undef, nlev, ncol)
     flux_grad = DA{FT}(undef, nlay, ncol)
     flux_grad_err = FT(0)
-    exfiltrate && Infiltrator.@exfiltrate
+
     device = ClimaComms.device(context)
     for i in 1:nsteps
         # calling the long wave gray radiation solver
         solve_lw!(slv_lw, gray_as)
         # computing heating rate
-        compute_gray_heating_rate!(device, hr_lay, p_lev, ncol, nlay, flux_net, cp_d_, grav_)
+        compute_gray_heating_rate!(
+            device,
+            hr_lay,
+            p_lev,
+            ncol,
+            nlay,
+            flux_net,
+            cp_d_,
+            grav_,
+        )
         # updating t_lay and t_lev based on heating rate
         update_profile_lw!(
             device,
@@ -104,9 +118,15 @@ function gray_atmos_lw_equil(context, ::Type{SLVLW}, ::Type{FT}; exfiltrate = fa
     t_error = maximum(abs.(T_ex_lev .- gray_as.t_lev))
     color2 = :cyan
 
-    printstyled("\nGray atmosphere longwave test with ncol = $ncol, nlev = $nlev, solver = $SLVLW\n", color = color2)
+    printstyled(
+        "\nGray atmosphere longwave test with ncol = $ncol, nlev = $nlev, solver = $SLVLW\n",
+        color = color2,
+    )
     printstyled("device = $device\n", color = color2)
-    printstyled("Integration time = $(FT(nsteps)/FT(24.0/tstep) / FT(365.0)) years\n\n", color = color2)
+    printstyled(
+        "Integration time = $(FT(nsteps)/FT(24.0/tstep) / FT(365.0)) years\n\n",
+        color = color2,
+    )
 
     println("t_error = $(t_error); flux_grad_err = $(flux_grad_err)\n")
 
@@ -116,6 +136,7 @@ function gray_atmos_lw_equil(context, ::Type{SLVLW}, ::Type{FT}; exfiltrate = fa
         @test (@allocated solve_lw!(slv_lw, gray_as)) == 0
         @test (@allocated solve_lw!(slv_lw, gray_as)) ≤ 128
     end
+    return (; slv_lw, gray_as)
 end
 
 function gray_atmos_sw_test(
@@ -123,7 +144,6 @@ function gray_atmos_sw_test(
     ::Type{SLVSW},
     ::Type{FT},
     ncol::Int;
-    exfiltrate = false,
 ) where {FT <: AbstractFloat, SLVSW}
     param_set = RRTMGPParameters(FT)
     device = ClimaComms.device(context)
@@ -142,7 +162,7 @@ function gray_atmos_sw_test(
     sfc_emis = Array{FT}(undef, nbnd, ncol) # surface emissivity
     sfc_emis .= FT(1.0)
     deg2rad = FT(π) / FT(180)
-    grid_params = RRTMGPGridParams(FT; context, nlay, ncol)
+    grid_params = RRTMGPGridParams(FT; context, domain_nlay = nlay, ncol)
 
     cos_zenith = DA{FT, 1}(undef, ncol)   # cosine of solar zenith angle
     toa_flux = DA{FT, 1}(undef, ncol) # top of atmosphere flux
@@ -167,10 +187,16 @@ function gray_atmos_sw_test(
 
     as = setup_gray_as_pr_grid(context, nlay, lat, p0, pe, otp, param_set, DA) # init gray atmos state
 
-    swbcs = (; cos_zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse)
+    swbcs = (;
+        cos_zenith,
+        toa_flux,
+        sfc_alb_direct,
+        inc_flux_diffuse,
+        sfc_alb_diffuse,
+    )
     slv_sw = SLVSW(grid_params; swbcs...)
 
-    exfiltrate && Infiltrator.@exfiltrate
+
     solve_sw!(slv_sw, as)
 
     τ = Array(slv_sw.op.τ)
@@ -187,7 +213,10 @@ function gray_atmos_sw_test(
 
     color2 = :cyan
 
-    printstyled("\nGray atmosphere shortwave test with ncol = $ncol, nlev = $nlev, solver = $SLVSW\n", color = color2)
+    printstyled(
+        "\nGray atmosphere shortwave test with ncol = $ncol, nlev = $nlev, solver = $SLVSW\n",
+        color = color2,
+    )
     printstyled("device = $device\n\n", color = color2)
 
     println("relative error = $rel_error")
@@ -199,4 +228,5 @@ function gray_atmos_sw_test(
         @test (@allocated solve_sw!(slv_sw, as)) == 0
         @test (@allocated solve_sw!(slv_sw, as)) ≤ 256
     end
+    return (; slv_sw, as)
 end

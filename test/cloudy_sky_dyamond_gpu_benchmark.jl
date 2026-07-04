@@ -36,7 +36,8 @@ function benchmark_all_sky(
     ncol = 128,# repeats col#1 ncol times per RRTMGP example
     cldfrac = FT(1),
 ) where {FT <: AbstractFloat, SLVLW, SLVSW}
-    overrides = (; grav = 9.80665, molmass_dryair = 0.028964, molmass_water = 0.018016)
+    overrides =
+        (; grav = 9.80665, molmass_dryair = 0.028964, molmass_water = 0.018016)
     param_set = RRTMGPParameters(FT, overrides)
     device = ClimaComms.device(context)
     DA = ClimaComms.array_type(device)
@@ -67,7 +68,13 @@ function benchmark_all_sky(
     end
     # reading input file
     ds_in = Dataset(input_file, "r")
-    as, sfc_emis, sfc_alb_direct, sfc_alb_diffuse, cos_zenith, toa_flux, bot_at_1 = setup_cloudy_sky_as(
+    as,
+    sfc_emis,
+    sfc_alb_direct,
+    sfc_alb_diffuse,
+    cos_zenith,
+    toa_flux,
+    bot_at_1 = setup_cloudy_sky_as(
         context,
         ds_in,
         idx_gases,
@@ -83,7 +90,7 @@ function benchmark_all_sky(
     close(ds_in)
     nlay, ncol = AtmosphericStates.get_dims(as)
     nlev = nlay + 1
-    grid_params = RRTMGPGridParams(FT; context, nlay, ncol)
+    grid_params = RRTMGPGridParams(FT; context, domain_nlay = nlay, ncol)
     #---reading comparison files -----------------------------------
     if bot_at_1
         flip_ind = 1:nlev
@@ -96,37 +103,82 @@ function benchmark_all_sky(
     slv_lw = SLVLW(grid_params; params = param_set, sfc_emis, inc_flux)
     # Setting up shortwave problem---------------------------------------
     inc_flux_diffuse = nothing
-    swbcs = (; cos_zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse)
+    swbcs = (;
+        cos_zenith,
+        toa_flux,
+        sfc_alb_direct,
+        inc_flux_diffuse,
+        sfc_alb_diffuse,
+    )
     slv_sw = SLVSW(grid_params; swbcs...)
     #------calling solvers
     metric_scaling = DA(one.(slv_sw.flux.flux_up))
     solve_lw!(slv_lw, as, lookup_lw, lookup_lw_cld, nothing, metric_scaling)
-    trial_lw = @benchmark CUDA.@sync solve_lw!($slv_lw, $as, $lookup_lw, $lookup_lw_cld, nothing, $metric_scaling)
+    trial_lw = @benchmark CUDA.@sync solve_lw!(
+        $slv_lw,
+        $as,
+        $lookup_lw,
+        $lookup_lw_cld,
+        nothing,
+        $metric_scaling,
+    )
 
     solve_sw!(slv_sw, as, lookup_sw, lookup_sw_cld, nothing, metric_scaling)
-    trial_sw = @benchmark CUDA.@sync solve_sw!($slv_sw, $as, $lookup_sw, $lookup_sw_cld, nothing, $metric_scaling)
+    trial_sw = @benchmark CUDA.@sync solve_sw!(
+        $slv_sw,
+        $as,
+        $lookup_sw,
+        $lookup_sw_cld,
+        nothing,
+        $metric_scaling,
+    )
     return trial_lw, trial_sw
 end
 
-function generate_gpu_allsky_benchmarks(FT, npts, ::Type{SLVLW}, ::Type{SLVSW}) where {SLVLW, SLVSW}
+function generate_gpu_allsky_benchmarks(
+    FT,
+    npts,
+    ::Type{SLVLW},
+    ::Type{SLVSW},
+) where {SLVLW, SLVSW}
     context = ClimaComms.context()
     # compute equivalent ncols for DYAMOND resolution
     helems, nlevels, nlev_test, nq = 30, 64, 73, 4
-    ncols_dyamond = Int(ceil(helems * helems * 6 * nq * nq * (nlevels / nlev_test)))
+    ncols_dyamond =
+        Int(ceil(helems * helems * 6 * nq * nq * (nlevels / nlev_test)))
     println("\n")
-    printstyled("Running DYAMOND all-sky benchmark on $(context.device) device with $FT precision\n", color = 130)
-    printstyled("Longwave solver = $SLVLW; Shortwave solver = $SLVSW\n", color = 130)
-    printstyled("==============|====================================|==================================\n", color = 130)
+    printstyled(
+        "Running DYAMOND all-sky benchmark on $(context.device) device with $FT precision\n",
+        color = 130,
+    )
+    printstyled(
+        "Longwave solver = $SLVLW; Shortwave solver = $SLVSW\n",
+        color = 130,
+    )
+    printstyled(
+        "==============|====================================|==================================\n",
+        color = 130,
+    )
     printstyled(
         "  ncols       |   median time for longwave solver  | median time for shortwave solver \n",
         color = :green,
     )
-    printstyled("==============|====================================|==================================\n", color = 130)
+    printstyled(
+        "==============|====================================|==================================\n",
+        color = 130,
+    )
     for pts in 1:npts
         ncols = unsafe_trunc(Int, cld(ncols_dyamond, 2^(pts - 1)))
         ndof = ncols * nlev_test
         sz_per_fld_gb = ndof * sizeof(FT) / 1024 / 1024 / 1024
-        trial_lw, trial_sw = benchmark_all_sky(context, SLVLW, SLVSW, FT; ncol = ncols, cldfrac = FT(1))
+        trial_lw, trial_sw = benchmark_all_sky(
+            context,
+            SLVLW,
+            SLVSW,
+            FT;
+            ncol = ncols,
+            cldfrac = FT(1),
+        )
         Printf.@printf(
             "%10i    |           %25s|       %25s \n",
             ncols,
@@ -134,7 +186,10 @@ function generate_gpu_allsky_benchmarks(FT, npts, ::Type{SLVLW}, ::Type{SLVSW}) 
             Statistics.median(trial_sw)
         )
     end
-    printstyled("==============|====================================|==================================\n", color = 130)
+    printstyled(
+        "==============|====================================|==================================\n",
+        color = 130,
+    )
     return nothing
 end
 

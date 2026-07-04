@@ -1,8 +1,19 @@
-import RRTMGP.LookUpTables: LookUpAerosolMerra, LookUpLW, LookUpSW, LookUpCld, LookUpPlanck
+import RRTMGP.LookUpTables:
+    LookUpAerosolMerra, LookUpLW, LookUpSW, LookUpCld, LookUpPlanck
 import RRTMGP.LookUpTables: LookUpMinor, ReferencePoints, BandData
 
-function LookUpAerosolMerra(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
-    dims = DA([Int(ds.dim["nband"]), Int(ds.dim["nval"]), Int(ds.dim["nbin"]), Int(ds.dim["nrh"]), Int(ds.dim["pair"])])
+function LookUpAerosolMerra(
+    ds,
+    ::Type{FT},
+    ::Type{DA},
+) where {FT <: AbstractFloat, DA}
+    dims = DA([
+        Int(ds.dim["nband"]),
+        Int(ds.dim["nval"]),
+        Int(ds.dim["nbin"]),
+        Int(ds.dim["nrh"]),
+        Int(ds.dim["pair"]),
+    ])
     size_bin_limits = DA{FT}(Array(ds["merra_aero_bin_lims"]))
     rh_levels = DA{FT}(Array(ds["aero_rh"]))
     dust = DA(Array{FT}(ds["aero_dust_tbl"]))
@@ -36,7 +47,8 @@ function LookUpAerosolMerra(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFlo
     idx_aerosol_keys = filter(collect(keys(idx_aerosol))) do k
         occursin("dust", k) || occursin("sea_salt", k)
     end
-    idx_aerosize = Dict(map(k -> Pair(idx_aerosol[k], idx_aerosol[k]), idx_aerosol_keys))
+    idx_aerosize =
+        Dict(map(k -> Pair(idx_aerosol[k], idx_aerosol[k]), idx_aerosol_keys))
     return LookUpAerosolMerra(
         dims,
         size_bin_limits,
@@ -118,8 +130,10 @@ function LookUpLW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     end
 
     @inbounds for igas in 1:n_min_absrb_lower
-        gases_minor_lower[igas] = strip(String(ds["minor_gases_lower"][:, igas]))
-        scaling_gas_lower[igas] = strip(String(ds["scaling_gas_lower"][:, igas]))
+        gases_minor_lower[igas] =
+            strip(String(ds["minor_gases_lower"][:, igas]))
+        scaling_gas_lower[igas] =
+            strip(String(ds["scaling_gas_lower"][:, igas]))
         if ~isempty(gases_minor_lower[igas])
             idx_gases_minor_lower[igas] = idx_gases[gases_minor_lower[igas]]
         end
@@ -131,8 +145,10 @@ function LookUpLW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     idx_scaling_gas_lower = idx_scaling_gas_lower
 
     @inbounds for igas in 1:n_min_absrb_upper
-        gases_minor_upper[igas] = strip(String(ds["minor_gases_upper"][:, igas]))
-        scaling_gas_upper[igas] = strip(String(ds["scaling_gas_upper"][:, igas]))
+        gases_minor_upper[igas] =
+            strip(String(ds["minor_gases_upper"][:, igas]))
+        scaling_gas_upper[igas] =
+            strip(String(ds["scaling_gas_upper"][:, igas]))
         if ~isempty(gases_minor_upper[igas])
             idx_gases_minor_upper[igas] = idx_gases[gases_minor_upper[igas]]
         end
@@ -157,7 +173,8 @@ function LookUpLW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     kmajor = FTA4D(permutedims(Array(ds["kmajor"]), [2, 3, 4, 1]))
     kminor_start_lower = IA1D(Array(ds["kminor_start_lower"])) # not currently used
     kminor_start_upper = IA1D(Array(ds["kminor_start_upper"])) # not currently used
-    planck_fraction = FTA4D(permutedims(Array(ds["plank_fraction"]), [2, 3, 4, 1]))
+    planck_fraction =
+        FTA4D(permutedims(Array(ds["plank_fraction"]), [2, 3, 4, 1]))
     t_planck = FTA1D(Array(ds["temperature_Planck"]))
 
     tot_planck = FTA2D(Array(ds["totplnk"]))
@@ -194,7 +211,8 @@ function LookUpLW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
         minor_lower_bnd[i] = major_gpt2bnd[minor_lower_gpt_lims[1, i]]
         if i > 1
             minor_lower_gpt_sh[i] =
-                minor_lower_gpt_sh[i - 1] + minor_lower_gpt_lims[2, i - 1] - minor_lower_gpt_lims[1, i - 1] + 1
+                minor_lower_gpt_sh[i - 1] + minor_lower_gpt_lims[2, i - 1] -
+                minor_lower_gpt_lims[1, i - 1] + 1
         end
     end
 
@@ -203,7 +221,8 @@ function LookUpLW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
         minor_upper_bnd[i] = major_gpt2bnd[minor_upper_gpt_lims[1, i]]
         if i > 1
             minor_upper_gpt_sh[i] =
-                minor_upper_gpt_sh[i - 1] + minor_upper_gpt_lims[2, i - 1] - minor_upper_gpt_lims[1, i - 1] + 1
+                minor_upper_gpt_sh[i - 1] + minor_upper_gpt_lims[2, i - 1] -
+                minor_upper_gpt_lims[1, i - 1] + 1
         end
     end
     #-----------------------
@@ -230,24 +249,43 @@ function LookUpLW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     reorder_minor_upper = zeros(Int, n_contrib_upper)
     loc_lower, loc_upper = 1, 1
     for ibnd in 1:n_bnd
-        nminorgases_lower = minor_lower_bnd_st[ibnd + 1] - minor_lower_bnd_st[ibnd]
-        nminorgases_upper = minor_upper_bnd_st[ibnd + 1] - minor_upper_bnd_st[ibnd]
-        for (loc_in_bnd, igpt) in enumerate(bnd_lims_gpt[1, ibnd]:bnd_lims_gpt[2, ibnd])
-            minor_lower_gpt_st[igpt + 1] = minor_lower_gpt_st[igpt] + nminorgases_lower
-            minor_upper_gpt_st[igpt + 1] = minor_upper_gpt_st[igpt] + nminorgases_upper
+        nminorgases_lower =
+            minor_lower_bnd_st[ibnd + 1] - minor_lower_bnd_st[ibnd]
+        nminorgases_upper =
+            minor_upper_bnd_st[ibnd + 1] - minor_upper_bnd_st[ibnd]
+        for (loc_in_bnd, igpt) in
+            enumerate(bnd_lims_gpt[1, ibnd]:bnd_lims_gpt[2, ibnd])
+            minor_lower_gpt_st[igpt + 1] =
+                minor_lower_gpt_st[igpt] + nminorgases_lower
+            minor_upper_gpt_st[igpt + 1] =
+                minor_upper_gpt_st[igpt] + nminorgases_upper
             for i in minor_lower_bnd_st[ibnd]:(minor_lower_bnd_st[ibnd + 1] - 1)
-                reorder_minor_lower[loc_lower] = minor_lower_gpt_sh[i] + loc_in_bnd
+                reorder_minor_lower[loc_lower] =
+                    minor_lower_gpt_sh[i] + loc_in_bnd
                 loc_lower += 1
             end
             for i in minor_upper_bnd_st[ibnd]:(minor_upper_bnd_st[ibnd + 1] - 1)
-                reorder_minor_upper[loc_upper] = minor_upper_gpt_sh[i] + loc_in_bnd
+                reorder_minor_upper[loc_upper] =
+                    minor_upper_gpt_sh[i] + loc_in_bnd
                 loc_upper += 1
             end
         end
     end
 
-    kminor_lower = FTA3D(permutedims(Array(ds["kminor_lower"]), [2, 3, 1])[:, :, reorder_minor_lower])
-    kminor_upper = FTA3D(permutedims(Array(ds["kminor_upper"]), [2, 3, 1])[:, :, reorder_minor_upper])
+    kminor_lower = FTA3D(
+        permutedims(Array(ds["kminor_lower"]), [2, 3, 1])[
+            :,
+            :,
+            reorder_minor_lower,
+        ],
+    )
+    kminor_upper = FTA3D(
+        permutedims(Array(ds["kminor_upper"]), [2, 3, 1])[
+            :,
+            :,
+            reorder_minor_upper,
+        ],
+    )
     #-----------------------
     major_gpt2bnd = DA(major_gpt2bnd)
     minor_lower_bnd = DA(minor_lower_bnd)
@@ -260,11 +298,15 @@ function LookUpLW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     #-----------------------
     band_data = BandData(major_gpt2bnd, bnd_lims_gpt, bnd_lims_wn)
 
-    minor_lower_scales_with_density = reshape(Array(ds["minor_scales_with_density_lower"]), 1, :)
-    minor_upper_scales_with_density = reshape(Array(ds["minor_scales_with_density_upper"]), 1, :)
+    minor_lower_scales_with_density =
+        reshape(Array(ds["minor_scales_with_density_lower"]), 1, :)
+    minor_upper_scales_with_density =
+        reshape(Array(ds["minor_scales_with_density_upper"]), 1, :)
 
-    lower_scale_by_complement = reshape(Array(ds["scale_by_complement_lower"]), 1, :)
-    upper_scale_by_complement = reshape(Array(ds["scale_by_complement_upper"]), 1, :)
+    lower_scale_by_complement =
+        reshape(Array(ds["scale_by_complement_lower"]), 1, :)
+    upper_scale_by_complement =
+        reshape(Array(ds["scale_by_complement_upper"]), 1, :)
 
     p_ref = Array{FT, 1}(Array(ds["press_ref"]))
     t_ref = Array{FT, 1}(Array(ds["temp_ref"]))
@@ -308,7 +350,15 @@ function LookUpLW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     )
     ref_points = ReferencePoints(ln_p_ref, t_ref, vmr_ref)
     return (
-        LookUpLW{FT, IA3D, FTA4D, typeof(band_data), typeof(planck), typeof(ref_points), typeof(minor_lower)}(
+        LookUpLW{
+            FT,
+            IA3D,
+            FTA4D,
+            typeof(band_data),
+            typeof(planck),
+            typeof(ref_points),
+            typeof(minor_lower),
+        }(
             idx_h2o,
             p_ref_tropo,
             p_ref_min,
@@ -388,8 +438,10 @@ function LookUpSW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     end
 
     @inbounds for igas in 1:n_min_absrb_lower
-        gases_minor_lower[igas] = strip(String(ds["minor_gases_lower"][:, igas]))
-        scaling_gas_lower[igas] = strip(String(ds["scaling_gas_lower"][:, igas]))
+        gases_minor_lower[igas] =
+            strip(String(ds["minor_gases_lower"][:, igas]))
+        scaling_gas_lower[igas] =
+            strip(String(ds["scaling_gas_lower"][:, igas]))
         if ~isempty(gases_minor_lower[igas])
             idx_gases_minor_lower[igas] = idx_gases[gases_minor_lower[igas]]
         end
@@ -399,8 +451,10 @@ function LookUpSW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     end
 
     @inbounds for igas in 1:n_min_absrb_upper
-        gases_minor_upper[igas] = strip(String(ds["minor_gases_upper"][:, igas]))
-        scaling_gas_upper[igas] = strip(String(ds["scaling_gas_upper"][:, igas]))
+        gases_minor_upper[igas] =
+            strip(String(ds["minor_gases_upper"][:, igas]))
+        scaling_gas_upper[igas] =
+            strip(String(ds["scaling_gas_upper"][:, igas]))
         if ~isempty(gases_minor_upper[igas])
             idx_gases_minor_upper[igas] = idx_gases[gases_minor_upper[igas]]
         end
@@ -452,7 +506,8 @@ function LookUpSW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
         minor_lower_bnd[i] = major_gpt2bnd[minor_lower_gpt_lims[1, i]]
         if i > 1
             minor_lower_gpt_sh[i] =
-                minor_lower_gpt_sh[i - 1] + minor_lower_gpt_lims[2, i - 1] - minor_lower_gpt_lims[1, i - 1] + 1
+                minor_lower_gpt_sh[i - 1] + minor_lower_gpt_lims[2, i - 1] -
+                minor_lower_gpt_lims[1, i - 1] + 1
         end
     end
 
@@ -461,7 +516,8 @@ function LookUpSW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
         minor_upper_bnd[i] = major_gpt2bnd[minor_upper_gpt_lims[1, i]]
         if i > 1
             minor_upper_gpt_sh[i] =
-                minor_upper_gpt_sh[i - 1] + minor_upper_gpt_lims[2, i - 1] - minor_upper_gpt_lims[1, i - 1] + 1
+                minor_upper_gpt_sh[i - 1] + minor_upper_gpt_lims[2, i - 1] -
+                minor_upper_gpt_lims[1, i - 1] + 1
         end
     end
     #-----------------------
@@ -488,24 +544,43 @@ function LookUpSW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     reorder_minor_upper = zeros(Int, n_contrib_upper)
     loc_lower, loc_upper = 1, 1
     for ibnd in 1:n_bnd
-        nminorgases_lower = minor_lower_bnd_st[ibnd + 1] - minor_lower_bnd_st[ibnd]
-        nminorgases_upper = minor_upper_bnd_st[ibnd + 1] - minor_upper_bnd_st[ibnd]
-        for (loc_in_bnd, igpt) in enumerate(bnd_lims_gpt[1, ibnd]:bnd_lims_gpt[2, ibnd])
-            minor_lower_gpt_st[igpt + 1] = minor_lower_gpt_st[igpt] + nminorgases_lower
-            minor_upper_gpt_st[igpt + 1] = minor_upper_gpt_st[igpt] + nminorgases_upper
+        nminorgases_lower =
+            minor_lower_bnd_st[ibnd + 1] - minor_lower_bnd_st[ibnd]
+        nminorgases_upper =
+            minor_upper_bnd_st[ibnd + 1] - minor_upper_bnd_st[ibnd]
+        for (loc_in_bnd, igpt) in
+            enumerate(bnd_lims_gpt[1, ibnd]:bnd_lims_gpt[2, ibnd])
+            minor_lower_gpt_st[igpt + 1] =
+                minor_lower_gpt_st[igpt] + nminorgases_lower
+            minor_upper_gpt_st[igpt + 1] =
+                minor_upper_gpt_st[igpt] + nminorgases_upper
             for i in minor_lower_bnd_st[ibnd]:(minor_lower_bnd_st[ibnd + 1] - 1)
-                reorder_minor_lower[loc_lower] = minor_lower_gpt_sh[i] + loc_in_bnd
+                reorder_minor_lower[loc_lower] =
+                    minor_lower_gpt_sh[i] + loc_in_bnd
                 loc_lower += 1
             end
             for i in minor_upper_bnd_st[ibnd]:(minor_upper_bnd_st[ibnd + 1] - 1)
-                reorder_minor_upper[loc_upper] = minor_upper_gpt_sh[i] + loc_in_bnd
+                reorder_minor_upper[loc_upper] =
+                    minor_upper_gpt_sh[i] + loc_in_bnd
                 loc_upper += 1
             end
         end
     end
 
-    kminor_lower = FTA3D(permutedims(Array(ds["kminor_lower"]), [2, 3, 1])[:, :, reorder_minor_lower])
-    kminor_upper = FTA3D(permutedims(Array(ds["kminor_upper"]), [2, 3, 1])[:, :, reorder_minor_upper])
+    kminor_lower = FTA3D(
+        permutedims(Array(ds["kminor_lower"]), [2, 3, 1])[
+            :,
+            :,
+            reorder_minor_lower,
+        ],
+    )
+    kminor_upper = FTA3D(
+        permutedims(Array(ds["kminor_upper"]), [2, 3, 1])[
+            :,
+            :,
+            reorder_minor_upper,
+        ],
+    )
     #------------------------
     major_gpt2bnd = DA(major_gpt2bnd)
     minor_lower_bnd = DA(minor_lower_bnd)
@@ -518,10 +593,14 @@ function LookUpSW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     #-----------------------
     band_data = BandData(major_gpt2bnd, bnd_lims_gpt, bnd_lims_wn)
 
-    minor_lower_scales_with_density = reshape(Array(ds["minor_scales_with_density_lower"]), 1, :)
-    minor_upper_scales_with_density = reshape(Array(ds["minor_scales_with_density_upper"]), 1, :)
-    lower_scale_by_complement = reshape(Array(ds["scale_by_complement_lower"]), 1, :)
-    upper_scale_by_complement = reshape(Array(ds["scale_by_complement_upper"]), 1, :)
+    minor_lower_scales_with_density =
+        reshape(Array(ds["minor_scales_with_density_lower"]), 1, :)
+    minor_upper_scales_with_density =
+        reshape(Array(ds["minor_scales_with_density_upper"]), 1, :)
+    lower_scale_by_complement =
+        reshape(Array(ds["scale_by_complement_lower"]), 1, :)
+    upper_scale_by_complement =
+        reshape(Array(ds["scale_by_complement_upper"]), 1, :)
 
     p_ref = Array{FT, 1}(Array(ds["press_ref"]))
     t_ref = Array{FT, 1}(Array(ds["temp_ref"]))
@@ -545,7 +624,8 @@ function LookUpSW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     mg_index = FT(max(ds["mg_default"][], 0))
     sb_index = FT(max(ds["sb_default"][], 0))
     solar_src =
-        Array(ds["solar_source_quiet"]) .+ (mg_index - a_offset) .* Array(ds["solar_source_facular"]) .+
+        Array(ds["solar_source_quiet"]) .+
+        (mg_index - a_offset) .* Array(ds["solar_source_facular"]) .+
         (sb_index - b_offset) .* Array(ds["solar_source_sunspot"])
     solar_src_tot = FT(sum(solar_src))
     solar_src_scaled = FTA1D(solar_src ./ solar_src_tot)
@@ -580,7 +660,16 @@ function LookUpSW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     ref_points = ReferencePoints(ln_p_ref, t_ref, vmr_ref)
 
     return (
-        LookUpSW{FT, IA3D, FTA1D, FTA3D, FTA4D, typeof(band_data), typeof(ref_points), typeof(minor_lower)}(
+        LookUpSW{
+            FT,
+            IA3D,
+            FTA1D,
+            FTA3D,
+            FTA4D,
+            typeof(band_data),
+            typeof(ref_points),
+            typeof(minor_lower),
+        }(
             idx_h2o,
             p_ref_tropo,
             p_ref_min,
@@ -617,8 +706,10 @@ function LookUpCld(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
         # ice particle size upper bound for LUT interpolation
         FT(ds["diamice_upr"][]) / 2,
     ])
-    liqdata = DA(vcat(Array(ds["extliq"]), Array(ds["ssaliq"]), Array(ds["asyliq"])))
-    icedata = DA(vcat(Array(ds["extice"]), Array(ds["ssaice"]), Array(ds["asyice"])))
+    liqdata =
+        DA(vcat(Array(ds["extliq"]), Array(ds["ssaliq"]), Array(ds["asyliq"])))
+    icedata =
+        DA(vcat(Array(ds["extice"]), Array(ds["ssaice"]), Array(ds["asyice"])))
     bnd_lims_wn = DA(Array(ds["bnd_limits_wavenumber"]))
     return LookUpCld(dims, bounds, liqdata, icedata, bnd_lims_wn)
 end

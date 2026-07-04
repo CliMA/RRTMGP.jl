@@ -31,11 +31,15 @@ function get_lookup_filename(optics_type::Symbol, λ::Symbol)
     config == (:gas, :lw) && return joinpath(basedir, "rrtmgp-gas-lw-g256.nc")
     config == (:gas, :sw) && return joinpath(basedir, "rrtmgp-gas-sw-g224.nc")
 
-    config == (:cloud, :lw) && return joinpath(basedir, "rrtmgp-clouds-lw-bnd.nc")
-    config == (:cloud, :sw) && return joinpath(basedir, "rrtmgp-clouds-sw-bnd.nc")
+    config == (:cloud, :lw) &&
+        return joinpath(basedir, "rrtmgp-clouds-lw-bnd.nc")
+    config == (:cloud, :sw) &&
+        return joinpath(basedir, "rrtmgp-clouds-sw-bnd.nc")
 
-    config == (:aerosol, :lw) && return joinpath(basedir, "rrtmgp-aerosols-merra-lw.nc")
-    config == (:aerosol, :sw) && return joinpath(basedir, "rrtmgp-aerosols-merra-sw.nc")
+    config == (:aerosol, :lw) &&
+        return joinpath(basedir, "rrtmgp-aerosols-merra-lw.nc")
+    config == (:aerosol, :sw) &&
+        return joinpath(basedir, "rrtmgp-aerosols-merra-sw.nc")
 end
 
 """
@@ -75,7 +79,8 @@ function get_input_filename(problemtype::Symbol, λ::Symbol)
                joinpath(dir, "rrtmgp-allsky-sw-no-aerosols.nc")
     else # :gas_clouds_aerosols
         dir = joinpath(basedir, "examples", "all-sky", "reference")
-        return λ == :lw ? joinpath(dir, "rrtmgp-allsky-lw.nc") : joinpath(dir, "rrtmgp-allsky-sw.nc")
+        return λ == :lw ? joinpath(dir, "rrtmgp-allsky-lw.nc") :
+               joinpath(dir, "rrtmgp-allsky-sw.nc")
     end
 end
 

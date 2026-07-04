@@ -4,7 +4,14 @@ using DocStringExtensions
 using Adapt
 
 export AbstractLookUp,
-    LookUpLW, LookUpSW, LookUpCld, LookUpAerosolMerra, LookUpMinor, ReferencePoints, LookUpPlanck, BandData
+    LookUpLW,
+    LookUpSW,
+    LookUpCld,
+    LookUpAerosolMerra,
+    LookUpMinor,
+    ReferencePoints,
+    LookUpPlanck,
+    BandData
 
 """
     AbstractLookUp
@@ -38,10 +45,14 @@ Adapt.@adapt_structure LookUpMinor
 # number of minor contributors in the lower/upper atmosphere
 @inline get_n_contrib(lkp::LookUpMinor) = size(lkp.kminor, 3)
 # get bounds for each g-point
-@inline getbounds(lkp::LookUpMinor, ibnd, igpt) =
-    @inbounds (lkp.bnd_st[ibnd], lkp.gpt_st[igpt], lkp.gpt_st[igpt + 1] - lkp.gpt_st[igpt])
+@inline getbounds(lkp::LookUpMinor, ibnd, igpt) = @inbounds (
+    lkp.bnd_st[ibnd],
+    lkp.gpt_st[igpt],
+    lkp.gpt_st[igpt + 1] - lkp.gpt_st[igpt],
+)
 # returns minor gas index, scaling gas index, minor gas scales with density and minor gas scales by complement at the given `idx`.
-@inline get_minor_gas_data(lkp::LookUpMinor, idx) = @inbounds view(lkp.gasdata, :, idx)
+@inline get_minor_gas_data(lkp::LookUpMinor, idx) =
+    @inbounds view(lkp.gasdata, :, idx)
 
 """
     ReferencePoints{RD1, RD3}

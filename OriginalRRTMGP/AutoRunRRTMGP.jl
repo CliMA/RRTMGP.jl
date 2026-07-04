@@ -23,16 +23,32 @@ if run_clear_sky
             run(`python run-rfmip-examples.py`)
         else
             println("Running RFMIP drivers")
-            conds_file = joinpath(".", "multiple_input4MIPs_radiation_RFMIP_UColorado-RFMIP-1-2_none.nc")
-            lw_coeffs = joinpath(rte_rrtmgp_dir, "rrtmgp", "data", "rrtmgp-data-lw-g256-2018-12-04.nc")
-            sw_coeffs = joinpath(rte_rrtmgp_dir, "rrtmgp", "data", "rrtmgp-data-sw-g224-2018-12-04.nc")
+            conds_file = joinpath(
+                ".",
+                "multiple_input4MIPs_radiation_RFMIP_UColorado-RFMIP-1-2_none.nc",
+            )
+            lw_coeffs = joinpath(
+                rte_rrtmgp_dir,
+                "rrtmgp",
+                "data",
+                "rrtmgp-data-lw-g256-2018-12-04.nc",
+            )
+            sw_coeffs = joinpath(
+                rte_rrtmgp_dir,
+                "rrtmgp",
+                "data",
+                "rrtmgp-data-sw-g224-2018-12-04.nc",
+            )
             for wavelength in ["l", "s"]
                 for direction in ["u", "d"]
                     for forcing_index in ["1"]
                         # for forcing_index in ["1","2","3"]
                         for physics_index in ["1"]
                             # for physics_index in ["1","2"]
-                            @show wavelength, direction, forcing_index, physics_index
+                            @show wavelength,
+                            direction,
+                            forcing_index,
+                            physics_index
                             # Arguments: block size, input conditions, coefficient files, forcing index, physics index
                             run(
                                 `$(joinpath(".", "rrtmgp_rfmip_lw")) 8 $(conds_file) $(lw_coeffs) $(forcing_index) $(physics_index)`,
