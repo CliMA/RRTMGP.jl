@@ -188,13 +188,39 @@ host calls it every radiation step. CI asserts `@allocated == 0` and
 `JET.@test_opt` for the gray Layer-2 aggregate and for the Layer-1
 `solve_lw!`/`solve_sw!` kernels of the spectral modes (single-threaded CPU).
 
-See also `update_lw_fluxes!`, `update_sw_fluxes!`, and `update_net_fluxes!`.
+See also `prepare_atmosphere!`, `update_lw_fluxes!`, `update_sw_fluxes!`, and
+`update_net_fluxes!`.
 """
 function update_fluxes!(s::RRTMGPSolver, seedval = nothing)
     # opt-in input validation (see `check_values`/`validate_inputs`); a single
     # branch when off, so the zero-allocation contract is unaffected
     check_values[] && validate_inputs(s)
     _maybe_reset_rng_seed!(_radiation_method(s), seedval)
+    prepare_atmosphere!(s)
+    update_lw_fluxes!(s)
+    update_sw_fluxes!(s)
+    update_net_fluxes!(s)
+    return nothing
+end
+
+"""
+    prepare_atmosphere!(s::RRTMGPSolver)
+
+Run the atmospheric-state preparation cascade without solving: interpolate
+level pressures/temperatures from layer values (per the solver's
+`interpolation`/`bottom_extrapolation` configuration; a no-op for
+`NoInterpolation`), fill the isothermal boundary layer (when configured), clip
+unphysical inputs (pressures below the lookup tables' minimum, negative water
+vapor), and compute the dry-air column amounts. Mutates the solver's
+atmospheric state in place and returns `nothing`.
+
+[`update_fluxes!`](@ref) calls this before solving; call it directly to inspect
+the prepared state (interpolated level values, column amounts) without running
+the radiative transfer — the prepare/solve split familiar from other radiation
+drivers. Relative humidity is *not* recomputed here (a host responsibility; see
+[`update_concentrations!`](@ref)).
+"""
+function prepare_atmosphere!(s::RRTMGPSolver)
     as = _atmospheric_state(s)
     p_min = get_p_min(as, _lw_lookup(s))
     interpolate_levels!(
@@ -209,20 +235,17 @@ function update_fluxes!(s::RRTMGPSolver, seedval = nothing)
     s.grid_params.isothermal_boundary_layer &&
         add_isothermal_boundary_layer!(as, p_min)
     clip!(
-    as,
-    p_min,
-    _idx_h2o(s);
-    t_min = RP.optics_lookup_temperature_min(s.params),
-    t_max = RP.optics_lookup_temperature_max(s.params),
-)
+        as,
+        p_min,
+        _idx_h2o(s);
+        t_min = RP.optics_lookup_temperature_min(s.params),
+        t_max = RP.optics_lookup_temperature_max(s.params),
+    )
     update_concentrations!(
         as,
         s.params,
         ClimaComms.device(s.grid_params),
         _idx_h2o(s),
     )
-    update_lw_fluxes!(s)
-    update_sw_fluxes!(s)
-    update_net_fluxes!(s)
     return nothing
 end

@@ -32,6 +32,19 @@ Adapt.adapt_storage(::CopyToArray, x::AbstractArray) = copy(x)
     end
 end
 
+# prepare_atmosphere! is the preparation half of update_fluxes!: running it
+# separately and then the full update must give the same fluxes as the full
+# update alone (the cascade is idempotent for an already-consistent state).
+@testset "prepare_atmosphere! (prepare/solve split)" begin
+    solver = RRTMGP.solve_gray(Float64; nlay = 20, ncol = 4).solver
+    RRTMGP.prepare_atmosphere!(solver) # callable on its own
+    RRTMGP.update_fluxes!(solver)
+    F1 = copy(Array(RRTMGP.net_flux(solver)))
+    RRTMGP.prepare_atmosphere!(solver) # prepare again, then full update
+    RRTMGP.update_fluxes!(solver)
+    @test Array(RRTMGP.net_flux(solver)) == F1
+end
+
 # Renamed-module compat aliases (deprecated names, kept for one release).
 @testset "renamed-module aliases" begin
     @test RRTMGP.Vmrs === RRTMGP.VolumeMixingRatios

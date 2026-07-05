@@ -3,6 +3,11 @@ RRTMGP.jl Release Notes
 
 main
 ------
+- New `prepare_atmosphere!(solver)`: runs the atmospheric-state preparation
+  cascade (level interpolation, isothermal boundary layer, clipping, dry-air
+  column amounts) without solving, so hosts can inspect the prepared state —
+  the prepare/solve split. `update_fluxes!` is now literally
+  `prepare_atmosphere!` followed by the three solve/combine steps.
 - **Breaking:** `lookup_tables` now returns a typed [`LookupBundle`] instead of
   a nested `(; lookups, lu_kwargs)` `NamedTuple`: stable fields
   (`lookup_lw`, `lookup_sw`, cloud/aerosol tables, the name→index maps, and the

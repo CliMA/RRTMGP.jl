@@ -46,6 +46,7 @@ RRTMGP.load_lookup_tables
 
 ```@docs
 RRTMGP.update_fluxes!
+RRTMGP.prepare_atmosphere!
 RRTMGP.update_sw_fluxes!
 RRTMGP.update_lw_fluxes!
 RRTMGP.update_net_fluxes!
