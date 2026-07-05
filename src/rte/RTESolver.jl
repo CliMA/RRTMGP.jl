@@ -3,6 +3,7 @@ module RTESolver
 import ClimaComms
 using Adapt
 
+import ..Numerics
 using ..AngularDiscretizations
 using ..Vmrs
 using ..AtmosphericStates

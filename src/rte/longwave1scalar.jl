@@ -207,13 +207,7 @@ Transport for no-scattering longwave problem.
     (; flux_up, flux_dn) = flux
 
     τ = op.τ
-    # Switch `fact` to its 3rd-order series when the cancellation error of the
-    # direct form, ~eps/τ², reaches the series truncation error, ~τ³: at
-    # τ ~ eps^(1/4) (matches rte-rrtmgp, credited to Peter Blossey & Dmitry
-    # Alexeev). At Float32 this is ~1.9e-2; the previous 100·eps(FT) threshold
-    # left τ ∈ [1e-5, 2e-2] in the cancellation-dominated branch, with O(1)
-    # relative errors in `fact` just above threshold.
-    τ_thresh = sqrt(sqrt(eps(FT)))
+    τ_thresh = Numerics.τ_thresh(FT) # see Numerics for the eps^(1/4) derivation
 
     intensity_to_flux = FT(π) * w_μ
     flux_to_intensity = FT(1) / intensity_to_flux

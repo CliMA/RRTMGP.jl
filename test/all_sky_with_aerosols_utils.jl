@@ -184,6 +184,18 @@ function all_sky_with_aerosols(
     # h2o/o3 are layer fields (2D); well-mixed gases are global means.
     @test ndims(RRTMGP.volume_mixing_ratio(solver, "h2o")) == 2
 
+    # Layer-2 update_fluxes! must stay allocation-free and type-stable on the
+    # all-sky (spectral + clouds + aerosols) path too; the gray path is asserted
+    # in test/standalone.jl. Single-threaded only: multi-threaded `@threaded`
+    # loops allocate task state.
+    if device isa ClimaComms.CPUSingleThreaded
+        RRTMGP.update_fluxes!(solver) # warm up / compile
+        # `@allocated`'s first measurement includes one-time setup; discard it.
+        @allocated RRTMGP.update_fluxes!(solver)
+        @test (@allocated RRTMGP.update_fluxes!(solver)) == 0
+        JET.@test_opt RRTMGP.update_fluxes!(solver)
+    end
+
     # --- spectrally-resolved (per-band) fluxes (two-stream only) ---
     if op_lw isa Optics.TwoStream && op_sw isa Optics.TwoStream
         solver_spec = RRTMGPSolver(

@@ -1,13 +1,12 @@
 module RRTMGP
 using Artifacts
 
-# we may be hitting a slow path:
-# https://stackoverflow.com/questions/14687665/very-slow-stdpow-for-bases-very-close-to-1
-pow_fast(x, y) = exp(y * log(x))
-
 get_artifact_path() = joinpath(artifact"rrtmgp-data", "rrtmgp-data-1.9")
 
 import ClimaComms
+include("Numerics.jl")
+import .Numerics
+import .Numerics: pow_fast
 include("Parameters.jl")
 import .Parameters as RP
 
@@ -32,6 +31,7 @@ include(joinpath("api", "grid_adaptation.jl"))
 
 include(joinpath("api", "api.jl"))
 include(joinpath("api", "getters.jl"))
+include(joinpath("api", "validation.jl"))
 include(joinpath("api", "standalone.jl"))
 
 end # module

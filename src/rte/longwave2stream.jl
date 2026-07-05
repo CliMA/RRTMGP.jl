@@ -162,11 +162,10 @@ total source function at levels using linear-in-tau approximation.
     # Equations are developed in Meador and Weaver, 1980,
     #    doi:10.1175/1520-0469(1980)037<0630:TSATRT>2.0.CO;2
     #
-    # -------------------------------------------------------------------------------------------------    
+    # -------------------------------------------------------------------------------------------------
     # setting references
-    #k_min = FT === Float64 ? FT(1e-12) : FT(1e-4) used in RRTMGP-RTE FORTRAN code
-    k_min = sqrt(eps(FT)) #FT(1e4 * eps(FT))
-    lw_diff_sec = FT(1.66)
+    k_min = Numerics.k_min(FT)
+    lw_diff_sec = FT(1.66) # Fu et al. 1997 diffusivity secant
     τ_thresh = 100 * eps(FT)# tau(icol,ilay) > 1.0e-8_wp used in rte-rrtmgp
     # this is chosen to prevent catastrophic cancellation in src_up and src_dn calculation
 

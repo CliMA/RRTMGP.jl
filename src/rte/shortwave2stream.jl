@@ -183,7 +183,7 @@ Equations are developed in Meador and Weaver, 1980,
 doi:10.1175/1520-0469(1980)037<0630:TSATRT>2.0.CO;2
 """
 @inline function sw_2stream_coeffs(τ::FT, ssa::FT, g::FT, μ₀::FT) where {FT}
-    k_min = sqrt(eps(FT)) #FT(1e4 * eps(FT)) # Suggestion from Chiel van Heerwaarden
+    k_min = Numerics.k_min(FT)
     # Zdunkowski Practical Improved Flux Method "PIFM"
     #  (Zdunkowski et al., 1980;  Contributions to Atmospheric Physics 53, 147-66)
     γ1 = (FT(8) - ssa * (FT(5) + FT(3) * g)) * FT(0.25)
@@ -212,7 +212,7 @@ doi:10.1175/1520-0469(1980)037<0630:TSATRT>2.0.CO;2
     Tdif = RT_term * FT(2) * k * exp_minusktau # Eqn. 26
 
     # Transmittance of direct, unscattered beam. Also used below
-    T₀ = Tnoscat = exp(-τ / max(μ₀, eps(FT)))
+    T₀ = Tnoscat = exp(-τ / max(μ₀, Numerics.μ₀_min(FT)))
 
     # Direct reflect and transmission
     k_μ = k * μ₀
@@ -221,11 +221,9 @@ doi:10.1175/1520-0469(1980)037<0630:TSATRT>2.0.CO;2
     # off resonance so numerator and denominator stay mutually consistent
     # (the old guard divided by a bare eps(FT), which amplified the O(eps)
     # numerator noise at resonance to O(1) and discarded the denominator's
-    # sign). Window sqrt(eps): at its edge the directly-computed 1 − k²μ₀²
-    # still carries ≤ sqrt(eps) relative rounding, matching the O(sqrt(eps))
-    # perturbation from the nudge itself.
-    if abs(FT(1) - k_μ2) < sqrt(eps(FT))
-        k_μ2 = FT(1) - sqrt(eps(FT))
+    # sign). See Numerics.resonance_window for the sqrt(eps) choice.
+    if abs(FT(1) - k_μ2) < Numerics.resonance_window(FT)
+        k_μ2 = FT(1) - Numerics.resonance_window(FT)
         k_μ = sqrt(k_μ2)
     end
     k_γ3 = k * γ3
@@ -277,7 +275,7 @@ end
     for ilev in nlay:-1:lev
         τ_sum += τ[ilev]
     end
-    return flux_dn_dir_top * exp(-τ_sum / max(μ₀, eps(eltype(τ))))
+    return flux_dn_dir_top * exp(-τ_sum / max(μ₀, Numerics.μ₀_min(eltype(τ))))
 end
 
 """
@@ -323,7 +321,7 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
     # repeated subtraction — accumulating ~nlay·eps·τ_sum error exactly
     # where τ_cum → 0, near TOA — and re-exponentiated in both passes.)
     flux_dn_dir_top = toa_flux * solar_frac * μ₀
-    inv_μ₀ = FT(1) / max(μ₀, eps(FT))
+    inv_μ₀ = FT(1) / max(μ₀, Numerics.μ₀_min(FT))
     @inbounds flux_dn_dir[nlev, gcol] = flux_dn_dir_top
     τ_cum = FT(0)
     @inbounds for ilev in nlay:-1:1

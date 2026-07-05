@@ -217,6 +217,25 @@ end
     @test parent(op1.τ) === op1.layerdata
 end
 
+# Opt-in input validation: `RRTMGP.check_values[] = true` makes `update_fluxes!`
+# validate solver inputs; off (the default) it costs a single branch — the
+# zero-alloc/JET testset below runs with the toggle off and still asserts 0.
+@testset "input validation toggle" begin
+    solver = RRTMGP.solve_gray(Float64; nlay = 12, ncol = 3).solver
+    RRTMGP.validate_inputs(solver) # valid inputs pass
+    RRTMGP.cos_zenith(solver) .= 2 # corrupt an input (broadcast: device-safe)
+    @test_throws ErrorException RRTMGP.validate_inputs(solver)
+    try
+        RRTMGP.check_values[] = true
+        @test_throws ErrorException RRTMGP.update_fluxes!(solver)
+    finally
+        RRTMGP.check_values[] = false
+    end
+    RRTMGP.cos_zenith(solver) .= 1 / 2
+    RRTMGP.update_fluxes!(solver) # runs again once repaired, toggle off
+    @test all(isfinite, Array(RRTMGP.net_flux(solver)))
+end
+
 # Layer-2 `update_fluxes!` runs every radiation step, so it must be allocation-free
 # and type-stable. The getters are type-stable because `_domain_view` always returns
 # one concrete view type (no `Union{Array, SubArray}` from a runtime boundary-layer
