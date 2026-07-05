@@ -177,12 +177,16 @@ total source function at levels using linear-in-tau approximation.
     # counterpart in sw_2stream_coeffs).
     k = sqrt(max(lw_diff_sec * (FT(1) - ssa) * (γ1 + γ2), k_min))
 
-    coeff = exp(-2 * τ * k)
+    e1 = exp(-τ * k)
+    coeff = e1 * e1 # = exp(-2τk)
+    # 1 − e^{−2kτ} via expm1 and the exact factorization (1 − e)(1 + e);
+    # the naive 1 − e² loses ~eps/(2kτ) relative accuracy for thin layers.
+    one_minus_e2kt = (-expm1(-τ * k)) * (1 + e1)
     # Refactored to avoid rounding errors when k, gamma1 are of very different magnitudes
-    RT_term = 1 / (k * (1 + coeff) + γ1 * (1 - coeff))
+    RT_term = 1 / (k * (1 + coeff) + γ1 * one_minus_e2kt)
 
-    Rdif = RT_term * γ2 * (1 - coeff) # Equation 25
-    Tdif = RT_term * 2 * k * exp(-τ * k) # Equation 26
+    Rdif = RT_term * γ2 * one_minus_e2kt # Equation 25
+    Tdif = RT_term * 2 * k * e1 # Equation 26
 
     # Source function for diffuse radiation
     # Compute LW source function for upward and downward emission at levels using linear-in-tau assumption

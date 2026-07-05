@@ -39,11 +39,15 @@ using RRTMGP.ArtifactPaths
 @isdefined(setup_cloudy_sky_as) || include("read_cloudy_sky.jl")
 
 # Maximum |Float32 − Float64| flux thresholds [W/m²] (gray heating rate [K/s]).
-# Measured-with-~2× headroom; tighten as numerics fixes land, never loosen.
-# Post-PR-1 measurements (F1 τ_thresh, F3 k-identity, F9/F10/F11): LW noscat
-# 3.8e-4 (was 1.1e-2 clear / 3.3e-2 cloudy); cloudy LW 2-stream 4.2e-3 (was
-# 3.4e-2). Clear LW 2-stream (~3.2e-2) awaits the source restructure; SW
-# (~1e-2 clear, ~5.6e-2 cloudy) awaits the second-wave fixes.
+# Measured-with-headroom; tighten as numerics fixes land, never loosen.
+# Measured after the quick-win fixes (τ_thresh, k-identity, η/index clamps) and
+# the second wave (expm1, resonance shift, delta-scale forms, direct-beam
+# prepass): LW noscat 3.8e-4 (was 1.1e-2 clear / 3.3e-2 cloudy); cloudy LW
+# 2-stream 4.5e-3 (was 3.4e-2); clear LW 2-stream ~3.0e-2 (awaits the LW source
+# restructure). SW: ~1.1e-2/1.6e-2 clear, ~4.9e-2/5.5e-2 cloudy — verified to be
+# per-g-point interpolation/coefficient noise, NOT accumulation: repeating the
+# runs with full Float64 broadband accumulation left the SW differences
+# unchanged, so compensated/f64 accumulators were deliberately not added.
 const F32_THRESHOLDS = (;
     gray_flux = 1.0e-3,
     gray_heating_rate = 1.0e-8,
