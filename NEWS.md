@@ -8,12 +8,15 @@ main
   identities in the two-stream `k`, expm1-based thin-layer factors, a consistent
   off-resonance evaluation of the shortwave direct reflectance/transmittance,
   exact non-cancelling delta-scaling forms, an addition-built direct-beam
-  profile, and a continuous gas-optics η interpolation at η = 1. Measured
-  Float32↔Float64 broadband agreement improves ~25–80× on the longwave
-  no-scattering path (to ~4e-4 W/m²) and ~8× on cloudy longwave two-stream; a
-  new ratcheting f32↔f64 consistency test (test/float32_consistency.jl) locks
-  the gains, and the Float32 longwave no-scattering reference tolerances
-  tighten from 0.05 to 5e-3 W/m².
+  profile, a continuous gas-optics η interpolation at η = 1, and a restructured
+  longwave two-stream source (exact `1 ∓ Rdif − Tdif` factorizations, so no term
+  divides by τ and thin layers keep their real O(τ) emission instead of being
+  zeroed below a threshold). Measured Float32↔Float64 broadband agreement
+  improves 25–90×: every longwave path now sits at its ~2–5e-4 W/m²
+  interpolation-noise floor (from 1.1e-2–3.4e-2). A new ratcheting f32↔f64
+  consistency test (test/float32_consistency.jl) locks the gains, and the
+  Float32 longwave no-scattering reference tolerances tighten from 0.05 to
+  5e-3 W/m².
 - New `RRTMGP.Numerics` module: every numerical guard constant (`k_min`,
   `τ_thresh`, `resonance_window`, `μ₀_min`) in one place with its derivation.
 - New opt-in input validation: set `RRTMGP.check_values[] = true` to have
