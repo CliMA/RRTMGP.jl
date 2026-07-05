@@ -168,42 +168,47 @@ function rte_sw_2stream_solve_CUDA!(
                 )
                 solar_frac = lookup_sw.solar_src_scaled[igpt]
                 ibnd = lookup_sw.band_data.major_gpt2bnd[igpt]
-                # rte shortwave solver
-                rte_sw_2stream!(
-                    op,
-                    src_sw,
-                    bcs_sw,
-                    flux,
-                    solar_frac,
-                    igpt,
-                    n_gpt,
-                    ibnd,
-                    nlev,
-                    gcol,
-                )
-                if igpt == 1
-                    for ilev in 1:nlev
-                        flux_up_sw[ilev, gcol] = flux_up[ilev, gcol]
-                        flux_dn_sw[ilev, gcol] = flux_dn[ilev, gcol]
+                # Skip the RTE solve for night columns (cos_zenith ≤ 0): they are
+                # zeroed after the loop, so night warps skip the sweep instead of
+                # computing fluxes that get overwritten (matches the CPU two-stream
+                # and the noscat solvers).
+                if μ₀ > 0
+                    # rte shortwave solver
+                    rte_sw_2stream!(
+                        op,
+                        src_sw,
+                        bcs_sw,
+                        flux,
+                        solar_frac,
+                        igpt,
+                        n_gpt,
+                        ibnd,
+                        nlev,
+                        gcol,
+                    )
+                    if igpt == 1
+                        for ilev in 1:nlev
+                            flux_up_sw[ilev, gcol] = flux_up[ilev, gcol]
+                            flux_dn_sw[ilev, gcol] = flux_dn[ilev, gcol]
+                        end
+                        flux_dn_dir_sw[1, gcol] = flux_dn_dir[1, gcol]
+                    else
+                        for ilev in 1:nlev
+                            flux_up_sw[ilev, gcol] += flux_up[ilev, gcol]
+                            flux_dn_sw[ilev, gcol] += flux_dn[ilev, gcol]
+                        end
+                        flux_dn_dir_sw[1, gcol] += flux_dn_dir[1, gcol]
                     end
-                    flux_dn_dir_sw[1, gcol] = flux_dn_dir[1, gcol]
-                else
-                    for ilev in 1:nlev
-                        flux_up_sw[ilev, gcol] += flux_up[ilev, gcol]
-                        flux_dn_sw[ilev, gcol] += flux_dn[ilev, gcol]
-                    end
-                    flux_dn_dir_sw[1, gcol] += flux_dn_dir[1, gcol]
+                    # retain this g-point's contribution in its band (no-op when off)
+                    accumulate_band_flux!(
+                        band_flux,
+                        flux_up,
+                        flux_dn,
+                        gcol,
+                        ibnd,
+                        nlev,
+                    )
                 end
-                # retain this g-point's contribution in its band (day columns only, so
-                # night columns stay zero and match the zeroed broadband; no-op when off)
-                μ₀ > 0 && accumulate_band_flux!(
-                    band_flux,
-                    flux_up,
-                    flux_dn,
-                    gcol,
-                    ibnd,
-                    nlev,
-                )
             end
             if μ₀ ≤ 0 # zero out columns with zenith angle ≥ π/2
                 set_flux_to_zero!(flux_sw, gcol)
