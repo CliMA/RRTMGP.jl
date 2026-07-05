@@ -225,7 +225,8 @@ end
 """
     apply_metric_scaling!(flux::Union{FluxLW, FluxSW}, metric_scaling)
 
-Apply metric scaling factor for longwave radiative fluxes. This accounts for geometric expansion of 
+Apply the metric scaling factor to radiative fluxes (longwave or shortwave; for a `FluxSW` the
+direct beam `flux_dn_dir` is scaled too). This accounts for geometric expansion of 
 grid columns with increasing altitude when deep-atmosphere metric terms are used. Requires
 `flux_up`, `flux_dn` and `flux_net` to be available in `flux`. The metric scaling factor is 
 an optional argument that has a value `nothing` when shallow atmosphere approximations
