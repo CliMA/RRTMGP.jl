@@ -10,7 +10,7 @@
 # and the allocating `spectral_*_flux_net`) is documented in `docs/src/getters.md`.
 
 import ..AtmosphericStates: getview_p_lay, getview_t_lay, getview_rel_hum
-import ..Vmrs
+import ..VolumeMixingRatios
 
 #! format: off
 
@@ -306,7 +306,7 @@ volume_mixing_ratio(s::RRTMGPSolver, name::AbstractString) =
 
 function _volume_mixing_ratio(
     s::RRTMGPSolver,
-    vmr::Vmrs.VmrGM,
+    vmr::VolumeMixingRatios.VmrGM,
     name::AbstractString,
 )
     name == "h2o" && return _domain_view(s, vmr.vmr_h2o)
@@ -320,5 +320,5 @@ function _volume_mixing_ratio(
     # view would scalar-index the GPU when read.)
     return only(Array(view(vmr.vmr, idx:idx)))
 end
-_volume_mixing_ratio(s::RRTMGPSolver, vmr::Vmrs.Vmr, name::AbstractString) =
+_volume_mixing_ratio(s::RRTMGPSolver, vmr::VolumeMixingRatios.Vmr, name::AbstractString) =
     _domain_view(s, view(vmr.vmr, _lookup_tables(s).lookups.idx_gases_sw[name], :, :))

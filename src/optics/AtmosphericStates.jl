@@ -4,7 +4,7 @@ using DocStringExtensions
 using Adapt
 import ..Parameters as RP
 
-using ..Vmrs
+using ..VolumeMixingRatios
 
 export AbstractAtmosphericState,
     AtmosphericState,

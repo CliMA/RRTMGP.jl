@@ -67,8 +67,8 @@ function lookup_tables(
     if !isnothing(idx_aerosol_sw)
         # Lock the loaded aerosol ordering to the canonical map (the single
         # source of truth in src/api/aerosols.jl).
-        @assert idx_aerosol_sw == RRTMGP.aerosol_idx() "shortwave aerosol lookup ordering does not match RRTMGP.aerosol_idx() (src/api/aerosols.jl)"
-        @assert idx_aerosol_lw == RRTMGP.aerosol_idx() "longwave aerosol lookup ordering does not match RRTMGP.aerosol_idx() (src/api/aerosols.jl)"
+        @assert idx_aerosol_sw == RRTMGP.aerosol_index_map() "shortwave aerosol lookup ordering does not match RRTMGP.aerosol_index_map() (src/api/aerosols.jl)"
+        @assert idx_aerosol_lw == RRTMGP.aerosol_index_map() "longwave aerosol lookup ordering does not match RRTMGP.aerosol_index_map() (src/api/aerosols.jl)"
     end
 
     lookups = (;

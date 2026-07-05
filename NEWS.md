@@ -3,6 +3,12 @@ RRTMGP.jl Release Notes
 
 main
 ------
+- **Breaking (with aliases):** renamed two modules for clarity — `Vmrs` →
+  `VolumeMixingRatios` and `GrayUtils` → `GrayAtmosphere`. The old names remain
+  as `const` aliases for one release and will be removed in 0.24.
+- **Breaking:** renamed `aerosol_idx()` → `aerosol_index_map()`, resolving the
+  one-character collision with `aerosol_index(name)` (which returns a single
+  index rather than the whole map).
 - Float32 accuracy overhaul of the RTE kernels: series-switch threshold for the
   longwave no-scattering source at eps^(1/4) (was 100·eps), exact `γ1 − γ2`
   identities in the two-stream `k`, expm1-based thin-layer factors, a consistent

@@ -1,7 +1,7 @@
 using Test
 import RRTMGP
 import RRTMGP.AtmosphericStates: AtmosphericState
-import RRTMGP.Vmrs: VmrGM
+import RRTMGP.VolumeMixingRatios: VmrGM
 
 # Build a minimal clear-sky AtmosphericState (no clouds/aerosols, VmrGM storage).
 function _make_as(FT, nlay, ncol)

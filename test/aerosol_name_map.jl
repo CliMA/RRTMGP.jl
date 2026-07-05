@@ -2,7 +2,7 @@ using Test
 import RRTMGP
 
 @testset "aerosol name <-> index map" begin
-    idx = RRTMGP.aerosol_idx()
+    idx = RRTMGP.aerosol_index_map()
     names = RRTMGP.aerosol_names()
 
     # There are 15 MERRA aerosol species.

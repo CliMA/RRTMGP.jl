@@ -10,7 +10,7 @@ import ClimaComms
 
 using RRTMGP
 using RRTMGP: RRTMGPGridParams
-using RRTMGP.Vmrs
+using RRTMGP.VolumeMixingRatios
 using RRTMGP.LookUpTables
 using RRTMGP.AtmosphericStates
 using RRTMGP.Optics

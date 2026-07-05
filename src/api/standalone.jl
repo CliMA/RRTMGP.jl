@@ -6,7 +6,7 @@
 # gray-atmosphere path needs neither NCDatasets nor ClimaParams, so it runs in a
 # fresh session after `using RRTMGP`.
 
-import ..GrayUtils
+import ..GrayAtmosphere
 import ..AtmosphericStates
 import ..BCs
 using ClimaComms
@@ -44,7 +44,7 @@ function heating_rate(s::RRTMGPSolver)
     # `net_flux`/`face_pressure` are domain views, so use the domain layer count.
     nlay = s.grid_params.nlay - Int(s.grid_params.isothermal_boundary_layer)
     hr = similar(net_flux(s), nlay, ncol)
-    GrayUtils.compute_gray_heating_rate!(
+    GrayAtmosphere.compute_gray_heating_rate!(
         device,
         hr,
         level_pressure(s),

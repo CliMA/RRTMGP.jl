@@ -5,7 +5,7 @@ using Adapt
 
 import ..Numerics
 using ..AngularDiscretizations
-using ..Vmrs
+using ..VolumeMixingRatios
 using ..AtmosphericStates
 using ..Fluxes
 using ..BCs

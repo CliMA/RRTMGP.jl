@@ -25,10 +25,10 @@ import RRTMGP.AtmosphericStates: AtmosphericState
 import RRTMGP.AtmosphericStates: CloudState
 import RRTMGP.AtmosphericStates: AerosolState
 import RRTMGP.AtmosphericStates
-import RRTMGP.GrayUtils: update_profile_lw!
-import RRTMGP.GrayUtils: compute_gray_heating_rate!
-import RRTMGP.GrayUtils: compute_gray_heating_rate_kernel!
-import RRTMGP.GrayUtils: update_profile_lw_kernel!
+import RRTMGP.GrayAtmosphere: update_profile_lw!
+import RRTMGP.GrayAtmosphere: compute_gray_heating_rate!
+import RRTMGP.GrayAtmosphere: compute_gray_heating_rate_kernel!
+import RRTMGP.GrayAtmosphere: update_profile_lw_kernel!
 import RRTMGP.LookUpTables: LookUpLW, LookUpCld, LookUpSW, LookUpAerosolMerra
 import RRTMGP.RTESolver: rte_lw_noscat_solve!
 import RRTMGP.RTESolver: rte_lw_noscat_one_angle!
@@ -55,7 +55,7 @@ include(joinpath("cuda", "gray_atmospheric_states.jl"))
 include(joinpath("cuda", "rte_longwave_2stream.jl"))
 include(joinpath("cuda", "optics.jl"))
 include(joinpath("cuda", "rte_shortwave_noscat.jl"))
-include(joinpath("cuda", "optics_gray_utils.jl"))
+include(joinpath("cuda", "gray_atmosphere.jl"))
 include(joinpath("cuda", "rte_shortwave_2stream.jl"))
 include(joinpath("cuda", "rte_longwave_noscat.jl"))
 

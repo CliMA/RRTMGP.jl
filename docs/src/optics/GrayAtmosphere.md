@@ -1,7 +1,7 @@
 # Utilities for gray radiation simulation
 
 ```@meta
-CurrentModule = RRTMGP.GrayUtils
+CurrentModule = RRTMGP.GrayAtmosphere
 ```
 
 ```@docs

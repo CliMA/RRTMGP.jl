@@ -24,14 +24,16 @@ include(joinpath("api", "radiation_methods.jl"))
 include(joinpath("api", "aerosols.jl"))
 
 # ── Layer 0: core containers — states, sources, optics, fluxes, BCs, lookups
-include(joinpath("optics", "Vmrs.jl"))
+include(joinpath("optics", "VolumeMixingRatios.jl"))
+const Vmrs = VolumeMixingRatios # compat alias (deprecated name; remove in 0.24)
 include(joinpath("optics", "LookUpTables.jl"))
 include(joinpath("optics", "AngularDiscretizations.jl"))
 include(joinpath("optics", "AtmosphericStates.jl"))
 include(joinpath("optics", "Sources.jl"))
 include(joinpath("optics", "Optics.jl"))
 include(joinpath("optics", "Fluxes.jl"))
-include(joinpath("optics", "GrayUtils.jl"))
+include(joinpath("optics", "GrayAtmosphere.jl"))
+const GrayUtils = GrayAtmosphere # compat alias (deprecated name; remove in 0.24)
 include(joinpath("optics", "BCs.jl"))
 
 # ── Layer 1: RTE solver workspaces and the functional solve_lw!/solve_sw! core

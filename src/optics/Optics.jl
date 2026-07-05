@@ -5,7 +5,7 @@ using Adapt
 using Random
 import ClimaComms
 
-using ..Vmrs
+using ..VolumeMixingRatios
 import ..pow_fast
 using ..LookUpTables
 using ..AtmosphericStates

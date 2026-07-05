@@ -54,14 +54,14 @@ const _AEROSOL_NAMES = [
 ]
 
 """
-    aerosol_idx()
+    aerosol_index_map()
 
 Return the canonical mapping from aerosol species name to its index in the
 `AerosolState` arrays (`aero_mass`, `aero_size`). This ordering is the single
 source of truth shared by the optics kernel, the lookup-table loader, and the
 state accessors. Returns a fresh copy — mutating it does not affect RRTMGP.
 """
-aerosol_idx() = copy(AEROSOL_IDX)
+aerosol_index_map() = copy(AEROSOL_IDX)
 
 """
     aerosol_names()
