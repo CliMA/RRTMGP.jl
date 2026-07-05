@@ -54,9 +54,9 @@ _configure_threadblock(nitems) =
 include(joinpath("cuda", "gray_atmospheric_states.jl"))
 include(joinpath("cuda", "rte_longwave_2stream.jl"))
 include(joinpath("cuda", "optics.jl"))
-include(joinpath("cuda", "rte_shortwave_1scalar.jl"))
+include(joinpath("cuda", "rte_shortwave_noscat.jl"))
 include(joinpath("cuda", "optics_gray_utils.jl"))
 include(joinpath("cuda", "rte_shortwave_2stream.jl"))
-include(joinpath("cuda", "rte_longwave_1scalar.jl"))
+include(joinpath("cuda", "rte_longwave_noscat.jl"))
 
 end
