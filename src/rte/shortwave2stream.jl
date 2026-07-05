@@ -192,7 +192,10 @@ doi:10.1175/1520-0469(1980)037<0630:TSATRT>2.0.CO;2
     γ4 = FT(1) - γ3
     α1 = γ1 * γ4 + γ2 * γ3                          # Eq. 16
     α2 = γ1 * γ3 + γ2 * γ4                          # Eq. 17
-    k = sqrt(max((γ1 - γ2) * (γ1 + γ2), k_min))
+    # For PIFM, γ1 − γ2 ≡ 2(1 − ssa) exactly; use the identity rather than the
+    # difference of two rounded O(1) numbers, which loses ~eps absolute and
+    # gives O(1%) errors in k for bright scattering (ssa → 1) at Float32.
+    k = sqrt(max(FT(2) * (FT(1) - ssa) * (γ1 + γ2), k_min))
 
     exp_minusktau = exp(-τ * k)
     exp_minus2ktau = exp_minusktau * exp_minusktau

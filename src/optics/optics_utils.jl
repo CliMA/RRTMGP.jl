@@ -8,7 +8,10 @@ This function assumes `Δx` is uniform.
 @inline function loc_lower(xi, Δx, n, x)
     @inbounds xi ≤ x[1] && return 1
     @inbounds xi >= x[n] && return n - 1
-    return @inbounds unsafe_trunc(Int, (xi - x[1]) / Δx) + 1
+    # The quotient can round UP to exactly n - 1 for xi < x[n] (Float32
+    # especially), which would return n and read one past the end under
+    # `@inbounds`; clamp to the last valid lower index.
+    return @inbounds min(unsafe_trunc(Int, (xi - x[1]) / Δx) + 1, n - 1)
 end
 
 """

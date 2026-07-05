@@ -149,7 +149,8 @@ No-scattering solver for the shortwave problem.
     ilev = nlev - 1
     @inbounds while ilev ≥ 1
         flux_dn_dir[ilev, gcol] =
-            flux_dn_dir[ilev + 1, gcol] * exp(-τ[ilev, gcol] / cos_zenith[gcol])
+            flux_dn_dir[ilev + 1, gcol] *
+            exp(-τ[ilev, gcol] / max(cos_zenith[gcol], eps(FT)))
         flux_dn[ilev, gcol] = flux_dn_dir[ilev, gcol]
         flux_up[ilev, gcol] = FT(0)
         flux_net[ilev, gcol] = -flux_dn_dir[ilev, gcol]

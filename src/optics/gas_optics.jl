@@ -154,7 +154,10 @@ Compute interpolation fraction for binary species parameter.
     #η = col_mix1 > 0 ? vmr1 / col_mix1 : FT(0.5) # rte-rrtmgp uses col_mix1 > tiny(col_mix1)
     loc_η = FT(η * (n_η - 1))
     jη1 = min(unsafe_trunc(Int, loc_η) + 1, n_η - 1)
-    fη1 = loc_η - unsafe_trunc(Int, loc_η)
+    # Fraction relative to the (clamped) cell, so η = 1 lands on the last table
+    # node (fη = 1) instead of jumping back a full cell (fη = 0). At Float32, η
+    # rounds to exactly 1 far more often than at Float64.
+    fη1 = loc_η - (jη1 - 1)
 
     itemp = 2
     @inbounds η_half =
@@ -168,7 +171,7 @@ Compute interpolation fraction for binary species parameter.
     #η = col_mix2 > 0 ? vmr1 / col_mix2 : FT(0.5) # rte-rrtmgp uses col_mix2 > tiny(col_mix2)
     loc_η = FT(η * (n_η - 1))
     jη2 = min(unsafe_trunc(Int, loc_η) + 1, n_η - 1)
-    fη2 = loc_η - unsafe_trunc(Int, loc_η)
+    fη2 = loc_η - (jη2 - 1) # cell-relative; continuous at η = 1 (see fη1)
 
     return ((jη1, jη2, fη1, fη2), (col_mix1, col_mix2))
 end

@@ -172,7 +172,10 @@ total source function at levels using linear-in-tau approximation.
 
     γ1 = lw_diff_sec * (1 - FT(0.5) * ssa * (1 + g))
     γ2 = lw_diff_sec * FT(0.5) * ssa * (1 - g)
-    k = sqrt(max((γ1 + γ2) * (γ1 - γ2), k_min))
+    # γ1 − γ2 ≡ lw_diff_sec·(1 − ssa) exactly (Fu et al. Eqs 2.9–2.10); the
+    # identity avoids the near-1 cancellation at ssa → 1 (see the shortwave
+    # counterpart in sw_2stream_coeffs).
+    k = sqrt(max(lw_diff_sec * (FT(1) - ssa) * (γ1 + γ2), k_min))
 
     coeff = exp(-2 * τ * k)
     # Refactored to avoid rounding errors when k, gamma1 are of very different magnitudes
