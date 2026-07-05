@@ -99,28 +99,30 @@ function rte_sw_noscat_solve_CUDA!(
             for igpt in 1:n_gpt
                 compute_optical_props!(op, as, gcol, igpt, lookup_sw, nothing)
                 solar_frac = lookup_sw.solar_src_scaled[igpt]
-                rte_sw_noscat!(
-                    flux,
-                    op,
-                    bcs_sw,
-                    igpt,
-                    n_gpt,
-                    solar_frac,
-                    gcol,
-                    nlev,
-                )
-                if igpt == 1
-                    for ilev in 1:nlev
-                        flux_up_sw[ilev, gcol] = flux_up[ilev, gcol]
-                        flux_dn_sw[ilev, gcol] = flux_dn[ilev, gcol]
+                if μ₀ > 0
+                    rte_sw_noscat!(
+                        flux,
+                        op,
+                        bcs_sw,
+                        igpt,
+                        n_gpt,
+                        solar_frac,
+                        gcol,
+                        nlev,
+                    )
+                    if igpt == 1
+                        for ilev in 1:nlev
+                            flux_up_sw[ilev, gcol] = flux_up[ilev, gcol]
+                            flux_dn_sw[ilev, gcol] = flux_dn[ilev, gcol]
+                        end
+                        flux_dn_dir_sw[1, gcol] = flux_dn_dir[1, gcol]
+                    else
+                        for ilev in 1:nlev
+                            flux_up_sw[ilev, gcol] += flux_up[ilev, gcol]
+                            flux_dn_sw[ilev, gcol] += flux_dn[ilev, gcol]
+                        end
+                        flux_dn_dir_sw[1, gcol] += flux_dn_dir[1, gcol]
                     end
-                    flux_dn_dir_sw[1, gcol] = flux_dn_dir[1, gcol]
-                else
-                    for ilev in 1:nlev
-                        flux_up_sw[ilev, gcol] += flux_up[ilev, gcol]
-                        flux_dn_sw[ilev, gcol] += flux_dn[ilev, gcol]
-                    end
-                    flux_dn_dir_sw[1, gcol] += flux_dn_dir[1, gcol]
                 end
             end
             if μ₀ <= 0
