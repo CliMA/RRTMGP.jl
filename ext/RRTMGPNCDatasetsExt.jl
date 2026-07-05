@@ -11,8 +11,10 @@ import RRTMGP:
     ClearSkyRadiation,
     AllSkyRadiation,
     AllSkyRadiationWithClearSkyDiagnostics
-import RRTMGP: lookup_tables
+import RRTMGP: lookup_tables, LookupBundle
 
+# (The gray method needs no tables and lives in src/api/solver.jl; only the
+# spectral methods below require NCDatasets.)
 lookup_tables(
     grid_params::RRTMGPGridParams,
     radiation_method::AbstractRRTMGPMethod,
@@ -21,12 +23,6 @@ lookup_tables(
     ClimaComms.device(grid_params),
     eltype(grid_params),
 )
-
-lookup_tables(
-    radiation_method::GrayRadiation,
-    device::ClimaComms.AbstractDevice,
-    ::Type{FT},
-) where {FT} = (; lookups = (;), lu_kwargs = (; nbnd_lw = 1, nbnd_sw = 1))
 
 function lookup_tables(
     radiation_method::ClearSkyRadiation,
@@ -71,23 +67,25 @@ function lookup_tables(
         @assert idx_aerosol_lw == RRTMGP.aerosol_index_map() "longwave aerosol lookup ordering does not match RRTMGP.aerosol_index_map() (src/api/aerosols.jl)"
     end
 
-    lookups = (;
-        idx_aerosize_lw,
-        idx_aerosize_sw,
-        idx_aerosol_lw,
-        idx_aerosol_sw,
-        idx_gases_lw,
-        idx_gases_sw,
-        lookup_lw,
-        lookup_lw_aero,
-        lookup_sw,
-        lookup_sw_aero,
-    )
-
     @assert RRTMGP.LookUpTables.get_n_gases(lookup_lw) ==
             RRTMGP.LookUpTables.get_n_gases(lookup_sw)
     @assert lookup_lw.p_ref_min == lookup_sw.p_ref_min
-    return (; lookups, lu_kwargs = (; nbnd_lw, ngas_lw, nbnd_sw, ngas_sw))
+    return LookupBundle(;
+        lookup_lw,
+        lookup_sw,
+        lookup_lw_aero,
+        lookup_sw_aero,
+        idx_gases_lw,
+        idx_gases_sw,
+        idx_aerosol_lw,
+        idx_aerosol_sw,
+        idx_aerosize_lw,
+        idx_aerosize_sw,
+        nbnd_lw,
+        nbnd_sw,
+        ngas_lw,
+        ngas_sw,
+    )
 end
 
 function lookup_tables(
@@ -107,15 +105,29 @@ function lookup_tables(
         end
     lookup_lw_cld = artifact(:cloud, :lw, :LookUpCld)
     lookup_sw_cld = artifact(:cloud, :sw, :LookUpCld)
-    clear_sky_lookups = lookup_tables(
+    b = lookup_tables(
         ClearSkyRadiation(radiation_method.aerosol_radiation),
         device,
         FT,
     )
-    lookups = (; clear_sky_lookups.lookups..., lookup_lw_cld, lookup_sw_cld)
-    (; lu_kwargs) = clear_sky_lookups
-
-    return (; lookups, lu_kwargs)
+    return LookupBundle(;
+        b.lookup_lw,
+        b.lookup_sw,
+        lookup_lw_cld,
+        lookup_sw_cld,
+        b.lookup_lw_aero,
+        b.lookup_sw_aero,
+        b.idx_gases_lw,
+        b.idx_gases_sw,
+        b.idx_aerosol_lw,
+        b.idx_aerosol_sw,
+        b.idx_aerosize_lw,
+        b.idx_aerosize_sw,
+        b.nbnd_lw,
+        b.nbnd_sw,
+        b.ngas_lw,
+        b.ngas_sw,
+    )
 end
 
 include("lookup_constructors.jl")

@@ -45,6 +45,7 @@ include(joinpath("api", "interpolation.jl"))
 include(joinpath("api", "grid_adaptation.jl"))
 
 # ── Layer 2: the RRTMGPSolver aggregate, orchestration, getters, validation
+include(joinpath("api", "lookup_bundle.jl"))
 include(joinpath("api", "solver.jl"))
 include(joinpath("api", "update_fluxes.jl"))
 include(joinpath("api", "getters.jl"))

@@ -37,6 +37,9 @@ RRTMGP.optical_thickness_parameter
 
 ```@docs
 RRTMGP.lookup_tables
+RRTMGP.LookupBundle
+RRTMGP.save_lookup_tables
+RRTMGP.load_lookup_tables
 ```
 
 ## Computing fluxes

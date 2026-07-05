@@ -17,17 +17,17 @@ update_lw_fluxes!(s::RRTMGPSolver, ::GrayRadiation) = RTESolver.solve_lw!(
 update_lw_fluxes!(s::RRTMGPSolver, ::ClearSkyRadiation) = RTESolver.solve_lw!(
     _longwave_solver(s),
     _atmospheric_state(s),
-    _lookup_tables(s).lookups.lookup_lw,
+    _lookup_tables(s).lookup_lw,
     nothing,
-    _lookup_tables(s).lookups.lookup_lw_aero,
+    _lookup_tables(s).lookup_lw_aero,
     _deep_atmosphere_inverse_scaling(s),
 )
 update_lw_fluxes!(s::RRTMGPSolver, ::AllSkyRadiation) = RTESolver.solve_lw!(
     _longwave_solver(s),
     _atmospheric_state(s),
-    _lookup_tables(s).lookups.lookup_lw,
-    _lookup_tables(s).lookups.lookup_lw_cld,
-    _lookup_tables(s).lookups.lookup_lw_aero,
+    _lookup_tables(s).lookup_lw,
+    _lookup_tables(s).lookup_lw_cld,
+    _lookup_tables(s).lookup_lw_aero,
     _deep_atmosphere_inverse_scaling(s),
 )
 function update_lw_fluxes!(
@@ -35,7 +35,7 @@ function update_lw_fluxes!(
     ::AllSkyRadiationWithClearSkyDiagnostics,
 )
     as = _atmospheric_state(s)
-    (; lookups) = _lookup_tables(s)
+    lookups = _lookup_tables(s)
     lw_solver = _longwave_solver(s)
     ms = _deep_atmosphere_inverse_scaling(s)
     RTESolver.solve_lw!(
@@ -74,24 +74,24 @@ update_sw_fluxes!(s::RRTMGPSolver, ::GrayRadiation) = RTESolver.solve_sw!(
 update_sw_fluxes!(s::RRTMGPSolver, ::ClearSkyRadiation) = RTESolver.solve_sw!(
     _shortwave_solver(s),
     _atmospheric_state(s),
-    _lookup_tables(s).lookups.lookup_sw,
+    _lookup_tables(s).lookup_sw,
     nothing,
-    _lookup_tables(s).lookups.lookup_sw_aero,
+    _lookup_tables(s).lookup_sw_aero,
     _deep_atmosphere_inverse_scaling(s),
 )
 update_sw_fluxes!(s::RRTMGPSolver, ::AllSkyRadiation) = RTESolver.solve_sw!(
     _shortwave_solver(s),
     _atmospheric_state(s),
-    _lookup_tables(s).lookups.lookup_sw,
-    _lookup_tables(s).lookups.lookup_sw_cld,
-    _lookup_tables(s).lookups.lookup_sw_aero,
+    _lookup_tables(s).lookup_sw,
+    _lookup_tables(s).lookup_sw_cld,
+    _lookup_tables(s).lookup_sw_aero,
     _deep_atmosphere_inverse_scaling(s),
 )
 function update_sw_fluxes!(
     s::RRTMGPSolver,
     ::AllSkyRadiationWithClearSkyDiagnostics,
 )
-    (; lookups) = _lookup_tables(s)
+    lookups = _lookup_tables(s)
     sw_solver = _shortwave_solver(s)
     as = _atmospheric_state(s)
     ms = _deep_atmosphere_inverse_scaling(s)
@@ -130,12 +130,12 @@ _deep_atmosphere_inverse_scaling(s::RRTMGPSolver) =
 _lw_lookup(s::RRTMGPSolver) = _lw_lookup(s, _radiation_method(s))
 _lw_lookup(::RRTMGPSolver, ::GrayRadiation) = nothing
 _lw_lookup(s::RRTMGPSolver, ::AbstractRRTMGPMethod) =
-    _lookup_tables(s).lookups.lookup_lw
+    _lookup_tables(s).lookup_lw
 
 _idx_h2o(s::RRTMGPSolver) = _idx_h2o(s, _radiation_method(s))
 _idx_h2o(::RRTMGPSolver, ::GrayRadiation) = nothing
 _idx_h2o(s::RRTMGPSolver, ::AbstractRRTMGPMethod) =
-    _lookup_tables(s).lookups.lookup_lw.idx_h2o
+    _lookup_tables(s).lookup_lw.idx_h2o
 
 _maybe_reset_rng_seed!(::AbstractRRTMGPMethod, seedval) = nothing
 function _maybe_reset_rng_seed!(

@@ -45,7 +45,7 @@ jobs:
             ubuntu-latest-julia-
       - uses: julia-actions/julia-downgrade-compat@v2
         with:
-          skip: Random, Artifacts, LinearAlgebra
+          skip: Random, Artifacts, LinearAlgebra, Serialization
           julia_version: ${{ matrix.version }}
           mode: 'forcedeps'
       - uses: julia-actions/julia-buildpkg@latest

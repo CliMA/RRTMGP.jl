@@ -3,6 +3,16 @@ RRTMGP.jl Release Notes
 
 main
 ------
+- **Breaking:** `lookup_tables` now returns a typed [`LookupBundle`] instead of
+  a nested `(; lookups, lu_kwargs)` `NamedTuple`: stable fields
+  (`lookup_lw`, `lookup_sw`, cloud/aerosol tables, the name→index maps, and the
+  band/gas counts), `nothing` where a table is absent. Code that indexed the
+  NamedTuple (e.g. `bundle.lookups.lookup_lw`, `bundle.lu_kwargs.nbnd_lw`) drops
+  one level (`bundle.lookup_lw`, `bundle.nbnd_lw`).
+- New `save_lookup_tables(path, bundle)` / `load_lookup_tables(path, grid_params)`
+  cache the lookup tables on disk (Julia `Serialization`; a same-version cache,
+  not an interchange format), so the spectral methods can run without NCDatasets
+  once a cache has been generated — e.g. for standalone/classroom use.
 - The CPU and CUDA solver drivers now share device-agnostic per-(g-point,
   column) bodies (`*_gpt_col!` in `src/rte/`), removing the duplicated
   orchestration where backend asymmetries repeatedly crept in. As part of the

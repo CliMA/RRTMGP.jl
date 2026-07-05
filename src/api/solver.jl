@@ -12,38 +12,24 @@ import Random
 """
     lookup_tables(grid_params::RRTMGPGridParams, radiation_method::AbstractRRTMGPMethod)
 
-Build the lookup tables for `radiation_method`, returning a `NamedTuple`
-`(; lookups, lu_kwargs)`:
- - `lookups`: the RRTMGP lookup tables and gas/aerosol index maps (varies by
-   radiation mode; empty for `GrayRadiation`),
- - `lu_kwargs`: band/gas counts (`nbnd_lw`, `nbnd_sw`, and — spectral modes
-   only — `ngas_lw`, `ngas_sw`).
-
-Treat the return value as an **opaque token**: build it once and pass it back to
-the `RRTMGPSolver` constructor via `lookups = ...` to avoid a second NetCDF read.
-Its internal layout is not API and may become a typed struct in a future release.
+Build the lookup tables for `radiation_method`, returning a
+[`LookupBundle`](@ref) — the gas/cloud/aerosol lookup tables, the name→index
+maps, and the band/gas counts. Build it once and pass it back to the
+`RRTMGPSolver` constructor via `lookups = ...` to avoid a second NetCDF read,
+or cache it on disk with [`save_lookup_tables`](@ref).
 
 The spectral (non-gray) methods are provided by an extension: load NCDatasets
-(`using NCDatasets`) first.
-
-TODO:
- - We should add type annotations for the data read from NC files as this will
-   improve inference and the return type of `lookup_tables`.
+(`using NCDatasets`) first (or [`load_lookup_tables`](@ref) from a cache).
 """
 function lookup_tables end
 
 # Gray radiation uses no lookup tables, so this method needs no NCDatasets (the
 # spectral methods are provided by the NCDatasets extension).
 lookup_tables(::RRTMGPGridParams, ::GrayRadiation) =
-    (; lookups = (;), lu_kwargs = (; nbnd_lw = 1, nbnd_sw = 1))
+    LookupBundle(; nbnd_lw = 1, nbnd_sw = 1)
 
 # Non-gray radiation needs lookup tables loaded from NetCDF; surface a clear,
 # actionable error if the NCDatasets extension has not been loaded.
-#
-# FUTURE IMPROVEMENT:
-# To improve the standalone experience, RRTMGP.jl should eventually provide serialized Julia-native 
-# lookup tables (e.g., via JLD2 or Serialization binary arrays in Artifacts). This would allow loading 
-# real-gas lookup tables completely standalone without requiring NCDatasets.jl or C-library wrappers.
 _check_lookup_support(::GrayRadiation) = nothing
 function _check_lookup_support(radiation_method::AbstractRRTMGPMethod)
     if isnothing(Base.get_extension(@__MODULE__, :RRTMGPNCDatasetsExt))
@@ -74,8 +60,8 @@ Construct it with the `RRTMGPSolver` constructor and drive it with
 - `sws`: shortwave RTE solver and its flux/scratch buffers.
 - `lws`: longwave RTE solver and its flux/scratch buffers.
 - `as`: the atmospheric state (solver inputs).
-- `lookups`: the `(; lookups, lu_kwargs)` bundle from `lookup_tables` (for gray
-  radiation the tables are empty and only the band counts are carried).
+- `lookups`: the [`LookupBundle`](@ref) from `lookup_tables` (for gray
+  radiation the tables are `nothing` and only the band counts are carried).
 - `clear_flux_lw`: clear-sky longwave fluxes, or `nothing`.
 - `clear_flux_sw`: clear-sky shortwave fluxes, or `nothing`.
 - `center_z`: layer-center altitudes [m], or `nothing`.
@@ -227,8 +213,8 @@ function RRTMGPSolver(
         (op_lw isa OneScalar || op_sw isa OneScalar) && error(
             "spectral_fluxes = true requires two-stream optics for both bands.",
         )
-        band_flux_lw = Fluxes.FluxBand(grid_params, lookups.lu_kwargs.nbnd_lw)
-        band_flux_sw = Fluxes.FluxBand(grid_params, lookups.lu_kwargs.nbnd_sw)
+        band_flux_lw = Fluxes.FluxBand(grid_params, lookups.nbnd_lw)
+        band_flux_sw = Fluxes.FluxBand(grid_params, lookups.nbnd_sw)
     else
         band_flux_lw = nothing
         band_flux_sw = nothing

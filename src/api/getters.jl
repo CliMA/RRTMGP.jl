@@ -17,9 +17,6 @@ import ..VolumeMixingRatios
 _maybe_transpose(x) = transpose(x)
 _maybe_transpose(x::Nothing) = x
 
-# TODO: this is not user-facing yet in that `lookup_tables` still returns a
-# NamedTuple, and we should probably make a dedicated struct for this.
-
 # internal API methods
 _lookup_tables(s::RRTMGPSolver) = s.lookups
 _radiation_method(s::RRTMGPSolver) = s.radiation_method
@@ -111,10 +108,10 @@ Return the radiation method the solver was constructed with: `GrayRadiation`,
 radiation_method(s::RRTMGPSolver) = _radiation_method(s)
 
 # Gray radiation carries no spectral lookup tables; raise an informative error for
-# getters that need them (band bounds, gas indices) instead of a NamedTuple field error.
+# getters that need them (band bounds, gas indices).
 function _require_spectral_lookups(s::RRTMGPSolver)
-    lookups = _lookup_tables(s).lookups
-    hasproperty(lookups, :lookup_lw) || error(
+    lookups = _lookup_tables(s)
+    isnothing(lookups.lookup_lw) && error(
         "spectral lookup tables are not present on this solver (gray radiation); \
          construct it with a spectral radiation method (e.g. `ClearSkyRadiation`).",
     )
@@ -123,8 +120,8 @@ end
 
 # The aerosol index map exists only when the solver was built with aerosol optics.
 function _require_aerosol_lookups(s::RRTMGPSolver)
-    lookups = _lookup_tables(s).lookups
-    hasproperty(lookups, :idx_aerosol_sw) || error(
+    lookups = _lookup_tables(s)
+    isnothing(lookups.idx_aerosol_sw) && error(
         "aerosol lookup tables are not present on this solver; construct it with a \
          radiation method with `aerosol_radiation = true`.",
     )
@@ -309,7 +306,7 @@ function _volume_mixing_ratio(
 )
     name == "h2o" && return _domain_view(s, vmr.vmr_h2o)
     name == "o3" && return _domain_view(s, vmr.vmr_o3)
-    idx = _lookup_tables(s).lookups.idx_gases_sw[name]
+    idx = _lookup_tables(s).idx_gases_sw[name]
     # The water-vapor continuum pseudo-gases ("h2o_self"/"h2o_frgn") share the h2o
     # slot: the loader maps them to `idx_h2o` and `get_vmr` maps index 1 to `vmr_h2o`,
     # so return the h2o field rather than the (unused) well-mixed slot 1.
@@ -319,4 +316,4 @@ function _volume_mixing_ratio(
     return only(Array(view(vmr.vmr, idx:idx)))
 end
 _volume_mixing_ratio(s::RRTMGPSolver, vmr::VolumeMixingRatios.Vmr, name::AbstractString) =
-    _domain_view(s, view(vmr.vmr, _lookup_tables(s).lookups.idx_gases_sw[name], :, :))
+    _domain_view(s, view(vmr.vmr, _lookup_tables(s).idx_gases_sw[name], :, :))
