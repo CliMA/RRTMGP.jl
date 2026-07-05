@@ -12,7 +12,6 @@ export AbstractFlux,
     set_flux_to_zero!,
     set_band_flux_to_zero!,
     accumulate_band_flux!,
-    add_to_flux!,
     apply_metric_scaling!,
     compute_net_flux!
 
@@ -199,25 +198,6 @@ Set shortwave flux for column `gcol` to zero
         flux_dn[ilev, gcol] = FT(0)
         flux_net[ilev, gcol] = FT(0)
         flux_dn_dir[ilev, gcol] = FT(0)
-    end
-    return nothing
-end
-
-"""
-    add_to_flux!(flux1::FluxLW, flux2::FluxLW, gcol::Int)
-
-add longwave flux2 to longwave flux1 for column `gcol`
-flux1 .+= flux2
-
-"""
-@inline function add_to_flux!(flux1::FluxLW, flux2::FluxLW, gcol::Int)
-    flux_up1, flux_dn1, flux_net1 = flux1.flux_up, flux1.flux_dn, flux1.flux_net
-    flux_up2, flux_dn2, flux_net2 = flux2.flux_up, flux2.flux_dn, flux2.flux_net
-    nlev = size(flux_up1, 1)
-    @inbounds for ilev in 1:nlev
-        flux_up1[ilev, gcol] += flux_up2[ilev, gcol]
-        flux_dn1[ilev, gcol] += flux_dn2[ilev, gcol]
-        flux_net1[ilev, gcol] += flux_net2[ilev, gcol]
     end
     return nothing
 end

@@ -4,7 +4,6 @@ import ClimaComms
 import RRTMGP.Parameters as RP
 import RRTMGP.AngularDiscretizations.AngularDiscretization
 import RRTMGP.Fluxes: FluxLW, FluxSW
-import RRTMGP.Fluxes: add_to_flux!
 import RRTMGP.Fluxes: compute_net_flux!, set_flux_to_zero!
 import RRTMGP.Fluxes: set_band_flux_to_zero!, accumulate_band_flux!
 import RRTMGP.Sources: SourceLWNoScat
@@ -38,6 +37,10 @@ import RRTMGP.RTESolver: rte_sw_2stream_solve!
 import RRTMGP.RTESolver: rte_sw_2stream!
 import RRTMGP.RTESolver: rte_sw_noscat!
 import RRTMGP.RTESolver: rte_sw_noscat_solve!
+# device-agnostic per-(g-point, column) bodies shared with the CPU drivers
+import RRTMGP.RTESolver: lw_noscat_gpt_col!, lw_2stream_gpt_col!
+import RRTMGP.RTESolver: sw_noscat_gpt_col!, sw_2stream_gpt_col!
+import RRTMGP.RTESolver: _compute_aero_mask!
 import CUDA: threadIdx, blockIdx, blockDim, @cuda
 
 _max_threads_cuda() = 256

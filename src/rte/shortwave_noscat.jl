@@ -33,6 +33,28 @@ function rte_sw_noscat_solve!(
     return nothing
 end
 
+# Device-agnostic per-(g-point, column) body, shared by the CPU driver below
+# and the CUDA kernel in ext/cuda. Callers guard on cos_zenith > 0 (night
+# columns are zeroed once, after the g-point loop).
+@inline function sw_noscat_gpt_col!(
+    igpt,
+    gcol,
+    flux,
+    flux_sw,
+    op,
+    bcs_sw,
+    as,
+    lookup_sw,
+    n_gpt,
+    nlev,
+)
+    compute_optical_props!(op, as, gcol, igpt, lookup_sw, nothing)
+    @inbounds solar_frac = lookup_sw.solar_src_scaled[igpt]
+    rte_sw_noscat!(flux, op, bcs_sw, igpt, n_gpt, solar_frac, gcol, nlev)
+    _accumulate_fluxes!(flux_sw, flux, gcol, nlev, igpt)
+    return nothing
+end
+
 function rte_sw_noscat_solve!(
     device::ClimaComms.AbstractCPUDevice,
     flux::FluxSW,
@@ -45,60 +67,23 @@ function rte_sw_noscat_solve!(
     nlay, ncol = AtmosphericStates.get_dims(as)
     nlev = nlay + 1
     n_gpt = length(lookup_sw.solar_src_scaled)
-    flux_up_sw = flux_sw.flux_up
-    flux_dn_sw = flux_sw.flux_dn
-    flux_dn_dir_sw = flux_sw.flux_dn_dir
-    flux_net_sw = flux_sw.flux_net
-    (; flux_up, flux_dn, flux_dn_dir) = flux
     cos_zenith = bcs_sw.cos_zenith
     @inbounds begin
         for igpt in 1:n_gpt
             ClimaComms.@threaded device for gcol in 1:ncol
                 if cos_zenith[gcol] > 0
-                    compute_optical_props!(
-                        op,
-                        as,
-                        gcol,
+                    sw_noscat_gpt_col!(
                         igpt,
-                        lookup_sw,
-                        nothing,
-                    )
-                    solar_frac = lookup_sw.solar_src_scaled[igpt]
-                    rte_sw_noscat!(
+                        gcol,
                         flux,
+                        flux_sw,
                         op,
                         bcs_sw,
-                        igpt,
+                        as,
+                        lookup_sw,
                         n_gpt,
-                        solar_frac,
-                        gcol,
                         nlev,
                     )
-                    if igpt == 1
-                        map!(
-                            x -> x,
-                            view(flux_up_sw, :, gcol),
-                            view(flux_up, :, gcol),
-                        )
-                        map!(
-                            x -> x,
-                            view(flux_dn_sw, :, gcol),
-                            view(flux_dn, :, gcol),
-                        )
-                        map!(
-                            x -> x,
-                            view(flux_dn_dir_sw, :, gcol),
-                            view(flux_dn_dir, :, gcol),
-                        )
-                    else
-                        for ilev in 1:nlev
-                            flux_up_sw[ilev, gcol] += flux_up[ilev, gcol]
-                            flux_dn_sw[ilev, gcol] += flux_dn[ilev, gcol]
-                        end
-                        flux_dn_dir_sw[1, gcol] += flux_dn_dir[1, gcol]
-                    end
-                else
-                    set_flux_to_zero!(flux_sw, gcol)
                 end
             end
         end

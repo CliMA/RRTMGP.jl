@@ -16,6 +16,7 @@ using ..LookUpTables
 
 export solve_lw!, solve_sw!
 
+include("driver_utils.jl")
 include("longwave_noscat.jl")
 include("longwave_2stream.jl")
 include("shortwave_noscat.jl")

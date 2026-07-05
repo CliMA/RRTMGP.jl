@@ -10,6 +10,7 @@ function rte_lw_2stream_solve!(
     nlay, ncol = AtmosphericStates.get_dims(as)
     nlev = nlay + 1
     igpt, ibnd = 1, 1
+    (; flux_up, flux_dn, flux_net) = flux_lw
     @inbounds begin
         ClimaComms.@threaded device for gcol in 1:ncol
             compute_optical_props!(op, as, src_lw, gcol)
@@ -24,10 +25,50 @@ function rte_lw_2stream_solve!(
                 nlev,
                 ncol,
             )
-            compute_net_flux!(flux_lw, gcol)
+            for ilev in 1:nlev
+                flux_net[ilev, gcol] = flux_up[ilev, gcol] - flux_dn[ilev, gcol]
+            end
         end
     end
     return nothing
+end
+
+# Device-agnostic per-(g-point, column) body, shared by the CPU driver below
+# and the CUDA kernel in ext/cuda. Returns whether this g-point had any cloudy
+# layer (for the cloud-cover diagnostic).
+@inline function lw_2stream_gpt_col!(
+    igpt,
+    gcol,
+    flux,
+    flux_lw,
+    band_flux,
+    src_lw,
+    bcs_lw,
+    op,
+    as,
+    lookup_lw,
+    lookup_lw_cld,
+    lookup_lw_aero,
+    ibnd,
+    nlev,
+    ncol,
+)
+    cloudy = _build_cloud_mask!(as.cloud_state, Val(:mask_lw), gcol)
+    compute_optical_props!(
+        op,
+        as,
+        src_lw,
+        gcol,
+        igpt,
+        lookup_lw,
+        lookup_lw_cld,
+        lookup_lw_aero,
+    )
+    rte_lw_2stream!(op, flux, src_lw, bcs_lw, gcol, igpt, ibnd, nlev, ncol)
+    _accumulate_fluxes!(flux_lw, flux, gcol, nlev, igpt)
+    # retain this g-point's contribution in its band (no-op when off)
+    accumulate_band_flux!(band_flux, flux.flux_up, flux.flux_dn, gcol, ibnd, nlev)
+    return cloudy
 end
 
 function rte_lw_2stream_solve!(
@@ -48,90 +89,44 @@ function rte_lw_2stream_solve!(
     (; major_gpt2bnd) = lookup_lw.band_data
     n_gpt = length(major_gpt2bnd)
     (; cloud_state, aerosol_state) = as
-    bld_cld_mask = cloud_state isa CloudState
-    flux_up_lw = flux_lw.flux_up
-    flux_dn_lw = flux_lw.flux_dn
-    (; flux_up, flux_dn) = flux
-    FT = eltype(flux_up)
+    track_cld_cover =
+        cloud_state isa CloudState && !isnothing(cloud_state.cld_cover_lw)
+    FT = eltype(flux_lw.flux_up)
     # zero the optional per-band accumulator (no-op when spectral fluxes are off)
     set_band_flux_to_zero!(band_flux)
     @inbounds begin
-        # initialize LW cloud cover accumulator
-        if bld_cld_mask && !isnothing(cloud_state.cld_cover_lw)
-            cloud_state.cld_cover_lw .= FT(0)
-        end
+        track_cld_cover && (cloud_state.cld_cover_lw .= FT(0))
         if aerosol_state isa AerosolState
             ClimaComms.@threaded device for gcol in 1:ncol
-                Optics.compute_aero_mask!(
-                    view(aerosol_state.aero_mask, :, gcol),
-                    view(aerosol_state.aero_mass, :, :, gcol),
-                )
+                _compute_aero_mask!(aerosol_state, gcol)
             end
         end
         for igpt in 1:n_gpt
+            ibnd = major_gpt2bnd[igpt]
             ClimaComms.@threaded device for gcol in 1:ncol
-                ibnd = major_gpt2bnd[igpt]
-                bld_cld_mask && Optics.build_cloud_mask!(
-                    view(cloud_state.mask_lw, :, gcol),
-                    view(cloud_state.cld_frac, :, gcol),
-                    cloud_state.mask_type,
-                )
-                # accumulate LW cloud cover
-                if bld_cld_mask && !isnothing(cloud_state.cld_cover_lw)
-                    cloud_state.cld_cover_lw[gcol] +=
-                        any(view(cloud_state.mask_lw, :, gcol)) ? FT(1) : FT(0)
-                end
-                compute_optical_props!(
+                cloudy = lw_2stream_gpt_col!(
+                    igpt,
+                    gcol,
+                    flux,
+                    flux_lw,
+                    band_flux,
+                    src_lw,
+                    bcs_lw,
                     op,
                     as,
-                    src_lw,
-                    gcol,
-                    igpt,
                     lookup_lw,
                     lookup_lw_cld,
                     lookup_lw_aero,
-                )
-                rte_lw_2stream!(
-                    op,
-                    flux,
-                    src_lw,
-                    bcs_lw,
-                    gcol,
-                    igpt,
                     ibnd,
                     nlev,
                     ncol,
                 )
-                if igpt == 1
-                    map!(
-                        x -> x,
-                        view(flux_up_lw, :, gcol),
-                        view(flux_up, :, gcol),
-                    )
-                    map!(
-                        x -> x,
-                        view(flux_dn_lw, :, gcol),
-                        view(flux_dn, :, gcol),
-                    )
-                else
-                    for ilev in 1:nlev
-                        @inbounds flux_up_lw[ilev, gcol] += flux_up[ilev, gcol]
-                        @inbounds flux_dn_lw[ilev, gcol] += flux_dn[ilev, gcol]
-                    end
-                end
-                # retain this g-point's contribution in its band (no-op when off)
-                accumulate_band_flux!(
-                    band_flux,
-                    flux_up,
-                    flux_dn,
-                    gcol,
-                    ibnd,
-                    nlev,
-                )
+                track_cld_cover &&
+                    (cloud_state.cld_cover_lw[gcol] += FT(cloudy))
             end
         end
         # normalize LW cloud cover by number of g-points
-        if bld_cld_mask && !isnothing(cloud_state.cld_cover_lw)
+        if track_cld_cover
             ClimaComms.@threaded device for gcol in 1:ncol
                 cloud_state.cld_cover_lw[gcol] /= n_gpt
             end

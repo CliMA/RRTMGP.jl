@@ -3,6 +3,14 @@ RRTMGP.jl Release Notes
 
 main
 ------
+- The CPU and CUDA solver drivers now share device-agnostic per-(g-point,
+  column) bodies (`*_gpt_col!` in `src/rte/`), removing the duplicated
+  orchestration where backend asymmetries repeatedly crept in. As part of the
+  unification, the broadband shortwave direct beam `sw_direct_flux_dn` is now
+  accumulated at **every** level: it was previously meaningful only at the
+  surface row (a documented limitation inherited from PR #550), with the rows
+  above holding the first g-point's profile on CPU and uninitialized memory on
+  GPU.
 - **Breaking (with aliases):** renamed two modules for clarity — `Vmrs` →
   `VolumeMixingRatios` and `GrayUtils` → `GrayAtmosphere`. The old names remain
   as `const` aliases for one release and will be removed in 0.24.

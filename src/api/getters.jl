@@ -70,8 +70,6 @@ surface_emissivity(s::RRTMGPSolver)                   = s.lws.bcs.sfc_emis
 sw_flux_up(s::RRTMGPSolver)                           = _domain_view(s, s.sws.flux.flux_up)
 sw_flux_dn(s::RRTMGPSolver)                           = _domain_view(s, s.sws.flux.flux_dn)
 sw_flux_net(s::RRTMGPSolver)                          = _domain_view(s, s.sws.flux.flux_net)
-# NOTE: for spectral (non-gray) two-stream shortwave, the solvers accumulate the direct
-# beam only at the surface row `[1, :]` (see PR #550); rows above are not updated.
 sw_direct_flux_dn(s::RRTMGPSolver)                    = _domain_view(s, s.sws.flux.flux_dn_dir)
 clear_sw_flux_up(s::RRTMGPSolver)                     = _domain_view(s, _require_clear_sky(s.clear_flux_sw).flux_up)
 clear_sw_flux_dn(s::RRTMGPSolver)                     = _domain_view(s, _require_clear_sky(s.clear_flux_sw).flux_dn)
