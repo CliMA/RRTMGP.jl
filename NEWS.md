@@ -3,6 +3,10 @@ RRTMGP.jl Release Notes
 
 main
 ------
+- New docs page "Fortran and paper concordance": tables mapping RRTMGP.jl
+  names (containers, RTE/gas-optics/cloud/aerosol kernels) to the Fortran
+  rte-rrtmgp `mo_*`/`ty_*` names and to the papers whose equations they
+  implement, so Fortran-literate readers can navigate instantly.
 - The standalone (Layer-3) path is complete: `standard_atmosphere(FT; kind)`
   builds an idealized clear-sky `AtmosphereProfile` (`:tropical`,
   `:midlatitude_summer`, `:subarctic_winter` — analytic two-segment
