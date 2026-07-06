@@ -6,16 +6,33 @@ using RRTMGP
 using RRTMGP: RRTMGPGridParams
 import RRTMGP: RRTMGPSolver
 import RRTMGP: AbstractRRTMGPMethod
-import RRTMGP: GrayRadiation, ClearSkyRadiation, AllSkyRadiation, AllSkyRadiationWithClearSkyDiagnostics
+import RRTMGP:
+    GrayRadiation,
+    ClearSkyRadiation,
+    AllSkyRadiation,
+    AllSkyRadiationWithClearSkyDiagnostics
 import RRTMGP: lookup_tables
 
-lookup_tables(grid_params::RRTMGPGridParams, radiation_method::AbstractRRTMGPMethod) =
-    lookup_tables(radiation_method, ClimaComms.device(grid_params), eltype(grid_params))
+lookup_tables(
+    grid_params::RRTMGPGridParams,
+    radiation_method::AbstractRRTMGPMethod,
+) = lookup_tables(
+    radiation_method,
+    ClimaComms.device(grid_params),
+    eltype(grid_params),
+)
 
-lookup_tables(radiation_method::GrayRadiation, device::ClimaComms.AbstractDevice, ::Type{FT}) where {FT} =
-    (; lookups = (;), lu_kwargs = (; nbnd_lw = 1, nbnd_sw = 1))
+lookup_tables(
+    radiation_method::GrayRadiation,
+    device::ClimaComms.AbstractDevice,
+    ::Type{FT},
+) where {FT} = (; lookups = (;), lu_kwargs = (; nbnd_lw = 1, nbnd_sw = 1))
 
-function lookup_tables(radiation_method::ClearSkyRadiation, device::ClimaComms.AbstractDevice, ::Type{FT}) where {FT}
+function lookup_tables(
+    radiation_method::ClearSkyRadiation,
+    device::ClimaComms.AbstractDevice,
+    ::Type{FT},
+) where {FT}
     DA = ClimaComms.array_type(device)
 
     # Call functions in lookup_constructors.jl
@@ -28,25 +45,30 @@ function lookup_tables(radiation_method::ClearSkyRadiation, device::ClimaComms.A
     nbnd_lw = RRTMGP.LookUpTables.get_n_bnd(lookup_lw)
     ngas_lw = RRTMGP.LookUpTables.get_n_gases(lookup_lw)
 
-    lookup_lw_aero, idx_aerosol_lw, idx_aerosize_lw = if radiation_method.aerosol_radiation
-        artifact(:aerosol, :lw, :LookUpAerosolMerra)
-    else
-        (nothing, nothing, nothing)
-    end
+    lookup_lw_aero, idx_aerosol_lw, idx_aerosize_lw =
+        if radiation_method.aerosol_radiation
+            artifact(:aerosol, :lw, :LookUpAerosolMerra)
+        else
+            (nothing, nothing, nothing)
+        end
 
     lookup_sw, idx_gases_sw = artifact(:gas, :sw, :LookUpSW)
-    @assert sort(collect(keys(idx_gases_sw))) == sort(RRTMGP.gas_names_sw())
+    @assert sort(collect(keys(idx_gases_sw))) == sort(RRTMGP.gas_names_sw()) "shortwave lookup gas names do not match RRTMGP.gas_names_sw()"
 
     nbnd_sw = RRTMGP.LookUpTables.get_n_bnd(lookup_sw)
     ngas_sw = RRTMGP.LookUpTables.get_n_gases(lookup_sw)
 
-    lookup_sw_aero, idx_aerosol_sw, idx_aerosize_sw = if radiation_method.aerosol_radiation
-        artifact(:aerosol, :sw, :LookUpAerosolMerra)
-    else
-        (nothing, nothing, nothing)
-    end
+    lookup_sw_aero, idx_aerosol_sw, idx_aerosize_sw =
+        if radiation_method.aerosol_radiation
+            artifact(:aerosol, :sw, :LookUpAerosolMerra)
+        else
+            (nothing, nothing, nothing)
+        end
     if !isnothing(idx_aerosol_sw)
-        @assert sort(collect(keys(idx_aerosol_sw))) == sort(RRTMGP.aerosol_names())
+        # Lock the loaded aerosol ordering to the canonical map (the single
+        # source of truth in src/api/aerosols.jl).
+        @assert idx_aerosol_sw == RRTMGP.aerosol_idx() "shortwave aerosol lookup ordering does not match RRTMGP.aerosol_idx() (src/api/aerosols.jl)"
+        @assert idx_aerosol_lw == RRTMGP.aerosol_idx() "longwave aerosol lookup ordering does not match RRTMGP.aerosol_idx() (src/api/aerosols.jl)"
     end
 
     lookups = (;
@@ -62,13 +84,17 @@ function lookup_tables(radiation_method::ClearSkyRadiation, device::ClimaComms.A
         lookup_sw_aero,
     )
 
-    @assert RRTMGP.LookUpTables.get_n_gases(lookup_lw) == RRTMGP.LookUpTables.get_n_gases(lookup_sw)
+    @assert RRTMGP.LookUpTables.get_n_gases(lookup_lw) ==
+            RRTMGP.LookUpTables.get_n_gases(lookup_sw)
     @assert lookup_lw.p_ref_min == lookup_sw.p_ref_min
     return (; lookups, lu_kwargs = (; nbnd_lw, ngas_lw, nbnd_sw, ngas_sw))
 end
 
 function lookup_tables(
-    radiation_method::Union{AllSkyRadiation, AllSkyRadiationWithClearSkyDiagnostics},
+    radiation_method::Union{
+        AllSkyRadiation,
+        AllSkyRadiationWithClearSkyDiagnostics,
+    },
     device::ClimaComms.AbstractDevice,
     ::Type{FT},
 ) where {FT}
@@ -81,7 +107,11 @@ function lookup_tables(
         end
     lookup_lw_cld = artifact(:cloud, :lw, :LookUpCld)
     lookup_sw_cld = artifact(:cloud, :sw, :LookUpCld)
-    clear_sky_lookups = lookup_tables(ClearSkyRadiation(radiation_method.aerosol_radiation), device, FT)
+    clear_sky_lookups = lookup_tables(
+        ClearSkyRadiation(radiation_method.aerosol_radiation),
+        device,
+        FT,
+    )
     lookups = (; clear_sky_lookups.lookups..., lookup_lw_cld, lookup_sw_cld)
     (; lu_kwargs) = clear_sky_lookups
 

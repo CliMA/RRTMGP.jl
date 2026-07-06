@@ -7,7 +7,7 @@ using ClimaComms
 import ..Parameters as RP
 import ..RRTMGPGridParams
 
-export AbstractSourceLW, SourceLWNoScat, SourceLW2Str, SourceSW2Str, source_func_longwave, source_func_shortwave
+export AbstractSourceLW, SourceLWNoScat, SourceLW2Str, SourceSW2Str
 
 """
     AbstractSourceLW
@@ -38,19 +38,6 @@ struct SourceLWNoScat{S, D, PS} <: AbstractSourceLW
 end
 Adapt.@adapt_structure SourceLWNoScat
 
-function SourceLWNoScat(param_set::RP.ARP, ::Type{FT}, ::Type{DA}, nlay::Int, ncol::Int) where {FT <: AbstractFloat, DA}
-    sfc_source = DA{FT, 1}(undef, ncol)
-    lay_source = DA{FT, 2}(undef, nlay, ncol)
-    lev_source = DA{FT, 2}(undef, nlay + 1, ncol)
-    @warn "Please use the SourceLWNoScat with RRTMGPGridParams"
-    return SourceLWNoScat{typeof(sfc_source), typeof(lay_source), typeof(param_set)}(
-        param_set,
-        sfc_source,
-        lay_source,
-        lev_source,
-    )
-end
-
 function SourceLWNoScat(grid_params::RRTMGPGridParams; params::RP.ARP)
     (; ncol, nlay) = grid_params
     DA = ClimaComms.array_type(grid_params)
@@ -59,7 +46,11 @@ function SourceLWNoScat(grid_params::RRTMGPGridParams; params::RP.ARP)
     lay_source = DA{FT, 2}(undef, nlay, ncol)
     lev_source = DA{FT, 2}(undef, nlay + 1, ncol)
 
-    return SourceLWNoScat{typeof(sfc_source), typeof(lay_source), typeof(params)}(
+    return SourceLWNoScat{
+        typeof(sfc_source),
+        typeof(lay_source),
+        typeof(params),
+    }(
         params,
         sfc_source,
         lay_source,
@@ -92,25 +83,28 @@ struct SourceLW2Str{S, D, V, PS} <: AbstractSourceLW
     "temporary storage array, used in 2 stream calculations `(nlay + 1, ncol)`"
     src::V
 end
-Adapt.@adapt_structure SourceLW2Str
 
-function SourceLW2Str(param_set::RP.ARP, ::Type{FT}, ::Type{DA}, nlay::Int, ncol::Int) where {FT <: AbstractFloat, DA}
-    @warn "Please use the SourceLW2Str with RRTMGPGridParams"
-    sfc_source = DA{FT, 1}(undef, ncol) # sfc_source
-    leveldata = DA{FT, 3}(undef, 3, nlay + 1, ncol)
-    lev_source = view(leveldata, 1, :, :) # lev_source
-    albedo = view(leveldata, 2, :, :) # albedo
-    src = view(leveldata, 3, :, :) # src
-
-    return SourceLW2Str{typeof(sfc_source), typeof(leveldata), typeof(lev_source), typeof(param_set)}(
-        param_set,
+function Adapt.adapt_structure(to, src::SourceLW2Str)
+    sfc_source = Adapt.adapt(to, src.sfc_source)
+    leveldata = Adapt.adapt(to, src.leveldata)
+    lev_source = view(leveldata, 1, :, :)
+    albedo = view(leveldata, 2, :, :)
+    src_view = view(leveldata, 3, :, :)
+    return SourceLW2Str{
+        typeof(sfc_source),
+        typeof(leveldata),
+        typeof(lev_source),
+        typeof(src.param_set),
+    }(
+        src.param_set,
         sfc_source,
         leveldata,
         lev_source,
         albedo,
-        src,
+        src_view,
     )
 end
+
 function SourceLW2Str(grid_params::RRTMGPGridParams; params::RP.ARP)
     (; ncol, nlay) = grid_params
     DA = ClimaComms.array_type(grid_params)
@@ -121,7 +115,12 @@ function SourceLW2Str(grid_params::RRTMGPGridParams; params::RP.ARP)
     albedo = view(leveldata, 2, :, :)
     src = view(leveldata, 3, :, :)
 
-    return SourceLW2Str{typeof(sfc_source), typeof(leveldata), typeof(lev_source), typeof(params)}(
+    return SourceLW2Str{
+        typeof(sfc_source),
+        typeof(leveldata),
+        typeof(lev_source),
+        typeof(params),
+    }(
         params,
         sfc_source,
         leveldata,
@@ -131,30 +130,6 @@ function SourceLW2Str(grid_params::RRTMGPGridParams; params::RP.ARP)
     )
 end
 
-
-"""
-    source_func_longwave(
-        param_set,
-        ::Type{FT},
-        ncol::Int,
-        nlay::Int,
-        OPC::Symbol,
-        ::Type{DA},
-    ) where {FT, DA}
-
-Initializes the longwave source for one scalar and two stream simulations.
-"""
-function source_func_longwave(
-    param_set::RP.ARP,
-    ::Type{FT},
-    ncol::Int,
-    nlay::Int,
-    OPC::Symbol,
-    ::Type{DA},
-) where {FT, DA}
-    @warn "Please call SourceLWNoScat or SourceLW2Str directly with RRTMGPGridParams"
-    (OPC === :OneScalar) ? SourceLWNoScat(param_set, FT, DA, nlay, ncol) : SourceLW2Str(param_set, FT, DA, nlay, ncol)
-end
 
 """
     SourceSW2Str{S,D,V}
@@ -176,15 +151,18 @@ struct SourceSW2Str{S, D, V}
     "temporary storage array, used in 2 stream calculations `(nlay + 1, ncol)`"
     src::V
 end
-Adapt.@adapt_structure SourceSW2Str
 
-function SourceSW2Str(::Type{FT}, ::Type{DA}, nlay::Int, ncol::Int) where {FT <: AbstractFloat, DA}
-    sfc_source = DA{FT, 1}(undef, ncol)
-    leveldata = DA{FT, 3}(undef, 2, nlay + 1, ncol)
+function Adapt.adapt_structure(to, src::SourceSW2Str)
+    sfc_source = Adapt.adapt(to, src.sfc_source)
+    leveldata = Adapt.adapt(to, src.leveldata)
     albedo = view(leveldata, 1, :, :)
-    src = view(leveldata, 2, :, :)
-    @warn "Please use SourceSW2Str with RRTMGPGridParams instead."
-    return SourceSW2Str{typeof(sfc_source), typeof(leveldata), typeof(albedo)}(sfc_source, leveldata, albedo, src)
+    src_view = view(leveldata, 2, :, :)
+    return SourceSW2Str{typeof(sfc_source), typeof(leveldata), typeof(albedo)}(
+        sfc_source,
+        leveldata,
+        albedo,
+        src_view,
+    )
 end
 
 function SourceSW2Str(grid_params::RRTMGPGridParams)
@@ -196,23 +174,12 @@ function SourceSW2Str(grid_params::RRTMGPGridParams)
     albedo = view(leveldata, 1, :, :)
     src = view(leveldata, 2, :, :)
 
-    return SourceSW2Str{typeof(sfc_source), typeof(leveldata), typeof(albedo)}(sfc_source, leveldata, albedo, src)
-end
-
-"""
-    source_func_shortwave(
-        ::Type{FT},
-        ncol::Int,
-        nlay::Int,
-        opc::Symbol,
-        ::Type{DA},
-    ) where {FT,DA}
-
-Initializes the shortwave source for one scalar and two stream simulations.
-"""
-function source_func_shortwave(::Type{FT}, ncol::Int, nlay::Int, opc::Symbol, ::Type{DA}) where {FT, DA}
-    @warn "Please call SourceSW2Str directly with RRTMGPGridParams"
-    (opc == :OneScalar) ? nothing : SourceSW2Str(FT, DA, nlay, ncol)
+    return SourceSW2Str{typeof(sfc_source), typeof(leveldata), typeof(albedo)}(
+        sfc_source,
+        leveldata,
+        albedo,
+        src,
+    )
 end
 
 end

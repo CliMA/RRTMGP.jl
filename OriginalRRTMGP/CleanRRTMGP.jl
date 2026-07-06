@@ -24,7 +24,10 @@ cd(joinpath(root_dir, "rte-rrtmgp", "examples")) do
 end
 
 cd(rte_rrtmgp_rfmip_clear_sky) do
-    conds_file = joinpath(".", "multiple_input4MIPs_radiation_RFMIP_UColorado-RFMIP-1-2_none.nc")
+    conds_file = joinpath(
+        ".",
+        "multiple_input4MIPs_radiation_RFMIP_UColorado-RFMIP-1-2_none.nc",
+    )
     rm(conds_file; force = true)
     rm(".DS_store"; force = true)
     rm("generate-output-file-templates.py"; force = true)

@@ -14,7 +14,12 @@ using ..Sources
 using ..AngularDiscretizations
 import ..Parameters as RP
 
-export AbstractOpticalProps, OneScalar, TwoStream, compute_col_gas!, compute_relative_humidity!, compute_optical_props!
+export AbstractOpticalProps,
+    OneScalar,
+    TwoStream,
+    compute_col_gas!,
+    compute_relative_humidity!,
+    compute_optical_props!
 
 """
     AbstractOpticalProps
@@ -38,14 +43,11 @@ struct OneScalar{D, V} <: AbstractOpticalProps
     "view into optical depth"
     τ::V
 end
-Adapt.@adapt_structure OneScalar
 
-function OneScalar(::Type{FT}, ncol::Int, nlay::Int, ::Type{DA}) where {FT <: AbstractFloat, DA}
-    layerdata = DA{FT, 3}(undef, 1, nlay, ncol)
+function Adapt.adapt_structure(to, op::OneScalar)
+    layerdata = Adapt.adapt(to, op.layerdata)
     τ = view(layerdata, 1, :, :)
-    V = typeof(τ)
-    @warn "Please use OneScalar with RRTMGPGridParams instead."
-    return OneScalar{typeof(layerdata), V}(layerdata, τ)
+    return OneScalar{typeof(layerdata), typeof(τ)}(layerdata, τ)
 end
 
 function OneScalar(grid_params::RRTMGPGridParams)
@@ -78,18 +80,13 @@ struct TwoStream{D, V} <: AbstractOpticalProps
     "view into asymmetry parameter"
     g::V
 end
-Adapt.@adapt_structure TwoStream
 
-function TwoStream(::Type{FT}, ncol::Int, nlay::Int, ::Type{DA}) where {FT <: AbstractFloat, DA}
-    layerdata = DA{FT, 3}(zeros(3, nlay, ncol))
-    V = typeof(view(layerdata, 1, :, :))
-    @warn "Please use TwoStream with RRTMGPGridParams instead"
-    return TwoStream{typeof(layerdata), V}(
-        layerdata,
-        view(layerdata, 1, :, :),
-        view(layerdata, 2, :, :),
-        view(layerdata, 3, :, :),
-    )
+function Adapt.adapt_structure(to, op::TwoStream)
+    layerdata = Adapt.adapt(to, op.layerdata)
+    τ = view(layerdata, 1, :, :)
+    ssa = view(layerdata, 2, :, :)
+    g = view(layerdata, 3, :, :)
+    return TwoStream{typeof(layerdata), typeof(τ)}(layerdata, τ, ssa, g)
 end
 
 function TwoStream(grid_params::RRTMGPGridParams)
@@ -226,17 +223,33 @@ Computes optical properties for the longwave problem.
         t_lev_dec = t_lev_col[1]
 
         for glay in 1:nlay
-            col_dry, p_lay, t_lay = as_layerdata[1, glay], as_layerdata[2, glay], as_layerdata[3, glay]
+            col_dry, p_lay, t_lay = as_layerdata[1, glay],
+            as_layerdata[2, glay],
+            as_layerdata[3, glay]
             # compute gas optics
-            τ[glay], _, _, planckfrac = compute_gas_optics(lkp, vmr, col_dry, igpt, ibnd, p_lay, t_lay, glay, gcol)
+            τ[glay], _, _, planckfrac = compute_gas_optics(
+                lkp,
+                vmr,
+                col_dry,
+                igpt,
+                ibnd,
+                p_lay,
+                t_lay,
+                glay,
+                gcol,
+            )
             # compute longwave source terms
             t_lev_inc = t_lev_col[glay + 1]
 
-            lay_source[glay, gcol] = interp1d_equispaced(t_lay, t_planck, totplnk) * planckfrac
-            lev_src_inc = interp1d_equispaced(t_lev_inc, t_planck, totplnk) * planckfrac
-            lev_src_dec = interp1d_equispaced(t_lev_dec, t_planck, totplnk) * planckfrac
+            lay_source[glay, gcol] =
+                interp1d_equispaced(t_lay, t_planck, totplnk) * planckfrac
+            lev_src_inc =
+                interp1d_equispaced(t_lev_inc, t_planck, totplnk) * planckfrac
+            lev_src_dec =
+                interp1d_equispaced(t_lev_dec, t_planck, totplnk) * planckfrac
             if glay == 1
-                sfc_source[gcol] = interp1d_equispaced(t_sfc, t_planck, totplnk) * planckfrac
+                sfc_source[gcol] =
+                    interp1d_equispaced(t_sfc, t_planck, totplnk) * planckfrac
                 lev_source[glay, gcol] = lev_src_dec
             else
                 lev_source[glay, gcol] = sqrt(lev_src_inc_prev * lev_src_dec)
@@ -323,17 +336,31 @@ end
     @inbounds begin
         t_lev_dec = t_lev_col[1]
         for glay in 1:nlay
-            col_dry, p_lay, t_lay = as_layerdata[1, glay], as_layerdata[2, glay], as_layerdata[3, glay]
+            col_dry, p_lay, t_lay = as_layerdata[1, glay],
+            as_layerdata[2, glay],
+            as_layerdata[3, glay]
             # compute gas optics
-            τ[glay], ssa[glay], g[glay], planckfrac =
-                compute_gas_optics(lkp, vmr, col_dry, igpt, ibnd, p_lay, t_lay, glay, gcol)
+            τ[glay], ssa[glay], g[glay], planckfrac = compute_gas_optics(
+                lkp,
+                vmr,
+                col_dry,
+                igpt,
+                ibnd,
+                p_lay,
+                t_lay,
+                glay,
+                gcol,
+            )
             # compute longwave source terms
             t_lev_inc = t_lev_col[glay + 1]
 
-            lev_src_inc = interp1d_equispaced(t_lev_inc, t_planck, totplnk) * planckfrac
-            lev_src_dec = interp1d_equispaced(t_lev_dec, t_planck, totplnk) * planckfrac
+            lev_src_inc =
+                interp1d_equispaced(t_lev_inc, t_planck, totplnk) * planckfrac
+            lev_src_dec =
+                interp1d_equispaced(t_lev_dec, t_planck, totplnk) * planckfrac
             if glay == 1
-                sfc_source[gcol] = interp1d_equispaced(t_sfc, t_planck, totplnk) * planckfrac
+                sfc_source[gcol] =
+                    interp1d_equispaced(t_sfc, t_planck, totplnk) * planckfrac
                 lev_source[glay, gcol] = lev_src_dec
             else
                 lev_source[glay, gcol] = sqrt(lev_src_inc_prev * lev_src_dec)
@@ -424,9 +451,20 @@ Computes optical properties for the shortwave problem.
         τ = view(op.τ, :, gcol)
     end
     @inbounds for glay in 1:nlay
-        col_dry, p_lay, t_lay = as_layerdata[1, glay], as_layerdata[2, glay], as_layerdata[3, glay]
+        col_dry, p_lay, t_lay =
+            as_layerdata[1, glay], as_layerdata[2, glay], as_layerdata[3, glay]
         # compute gas optics
-        τ[glay], _, _ = compute_gas_optics(lkp, vmr, col_dry, igpt, ibnd, p_lay, t_lay, glay, gcol)
+        τ[glay], _, _ = compute_gas_optics(
+            lkp,
+            vmr,
+            col_dry,
+            igpt,
+            ibnd,
+            p_lay,
+            t_lay,
+            glay,
+            gcol,
+        )
     end
     return nothing
 end
@@ -451,9 +489,20 @@ end
         g = view(op.g, :, gcol)
     end
     @inbounds for glay in 1:nlay
-        col_dry, p_lay, t_lay = as_layerdata[1, glay], as_layerdata[2, glay], as_layerdata[3, glay]
+        col_dry, p_lay, t_lay =
+            as_layerdata[1, glay], as_layerdata[2, glay], as_layerdata[3, glay]
         # compute gas optics
-        τ[glay], ssa[glay], g[glay] = compute_gas_optics(lkp, vmr, col_dry, igpt, ibnd, p_lay, t_lay, glay, gcol)
+        τ[glay], ssa[glay], g[glay] = compute_gas_optics(
+            lkp,
+            vmr,
+            col_dry,
+            igpt,
+            ibnd,
+            p_lay,
+            t_lay,
+            glay,
+            gcol,
+        )
     end
     if !isnothing(lkp_cld) # clouds need TwoStream optics
         cloud_state = as.cloud_state

@@ -53,7 +53,8 @@ function test_cos_zenith_edge_cases(
     ncol = 4,
     cldfrac = FT(1),
 ) where {FT <: AbstractFloat, SLVLW, SLVSW}
-    overrides = (; grav = 9.80665, molmass_dryair = 0.028964, molmass_water = 0.018016)
+    overrides =
+        (; grav = 9.80665, molmass_dryair = 0.028964, molmass_water = 0.018016)
     param_set = RRTMGPParameters(FT, overrides)
 
     device = ClimaComms.device(context)
@@ -99,7 +100,13 @@ function test_cos_zenith_edge_cases(
 
     # Reading input file
     ds_in = Dataset(input_file, "r")
-    as, sfc_emis, sfc_alb_direct, sfc_alb_diffuse, cos_zenith, toa_flux, bot_at_1 = setup_allsky_with_aerosols_as(
+    as,
+    sfc_emis,
+    sfc_alb_direct,
+    sfc_alb_diffuse,
+    cos_zenith,
+    toa_flux,
+    bot_at_1 = setup_allsky_with_aerosols_as(
         context,
         ds_in,
         idx_gases,
@@ -118,13 +125,15 @@ function test_cos_zenith_edge_cases(
 
     nlay, _ = AtmosphericStates.get_dims(as)
     nlev = nlay + 1
-    grid_params = RRTMGPGridParams(FT; context, nlay, ncol)
+    grid_params = RRTMGPGridParams(FT; context, domain_nlay = nlay, ncol)
 
     # Copy aerosol data from column 1 to all other columns so all columns have identical data
     # except for the cos_zenith values being tested
     for icol in 2:ncol
-        as.aerosol_state.aero_size[:, :, icol] .= as.aerosol_state.aero_size[:, :, 1]
-        as.aerosol_state.aero_mass[:, :, icol] .= as.aerosol_state.aero_mass[:, :, 1]
+        as.aerosol_state.aero_size[:, :, icol] .=
+            as.aerosol_state.aero_size[:, :, 1]
+        as.aerosol_state.aero_mass[:, :, icol] .=
+            as.aerosol_state.aero_mass[:, :, 1]
     end
 
     # Test edge case cos_zenith values
@@ -140,13 +149,33 @@ function test_cos_zenith_edge_cases(
 
     # Setting up shortwave problem with edge case cos_zenith values
     inc_flux_diffuse = nothing
-    swbcs = (; cos_zenith = cos_zenith_test, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse)
+    swbcs = (;
+        cos_zenith = cos_zenith_test,
+        toa_flux,
+        sfc_alb_direct,
+        inc_flux_diffuse,
+        sfc_alb_diffuse,
+    )
     slv_sw = SLVSW(grid_params; swbcs...)
 
     # Calling solvers - this should not throw errors or produce NaN/Inf
     metric_scaling = nothing
-    solve_lw!(slv_lw, as, lookup_lw, lookup_lw_cld, lookup_lw_aero, metric_scaling)
-    solve_sw!(slv_sw, as, lookup_sw, lookup_sw_cld, lookup_sw_aero, metric_scaling)
+    solve_lw!(
+        slv_lw,
+        as,
+        lookup_lw,
+        lookup_lw_cld,
+        lookup_lw_aero,
+        metric_scaling,
+    )
+    solve_sw!(
+        slv_sw,
+        as,
+        lookup_sw,
+        lookup_sw_cld,
+        lookup_sw_aero,
+        metric_scaling,
+    )
 
     # Retrieve fluxes
     flux_up_sw = Array(slv_sw.flux.flux_up)
@@ -164,7 +193,10 @@ function test_cos_zenith_edge_cases(
         color = color2,
     )
     printstyled("device = $device\n", color = color2)
-    printstyled("Testing cos_zenith = [0.5, 0, 1e-10, -0.5]\n\n", color = color2)
+    printstyled(
+        "Testing cos_zenith = [0.5, 0, 1e-10, -0.5]\n\n",
+        color = color2,
+    )
 
     # Test 1: No NaN/Inf in shortwave fluxes
     @test all(isfinite, flux_up_sw)
@@ -218,10 +250,21 @@ end
 context = ClimaComms.context()
 
 @testset "cos_zenith edge cases with TwoStream SW solver (Float64)" begin
-    @time test_cos_zenith_edge_cases(context, NoScatLWRTE, TwoStreamSWRTE, Float64; ncol = 4)
+    @time test_cos_zenith_edge_cases(
+        context,
+        NoScatLWRTE,
+        TwoStreamSWRTE,
+        Float64;
+        ncol = 4,
+    )
 end
 
 @testset "cos_zenith edge cases with TwoStream SW solver (Float32)" begin
-    @time test_cos_zenith_edge_cases(context, NoScatLWRTE, TwoStreamSWRTE, Float32; ncol = 4)
+    @time test_cos_zenith_edge_cases(
+        context,
+        NoScatLWRTE,
+        TwoStreamSWRTE,
+        Float32;
+        ncol = 4,
+    )
 end
-

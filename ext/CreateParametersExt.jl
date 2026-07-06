@@ -3,10 +3,16 @@ module CreateParametersExt
 import RRTMGP.Parameters.RRTMGPParameters
 import ClimaParams as CP
 
-RRTMGPParameters(::Type{FT}, overrides = NamedTuple()) where {FT <: AbstractFloat} =
+RRTMGPParameters(
+    ::Type{FT},
+    overrides = NamedTuple(),
+) where {FT <: AbstractFloat} =
     RRTMGPParameters(CP.create_toml_dict(FT), overrides)
 
-function RRTMGPParameters(toml_dict::CP.ParamDict{FT}, overrides = NamedTuple()) where {FT}
+function RRTMGPParameters(
+    toml_dict::CP.ParamDict{FT},
+    overrides = NamedTuple(),
+) where {FT}
     name_map = (;
         :gravitational_acceleration => :grav,
         :molar_mass_dry_air => :molmass_dryair,
@@ -15,6 +21,8 @@ function RRTMGPParameters(toml_dict::CP.ParamDict{FT}, overrides = NamedTuple())
         :adiabatic_exponent_dry_air => :kappa_d,
         :stefan_boltzmann_constant => :Stefan,
         :avogadro_constant => :avogad,
+        :optics_lookup_temperature_min => :optics_lookup_temperature_min,
+        :optics_lookup_temperature_max => :optics_lookup_temperature_max,
     )
     parameters = CP.get_parameter_values(toml_dict, name_map, "RRTMGP")
     parameters = merge(parameters, overrides)

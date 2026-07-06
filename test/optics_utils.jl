@@ -28,7 +28,8 @@ using RRTMGP.Optics: loc_lower, interp1d_equispaced, interp1d_loc_factor
 
     @test interp1d_equispaced(-0.3, xeq, yeq) == yeq[1] # below lower limit
     @test interp1d_equispaced(1.55, xeq, yeq) == yeq[end] # above upper limit
-    @test interp1d_equispaced(0.72, xeq, yeq) == yeq[15] * (1 - 0.4) + yeq[16] * 0.4 # interior data point
+    @test interp1d_equispaced(0.72, xeq, yeq) ==
+          yeq[15] * (1 - 0.4) + yeq[16] * 0.4 # interior data point
     @test interp1d_equispaced(1.10, xeq, yeq) == yeq[23] # coincident with an internal data point
 
     # test interp1d_loc_factor for non-equispaced data

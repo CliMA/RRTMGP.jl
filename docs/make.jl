@@ -11,17 +11,26 @@ makedocs(;
     doctest = false,
     format = Documenter.HTML(
         prettyurls = get(ENV, "CI", nothing) == "true",
-        mathengine = MathJax(Dict(:TeX => Dict(:equationNumbers => Dict(:autoNumber => "AMS"), :Macros => Dict()))),
+        mathengine = MathJax(
+            Dict(
+                :TeX => Dict(
+                    :equationNumbers => Dict(:autoNumber => "AMS"),
+                    :Macros => Dict(),
+                ),
+            ),
+        ),
     ),
     clean = true,
     modules = [RRTMGP],
     pages = Any[
         "Home" => "index.md",
+        "Functional core" => "functional_core.md",
         "RTE" => "RTE.md",
         "Optics" => "Optics.md",
         "Example" => "Example.md",
         "API" => Any[
             "API" => "api.md"
+            "Getter contract" => "getters.md"
             "Angular Discretization" => "optics/AngularDiscretizations.md"
             "Artifacts" => "ArtifactPaths.md"
             "Atmospheric State" => "optics/AtmosphericStates.md"

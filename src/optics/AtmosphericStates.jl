@@ -36,7 +36,8 @@ Atmospheric conditions, used to compute optical properties.
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct AtmosphericState{FTA1D, FTA1DN, FTA2D, D, VMR, CLD, AER} <: AbstractAtmosphericState
+struct AtmosphericState{FTA1D, FTA1DN, FTA2D, D, VMR, CLD, AER} <:
+       AbstractAtmosphericState
     "longitude, in degrees (`ncol`), optional"
     lon::FTA1DN
     "latitude, in degrees (`ncol`), optional"
@@ -63,25 +64,35 @@ Adapt.@adapt_structure AtmosphericState
 # Number of columns
 @inline get_ncol(as::AtmosphericState) = size(as.layerdata, 3)
 # Number of layers and columns
-@inline get_dims(as::AtmosphericState) = size(as.layerdata, 2), size(as.layerdata, 3)
+@inline get_dims(as::AtmosphericState) =
+    size(as.layerdata, 2), size(as.layerdata, 3)
 
-@inline getview_layerdata(as::AtmosphericState, gcol) = @inbounds view(as.layerdata, :, :, gcol)
+@inline getview_layerdata(as::AtmosphericState, gcol) =
+    @inbounds view(as.layerdata, :, :, gcol)
 
 # view of column amounts of dry air [molecules per cm^2 of dry air]
-@inline getview_col_dry(as::AtmosphericState) = @inbounds view(as.layerdata, 1, :, :)
-@inline getview_col_dry(as::AtmosphericState, gcol) = @inbounds view(as.layerdata, 1, :, gcol)
+@inline getview_col_dry(as::AtmosphericState) =
+    @inbounds view(as.layerdata, 1, :, :)
+@inline getview_col_dry(as::AtmosphericState, gcol) =
+    @inbounds view(as.layerdata, 1, :, gcol)
 
 # view of layer pressures [Pa, mb]
-@inline getview_p_lay(as::AtmosphericState) = @inbounds view(as.layerdata, 2, :, :)
-@inline getview_p_lay(as::AtmosphericState, gcol) = @inbounds view(as.layerdata, 2, :, gcol)
+@inline getview_p_lay(as::AtmosphericState) =
+    @inbounds view(as.layerdata, 2, :, :)
+@inline getview_p_lay(as::AtmosphericState, gcol) =
+    @inbounds view(as.layerdata, 2, :, gcol)
 
 # view of layer temperatures [K]
-@inline getview_t_lay(as::AtmosphericState) = @inbounds view(as.layerdata, 3, :, :)
-@inline getview_t_lay(as::AtmosphericState, gcol) = @inbounds view(as.layerdata, 3, :, gcol)
+@inline getview_t_lay(as::AtmosphericState) =
+    @inbounds view(as.layerdata, 3, :, :)
+@inline getview_t_lay(as::AtmosphericState, gcol) =
+    @inbounds view(as.layerdata, 3, :, gcol)
 
 # view of relative humidity
-@inline getview_rel_hum(as::AtmosphericState) = @inbounds view(as.layerdata, 4, :, :)
-@inline getview_rel_hum(as::AtmosphericState, gcol) = @inbounds view(as.layerdata, 4, :, gcol)
+@inline getview_rel_hum(as::AtmosphericState) =
+    @inbounds view(as.layerdata, 4, :, :)
+@inline getview_rel_hum(as::AtmosphericState, gcol) =
+    @inbounds view(as.layerdata, 4, :, gcol)
 
 """
     CloudState{CD, CF, CC, CM, CMT}

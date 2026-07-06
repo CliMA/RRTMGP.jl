@@ -14,7 +14,10 @@ function compute_col_gas!(
     helmert1 = RP.grav(param_set)
     args = (p_lev, mol_m_dry, mol_m_h2o, avogadro, helmert1, vmr_h2o, lat)
     tx, bx = _configure_threadblock(nlay * ncol)
-    @cuda always_inline = true threads = (tx) blocks = (bx) compute_col_gas_CUDA!(col_dry, args...)
+    @cuda always_inline = true threads = (tx) blocks = (bx) compute_col_gas_CUDA!(
+        col_dry,
+        args...,
+    )
     return nothing
 end
 
@@ -45,7 +48,10 @@ function compute_relative_humidity!(
 
     args = (p_lay, t_lay, vmr_h2o, mwd, t_ref, q_lay_min)
     tx, bx = _configure_threadblock(nlay * ncol)
-    @cuda always_inline = true threads = (tx) blocks = (bx) compute_relative_humidity_CUDA!(rh, args...)
+    @cuda always_inline = true threads = (tx) blocks = (bx) compute_relative_humidity_CUDA!(
+        rh,
+        args...,
+    )
     return nothing
 end
 

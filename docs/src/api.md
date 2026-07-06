@@ -1,7 +1,9 @@
 # API
 
 RRTMGP has an API for creating various types of solvers, and accessing data
-passed to it.
+passed to it. Hosts read and write a solver's data through named getters; their
+uniform layout/domain-masking/writability contract — the RRTMGP–ClimaCore
+decoupling mechanism — is spelled out under [The getter contract](@ref).
 
 ```@meta
 CurrentModule = RRTMGP
@@ -27,19 +29,8 @@ RRTMGP.RRTMGPGridParams
 
 ```@docs
 RRTMGP.RRTMGPSolver
-```
-
-## RRTMGPData
-
-```@docs
-RRTMGP.RRTMGPData
-RRTMGP.NVCData
-RRTMGP.VCData
-RRTMGP.NCData
-RRTMGP.NData
-RRTMGP.set_domain!
-RRTMGP.set_cols!
-RRTMGP.domain_view
+RRTMGP.radiation_method
+RRTMGP.optical_thickness_parameter
 ```
 
 ## Lookup tables
@@ -48,30 +39,64 @@ RRTMGP.domain_view
 RRTMGP.lookup_tables
 ```
 
-## Volume Mixing Ratio
-
-```@docs
-Vmrs.VolumeMixingRatioGlobalMean
-```
-
 ## Computing fluxes
 
 ```@docs
+RRTMGP.update_fluxes!
 RRTMGP.update_sw_fluxes!
 RRTMGP.update_lw_fluxes!
+RRTMGP.update_net_fluxes!
+```
+
+## Spectrally-resolved fluxes
+
+Optional per-band fluxes, enabled with `spectral_fluxes = true` when constructing the
+[`RRTMGPSolver`](@ref RRTMGP.RRTMGPSolver). The [`spectral_lw_flux_up`](@ref
+RRTMGP.spectral_lw_flux_up) docstring covers the full `spectral_{lw,sw}_flux_{up,dn,net}`
+family.
+
+```@docs
+RRTMGP.spectral_lw_flux_up
+RRTMGP.lw_band_bounds
+RRTMGP.sw_band_bounds
+RRTMGP.Fluxes.FluxBand
+```
+
+## Grid adaptation
+
+```@docs
+RRTMGP.AbstractInterpolation
+RRTMGP.AbstractBottomExtrapolation
+RRTMGP.interpolate_levels!
+RRTMGP.add_isothermal_boundary_layer!
+RRTMGP.clip!
+RRTMGP.update_concentrations!
+RRTMGP.get_p_min
 ```
 
 ## Aerosol properties
 
 ```@docs
-RRTMGP.aero_radius
-RRTMGP.aero_column_mass_density
+RRTMGP.aerosol_radius
+RRTMGP.aerosol_column_mass_density
+RRTMGP.aerosol_idx
+RRTMGP.canonical_aerosol_name
+RRTMGP.aerosol_index
 ```
 
 ## Volume mixing ratios
 
 ```@docs
 RRTMGP.volume_mixing_ratio
+Vmrs.VolumeMixingRatioGlobalMean
+```
+
+## Standalone API
+
+```@docs
+RRTMGP.default_parameters
+RRTMGP.solve_gray
+RRTMGP.heating_rate
 ```
 
 ## Helpers
@@ -79,14 +104,4 @@ RRTMGP.volume_mixing_ratio
 ```@docs
 RRTMGP.gas_names_sw
 RRTMGP.aerosol_names
-```
-
-## Internals
-
-```@docs
-RRTMGP.AbstractIndexOrder
-RRTMGP.VCOrder
-RRTMGP.NOrder
-RRTMGP.NCOrder
-RRTMGP.NVCOrder
 ```

@@ -8,6 +8,5 @@ CurrentModule = RRTMGP.Vmrs
 AbstractVmr
 Vmr
 VmrGM
-init_vmr
 get_vmr
 ```

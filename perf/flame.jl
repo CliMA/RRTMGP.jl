@@ -2,14 +2,14 @@
 julia --project=examples
 julia --project=examples perf/flame.jl gray_atm.jl
 julia --project=examples perf/flame.jl clear_sky.jl
-julia --project=examples perf/flame.jl all_sky.jl
+julia --project=examples perf/flame.jl all_sky_with_aerosols.jl
 ```
 include(joinpath("perf", "flame.jl"))
 ```
 =#
 # ARGS[1]
 
-filename = isempty(ARGS) ? "all_sky.jl" : ARGS[1]
+filename = isempty(ARGS) ? "all_sky_with_aerosols.jl" : ARGS[1]
 root_dir = joinpath(dirname(@__DIR__))
 output_dir = joinpath(root_dir, "flame_graphs", splitext(filename)[1])
 file = joinpath(root_dir, "test", filename)

@@ -3,7 +3,7 @@ using Pkg.Artifacts
 using NCDatasets
 
 import JET
-import Infiltrator
+
 import ClimaComms
 @static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
 
@@ -37,9 +37,9 @@ function all_sky_with_aerosols(
     toler_sw;
     ncol = 128,# repeats col#1 ncol times per RRTMGP example 
     cldfrac = FT(1),
-    exfiltrate = false,
 ) where {FT <: AbstractFloat, SLVLW, SLVSW}
-    overrides = (; grav = 9.80665, molmass_dryair = 0.028964, molmass_water = 0.018016)
+    overrides =
+        (; grav = 9.80665, molmass_dryair = 0.028964, molmass_water = 0.018016)
     param_set = RRTMGPParameters(FT, overrides)
 
     device = ClimaComms.device(context)
@@ -85,7 +85,13 @@ function all_sky_with_aerosols(
 
     # reading input file
     ds_in = Dataset(input_file, "r")
-    as, sfc_emis, sfc_alb_direct, sfc_alb_diffuse, cos_zenith, toa_flux, bot_at_1 = setup_allsky_with_aerosols_as(
+    as,
+    sfc_emis,
+    sfc_alb_direct,
+    sfc_alb_diffuse,
+    cos_zenith,
+    toa_flux,
+    bot_at_1 = setup_allsky_with_aerosols_as(
         context,
         ds_in,
         idx_gases,
@@ -104,31 +110,120 @@ function all_sky_with_aerosols(
 
     nlay, _ = AtmosphericStates.get_dims(as)
     nlev = nlay + 1
-    grid_params = RRTMGPGridParams(FT; context, nlay, ncol)
+    grid_params = RRTMGPGridParams(FT; context, domain_nlay = nlay, ncol)
     # Setting up longwave problem
     inc_flux = nothing
     slv_lw = SLVLW(grid_params; params = param_set, sfc_emis, inc_flux)
     # Setting up shortwave problem
     inc_flux_diffuse = nothing
-    swbcs = (; cos_zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse)
+    swbcs = (;
+        cos_zenith,
+        toa_flux,
+        sfc_alb_direct,
+        inc_flux_diffuse,
+        sfc_alb_diffuse,
+    )
     slv_sw = SLVSW(grid_params; swbcs...)
 
     #---------------- Exercise new api (start)
     bcs_lw = BCs.LwBCs(sfc_emis, inc_flux)
-    bcs_sw = BCs.SwBCs(cos_zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse)
+    bcs_sw = BCs.SwBCs(
+        cos_zenith,
+        toa_flux,
+        sfc_alb_direct,
+        inc_flux_diffuse,
+        sfc_alb_diffuse,
+    )
     radiation_method = RRTMGP.AllSkyRadiationWithClearSkyDiagnostics(
         true, # aerosol_radiation
         true, # reset_rng_seed
     )
-    solver = RRTMGPSolver(grid_params, radiation_method, param_set, bcs_lw, bcs_sw, as)
+    op_lw =
+        SLVLW == NoScatLWRTE ? Optics.OneScalar(grid_params) :
+        Optics.TwoStream(grid_params)
+    op_sw =
+        SLVSW == NoScatSWRTE ? Optics.OneScalar(grid_params) :
+        Optics.TwoStream(grid_params)
+    solver = RRTMGPSolver(
+        grid_params,
+        radiation_method,
+        param_set,
+        bcs_lw,
+        bcs_sw,
+        as;
+        op_lw,
+        op_sw,
+    )
+    # Passing prebuilt `lookups` reuses them (no second NetCDF read); they are stored as-is.
+    prebuilt_lookups = RRTMGP.lookup_tables(grid_params, radiation_method)
+    solver_reused = RRTMGPSolver(
+        grid_params,
+        radiation_method,
+        param_set,
+        bcs_lw,
+        bcs_sw,
+        as;
+        op_lw,
+        op_sw,
+        lookups = prebuilt_lookups,
+    )
+    @test solver_reused.lookups === prebuilt_lookups
     RRTMGP.update_sw_fluxes!(solver)
     RRTMGP.update_lw_fluxes!(solver)
+    RRTMGP.update_net_fluxes!(solver) # so net_flux/heating_rate read a valid buffer
     for m in api_methods
         getproperty(RRTMGP, m)(solver)
     end
     for name in RRTMGP.aerosol_names()
-        RRTMGP.aero_column_mass_density(solver, name)
-        RRTMGP.aero_radius(solver, name)
+        RRTMGP.aerosol_column_mass_density(solver, name)
+        RRTMGP.aerosol_radius(solver, name)
+    end
+    for name in ("h2o", "o3", "co2")
+        RRTMGP.volume_mixing_ratio(solver, name)
+    end
+    # h2o/o3 are layer fields (2D); well-mixed gases are global means.
+    @test ndims(RRTMGP.volume_mixing_ratio(solver, "h2o")) == 2
+
+    # --- spectrally-resolved (per-band) fluxes (two-stream only) ---
+    if op_lw isa Optics.TwoStream && op_sw isa Optics.TwoStream
+        solver_spec = RRTMGPSolver(
+            grid_params,
+            radiation_method,
+            param_set,
+            bcs_lw,
+            bcs_sw,
+            as;
+            op_lw,
+            op_sw,
+            spectral_fluxes = true,
+        )
+        RRTMGP.update_lw_fluxes!(solver_spec)
+        RRTMGP.update_sw_fluxes!(solver_spec)
+        # summing the per-band fluxes recovers the broadband fluxes
+        @test dropdims(
+            sum(RRTMGP.spectral_lw_flux_up(solver_spec); dims = 3);
+            dims = 3,
+        ) ≈ RRTMGP.lw_flux_up(solver_spec)
+        @test dropdims(
+            sum(RRTMGP.spectral_lw_flux_dn(solver_spec); dims = 3);
+            dims = 3,
+        ) ≈ RRTMGP.lw_flux_dn(solver_spec)
+        @test dropdims(
+            sum(RRTMGP.spectral_sw_flux_up(solver_spec); dims = 3);
+            dims = 3,
+        ) ≈ RRTMGP.sw_flux_up(solver_spec)
+        @test dropdims(
+            sum(RRTMGP.spectral_sw_flux_dn(solver_spec); dims = 3);
+            dims = 3,
+        ) ≈ RRTMGP.sw_flux_dn(solver_spec)
+        # the band dimension matches the number of band-limit pairs
+        @test size(RRTMGP.lw_band_bounds(solver_spec), 1) == 2
+        @test size(RRTMGP.spectral_lw_flux_up(solver_spec), 3) ==
+              size(RRTMGP.lw_band_bounds(solver_spec), 2)
+        @test size(RRTMGP.spectral_sw_flux_up(solver_spec), 3) ==
+              size(RRTMGP.sw_band_bounds(solver_spec), 2)
+        # a solver built without spectral fluxes errors informatively
+        @test_throws ErrorException RRTMGP.spectral_lw_flux_up(solver)
     end
     #---------------- Exercise new api (end)
 
@@ -138,12 +233,27 @@ function all_sky_with_aerosols(
     # test scaling factors (e.g. when applying corrections to metric terms for deep atmospheres)
     # first, test do-nothing op eg. shallow atmospheres
     metric_scaling = nothing
-    solve_lw!(slv_lw, as, lookup_lw, lookup_lw_cld, lookup_lw_aero, metric_scaling)
-    solve_sw!(slv_sw, as, lookup_sw, lookup_sw_cld, lookup_sw_aero, metric_scaling)
+    solve_lw!(
+        slv_lw,
+        as,
+        lookup_lw,
+        lookup_lw_cld,
+        lookup_lw_aero,
+        metric_scaling,
+    )
+    solve_sw!(
+        slv_sw,
+        as,
+        lookup_sw,
+        lookup_sw_cld,
+        lookup_sw_aero,
+        metric_scaling,
+    )
 
     # comparison
     method = "Lookup Table Interpolation method"
-    comp_flux_up_lw, comp_flux_dn_lw, comp_flux_up_sw, comp_flux_dn_sw = load_comparison_data(bot_at_1, ncol)
+    comp_flux_up_lw, comp_flux_dn_lw, comp_flux_up_sw, comp_flux_dn_sw =
+        load_comparison_data(bot_at_1, ncol)
 
     comp_flux_net_lw = comp_flux_up_lw .- comp_flux_dn_lw
     comp_flux_net_sw = comp_flux_up_sw .- comp_flux_dn_sw
@@ -175,7 +285,9 @@ function all_sky_with_aerosols(
     println("L∞ error in flux_up           = $max_err_flux_up_lw")
     println("L∞ error in flux_dn           = $max_err_flux_dn_lw")
     println("L∞ error in flux_net          = $max_err_flux_net_lw")
-    println("L∞ relative error in flux_net = $(max_rel_err_flux_net_lw * 100) %\n")
+    println(
+        "L∞ relative error in flux_net = $(max_rel_err_flux_net_lw * 100) %\n",
+    )
 
     flux_up_sw = Array(slv_sw.flux.flux_up)
     flux_dn_sw = Array(slv_sw.flux.flux_dn)
@@ -205,7 +317,9 @@ function all_sky_with_aerosols(
     println("L∞ error in flux_up           = $max_err_flux_up_sw")
     println("L∞ error in flux_dn           = $max_err_flux_dn_sw")
     println("L∞ error in flux_net          = $max_err_flux_net_sw")
-    println("L∞ relative error in flux_net = $(max_rel_err_flux_net_sw * 100) %\n")
+    println(
+        "L∞ relative error in flux_net = $(max_rel_err_flux_net_sw * 100) %\n",
+    )
 
     # The reference results for the longwave solver are generated using a non-scattering solver,
     # which differ from the results generated by the TwoStream currently used.
@@ -219,7 +333,8 @@ function all_sky_with_aerosols(
 
     @test minimum(as.aerosol_state.aod_sw_ext) >= 0
     @test minimum(as.aerosol_state.aod_sw_sca) >= 0
-    @test minimum(as.aerosol_state.aod_sw_ext .- as.aerosol_state.aod_sw_sca) >= 0
+    @test minimum(as.aerosol_state.aod_sw_ext .- as.aerosol_state.aod_sw_sca) >=
+          0
 
     cld_cover_sw = Array(as.cloud_state.cld_cover_sw)
     cld_cover_lw = Array(as.cloud_state.cld_cover_lw)
@@ -240,18 +355,38 @@ function all_sky_with_aerosols(
     test_flux_up_lw = deepcopy(DA(slv_lw.flux.flux_up))
     test_flux_dn_lw = deepcopy(DA(slv_lw.flux.flux_dn))
     test_flux_net_lw = deepcopy(DA(slv_lw.flux.flux_net))
-    # Set up problem 
+    # Set up problem
     inc_flux = nothing
-    slv_lw = SLVLW(FT, DA, context, param_set, nlay, ncol, sfc_emis, inc_flux)
+    slv_lw = SLVLW(grid_params; params = param_set, sfc_emis, inc_flux)
     # Setting up shortwave problem
     inc_flux_diffuse = nothing
-    swbcs = (cos_zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse)
-    slv_sw = SLVSW(FT, DA, context, nlay, ncol, swbcs...)
+    swbcs = (;
+        cos_zenith,
+        toa_flux,
+        sfc_alb_direct,
+        inc_flux_diffuse,
+        sfc_alb_diffuse,
+    )
+    slv_sw = SLVSW(grid_params; swbcs...)
 
     # Use simple array to test pointwise mult op
     metric_scaling = DA(one.(slv_sw.flux.flux_up) * FT(2))
-    solve_lw!(slv_lw, as, lookup_lw, lookup_lw_cld, lookup_lw_aero, metric_scaling)
-    solve_sw!(slv_sw, as, lookup_sw, lookup_sw_cld, lookup_sw_aero, metric_scaling)
+    solve_lw!(
+        slv_lw,
+        as,
+        lookup_lw,
+        lookup_lw_cld,
+        lookup_lw_aero,
+        metric_scaling,
+    )
+    solve_sw!(
+        slv_sw,
+        as,
+        lookup_sw,
+        lookup_sw_cld,
+        lookup_sw_aero,
+        metric_scaling,
+    )
 
     flux_up_sw = DA(slv_sw.flux.flux_up)
     flux_dn_sw = DA(slv_sw.flux.flux_dn)
@@ -267,7 +402,19 @@ function all_sky_with_aerosols(
     @test all(test_flux_up_lw == flux_up_lw ./ metric_scaling)
     @test all(test_flux_dn_lw == flux_dn_lw ./ metric_scaling)
     @test all(test_flux_net_lw == flux_net_lw ./ metric_scaling)
-    @test all(test_flux_dn_dir_sw[1, :] == flux_dn_dir_sw[1, :] ./ metric_scaling[1, :])
+    @test all(
+        test_flux_dn_dir_sw[1, :] ==
+        flux_dn_dir_sw[1, :] ./ metric_scaling[1, :],
+    )
+
+    # Exercise the full update_fluxes! orchestrator and net-flux getters,
+    # and check they reproduce the reference all-sky net flux.
+    RRTMGP.update_fluxes!(solver)
+    solver_net = Array(RRTMGP.net_flux(solver))
+    @test solver_net ≈
+          Array(RRTMGP.lw_flux_net(solver)) .+ Array(RRTMGP.sw_flux_net(solver))
+    @test maximum(abs.(solver_net .- (comp_flux_net_lw .+ comp_flux_net_sw))) ≤
+          toler_lw[FT] + toler_sw[FT]
 
     return nothing
 end

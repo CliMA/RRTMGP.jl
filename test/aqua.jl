@@ -20,9 +20,7 @@ using Aqua
     for method_ambiguity in ambs
         @show method_ambiguity
     end
-    # TODO: Resolve method ambiguities 
-    # See https://github.com/CliMA/RRTMGP.jl/issues/578
-    @test length(ambs) <= 6
+    @test length(ambs) == 0
 end
 
 @testset "Aqua tests (additional)" begin

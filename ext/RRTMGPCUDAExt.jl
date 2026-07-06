@@ -5,7 +5,8 @@ import RRTMGP.Parameters as RP
 import RRTMGP.AngularDiscretizations.AngularDiscretization
 import RRTMGP.Fluxes: FluxLW, FluxSW
 import RRTMGP.Fluxes: add_to_flux!
-import RRTMGP.Fluxes: set_flux_to_zero!
+import RRTMGP.Fluxes: compute_net_flux!, set_flux_to_zero!
+import RRTMGP.Fluxes: set_band_flux_to_zero!, accumulate_band_flux!
 import RRTMGP.Sources: SourceLWNoScat
 import RRTMGP.Sources: SourceLW2Str
 import RRTMGP.Sources: SourceSW2Str
@@ -47,7 +48,8 @@ function _configure_threadblock(max_threads, nitems)
     return (nthreads, nblocks)
 end
 
-_configure_threadblock(nitems) = _configure_threadblock(_max_threads_cuda(), nitems)
+_configure_threadblock(nitems) =
+    _configure_threadblock(_max_threads_cuda(), nitems)
 
 include(joinpath("cuda", "gray_atmospheric_states.jl"))
 include(joinpath("cuda", "rte_longwave_2stream.jl"))
@@ -56,6 +58,5 @@ include(joinpath("cuda", "rte_shortwave_1scalar.jl"))
 include(joinpath("cuda", "optics_gray_utils.jl"))
 include(joinpath("cuda", "rte_shortwave_2stream.jl"))
 include(joinpath("cuda", "rte_longwave_1scalar.jl"))
-
 
 end

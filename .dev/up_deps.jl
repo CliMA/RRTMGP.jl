@@ -4,7 +4,13 @@ files in all of our environments.
 =#
 
 root = dirname(@__DIR__)
-dirs = (root, joinpath(root, "test"), joinpath(root, "docs"), joinpath(root, "examples"), joinpath(root, "gpuenv"))
+dirs = (
+    root,
+    joinpath(root, "test"),
+    joinpath(root, "docs"),
+    joinpath(root, "examples"),
+    joinpath(root, "gpuenv"),
+)
 
 cd(root) do
     for dir in dirs

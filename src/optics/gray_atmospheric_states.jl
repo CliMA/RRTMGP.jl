@@ -49,7 +49,13 @@ end
 Adapt.@adapt_structure GrayOpticalThicknessOGorman2008
 
 GrayOpticalThicknessOGorman2008(::Type{FT}) where {FT <: AbstractFloat} =
-    GrayOpticalThicknessOGorman2008{FT}(FT(1.0), FT(0.2), FT(7.2), FT(1.8), FT(0.22))
+    GrayOpticalThicknessOGorman2008{FT}(
+        FT(1.0),
+        FT(0.2),
+        FT(7.2),
+        FT(1.8),
+        FT(0.22),
+    )
 
 
 """
@@ -94,11 +100,13 @@ Adapt.@adapt_structure GrayAtmosphericState
 
 # view of layer pressures [Pa, mb]
 @inline getview_p_lay(as::GrayAtmosphericState) = as.p_lay
-@inline getview_p_lay(as::GrayAtmosphericState, gcol) = @inbounds view(as.p_lay, :, gcol)
+@inline getview_p_lay(as::GrayAtmosphericState, gcol) =
+    @inbounds view(as.p_lay, :, gcol)
 
 # view of layer temperatures [K]
 @inline getview_t_lay(as::GrayAtmosphericState) = as.t_lay
-@inline getview_t_lay(as::GrayAtmosphericState, gcol) = @inbounds view(as.t_lay, :, gcol)
+@inline getview_t_lay(as::GrayAtmosphericState, gcol) =
+    @inbounds view(as.t_lay, :, gcol)
 
 # This functions sets up a model temperature and pressure 
 # distributions for a gray atmosphere based on a pressure grid
@@ -134,11 +142,37 @@ function setup_gray_as_pr_grid(
     τ₀ = FT(0.22)
     r_d = RP.R_d(param_set)
     grav_ = RP.grav(param_set)
-    args = (p_lev, p_lay, t_lev, t_lay, z_lev, t_sfc, lat, d0, efac, p0, pe, Δp, te, tt, Δt, α, τ₀, r_d, grav_, nlay)
+    args = (
+        p_lev,
+        p_lay,
+        t_lev,
+        t_lay,
+        z_lev,
+        t_sfc,
+        lat,
+        d0,
+        efac,
+        p0,
+        pe,
+        Δp,
+        te,
+        tt,
+        Δt,
+        α,
+        τ₀,
+        r_d,
+        grav_,
+        nlay,
+    )
     device = ClimaComms.device(context)
     setup_gray_as_pr_grid!(device, ncol, args...)
     #------------------------------------------------
-    return GrayAtmosphericState{eltype(t_sfc), typeof(t_sfc), typeof(p_lev), typeof(otp)}(
+    return GrayAtmosphericState{
+        eltype(t_sfc),
+        typeof(t_sfc),
+        typeof(p_lev),
+        typeof(otp),
+    }(
         lat,
         p_lay,
         p_lev,
@@ -156,7 +190,11 @@ end
 # see Schneider 2004, J. Atmos. Sci. (2004) 61 (12): 1317–1340.
 # https://doi.org/10.1175/1520-0469(2004)061<1317:TTATTS>2.0.CO;2
 
-function setup_gray_as_pr_grid!(device::ClimaComms.AbstractCPUDevice, ncol, args...)
+function setup_gray_as_pr_grid!(
+    device::ClimaComms.AbstractCPUDevice,
+    ncol,
+    args...,
+)
     @inbounds begin
         ClimaComms.@threaded device for gcol in 1:ncol
             setup_gray_as_pr_grid_kernel!(args..., gcol)
@@ -186,7 +224,11 @@ function setup_gray_as_pr_grid_kernel!(
     grav_::FT,
     nlay::Int,
     gcol::Int,
-) where {FT <: AbstractFloat, FTA1D <: AbstractArray{FT, 1}, FTA2D <: AbstractArray{FT, 2}}
+) where {
+    FT <: AbstractFloat,
+    FTA1D <: AbstractArray{FT, 1},
+    FTA2D <: AbstractArray{FT, 2},
+}
     ts = te + Δt * (FT(1) / FT(3) - sin(lat[gcol] / FT(180) * FT(π))^2) # surface temp at a given latitude (K)
     d0[gcol] = FT((ts / tt)^FT(4) - FT(1)) # optical depth
     nlev = nlay + 1
@@ -202,10 +244,13 @@ function setup_gray_as_pr_grid_kernel!(
         #                else
         #                    p_lev[ilay+1, gcol] = p_lev[ilay, gcol] * exp(-efac)
         #                end
-        p_lay[ilay, gcol] = (p_lev[ilay, gcol] + p_lev[ilay + 1, gcol]) * FT(0.5)
+        p_lay[ilay, gcol] =
+            (p_lev[ilay, gcol] + p_lev[ilay + 1, gcol]) * FT(0.5)
 
-        t_lev[ilay + 1, gcol] = tt * (FT(1) + d0[gcol] * (p_lev[ilay + 1, gcol] / p0)^α)^FT(0.25)
-        t_lay[ilay, gcol] = tt * (FT(1) + d0[gcol] * (p_lay[ilay, gcol] / p0)^α)^FT(0.25)
+        t_lev[ilay + 1, gcol] =
+            tt * (FT(1) + d0[gcol] * (p_lev[ilay + 1, gcol] / p0)^α)^FT(0.25)
+        t_lay[ilay, gcol] =
+            tt * (FT(1) + d0[gcol] * (p_lay[ilay, gcol] / p0)^α)^FT(0.25)
 
         H = r_d * t_lay[ilay, gcol] / grav_
         Δz_lay = H * log(p_lev[ilay, gcol] / p_lev[ilay + 1, gcol])

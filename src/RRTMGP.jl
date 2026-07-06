@@ -13,7 +13,7 @@ import .Parameters as RP
 
 include("ArtifactPaths.jl")
 include(joinpath("api", "api_types.jl"))
-include(joinpath("api", "datalayouts.jl"))
+include(joinpath("api", "aerosols.jl"))
 include(joinpath("optics", "Vmrs.jl"))
 include(joinpath("optics", "LookUpTables.jl"))
 include(joinpath("optics", "AngularDiscretizations.jl"))
@@ -27,7 +27,11 @@ include(joinpath("optics", "RTE.jl"))
 
 include(joinpath("rte", "RTESolver.jl"))
 
+include(joinpath("api", "interpolation.jl"))
+include(joinpath("api", "grid_adaptation.jl"))
+
 include(joinpath("api", "api.jl"))
-include(joinpath("api", "api_methods.jl"))
+include(joinpath("api", "getters.jl"))
+include(joinpath("api", "standalone.jl"))
 
 end # module

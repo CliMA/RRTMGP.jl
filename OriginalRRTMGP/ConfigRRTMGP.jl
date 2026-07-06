@@ -20,8 +20,10 @@ end
 
 root_dir = dirname(pwd())
 rte_rrtmgp_dir = joinpath(root_dir, "rte-rrtmgp")
-rte_rrtmgp_rfmip_clear_sky = joinpath(root_dir, "rte-rrtmgp", "examples", "rfmip-clear-sky")
-rte_rrtmgp_rfmip_all_sky = joinpath(root_dir, "rte-rrtmgp", "examples", "all-sky")
+rte_rrtmgp_rfmip_clear_sky =
+    joinpath(root_dir, "rte-rrtmgp", "examples", "rfmip-clear-sky")
+rte_rrtmgp_rfmip_all_sky =
+    joinpath(root_dir, "rte-rrtmgp", "examples", "all-sky")
 rte_rrtmgp_test_val_dir = joinpath(root_dir, "rte-rrtmgp-test-val")
 
 # rte-rrtmgp ENV variables

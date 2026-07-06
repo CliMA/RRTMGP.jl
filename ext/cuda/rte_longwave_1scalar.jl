@@ -11,7 +11,9 @@ function rte_lw_noscat_solve!(
     nlev = nlay + 1
     tx, bx = _configure_threadblock(ncol)
     args = (flux_lw, src_lw, bcs_lw, op, angle_disc, nlay, ncol, as)
-    @cuda always_inline = true threads = (tx) blocks = (bx) rte_lw_noscat_solve_CUDA!(args...)
+    @cuda always_inline = true threads = (tx) blocks = (bx) rte_lw_noscat_solve_CUDA!(
+        args...,
+    )
     return nothing
 end
 
@@ -31,13 +33,22 @@ function rte_lw_noscat_solve_CUDA!(
     τ = op.τ
     Ds = angle_disc.gauss_Ds[1]
     w_μ = angle_disc.gauss_wts[1]
-    (; flux_up, flux_dn, flux_net) = flux_lw
     if gcol ≤ ncol
         compute_optical_props!(op, as, src_lw, gcol)
-        rte_lw_noscat_one_angle!(src_lw, bcs_lw, op, Ds, w_μ, gcol, flux_lw, igpt, ibnd, nlay, nlev)
-        @inbounds for ilev in 1:nlev
-            flux_net[ilev, gcol] = flux_up[ilev, gcol] - flux_dn[ilev, gcol]
-        end
+        rte_lw_noscat_one_angle!(
+            src_lw,
+            bcs_lw,
+            op,
+            Ds,
+            w_μ,
+            gcol,
+            flux_lw,
+            igpt,
+            ibnd,
+            nlay,
+            nlev,
+        )
+        compute_net_flux!(flux_lw, gcol)
     end
     return nothing
 end
@@ -58,8 +69,23 @@ function rte_lw_noscat_solve!(
     nlay, ncol = AtmosphericStates.get_dims(as)
     nlev = nlay + 1
     tx, bx = _configure_threadblock(ncol)
-    args = (flux, flux_lw, src_lw, bcs_lw, op, angle_disc, nlay, ncol, as, lookup_lw, lookup_lw_cld, lookup_lw_aero)
-    @cuda always_inline = true threads = (tx) blocks = (bx) rte_lw_noscat_solve_CUDA!(args...)
+    args = (
+        flux,
+        flux_lw,
+        src_lw,
+        bcs_lw,
+        op,
+        angle_disc,
+        nlay,
+        ncol,
+        as,
+        lookup_lw,
+        lookup_lw_cld,
+        lookup_lw_aero,
+    )
+    @cuda always_inline = true threads = (tx) blocks = (bx) rte_lw_noscat_solve_CUDA!(
+        args...,
+    )
     return nothing
 end
 
@@ -86,13 +112,14 @@ function rte_lw_noscat_solve_CUDA!(
     w_μ = angle_disc.gauss_wts[1]
     if gcol ≤ ncol
         flux_up_lw = flux_lw.flux_up
-        flux_dn_lw = flux_lw.flux_dn
-        flux_net_lw = flux_lw.flux_net
         (; cloud_state, aerosol_state) = as
         FT = eltype(flux_up_lw)
         n_cloudy_gpts = 0  # thread-local counter for LW cloud cover
         if aerosol_state isa AerosolState
-            Optics.compute_aero_mask!(view(aerosol_state.aero_mask, :, gcol), view(aerosol_state.aero_mass, :, :, gcol))
+            Optics.compute_aero_mask!(
+                view(aerosol_state.aero_mask, :, gcol),
+                view(aerosol_state.aero_mass, :, :, gcol),
+            )
         end
         @inbounds for igpt in 1:n_gpt
             ibnd = major_gpt2bnd[igpt]
@@ -106,16 +133,36 @@ function rte_lw_noscat_solve_CUDA!(
                 n_cloudy_gpts += any(view(cloud_state.mask_lw, :, gcol)) ? 1 : 0
             end
             igpt == 1 && set_flux_to_zero!(flux_lw, gcol)
-            compute_optical_props!(op, as, src_lw, gcol, igpt, lookup_lw, lookup_lw_cld, lookup_lw_aero)
-            rte_lw_noscat_one_angle!(src_lw, bcs_lw, op, Ds, w_μ, gcol, flux, igpt, ibnd, nlay, nlev)
+            compute_optical_props!(
+                op,
+                as,
+                src_lw,
+                gcol,
+                igpt,
+                lookup_lw,
+                lookup_lw_cld,
+                lookup_lw_aero,
+            )
+            rte_lw_noscat_one_angle!(
+                src_lw,
+                bcs_lw,
+                op,
+                Ds,
+                w_μ,
+                gcol,
+                flux,
+                igpt,
+                ibnd,
+                nlay,
+                nlev,
+            )
             add_to_flux!(flux_lw, flux, gcol)
         end
         @inbounds begin
-            for ilev in 1:nlev
-                flux_net_lw[ilev, gcol] = flux_up_lw[ilev, gcol] - flux_dn_lw[ilev, gcol]
-            end
+            compute_net_flux!(flux_lw, gcol)
             # write out LW cloud cover
-            if cloud_state isa CloudState && !isnothing(cloud_state.cld_cover_lw)
+            if cloud_state isa CloudState &&
+               !isnothing(cloud_state.cld_cover_lw)
                 cloud_state.cld_cover_lw[gcol] = FT(n_cloudy_gpts) / n_gpt
             end
         end

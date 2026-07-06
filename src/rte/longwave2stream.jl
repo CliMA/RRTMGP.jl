@@ -10,14 +10,21 @@ function rte_lw_2stream_solve!(
     nlay, ncol = AtmosphericStates.get_dims(as)
     nlev = nlay + 1
     igpt, ibnd = 1, 1
-    (; flux_up, flux_dn, flux_net) = flux_lw
     @inbounds begin
         ClimaComms.@threaded device for gcol in 1:ncol
             compute_optical_props!(op, as, src_lw, gcol)
-            rte_lw_2stream!(op, flux_lw, src_lw, bcs_lw, gcol, igpt, ibnd, nlev, ncol)
-            for ilev in 1:nlev
-                flux_net[ilev, gcol] = flux_up[ilev, gcol] - flux_dn[ilev, gcol]
-            end
+            rte_lw_2stream!(
+                op,
+                flux_lw,
+                src_lw,
+                bcs_lw,
+                gcol,
+                igpt,
+                ibnd,
+                nlev,
+                ncol,
+            )
+            compute_net_flux!(flux_lw, gcol)
         end
     end
     return nothing
@@ -27,6 +34,7 @@ function rte_lw_2stream_solve!(
     device::ClimaComms.AbstractCPUDevice,
     flux::FluxLW,
     flux_lw::FluxLW,
+    band_flux,
     src_lw::SourceLW2Str,
     bcs_lw::LwBCs,
     op::TwoStream,
@@ -43,9 +51,10 @@ function rte_lw_2stream_solve!(
     bld_cld_mask = cloud_state isa CloudState
     flux_up_lw = flux_lw.flux_up
     flux_dn_lw = flux_lw.flux_dn
-    flux_net_lw = flux_lw.flux_net
     (; flux_up, flux_dn) = flux
     FT = eltype(flux_up)
+    # zero the optional per-band accumulator (no-op when spectral fluxes are off)
+    set_band_flux_to_zero!(band_flux)
     @inbounds begin
         # initialize LW cloud cover accumulator
         if bld_cld_mask && !isnothing(cloud_state.cld_cover_lw)
@@ -72,17 +81,53 @@ function rte_lw_2stream_solve!(
                     cloud_state.cld_cover_lw[gcol] +=
                         any(view(cloud_state.mask_lw, :, gcol)) ? FT(1) : FT(0)
                 end
-                compute_optical_props!(op, as, src_lw, gcol, igpt, lookup_lw, lookup_lw_cld, lookup_lw_aero)
-                rte_lw_2stream!(op, flux, src_lw, bcs_lw, gcol, igpt, ibnd, nlev, ncol)
+                compute_optical_props!(
+                    op,
+                    as,
+                    src_lw,
+                    gcol,
+                    igpt,
+                    lookup_lw,
+                    lookup_lw_cld,
+                    lookup_lw_aero,
+                )
+                rte_lw_2stream!(
+                    op,
+                    flux,
+                    src_lw,
+                    bcs_lw,
+                    gcol,
+                    igpt,
+                    ibnd,
+                    nlev,
+                    ncol,
+                )
                 if igpt == 1
-                    map!(x -> x, view(flux_up_lw, :, gcol), view(flux_up, :, gcol))
-                    map!(x -> x, view(flux_dn_lw, :, gcol), view(flux_dn, :, gcol))
+                    map!(
+                        x -> x,
+                        view(flux_up_lw, :, gcol),
+                        view(flux_up, :, gcol),
+                    )
+                    map!(
+                        x -> x,
+                        view(flux_dn_lw, :, gcol),
+                        view(flux_dn, :, gcol),
+                    )
                 else
                     for ilev in 1:nlev
                         @inbounds flux_up_lw[ilev, gcol] += flux_up[ilev, gcol]
                         @inbounds flux_dn_lw[ilev, gcol] += flux_dn[ilev, gcol]
                     end
                 end
+                # retain this g-point's contribution in its band (no-op when off)
+                accumulate_band_flux!(
+                    band_flux,
+                    flux_up,
+                    flux_dn,
+                    gcol,
+                    ibnd,
+                    nlev,
+                )
             end
         end
         # normalize LW cloud cover by number of g-points
@@ -92,9 +137,7 @@ function rte_lw_2stream_solve!(
             end
         end
         ClimaComms.@threaded device for gcol in 1:ncol
-            for ilev in 1:nlev
-                flux_net_lw[ilev, gcol] = flux_up_lw[ilev, gcol] - flux_dn_lw[ilev, gcol]
-            end
+            compute_net_flux!(flux_lw, gcol)
         end
     end
     return nothing
@@ -198,7 +241,8 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
     (; albedo, lev_source, sfc_source, src) = src_lw
     (; inc_flux, sfc_emis) = bcs_lw
     FT = eltype(τ)
-    @inbounds flux_dn_ilevplus1 = isnothing(inc_flux) ? FT(0) : inc_flux[gcol, igpt]
+    @inbounds flux_dn_ilevplus1 =
+        isnothing(inc_flux) ? FT(0) : inc_flux[gcol, igpt]
     @inbounds flux_dn[nlev, gcol] = flux_dn_ilevplus1
     # Albedo of lowest level is the surface albedo...
     @inbounds albedo_ilev = FT(1) - sfc_emis[ibnd, gcol]
@@ -212,16 +256,25 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
     @inbounds lev_src_bot = lev_source[1, gcol]
     @inbounds for ilev in 1:nlay
         lev_src_top = lev_source[ilev + 1, gcol]
-        τ_lay, ssa_lay, g_lay = τ[ilev, gcol], ssa[ilev, gcol], g[ilev, gcol]
-        Rdif, Tdif, src_up, src_dn = lw_2stream_coeffs(τ_lay, ssa_lay, g_lay, lev_src_bot, lev_src_top)
+        τ_lay, ssa_lay, g_lay =
+            τ[ilev, gcol], ssa[ilev, gcol], g[ilev, gcol]
+        Rdif, Tdif, src_up, src_dn = lw_2stream_coeffs(
+            τ_lay,
+            ssa_lay,
+            g_lay,
+            lev_src_bot,
+            lev_src_top,
+        )
         denom = FT(1) / (FT(1) - Rdif * albedo_ilev)  # Eq 10
         albedo_ilevplus1 = Rdif + Tdif * Tdif * albedo_ilev * denom # Equation 9
         # 
         # Equation 11 -- source is emitted upward radiation at top of layer plus
         # radiation emitted at bottom of layer,
         # transmitted through the layer and reflected from layers below (Tdiff*src*albedo)
-        src_ilevplus1 = src_up + Tdif * denom * (src_ilev + albedo_ilev * src_dn)
-        albedo[ilev + 1, gcol], src[ilev + 1, gcol] = albedo_ilevplus1, src_ilevplus1
+        src_ilevplus1 =
+            src_up + Tdif * denom * (src_ilev + albedo_ilev * src_dn)
+        albedo[ilev + 1, gcol], src[ilev + 1, gcol] =
+            albedo_ilevplus1, src_ilevplus1
         lev_src_bot = lev_src_top
         albedo_ilev, src_ilev = albedo_ilevplus1, src_ilevplus1
     end
@@ -235,14 +288,23 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
     @inbounds lev_src_top = lev_source[nlay + 1, gcol]
     ilev = nlay
     @inbounds while ilev ≥ 1
-        lev_src_bot, albedo_ilev, src_ilev = lev_source[ilev, gcol], albedo[ilev, gcol], src[ilev, gcol]
-        τ_lay, ssa_lay, g_lay = τ[ilev, gcol], ssa[ilev, gcol], g[ilev, gcol]
-        Rdif, Tdif, _, src_dn = lw_2stream_coeffs(τ_lay, ssa_lay, g_lay, lev_src_bot, lev_src_top)
+        lev_src_bot, albedo_ilev, src_ilev =
+            lev_source[ilev, gcol], albedo[ilev, gcol], src[ilev, gcol]
+        τ_lay, ssa_lay, g_lay =
+            τ[ilev, gcol], ssa[ilev, gcol], g[ilev, gcol]
+        Rdif, Tdif, _, src_dn = lw_2stream_coeffs(
+            τ_lay,
+            ssa_lay,
+            g_lay,
+            lev_src_bot,
+            lev_src_top,
+        )
 
         denom = FT(1) / (FT(1) - Rdif * albedo_ilev)  # Eq 10
-        flux_dn_ilev = (Tdif * flux_dn_ilevplus1 + # Equation 13
-                        Rdif * src_ilev +
-                        src_dn) * denom
+        flux_dn_ilev =
+            (Tdif * flux_dn_ilevplus1 + # Equation 13
+             Rdif * src_ilev +
+             src_dn) * denom
         flux_up[ilev, gcol] =
             flux_dn_ilev * albedo_ilev + # Equation 12
             src_ilev
