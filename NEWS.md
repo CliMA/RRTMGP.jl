@@ -3,6 +3,16 @@ RRTMGP.jl Release Notes
 
 main
 ------
+- The standalone (Layer-3) path is complete: `standard_atmosphere(FT; kind)`
+  builds an idealized clear-sky `AtmosphereProfile` (`:tropical`,
+  `:midlatitude_summer`, `:subarctic_winter` — analytic two-segment
+  temperature, exact hydrostatic pressure, idealized water vapor/ozone,
+  present-day well-mixed gases), and `solve(profile; method)` solves it in one
+  call — `ClearSkyRadiation` (default) or `GrayRadiation`. Both `solve` and
+  `solve_gray` now return a documented `RadiationOutput` struct with stable
+  field names (`lw_up` … `sw_direct_dn`, `net`, `heating_rate`, `solver`);
+  `solve_gray` previously returned a `NamedTuple` with the same names, so
+  field access is unchanged.
 - New `prepare_atmosphere!(solver)`: runs the atmospheric-state preparation
   cascade (level interpolation, isothermal boundary layer, clipping, dry-air
   column amounts) without solving, so hosts can inspect the prepared state —

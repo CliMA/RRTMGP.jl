@@ -154,6 +154,10 @@ printstyled("\n\nLookup-table serialization tests\n", color = color1)
 printstyled("=================================\n\n", color = color1)
 include("lookup_serialization.jl")
 
+printstyled("\n\nStandalone spectral solve(profile) tests\n", color = color1)
+printstyled("=================================\n\n", color = color1)
+include("standalone_spectral.jl")
+
 printstyled("\n\nOptics utilities tests\n", color = color1)
 printstyled("==============\n\n", color = color1)
 include("optics_utils.jl")

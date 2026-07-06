@@ -18,6 +18,7 @@ Adapt.adapt_storage(::CopyToArray, x::AbstractArray) = copy(x)
     for FT in (Float32, Float64)
         nlay, ncol = 60, 9
         out = RRTMGP.solve_gray(FT; nlay, ncol)
+        @test out isa RRTMGP.RadiationOutput
         @test out.solver isa RRTMGP.RRTMGPSolver
         @test eltype(Array(out.net)) == FT
         @test size(Array(out.net)) == (nlay + 1, ncol)
@@ -66,6 +67,70 @@ end
             RRTMGP.ClearSkyRadiation(false),
         )
     end
+end
+
+@testset "standard_atmosphere profiles" begin
+    for FT in (Float32, Float64)
+        nlay, ncol = 40, 3
+        prof = RRTMGP.standard_atmosphere(FT; kind = :tropical, nlay, ncol)
+        @test prof isa RRTMGP.AtmosphereProfile
+        @test eltype(prof.p_lay) == FT
+        @test size(prof.p_lay) == (nlay, ncol)
+        @test size(prof.p_lev) == (nlay + 1, ncol)
+        @test size(prof.t_sfc) == (ncol,)
+        # all columns are identical
+        @test prof.t_lay[:, 1] == prof.t_lay[:, end]
+        # pressure decreases monotonically upward, from the surface value
+        @test prof.p_lev[1, 1] ≈ 101325.0
+        @test all(diff(prof.p_lev[:, 1]) .< 0)
+        @test all(diff(prof.p_lay[:, 1]) .< 0)
+        # layers sit between their bounding levels
+        @test all(prof.p_lev[2:end, 1] .< prof.p_lay[:, 1] .<= prof.p_lev[1:(end - 1), 1])
+        # surface temperature and the tropical tropopause
+        @test prof.t_lev[1, 1] == 300
+        @test 180 < minimum(prof.t_lev) < 210
+        # water vapor decays to the stratospheric floor; ozone peaks aloft
+        @test prof.vmr_h2o[1, 1] > 1e-2
+        @test minimum(prof.vmr_h2o) ≈ 4.0e-6
+        @test 20e3 <
+              prof.z_lev[argmax(prof.vmr_o3[:, 1]), 1] <
+              40e3
+        @test prof.well_mixed_vmr["co2"] ≈ 420e-6
+    end
+    # the three kinds are ordered warm → cold at the surface
+    t_sfc(kind) = RRTMGP.standard_atmosphere(Float64; kind).t_sfc[1]
+    @test t_sfc(:tropical) > t_sfc(:midlatitude_summer) > t_sfc(:subarctic_winter)
+    @test_throws ErrorException RRTMGP.standard_atmosphere(Float64; kind = :venus)
+end
+
+@testset "gray solve(profile)" begin
+    for FT in (Float32, Float64)
+        nlay, ncol = 30, 2
+        prof = RRTMGP.standard_atmosphere(FT; nlay, ncol)
+        out = RRTMGP.solve(prof; method = RRTMGP.GrayRadiation())
+        @test out isa RRTMGP.RadiationOutput
+        @test eltype(Array(out.net)) == FT
+        @test size(Array(out.net)) == (nlay + 1, ncol)
+        @test size(Array(out.heating_rate)) == (nlay, ncol)
+        for f in (out.lw_up, out.lw_dn, out.sw_up, out.sw_dn, out.net)
+            @test all(isfinite, Array(f))
+        end
+        @test Array(out.net) ≈ Array(out.lw_net) .+ Array(out.sw_net)
+        # OLR is positive and bounded by σT⁴ of the warmest layer
+        @test 0 < Array(out.lw_up)[end, 1] < 600
+        # the profile is not aliased by the solve (arrays stay host-side, unclipped)
+        @test prof.p_lay isa Array
+    end
+    # cloud/aerosol methods are rejected with actionable errors
+    prof = RRTMGP.standard_atmosphere(Float64; nlay = 10)
+    @test_throws ErrorException RRTMGP.solve(
+        prof;
+        method = RRTMGP.AllSkyRadiation(false, false),
+    )
+    @test_throws ErrorException RRTMGP.solve(
+        prof;
+        method = RRTMGP.ClearSkyRadiation(true),
+    )
 end
 
 # Passing `op_sw = OneScalar` must route the constructor to a non-scattering

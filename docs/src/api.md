@@ -117,6 +117,10 @@ VolumeMixingRatios.VolumeMixingRatioGlobalMean
 
 ```@docs
 RRTMGP.default_parameters
+RRTMGP.AtmosphereProfile
+RRTMGP.standard_atmosphere
+RRTMGP.solve
+RRTMGP.RadiationOutput
 RRTMGP.solve_gray
 RRTMGP.heating_rate
 ```
