@@ -183,26 +183,56 @@ _vmr_h2o(vmr::Vmrs.VmrGM, idx_h2o) = vmr.vmr_h2o
 _vmr_h2o(vmr::Vmrs.Vmr, idx_h2o) = view(vmr.vmr, idx_h2o, :, :)
 
 """
-    clip!(as, p_min[, idx_h2o])
+    clip!(as, p_min[, idx_h2o]; t_min = nothing, t_max = nothing)
 
 Clip the layer/level pressures of `as` to be at least `p_min`, and (for non-gray
-states) clip the water-vapor volume mixing ratio to be nonnegative. Mutates `as`
-in place and returns it.
+states) clip the water-vapor volume mixing ratio to be nonnegative and clamp the
+layer/level temperatures into `[t_min, t_max]` (pass the valid range of the
+optics lookup tables; `nothing` skips the temperature clamp). Mutates `as` in
+place and returns it.
+
+The gray state applies no temperature clamp: it uses no lookup tables, and its
+analytic optics remain valid for temperatures an idealized atmosphere may reach
+outside the lookup range.
 """
-function clip!(as::GrayAtmosphericState, p_min, idx_h2o = nothing)
+function clip!(
+    as::GrayAtmosphericState,
+    p_min,
+    idx_h2o = nothing;
+    t_min = nothing,
+    t_max = nothing,
+)
     p_lev = as.p_lev
     p_lay = getview_p_lay(as)
     @. p_lay = max(p_lay, p_min)
     @. p_lev = max(p_lev, p_min)
     return as
 end
-function clip!(as::AtmosphericState, p_min, idx_h2o = nothing)
+function clip!(
+    as::AtmosphericState,
+    p_min,
+    idx_h2o = nothing;
+    t_min = nothing,
+    t_max = nothing,
+)
     vmr_h2o = _vmr_h2o(as.vmr, idx_h2o)
     @. vmr_h2o = max(vmr_h2o, 0)
     p_lev = as.p_lev
     p_lay = getview_p_lay(as)
     @. p_lay = max(p_lay, p_min)
     @. p_lev = max(p_lev, p_min)
+    _clip_temperature!(as, t_min, t_max)
+    return as
+end
+
+# Clamp the temperature inputs into the valid range of the optics lookup
+# tables (both bounds required; a `nothing` bound skips the clamp).
+_clip_temperature!(as, t_min, t_max) = as
+function _clip_temperature!(as::AtmosphericState, t_min::Real, t_max::Real)
+    t_lev = as.t_lev
+    t_lay = getview_t_lay(as)
+    @. t_lay = clamp(t_lay, t_min, t_max)
+    @. t_lev = clamp(t_lev, t_min, t_max)
     return as
 end
 

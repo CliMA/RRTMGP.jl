@@ -29,7 +29,6 @@ function rte_lw_2stream_solve_CUDA!(
     nlev = nlay + 1
     igpt, ibnd = 1, 1
     if gcol ≤ ncol
-        (; flux_up, flux_dn, flux_net) = flux_lw
         compute_optical_props!(op, as, src_lw, gcol)
         rte_lw_2stream!(
             op,
@@ -42,11 +41,7 @@ function rte_lw_2stream_solve_CUDA!(
             nlev,
             ncol,
         )
-        @inbounds begin
-            for ilev in 1:nlev
-                flux_net[ilev, gcol] = flux_up[ilev, gcol] - flux_dn[ilev, gcol]
-            end
-        end
+        compute_net_flux!(flux_lw, gcol)
     end
     return nothing
 end
@@ -109,7 +104,6 @@ function rte_lw_2stream_solve_CUDA!(
     if gcol ≤ ncol
         flux_up_lw = flux_lw.flux_up
         flux_dn_lw = flux_lw.flux_dn
-        flux_net_lw = flux_lw.flux_net
         (; flux_up, flux_dn) = flux
         FT = eltype(flux_up)
         (; cloud_state, aerosol_state) = as
@@ -167,10 +161,7 @@ function rte_lw_2stream_solve_CUDA!(
             accumulate_band_flux!(band_flux, flux_up, flux_dn, gcol, ibnd, nlev)
         end
         @inbounds begin
-            for ilev in 1:nlev
-                flux_net_lw[ilev, gcol] =
-                    flux_up_lw[ilev, gcol] - flux_dn_lw[ilev, gcol]
-            end
+            compute_net_flux!(flux_lw, gcol)
             # write out LW cloud cover
             if cloud_state isa CloudState &&
                !isnothing(cloud_state.cld_cover_lw)

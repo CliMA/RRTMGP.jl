@@ -31,9 +31,6 @@ function rte_sw_2stream_solve_CUDA!(
     FT = eltype(bcs_sw.cos_zenith)
     solar_frac = FT(1)
     if gcol ≤ ncol
-        flux_up_sw = flux_sw.flux_up
-        flux_dn_sw = flux_sw.flux_dn
-        flux_net_sw = flux_sw.flux_net
         μ₀ = bcs_sw.cos_zenith[gcol]
         @inbounds begin
             compute_optical_props!(op, as, gcol)
@@ -50,21 +47,10 @@ function rte_sw_2stream_solve_CUDA!(
                 nlev,
                 gcol,
             )
-            for ilev in 1:nlev
-                flux_net_sw[ilev, gcol] =
-                    flux_up_sw[ilev, gcol] - flux_dn_sw[ilev, gcol]
-            end
+            compute_net_flux!(flux_sw, gcol)
         end
         if μ₀ ≤ 0 # zero out columns with zenith angle ≥ π/2
-            for ilev in 1:nlev
-                flux_up_sw[ilev, gcol] = FT(0)
-            end
-            for ilev in 1:nlev
-                flux_dn_sw[ilev, gcol] = FT(0)
-            end
-            for ilev in 1:nlev
-                flux_net_sw[ilev, gcol] = FT(0)
-            end
+            set_flux_to_zero!(flux_sw, gcol)
         end
     end
     return nothing
@@ -129,7 +115,6 @@ function rte_sw_2stream_solve_CUDA!(
         flux_up_sw = flux_sw.flux_up
         flux_dn_sw = flux_sw.flux_dn
         flux_dn_dir_sw = flux_sw.flux_dn_dir
-        flux_net_sw = flux_sw.flux_net
         flux_up = flux.flux_up
         flux_dn = flux.flux_dn
         flux_dn_dir = flux.flux_dn_dir

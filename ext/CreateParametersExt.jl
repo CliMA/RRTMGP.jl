@@ -21,6 +21,8 @@ function RRTMGPParameters(
         :adiabatic_exponent_dry_air => :kappa_d,
         :stefan_boltzmann_constant => :Stefan,
         :avogadro_constant => :avogad,
+        :optics_lookup_temperature_min => :optics_lookup_temperature_min,
+        :optics_lookup_temperature_max => :optics_lookup_temperature_max,
     )
     parameters = CP.get_parameter_values(toml_dict, name_map, "RRTMGP")
     parameters = merge(parameters, overrides)

@@ -136,25 +136,23 @@ No-scattering solver for the shortwave problem.
     gcol::Int,
     nlev::Int,
 )
-    @fastmath begin
-        (; toa_flux, cos_zenith) = bcs_sw
-        τ = op.τ
-        (; flux_up, flux_dn, flux_dn_dir, flux_net) = flux
-        FT = eltype(toa_flux)
-        # downward propagation
-        @inbounds flux_dn_dir[nlev, gcol] =
-            toa_flux[gcol] * solar_frac * cos_zenith[gcol]
-        @inbounds flux_dn[nlev, gcol] = flux_dn_dir[nlev, gcol]
-        @inbounds flux_up[nlev, gcol] = FT(0)
-        @inbounds flux_net[nlev, gcol] = -flux_dn_dir[nlev, gcol]
-        ilev = nlev - 1
-        @inbounds while ilev ≥ 1
-            flux_dn_dir[ilev, gcol] =
-                flux_dn_dir[ilev + 1, gcol] * exp(-τ[ilev, gcol] / cos_zenith[gcol])
-            flux_dn[ilev, gcol] = flux_dn_dir[ilev, gcol]
-            flux_up[ilev, gcol] = FT(0)
-            flux_net[ilev, gcol] = -flux_dn_dir[ilev, gcol]
-            ilev -= 1
-        end
+    (; toa_flux, cos_zenith) = bcs_sw
+    τ = op.τ
+    (; flux_up, flux_dn, flux_dn_dir, flux_net) = flux
+    FT = eltype(toa_flux)
+    # downward propagation
+    @inbounds flux_dn_dir[nlev, gcol] =
+        toa_flux[gcol] * solar_frac * cos_zenith[gcol]
+    @inbounds flux_dn[nlev, gcol] = flux_dn_dir[nlev, gcol]
+    @inbounds flux_up[nlev, gcol] = FT(0)
+    @inbounds flux_net[nlev, gcol] = -flux_dn_dir[nlev, gcol]
+    ilev = nlev - 1
+    @inbounds while ilev ≥ 1
+        flux_dn_dir[ilev, gcol] =
+            flux_dn_dir[ilev + 1, gcol] * exp(-τ[ilev, gcol] / cos_zenith[gcol])
+        flux_dn[ilev, gcol] = flux_dn_dir[ilev, gcol]
+        flux_up[ilev, gcol] = FT(0)
+        flux_net[ilev, gcol] = -flux_dn_dir[ilev, gcol]
+        ilev -= 1
     end
 end

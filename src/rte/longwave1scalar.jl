@@ -13,7 +13,6 @@ function rte_lw_noscat_solve!(
     τ = op.τ
     Ds = angle_disc.gauss_Ds[1]
     w_μ = angle_disc.gauss_wts[1]
-    (; flux_up, flux_dn, flux_net) = flux_lw
     @inbounds begin
         ClimaComms.@threaded device for gcol in 1:ncol
             compute_optical_props!(op, as, src_lw, gcol)
@@ -30,9 +29,7 @@ function rte_lw_noscat_solve!(
                 nlay,
                 nlev,
             )
-            for ilev in 1:nlev
-                flux_net[ilev, gcol] = flux_up[ilev, gcol] - flux_dn[ilev, gcol]
-            end
+            compute_net_flux!(flux_lw, gcol)
         end
     end
     return nothing
@@ -61,8 +58,6 @@ function rte_lw_noscat_solve!(
     bld_cld_mask = cloud_state isa CloudState
 
     flux_up_lw = flux_lw.flux_up
-    flux_dn_lw = flux_lw.flux_dn
-    flux_net_lw = flux_lw.flux_net
     FT = eltype(flux_up_lw)
     @inbounds begin
         # initialize LW cloud cover accumulator
@@ -127,10 +122,7 @@ function rte_lw_noscat_solve!(
             end
         end
         ClimaComms.@threaded device for gcol in 1:ncol
-            for ilev in 1:nlev
-                flux_net_lw[ilev, gcol] =
-                    flux_up_lw[ilev, gcol] - flux_dn_lw[ilev, gcol]
-            end
+            compute_net_flux!(flux_lw, gcol)
         end
     end
     return nothing
@@ -149,14 +141,12 @@ See Clough et al., 1992, doi: 10.1029/92JD01419, Eq 13
     trans::FT,
     τ_thresh,
 ) where {FT}
-    begin
-        fact =
-            (τ_loc > τ_thresh) ? ((FT(1) - trans) / τ_loc - trans) :
-            τ_loc * (FT(1 / 2) + τ_loc * (-FT(1 / 3) + τ_loc * FT(1 / 8)))
-        # Equations below are developed in Clough et al., 1992, doi:10.1029/92JD01419, Eq 13
-        return (FT(1) - trans) * lev_source_inc +
-               FT(2) * fact * (lay_source - lev_source_inc)
-    end
+    fact =
+        (τ_loc > τ_thresh) ? ((FT(1) - trans) / τ_loc - trans) :
+        τ_loc * (FT(1 / 2) + τ_loc * (-FT(1 / 3) + τ_loc * FT(1 / 8)))
+    # Equations below are developed in Clough et al., 1992, doi:10.1029/92JD01419, Eq 13
+    return (FT(1) - trans) * lev_source_inc +
+           FT(2) * fact * (lay_source - lev_source_inc)
 end
 
 """
@@ -172,14 +162,12 @@ See Clough et al., 1992, doi: 10.1029/92JD01419, Eq 13
     trans::FT,
     τ_thresh,
 ) where {FT}
-    begin
-        fact =
-            (τ_loc > τ_thresh) ? ((FT(1) - trans) / τ_loc - trans) :
-            τ_loc * (FT(1 / 2) + τ_loc * (-FT(1 / 3) + τ_loc * FT(1 / 8)))
-        # Equations below are developed in Clough et al., 1992, doi:10.1029/92JD01419, Eq 13
-        return (FT(1) - trans) * lev_source_dec +
-               FT(2) * fact * (lay_source - lev_source_dec)
-    end
+    fact =
+        (τ_loc > τ_thresh) ? ((FT(1) - trans) / τ_loc - trans) :
+        τ_loc * (FT(1 / 2) + τ_loc * (-FT(1 / 3) + τ_loc * FT(1 / 8)))
+    # Equations below are developed in Clough et al., 1992, doi:10.1029/92JD01419, Eq 13
+    return (FT(1) - trans) * lev_source_dec +
+           FT(2) * fact * (lay_source - lev_source_dec)
 end
 
 """
@@ -212,70 +200,68 @@ Transport for no-scattering longwave problem.
     nlay::Int,
     nlev::Int,
 ) where {FT}
-    begin
-        # setting references
-        (; sfc_source) = src_lw
-        (; lay_source, lev_source) = src_lw
-        (; sfc_emis, inc_flux) = bcs_lw
-        (; flux_up, flux_dn) = flux
+    # setting references
+    (; sfc_source) = src_lw
+    (; lay_source, lev_source) = src_lw
+    (; sfc_emis, inc_flux) = bcs_lw
+    (; flux_up, flux_dn) = flux
 
-        τ = op.τ
-        τ_thresh = 100 * eps(FT) # or abs(eps(FT))?
+    τ = op.τ
+    τ_thresh = 100 * eps(FT) # or abs(eps(FT))?
 
-        intensity_to_flux = FT(π) * w_μ
-        flux_to_intensity = FT(1) / intensity_to_flux
+    intensity_to_flux = FT(π) * w_μ
+    flux_to_intensity = FT(1) / intensity_to_flux
 
-        # Transport is for intensity
-        #   convert flux at top of domain to intensity assuming azimuthal isotropy
-        intensity_dn_ilevplus1 =
-            isnothing(inc_flux) ? FT(0) :
-            inc_flux[gcol, igpt] * flux_to_intensity
-        @inbounds flux_dn[nlev, gcol] =
-            intensity_dn_ilevplus1 * intensity_to_flux
+    # Transport is for intensity
+    #   convert flux at top of domain to intensity assuming azimuthal isotropy
+    intensity_dn_ilevplus1 =
+        isnothing(inc_flux) ? FT(0) :
+        inc_flux[gcol, igpt] * flux_to_intensity
+    @inbounds flux_dn[nlev, gcol] =
+        intensity_dn_ilevplus1 * intensity_to_flux
 
-        # Top of domain is index nlev
-        # Downward propagation
-        ilev = nlay
-        @inbounds while ilev ≥ 1
-            τ_loc = τ[ilev, gcol] * Ds
-            trans = exp(-τ_loc)
-            lay_src = lay_source[ilev, gcol]
-            intensity_dn_ilev =
-                trans * intensity_dn_ilevplus1 + lw_noscat_source_dn(
-                    lev_source[ilev, gcol],
-                    lay_src,
-                    τ_loc,
-                    trans,
-                    τ_thresh,
-                )
-            intensity_dn_ilevplus1 = intensity_dn_ilev
-            flux_dn[ilev, gcol] = intensity_dn_ilev * intensity_to_flux
-            ilev -= 1
-        end
+    # Top of domain is index nlev
+    # Downward propagation
+    ilev = nlay
+    @inbounds while ilev ≥ 1
+        τ_loc = τ[ilev, gcol] * Ds
+        trans = exp(-τ_loc)
+        lay_src = lay_source[ilev, gcol]
+        intensity_dn_ilev =
+            trans * intensity_dn_ilevplus1 + lw_noscat_source_dn(
+                lev_source[ilev, gcol],
+                lay_src,
+                τ_loc,
+                trans,
+                τ_thresh,
+            )
+        intensity_dn_ilevplus1 = intensity_dn_ilev
+        flux_dn[ilev, gcol] = intensity_dn_ilev * intensity_to_flux
+        ilev -= 1
+    end
 
-        # Surface reflection and emission
-        @inbounds intensity_up_ilevminus1 =
-            intensity_dn_ilevplus1 * (FT(1) - sfc_emis[ibnd, gcol]) +
-            sfc_emis[ibnd, gcol] * sfc_source[gcol]
-        #flux_dn[1, gcol] * (FT(1) - sfc_emis[ibnd, gcol]) + sfc_emis[ibnd, gcol] * sfc_source[gcol]
-        @inbounds flux_up[1, gcol] = intensity_up_ilevminus1 * intensity_to_flux
+    # Surface reflection and emission
+    @inbounds intensity_up_ilevminus1 =
+        intensity_dn_ilevplus1 * (FT(1) - sfc_emis[ibnd, gcol]) +
+        sfc_emis[ibnd, gcol] * sfc_source[gcol]
+    #flux_dn[1, gcol] * (FT(1) - sfc_emis[ibnd, gcol]) + sfc_emis[ibnd, gcol] * sfc_source[gcol]
+    @inbounds flux_up[1, gcol] = intensity_up_ilevminus1 * intensity_to_flux
 
-        # Upward propagation
-        @inbounds for ilev in 2:(nlay + 1)
-            τ_loc = τ[ilev - 1, gcol] * Ds
-            trans = exp(-τ_loc)
-            lay_src = lay_source[ilev - 1, gcol]
-            intensity_up_ilev =
-                trans * intensity_up_ilevminus1 + lw_noscat_source_up(
-                    lev_source[ilev, gcol],
-                    lay_src,
-                    τ_loc,
-                    trans,
-                    τ_thresh,
-                )
-            intensity_up_ilevminus1 = intensity_up_ilev
-            flux_up[ilev, gcol] = intensity_up_ilev * intensity_to_flux
-        end
+    # Upward propagation
+    @inbounds for ilev in 2:(nlay + 1)
+        τ_loc = τ[ilev - 1, gcol] * Ds
+        trans = exp(-τ_loc)
+        lay_src = lay_source[ilev - 1, gcol]
+        intensity_up_ilev =
+            trans * intensity_up_ilevminus1 + lw_noscat_source_up(
+                lev_source[ilev, gcol],
+                lay_src,
+                τ_loc,
+                trans,
+                τ_thresh,
+            )
+        intensity_up_ilevminus1 = intensity_up_ilev
+        flux_up[ilev, gcol] = intensity_up_ilev * intensity_to_flux
     end
     return nothing
 end

@@ -15,14 +15,11 @@ import ClimaComms
 import Logging
 
 @info "------------------------------------------------- Benchmark: gray_atm"
-@suppress_out begin
-    include(joinpath(root_dir, "test", "gray_atm_utils.jl"))
-    global gray_lw_result = gray_atmos_lw_equil(
-        ClimaComms.context(),
-        NoScatLWRTE,
-        FT,
-    )
-end
+@suppress_out include(joinpath(root_dir, "test", "gray_atm_utils.jl"))
+# `@suppress_out` returns its block's value, so the assignment stays at top
+# level (no `global` needed, which an assignment inside the block would be)
+gray_lw_result =
+    @suppress_out gray_atmos_lw_equil(ClimaComms.context(), NoScatLWRTE, FT)
 (; slv_lw, gray_as) = gray_lw_result
 @info "gray_atm lw"
 solve_lw!(slv_lw, gray_as) # compile first

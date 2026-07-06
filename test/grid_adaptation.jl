@@ -145,4 +145,15 @@ end
     RRTMGP.clip!(as, p_min)
     @test p_lay[1, 1] == p_min
     @test as.vmr.vmr_h2o[1, 1] == 0
+
+    # temperature clamp to the optics-lookup range (opt-in via t_min/t_max)
+    t_lay[1, 1] = FT(120)
+    as.t_lev[end, 1] = FT(400)
+    RRTMGP.clip!(as, p_min; t_min = FT(160), t_max = FT(355))
+    @test t_lay[1, 1] == FT(160)
+    @test as.t_lev[end, 1] == FT(355)
+    # without bounds the temperatures are untouched
+    t_lay[1, 1] = FT(120)
+    RRTMGP.clip!(as, p_min)
+    @test t_lay[1, 1] == FT(120)
 end

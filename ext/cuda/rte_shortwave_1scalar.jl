@@ -29,9 +29,6 @@ function rte_sw_noscat_solve_CUDA!(
     FT = eltype(bcs_sw.cos_zenith)
     solar_frac = FT(1)
     if gcol ≤ ncol
-        flux_up_sw = flux_sw.flux_up
-        flux_dn_sw = flux_sw.flux_dn
-        flux_net_sw = flux_sw.flux_net
         @inbounds begin
             μ₀ = bcs_sw.cos_zenith[gcol]
             if μ₀ > 0
@@ -89,7 +86,6 @@ function rte_sw_noscat_solve_CUDA!(
     if gcol ≤ ncol
         flux_up_sw = flux_sw.flux_up
         flux_dn_sw = flux_sw.flux_dn
-        flux_net_sw = flux_sw.flux_net
         flux_dn_dir_sw = flux_sw.flux_dn_dir
         flux_up = flux.flux_up
         flux_dn = flux.flux_dn
@@ -128,10 +124,7 @@ function rte_sw_noscat_solve_CUDA!(
             if μ₀ <= 0
                 set_flux_to_zero!(flux_sw, gcol)
             else
-                for ilev in 1:nlev
-                    flux_net_sw[ilev, gcol] =
-                        flux_up_sw[ilev, gcol] - flux_dn_sw[ilev, gcol]
-                end
+                compute_net_flux!(flux_sw, gcol)
             end
         end
     end

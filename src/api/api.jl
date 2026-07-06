@@ -459,7 +459,8 @@ end
     update_fluxes!(s::RRTMGPSolver, seedval = nothing)
 
 Run the full radiation update: prepare the atmospheric state (interpolate levels,
-add the isothermal boundary layer, clip, and compute concentrations), solve the
+add the isothermal boundary layer, clip pressures/temperatures/humidity to the
+range the optics support, and compute concentrations), solve the
 longwave and shortwave problems (applying `deep_atmosphere_inverse_scaling` if present), and
 combine them into the net flux. Mutates `s` in place — its atmospheric state and
 flux buffers — and returns `nothing` (read results via `net_flux(s)` and the
@@ -488,7 +489,13 @@ function update_fluxes!(s::RRTMGPSolver, seedval = nothing)
     )
     s.grid_params.isothermal_boundary_layer &&
         add_isothermal_boundary_layer!(as, p_min)
-    clip!(as, p_min, _idx_h2o(s))
+    clip!(
+        as,
+        p_min,
+        _idx_h2o(s);
+        t_min = RP.optics_lookup_temperature_min(s.params),
+        t_max = RP.optics_lookup_temperature_max(s.params),
+    )
     update_concentrations!(
         as,
         s.params,
