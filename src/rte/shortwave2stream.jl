@@ -268,16 +268,6 @@ doi:10.1175/1520-0469(1980)037<0630:TSATRT>2.0.CO;2
     return (Rdir, Tdir, Tnoscat, Rdif, Tdif)
 end
 
-# Direct-beam and source for diffuse radiation
-@inline function get_flux_dn_dir(τ, μ₀, flux_dn_dir_top, lev)
-    nlay = length(τ)
-    τ_sum = zero(eltype(τ))
-    for ilev in nlay:-1:lev
-        τ_sum += τ[ilev]
-    end
-    return flux_dn_dir_top * exp(-τ_sum / max(μ₀, Numerics.μ₀_min(eltype(τ))))
-end
-
 """
     rte_sw_2stream!(
         (; τ, ssa, g)::TwoStream,
