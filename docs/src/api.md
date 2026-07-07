@@ -48,6 +48,24 @@ RRTMGP.update_lw_fluxes!
 RRTMGP.update_net_fluxes!
 ```
 
+## Input validation
+
+```@docs
+RRTMGP.check_values
+RRTMGP.validate_inputs
+```
+
+## Numerical policy
+
+```@docs
+RRTMGP.Numerics
+RRTMGP.Numerics.k_min
+RRTMGP.Numerics.τ_thresh
+RRTMGP.Numerics.resonance_window
+RRTMGP.Numerics.μ₀_min
+RRTMGP.Numerics.pow_fast
+```
+
 ## Spectrally-resolved fluxes
 
 Optional per-band fluxes, enabled with `spectral_fluxes = true` when constructing the

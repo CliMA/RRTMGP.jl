@@ -164,38 +164,62 @@ total source function at levels using linear-in-tau approximation.
     #
     # -------------------------------------------------------------------------------------------------    
     # setting references
-    #k_min = FT === Float64 ? FT(1e-12) : FT(1e-4) used in RRTMGP-RTE FORTRAN code
-    k_min = sqrt(eps(FT)) #FT(1e4 * eps(FT))
-    lw_diff_sec = FT(1.66)
-    τ_thresh = 100 * eps(FT)# tau(icol,ilay) > 1.0e-8_wp used in rte-rrtmgp
-    # this is chosen to prevent catastrophic cancellation in src_up and src_dn calculation
+    k_min = Numerics.k_min(FT)
+    lw_diff_sec = FT(1.66) # Fu et al. 1997 diffusivity secant
 
     γ1 = lw_diff_sec * (1 - FT(0.5) * ssa * (1 + g))
     γ2 = lw_diff_sec * FT(0.5) * ssa * (1 - g)
-    k = sqrt(max((γ1 + γ2) * (γ1 - γ2), k_min))
+    # γ1 − γ2 ≡ lw_diff_sec·(1 − ssa) exactly (Fu et al. Eqs 2.9–2.10); the
+    # identity avoids the near-1 cancellation at ssa → 1 (see the shortwave
+    # counterpart in sw_2stream_coeffs).
+    k = sqrt(max(lw_diff_sec * (FT(1) - ssa) * (γ1 + γ2), k_min))
 
-    coeff = exp(-2 * τ * k)
+    e1 = exp(-τ * k)
+    om1 = -expm1(-τ * k) # = 1 − e1, accurate for small kτ
+    coeff = e1 * e1 # = exp(-2τk)
+    # 1 − e^{−2kτ} via the exact factorization (1 − e)(1 + e); the naive
+    # 1 − e² loses ~eps/(2kτ) relative accuracy for thin layers.
+    one_minus_e2kt = om1 * (1 + e1)
     # Refactored to avoid rounding errors when k, gamma1 are of very different magnitudes
-    RT_term = 1 / (k * (1 + coeff) + γ1 * (1 - coeff))
+    RT_term = 1 / (k * (1 + coeff) + γ1 * one_minus_e2kt)
 
-    Rdif = RT_term * γ2 * (1 - coeff) # Equation 25
-    Tdif = RT_term * 2 * k * exp(-τ * k) # Equation 26
+    Rdif = RT_term * γ2 * one_minus_e2kt # Equation 25
+    Tdif = RT_term * 2 * k * e1 # Equation 26
 
-    # Source function for diffuse radiation
-    # Compute LW source function for upward and downward emission at levels using linear-in-tau assumption
-    # This version straight from ECRAD
-    # Source is provided as W/m2-str; factor of pi converts to flux units
-    # lw_source_2str
-
-    if τ > τ_thresh
-        # Toon et al. (JGR 1989) Eqs 26-27
-        Z = (lev_src_bot - lev_src_top) / (τ * (γ1 + γ2))
-        Zup_top = Z + lev_src_top
-        Zup_bottom = Z + lev_src_bot
-        Zdn_top = -Z + lev_src_top
-        Zdn_bottom = -Z + lev_src_bot
-        src_up = pi * (Zup_top - Rdif * Zdn_top - Tdif * Zup_bottom)
-        src_dn = pi * (Zdn_bottom - Rdif * Zup_bottom - Tdif * Zdn_top)
+    # Source function for diffuse radiation: linear-in-τ (Toon et al. 1989,
+    # JGR, Eqs 26-27, as in ecRad's lw_source_2str), refactored so nothing
+    # divides by τ alone. Sources are W/m²-str; π converts to flux units.
+    #
+    # With B_t/B_b the level sources and Z = (B_b − B_t)/(τ(γ1+γ2)), the
+    # Toon sources are algebraically
+    #   src_up/π = B_t·(1 − Rdif − Tdif) + Tdif·(B_t − B_b) + Z·(1 + Rdif − Tdif)
+    #   src_dn/π = B_b·(1 − Rdif − Tdif) + Tdif·(B_b − B_t) − Z·(1 + Rdif − Tdif)
+    # and the coefficient combinations factor exactly (om2 = om1(1 + e1)):
+    #   1 ∓ Rdif − Tdif = om1·(k·om1 + (γ1 ∓ γ2)(1 + e1))·RT_term
+    # so, with γ1 − γ2 ≡ lw_diff_sec(1 − ssa),
+    #   Z·(1 + Rdif − Tdif) = ΔB·(om1/τ)·(k·om1 + (γ1+γ2)(1+e1))·RT_term/(γ1+γ2)
+    # where om1/τ → k as τ → 0 and stays accurate via expm1. Every factor is
+    # a product/sum of non-cancelling terms, bounding the absolute source
+    # error by ~eps·ΔB for ALL τ. The direct Toon form loses
+    # ~eps·ΔB/(τ(γ1+γ2)) — unbounded as τ → 0 — and required zeroing the
+    # source below a τ threshold, discarding the real O(τ) emission of thin
+    # layers; only a genuinely empty layer (τ = 0: Rdif = 0, Tdif = 1, no
+    # emission) short-circuits here.
+    if τ > FT(0)
+        ΔB = lev_src_bot - lev_src_top
+        γ_sum = γ1 + γ2
+        one_p_e1 = 1 + e1
+        # layer emissivity factor, 1 − Rdif − Tdif
+        emis_fac =
+            om1 *
+            (k * om1 + lw_diff_sec * (FT(1) - ssa) * one_p_e1) *
+            RT_term
+        # Z·(1 + Rdif − Tdif), as ΔB times a well-conditioned factor
+        ΔBz =
+            ΔB * (om1 / τ) * (k * om1 + γ_sum * one_p_e1) * RT_term /
+            max(γ_sum, eps(FT))
+        src_up = FT(π) * (lev_src_top * emis_fac - Tdif * ΔB + ΔBz)
+        src_dn = FT(π) * (lev_src_bot * emis_fac + Tdif * ΔB - ΔBz)
     else
         src_up = FT(0)
         src_dn = FT(0)

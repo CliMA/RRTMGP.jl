@@ -207,7 +207,7 @@ Transport for no-scattering longwave problem.
     (; flux_up, flux_dn) = flux
 
     τ = op.τ
-    τ_thresh = 100 * eps(FT) # or abs(eps(FT))?
+    τ_thresh = Numerics.τ_thresh(FT) # see Numerics for the eps^(1/4) derivation
 
     intensity_to_flux = FT(π) * w_μ
     flux_to_intensity = FT(1) / intensity_to_flux

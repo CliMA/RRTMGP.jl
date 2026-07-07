@@ -43,7 +43,6 @@ function update_profile_lw!(
     ncol,
 )
     # updating t_lay and t_lev based on heating rate
-    # TODO: it looks like we should probably reorder these args and eliminate one method?
     @inbounds begin
         ClimaComms.@threaded device for gcol in 1:ncol
             update_profile_lw_kernel!(

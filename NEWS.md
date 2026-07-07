@@ -3,7 +3,30 @@ RRTMGP.jl Release Notes
 
 main
 ------
-
+- Float32 accuracy overhaul of the RTE kernels: series-switch threshold for the
+  longwave no-scattering source at eps^(1/4) (was 100·eps), exact `γ1 − γ2`
+  identities in the two-stream `k`, expm1-based thin-layer factors, a consistent
+  off-resonance evaluation of the shortwave direct reflectance/transmittance,
+  exact non-cancelling delta-scaling forms, an addition-built direct-beam
+  profile, a continuous gas-optics η interpolation at η = 1, and a restructured
+  longwave two-stream source (exact `1 ∓ Rdif − Tdif` factorizations, so no term
+  divides by τ and thin layers keep their real O(τ) emission instead of being
+  zeroed below a threshold). Measured Float32↔Float64 broadband agreement
+  improves 25–90×: every longwave path now sits at its ~2–5e-4 W/m²
+  interpolation-noise floor (from 1.1e-2–3.4e-2). A new ratcheting f32↔f64
+  consistency test (test/float32_consistency.jl) locks the gains, and the
+  Float32 longwave no-scattering reference tolerances tighten from 0.05 to
+  5e-3 W/m².
+- New `RRTMGP.Numerics` module: every numerical guard constant (`k_min`,
+  `τ_thresh`, `resonance_window`, `μ₀_min`) in one place with its derivation.
+- New opt-in input validation: set `RRTMGP.check_values[] = true` to have
+  `update_fluxes!` validate solver inputs (pressures/temperatures positive and
+  finite, `cos_zenith ∈ [-1, 1]`, emissivity/albedos ∈ [0, 1], VMRs ≥ 0) via
+  `validate_inputs`; off by default and allocation-free when off.
+- Lookup loaders now assert the canonical gas slots the kernels hard-code
+  (h2o → 1, o3 → 3) and that `temperature_Planck` is in Kelvin (the g128 file
+  variants store an integer index, which would silently corrupt the Planck
+  interpolation).
 - **Breaking:** the public API is now centered on `RRTMGPSolver` plus a complete set of named
   getters (`layer_temperature`, `level_pressure`, `net_flux`, ...), built on the functional
   `solve_lw!`/`solve_sw!` core. Hosts exchange every input and output through the getters — a

@@ -475,6 +475,9 @@ host calls it every radiation step. CI asserts `@allocated == 0` and
 See also `update_lw_fluxes!`, `update_sw_fluxes!`, and `update_net_fluxes!`.
 """
 function update_fluxes!(s::RRTMGPSolver, seedval = nothing)
+    # opt-in input validation (see `check_values`/`validate_inputs`); a single
+    # branch when off, so the zero-allocation contract is unaffected
+    check_values[] && validate_inputs(s)
     _maybe_reset_rng_seed!(_radiation_method(s), seedval)
     as = _atmospheric_state(s)
     p_min = get_p_min(as, _lw_lookup(s))

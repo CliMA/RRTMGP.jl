@@ -8,7 +8,10 @@ This function assumes `Δx` is uniform.
 @inline function loc_lower(xi, Δx, n, x)
     @inbounds xi ≤ x[1] && return 1
     @inbounds xi >= x[n] && return n - 1
-    return @inbounds unsafe_trunc(Int, (xi - x[1]) / Δx) + 1
+    # The quotient can round UP to exactly n - 1 for xi < x[n] (Float32
+    # especially), which would return n and read one past the end under
+    # `@inbounds`; clamp to the last valid lower index.
+    return @inbounds min(unsafe_trunc(Int, (xi - x[1]) / Δx) + 1, n - 1)
 end
 
 """
@@ -205,10 +208,18 @@ delta-scale two stream optical properties.
 """
 function delta_scale(τ, ssa, g)
     FT = typeof(τ)
-    f = g * g
-    wf = ssa * f
-    τ_s = (FT(1) - wf) * τ
-    ssa_s = (ssa - wf) / max(eps(FT), FT(1) - wf)
-    g_s = (g - f) / max(eps(FT), FT(1) - f)
+    # Exact, non-cancelling forms of the f = g² similarity scaling:
+    #   τ' = (1 − ssa·g²)·τ, ssa' = ssa(1 − g²)/(1 − ssa·g²), g' = g/(1 + g),
+    # where 1 − ssa·g² = (1 − ssa) + ssa(1 − g)(1 + g) is a sum of nonnegative
+    # terms and g' = (g − g²)/(1 − g²) reduces exactly to g/(1 + g). The old
+    # (ssa − wf)/(1 − wf) and (g − f)/(1 − f) forms subtracted near-1 quantities
+    # (bright, strongly forward-scattering clouds) and needed eps-guards; these
+    # need none (g ≥ 0 for cloud/aerosol phase functions; the guards below only
+    # protect the pathological ssa = g = 1).
+    ssa_one_minus_g2 = ssa * (FT(1) - g) * (FT(1) + g) # = ssa(1 − g²) ≥ 0
+    one_minus_wf = (FT(1) - ssa) + ssa_one_minus_g2    # = 1 − ssa·g² ≥ 0
+    τ_s = one_minus_wf * τ
+    ssa_s = ssa_one_minus_g2 / max(eps(FT), one_minus_wf)
+    g_s = g / max(eps(FT), FT(1) + g)
     return (τ_s, ssa_s, g_s)
 end

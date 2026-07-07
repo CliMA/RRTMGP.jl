@@ -183,7 +183,7 @@ Equations are developed in Meador and Weaver, 1980,
 doi:10.1175/1520-0469(1980)037<0630:TSATRT>2.0.CO;2
 """
 @inline function sw_2stream_coeffs(τ::FT, ssa::FT, g::FT, μ₀::FT) where {FT}
-    k_min = sqrt(eps(FT)) #FT(1e4 * eps(FT)) # Suggestion from Chiel van Heerwaarden
+    k_min = Numerics.k_min(FT)
     # Zdunkowski Practical Improved Flux Method "PIFM"
     #  (Zdunkowski et al., 1980;  Contributions to Atmospheric Physics 53, 147-66)
     γ1 = (FT(8) - ssa * (FT(5) + FT(3) * g)) * FT(0.25)
@@ -192,34 +192,46 @@ doi:10.1175/1520-0469(1980)037<0630:TSATRT>2.0.CO;2
     γ4 = FT(1) - γ3
     α1 = γ1 * γ4 + γ2 * γ3                          # Eq. 16
     α2 = γ1 * γ3 + γ2 * γ4                          # Eq. 17
-    k = sqrt(max((γ1 - γ2) * (γ1 + γ2), k_min))
+    # For PIFM, γ1 − γ2 ≡ 2(1 − ssa) exactly; use the identity rather than the
+    # difference of two rounded O(1) numbers, which loses ~eps absolute and
+    # gives O(1%) errors in k for bright scattering (ssa → 1) at Float32.
+    k = sqrt(max(FT(2) * (FT(1) - ssa) * (γ1 + γ2), k_min))
 
     exp_minusktau = exp(-τ * k)
     exp_minus2ktau = exp_minusktau * exp_minusktau
+    # 1 − e^{−kτ} via expm1 (accurate for small kτ), and 1 − e^{−2kτ} from it
+    # by the exact factorization (1 − e)(1 + e) — the naive 1 − e² loses
+    # ~eps/(2kτ) relative accuracy for optically thin layers.
+    om1 = -expm1(-τ * k)
+    one_minus_e2kt = om1 * (FT(1) + exp_minusktau)
 
     # Refactored to avoid rounding errors when k, gamma1 are of very different magnitudes
-    RT_term =
-        FT(1) /
-        (k * (FT(1) + exp_minus2ktau) + γ1 * (FT(1) - exp_minus2ktau))
+    RT_term = FT(1) / (k * (FT(1) + exp_minus2ktau) + γ1 * one_minus_e2kt)
 
-    Rdif = RT_term * γ2 * (FT(1) - exp_minus2ktau) # Eqn. 25
-    Tdif = RT_term * FT(2) * k * exp_minusktau     # Eqn. 26
+    Rdif = RT_term * γ2 * one_minus_e2kt       # Eqn. 25
+    Tdif = RT_term * FT(2) * k * exp_minusktau # Eqn. 26
 
     # Transmittance of direct, unscattered beam. Also used below
-    T₀ = Tnoscat = exp(-τ / max(μ₀, eps(FT)))
+    T₀ = Tnoscat = exp(-τ / max(μ₀, Numerics.μ₀_min(FT)))
 
     # Direct reflect and transmission
     k_μ = k * μ₀
+    k_μ2 = k_μ * k_μ
+    # Equations 14-15 have a removable singularity at k·μ₀ = 1. Nudge k·μ₀
+    # off resonance so numerator and denominator stay mutually consistent
+    # (the old guard divided by a bare eps(FT), which amplified the O(eps)
+    # numerator noise at resonance to O(1) and discarded the denominator's
+    # sign). See Numerics.resonance_window for the sqrt(eps) choice.
+    if abs(FT(1) - k_μ2) < Numerics.resonance_window(FT)
+        k_μ2 = FT(1) - Numerics.resonance_window(FT)
+        k_μ = sqrt(k_μ2)
+    end
     k_γ3 = k * γ3
     k_γ4 = k * γ4
 
     # Equation 14, multiplying top and bottom by exp(-k*tau)
     #   and rearranging to avoid div by 0.
-    if abs(FT(1) - k_μ * k_μ) ≥ eps(FT)
-        RT_term = ssa * RT_term / (FT(1) - k_μ * k_μ)
-    else
-        RT_term = ssa * RT_term / eps(FT)
-    end
+    RT_term = ssa * RT_term / (FT(1) - k_μ2)
 
     Rdir_unconstrained =
         RT_term * (
@@ -254,16 +266,6 @@ doi:10.1175/1520-0469(1980)037<0630:TSATRT>2.0.CO;2
     Rdir = max(FT(0), min(Rdir_unconstrained, (FT(1) - T₀)))
     Tdir = max(FT(0), min(Tdir_unconstrained, (FT(1) - T₀ - Rdir)))
     return (Rdir, Tdir, Tnoscat, Rdif, Tdif)
-end
-
-# Direct-beam and source for diffuse radiation
-@inline function get_flux_dn_dir(τ, μ₀, flux_dn_dir_top, lev)
-    nlay = length(τ)
-    τ_sum = zero(eltype(τ))
-    for ilev in nlay:-1:lev
-        τ_sum += τ[ilev]
-    end
-    return flux_dn_dir_top * exp(-τ_sum / max(μ₀, eps(eltype(τ))))
 end
 
 """
@@ -303,14 +305,20 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
         sfc_alb_direct = bcs_sw.sfc_alb_direct[ibnd, gcol]
         μ₀ = bcs_sw.cos_zenith[gcol]
     end
-    τ_sum = FT(0)
-    for ilay in 1:nlay
-        @inbounds τ_sum += τ[ilay, gcol]
-    end
-    # Direct-beam and source for diffuse radiation
+    # Direct-beam profile, computed top-down with an addition-built
+    # cumulative optical depth and stored for the two passes below. (The
+    # previous scheme summed τ once, then recovered per-level values by
+    # repeated subtraction — accumulating ~nlay·eps·τ_sum error exactly
+    # where τ_cum → 0, near TOA — and re-exponentiated in both passes.)
     flux_dn_dir_top = toa_flux * solar_frac * μ₀
-    flux_dn_dir_bot = flux_dn_dir_top * exp(-τ_sum / max(μ₀, eps(FT))) # store value at surface
-    @inbounds flux_dn_dir[1, gcol] = flux_dn_dir_bot # store value at surface
+    inv_μ₀ = FT(1) / max(μ₀, Numerics.μ₀_min(FT))
+    @inbounds flux_dn_dir[nlev, gcol] = flux_dn_dir_top
+    τ_cum = FT(0)
+    @inbounds for ilev in nlay:-1:1
+        τ_cum += τ[ilev, gcol]
+        flux_dn_dir[ilev, gcol] = flux_dn_dir_top * exp(-τ_cum * inv_μ₀)
+    end
+    flux_dn_dir_bot = @inbounds flux_dn_dir[1, gcol] # surface value
     sfc_source = flux_dn_dir_bot * sfc_alb_direct
 
     @inbounds flux_dn[nlev, gcol] = FT(0) # set to incoming flux when provided?
@@ -321,7 +329,6 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
     @inbounds src[1, gcol] = sfc_source
     # From bottom to top of atmosphere --
     #   compute albedo and source of upward radiation
-    τ_cum = τ_sum
     albedo_ilev, src_ilev = surface_albedo, sfc_source
     @inbounds for ilev in 1:nlay
         τ_ilev, ssa_ilev, g_ilev =
@@ -330,16 +337,13 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
             sw_2stream_coeffs(τ_ilev, ssa_ilev, g_ilev, μ₀)
         denom = FT(1) / (FT(1) - Rdif * albedo_ilev)  # Eq 10
         albedo_ilevplus1 = Rdif + Tdif * Tdif * albedo_ilev * denom # Equation 9
-        # 
+        #
         # Equation 11 -- source is emitted upward radiation at top of layer plus
         # radiation emitted at bottom of layer,
         # transmitted through the layer and reflected from layers below (Tdiff*src*albedo)
-        τ_cum -= τ_ilev
-        τ_cum = max(τ_cum, FT(0))
-        flux_dn_dir_ilevplus1 =
-            flux_dn_dir_top * exp(-τ_cum / max(μ₀, eps(FT)))
-        src_up_ilev = Rdir * flux_dn_dir_ilevplus1 #flux_dn_dir[ilev + 1]
-        src_dn_ilev = Tdir * flux_dn_dir_ilevplus1 #flux_dn_dir[ilev + 1]
+        flux_dn_dir_ilevplus1 = flux_dn_dir[ilev + 1, gcol]
+        src_up_ilev = Rdir * flux_dn_dir_ilevplus1
+        src_dn_ilev = Tdir * flux_dn_dir_ilevplus1
         src_ilevplus1 =
             src_up_ilev +
             Tdif * denom * (src_ilev + albedo_ilev * src_dn_ilev)
@@ -356,7 +360,6 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
     # From the top of the atmosphere downward -- compute fluxes
     @inbounds flux_dn_ilevplus1 = flux_dn[nlev, gcol]
     @inbounds flux_dn[nlev, gcol] += flux_dn_dir_top
-    τ_cum = FT(0)
 
     ilev = nlay
     @inbounds while ilev ≥ 1
@@ -366,9 +369,7 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
         (_, Tdir, _, Rdif, Tdif) =
             sw_2stream_coeffs(τ_ilev, ssa_ilev, g_ilev, μ₀)
         denom = FT(1) / (FT(1) - Rdif * albedo_ilev)  # Eq 10
-        src_dn_ilev =
-            Tdir * flux_dn_dir_top * exp(-τ_cum / max(μ₀, eps(FT)))
-        τ_cum += τ_ilev
+        src_dn_ilev = Tdir * flux_dn_dir[ilev + 1, gcol]
         flux_dn_ilev =
             (Tdif * flux_dn_ilevplus1 + # Equation 13
              Rdif * src_ilev +
@@ -376,8 +377,7 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
         flux_up[ilev, gcol] =
             flux_dn_ilev * albedo_ilev + # Equation 12
             src_ilev
-        flux_dn[ilev, gcol] =
-            flux_dn_ilev + flux_dn_dir_top * exp(-τ_cum / max(μ₀, eps(FT)))
+        flux_dn[ilev, gcol] = flux_dn_ilev + flux_dn_dir[ilev, gcol]
         flux_dn_ilevplus1 = flux_dn_ilev
         ilev -= 1
     end

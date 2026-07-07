@@ -2,6 +2,19 @@ import RRTMGP.LookUpTables:
     LookUpAerosolMerra, LookUpLW, LookUpSW, LookUpCld, LookUpPlanck
 import RRTMGP.LookUpTables: LookUpMinor, ReferencePoints, BandData
 
+# The RTE/optics kernels hard-code the water-vapor and ozone slots of the gas
+# index (`get_vmr` for the global-mean storage maps ig == 1 → vmr_h2o and
+# ig == 3 → vmr_o3, matching the canonical RRTMGP gas ordering). Fail loudly at
+# load time if a lookup artifact ever reorders the gases.
+function _assert_canonical_gas_slots(idx_gases)
+    idx_gases["h2o"] == 1 && idx_gases["o3"] == 3 || error(
+        "unexpected gas ordering in lookup table: the solver kernels require " *
+        "h2o → 1 and o3 → 3, got h2o → $(idx_gases["h2o"]), " *
+        "o3 → $(idx_gases["o3"]).",
+    )
+    return nothing
+end
+
 function LookUpAerosolMerra(
     ds,
     ::Type{FT},
@@ -120,7 +133,7 @@ function LookUpLW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     idx_h2o = idx_gases["h2o"]
     idx_gases["h2o_frgn"] = idx_h2o # water vapor - foreign
     idx_gases["h2o_self"] = idx_h2o # water vapor - self-continua
-
+    _assert_canonical_gas_slots(idx_gases)
 
     n_gases = n_maj_absrb
 
@@ -175,7 +188,17 @@ function LookUpLW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     kminor_start_upper = IA1D(Array(ds["kminor_start_upper"])) # not currently used
     planck_fraction =
         FTA4D(permutedims(Array(ds["plank_fraction"]), [2, 3, 4, 1]))
-    t_planck = FTA1D(Array(ds["temperature_Planck"]))
+    t_planck_data = Array(ds["temperature_Planck"])
+    # Some reduced-resolution gas files (the g128 variants) store
+    # `temperature_Planck` as an integer INDEX (0…n) rather than Kelvin;
+    # interpolating against that would silently clamp every temperature to the
+    # last Planck entry. Require plausible Kelvin values.
+    (100 <= first(t_planck_data) && last(t_planck_data) <= 500) || error(
+        "`temperature_Planck` in the longwave lookup file does not look like " *
+        "Kelvin (range $(first(t_planck_data))…$(last(t_planck_data))); " *
+        "this file is not usable with RRTMGP.jl's Planck interpolation.",
+    )
+    t_planck = FTA1D(t_planck_data)
 
     tot_planck = FTA2D(Array(ds["totplnk"]))
 
@@ -429,6 +452,7 @@ function LookUpSW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     idx_h2o = idx_gases["h2o"]
     idx_gases["h2o_frgn"] = idx_h2o # water vapor - foreign
     idx_gases["h2o_self"] = idx_h2o # water vapor - self-continua
+    _assert_canonical_gas_slots(idx_gases)
 
     n_gases = n_maj_absrb
 
