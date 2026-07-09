@@ -103,6 +103,7 @@ fluxes, and summing over the band dimension recovers the broadband up/down fluxe
 struct FluxBand{FT <: AbstractFloat, FTA3D <: AbstractArray{FT, 3}}
     flux_up::FTA3D
     flux_dn::FTA3D
+    flux_net::FTA3D
 end
 Adapt.@adapt_structure FluxBand
 
@@ -112,7 +113,8 @@ function FluxBand(grid_params::RRTMGPGridParams, n_bnd::Int)
     DA = ClimaComms.array_type(grid_params)
     flux_up = DA{FT}(undef, nlay + 1, ncol, n_bnd)
     flux_dn = DA{FT}(undef, nlay + 1, ncol, n_bnd)
-    return FluxBand{FT, typeof(flux_up)}(flux_up, flux_dn)
+    flux_net = DA{FT}(undef, nlay + 1, ncol, n_bnd)
+    return FluxBand{FT, typeof(flux_up)}(flux_up, flux_dn, flux_net)
 end
 
 # Zero a per-band flux buffer before a solve (no-op when spectral fluxes are off).
@@ -120,6 +122,7 @@ set_band_flux_to_zero!(::Nothing) = nothing
 function set_band_flux_to_zero!(band::FluxBand{FT}) where {FT}
     band.flux_up .= FT(0)
     band.flux_dn .= FT(0)
+    band.flux_net .= FT(0)
     return nothing
 end
 

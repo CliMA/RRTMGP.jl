@@ -159,6 +159,8 @@ function update_net_fluxes!(s::RRTMGPSolver, ::AbstractRRTMGPMethod)
     # Operate on the raw (boundary-extended) buffers, not `parent(getter(s))`: the
     # getters allocate a `view` per call that would then just be stripped by `parent`.
     s.net_flux_buffer .= s.lws.flux.flux_net .+ s.sws.flux.flux_net
+    _update_band_net_fluxes!(s.lws)
+    _update_band_net_fluxes!(s.sws)
     return nothing
 end
 function update_net_fluxes!(
@@ -168,6 +170,15 @@ function update_net_fluxes!(
     s.net_flux_buffer .= s.lws.flux.flux_net .+ s.sws.flux.flux_net
     s.clear_net_flux_buffer .=
         s.clear_flux_lw.flux_net .+ s.clear_flux_sw.flux_net
+    _update_band_net_fluxes!(s.lws)
+    _update_band_net_fluxes!(s.sws)
+    return nothing
+end
+
+_update_band_net_fluxes!(ws) = _update_band_net_fluxes!(hasproperty(ws, :band_flux) ? ws.band_flux : nothing)
+_update_band_net_fluxes!(::Nothing) = nothing
+function _update_band_net_fluxes!(band::Fluxes.FluxBand)
+    band.flux_net .= band.flux_up .- band.flux_dn
     return nothing
 end
 

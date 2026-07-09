@@ -190,8 +190,8 @@ end
 
 Compute optical thickness, single scattering albedo, and asymmetry parameter.
 """
-@inline function compute_gas_optics(
-    lkp::LookUpLW,
+@inline function compute_gas_optics_core(
+    lkp,
     vmr,
     col_dry,
     igpt,
@@ -224,9 +224,6 @@ Compute optical thickness, single scattering albedo, and asymmetry parameter.
         tropo,
         jftemp[1],
     )
-    # compute Planck fraction
-    @inbounds planck_fraction = view(lkp.planck.planck_fraction, :, :, :, igpt)
-    pfrac = interp3d(jfη..., jftemp..., jfpress..., planck_fraction)
 
     # computing τ_major
     τ_major =
@@ -247,6 +244,35 @@ Compute optical thickness, single scattering albedo, and asymmetry parameter.
         glay,
         gcol,
     )
+    return (τ_major, τ_minor, tropo, vmr_h2o, jftemp, jfη, jfpress)
+end
+
+@inline function compute_gas_optics(
+    lkp::LookUpLW,
+    vmr,
+    col_dry,
+    igpt,
+    ibnd,
+    p_lay,
+    t_lay,
+    glay,
+    gcol,
+)
+    τ_major, τ_minor, tropo, vmr_h2o, jftemp, jfη, jfpress = compute_gas_optics_core(
+        lkp,
+        vmr,
+        col_dry,
+        igpt,
+        ibnd,
+        p_lay,
+        t_lay,
+        glay,
+        gcol,
+    )
+    # compute Planck fraction
+    @inbounds planck_fraction = view(lkp.planck.planck_fraction, :, :, :, igpt)
+    pfrac = interp3d(jfη..., jftemp..., jfpress..., planck_fraction)
+
     # τ_Rayleigh is zero for longwave
     τ = max(τ_major + τ_minor, zero(τ_major))
     return (τ, zero(τ_major), zero(τ_major), pfrac) # initializing asymmetry parameter
@@ -263,46 +289,14 @@ end
     glay,
     gcol,
 )
-    # upper/lower troposphere
-    tropo = p_lay > lkp.p_ref_tropo ? 1 : 2
-    # volume mixing ratio of h2o
-    vmr_h2o = get_vmr(vmr, lkp.idx_h2o, glay, gcol)
-
-    jftemp = compute_interp_frac_temp(lkp.ref_points.t_ref, t_lay)
-    jfpress = compute_interp_frac_press(lkp.ref_points.ln_p_ref, p_lay, tropo)
-
-    @inbounds kmajor = view(lkp.kmajor, :, :, :, igpt)
-    n_η = size(kmajor, 1)
-
-    ig = view(lkp.key_species, 1:2, tropo, ibnd)
-    @inbounds vmr1 = get_vmr(vmr, ig[1], glay, gcol)
-    @inbounds vmr2 = get_vmr(vmr, ig[2], glay, gcol)
-
-    jfη, col_mix = compute_interp_frac_η(
-        n_η,
-        ig,
-        lkp.ref_points.vmr_ref,
-        (vmr1, vmr2),
-        tropo,
-        jftemp[1],
-    )
-
-    # computing τ_major
-    τ_major =
-        interp3d(jfη..., jftemp..., jfpress..., kmajor, col_mix...) * col_dry
-    # computing τ_minor
-    lkp_minor = tropo == 1 ? lkp.minor_lower : lkp.minor_upper
-    τ_minor = compute_τ_minor(
-        lkp_minor,
+    τ_major, τ_minor, tropo, vmr_h2o, jftemp, jfη, jfpress = compute_gas_optics_core(
+        lkp,
         vmr,
-        vmr_h2o,
         col_dry,
-        p_lay,
-        t_lay,
-        jftemp...,
-        jfη...,
         igpt,
         ibnd,
+        p_lay,
+        t_lay,
         glay,
         gcol,
     )
