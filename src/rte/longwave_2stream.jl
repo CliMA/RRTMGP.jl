@@ -10,7 +10,6 @@ function rte_lw_2stream_solve!(
     nlay, ncol = AtmosphericStates.get_dims(as)
     nlev = nlay + 1
     igpt, ibnd = 1, 1
-    (; flux_up, flux_dn, flux_net) = flux_lw
     @inbounds begin
         ClimaComms.@threaded device for gcol in 1:ncol
             compute_optical_props!(op, as, src_lw, gcol)
@@ -25,9 +24,7 @@ function rte_lw_2stream_solve!(
                 nlev,
                 ncol,
             )
-            for ilev in 1:nlev
-                flux_net[ilev, gcol] = flux_up[ilev, gcol] - flux_dn[ilev, gcol]
-            end
+            compute_net_flux!(flux_lw, gcol, nlev)
         end
     end
     return nothing
@@ -132,7 +129,7 @@ function rte_lw_2stream_solve!(
             end
         end
         ClimaComms.@threaded device for gcol in 1:ncol
-            compute_net_flux!(flux_lw, gcol)
+            compute_net_flux!(flux_lw, gcol, nlev)
         end
     end
     return nothing
@@ -175,14 +172,14 @@ total source function at levels using linear-in-tau approximation.
     # 1 − e^{−2kτ} via the exact factorization (1 − e)(1 + e); the naive
     # 1 − e² loses ~eps/(2kτ) relative accuracy for thin layers.
     one_minus_e2kt = om1 * (1 + e1)
-    # Refactored to avoid rounding errors when k, gamma1 are of very different magnitudes
+    # Formulated to avoid rounding errors when k, gamma1 are of very different magnitudes
     RT_term = 1 / (k * (1 + coeff) + γ1 * one_minus_e2kt)
 
     Rdif = RT_term * γ2 * one_minus_e2kt # Equation 25
     Tdif = RT_term * 2 * k * e1 # Equation 26
 
     # Source function for diffuse radiation: linear-in-τ (Toon et al. 1989,
-    # JGR, Eqs 26-27, as in ecRad's lw_source_2str), refactored so nothing
+    # JGR, Eqs 26-27, as in ecRad's lw_source_2str), formulated so nothing
     # divides by τ alone. Sources are W/m²-str; π converts to flux units.
     #
     # With B_t/B_b the level sources and Z = (B_b − B_t)/(τ(γ1+γ2)), the
@@ -195,10 +192,8 @@ total source function at levels using linear-in-tau approximation.
     #   Z·(1 + Rdif − Tdif) = ΔB·(om1/τ)·(k·om1 + (γ1+γ2)(1+e1))·RT_term/(γ1+γ2)
     # where om1/τ → k as τ → 0 and stays accurate via expm1. Every factor is
     # a product/sum of non-cancelling terms, bounding the absolute source
-    # error by ~eps·ΔB for ALL τ. The direct Toon form loses
-    # ~eps·ΔB/(τ(γ1+γ2)) — unbounded as τ → 0 — and required zeroing the
-    # source below a τ threshold, discarding the real O(τ) emission of thin
-    # layers; only a genuinely empty layer (τ = 0: Rdif = 0, Tdif = 1, no
+    # error by ~eps·ΔB for ALL τ, preserving the real O(τ) emission of thin
+    # layers. Only a genuinely empty layer (τ = 0: Rdif = 0, Tdif = 1, no
     # emission) short-circuits here.
     if τ > FT(0)
         ΔB = lev_src_bot - lev_src_top
@@ -255,7 +250,7 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
     nlay = nlev - 1
     # setting references
     (; τ, ssa, g) = op
-    (; flux_up, flux_dn, flux_net) = flux
+    (; flux_up, flux_dn) = flux
 
     (; albedo, lev_source, sfc_source, src) = src_lw
     (; inc_flux, sfc_emis) = bcs_lw

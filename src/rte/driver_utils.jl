@@ -1,7 +1,7 @@
 #####
 ##### Device-agnostic pieces shared by the CPU and CUDA drivers of the four
-##### spectral solvers, so the per-(g-point, column) orchestration — the part
-##### that historically diverged between backends — exists exactly once.
+##### spectral solvers, so the per-(g-point, column) orchestration exists
+##### exactly once.
 #####
 
 # Aerosol mask for one column (no-op without aerosols).

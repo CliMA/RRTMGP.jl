@@ -25,8 +25,9 @@ function rte_sw_noscat_solve!(
                     gcol,
                     nlev,
                 )
+                compute_net_flux!(flux_sw, gcol, nlev)
             else
-                set_flux_to_zero!(flux_sw, gcol)
+                set_flux_to_zero!(flux_sw, gcol, nlev)
             end
         end
     end
@@ -89,9 +90,9 @@ function rte_sw_noscat_solve!(
         end
         ClimaComms.@threaded device for gcol in 1:ncol
             if cos_zenith[gcol] > 0
-                compute_net_flux!(flux_sw, gcol)
+                compute_net_flux!(flux_sw, gcol, nlev)
             else
-                set_flux_to_zero!(flux_sw, gcol)
+                set_flux_to_zero!(flux_sw, gcol, nlev)
             end
         end
     end
@@ -123,14 +124,13 @@ No-scattering solver for the shortwave problem.
 )
     (; toa_flux, cos_zenith) = bcs_sw
     τ = op.τ
-    (; flux_up, flux_dn, flux_dn_dir, flux_net) = flux
+    (; flux_up, flux_dn, flux_dn_dir) = flux
     FT = eltype(toa_flux)
     # downward propagation
     @inbounds flux_dn_dir[nlev, gcol] =
         toa_flux[gcol] * solar_frac * cos_zenith[gcol]
     @inbounds flux_dn[nlev, gcol] = flux_dn_dir[nlev, gcol]
     @inbounds flux_up[nlev, gcol] = FT(0)
-    @inbounds flux_net[nlev, gcol] = -flux_dn_dir[nlev, gcol]
     ilev = nlev - 1
     @inbounds while ilev ≥ 1
         flux_dn_dir[ilev, gcol] =
@@ -138,7 +138,6 @@ No-scattering solver for the shortwave problem.
             exp(-τ[ilev, gcol] / max(cos_zenith[gcol], Numerics.μ₀_min(FT)))
         flux_dn[ilev, gcol] = flux_dn_dir[ilev, gcol]
         flux_up[ilev, gcol] = FT(0)
-        flux_net[ilev, gcol] = -flux_dn_dir[ilev, gcol]
         ilev -= 1
     end
 end

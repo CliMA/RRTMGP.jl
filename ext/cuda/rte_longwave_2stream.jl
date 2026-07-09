@@ -7,7 +7,6 @@ function rte_lw_2stream_solve!(
     as::GrayAtmosphericState,
 )
     nlay, ncol = AtmosphericStates.get_dims(as)
-    nlev = nlay + 1
     tx, bx = _configure_threadblock(ncol)
     args = (flux_lw, src_lw, bcs_lw, op, nlay, ncol, as)
     @cuda always_inline = true threads = (tx) blocks = (bx) rte_lw_2stream_solve_CUDA!(
@@ -29,7 +28,6 @@ function rte_lw_2stream_solve_CUDA!(
     nlev = nlay + 1
     igpt, ibnd = 1, 1
     if gcol ≤ ncol
-        (; flux_up, flux_dn, flux_net) = flux_lw
         compute_optical_props!(op, as, src_lw, gcol)
         rte_lw_2stream!(
             op,
@@ -42,11 +40,7 @@ function rte_lw_2stream_solve_CUDA!(
             nlev,
             ncol,
         )
-        @inbounds begin
-            for ilev in 1:nlev
-                flux_net[ilev, gcol] = flux_up[ilev, gcol] - flux_dn[ilev, gcol]
-            end
-        end
+        compute_net_flux!(flux_lw, gcol, nlev)
     end
     return nothing
 end
@@ -65,7 +59,6 @@ function rte_lw_2stream_solve!(
     lookup_lw_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
 )
     nlay, ncol = AtmosphericStates.get_dims(as)
-    nlev = nlay + 1
     set_band_flux_to_zero!(band_flux)
     tx, bx = _configure_threadblock(ncol)
     args = (
@@ -132,7 +125,7 @@ function rte_lw_2stream_solve_CUDA!(
             n_cloudy_gpts += cloudy ? 1 : 0
         end
         @inbounds begin
-            compute_net_flux!(flux_lw, gcol)
+            compute_net_flux!(flux_lw, gcol, nlev)
             # write out LW cloud cover
             if cloud_state isa CloudState &&
                !isnothing(cloud_state.cld_cover_lw)

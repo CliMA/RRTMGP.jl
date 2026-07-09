@@ -13,10 +13,6 @@ function rte_sw_2stream_solve!(
     FT = eltype(cos_zenith)
     solar_frac = FT(1)
     @inbounds begin
-        flux_up_sw = flux_sw.flux_up
-        flux_dn_sw = flux_sw.flux_dn
-        flux_net_sw = flux_sw.flux_net
-
         ClimaComms.@threaded device for gcol in 1:ncol
             compute_optical_props!(op, as, gcol)
             if cos_zenith[gcol] > 0
@@ -33,12 +29,9 @@ function rte_sw_2stream_solve!(
                     nlev,
                     gcol,
                 )
-                for ilev in 1:nlev
-                    flux_net_sw[ilev, gcol] =
-                        flux_up_sw[ilev, gcol] - flux_dn_sw[ilev, gcol]
-                end
+                compute_net_flux!(flux_sw, gcol, nlev)
             else # zero out columns with zenith angle ≥ π/2
-                set_flux_to_zero!(flux_sw, gcol)
+                set_flux_to_zero!(flux_sw, gcol, nlev)
             end
         end
     end
@@ -171,9 +164,9 @@ function rte_sw_2stream_solve!(
         end
         ClimaComms.@threaded device for gcol in 1:ncol
             if cos_zenith[gcol] > 0
-                compute_net_flux!(flux_sw, gcol)
+                compute_net_flux!(flux_sw, gcol, nlev)
             else # zero out columns with zenith angle ≥ π/2
-                set_flux_to_zero!(flux_sw, gcol)
+                set_flux_to_zero!(flux_sw, gcol, nlev)
             end
         end
     end
@@ -212,7 +205,7 @@ doi:10.1175/1520-0469(1980)037<0630:TSATRT>2.0.CO;2
     om1 = -expm1(-τ * k)
     one_minus_e2kt = om1 * (FT(1) + exp_minusktau)
 
-    # Refactored to avoid rounding errors when k, gamma1 are of very different magnitudes
+    # Formulated to avoid rounding errors when k, gamma1 are of very different magnitudes
     RT_term = FT(1) / (k * (FT(1) + exp_minus2ktau) + γ1 * one_minus_e2kt)
 
     Rdif = RT_term * γ2 * one_minus_e2kt       # Eqn. 25
@@ -225,10 +218,8 @@ doi:10.1175/1520-0469(1980)037<0630:TSATRT>2.0.CO;2
     k_μ = k * μ₀
     k_μ2 = k_μ * k_μ
     # Equations 14-15 have a removable singularity at k·μ₀ = 1. Nudge k·μ₀
-    # off resonance so numerator and denominator stay mutually consistent
-    # (the old guard divided by a bare eps(FT), which amplified the O(eps)
-    # numerator noise at resonance to O(1) and discarded the denominator's
-    # sign). See Numerics.resonance_window for the sqrt(eps) choice.
+    # off resonance so numerator and denominator stay mutually consistent.
+    # See Numerics.resonance_window for the sqrt(eps) choice.
     if abs(FT(1) - k_μ2) < Numerics.resonance_window(FT)
         k_μ2 = FT(1) - Numerics.resonance_window(FT)
         k_μ = sqrt(k_μ2)
@@ -313,10 +304,7 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
         μ₀ = bcs_sw.cos_zenith[gcol]
     end
     # Direct-beam profile, computed top-down with an addition-built
-    # cumulative optical depth and stored for the two passes below. (The
-    # previous scheme summed τ once, then recovered per-level values by
-    # repeated subtraction — accumulating ~nlay·eps·τ_sum error exactly
-    # where τ_cum → 0, near TOA — and re-exponentiated in both passes.)
+    # cumulative optical depth and stored for the two passes below.
     flux_dn_dir_top = toa_flux * solar_frac * μ₀
     inv_μ₀ = FT(1) / max(μ₀, Numerics.μ₀_min(FT))
     @inbounds flux_dn_dir[nlev, gcol] = flux_dn_dir_top

@@ -27,11 +27,6 @@ reports on the physical grid.
  - `isothermal_boundary_layer = false`: whether RRTMGP adds an isothermal boundary
     layer/level at the top of the domain.
 
-Migrating from the pre-`RRTMGPGridParams` workspace constructors (`OneScalar(FT, ncol,
-nlay, DA)`, `TwoStream(...)`, ...): pass the same physical layer count as `domain_nlay`,
-and do not add the boundary layer yourself — RRTMGP does when `isothermal_boundary_layer =
-true`. A caller that previously baked the extra layer into `nlay` must drop it here, or the
-boundary layer is double-counted.
 """
 struct RRTMGPGridParams{FT, C}
     context::C

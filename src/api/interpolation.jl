@@ -5,12 +5,6 @@
 # Methods for obtaining cell-face (level) pressures/temperatures from cell-center
 # (layer) pressures/temperatures, used when a caller provides only layer values.
 
-# TODO: Remove comment after ClimaAtmos update
-#
-# Lifted from the ClimaAtmos RRTMGP interface so RRTMGP can do this itself,
-# without ClimaCore. The arithmetic is kept identical to preserve bit-for-bit
-# reproducibility of downstream fluxes.
-
 # Each scheme assumes a constant lapse rate ∂T/∂z = L between the two known points
 # (z₁, p₁, T₁) and (z₂, p₂, T₂), giving T(z) = T₁ + (T₂ - T₁) / (z₂ - z₁) * (z - z₁).
 # Pressure follows hydrostatic balance when T₁ == T₂ and an isentropic p ∝ T^B law

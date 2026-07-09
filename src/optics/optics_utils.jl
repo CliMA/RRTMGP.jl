@@ -211,11 +211,10 @@ function delta_scale(τ, ssa, g)
     # Exact, non-cancelling forms of the f = g² similarity scaling:
     #   τ' = (1 − ssa·g²)·τ, ssa' = ssa(1 − g²)/(1 − ssa·g²), g' = g/(1 + g),
     # where 1 − ssa·g² = (1 − ssa) + ssa(1 − g)(1 + g) is a sum of nonnegative
-    # terms and g' = (g − g²)/(1 − g²) reduces exactly to g/(1 + g). The old
-    # (ssa − wf)/(1 − wf) and (g − f)/(1 − f) forms subtracted near-1 quantities
-    # (bright, strongly forward-scattering clouds) and needed eps-guards; these
-    # need none (g ≥ 0 for cloud/aerosol phase functions; the guards below only
-    # protect the pathological ssa = g = 1).
+    # terms and g' = (g − g²)/(1 − g²) reduces exactly to g/(1 + g). These forms
+    # avoid subtracting near-1 quantities and require no eps-guards (g ≥ 0 for
+    # cloud/aerosol phase functions; the guards below only protect the
+    # pathological ssa = g = 1).
     ssa_one_minus_g2 = ssa * (FT(1) - g) * (FT(1) + g) # = ssa(1 − g²) ≥ 0
     one_minus_wf = (FT(1) - ssa) + ssa_one_minus_g2    # = 1 − ssa·g² ≥ 0
     τ_s = one_minus_wf * τ

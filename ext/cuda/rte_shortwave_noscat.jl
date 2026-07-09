@@ -6,7 +6,6 @@ function rte_sw_noscat_solve!(
     as::GrayAtmosphericState,
 )
     nlay, ncol = AtmosphericStates.get_dims(as)
-    nlev = nlay + 1
     tx, bx = _configure_threadblock(ncol)
     args = (flux_sw, op, bcs_sw, nlay, ncol, as)
     @cuda always_inline = true threads = (tx) blocks = (bx) rte_sw_noscat_solve_CUDA!(
@@ -29,9 +28,6 @@ function rte_sw_noscat_solve_CUDA!(
     FT = eltype(bcs_sw.cos_zenith)
     solar_frac = FT(1)
     if gcol ≤ ncol
-        flux_up_sw = flux_sw.flux_up
-        flux_dn_sw = flux_sw.flux_dn
-        flux_net_sw = flux_sw.flux_net
         @inbounds begin
             μ₀ = bcs_sw.cos_zenith[gcol]
             if μ₀ > 0
@@ -46,8 +42,9 @@ function rte_sw_noscat_solve_CUDA!(
                     gcol,
                     nlev,
                 )
+                compute_net_flux!(flux_sw, gcol, nlev)
             else
-                set_flux_to_zero!(flux_sw, gcol)
+                set_flux_to_zero!(flux_sw, gcol, nlev)
             end
         end
     end
@@ -64,7 +61,6 @@ function rte_sw_noscat_solve!(
     lookup_sw::LookUpSW,
 )
     nlay, ncol = AtmosphericStates.get_dims(as)
-    nlev = nlay + 1
     tx, bx = _configure_threadblock(ncol)
     args = (flux, flux_sw, op, bcs_sw, nlay, ncol, as, lookup_sw)
     @cuda always_inline = true threads = (tx) blocks = (bx) rte_sw_noscat_solve_CUDA!(
@@ -104,9 +100,9 @@ function rte_sw_noscat_solve_CUDA!(
                         nlev,
                     )
                 end
-                compute_net_flux!(flux_sw, gcol)
+                compute_net_flux!(flux_sw, gcol, nlev)
             else
-                set_flux_to_zero!(flux_sw, gcol)
+                set_flux_to_zero!(flux_sw, gcol, nlev)
             end
         end
     end

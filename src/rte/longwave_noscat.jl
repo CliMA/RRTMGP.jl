@@ -10,10 +10,8 @@ function rte_lw_noscat_solve!(
     nlay, ncol = AtmosphericStates.get_dims(as)
     nlev = nlay + 1
     igpt, ibnd = 1, 1
-    τ = op.τ
     Ds = angle_disc.gauss_Ds[1]
     w_μ = angle_disc.gauss_wts[1]
-    (; flux_up, flux_dn, flux_net) = flux_lw
     @inbounds begin
         ClimaComms.@threaded device for gcol in 1:ncol
             compute_optical_props!(op, as, src_lw, gcol)
@@ -30,9 +28,7 @@ function rte_lw_noscat_solve!(
                 nlay,
                 nlev,
             )
-            for ilev in 1:nlev
-                flux_net[ilev, gcol] = flux_up[ilev, gcol] - flux_dn[ilev, gcol]
-            end
+            compute_net_flux!(flux_lw, gcol, nlev)
         end
     end
     return nothing
@@ -149,7 +145,7 @@ function rte_lw_noscat_solve!(
             end
         end
         ClimaComms.@threaded device for gcol in 1:ncol
-            compute_net_flux!(flux_lw, gcol)
+            compute_net_flux!(flux_lw, gcol, nlev)
         end
     end
     return nothing

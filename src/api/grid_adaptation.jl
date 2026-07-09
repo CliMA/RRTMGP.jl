@@ -2,14 +2,10 @@
 ##### Grid adaptation: prepare an AtmosphericState for the RTE solvers
 #####
 #
-# TODO: Remove comment after ClimaAtmos update:
-#
-# Optional, separable steps lifted from the ClimaAtmos RRTMGP interface so they
-# live with the radiation code and can be used standalone (without ClimaCore).
+# Optional, separable steps to prepare an atmospheric state for the RTE solvers.
 # Each operates in place on an `AtmosphericState` (or `GrayAtmosphericState`) and
 # dispatches on the state / sub-state type, so it is a no-op where not
-# applicable. The arithmetic is kept identical to the original to preserve
-# bit-for-bit reproducibility of downstream fluxes.
+# applicable.
 
 import ..AtmosphericStates:
     AbstractAtmosphericState,

@@ -8,7 +8,6 @@ function rte_lw_noscat_solve!(
     as::GrayAtmosphericState,
 )
     nlay, ncol = AtmosphericStates.get_dims(as)
-    nlev = nlay + 1
     tx, bx = _configure_threadblock(ncol)
     args = (flux_lw, src_lw, bcs_lw, op, angle_disc, nlay, ncol, as)
     @cuda always_inline = true threads = (tx) blocks = (bx) rte_lw_noscat_solve_CUDA!(
@@ -30,10 +29,8 @@ function rte_lw_noscat_solve_CUDA!(
     gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
     nlev = nlay + 1
     igpt, ibnd = 1, 1
-    τ = op.τ
     Ds = angle_disc.gauss_Ds[1]
     w_μ = angle_disc.gauss_wts[1]
-    (; flux_up, flux_dn, flux_net) = flux_lw
     if gcol ≤ ncol
         compute_optical_props!(op, as, src_lw, gcol)
         rte_lw_noscat_one_angle!(
@@ -49,9 +46,7 @@ function rte_lw_noscat_solve_CUDA!(
             nlay,
             nlev,
         )
-        @inbounds for ilev in 1:nlev
-            flux_net[ilev, gcol] = flux_up[ilev, gcol] - flux_dn[ilev, gcol]
-        end
+        compute_net_flux!(flux_lw, gcol, nlev)
     end
     return nothing
 end
@@ -70,7 +65,6 @@ function rte_lw_noscat_solve!(
     lookup_lw_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
 )
     nlay, ncol = AtmosphericStates.get_dims(as)
-    nlev = nlay + 1
     tx, bx = _configure_threadblock(ncol)
     args = (
         flux,
@@ -139,7 +133,7 @@ function rte_lw_noscat_solve_CUDA!(
             n_cloudy_gpts += cloudy ? 1 : 0
         end
         @inbounds begin
-            compute_net_flux!(flux_lw, gcol)
+            compute_net_flux!(flux_lw, gcol, nlev)
             # write out LW cloud cover
             if cloud_state isa CloudState &&
                !isnothing(cloud_state.cld_cover_lw)

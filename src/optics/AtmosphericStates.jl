@@ -125,9 +125,8 @@ struct CloudState{CD, CF, CC, CM, CMT}
 end
 Adapt.@adapt_structure CloudState
 
-# Backward-compatible constructor: callers that don't allocate cld_cover arrays
-# can use the old 9-argument form and both covers default to `nothing`. Remove
-# this in the next breaking release.
+# Convenience constructor: callers that don't allocate cld_cover arrays
+# can use this 9-argument form where both covers default to `nothing`.
 function CloudState(
     cld_r_eff_liq,
     cld_r_eff_ice,

@@ -414,10 +414,7 @@ function all_sky_with_aerosols(
     @test all(test_flux_up_lw == flux_up_lw ./ metric_scaling)
     @test all(test_flux_dn_lw == flux_dn_lw ./ metric_scaling)
     @test all(test_flux_net_lw == flux_net_lw ./ metric_scaling)
-    @test all(
-        test_flux_dn_dir_sw[1, :] ==
-        flux_dn_dir_sw[1, :] ./ metric_scaling[1, :],
-    )
+    @test all(test_flux_dn_dir_sw == flux_dn_dir_sw ./ metric_scaling)
 
     # Exercise the full update_fluxes! orchestrator and net-flux getters,
     # and check they reproduce the reference all-sky net flux.

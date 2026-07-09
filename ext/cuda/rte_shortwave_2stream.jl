@@ -7,7 +7,6 @@ function rte_sw_2stream_solve!(
     as::GrayAtmosphericState,
 )
     nlay, ncol = AtmosphericStates.get_dims(as)
-    nlev = nlay + 1
     tx, bx = _configure_threadblock(ncol)
     args = (flux_sw, op, bcs_sw, src_sw, nlay, ncol, as)
     @cuda always_inline = true threads = (tx) blocks = (bx) rte_sw_2stream_solve_CUDA!(
@@ -31,9 +30,6 @@ function rte_sw_2stream_solve_CUDA!(
     FT = eltype(bcs_sw.cos_zenith)
     solar_frac = FT(1)
     if gcol ≤ ncol
-        flux_up_sw = flux_sw.flux_up
-        flux_dn_sw = flux_sw.flux_dn
-        flux_net_sw = flux_sw.flux_net
         μ₀ = bcs_sw.cos_zenith[gcol]
         @inbounds begin
             compute_optical_props!(op, as, gcol)
@@ -50,21 +46,10 @@ function rte_sw_2stream_solve_CUDA!(
                 nlev,
                 gcol,
             )
-            for ilev in 1:nlev
-                flux_net_sw[ilev, gcol] =
-                    flux_up_sw[ilev, gcol] - flux_dn_sw[ilev, gcol]
-            end
+            compute_net_flux!(flux_sw, gcol, nlev)
         end
         if μ₀ ≤ 0 # zero out columns with zenith angle ≥ π/2
-            for ilev in 1:nlev
-                flux_up_sw[ilev, gcol] = FT(0)
-            end
-            for ilev in 1:nlev
-                flux_dn_sw[ilev, gcol] = FT(0)
-            end
-            for ilev in 1:nlev
-                flux_net_sw[ilev, gcol] = FT(0)
-            end
+            set_flux_to_zero!(flux_sw, gcol, nlev)
         end
     end
     return nothing
@@ -84,8 +69,6 @@ function rte_sw_2stream_solve!(
     lookup_sw_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
 )
     nlay, ncol = AtmosphericStates.get_dims(as)
-    nlev = nlay + 1
-    n_gpt = length(lookup_sw.solar_src_scaled)
     set_band_flux_to_zero!(band_flux)
     tx, bx = _configure_threadblock(ncol)
     args = (
@@ -154,9 +137,9 @@ function rte_sw_2stream_solve_CUDA!(
                 n_cloudy_gpts += cloudy ? 1 : 0
             end
             if μ₀ ≤ 0 # zero out columns with zenith angle ≥ π/2
-                set_flux_to_zero!(flux_sw, gcol)
+                set_flux_to_zero!(flux_sw, gcol, nlev)
             else
-                compute_net_flux!(flux_sw, gcol)
+                compute_net_flux!(flux_sw, gcol, nlev)
 
             end
             # write out SW cloud cover
