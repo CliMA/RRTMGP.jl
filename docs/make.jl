@@ -36,12 +36,12 @@ makedocs(;
             "Atmospheric State" => "optics/AtmosphericStates.md"
             "Boundary Conditions" => "optics/BCs.md"
             "Fluxes" => "optics/Fluxes.md"
-            "Utilities for gray radiation simulation" => "optics/GrayUtils.md"
+            "Utilities for gray radiation simulation" => "optics/GrayAtmosphere.md"
             "Lookup Tables" => "optics/LookUpTables.md"
             "Optics" => "optics/Optics.md"
             "Solver struct" => "optics/RTE.md"
             "Source Functions" => "optics/Sources.md"
-            "Volume Mixing Ratios" => "optics/Vmrs.md"
+            "Volume Mixing Ratios" => "optics/VolumeMixingRatios.md"
             "RTE Solver" => "rte/RTESolver.md"
         ],
         "References" => "References.md",

@@ -32,12 +32,12 @@ _positive_finite(v) = isfinite(v) & (v > zero(v))
 _nonnegative_finite(v) = isfinite(v) & (v ≥ zero(v))
 
 _check_vmr(::Nothing) = true
-_check_vmr(vmr::Vmrs.VmrGM) = begin
+_check_vmr(vmr::VolumeMixingRatios.VmrGM) = begin
     _check(_nonnegative_finite, vmr.vmr_h2o, :vmr_h2o)
     _check(_nonnegative_finite, vmr.vmr_o3, :vmr_o3)
     _check(_nonnegative_finite, vmr.vmr, :vmr)
 end
-_check_vmr(vmr::Vmrs.Vmr) = _check(_nonnegative_finite, vmr.vmr, :vmr)
+_check_vmr(vmr::VolumeMixingRatios.Vmr) = _check(_nonnegative_finite, vmr.vmr, :vmr)
 
 """
     validate_inputs(s::RRTMGPSolver)

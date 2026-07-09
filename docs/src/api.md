@@ -37,6 +37,9 @@ RRTMGP.optical_thickness_parameter
 
 ```@docs
 RRTMGP.lookup_tables
+RRTMGP.LookupBundle
+RRTMGP.save_lookup_tables
+RRTMGP.load_lookup_tables
 ```
 
 ## Computing fluxes
@@ -97,7 +100,7 @@ RRTMGP.get_p_min
 ```@docs
 RRTMGP.aerosol_radius
 RRTMGP.aerosol_column_mass_density
-RRTMGP.aerosol_idx
+RRTMGP.aerosol_index_map
 RRTMGP.canonical_aerosol_name
 RRTMGP.aerosol_index
 ```
@@ -106,7 +109,7 @@ RRTMGP.aerosol_index
 
 ```@docs
 RRTMGP.volume_mixing_ratio
-Vmrs.VolumeMixingRatioGlobalMean
+VolumeMixingRatios.VolumeMixingRatioGlobalMean
 ```
 
 ## Standalone API

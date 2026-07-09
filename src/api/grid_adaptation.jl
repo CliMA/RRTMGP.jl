@@ -2,14 +2,10 @@
 ##### Grid adaptation: prepare an AtmosphericState for the RTE solvers
 #####
 #
-# TODO: Remove comment after ClimaAtmos update:
-#
-# Optional, separable steps lifted from the ClimaAtmos RRTMGP interface so they
-# live with the radiation code and can be used standalone (without ClimaCore).
+# Optional, separable steps to prepare an atmospheric state for the RTE solvers.
 # Each operates in place on an `AtmosphericState` (or `GrayAtmosphericState`) and
 # dispatches on the state / sub-state type, so it is a no-op where not
-# applicable. The arithmetic is kept identical to the original to preserve
-# bit-for-bit reproducibility of downstream fluxes.
+# applicable.
 
 import ..AtmosphericStates:
     AbstractAtmosphericState,
@@ -21,7 +17,7 @@ import ..AtmosphericStates:
     getview_t_lay,
     getview_rel_hum,
     getview_col_dry
-import ..Vmrs
+import ..VolumeMixingRatios
 import ..Optics
 
 """
@@ -140,12 +136,12 @@ function add_isothermal_boundary_layer!(as::GrayAtmosphericState, p_min)
     return as
 end
 
-function _extend_boundary_vmr!(vmr::Vmrs.VmrGM)
+function _extend_boundary_vmr!(vmr::VolumeMixingRatios.VmrGM)
     @views vmr.vmr_h2o[end, :] .= vmr.vmr_h2o[end - 1, :]
     @views vmr.vmr_o3[end, :] .= vmr.vmr_o3[end - 1, :]
     return nothing
 end
-function _extend_boundary_vmr!(vmr::Vmrs.Vmr)
+function _extend_boundary_vmr!(vmr::VolumeMixingRatios.Vmr)
     @views vmr.vmr[:, end, :] .= vmr.vmr[:, end - 1, :]
     return nothing
 end
@@ -179,8 +175,8 @@ end
 
 # Water-vapor volume mixing ratio, whichever storage is used. `idx_h2o` is only
 # needed for the (per-gas) `Vmr` storage; it is ignored for `VmrGM`.
-_vmr_h2o(vmr::Vmrs.VmrGM, idx_h2o) = vmr.vmr_h2o
-_vmr_h2o(vmr::Vmrs.Vmr, idx_h2o) = view(vmr.vmr, idx_h2o, :, :)
+_vmr_h2o(vmr::VolumeMixingRatios.VmrGM, idx_h2o) = vmr.vmr_h2o
+_vmr_h2o(vmr::VolumeMixingRatios.Vmr, idx_h2o) = view(vmr.vmr, idx_h2o, :, :)
 
 """
     clip!(as, p_min[, idx_h2o]; t_min = nothing, t_max = nothing)

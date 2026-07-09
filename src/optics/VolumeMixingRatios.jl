@@ -1,4 +1,4 @@
-module Vmrs
+module VolumeMixingRatios
 using DocStringExtensions
 using Adapt
 import ..RRTMGPGridParams

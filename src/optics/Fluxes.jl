@@ -12,7 +12,6 @@ export AbstractFlux,
     set_flux_to_zero!,
     set_band_flux_to_zero!,
     accumulate_band_flux!,
-    add_to_flux!,
     apply_metric_scaling!,
     compute_net_flux!
 
@@ -146,15 +145,15 @@ end
 end
 
 """
+    compute_net_flux!(flux::AbstractFlux, gcol, nlev)
     compute_net_flux!(flux::AbstractFlux, gcol)
 
-Computes net flux for column `gcol`
+Computes net flux for column `gcol` across `nlev` levels:
 
 `flux.flux_net` = `flux.flux_up` - `flux.flux_dn`
 """
-@inline function compute_net_flux!(flux::AbstractFlux, gcol)
+@inline function compute_net_flux!(flux::AbstractFlux, gcol, nlev)
     (; flux_up, flux_dn, flux_net) = flux
-    nlev = size(flux_up, 1)
     @inbounds begin
         for ilev in 1:nlev
             flux_net[ilev, gcol] = flux_up[ilev, gcol] - flux_dn[ilev, gcol]
@@ -163,17 +162,21 @@ Computes net flux for column `gcol`
     return nothing
 end
 
+@inline compute_net_flux!(flux::AbstractFlux, gcol) =
+    compute_net_flux!(flux, gcol, size(flux.flux_up, 1))
+
 """
+    set_flux_to_zero!(flux::FluxLW{FT}, gcol::Int, nlev::Int) where {FT<:AbstractFloat}
     set_flux_to_zero!(flux::FluxLW{FT}, gcol::Int) where {FT<:AbstractFloat}
 
-Set longwave flux for column `gcol` to zero
+Set longwave flux for column `gcol` to zero across `nlev` levels.
 """
 @inline function set_flux_to_zero!(
     flux::FluxLW{FT},
     gcol::Int,
+    nlev::Int,
 ) where {FT <: AbstractFloat}
     (; flux_up, flux_dn, flux_net) = flux
-    nlev = size(flux_up, 1)
     @inbounds for ilev in 1:nlev
         flux_up[ilev, gcol] = FT(0)
         flux_dn[ilev, gcol] = FT(0)
@@ -182,18 +185,21 @@ Set longwave flux for column `gcol` to zero
     return nothing
 end
 
+@inline set_flux_to_zero!(flux::FluxLW, gcol::Int) =
+    set_flux_to_zero!(flux, gcol, size(flux.flux_up, 1))
+
 """
+    set_flux_to_zero!(flux::FluxSW{FT}, gcol::Int, nlev::Int) where {FT<:AbstractFloat}
     set_flux_to_zero!(flux::FluxSW{FT}, gcol::Int) where {FT<:AbstractFloat}
 
-Set shortwave flux for column `gcol` to zero
-
+Set shortwave flux for column `gcol` to zero across `nlev` levels.
 """
 @inline function set_flux_to_zero!(
     flux::FluxSW{FT},
     gcol::Int,
+    nlev::Int,
 ) where {FT <: AbstractFloat}
     (; flux_up, flux_dn, flux_net, flux_dn_dir) = flux
-    nlev = size(flux_up, 1)
     @inbounds for ilev in 1:nlev
         flux_up[ilev, gcol] = FT(0)
         flux_dn[ilev, gcol] = FT(0)
@@ -203,24 +209,8 @@ Set shortwave flux for column `gcol` to zero
     return nothing
 end
 
-"""
-    add_to_flux!(flux1::FluxLW, flux2::FluxLW, gcol::Int)
-
-add longwave flux2 to longwave flux1 for column `gcol`
-flux1 .+= flux2
-
-"""
-@inline function add_to_flux!(flux1::FluxLW, flux2::FluxLW, gcol::Int)
-    flux_up1, flux_dn1, flux_net1 = flux1.flux_up, flux1.flux_dn, flux1.flux_net
-    flux_up2, flux_dn2, flux_net2 = flux2.flux_up, flux2.flux_dn, flux2.flux_net
-    nlev = size(flux_up1, 1)
-    @inbounds for ilev in 1:nlev
-        flux_up1[ilev, gcol] += flux_up2[ilev, gcol]
-        flux_dn1[ilev, gcol] += flux_dn2[ilev, gcol]
-        flux_net1[ilev, gcol] += flux_net2[ilev, gcol]
-    end
-    return nothing
-end
+@inline set_flux_to_zero!(flux::FluxSW, gcol::Int) =
+    set_flux_to_zero!(flux, gcol, size(flux.flux_up, 1))
 
 """
     apply_metric_scaling!(flux::Union{FluxLW, FluxSW}, metric_scaling)

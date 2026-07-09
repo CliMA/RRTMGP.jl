@@ -150,6 +150,10 @@ printstyled("\n\nFloat32 consistency tests\n", color = color1)
 printstyled("=================================\n\n", color = color1)
 include("float32_consistency.jl")
 
+printstyled("\n\nLookup-table serialization tests\n", color = color1)
+printstyled("=================================\n\n", color = color1)
+include("lookup_serialization.jl")
+
 printstyled("\n\nOptics utilities tests\n", color = color1)
 printstyled("==============\n\n", color = color1)
 include("optics_utils.jl")

@@ -1,4 +1,4 @@
-module GrayUtils
+module GrayAtmosphere
 
 import ClimaComms
 using ..AtmosphericStates

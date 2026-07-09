@@ -6,7 +6,6 @@ function rte_sw_noscat_solve!(
     as::GrayAtmosphericState,
 )
     nlay, ncol = AtmosphericStates.get_dims(as)
-    nlev = nlay + 1
     tx, bx = _configure_threadblock(ncol)
     args = (flux_sw, op, bcs_sw, nlay, ncol, as)
     @cuda always_inline = true threads = (tx) blocks = (bx) rte_sw_noscat_solve_CUDA!(
@@ -43,8 +42,9 @@ function rte_sw_noscat_solve_CUDA!(
                     gcol,
                     nlev,
                 )
+                compute_net_flux!(flux_sw, gcol, nlev)
             else
-                set_flux_to_zero!(flux_sw, gcol)
+                set_flux_to_zero!(flux_sw, gcol, nlev)
             end
         end
     end
@@ -61,7 +61,6 @@ function rte_sw_noscat_solve!(
     lookup_sw::LookUpSW,
 )
     nlay, ncol = AtmosphericStates.get_dims(as)
-    nlev = nlay + 1
     tx, bx = _configure_threadblock(ncol)
     args = (flux, flux_sw, op, bcs_sw, nlay, ncol, as, lookup_sw)
     @cuda always_inline = true threads = (tx) blocks = (bx) rte_sw_noscat_solve_CUDA!(
@@ -84,47 +83,26 @@ function rte_sw_noscat_solve_CUDA!(
     nlev = nlay + 1
     n_gpt = length(lookup_sw.solar_src_scaled)
     if gcol ≤ ncol
-        flux_up_sw = flux_sw.flux_up
-        flux_dn_sw = flux_sw.flux_dn
-        flux_dn_dir_sw = flux_sw.flux_dn_dir
-        flux_up = flux.flux_up
-        flux_dn = flux.flux_dn
-        flux_dn_dir = flux.flux_dn_dir
-        μ₀ = bcs_sw.cos_zenith[gcol]
+        μ₀ = @inbounds bcs_sw.cos_zenith[gcol]
         @inbounds begin
-            for igpt in 1:n_gpt
-                compute_optical_props!(op, as, gcol, igpt, lookup_sw, nothing)
-                solar_frac = lookup_sw.solar_src_scaled[igpt]
-                if μ₀ > 0
-                    rte_sw_noscat!(
+            if μ₀ > 0
+                for igpt in 1:n_gpt
+                    sw_noscat_gpt_col!(
+                        igpt,
+                        gcol,
                         flux,
+                        flux_sw,
                         op,
                         bcs_sw,
-                        igpt,
+                        as,
+                        lookup_sw,
                         n_gpt,
-                        solar_frac,
-                        gcol,
                         nlev,
                     )
-                    if igpt == 1
-                        for ilev in 1:nlev
-                            flux_up_sw[ilev, gcol] = flux_up[ilev, gcol]
-                            flux_dn_sw[ilev, gcol] = flux_dn[ilev, gcol]
-                        end
-                        flux_dn_dir_sw[1, gcol] = flux_dn_dir[1, gcol]
-                    else
-                        for ilev in 1:nlev
-                            flux_up_sw[ilev, gcol] += flux_up[ilev, gcol]
-                            flux_dn_sw[ilev, gcol] += flux_dn[ilev, gcol]
-                        end
-                        flux_dn_dir_sw[1, gcol] += flux_dn_dir[1, gcol]
-                    end
                 end
-            end
-            if μ₀ <= 0
-                set_flux_to_zero!(flux_sw, gcol)
+                compute_net_flux!(flux_sw, gcol, nlev)
             else
-                compute_net_flux!(flux_sw, gcol)
+                set_flux_to_zero!(flux_sw, gcol, nlev)
             end
         end
     end

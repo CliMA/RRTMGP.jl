@@ -3,6 +3,30 @@ RRTMGP.jl Release Notes
 
 main
 ------
+- **Breaking:** `lookup_tables` now returns a typed [`LookupBundle`] instead of
+  a nested `(; lookups, lu_kwargs)` `NamedTuple`: stable fields
+  (`lookup_lw`, `lookup_sw`, cloud/aerosol tables, the name→index maps, and the
+  band/gas counts), `nothing` where a table is absent. Code that indexed the
+  NamedTuple (e.g. `bundle.lookups.lookup_lw`, `bundle.lu_kwargs.nbnd_lw`) drops
+  one level (`bundle.lookup_lw`, `bundle.nbnd_lw`).
+- New `save_lookup_tables(path, bundle)` / `load_lookup_tables(path, grid_params)`
+  cache the lookup tables on disk (Julia `Serialization`; a same-version cache,
+  not an interchange format), so the spectral methods can run without NCDatasets
+  once a cache has been generated — e.g. for standalone/classroom use.
+- The CPU and CUDA solver drivers now share device-agnostic per-(g-point,
+  column) bodies (`*_gpt_col!` in `src/rte/`), removing the duplicated
+  orchestration where backend asymmetries repeatedly crept in. As part of the
+  unification, the broadband shortwave direct beam `sw_direct_flux_dn` is now
+  accumulated at **every** level: it was previously meaningful only at the
+  surface row (a documented limitation inherited from PR #550), with the rows
+  above holding the first g-point's profile on CPU and uninitialized memory on
+  GPU.
+- **Breaking (with aliases):** renamed two modules for clarity — `Vmrs` →
+  `VolumeMixingRatios` and `GrayUtils` → `GrayAtmosphere`. The old names remain
+  as `const` aliases for one release and will be removed in 0.24.
+- **Breaking:** renamed `aerosol_idx()` → `aerosol_index_map()`, resolving the
+  one-character collision with `aerosol_index(name)` (which returns a single
+  index rather than the whole map).
 - Float32 accuracy overhaul of the RTE kernels: series-switch threshold for the
   longwave no-scattering source at eps^(1/4) (was 100·eps), exact `γ1 − γ2`
   identities in the two-stream `k`, expm1-based thin-layer factors, a consistent

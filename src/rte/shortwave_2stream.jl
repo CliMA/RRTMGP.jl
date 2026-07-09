@@ -29,13 +29,75 @@ function rte_sw_2stream_solve!(
                     nlev,
                     gcol,
                 )
-                compute_net_flux!(flux_sw, gcol)
+                compute_net_flux!(flux_sw, gcol, nlev)
             else # zero out columns with zenith angle ≥ π/2
-                set_flux_to_zero!(flux_sw, gcol)
+                set_flux_to_zero!(flux_sw, gcol, nlev)
             end
         end
     end
     return nothing
+end
+
+# Device-agnostic per-(g-point, column) body, shared by the CPU driver below
+# and the CUDA kernel in ext/cuda. The cloud mask and optical properties are
+# computed for every column (the cloud-cover diagnostic counts night columns
+# too); the solve and flux accumulation run only for day columns — night
+# columns are zeroed once, after the g-point loop. Returns whether this
+# g-point had any cloudy layer.
+@inline function sw_2stream_gpt_col!(
+    igpt,
+    gcol,
+    flux,
+    flux_sw,
+    band_flux,
+    op,
+    bcs_sw,
+    src_sw,
+    as,
+    lookup_sw,
+    lookup_sw_cld,
+    lookup_sw_aero,
+    μ₀,
+    ibnd,
+    n_gpt,
+    nlev,
+)
+    cloudy = _build_cloud_mask!(as.cloud_state, Val(:mask_sw), gcol)
+    compute_optical_props!(
+        op,
+        as,
+        gcol,
+        igpt,
+        lookup_sw,
+        lookup_sw_cld,
+        lookup_sw_aero,
+    )
+    if μ₀ > 0
+        @inbounds solar_frac = lookup_sw.solar_src_scaled[igpt]
+        rte_sw_2stream!(
+            op,
+            src_sw,
+            bcs_sw,
+            flux,
+            solar_frac,
+            igpt,
+            n_gpt,
+            ibnd,
+            nlev,
+            gcol,
+        )
+        _accumulate_fluxes!(flux_sw, flux, gcol, nlev, igpt)
+        # retain this g-point's contribution in its band (no-op when off)
+        accumulate_band_flux!(
+            band_flux,
+            flux.flux_up,
+            flux.flux_dn,
+            gcol,
+            ibnd,
+            nlev,
+        )
+    end
+    return cloudy
 end
 
 function rte_sw_2stream_solve!(
@@ -58,115 +120,53 @@ function rte_sw_2stream_solve!(
     set_band_flux_to_zero!(band_flux)
     @inbounds begin
         (; cloud_state, aerosol_state) = as
-        bld_cld_mask = cloud_state isa CloudState
-        flux_up_sw = flux_sw.flux_up
-        flux_dn_sw = flux_sw.flux_dn
-        flux_dn_dir_sw = flux_sw.flux_dn_dir
-        (; flux_up, flux_dn, flux_dn_dir) = flux
         cos_zenith = bcs_sw.cos_zenith
-        FT = eltype(flux_up)
-        # initialize cloud cover accumulator
-        if bld_cld_mask && !isnothing(cloud_state.cld_cover_sw)
-            cloud_state.cld_cover_sw .= FT(0)
-        end
+        track_cld_cover =
+            cloud_state isa CloudState && !isnothing(cloud_state.cld_cover_sw)
+        FT = eltype(flux_sw.flux_up)
+        track_cld_cover && (cloud_state.cld_cover_sw .= FT(0))
         if aerosol_state isa AerosolState
             ClimaComms.@threaded device for gcol in 1:ncol
-                Optics.compute_aero_mask!(
-                    view(aerosol_state.aero_mask, :, gcol),
-                    view(aerosol_state.aero_mass, :, :, gcol),
-                )
+                _compute_aero_mask!(aerosol_state, gcol)
             end
         end
         for igpt in 1:n_gpt
+            ibnd = lookup_sw.band_data.major_gpt2bnd[igpt]
             ClimaComms.@threaded device for gcol in 1:ncol
-                bld_cld_mask && Optics.build_cloud_mask!(
-                    view(cloud_state.mask_sw, :, gcol),
-                    view(cloud_state.cld_frac, :, gcol),
-                    cloud_state.mask_type,
-                )
-                # accumulate cloud cover: count g-points with any cloudy layer
-                if bld_cld_mask && !isnothing(cloud_state.cld_cover_sw)
-                    cloud_state.cld_cover_sw[gcol] +=
-                        any(view(cloud_state.mask_sw, :, gcol)) ? FT(1) : FT(0)
-                end
-                # compute optical properties
-                compute_optical_props!(
-                    op,
-                    as,
-                    gcol,
+                cloudy = sw_2stream_gpt_col!(
                     igpt,
+                    gcol,
+                    flux,
+                    flux_sw,
+                    band_flux,
+                    op,
+                    bcs_sw,
+                    src_sw,
+                    as,
                     lookup_sw,
                     lookup_sw_cld,
                     lookup_sw_aero,
+                    cos_zenith[gcol],
+                    ibnd,
+                    n_gpt,
+                    nlev,
                 )
-                if cos_zenith[gcol] > 0
-                    solar_frac = lookup_sw.solar_src_scaled[igpt]
-                    ibnd = lookup_sw.band_data.major_gpt2bnd[igpt]
-                    # call rte shortwave solver
-                    rte_sw_2stream!(
-                        op,
-                        src_sw,
-                        bcs_sw,
-                        flux,
-                        solar_frac,
-                        igpt,
-                        n_gpt,
-                        ibnd,
-                        nlev,
-                        gcol,
-                    )
-                    if igpt == 1
-                        map!(
-                            x -> x,
-                            view(flux_up_sw, :, gcol),
-                            view(flux_up, :, gcol),
-                        )
-                        map!(
-                            x -> x,
-                            view(flux_dn_sw, :, gcol),
-                            view(flux_dn, :, gcol),
-                        )
-                        map!(
-                            x -> x,
-                            view(flux_dn_dir_sw, :, gcol),
-                            view(flux_dn_dir, :, gcol),
-                        )
-                    else
-                        for ilev in 1:nlev
-                            @inbounds flux_up_sw[ilev, gcol] +=
-                                flux_up[ilev, gcol]
-                            @inbounds flux_dn_sw[ilev, gcol] +=
-                                flux_dn[ilev, gcol]
-                        end
-                        @inbounds flux_dn_dir_sw[1, gcol] +=
-                            flux_dn_dir[1, gcol]
-                    end
-                    # retain this g-point's contribution in its band (no-op when off)
-                    accumulate_band_flux!(
-                        band_flux,
-                        flux_up,
-                        flux_dn,
-                        gcol,
-                        ibnd,
-                        nlev,
-                    )
-                else # zero out columns with zenith angle ≥ π/2
-                    set_flux_to_zero!(flux_sw, gcol)
-                end
+                track_cld_cover &&
+                    (cloud_state.cld_cover_sw[gcol] += FT(cloudy))
             end
         end
 
         # normalize cloud cover by number of g-points
-        if bld_cld_mask && !isnothing(cloud_state.cld_cover_sw)
+        if track_cld_cover
             ClimaComms.@threaded device for gcol in 1:ncol
                 cloud_state.cld_cover_sw[gcol] /= n_gpt
             end
         end
         ClimaComms.@threaded device for gcol in 1:ncol
             if cos_zenith[gcol] > 0
-                compute_net_flux!(flux_sw, gcol)
+                compute_net_flux!(flux_sw, gcol, nlev)
             else # zero out columns with zenith angle ≥ π/2
-                set_flux_to_zero!(flux_sw, gcol)
+                set_flux_to_zero!(flux_sw, gcol, nlev)
             end
         end
     end
@@ -205,7 +205,7 @@ doi:10.1175/1520-0469(1980)037<0630:TSATRT>2.0.CO;2
     om1 = -expm1(-τ * k)
     one_minus_e2kt = om1 * (FT(1) + exp_minusktau)
 
-    # Refactored to avoid rounding errors when k, gamma1 are of very different magnitudes
+    # Formulated to avoid rounding errors when k, gamma1 are of very different magnitudes
     RT_term = FT(1) / (k * (FT(1) + exp_minus2ktau) + γ1 * one_minus_e2kt)
 
     Rdif = RT_term * γ2 * one_minus_e2kt       # Eqn. 25
@@ -218,10 +218,8 @@ doi:10.1175/1520-0469(1980)037<0630:TSATRT>2.0.CO;2
     k_μ = k * μ₀
     k_μ2 = k_μ * k_μ
     # Equations 14-15 have a removable singularity at k·μ₀ = 1. Nudge k·μ₀
-    # off resonance so numerator and denominator stay mutually consistent
-    # (the old guard divided by a bare eps(FT), which amplified the O(eps)
-    # numerator noise at resonance to O(1) and discarded the denominator's
-    # sign). See Numerics.resonance_window for the sqrt(eps) choice.
+    # off resonance so numerator and denominator stay mutually consistent.
+    # See Numerics.resonance_window for the sqrt(eps) choice.
     if abs(FT(1) - k_μ2) < Numerics.resonance_window(FT)
         k_μ2 = FT(1) - Numerics.resonance_window(FT)
         k_μ = sqrt(k_μ2)
@@ -306,10 +304,7 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
         μ₀ = bcs_sw.cos_zenith[gcol]
     end
     # Direct-beam profile, computed top-down with an addition-built
-    # cumulative optical depth and stored for the two passes below. (The
-    # previous scheme summed τ once, then recovered per-level values by
-    # repeated subtraction — accumulating ~nlay·eps·τ_sum error exactly
-    # where τ_cum → 0, near TOA — and re-exponentiated in both passes.)
+    # cumulative optical depth and stored for the two passes below.
     flux_dn_dir_top = toa_flux * solar_frac * μ₀
     inv_μ₀ = FT(1) / max(μ₀, Numerics.μ₀_min(FT))
     @inbounds flux_dn_dir[nlev, gcol] = flux_dn_dir_top

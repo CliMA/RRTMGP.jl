@@ -4,7 +4,6 @@ import ClimaComms
 import RRTMGP.Parameters as RP
 import RRTMGP.AngularDiscretizations.AngularDiscretization
 import RRTMGP.Fluxes: FluxLW, FluxSW
-import RRTMGP.Fluxes: add_to_flux!
 import RRTMGP.Fluxes: compute_net_flux!, set_flux_to_zero!
 import RRTMGP.Fluxes: set_band_flux_to_zero!, accumulate_band_flux!
 import RRTMGP.Sources: SourceLWNoScat
@@ -25,10 +24,10 @@ import RRTMGP.AtmosphericStates: AtmosphericState
 import RRTMGP.AtmosphericStates: CloudState
 import RRTMGP.AtmosphericStates: AerosolState
 import RRTMGP.AtmosphericStates
-import RRTMGP.GrayUtils: update_profile_lw!
-import RRTMGP.GrayUtils: compute_gray_heating_rate!
-import RRTMGP.GrayUtils: compute_gray_heating_rate_kernel!
-import RRTMGP.GrayUtils: update_profile_lw_kernel!
+import RRTMGP.GrayAtmosphere: update_profile_lw!
+import RRTMGP.GrayAtmosphere: compute_gray_heating_rate!
+import RRTMGP.GrayAtmosphere: compute_gray_heating_rate_kernel!
+import RRTMGP.GrayAtmosphere: update_profile_lw_kernel!
 import RRTMGP.LookUpTables: LookUpLW, LookUpCld, LookUpSW, LookUpAerosolMerra
 import RRTMGP.RTESolver: rte_lw_noscat_solve!
 import RRTMGP.RTESolver: rte_lw_noscat_one_angle!
@@ -38,6 +37,10 @@ import RRTMGP.RTESolver: rte_sw_2stream_solve!
 import RRTMGP.RTESolver: rte_sw_2stream!
 import RRTMGP.RTESolver: rte_sw_noscat!
 import RRTMGP.RTESolver: rte_sw_noscat_solve!
+# device-agnostic per-(g-point, column) bodies shared with the CPU drivers
+import RRTMGP.RTESolver: lw_noscat_gpt_col!, lw_2stream_gpt_col!
+import RRTMGP.RTESolver: sw_noscat_gpt_col!, sw_2stream_gpt_col!
+import RRTMGP.RTESolver: _compute_aero_mask!
 import CUDA: threadIdx, blockIdx, blockDim, @cuda
 
 _max_threads_cuda() = 256
@@ -54,9 +57,9 @@ _configure_threadblock(nitems) =
 include(joinpath("cuda", "gray_atmospheric_states.jl"))
 include(joinpath("cuda", "rte_longwave_2stream.jl"))
 include(joinpath("cuda", "optics.jl"))
-include(joinpath("cuda", "rte_shortwave_1scalar.jl"))
-include(joinpath("cuda", "optics_gray_utils.jl"))
+include(joinpath("cuda", "rte_shortwave_noscat.jl"))
+include(joinpath("cuda", "gray_atmosphere.jl"))
 include(joinpath("cuda", "rte_shortwave_2stream.jl"))
-include(joinpath("cuda", "rte_longwave_1scalar.jl"))
+include(joinpath("cuda", "rte_longwave_noscat.jl"))
 
 end

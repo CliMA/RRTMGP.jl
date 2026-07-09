@@ -1,7 +1,7 @@
 # Volume Mixing Ratios
 
 ```@meta
-CurrentModule = RRTMGP.Vmrs
+CurrentModule = RRTMGP.VolumeMixingRatios
 ```
 
 ```@docs

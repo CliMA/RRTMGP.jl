@@ -14,7 +14,7 @@ import ClimaComms
 
 using RRTMGP
 using RRTMGP: RRTMGPGridParams, RRTMGPSolver
-using RRTMGP.Vmrs
+using RRTMGP.VolumeMixingRatios
 using RRTMGP.LookUpTables
 using RRTMGP.AtmosphericStates
 using RRTMGP.Optics
@@ -41,9 +41,7 @@ Test that the solver handles edge cases for cos_zenith gracefully:
 
 The solver should not produce NaN or Inf values in any of these cases.
 
-Note: flux_dn_dir only stores the direct beam flux at the surface (level 1).
-Levels 2-nlev are not computed and may contain uninitialized values - this is 
-expected behavior, not a bug (testing only level 1 for flux_dn_dir).
+Note: flux_dn_dir stores the direct beam flux at all levels.
 =#
 function test_cos_zenith_edge_cases(
     context,
@@ -202,9 +200,7 @@ function test_cos_zenith_edge_cases(
     @test all(isfinite, flux_up_sw)
     @test all(isfinite, flux_dn_sw)
     @test all(isfinite, flux_net_sw)
-    # Note: flux_dn_dir only has valid data at level 1 (surface) 
-    # Levels 2-nlev may contain uninitialized values
-    @test all(isfinite, flux_dn_dir_sw[1, :])
+    @test all(isfinite, flux_dn_dir_sw)
 
     # Test 2: No NaN/Inf in longwave fluxes
     @test all(isfinite, flux_up_lw)
@@ -214,7 +210,7 @@ function test_cos_zenith_edge_cases(
     # Test 3: Column with normal cos_zenith (0.5) should have positive fluxes
     @test all(flux_up_sw[:, 1] .> FT(0))
     @test all(flux_dn_sw[:, 1] .> FT(0))
-    @test flux_dn_dir_sw[1, 1] > FT(0)
+    @test all(flux_dn_dir_sw[:, 1] .> FT(0))
 
     # Test 4: Columns with cos_zenith ≤ 0 should have zero shortwave fluxes
     # (columns 2 and 4: cos_zenith = 0 and cos_zenith = -0.5)
@@ -227,7 +223,7 @@ function test_cos_zenith_edge_cases(
     # The flux should be very small but finite
     @test all(isfinite.(flux_up_sw[:, 3]))
     @test all(isfinite.(flux_dn_sw[:, 3]))
-    @test isfinite(flux_dn_dir_sw[1, 3])
+    @test all(isfinite.(flux_dn_dir_sw[:, 3]))
 
     # Test 6: Aerosol optical depth should be non-negative and physically consistent
     # Check no NaN or Inf in aerosol optical depths

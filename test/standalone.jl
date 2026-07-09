@@ -32,6 +32,12 @@ Adapt.adapt_storage(::CopyToArray, x::AbstractArray) = copy(x)
     end
 end
 
+# Renamed-module compat aliases (deprecated names, kept for one release).
+@testset "renamed-module aliases" begin
+    @test RRTMGP.Vmrs === RRTMGP.VolumeMixingRatios
+    @test RRTMGP.GrayUtils === RRTMGP.GrayAtmosphere
+end
+
 @testset "default_parameters" begin
     p = RRTMGP.default_parameters(Float64)
     @test RRTMGP.Parameters.grav(p) == 9.81

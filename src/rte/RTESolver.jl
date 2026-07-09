@@ -5,7 +5,7 @@ using Adapt
 
 import ..Numerics
 using ..AngularDiscretizations
-using ..Vmrs
+using ..VolumeMixingRatios
 using ..AtmosphericStates
 using ..Fluxes
 using ..BCs
@@ -16,10 +16,11 @@ using ..LookUpTables
 
 export solve_lw!, solve_sw!
 
-include("longwave1scalar.jl")
-include("longwave2stream.jl")
-include("shortwave1scalar.jl")
-include("shortwave2stream.jl")
+include("driver_utils.jl")
+include("longwave_noscat.jl")
+include("longwave_2stream.jl")
+include("shortwave_noscat.jl")
+include("shortwave_2stream.jl")
 
 
 """

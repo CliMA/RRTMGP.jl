@@ -119,7 +119,7 @@ vertical/layer getters are domain-masked views into solver-owned buffers.
 |---|---|
 | `lw_flux_up`, `lw_flux_dn`, `lw_flux_net` | longwave up / down / net |
 | `sw_flux_up`, `sw_flux_dn`, `sw_flux_net` | shortwave up / down / net |
-| `sw_direct_flux_dn` | shortwave direct-beam downward — for spectral (non-gray) two-stream radiation only the surface row `[1, :]` is accumulated; rows above are not updated |
+| `sw_direct_flux_dn` | shortwave direct-beam downward |
 | `net_flux` | combined longwave + shortwave net flux |
 | [`heating_rate`](@ref RRTMGP.heating_rate) | radiative heating rate [K/s], `(nlay, ncol)` — computed on demand (allocates; not a view) |
 

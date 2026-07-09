@@ -10,15 +10,12 @@
 # and the allocating `spectral_*_flux_net`) is documented in `docs/src/getters.md`.
 
 import ..AtmosphericStates: getview_p_lay, getview_t_lay, getview_rel_hum
-import ..Vmrs
+import ..VolumeMixingRatios
 
 #! format: off
 
 _maybe_transpose(x) = transpose(x)
 _maybe_transpose(x::Nothing) = x
-
-# TODO: this is not user-facing yet in that `lookup_tables` still returns a
-# NamedTuple, and we should probably make a dedicated struct for this.
 
 # internal API methods
 _lookup_tables(s::RRTMGPSolver) = s.lookups
@@ -70,8 +67,6 @@ surface_emissivity(s::RRTMGPSolver)                   = s.lws.bcs.sfc_emis
 sw_flux_up(s::RRTMGPSolver)                           = _domain_view(s, s.sws.flux.flux_up)
 sw_flux_dn(s::RRTMGPSolver)                           = _domain_view(s, s.sws.flux.flux_dn)
 sw_flux_net(s::RRTMGPSolver)                          = _domain_view(s, s.sws.flux.flux_net)
-# NOTE: for spectral (non-gray) two-stream shortwave, the solvers accumulate the direct
-# beam only at the surface row `[1, :]` (see PR #550); rows above are not updated.
 sw_direct_flux_dn(s::RRTMGPSolver)                    = _domain_view(s, s.sws.flux.flux_dn_dir)
 clear_sw_flux_up(s::RRTMGPSolver)                     = _domain_view(s, _require_clear_sky(s.clear_flux_sw).flux_up)
 clear_sw_flux_dn(s::RRTMGPSolver)                     = _domain_view(s, _require_clear_sky(s.clear_flux_sw).flux_dn)
@@ -113,10 +108,10 @@ Return the radiation method the solver was constructed with: `GrayRadiation`,
 radiation_method(s::RRTMGPSolver) = _radiation_method(s)
 
 # Gray radiation carries no spectral lookup tables; raise an informative error for
-# getters that need them (band bounds, gas indices) instead of a NamedTuple field error.
+# getters that need them (band bounds, gas indices).
 function _require_spectral_lookups(s::RRTMGPSolver)
-    lookups = _lookup_tables(s).lookups
-    hasproperty(lookups, :lookup_lw) || error(
+    lookups = _lookup_tables(s)
+    isnothing(lookups.lookup_lw) && error(
         "spectral lookup tables are not present on this solver (gray radiation); \
          construct it with a spectral radiation method (e.g. `ClearSkyRadiation`).",
     )
@@ -125,8 +120,8 @@ end
 
 # The aerosol index map exists only when the solver was built with aerosol optics.
 function _require_aerosol_lookups(s::RRTMGPSolver)
-    lookups = _lookup_tables(s).lookups
-    hasproperty(lookups, :idx_aerosol_sw) || error(
+    lookups = _lookup_tables(s)
+    isnothing(lookups.idx_aerosol_sw) && error(
         "aerosol lookup tables are not present on this solver; construct it with a \
          radiation method with `aerosol_radiation = true`.",
     )
@@ -306,12 +301,12 @@ volume_mixing_ratio(s::RRTMGPSolver, name::AbstractString) =
 
 function _volume_mixing_ratio(
     s::RRTMGPSolver,
-    vmr::Vmrs.VmrGM,
+    vmr::VolumeMixingRatios.VmrGM,
     name::AbstractString,
 )
     name == "h2o" && return _domain_view(s, vmr.vmr_h2o)
     name == "o3" && return _domain_view(s, vmr.vmr_o3)
-    idx = _lookup_tables(s).lookups.idx_gases_sw[name]
+    idx = _lookup_tables(s).idx_gases_sw[name]
     # The water-vapor continuum pseudo-gases ("h2o_self"/"h2o_frgn") share the h2o
     # slot: the loader maps them to `idx_h2o` and `get_vmr` maps index 1 to `vmr_h2o`,
     # so return the h2o field rather than the (unused) well-mixed slot 1.
@@ -320,5 +315,5 @@ function _volume_mixing_ratio(
     # view would scalar-index the GPU when read.)
     return only(Array(view(vmr.vmr, idx:idx)))
 end
-_volume_mixing_ratio(s::RRTMGPSolver, vmr::Vmrs.Vmr, name::AbstractString) =
-    _domain_view(s, view(vmr.vmr, _lookup_tables(s).lookups.idx_gases_sw[name], :, :))
+_volume_mixing_ratio(s::RRTMGPSolver, vmr::VolumeMixingRatios.Vmr, name::AbstractString) =
+    _domain_view(s, view(vmr.vmr, _lookup_tables(s).idx_gases_sw[name], :, :))

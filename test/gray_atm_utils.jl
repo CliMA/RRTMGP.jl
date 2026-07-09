@@ -11,7 +11,7 @@ using RRTMGP.Fluxes
 using RRTMGP.RTE
 using RRTMGP.RTESolver
 using RRTMGP.Optics
-using RRTMGP.GrayUtils
+using RRTMGP.GrayAtmosphere
 using RRTMGP.AtmosphericStates
 using RRTMGP.Sources
 using RRTMGP.BCs
