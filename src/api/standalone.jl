@@ -86,7 +86,7 @@ function heating_rate(s::RRTMGPSolver)
     device = ClimaComms.device(s.grid_params)
     (; ncol) = s.grid_params
     FT = eltype(s.grid_params)
-    # `net_flux`/`face_pressure` are domain views, so use the domain layer count.
+    # `net_flux`/`level_pressure` are domain views, so use the domain layer count.
     nlay = s.grid_params.nlay - Int(s.grid_params.isothermal_boundary_layer)
     hr = similar(net_flux(s), nlay, ncol)
     GrayAtmosphere.compute_gray_heating_rate!(

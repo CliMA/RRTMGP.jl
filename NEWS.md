@@ -92,12 +92,12 @@ main
   functions over plain `(nlay, ncol)` array views: `interpolate_levels!`,
   `add_isothermal_boundary_layer!`, `clip!`, and `update_concentrations!`.
 - `clip!` now also clamps the spectral solvers' layer/level temperatures into the
-  valid range of the optics lookup tables (new `RRTMGPParameters` fields
-  `optics_lookup_temperature_min`/`max`, read from ClimaParams; 160–355 K), moving
-  the clamp that ClimaAtmos applied before every radiation call into RRTMGP's own
-  input preparation. The gray path is deliberately not clamped: it uses no lookup
-  tables, and idealized gray atmospheres can legitimately reach temperatures
-  outside the lookup range.
+  valid range of the optics lookup tables — the tables' first and last reference
+  temperatures (`lookup.t_ref_min`/`t_ref_max`, 160–355 K for the standard tables),
+  read straight from the lookup table — moving the clamp that ClimaAtmos applied
+  before every radiation call into RRTMGP's own input preparation. The gray path is
+  deliberately not clamped: it uses no lookup tables, and idealized gray atmospheres
+  can legitimately reach temperatures outside the lookup range.
 - Added standalone entry points that need no NetCDF lookup tables — `solve_gray`,
   `default_parameters`, and `heating_rate` (in K/s) — for single-column/classroom use.
 - Added optional spectrally-resolved (per-band) fluxes: construct with `spectral_fluxes = true`,

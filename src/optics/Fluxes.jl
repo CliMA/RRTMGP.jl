@@ -91,14 +91,15 @@ end
 """
     FluxBand{FT, FTA3D}
 
-Optional per-band upward and downward radiative fluxes at each level,
+Optional per-band upward, downward, and net radiative fluxes at each level,
 `(nlev, ncol, n_bnd)`. Only allocated when spectrally-resolved fluxes are requested.
 Band `b`'s slice `[:, :, b]` has the same `(nlev, ncol)` layout as the broadband
-fluxes, and summing over the band dimension recovers the broadband up/down fluxes.
+fluxes, and summing over the band dimension recovers the broadband fluxes.
 
 # Fields
 - `flux_up`: upward flux per band [W/m²], `(nlev, ncol, n_bnd)`.
 - `flux_dn`: downward flux per band [W/m²], `(nlev, ncol, n_bnd)`.
+- `flux_net`: net flux per band (`flux_up - flux_dn`) [W/m²], `(nlev, ncol, n_bnd)`.
 """
 struct FluxBand{FT <: AbstractFloat, FTA3D <: AbstractArray{FT, 3}}
     flux_up::FTA3D

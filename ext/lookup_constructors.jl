@@ -335,6 +335,10 @@ function LookUpLW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     t_ref = Array{FT, 1}(Array(ds["temp_ref"]))
 
     p_ref_min = minimum(p_ref)
+    # First/last reference temperatures bound the table's valid interpolation
+    # range. Capture them here as CPU scalars (like `p_ref_min`) so callers can
+    # read the temperature bounds without indexing the device-resident `t_ref`.
+    t_ref_min, t_ref_max = extrema(t_ref)
 
     Δ_t_ref = t_ref[2] - t_ref[1]
     Δ_ln_p_ref = log(p_ref[1]) - log(p_ref[2])
@@ -385,6 +389,8 @@ function LookUpLW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
             idx_h2o,
             p_ref_tropo,
             p_ref_min,
+            t_ref_min,
+            t_ref_max,
             key_species,
             kmajor,
             planck,
@@ -630,6 +636,10 @@ function LookUpSW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     t_ref = Array{FT, 1}(Array(ds["temp_ref"]))
 
     p_ref_min = minimum(p_ref)
+    # First/last reference temperatures bound the table's valid interpolation
+    # range. Capture them here as CPU scalars (like `p_ref_min`) so callers can
+    # read the temperature bounds without indexing the device-resident `t_ref`.
+    t_ref_min, t_ref_max = extrema(t_ref)
 
     Δ_t_ref = t_ref[2] - t_ref[1]
     Δ_ln_p_ref = log(p_ref[1]) - log(p_ref[2])
@@ -697,6 +707,8 @@ function LookUpSW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
             idx_h2o,
             p_ref_tropo,
             p_ref_min,
+            t_ref_min,
+            t_ref_max,
             solar_src_tot,
             key_species,
             kmajor,

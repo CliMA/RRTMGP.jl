@@ -11,10 +11,6 @@ Base.@kwdef struct RRTMGPParameters{FT} <: ARP
     kappa_d::FT
     Stefan::FT
     avogad::FT
-    # valid temperature range of the optics lookup tables [K]; `clip!` clamps
-    # the spectral solvers' temperature inputs to it
-    optics_lookup_temperature_min::FT = 160
-    optics_lookup_temperature_max::FT = 355
 end
 
 # Method wrappers

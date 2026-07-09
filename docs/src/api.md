@@ -94,6 +94,7 @@ RRTMGP.add_isothermal_boundary_layer!
 RRTMGP.clip!
 RRTMGP.update_concentrations!
 RRTMGP.get_p_min
+RRTMGP.get_t_min
 ```
 
 ## Aerosol properties

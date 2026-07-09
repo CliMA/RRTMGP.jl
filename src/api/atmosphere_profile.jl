@@ -36,7 +36,7 @@ end
 
 # Idealized per-kind parameters: surface temperature [K], tropopause height
 # [m], tropospheric lapse rate [K/m], stratospheric inverse lapse rate [K/m],
-# surface and stratospheric-floor water-vapor vmr, default latitude [degrees].
+# surface water-vapor vmr, default latitude [degrees].
 # The values are idealized climatological choices (inspired by the AFGL
 # reference-atmosphere climatology, but analytic rather than tabulated).
 const _STANDARD_ATMOSPHERES = Dict(
@@ -73,9 +73,10 @@ function _standard_T(z, prm)
     return (prm.t_sfc - prm.Γ_trop * prm.z_trop) + prm.Γ_strat * (z - prm.z_trop)
 end
 
-# Hydrostatic pressure for the two-segment profile (exact closed forms for a
-# constant-lapse-rate ideal-gas atmosphere: p ∝ T^(g/(R_d·Γ)), decreasing
-# along −Γ and increasing along +Γ).
+# Hydrostatic pressure for the two-segment profile (exact closed form for a
+# constant-lapse-rate ideal-gas atmosphere, p ∝ T^(±g/(R_d·Γ)); the exponent is
+# positive in the cooling troposphere and negative in the warming stratosphere,
+# so pressure decreases monotonically with height in both segments).
 function _standard_p(z, prm, p_sfc, grav, R_d)
     T_trop = prm.t_sfc - prm.Γ_trop * prm.z_trop
     if z ≤ prm.z_trop

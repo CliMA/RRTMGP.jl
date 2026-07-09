@@ -29,6 +29,21 @@ radiation, and the longwave lookup table's reference minimum pressure otherwise.
 get_p_min(as::GrayAtmosphericState, lookup_lw) = zero(eltype(as.p_lay))
 get_p_min(as::AtmosphericState, lookup_lw) = lookup_lw.p_ref_min
 
+"""
+    get_t_min(as, lookup_lw)
+    get_t_max(as, lookup_lw)
+
+Return the temperature bounds of the radiation scheme's valid interpolation
+range: the longwave lookup table's first/last reference temperatures for
+non-gray radiation, and `nothing` for gray radiation (which has no temperature
+lookup and whose temperatures are left unclipped). Passing `nothing` to
+[`clip!`](@ref) makes temperature clipping a no-op.
+"""
+get_t_min(as::GrayAtmosphericState, lookup_lw) = nothing
+get_t_min(as::AtmosphericState, lookup_lw) = lookup_lw.t_ref_min
+get_t_max(as::GrayAtmosphericState, lookup_lw) = nothing
+get_t_max(as::AtmosphericState, lookup_lw) = lookup_lw.t_ref_max
+
 #####
 ##### Level <-> layer interpolation
 #####

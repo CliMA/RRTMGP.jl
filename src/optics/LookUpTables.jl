@@ -114,6 +114,10 @@ struct LookUpLW{FT, IA3D, FTA4D, BND, P, R, LMNR} <: AbstractLookUp
     p_ref_tropo::FT
     "minimum pressure supported by RRTMGP lookup tables"
     p_ref_min::FT
+    "minimum temperature supported by RRTMGP lookup tables (first reference temperature)"
+    t_ref_min::FT
+    "maximum temperature supported by RRTMGP lookup tables (last reference temperature)"
+    t_ref_max::FT
     "major absorbing species in each band `(2, n_atmos_layers, n_bnd)`"
     key_species::IA3D
     "major absorption coefficient `(n_η, n_p_ref + 1, n_t_ref, n_gpt)`"
@@ -161,6 +165,10 @@ struct LookUpSW{FT, IA3D, FTA1D, FTA3D, FTA4D, BND, R, LMNR} <: AbstractLookUp
     p_ref_tropo::FT
     "minimum pressure supported by RRTMGP lookup tables"
     p_ref_min::FT
+    "minimum temperature supported by RRTMGP lookup tables (first reference temperature)"
+    t_ref_min::FT
+    "maximum temperature supported by RRTMGP lookup tables (last reference temperature)"
+    t_ref_max::FT
     "total solar irradiation"
     solar_src_tot::FT
     "major absorbing species in each band `(2, n_atmos_layers, n_bnd)`"

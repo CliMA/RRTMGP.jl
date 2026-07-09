@@ -24,7 +24,7 @@ and ``μ₀`` (cosine of the solar zenith angle).
 | `VolumeMixingRatios.Vmr` / `VmrGM` | `mo_gas_concentrations`: `ty_gas_concs` (`set_vmr!`) | — |
 | `Optics.OneScalar` (``τ`` only) | `mo_optical_props`: `ty_optical_props_1scl` | — |
 | `Optics.TwoStream` (``τ``, ``ω₀``, ``g``) | `mo_optical_props`: `ty_optical_props_2str` | — |
-| `SourceLWNoScat`, `SourceLW2Str` (`lay_source`, `lev_source`, `sfc_source` — same field names) | `mo_source_functions`: `ty_source_func_lw` (older Fortran versions split `lev_source` into `lev_source_inc`/`dec`) | Planck source ``B`` |
+| `SourceLWNoScat` (`lay_source`, `lev_source`, `sfc_source`), `SourceLW2Str` (`lev_source`, `sfc_source`) | `mo_source_functions`: `ty_source_func_lw` (older Fortran versions split `lev_source` into `lev_source_inc`/`dec`) | Planck source ``B`` |
 | `SourceSW2Str` | internal arrays of `sw_solver_2stream` | — |
 | `FluxLW`, `FluxSW` (`flux_up`, `flux_dn`, `flux_net`, `flux_dn_dir` — same field names) | `mo_fluxes`: `ty_fluxes_broadband` | ``F^↑``, ``F^↓`` |
 | `Fluxes.FluxBand` (`spectral_fluxes = true`) | `extensions/mo_fluxes_byband`: `ty_fluxes_byband` | — |

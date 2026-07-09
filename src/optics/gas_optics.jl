@@ -176,20 +176,10 @@ Compute interpolation fraction for binary species parameter.
     return ((jη1, jη2, fη1, fη2), (col_mix1, col_mix2))
 end
 
-"""
-    compute_gas_optics(
-        lkp::Union{LookUpLW, LookUpSW},
-        vmr,
-        col_dry,
-        igpt,
-        ibnd,
-        p_lay,
-        t_lay,
-        glay, gcol,
-    ) where {FT<:AbstractFloat}
-
-Compute optical thickness, single scattering albedo, and asymmetry parameter.
-"""
+# Internal helper shared by the longwave and shortwave `compute_gas_optics`
+# methods: computes the major/minor optical thickness contributions and the
+# interpolation fractions, returning the intermediate quantities the callers
+# need to finish the band-specific (Planck / Rayleigh) work.
 @inline function compute_gas_optics_core(
     lkp,
     vmr,
@@ -247,6 +237,20 @@ Compute optical thickness, single scattering albedo, and asymmetry parameter.
     return (τ_major, τ_minor, tropo, vmr_h2o, jftemp, jfη, jfpress)
 end
 
+"""
+    compute_gas_optics(
+        lkp::Union{LookUpLW, LookUpSW},
+        vmr,
+        col_dry,
+        igpt,
+        ibnd,
+        p_lay,
+        t_lay,
+        glay, gcol,
+    ) where {FT<:AbstractFloat}
+
+Compute optical thickness, single scattering albedo, and asymmetry parameter.
+"""
 @inline function compute_gas_optics(
     lkp::LookUpLW,
     vmr,

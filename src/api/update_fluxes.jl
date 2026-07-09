@@ -222,7 +222,8 @@ level pressures/temperatures from layer values (per the solver's
 `interpolation`/`bottom_extrapolation` configuration; a no-op for
 `NoInterpolation`), fill the isothermal boundary layer (when configured), clip
 unphysical inputs (pressures below the lookup tables' minimum, negative water
-vapor), and compute the dry-air column amounts. Mutates the solver's
+vapor, and — for non-gray optics — temperatures outside the lookup tables'
+range), and compute the dry-air column amounts. Mutates the solver's
 atmospheric state in place and returns `nothing`.
 
 [`update_fluxes!`](@ref) calls this before solving; call it directly to inspect
@@ -233,7 +234,8 @@ drivers. Relative humidity is *not* recomputed here (a host responsibility; see
 """
 function prepare_atmosphere!(s::RRTMGPSolver)
     as = _atmospheric_state(s)
-    p_min = get_p_min(as, _lw_lookup(s))
+    lookup_lw = _lw_lookup(s)
+    p_min = get_p_min(as, lookup_lw)
     interpolate_levels!(
         as,
         s.interpolation,
@@ -249,8 +251,8 @@ function prepare_atmosphere!(s::RRTMGPSolver)
         as,
         p_min,
         _idx_h2o(s);
-        t_min = RP.optics_lookup_temperature_min(s.params),
-        t_max = RP.optics_lookup_temperature_max(s.params),
+        t_min = get_t_min(as, lookup_lw),
+        t_max = get_t_max(as, lookup_lw),
     )
     update_concentrations!(
         as,
