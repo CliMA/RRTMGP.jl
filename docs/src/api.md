@@ -46,6 +46,7 @@ RRTMGP.load_lookup_tables
 
 ```@docs
 RRTMGP.update_fluxes!
+RRTMGP.prepare_atmosphere!
 RRTMGP.update_sw_fluxes!
 RRTMGP.update_lw_fluxes!
 RRTMGP.update_net_fluxes!
@@ -93,6 +94,7 @@ RRTMGP.add_isothermal_boundary_layer!
 RRTMGP.clip!
 RRTMGP.update_concentrations!
 RRTMGP.get_p_min
+RRTMGP.get_t_min
 ```
 
 ## Aerosol properties
@@ -116,6 +118,10 @@ VolumeMixingRatios.VolumeMixingRatioGlobalMean
 
 ```@docs
 RRTMGP.default_parameters
+RRTMGP.AtmosphereProfile
+RRTMGP.standard_atmosphere
+RRTMGP.solve
+RRTMGP.RadiationOutput
 RRTMGP.solve_gray
 RRTMGP.heating_rate
 ```

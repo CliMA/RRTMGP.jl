@@ -70,6 +70,8 @@ function lookup_tables(
     @assert RRTMGP.LookUpTables.get_n_gases(lookup_lw) ==
             RRTMGP.LookUpTables.get_n_gases(lookup_sw)
     @assert lookup_lw.p_ref_min == lookup_sw.p_ref_min
+    @assert lookup_lw.t_ref_min == lookup_sw.t_ref_min
+    @assert lookup_lw.t_ref_max == lookup_sw.t_ref_max
     return LookupBundle(;
         lookup_lw,
         lookup_sw,

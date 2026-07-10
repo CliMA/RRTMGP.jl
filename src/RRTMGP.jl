@@ -52,6 +52,7 @@ include(joinpath("api", "getters.jl"))
 include(joinpath("api", "validation.jl"))
 
 # ── Layer 3: standalone front door
+include(joinpath("api", "atmosphere_profile.jl"))
 include(joinpath("api", "standalone.jl"))
 
 end # module

@@ -136,7 +136,6 @@ _require_band_flux(band::Fluxes.FluxBand) = band
 _solver_band_flux(ws) =
     hasproperty(ws, :band_flux) ? _require_band_flux(ws.band_flux) :
     error("spectral fluxes require a two-stream, non-gray solver.")
-_band_net(band::Fluxes.FluxBand) = band.flux_up .- band.flux_dn
 
 """
     spectral_lw_flux_up(s::RRTMGPSolver)
@@ -153,22 +152,20 @@ for two-stream, non-gray radiation. Band `b`'s slice `[:, :, b]` has the same la
 broadband fluxes, and summing over the band dimension recovers them. Use
 [`lw_band_bounds`](@ref) / [`sw_band_bounds`](@ref) to identify each band's wavenumber range.
 
-The `up`/`dn` getters are views into the retained per-band buffers. The `net` getters instead
-allocate a fresh array each call (`up − dn` is not stored separately), so — unlike the other
-vertical getters — they are outside the zero-allocation/view contract.
+The `up`/`dn`/`net` getters are views into the retained per-band buffers.
 """
 spectral_lw_flux_up(s::RRTMGPSolver) =
     _domain_view(s, _solver_band_flux(s.lws).flux_up)
 spectral_lw_flux_dn(s::RRTMGPSolver) =
     _domain_view(s, _solver_band_flux(s.lws).flux_dn)
 spectral_lw_flux_net(s::RRTMGPSolver) =
-    _domain_view(s, _band_net(_solver_band_flux(s.lws)))
+    _domain_view(s, _solver_band_flux(s.lws).flux_net)
 spectral_sw_flux_up(s::RRTMGPSolver) =
     _domain_view(s, _solver_band_flux(s.sws).flux_up)
 spectral_sw_flux_dn(s::RRTMGPSolver) =
     _domain_view(s, _solver_band_flux(s.sws).flux_dn)
 spectral_sw_flux_net(s::RRTMGPSolver) =
-    _domain_view(s, _band_net(_solver_band_flux(s.sws)))
+    _domain_view(s, _solver_band_flux(s.sws).flux_net)
 
 """
     lw_band_bounds(s::RRTMGPSolver)

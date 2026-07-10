@@ -3,6 +3,25 @@ RRTMGP.jl Release Notes
 
 main
 ------
+- New docs page "Fortran and paper concordance": tables mapping RRTMGP.jl
+  names (containers, RTE/gas-optics/cloud/aerosol kernels) to the Fortran
+  rte-rrtmgp `mo_*`/`ty_*` names and to the papers whose equations they
+  implement, so Fortran-literate readers can navigate instantly.
+- The standalone (Layer-3) path is complete: `standard_atmosphere(FT; kind)`
+  builds an idealized clear-sky `AtmosphereProfile` (`:tropical`,
+  `:midlatitude_summer`, `:subarctic_winter` — analytic two-segment
+  temperature, exact hydrostatic pressure, idealized water vapor/ozone,
+  present-day well-mixed gases), and `solve(profile; method)` solves it in one
+  call — `ClearSkyRadiation` (default) or `GrayRadiation`. Both `solve` and
+  `solve_gray` now return a documented `RadiationOutput` struct with stable
+  field names (`lw_up` … `sw_direct_dn`, `net`, `heating_rate`, `solver`);
+  `solve_gray` previously returned a `NamedTuple` with the same names, so
+  field access is unchanged.
+- New `prepare_atmosphere!(solver)`: runs the atmospheric-state preparation
+  cascade (level interpolation, isothermal boundary layer, clipping, dry-air
+  column amounts) without solving, so hosts can inspect the prepared state —
+  the prepare/solve split. `update_fluxes!` is now literally
+  `prepare_atmosphere!` followed by the three solve/combine steps.
 - **Breaking:** `lookup_tables` now returns a typed [`LookupBundle`] instead of
   a nested `(; lookups, lu_kwargs)` `NamedTuple`: stable fields
   (`lookup_lw`, `lookup_sw`, cloud/aerosol tables, the name→index maps, and the
@@ -73,12 +92,12 @@ main
   functions over plain `(nlay, ncol)` array views: `interpolate_levels!`,
   `add_isothermal_boundary_layer!`, `clip!`, and `update_concentrations!`.
 - `clip!` now also clamps the spectral solvers' layer/level temperatures into the
-  valid range of the optics lookup tables (new `RRTMGPParameters` fields
-  `optics_lookup_temperature_min`/`max`, read from ClimaParams; 160–355 K), moving
-  the clamp that ClimaAtmos applied before every radiation call into RRTMGP's own
-  input preparation. The gray path is deliberately not clamped: it uses no lookup
-  tables, and idealized gray atmospheres can legitimately reach temperatures
-  outside the lookup range.
+  valid range of the optics lookup tables — the tables' first and last reference
+  temperatures (`lookup.t_ref_min`/`t_ref_max`, 160–355 K for the standard tables),
+  read straight from the lookup table — moving the clamp that ClimaAtmos applied
+  before every radiation call into RRTMGP's own input preparation. The gray path is
+  deliberately not clamped: it uses no lookup tables, and idealized gray atmospheres
+  can legitimately reach temperatures outside the lookup range.
 - Added standalone entry points that need no NetCDF lookup tables — `solve_gray`,
   `default_parameters`, and `heating_rate` (in K/s) — for single-column/classroom use.
 - Added optional spectrally-resolved (per-band) fluxes: construct with `spectral_fluxes = true`,

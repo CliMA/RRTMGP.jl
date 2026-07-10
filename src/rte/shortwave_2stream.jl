@@ -220,8 +220,9 @@ doi:10.1175/1520-0469(1980)037<0630:TSATRT>2.0.CO;2
     # Equations 14-15 have a removable singularity at k·μ₀ = 1. Nudge k·μ₀
     # off resonance so numerator and denominator stay mutually consistent.
     # See Numerics.resonance_window for the sqrt(eps) choice.
-    if abs(FT(1) - k_μ2) < Numerics.resonance_window(FT)
-        k_μ2 = FT(1) - Numerics.resonance_window(FT)
+    diff = FT(1) - k_μ2
+    if abs(diff) < Numerics.resonance_window(FT)
+        k_μ2 = diff ≥ 0 ? FT(1) - Numerics.resonance_window(FT) : FT(1) + Numerics.resonance_window(FT)
         k_μ = sqrt(k_μ2)
     end
     k_γ3 = k * γ3
@@ -261,8 +262,15 @@ doi:10.1175/1520-0469(1980)037<0630:TSATRT>2.0.CO;2
     # factor), whereas in ecRad (the model in the paper), they are normalized relative 
     # to the perpendicular incident intensity. Thus, the maximum fractional reflectance 
     # Rdir is bounded by 1 - T₀, and must not be scaled by μ₀.
-    Rdir = max(FT(0), min(Rdir_unconstrained, (FT(1) - T₀)))
-    Tdir = max(FT(0), min(Tdir_unconstrained, (FT(1) - T₀ - Rdir)))
+    Rdir = max(FT(0), Rdir_unconstrained)
+    Tdir = max(FT(0), Tdir_unconstrained)
+    av_energy = max(FT(0), FT(1) - T₀)
+    tot_dir = Rdir + Tdir
+    if tot_dir > av_energy
+        scale = av_energy / max(eps(FT), tot_dir)
+        Rdir *= scale
+        Tdir *= scale
+    end
     return (Rdir, Tdir, Tnoscat, Rdif, Tdif)
 end
 

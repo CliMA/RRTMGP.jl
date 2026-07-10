@@ -28,6 +28,7 @@ makedocs(;
         "RTE" => "RTE.md",
         "Optics" => "Optics.md",
         "Example" => "Example.md",
+        "Fortran and paper concordance" => "concordance.md",
         "API" => Any[
             "API" => "api.md"
             "Getter contract" => "getters.md"
