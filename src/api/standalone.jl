@@ -17,10 +17,9 @@ using ClimaComms
 
 The result of a standalone radiation solve ([`solve`](@ref) or
 [`solve_gray`](@ref)): the broadband fluxes, the heating rate, and the
-underlying solver. The field names are stable — teaching material written
-against them does not depend on the getter API. The flux fields are views into
-the solver's buffers (they change if the solver is re-solved); `heating_rate`
-is a freshly allocated array.
+underlying solver. The field names are stable, so teaching material written
+against them remains decoupled from the getter API. The flux fields are views into
+the solver's buffers; `heating_rate` is a freshly allocated array.
 
 # Fields
 - `lw_up`, `lw_dn`, `lw_net`: longwave up/down/net flux [W/m²], `(nlev, ncol)`.
@@ -191,10 +190,9 @@ end
 """
     solve(profile::AtmosphereProfile; method = ClearSkyRadiation(false), kwargs...)
 
-Solve the radiative-transfer problem for an [`AtmosphereProfile`](@ref) in a
-single call and return a [`RadiationOutput`](@ref). Builds the atmospheric
-state, boundary conditions, and an `RRTMGPSolver` internally, then runs
-[`update_fluxes!`](@ref) — the one-line standalone path:
+Solve the radiative-transfer problem for an [`AtmosphereProfile`](@ref) and return a
+[`RadiationOutput`](@ref). Builds the atmospheric state, boundary conditions, and an
+`RRTMGPSolver` internally, then runs [`update_fluxes!`](@ref):
 
 ```julia
 using RRTMGP, NCDatasets
@@ -204,11 +202,9 @@ out.net          # net flux at each level [W/m²]
 out.heating_rate # heating rate at each layer [K/s]
 ```
 
-`method` selects the radiation model: `ClearSkyRadiation(false)` (the default;
-requires lookup tables, so load NCDatasets first or pass cached `lookups`) or
-`GrayRadiation()` (no lookup tables — runs after a bare `using RRTMGP`; the
-profile's mixing ratios are ignored). Cloud and aerosol methods are not
-supported here — construct an [`RRTMGPSolver`](@ref) directly for those.
+`method` selects the radiation model: `ClearSkyRadiation(false)` (the default; requires lookup
+tables, so load NCDatasets first or pass cached `lookups`) or `GrayRadiation()` (runs after
+`using RRTMGP`). For cloud and aerosol methods, construct an [`RRTMGPSolver`](@ref).
 
 # Keyword Arguments
 - `method = ClearSkyRadiation(false)`: the radiation method (see above).
@@ -223,6 +219,13 @@ supported here — construct an [`RRTMGPSolver`](@ref) directly for those.
 - `surface_albedo = 0.2`: shortwave surface albedo [-].
 - `optical_thickness = GrayOpticalThicknessOGorman2008(FT)`: gray
   optical-thickness parameters (`GrayRadiation` only).
+- `interpolation = NoInterpolation()`: how [`update_fluxes!`](@ref) rebuilds
+  the level (cell-face) pressures and temperatures from the layer values on
+  each call (see [`AbstractInterpolation`](@ref)); the default uses the
+  profile's level values as given. Useful when a driver marches the layer
+  temperatures and wants the faces kept consistent automatically.
+- `bottom_extrapolation = SameAsInterpolation()`: scheme for the bottom face
+  (see [`AbstractBottomExtrapolation`](@ref)).
 """
 function solve(
     profile::AtmosphereProfile;
@@ -237,6 +240,8 @@ function solve(
     optical_thickness = AtmosphericStates.GrayOpticalThicknessOGorman2008(
         eltype(profile.p_lay),
     ),
+    interpolation::AbstractInterpolation = NoInterpolation(),
+    bottom_extrapolation::AbstractBottomExtrapolation = SameAsInterpolation(),
 )
     FT = eltype(profile.p_lay)
     (nlay, ncol) = size(profile.p_lay)
@@ -321,8 +326,17 @@ function solve(
     alb_dif = fill!(DA{FT}(undef, lookups.nbnd_sw, ncol), FT(surface_albedo))
     bcs_sw = BCs.SwBCs(cos_zen, toa, alb_dir, nothing, alb_dif)
 
-    solver =
-        RRTMGPSolver(grid_params, method, params, bcs_lw, bcs_sw, as; lookups)
+    solver = RRTMGPSolver(
+        grid_params,
+        method,
+        params,
+        bcs_lw,
+        bcs_sw,
+        as;
+        lookups,
+        interpolation,
+        bottom_extrapolation,
+    )
     update_fluxes!(solver)
     return _radiation_output(solver)
 end

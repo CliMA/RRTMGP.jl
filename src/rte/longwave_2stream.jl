@@ -138,9 +138,9 @@ end
 """
     lw_2stream_coeffs(τ::FT, ssa::FT, g::FT, lev_src_bot::FT, lev_src_top::FT) where {FT}
 
-This function combines RRTMGP-specific sources at levels,
-computes layer reflectance, transmittance, and
-total source function at levels using linear-in-tau approximation.
+Combine RRTMGP-specific sources at levels and compute the layer reflectance,
+transmittance, and total source function at levels, using the linear-in-tau
+approximation.
 """
 @inline function lw_2stream_coeffs(τ, ssa, g, lev_src_bot, lev_src_top)
     FT = eltype(τ)

@@ -1,74 +1,173 @@
-# Radiatve Transfer Equations
+# Radiative transfer
 
-## Radiation heating rate
+The RTE solvers integrate the radiative transfer equation through a
+plane-parallel, horizontally homogeneous column and return the upward and
+downward radiative fluxes and the heating rate. This page states the equations
+they solve and how they solve them; the optical properties that enter as
+coefficients are described under [Optics](@ref).
 
-Radiative fluxes enter the thermal energy equation as follows:
+## The radiative transfer equation
 
+Radiation is described by the spectral radiance ``I_\lambda``, the power per
+unit area, solid angle, and wavelength flowing in a given direction ``\Omega``.
+Along a ray, the medium changes the radiance by three processes: extinction
+(absorption plus scattering out of the beam), thermal emission, and scattering
+into the beam from all other directions. In terms of the extinction optical
+depth ``\tau_\lambda`` measured along the ray, the radiative transfer equation
+reads
 ```math
-\begin{align}
-\partial_t (\rho e) = - \nabla \cdot F_{net}
-\end{align}
+\frac{dI_\lambda(\Omega)}{d\tau_\lambda} =
+(1 - \omega_{0,\lambda})\, B_\lambda(T) - I_\lambda(\Omega)
++ \omega_{0,\lambda} \int_{4\pi} P_\lambda(\Omega', \Omega)\,
+I_\lambda(\Omega')\, d\Omega',
 ```
+where ``B_\lambda(T)`` is the Planck function at the local temperature,
+``\omega_{0,\lambda}`` is the single-scattering albedo — the fraction of the
+extinction due to scattering — and ``P_\lambda(\Omega', \Omega)`` is the phase
+function, the probability of scattering from direction ``\Omega'`` into
+``\Omega``. The emission term ``B_\lambda`` follows from Kirchhoff's law under
+local thermodynamic equilibrium (absorptivity = emissivity at every
+wavelength), which is assumed to hold throughout the atmosphere RRTMGP models. The scattering integral couples all directions, which is what makes
+the general equation expensive; in the atmosphere, it matters for clouds and
+aerosols in both the longwave and shortwave and for Rayleigh scattering in the
+shortwave. The two-stream approximation below reduces the angular coupling to
+two hemispheric fluxes.
 
-where ``F_{net} = \sum_j (F^{+}_j - F^{-}_j)``, and ``F^{+}_j`` and ``F^{-}_j`` denote the sum of shortwave and longwave upward and downward fluxes for spectral interval j, respectively.
-
-## RTE solver
-
-`solve_lw!` and `solve_sw!` solve the radiative transfor equation for longwave and shortwave radiation.
-
-!!! note
-    We have both no scattering and two stream solvers in the code. Only two stream solver is documented here.
-
-## Computing fluxes through a vertically layered atmosphere
-
-`rte_lw_2stream!` and `rte_sw_2stream!` compute longwave and shortwave radiative fluxes through a vertically layered atmosphere. The equations for upward and downward fluxes are calculated following [shonk2008](@cite):
-
+For longwave transfer in clear skies, scattering is negligible
+(``\omega_{0,\lambda} \to 0``), and the equation reduces to the *Schwarzschild
+equation*,
 ```math
-\begin{align}
-F^{+}_i = \alpha_i F^{-}_i + G_i \\
-F^{-}_i = \beta_i (T_i F^{-}_{i+1} + R_i G_i + S^{-}_i) + F^{-}_{i, dir} \\
-\alpha_{i+1} = R_i + T_i^2 \beta_i \alpha_i \\
-G_{i+1} = S^{+}_i + T_i \beta_i (G_i + \alpha_i S^{-}_i) \\
-\end{align}
+\frac{dI_\lambda}{d\tau_\lambda} = B_\lambda(T) - I_\lambda,
 ```
+with ``\tau_\lambda`` now the absorption optical depth.
 
-where ``\beta_k = 1 / (1 - \alpha_k R_k)``. ``T`` and ``R`` are transmittance and reflectance, and ``S^{+}`` and ``S^{-}`` represent upward and downward source functions. ``F^-_{dir}`` is the downward direct shortwave flux. The subscript ``i`` represents the level.
+## Two-stream approximation
 
-## Computing transmittance, reflectance, and total source functions
-
-### Longwave
-
-`lw_2stream_coeffs` calculates transmittance (``T``), reflectance (``R``), and source functions (``S^+`` and ``S^-``) from optical properties for longwave radiation. Transmittance and reflectance are calculated following [meador1980](@cite):
-
+Resolving the full angular dependence of ``I_\lambda`` is too costly for a
+climate model, so the flux calculation collapses the radiation field into an
+upward flux ``F_\lambda^\uparrow`` and a downward flux ``F_\lambda^\downarrow``.
+In the plane-parallel column, the vertical optical depth ``\widehat{\tau}_\lambda``
+increases downward from zero at the top of the atmosphere. Neglecting
+scattering, the two streams obey
 ```math
-\begin{align}
-T = \frac{2 k e^{-k \tau}}{k + \gamma_1 + (k - \gamma_1) e^{-2 k \tau}} \\
-R = \frac{\gamma_2 (1 - e^{-2 k \tau})}{k + \gamma_1 + (k - \gamma_1) e^{-2 k \tau}}
-\end{align}
+\frac{dF_\lambda^\uparrow}{d\widehat{\tau}_\lambda} = D\,(F_\lambda^\uparrow - \pi B_\lambda),
+\qquad
+\frac{dF_\lambda^\downarrow}{d\widehat{\tau}_\lambda} = D\,(\pi B_\lambda - F_\lambda^\downarrow),
 ```
+where the *diffusivity factor* ``D`` accounts for the slantwise paths of a
+diffuse field: replacing the range of zenith angles by a single effective secant
+``D`` closes the hemispheric integral that relates flux to radiance. With
+scattering, the streams couple through a layer reflectance, and RRTMGP forms the
+two-stream transmittance and reflectance from the optical thickness, single
+scattering albedo, and asymmetry parameter following [meador1980](@citet).
 
-where ``\tau`` is the optical depth, and ``k = \sqrt{\gamma_1^2 - \gamma_2^2}``. ``\gamma_1`` and ``\gamma_2`` are coupling coefficients in the two-stream approximation that describe how isotropic the phase function is, and are determined by the optical properties (single scattering albedo and asymmetry parameter).
+## Angular discretization
 
-``S^+`` and ``S^-`` are calculated from optical properties and Planck source functions following [toon1989](@cite).
+The longwave no-scattering solver does better than a single diffusivity angle:
+it integrates the Schwarzschild equation along a small set of discrete zenith
+angles and sums the results with Gauss quadrature weights, so the hemispheric
+flux is ``F_\lambda = \sum_i w_i\, I_\lambda(\mu_i)``. RRTMGP uses the
+Gauss-Jacobi-5 nodes of [hogan2024](@citet) with one to four angles
+([`AngularDiscretization`](@ref RRTMGP.AngularDiscretizations.AngularDiscretization)).
+The default single angle has secant ``D \approx 1.64``, close to Elsasser's
+classic diffusivity factor of ``1.66``, which the two-stream longwave solver
+adopts following [fu1997](@citet); adding angles improves the accuracy of the
+angular integral.
 
-### Shortwave
-`sw_2stream_coeffs` calculates diffuse transmittance (``T``), diffuse reflectance (``R``), direct transmittance (``T_{dir}``), and direct reflectance (``R_{dir}``) from optical properties for shortwave radiation. ``T`` and ``R`` are calculated following the same equations as for the longwave radiation. ``T_{dir}`` and ``R_{dir}`` is calculated following [meador1980](@cite):
+## Radiative heating rate
 
+The fluxes feed back on temperature through the divergence of the net upward
+flux ``F^{\mathrm{net}} = F^\uparrow - F^\downarrow``. A layer warms where the
+net flux converges and cools where it diverges:
 ```math
-\begin{align}
-T_{dir} = - A [(1 + k \mu) (\alpha_1 + k \gamma_4) e^{-\tau/\mu} - (1 - k \mu) (\alpha_1 - k \gamma_4) e^{-2k\tau} e^{-\tau/\mu} - 2k (\gamma_4 + \alpha_1 \mu) e^{-\tau/\mu}] \\
-R_{dir} =   A [(1 - k \mu) (\alpha_2 + k \gamma_3) - (1 + k \mu) (\alpha_2 - k \gamma_3) e^{-2 k \tau} - 2 (k \gamma_3 - \alpha_2 k \mu) e^{-k \tau}  e^{-\tau/\mu}]
-\end{align}
+\rho\, c_p \frac{\partial T}{\partial t} = -\frac{dF^{\mathrm{net}}}{dz}.
 ```
+Because the temperature tendency scales as ``1/\rho``, a given flux divergence
+warms thin, high-altitude air far more than dense air near the surface — one
+reason ozone's shortwave absorption heats the stratosphere so effectively.
+[`heating_rate`](@ref RRTMGP.heating_rate) returns ``\partial T/\partial t`` in
+K/s.
 
-where ``A = \omega_0 / (1 - k^2 \mu^2) / [k (1 + e^{-2 k \tau}) + \gamma_1 (1 - e^{-2 k \tau})]``. ``\omega_0`` is the single scattering albedo. ``\mu`` is the cosine of solar zenith angle. ``\gamma_3``, and ``\gamma_4`` are coefficients in the two-stream approximation and determined by the optical properties. They are constrained to ``\gamma_3 + \gamma_4 = 1`` by energy conservation.
+## How the equations are solved
 
-The direct downward flux (``F^{-}_{dir}``) and source functions (``S^+`` and ``S^-``) for each level are calculated from ``T_{dir}`` and ``R_{dir}``:
+The continuous equations are solved by discretizing the column into layers of
+uniform optical properties, within which they admit exact solutions. The
+resulting sweeps run independently for every spectral quadrature point and
+column, which is what makes the solvers parallelize well.
 
+The no-scattering longwave solver integrates the Schwarzschild equation along
+each quadrature angle exactly: crossing a layer of vertical optical depth
+``\widehat{\tau}`` multiplies the radiance by the slant-path transmittance
+``t = e^{-D\widehat{\tau}}`` and adds the layer's own emission,
 ```math
-\begin{align}
-F^-_{dir, i} = e^{-\tau/\mu} F^-_{dir, i+1} \\
-S^+_i = R_{dir, i} F^-_{dir, i+1} \\
-S^-_i = T_{dir, i} F^-_{dir, i+1}
-\end{align}
+I_{\mathrm{out}} = t\, I_{\mathrm{in}} + S,
 ```
+where the source ``S`` follows from a Planck function that varies linearly in
+optical depth across the layer ([clough1992](@citet)). One downward and one
+upward sweep of this update per quadrature angle yields the fluxes.
+
+In the two-stream solver, the coupled equations for ``F^\uparrow`` and
+``F^\downarrow`` within a layer have exponential solutions ``e^{\pm k\tau}``,
+which reduce each layer ``i`` to a diffuse reflectance ``R_i``, a transmittance
+``T_i``, and upward and downward source terms ``S_i^{\pm}``
+([meador1980](@citet); [toon1989](@citet) for the thermal source). The layers
+are then coupled by the adding method of [shonk2008](@citet). With ``\alpha_i``
+the albedo of the atmosphere–surface system below level ``i`` and ``G_i`` its
+upward emission, a first pass climbs from the surface,
+```math
+\begin{aligned}
+\alpha_{i+1} &= R_i + T_i^2 \beta_i \alpha_i,\\
+G_{i+1} &= S_i^{+} + T_i \beta_i \left(G_i + \alpha_i S_i^{-}\right),
+\end{aligned}
+```
+where ``\beta_i = (1 - \alpha_i R_i)^{-1}`` sums the infinite series of
+reflections between layer ``i`` and the medium below it. A second pass descends
+from the top-of-atmosphere boundary condition, computing the downwelling flux
+```math
+F_i^{\downarrow} = \beta_i \left(T_i F_{i+1}^{\downarrow} + R_i G_i +
+S_i^{-}\right) + F_{i,\mathrm{dir}}^{\downarrow},
+```
+where the last term is the direct solar beam, attenuated by Beer's law, and
+from it the upwelling flux ``F_i^{\uparrow} = \alpha_i F_i^{\downarrow} +
+G_i``. The result is the discrete counterpart of the integral solution of the
+transfer equation: the flux at each level accumulates every layer's emission,
+transmitted and reflected through the layers between the emitting layer and
+that level.
+
+## No-scattering and two-stream solvers
+
+RRTMGP provides two solver families, distinguished by whether they represent
+scattering:
+
+- The **no-scattering solver** carries the optical thickness ``\tau`` alone
+  ([`OneScalar`](@ref RRTMGP.Optics.OneScalar) optics). It integrates absorption
+  and emission over the Gauss angles above and is used for clear-sky longwave
+  transfer, where scattering is negligible; in the shortwave, it reduces to
+  Beer's-law extinction of the direct solar beam.
+- The **two-stream solver** carries the optical thickness, single scattering
+  albedo, and asymmetry parameter ([`TwoStream`](@ref RRTMGP.Optics.TwoStream)
+  optics) and represents multiple scattering. It is required wherever scattering
+  is not negligible: clouds and aerosols in both bands, and Rayleigh scattering
+  in the shortwave.
+
+Both families exist for the longwave and the shortwave
+([`NoScatLWRTE`](@ref RRTMGP.RTE.NoScatLWRTE) / [`TwoStreamLWRTE`](@ref RRTMGP.RTE.TwoStreamLWRTE)
+and [`NoScatSWRTE`](@ref RRTMGP.RTE.NoScatSWRTE) / [`TwoStreamSWRTE`](@ref RRTMGP.RTE.TwoStreamSWRTE)),
+and [`solve_lw!`](@ref RRTMGP.RTESolver.solve_lw!) / [`solve_sw!`](@ref RRTMGP.RTESolver.solve_sw!)
+dispatch on the workspace type.
+
+## Boundary conditions
+
+The sweep needs conditions at both ends of the column. At the surface, the
+longwave upwelling radiance is the surface Planck emission scaled by the surface
+emissivity, and the shortwave reflection is set by the direct and diffuse
+albedos; the incident solar flux and the cosine of the solar zenith angle enter
+at the top. Any prescribed incident diffuse flux at the top defaults to zero.
+
+RRTMGP can also insert an **isothermal boundary layer**: an extra layer between
+the host model's top and the minimum pressure of the gas-optics tables, held at
+the model-top temperature, that represents the radiative effect of the
+atmosphere above the model lid. It is enabled through
+[`RRTMGPGridParams`](@ref RRTMGP.RRTMGPGridParams), and every getter masks it
+off so the host reads and writes arrays sized to its own grid (see
+[The getter contract](@ref)).

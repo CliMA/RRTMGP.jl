@@ -4,14 +4,14 @@
         p_lev,
         mol_m_dry,
         mol_m_h2o,
-        avogadro
+        avogadro,
         helmert1,
-        vmr_h2o
+        vmr_h2o,
         lat,
         glay, gcol,
     )
 
-This function computes the column amounts of dry or moist air.
+Compute the column amounts of dry or moist air.
 """
 function compute_col_gas_kernel!(
     col_gas::AbstractArray{FT, 2},
@@ -53,7 +53,7 @@ compute_relative_humidity_kernel!(
     gcol::Int,
 ) where {FT}
 
-This function computes the relative humidity.
+Compute the relative humidity.
 """
 function compute_relative_humidity_kernel!(
     rh::AbstractArray{FT, 2},
@@ -80,9 +80,9 @@ function compute_relative_humidity_kernel!(
 end
 
 """
-    compute_interp_frac_temp(Δ_t_ref, n_t_ref, t_ref, t_lay)
+    compute_interp_frac_temp(t_ref, t_lay)
 
-compute interpolation fraction for temperature.
+Compute interpolation fraction for temperature.
 """
 @inline function compute_interp_frac_temp(t_ref, t_lay)
     @inbounds Δ_t_ref = t_ref[2] - t_ref[1]
@@ -93,13 +93,7 @@ compute interpolation fraction for temperature.
 end
 
 """
-    compute_interp_frac_press(
-        lkp::AbstractLookUp,
-        p_lay,
-        tropo,
-        glay,
-        gcol,
-    )
+    compute_interp_frac_press(ln_p_ref, p_lay, tropo)
 
 Compute interpolation fraction for pressure.
 """
@@ -122,16 +116,15 @@ end
 
 """
     compute_interp_frac_η(
-        lkp::AbstractLookUp,
-        vmr,
+        n_η,
+        ig,
+        vmr_ref,
+        (vmr1, vmr2),
         tropo,
         jtemp,
-        ibnd,
-        glay,
-        gcol,
     )
 
-Compute interpolation fraction for binary species parameter.
+Compute interpolation fraction for the binary species parameter ``η``.
 """
 @inline function compute_interp_frac_η(
     n_η,
@@ -247,7 +240,7 @@ end
         p_lay,
         t_lay,
         glay, gcol,
-    ) where {FT<:AbstractFloat}
+    )
 
 Compute optical thickness, single scattering albedo, and asymmetry parameter.
 """
@@ -328,7 +321,7 @@ end
 
 """
     compute_τ_minor(
-        lkp::AbstractLookUp,
+        lkp_minor::LookUpMinor,
         vmr,
         vmr_h2o::FT,
         col_dry,
@@ -420,7 +413,7 @@ end
 
 """
     compute_τ_rayleigh(
-        lkp::LookUpSW,
+        rayleigh_coeff::AbstractArray{FT, 2},
         col_dry::FT,
         vmr_h2o::FT,
         jtemp::Int,

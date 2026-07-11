@@ -1,6 +1,5 @@
 module AngularDiscretizations
 
-using DocStringExtensions
 using Adapt
 using ClimaComms
 import ..RRTMGPGridParams
@@ -8,20 +7,19 @@ import ..RRTMGPGridParams
 export AngularDiscretization
 
 """
-    AngularDiscretization{FT,FTA1D}
+    AngularDiscretization{FT, FTA1D}
 
 Weights and angle secants for "Gauss-Jacobi-5" quadrature.
-Values from Table 1, R. J. Hogan 2023, doi:10.1002/qj.4598
+Values from Table 1 of R. J. Hogan (2024), doi:10.1002/qj.4598.
 
 # Fields
-$(DocStringExtensions.FIELDS)
+- `n_gauss_angles`: Number of quadrature angles.
+- `gauss_Ds`: Quadrature secants (secant of propagation angle).
+- `gauss_wts`: Quadrature weights.
 """
 struct AngularDiscretization{FT <: AbstractFloat, FTA1D <: AbstractArray{FT, 1}}
-    "number of quadrature angles"
     n_gauss_angles::Int
-    "quadrature secants / secant of propagation angle"
     gauss_Ds::FTA1D
-    "quadrature weights"
     gauss_wts::FTA1D
 end
 Adapt.@adapt_structure AngularDiscretization

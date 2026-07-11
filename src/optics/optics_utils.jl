@@ -2,8 +2,7 @@
 """
     loc_lower(xi, Δx, n, x)
 
-Return the location of the left (lower) point of the interval in which `xi` is located in vector `x`.
-This function assumes `Δx` is uniform.
+Return the location of the left (lower) point of the interval in which `xi` is located in vector `x`, assuming uniform `Δx`.
 """
 @inline function loc_lower(xi, Δx, n, x)
     @inbounds xi ≤ x[1] && return 1
@@ -47,7 +46,7 @@ end
 """
     function interp1d_loc_factor(xi::FT, x::AbstractArray{FT, 1}) where {FT <: AbstractFloat}
 
-Computes the weights for linear interpolation. This works with non-uniformly spaced `x`.
+Compute the weights for linear interpolation. This works with non-uniformly spaced `x`.
 """
 @inline function interp1d_loc_factor(
     xi::FT,
@@ -111,7 +110,7 @@ end
         coeff::FTA3D,
         s1::FT = FT(1),
         s2::FT = FT(1),
-    ) where {FT<:AbstractFloat,FTA4D<:AbstractArray{FT,4}}
+    ) where {FT<:AbstractFloat,FTA3D<:AbstractArray{FT,3}}
 
 Perform 3D linear interpolation.
 
@@ -181,11 +180,11 @@ where,
     )
 end
 """
-    increment_2stream!(τ1::FT, ssa1::FT, g1::FT, τ2::FT, ssa2::FT, g2::FT) where {FT}
+    increment_2stream(τ1::FT, ssa1::FT, g1::FT, τ2::FT, ssa2::FT, g2::FT) where {FT}
 
-Increment TwoStream optical properties `τ1`, `ssa1` and `g1` 
+Increment TwoStream optical properties `τ1`, `ssa1` and `g1`
 with `τ2`, `ssa2` and `g2`. Here `τ` is the optical thickness,
-`ssa` is the single-scattering albedo, and `g` is the symmetry parameter.
+`ssa` is the single-scattering albedo, and `g` is the asymmetry parameter.
 """
 function increment_2stream(
     τ1::FT,

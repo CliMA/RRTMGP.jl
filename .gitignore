@@ -35,3 +35,8 @@ docs/site/
 Manifest.toml
 test/Manifest.toml
 
+# Literate.jl-generated tutorial pages
+docs/src/tutorials/
+
+# Temporary benchmark measurements
+perf/benchmark_baselines/measured_*.txt

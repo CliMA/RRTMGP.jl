@@ -25,7 +25,7 @@ export update_profile_lw!, compute_gray_heating_rate!
         ncol,
     )
 
-Updates t_lay and t_lev based on heating rate.
+Update `t_lay` and `t_lev` based on the heating rate.
 """
 function update_profile_lw!(
     device::ClimaComms.AbstractCPUDevice,
@@ -118,7 +118,7 @@ end
 
 """
     compute_gray_heating_rate!(
-        context,
+        device,
         hr_lay,
         p_lev,
         ncol,
@@ -128,7 +128,7 @@ end
         grav_,
     )
 
-Computes the heating rate for the gray radiation simulation.
+Compute the heating rate for the gray radiation simulation.
 """
 function compute_gray_heating_rate!(
     device::ClimaComms.AbstractCPUDevice,

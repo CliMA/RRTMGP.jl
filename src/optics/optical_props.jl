@@ -1,16 +1,15 @@
 """
-    OneScalar{FTA2D,AD} <: AbstractOpticalProps
+    OneScalar{D, V} <: AbstractOpticalProps
 
 Single scalar approximation for optical depth, used in
-calculations accounting for extinction and emission
+calculations accounting for extinction and emission.
 
 # Fields
-$(DocStringExtensions.FIELDS)
+- `layerdata`: Storage for optical thickness.
+- `τ`: View into optical depth.
 """
 struct OneScalar{D, V} <: AbstractOpticalProps
-    "storage for optical thickness"
     layerdata::D
-    "view into optical depth"
     τ::V
 end
 
@@ -32,22 +31,22 @@ end
 
 
 """
-    TwoStream{FTA2D} <: AbstractOpticalProps
+    TwoStream{D, V} <: AbstractOpticalProps
 
 Two stream approximation for optical properties, used in
-calculations accounting for extinction and emission
+calculations accounting for extinction and emission.
 
 # Fields
-$(DocStringExtensions.FIELDS)
+- `layerdata`: Storage for optical depth, single scattering albedo and asymmetry
+  parameter.
+- `τ`: View into optical depth.
+- `ssa`: View into single scattering albedo.
+- `g`: View into asymmetry parameter.
 """
 struct TwoStream{D, V} <: AbstractOpticalProps
-    "storage for optical depth, single scattering albedo and asymmerty parameter"
     layerdata::D
-    "view into optical depth"
     τ::V
-    "view into single scattering albedo"
     ssa::V
-    "view into asymmetry parameter"
     g::V
 end
 

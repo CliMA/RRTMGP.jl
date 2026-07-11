@@ -175,7 +175,7 @@ end
 
 """
     sw_2stream_coeffs(τ::FT, ssa::FT, g::FT, μ₀::FT) where {FT}
-Computes cell properties (transmittance and reflectance) for direct and diffuse radiation
+Compute cell properties (transmittance and reflectance) for direct and diffuse radiation
 Two-stream solutions to direct and diffuse reflectance and transmittance for a layer
 with optical depth tau, single scattering albedo w0, and asymmetery parameter g.
  
@@ -254,9 +254,9 @@ doi:10.1175/1520-0469(1980)037<0630:TSATRT>2.0.CO;2
     # the beam can either be reflected, penetrate unscattered to the base of a layer, 
     # or penetrate through but be scattered on the way - the rest is absorbed
     # Makes the equations safer in single precision. Credit: Robin Hogan, Peter Ukkonen
-    # Note: Unlike Eq. 9 and 10 in Hogan et al. (2024), "Improving the Two-Stream 
-    # Approximation in RRTMGP" (doi:10.1029/2023MS003932) where the upper bounds are 
-    # scaled by μ₀ (the cosine of the solar zenith angle), here they are not scaled. 
+    # Note: Unlike Eqs. 9 and 10 in Ukkonen & Hogan (2024), "Twelve times faster yet
+    # accurate ..." (doi:10.1029/2023MS003932), where the upper bounds are
+    # scaled by μ₀ (the cosine of the solar zenith angle), here they are not scaled.
     # This is because in RRTMGP, Rdir and Tdir are defined as fractional quantities 
     # relative to the horizontal incident direct flux (which already includes the μ₀ 
     # factor), whereas in ecRad (the model in the paper), they are normalized relative 

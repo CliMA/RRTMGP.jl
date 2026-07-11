@@ -104,13 +104,15 @@ end
         flux::FluxSW,
         op::OneScalar,
         bcs_sw::SwBCs,
+        igpt::Int,
+        n_gpt::Int,
         solar_frac::AbstractFloat,
         gcol,
         nlev,
     )
 
 No-scattering solver for the shortwave problem.
-(Extinction-only i.e. solar direct beam)
+(Extinction-only i.e., solar direct beam)
 """
 @inline function rte_sw_noscat!(
     flux::FluxSW,

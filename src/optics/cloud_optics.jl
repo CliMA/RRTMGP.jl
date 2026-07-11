@@ -64,8 +64,8 @@ end
         ibnd;
         delta_scaling = false,
     )
-This function computes the TwoStream clouds optics properties and adds them
-to the TwoStream gas optics properties.
+Compute the `TwoStream` cloud optics properties and add them
+to the `TwoStream` gas optics properties.
 """
 @inline function add_cloud_optics_2stream!(
     τ,
@@ -149,7 +149,7 @@ end
         cld_path_liq,
     )
 
-This function computes the `TwoStream` cloud liquid properties using the `LookUpTable` method.
+Compute the `TwoStream` cloud liquid properties using the `LookUpTable` method.
 """
 @inline function compute_lookup_cld_liq_props(
     nsize_liq,
@@ -202,7 +202,7 @@ end
         cld_path_ice,
     )
 
-This function computes the `TwoStream` cloud ice properties using the `LookUpTable` method.
+Compute the `TwoStream` cloud ice properties using the `LookUpTable` method.
 """
 @inline function compute_lookup_cld_ice_props(
     nsize_ice,
@@ -246,7 +246,7 @@ end
 """
     build_cloud_mask!(cld_mask, cld_frac, ::MaxRandomOverlap)
 
-Builds McICA-sampled cloud mask from cloud fraction data for maximum-random overlap
+Build a McICA-sampled cloud mask from cloud fraction data for maximum-random overlap
 
 Reference: https://github.com/AER-RC/RRTMG_SW/
 

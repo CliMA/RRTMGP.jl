@@ -3,6 +3,31 @@ RRTMGP.jl Release Notes
 
 main
 ------
+- Documentation reorganized along tutorial / how-to / explanation / reference
+  lines: two new executable (Literate.jl) tutorials — "A first radiation
+  calculation" and "Radiative-convective equilibrium", which reproduces
+  Manabe's classic fixed-relative-humidity climate-sensitivity experiment with
+  RRTMGP's clear-sky optics — plus four how-to guides (driving RRTMGP from a
+  host model, running on GPUs, caching the lookup tables, per-band fluxes).
+  The README now gives a Thermodynamics.jl-style overview with quick starts.
+- Struct docstrings migrated off `DocStringExtensions.FIELDS` to explicit
+  `# Fields` sections (per the CliMA documentation policy), so field
+  descriptions and units render on the API pages without inline field
+  docstrings.
+- New unit tests for previously indirect paths: every interpolation /
+  bottom-extrapolation scheme against closed forms (including a dry-adiabat
+  round-trip through `interpolate_levels!`), solver-constructor and getter
+  guard errors, `validate_inputs` field-by-field, the incident-longwave-flux
+  boundary condition, pointwise deep-atmosphere flux scaling, heating-rate =
+  net-flux divergence, gray `clip!`, aerosol-only `LookupBundle` round-trips,
+  cloud-radiative-effect sign checks in the all-sky tests, and the McICA
+  reproducibility tests now also run in `Float32`.
+- New advisory GPU benchmark ratchet (`perf/benchmark_ratchet.jl` + a
+  soft-fail Buildkite step): the DYAMOND-scale `solve_lw!`/`solve_sw!` medians
+  are compared against per-GPU baselines committed under
+  `perf/benchmark_baselines/`, flagging wall-time regressions beyond 20%
+  without blocking merges. The three DYAMOND benchmark scripts are now
+  includable (their sweeps run only when executed as scripts).
 - New docs page "Fortran and paper concordance": tables mapping RRTMGP.jl
   names (containers, RTE/gas-optics/cloud/aerosol kernels) to the Fortran
   rte-rrtmgp `mo_*`/`ty_*` names and to the papers whose equations they

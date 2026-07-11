@@ -1,5 +1,4 @@
 module VolumeMixingRatios
-using DocStringExtensions
 using Adapt
 import ..RRTMGPGridParams
 
@@ -7,28 +6,38 @@ export AbstractVmr, Vmr, VmrGM, get_vmr
 
 """
     AbstractVmr{FT}
+
+Abstract type for storage strategies for gas volume mixing ratios.
+
+Concrete subtypes:
+- [`VmrGM`](@ref): H₂O and O₃ vary spatially, other gases are well-mixed scalars.
+- [`Vmr`](@ref): every gas varies by layer and column.
+
+Subtypes are accessed through the interface method [`get_vmr`](@ref), which returns the
+volume mixing ratio of a given gas for a given layer and column.
 """
 abstract type AbstractVmr{FT <: AbstractFloat} end
+
 """
-    VmrGM{FT,FTA1D,FTA2D} <: AbstractVmr{FT}
+    VmrGM{FT, FTA1D, FTA2D} <: AbstractVmr{FT}
 
 Volume mixing ratios for various gases in the atmosphere. This struct can be used
-when only H₂O and O₃ concentrations vary spatially and a global mean is used 
+when only H₂O and O₃ concentrations vary spatially and a global mean is used
 for all other gases.
 
 # Fields
-$(DocStringExtensions.FIELDS)
+- `vmr_h2o`: Volume mixing ratio of H₂O.
+- `vmr_o3`: Volume mixing ratio of O₃.
+- `vmr`: Volume mixing ratios of all other gases, which are independent of location and
+  column.
 """
 struct VmrGM{
     FT <: AbstractFloat,
     FTA1D <: AbstractArray{FT, 1},
     FTA2D <: AbstractArray{FT, 2},
 } <: AbstractVmr{FT}
-    "volume mixing ratio of H₂O"
     vmr_h2o::FTA2D
-    "volume mixing ratio of Ozone"
     vmr_o3::FTA2D
-    "volume mixing ratio of all other gases, which are independent of location and column"
     vmr::FTA1D
 end
 VmrGM(vmr_h2o, vmr_o3, vmr) =
@@ -55,17 +64,16 @@ function VolumeMixingRatioGlobalMean(
 end
 
 """
-    Vmr{FT,FTA3D} <: AbstractVmr{FT}
+    Vmr{FT, FTA3D} <: AbstractVmr{FT}
 
 Volume mixing ratios for various gases in the atmosphere. This struct can be used
 when concentrations vary spatially for all gases.
 
 # Fields
-$(DocStringExtensions.FIELDS)
+- `vmr`: Volume mixing ratios of all gases as a function of layer and column.
 """
 struct Vmr{FT <: AbstractFloat, FTA3D <: AbstractArray{FT, 3}} <:
        AbstractVmr{FT}
-    "volume mixing ratio of all gases as a function of location and column"
     vmr::FTA3D
 end
 Vmr(vmr) = Vmr{eltype(vmr), typeof(vmr)}(vmr)

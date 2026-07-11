@@ -1,45 +1,155 @@
+<div align="center">
+  <img src="docs/src/assets/logo.svg" alt="RRTMGP.jl Logo" width="128" height="128">
+</div>
+
 # RRTMGP.jl
 
-Julia implementation of Radiative Transfer for Energetics and the RRTMGP optics.
+The `RRTMGP.jl` package is a Julia implementation of the radiative transfer
+solver RTE and the RRTMGP correlated-*k* gas optics
+([Pincus et al., 2019](https://doi.org/10.1029/2019MS001621)), based on the
+reference Fortran implementation
+[rte-rrtmgp](https://github.com/earth-system-radiation/rte-rrtmgp). It computes
+longwave and shortwave radiative fluxes and heating rates for clear, cloudy,
+and aerosol-laden atmospheres, and is the radiation scheme of the
+[CliMA Earth System Model](https://clima.caltech.edu).
 
 |||
-|---------------------:|:----------------------------------------------|
-| **Documentation**    | [![latest][docs-latest-img]][docs-latest-url] |
-| **Code Coverage**    | [![codecov][codecov-img]][codecov-url]        |
-| **BuildKite**        | [![buildkite][buildkite-img]][buildkite-url]  |
-| **Downloads**        | [![downloads][downloads-img]][downloads-url]  |
-
+|-----------------------------:|:-------------------------------------------------|
+| **Documentation**            | [![dev][docs-latest-img]][docs-latest-url]       |
+| **Docs Build**               | [![docs build][docs-bld-img]][docs-bld-url]      |
+| **GHA CI**                   | [![gha ci][gha-ci-img]][gha-ci-url]              |
+| **Buildkite CI**             | [![buildkite][buildkite-img]][buildkite-url]     |
+| **Code Coverage**            | [![codecov][codecov-img]][codecov-url]           |
+| **Downloads**                | [![Downloads][dlt-img]][dlt-url]                 |
 
 [docs-latest-img]: https://img.shields.io/badge/docs-latest-blue.svg
 [docs-latest-url]: https://CliMA.github.io/RRTMGP.jl/latest/
 
-[codecov-img]: https://codecov.io/gh/CliMA/RRTMGP.jl/branch/main/graph/badge.svg
-[codecov-url]: https://codecov.io/gh/CliMA/RRTMGP.jl
+[docs-bld-img]: https://github.com/CliMA/RRTMGP.jl/actions/workflows/docs.yml/badge.svg
+[docs-bld-url]: https://github.com/CliMA/RRTMGP.jl/actions/workflows/docs.yml
+
+[gha-ci-img]: https://github.com/CliMA/RRTMGP.jl/actions/workflows/OS-UnitTests.yml/badge.svg
+[gha-ci-url]: https://github.com/CliMA/RRTMGP.jl/actions/workflows/OS-UnitTests.yml
 
 [buildkite-img]: https://badge.buildkite.com/ee3a0c43cf4925ee14a966f794ac85d0b9439244d23e43b308.svg
 [buildkite-url]: https://buildkite.com/clima/rrtmgp-ci
 
-[downloads-img]: https://img.shields.io/badge/dynamic/json?url=http%3A%2F%2Fjuliapkgstats.com%2Fapi%2Fv1%2Ftotal_downloads%2FRRTMGP&query=total_requests&suffix=%2Ftotal&label=Downloads
-[downloads-url]: http://juliapkgstats.com/pkg/RRTMGP
+[codecov-img]: https://codecov.io/gh/CliMA/RRTMGP.jl/branch/main/graph/badge.svg
+[codecov-url]: https://codecov.io/gh/CliMA/RRTMGP.jl
 
-This is based off of the [rte-rrtmgp](https://github.com/RobertPincus/rte-rrtmgp) repository.
+[dlt-img]: https://img.shields.io/badge/dynamic/json?url=http%3A%2F%2Fjuliapkgstats.com%2Fapi%2Fv1%2Ftotal_downloads%2FRRTMGP&query=total_requests&label=Downloads
+[dlt-url]: https://juliapkgstats.com/pkg/RRTMGP
 
-# Install
+## Quick Start
 
-RRTMGP.jl is registered in the general Julia registry. To install, enter the package manager by typing `]` in the Julia REPL, and then type:
-
-```julia
-pkg> add RRTMGP
-```
-
-Then, to use
+### Installation
 
 ```julia
-julia> using RRTMGP
+using Pkg
+Pkg.add("RRTMGP")
 ```
 
-# Acknowledgments
+### Basic Usage
 
- - [Robert Pincus](https://github.com/RobertPincus) for his invaluable help
- - The authors of the [Fortran implementation](https://github.com/earth-system-radiation/rte-rrtmgp) of RTE-RRTMGP on which this code is based
- - NASA for images of the sun (for our [logo](https://clima.github.io/RRTMGP.jl/latest/assets/logo.png))
+The standalone front door provides a quick start. A gray (single-band)
+atmosphere uses analytic formulas:
+
+```julia
+using RRTMGP
+
+out = RRTMGP.solve_gray(Float64; nlay = 60, ncol = 1)
+out.net          # net flux at each level [W/m²]
+out.heating_rate # radiative heating rate at each layer [K/s]
+```
+
+For the full correlated-*k* gas optics, build an idealized clear-sky profile
+and solve it (the lookup tables are downloaded automatically; loading
+`NCDatasets` activates them):
+
+```julia
+using RRTMGP, NCDatasets
+
+profile = RRTMGP.standard_atmosphere(Float64; kind = :tropical)
+out = RRTMGP.solve(profile)
+out.lw_up[end, 1]   # outgoing longwave radiation at the top of the atmosphere [W/m²]
+out.heating_rate    # radiative heating rate at each layer [K/s]
+```
+
+### Host-Model Usage
+
+Climate models construct an `RRTMGPSolver` once, write their state through the
+[getter contract](https://clima.github.io/RRTMGP.jl/latest/getters/), and call
+`update_fluxes!(solver)` every radiation step:
+
+```julia
+solver = RRTMGP.RRTMGPSolver(grid_params, method, params, bcs_lw, bcs_sw, as)
+RRTMGP.update_fluxes!(solver)          # allocation-free, in place
+F = RRTMGP.net_flux(solver)            # (nlev, ncol) view into solver memory
+```
+
+## Key Features
+
+- **Full RRTMGP gas optics**: longwave and shortwave correlated-*k* lookup
+  tables, clouds (with McICA sampling of partial cloudiness), and MERRA
+  aerosols, validated against the Fortran rte-rrtmgp reference fluxes.
+- **Gray radiation**: analytic single-band optics for idealized-climate and
+  teaching use.
+- **Two-stream and no-scattering solvers** for both bands, with optional
+  per-band (spectrally resolved) flux output.
+- **CPU and GPU**: the same code runs single-threaded, multi-threaded, and on
+  CUDA GPUs via [ClimaComms](https://github.com/CliMA/ClimaComms.jl).
+- **Zero-allocation driver**: `update_fluxes!` is allocation-free and
+  type-stable (asserted in CI with `@allocated` and JET), allowing it to run
+  fast within a climate simulation.
+- **Dual precision**: `Float32` and `Float64` throughout, with high accuracy
+  (~ 1e-3 W/m²) at `Float32` and an accuracy-ratchet test pinning the
+  `Float32`↔`Float64` flux differences.
+
+## Design
+
+RRTMGP.jl is organized in three layers:
+
+1. **Functional core**: `solve_lw!` / `solve_sw!` kernels acting on explicit
+   state (`AtmosphericState`, optics, sources, boundary conditions, flux
+   workspaces). See the [Functional core](https://clima.github.io/RRTMGP.jl/latest/functional_core/) page.
+2. **Solver aggregate**: `RRTMGPSolver` bundles the configuration, state, and
+   workspaces; hosts exchange data through documented
+   [getters](https://clima.github.io/RRTMGP.jl/latest/getters/) and drive it
+   with `update_fluxes!`.
+3. **Standalone front door**: `solve_gray(FT)`, `standard_atmosphere(FT)`, and
+   `solve(profile)` for classroom use, single-column experiments, and quick
+   starts.
+
+Readers coming from the Fortran implementation can use the
+[Fortran and paper concordance](https://clima.github.io/RRTMGP.jl/latest/concordance/)
+to map names between the two code bases and the underlying papers.
+
+## Documentation
+
+- **[Documentation home](https://clima.github.io/RRTMGP.jl/latest/)**: overview
+  and page index.
+- **[Functional core](https://clima.github.io/RRTMGP.jl/latest/functional_core/)**:
+  the solver kernels, with runnable gray and clear-sky examples.
+- **[Getter contract](https://clima.github.io/RRTMGP.jl/latest/getters/)**: the
+  host data-exchange interface.
+- **[API reference](https://clima.github.io/RRTMGP.jl/latest/api/)**: types and
+  functions.
+
+## Integration with Climate Models
+
+RRTMGP.jl provides radiative fluxes and heating rates for the
+[CliMA](https://github.com/CliMA) ecosystem, including:
+
+- [ClimaAtmos](https://github.com/CliMA/ClimaAtmos.jl)
+- [ClimaCoupler](https://github.com/CliMA/ClimaCoupler.jl)
+
+## Getting Help
+
+For questions, check the [documentation](https://clima.github.io/RRTMGP.jl/latest/)
+or open an issue on [GitHub](https://github.com/CliMA/RRTMGP.jl).
+
+## Acknowledgments
+
+- [Robert Pincus](https://github.com/RobertPincus) for his invaluable help.
+- The authors of the [Fortran implementation](https://github.com/earth-system-radiation/rte-rrtmgp)
+  of RTE-RRTMGP, on which this code is based.

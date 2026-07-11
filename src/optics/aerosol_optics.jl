@@ -12,8 +12,8 @@
         iband_550nm
     )
 
-This function computes the `OneScalar` aerosol optics properties and adds them
-to the exising `OneScalar` optics properties.
+Compute the `OneScalar` aerosol optics properties and add them
+to the existing `OneScalar` optics properties.
 """
 @inline function add_aerosol_optics_1scalar!(
     τ,
@@ -71,8 +71,8 @@ end
         delta_scaling = false,
     )
 
-This function computes the `TwoStream` aerosol optics properties and adds them
-to the exising `TwoStream` optics properties:
+Compute the `TwoStream` aerosol optics properties and add them
+to the existing `TwoStream` optics properties:
 
  - `aod_ext` total aerosol optical depth
  - `aod_sca` scattering component of aerosol optical depth

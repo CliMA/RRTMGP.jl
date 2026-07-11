@@ -3,7 +3,6 @@ using Adapt
 import ClimaComms
 using ..AngularDiscretizations
 using ..AtmosphericStates
-using DocStringExtensions
 using ..Sources
 using ..Fluxes
 using ..Optics
@@ -22,7 +21,13 @@ properties, sources, boundary conditions and fluxes
 configurations for a non-scattering longwave simulation.
 
 # Fields
-$(DocStringExtensions.FIELDS)
+- `context`: ClimaComms context.
+- `op`: Optical properties.
+- `src`: Longwave source functions.
+- `bcs`: Longwave boundary conditions.
+- `fluxb`: Temporary storage for bandwise calculations.
+- `flux`: Longwave fluxes.
+- `angle_disc`: Angular discretization.
 """
 struct NoScatLWRTE{
     C,
@@ -33,19 +38,12 @@ struct NoScatLWRTE{
     FXL <: FluxLW,
     AD,
 }
-    "ClimaComms context"
     context::C
-    "optical properties"
     op::OP
-    "longwave source functions"
     src::SL
-    "longwave boundary conditions"
     bcs::BC
-    "temporary storage for bandwise calculations"
     fluxb::FXBL
-    "longwave fluxes"
     flux::FXL
-    "Angular discretization"
     angle_disc::AD
 end
 Adapt.@adapt_structure NoScatLWRTE
@@ -69,7 +67,13 @@ properties, sources, boundary conditions and fluxes
 configurations for a `2-stream` longwave simulation.
 
 # Fields
-$(DocStringExtensions.FIELDS)
+- `context`: ClimaComms context.
+- `op`: Optical properties.
+- `src`: Longwave source functions.
+- `bcs`: Longwave boundary conditions.
+- `fluxb`: Temporary storage for bandwise calculations.
+- `flux`: Longwave fluxes.
+- `band_flux`: Optional per-band longwave fluxes `(nlev, ncol, n_bnd)`, or `nothing`.
 """
 struct TwoStreamLWRTE{
     C,
@@ -80,19 +84,12 @@ struct TwoStreamLWRTE{
     FXL <: FluxLW,
     FXBND,
 }
-    "ClimaComms context"
     context::C
-    "optical properties"
     op::OP
-    "longwave source functions"
     src::SL
-    "longwave boundary conditions"
     bcs::BC
-    "temporary storage for bandwise calculations"
     fluxb::FXBL
-    "longwave fluxes"
     flux::FXL
-    "optional per-band longwave fluxes `(nlev, ncol, n_bnd)`, or `nothing`"
     band_flux::FXBND
 end
 Adapt.@adapt_structure TwoStreamLWRTE
@@ -123,18 +120,17 @@ properties, sources, boundary conditions and fluxes
 configurations for a non-scattering shortwave simulation.
 
 # Fields
-$(DocStringExtensions.FIELDS)
+- `context`: ClimaComms context.
+- `op`: Optical properties.
+- `bcs`: Shortwave boundary conditions.
+- `fluxb`: Temporary storage for bandwise calculations.
+- `flux`: Shortwave fluxes.
 """
 struct NoScatSWRTE{C, OP <: OneScalar, BC <: SwBCs, FXBS, FXS <: FluxSW}
-    "ClimaComms context"
     context::C
-    "optical properties"
     op::OP
-    "shortwave boundary conditions"
     bcs::BC
-    "temporary storage for bandwise calculations"
     fluxb::FXBS
-    "shortwave fluxes"
     flux::FXS
 end
 Adapt.@adapt_structure NoScatSWRTE
@@ -169,7 +165,13 @@ properties, sources, boundary conditions and fluxes
 configurations for a `2-stream` shortwave simulation.
 
 # Fields
-$(DocStringExtensions.FIELDS)
+- `context`: ClimaComms context.
+- `op`: Optical properties.
+- `src`: Shortwave source functions.
+- `bcs`: Shortwave boundary conditions.
+- `fluxb`: Temporary storage for bandwise calculations.
+- `flux`: Shortwave fluxes.
+- `band_flux`: Optional per-band shortwave fluxes `(nlev, ncol, n_bnd)`, or `nothing`.
 """
 struct TwoStreamSWRTE{
     C,
@@ -180,19 +182,12 @@ struct TwoStreamSWRTE{
     FXS <: FluxSW,
     FXBND,
 }
-    "ClimaComms context"
     context::C
-    "optical properties"
     op::OP
-    "shortwave source functions"
     src::SS
-    "shortwave boundary conditions"
     bcs::BC
-    "temporary storage for bandwise calculations"
     fluxb::FXBS
-    "shortwave fluxes"
     flux::FXS
-    "optional per-band shortwave fluxes `(nlev, ncol, n_bnd)`, or `nothing`"
     band_flux::FXBND
 end
 Adapt.@adapt_structure TwoStreamSWRTE
