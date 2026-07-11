@@ -126,3 +126,16 @@ steps:
         agents:
           slurm_ntasks: 1
           slurm_gpus: 1
+
+      # Advisory wall-time ratchet against committed per-GPU baselines
+      # (perf/benchmark_baselines/). Soft-fail: flags regressions without
+      # blocking merges; see the header of perf/benchmark_ratchet.jl.
+      - label: "GPU DYAMOND benchmark ratchet"
+        command: "julia --color=yes --project=test perf/benchmark_ratchet.jl"
+        soft_fail: true
+        artifact_paths: "perf/benchmark_baselines/*"
+        env:
+          CLIMACOMMS_DEVICE: "CUDA"
+        agents:
+          slurm_ntasks: 1
+          slurm_gpus: 1

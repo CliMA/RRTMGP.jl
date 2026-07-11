@@ -10,6 +10,14 @@ end
     include("grid_adaptation.jl")
 end
 
+@testset "Interpolation and extrapolation scheme tests" begin
+    include("interpolation_schemes.jl")
+end
+
+@testset "API contract tests" begin
+    include("api_contract.jl")
+end
+
 @testset "RRTMGP gray radiation tests" begin
     include("gray_atm.jl")
 end
@@ -99,7 +107,9 @@ printstyled("=================================\n\n", color = color1)
 @testset "RRTMGP partial cloud fraction reproducibility tests" begin
     include("partial_cloud_fraction.jl")
     context = ClimaComms.context()
-    partial_cloud_fraction_test(context, Float64)
+    for FT in (Float32, Float64)
+        partial_cloud_fraction_test(context, FT)
+    end
 end
 
 printstyled(

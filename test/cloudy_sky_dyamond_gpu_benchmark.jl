@@ -28,12 +28,99 @@ using RRTMGP.ArtifactPaths
 include("reference_files.jl")
 include("read_cloudy_sky.jl")
 
+if !@isdefined(_resample_benchmark_as)
+    function _resample_benchmark_as(
+        context,
+        as::AtmosphericStates.AtmosphericState,
+        target_nlay,
+        ::Type{FT},
+    ) where {FT}
+        nlay_orig, _ = AtmosphericStates.get_dims(as)
+        nlay_orig == target_nlay && return as
+        device = ClimaComms.device(context)
+        DA = ClimaComms.array_type(device)
+        nlev_orig = nlay_orig + 1
+        target_nlev = target_nlay + 1
+
+        lay_idx = [
+            clamp(round(Int, k * nlay_orig / target_nlay), 1, nlay_orig) for
+            k in 1:target_nlay
+        ]
+        lev_idx = [
+            clamp(round(Int, l * nlev_orig / target_nlev), 1, nlev_orig) for
+            l in 1:target_nlev
+        ]
+
+        new_layerdata = DA{FT}(Array(as.layerdata)[:, lay_idx, :])
+        new_p_lev = DA{FT}(Array(as.p_lev)[lev_idx, :])
+        new_t_lev = DA{FT}(Array(as.t_lev)[lev_idx, :])
+
+        vmr = as.vmr
+        new_vmr = if vmr isa VolumeMixingRatios.VmrGM
+            VolumeMixingRatios.VmrGM(
+                DA{FT}(Array(vmr.vmr_h2o)[lay_idx, :]),
+                DA{FT}(Array(vmr.vmr_o3)[lay_idx, :]),
+                vmr.vmr,
+            )
+        elseif vmr isa VolumeMixingRatios.Vmr
+            VolumeMixingRatios.Vmr(DA{FT}(Array(vmr.vmr)[:, lay_idx, :]))
+        else
+            vmr
+        end
+
+        cld = as.cloud_state
+        new_cld = if cld !== nothing
+            AtmosphericStates.CloudState(
+                DA{FT}(Array(cld.cld_r_eff_liq)[lay_idx, :]),
+                DA{FT}(Array(cld.cld_r_eff_ice)[lay_idx, :]),
+                DA{FT}(Array(cld.cld_path_liq)[lay_idx, :]),
+                DA{FT}(Array(cld.cld_path_ice)[lay_idx, :]),
+                DA{FT}(Array(cld.cld_frac)[lay_idx, :]),
+                cld.cld_cover_sw,
+                cld.cld_cover_lw,
+                DA{Bool}(Array(cld.mask_lw)[lay_idx, :]),
+                DA{Bool}(Array(cld.mask_sw)[lay_idx, :]),
+                cld.mask_type,
+                cld.ice_rgh,
+            )
+        else
+            nothing
+        end
+
+        aer = as.aerosol_state
+        new_aer = if aer !== nothing
+            AtmosphericStates.AerosolState(
+                aer.aod_sw_ext,
+                aer.aod_sw_sca,
+                DA{Bool}(Array(aer.aero_mask)[lay_idx, :]),
+                DA{FT}(Array(aer.aero_size)[:, lay_idx, :]),
+                DA{FT}(Array(aer.aero_mass)[:, lay_idx, :]),
+            )
+        else
+            nothing
+        end
+
+        return AtmosphericStates.AtmosphericState(
+            as.lon,
+            as.lat,
+            new_layerdata,
+            new_p_lev,
+            new_t_lev,
+            as.t_sfc,
+            new_vmr,
+            new_cld,
+            new_aer,
+        )
+    end
+end
+
 function benchmark_all_sky(
     context,
     ::Type{SLVLW},
     ::Type{SLVSW},
     ::Type{FT};
     ncol = 128,# repeats col#1 ncol times per RRTMGP example
+    nlay = nothing,
     cldfrac = FT(1),
 ) where {FT <: AbstractFloat, SLVLW, SLVSW}
     overrides =
@@ -88,6 +175,9 @@ function benchmark_all_sky(
         param_set,
     )
     close(ds_in)
+    if nlay !== nothing
+        as = _resample_benchmark_as(context, as, nlay, FT)
+    end
     nlay, ncol = AtmosphericStates.get_dims(as)
     nlev = nlay + 1
     grid_params = RRTMGPGridParams(FT; context, domain_nlay = nlay, ncol)
@@ -114,24 +204,46 @@ function benchmark_all_sky(
     #------calling solvers
     metric_scaling = DA(one.(slv_sw.flux.flux_up))
     solve_lw!(slv_lw, as, lookup_lw, lookup_lw_cld, nothing, metric_scaling)
-    trial_lw = @benchmark CUDA.@sync solve_lw!(
-        $slv_lw,
-        $as,
-        $lookup_lw,
-        $lookup_lw_cld,
-        nothing,
-        $metric_scaling,
-    )
+    trial_lw = if device isa ClimaComms.CUDADevice
+        @benchmark CUDA.@sync solve_lw!(
+            $slv_lw,
+            $as,
+            $lookup_lw,
+            $lookup_lw_cld,
+            nothing,
+            $metric_scaling,
+        )
+    else
+        @benchmark solve_lw!(
+            $slv_lw,
+            $as,
+            $lookup_lw,
+            $lookup_lw_cld,
+            nothing,
+            $metric_scaling,
+        )
+    end
 
     solve_sw!(slv_sw, as, lookup_sw, lookup_sw_cld, nothing, metric_scaling)
-    trial_sw = @benchmark CUDA.@sync solve_sw!(
-        $slv_sw,
-        $as,
-        $lookup_sw,
-        $lookup_sw_cld,
-        nothing,
-        $metric_scaling,
-    )
+    trial_sw = if device isa ClimaComms.CUDADevice
+        @benchmark CUDA.@sync solve_sw!(
+            $slv_sw,
+            $as,
+            $lookup_sw,
+            $lookup_sw_cld,
+            nothing,
+            $metric_scaling,
+        )
+    else
+        @benchmark solve_sw!(
+            $slv_sw,
+            $as,
+            $lookup_sw,
+            $lookup_sw_cld,
+            nothing,
+            $metric_scaling,
+        )
+    end
     return trial_lw, trial_sw
 end
 
@@ -193,7 +305,11 @@ function generate_gpu_allsky_benchmarks(
     return nothing
 end
 
-for FT in (Float32, Float64)
-    generate_gpu_allsky_benchmarks(FT, 4, NoScatLWRTE, TwoStreamSWRTE)
-    generate_gpu_allsky_benchmarks(FT, 4, TwoStreamLWRTE, TwoStreamSWRTE)
+# Run the resolution sweep only when executed as a script;
+# perf/benchmark_ratchet.jl includes this file for `benchmark_all_sky`.
+if abspath(PROGRAM_FILE) == @__FILE__
+    for FT in (Float32, Float64)
+        generate_gpu_allsky_benchmarks(FT, 4, NoScatLWRTE, TwoStreamSWRTE)
+        generate_gpu_allsky_benchmarks(FT, 4, TwoStreamLWRTE, TwoStreamSWRTE)
+    end
 end

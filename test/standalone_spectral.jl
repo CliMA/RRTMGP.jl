@@ -60,4 +60,28 @@ using NCDatasets
     delete!(prof_bad.well_mixed_vmr, "h2o")
     prof_bad.well_mixed_vmr["kryptonite"] = FT(1e-6) # not an RRTMGP gas
     @test_throws ErrorException RRTMGP.solve(prof_bad; lookups)
+
+    # volume_mixing_ratio getter branches (VmrGM storage):
+    # spatially varying gases are domain views ...
+    solver = out.solver
+    vmr_h2o = RRTMGP.volume_mixing_ratio(solver, "h2o")
+    @test size(vmr_h2o) == (nlay, 1)
+    # ... the water-vapor continuum pseudo-gases share the h2o storage ...
+    for continuum in ("h2o_self", "h2o_frgn")
+        @test Array(RRTMGP.volume_mixing_ratio(solver, continuum)) ==
+              Array(vmr_h2o)
+    end
+    # ... and a well-mixed gas is returned as a host scalar (not a device view)
+    co2 = RRTMGP.volume_mixing_ratio(solver, "co2")
+    @test co2 isa Number
+    @test co2 ≈ 420e-6
+
+    # per-gas Vmr storage returns a (nlay, ncol) view for every gas
+    ngas = solver.lookups.ngas_sw
+    vmr_all = RRTMGP.VolumeMixingRatios.Vmr(zeros(FT, ngas, nlay, 1))
+    idx_co2 = solver.lookups.idx_gases_sw["co2"]
+    vmr_all.vmr[idx_co2, :, :] .= FT(400e-6)
+    co2_view = RRTMGP._volume_mixing_ratio(solver, vmr_all, "co2")
+    @test size(co2_view) == (nlay, 1)
+    @test all(==(FT(400e-6)), Array(co2_view))
 end
