@@ -45,13 +45,13 @@ end
     up, dn = flux.flux_up, flux.flux_dn
     if igpt == 1
         @inbounds for ilev in 1:nlev
-            acc_up[ilev, gcol] = up[ilev, gcol]
-            acc_dn[ilev, gcol] = dn[ilev, gcol]
+            acc_up[gcol, ilev] = up[gcol, ilev]
+            acc_dn[gcol, ilev] = dn[gcol, ilev]
         end
     else
         @inbounds for ilev in 1:nlev
-            acc_up[ilev, gcol] += up[ilev, gcol]
-            acc_dn[ilev, gcol] += dn[ilev, gcol]
+            acc_up[gcol, ilev] += up[gcol, ilev]
+            acc_dn[gcol, ilev] += dn[gcol, ilev]
         end
     end
     return nothing
@@ -69,15 +69,15 @@ end
     up, dn, dir = flux.flux_up, flux.flux_dn, flux.flux_dn_dir
     if igpt == 1
         @inbounds for ilev in 1:nlev
-            acc_up[ilev, gcol] = up[ilev, gcol]
-            acc_dn[ilev, gcol] = dn[ilev, gcol]
-            acc_dir[ilev, gcol] = dir[ilev, gcol]
+            acc_up[gcol, ilev] = up[gcol, ilev]
+            acc_dn[gcol, ilev] = dn[gcol, ilev]
+            acc_dir[gcol, ilev] = dir[gcol, ilev]
         end
     else
         @inbounds for ilev in 1:nlev
-            acc_up[ilev, gcol] += up[ilev, gcol]
-            acc_dn[ilev, gcol] += dn[ilev, gcol]
-            acc_dir[ilev, gcol] += dir[ilev, gcol]
+            acc_up[gcol, ilev] += up[gcol, ilev]
+            acc_dn[gcol, ilev] += dn[gcol, ilev]
+            acc_dir[gcol, ilev] += dir[gcol, ilev]
         end
     end
     return nothing

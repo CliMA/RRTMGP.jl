@@ -202,7 +202,7 @@ function benchmark_all_sky(
     )
     slv_sw = SLVSW(grid_params; swbcs...)
     #------calling solvers
-    metric_scaling = DA(one.(slv_sw.flux.flux_up))
+    metric_scaling = DA(one.(as.p_lev))
     solve_lw!(slv_lw, as, lookup_lw, lookup_lw_cld, nothing, metric_scaling)
     trial_lw = if device isa ClimaComms.CUDADevice
         @benchmark CUDA.@sync solve_lw!(

@@ -212,7 +212,7 @@ function benchmark_all_sky_with_aerosols(
     )
     slv_sw = SLVSW(grid_params; swbcs...)
     #------calling solvers
-    metric_scaling = DA(one.(slv_sw.flux.flux_up))
+    metric_scaling = DA(one.(as.p_lev))
     solve_lw!(
         slv_lw,
         as,

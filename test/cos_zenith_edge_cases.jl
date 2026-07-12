@@ -176,14 +176,14 @@ function test_cos_zenith_edge_cases(
     )
 
     # Retrieve fluxes
-    flux_up_sw = Array(slv_sw.flux.flux_up)
-    flux_dn_sw = Array(slv_sw.flux.flux_dn)
-    flux_dn_dir_sw = Array(slv_sw.flux.flux_dn_dir)
-    flux_net_sw = Array(slv_sw.flux.flux_net)
+    flux_up_sw = Array(PermutedDimsArray(slv_sw.flux.flux_up, (2, 1)))
+    flux_dn_sw = Array(PermutedDimsArray(slv_sw.flux.flux_dn, (2, 1)))
+    flux_dn_dir_sw = Array(PermutedDimsArray(slv_sw.flux.flux_dn_dir, (2, 1)))
+    flux_net_sw = Array(PermutedDimsArray(slv_sw.flux.flux_net, (2, 1)))
 
-    flux_up_lw = Array(slv_lw.flux.flux_up)
-    flux_dn_lw = Array(slv_lw.flux.flux_dn)
-    flux_net_lw = Array(slv_lw.flux.flux_net)
+    flux_up_lw = Array(PermutedDimsArray(slv_lw.flux.flux_up, (2, 1)))
+    flux_dn_lw = Array(PermutedDimsArray(slv_lw.flux.flux_dn, (2, 1)))
+    flux_net_lw = Array(PermutedDimsArray(slv_lw.flux.flux_net, (2, 1)))
 
     color2 = :cyan
     printstyled(

@@ -152,9 +152,9 @@ function clear_sky(
 
     comp_flux_net_lw = comp_flux_up_lw .- comp_flux_dn_lw
 
-    flux_up_lw = Array(slv_lw.flux.flux_up)
-    flux_dn_lw = Array(slv_lw.flux.flux_dn)
-    flux_net_lw = Array(slv_lw.flux.flux_net)
+    flux_up_lw = Array(PermutedDimsArray(slv_lw.flux.flux_up, (2, 1)))
+    flux_dn_lw = Array(PermutedDimsArray(slv_lw.flux.flux_dn, (2, 1)))
+    flux_net_lw = Array(PermutedDimsArray(slv_lw.flux.flux_net, (2, 1)))
 
     max_err_flux_up_lw = maximum(abs.(flux_up_lw .- comp_flux_up_lw))
     max_err_flux_dn_lw = maximum(abs.(flux_dn_lw .- comp_flux_dn_lw))
@@ -186,9 +186,9 @@ function clear_sky(
     # comparing shortwave fluxes with data from RRTMGP FORTRAN code
     comp_flux_net_sw = comp_flux_up_sw .- comp_flux_dn_sw
 
-    flux_up_sw = Array(slv_sw.flux.flux_up)
-    flux_dn_sw = Array(slv_sw.flux.flux_dn)
-    flux_net_sw = Array(slv_sw.flux.flux_net)
+    flux_up_sw = Array(PermutedDimsArray(slv_sw.flux.flux_up, (2, 1)))
+    flux_dn_sw = Array(PermutedDimsArray(slv_sw.flux.flux_dn, (2, 1)))
+    flux_net_sw = Array(PermutedDimsArray(slv_sw.flux.flux_net, (2, 1)))
 
     # Test if shortwave fluxes are zero if zenith angle is ≥ π/2
     cos_zenith = Array(cos_zenith)

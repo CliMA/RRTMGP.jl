@@ -129,17 +129,17 @@ No-scattering solver for the shortwave problem.
     (; flux_up, flux_dn, flux_dn_dir) = flux
     FT = eltype(toa_flux)
     # downward propagation
-    @inbounds flux_dn_dir[nlev, gcol] =
+    @inbounds flux_dn_dir[gcol, nlev] =
         toa_flux[gcol] * solar_frac * cos_zenith[gcol]
-    @inbounds flux_dn[nlev, gcol] = flux_dn_dir[nlev, gcol]
-    @inbounds flux_up[nlev, gcol] = FT(0)
+    @inbounds flux_dn[gcol, nlev] = flux_dn_dir[gcol, nlev]
+    @inbounds flux_up[gcol, nlev] = FT(0)
     ilev = nlev - 1
     @inbounds while ilev ≥ 1
-        flux_dn_dir[ilev, gcol] =
-            flux_dn_dir[ilev + 1, gcol] *
-            exp(-τ[ilev, gcol] / max(cos_zenith[gcol], Numerics.μ₀_min(FT)))
-        flux_dn[ilev, gcol] = flux_dn_dir[ilev, gcol]
-        flux_up[ilev, gcol] = FT(0)
+        flux_dn_dir[gcol, ilev] =
+            flux_dn_dir[gcol, ilev + 1] *
+            exp(-τ[gcol, ilev] / max(cos_zenith[gcol], Numerics.μ₀_min(FT)))
+        flux_dn[gcol, ilev] = flux_dn_dir[gcol, ilev]
+        flux_up[gcol, ilev] = FT(0)
         ilev -= 1
     end
 end

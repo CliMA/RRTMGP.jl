@@ -47,9 +47,9 @@ function FluxLW(grid_params::RRTMGPGridParams)
     (; ncol, nlay) = grid_params
     DA = ClimaComms.array_type(grid_params)
     FT = eltype(grid_params)
-    flux_up = DA{FT}(undef, nlay + 1, ncol)
-    flux_dn = DA{FT}(undef, nlay + 1, ncol)
-    flux_net = DA{FT}(undef, nlay + 1, ncol)
+    flux_up = DA{FT}(undef, ncol, nlay + 1)
+    flux_dn = DA{FT}(undef, ncol, nlay + 1)
+    flux_net = DA{FT}(undef, ncol, nlay + 1)
     return FluxLW{FT, typeof(flux_net)}(flux_up, flux_dn, flux_net)
 end
 
@@ -59,10 +59,10 @@ end
 Upward, downward and net shortwave fluxes at each level.
 
 # Fields
-- `flux_up`: Upward flux [W/m²] `(nlev, ncol)`.
-- `flux_dn`: Downward flux [W/m²] `(nlev, ncol)`.
-- `flux_net`: Net flux [W/m²] `(nlev, ncol)`.
-- `flux_dn_dir`: Direct downward flux [W/m²] `(nlev, ncol)`.
+- `flux_up`: Upward flux [W/m²] `(ncol, nlev)`.
+- `flux_dn`: Downward flux [W/m²] `(ncol, nlev)`.
+- `flux_net`: Net flux [W/m²] `(ncol, nlev)`.
+- `flux_dn_dir`: Direct downward flux [W/m²] `(ncol, nlev)`.
 """
 struct FluxSW{FT <: AbstractFloat, FTA2D <: AbstractArray{FT, 2}} <:
        AbstractFlux{FT, FTA2D}
@@ -84,10 +84,10 @@ function FluxSW(grid_params::RRTMGPGridParams)
     (; nlay, ncol) = grid_params
     FT = eltype(grid_params)
     DA = ClimaComms.array_type(grid_params)
-    flux_up = DA{FT}(undef, nlay + 1, ncol)
-    flux_dn = DA{FT}(undef, nlay + 1, ncol)
-    flux_net = DA{FT}(undef, nlay + 1, ncol)
-    flux_dn_dir = DA{FT}(undef, nlay + 1, ncol)
+    flux_up = DA{FT}(undef, ncol, nlay + 1)
+    flux_dn = DA{FT}(undef, ncol, nlay + 1)
+    flux_net = DA{FT}(undef, ncol, nlay + 1)
+    flux_dn_dir = DA{FT}(undef, ncol, nlay + 1)
     return FluxSW{FT, typeof(flux_net)}(flux_up, flux_dn, flux_net, flux_dn_dir)
 end
 
@@ -95,14 +95,14 @@ end
     FluxBand{FT, FTA3D}
 
 Optional per-band upward, downward, and net radiative fluxes at each level,
-`(nlev, ncol, n_bnd)`. Only allocated when spectrally-resolved fluxes are requested.
-Band `b`'s slice `[:, :, b]` has the same `(nlev, ncol)` layout as the broadband
+`(ncol, nlev, n_bnd)`. Only allocated when spectrally-resolved fluxes are requested.
+Band `b`'s slice `[:, :, b]` has the same `(ncol, nlev)` layout as the broadband
 fluxes, and summing over the band dimension recovers the broadband fluxes.
 
 # Fields
-- `flux_up`: upward flux per band [W/m²], `(nlev, ncol, n_bnd)`.
-- `flux_dn`: downward flux per band [W/m²], `(nlev, ncol, n_bnd)`.
-- `flux_net`: net flux per band (`flux_up - flux_dn`) [W/m²], `(nlev, ncol, n_bnd)`.
+- `flux_up`: upward flux per band [W/m²], `(ncol, nlev, n_bnd)`.
+- `flux_dn`: downward flux per band [W/m²], `(ncol, nlev, n_bnd)`.
+- `flux_net`: net flux per band (`flux_up - flux_dn`) [W/m²], `(ncol, nlev, n_bnd)`.
 """
 struct FluxBand{FT <: AbstractFloat, FTA3D <: AbstractArray{FT, 3}}
     flux_up::FTA3D
@@ -115,9 +115,9 @@ function FluxBand(grid_params::RRTMGPGridParams, n_bnd::Int)
     (; nlay, ncol) = grid_params
     FT = eltype(grid_params)
     DA = ClimaComms.array_type(grid_params)
-    flux_up = DA{FT}(undef, nlay + 1, ncol, n_bnd)
-    flux_dn = DA{FT}(undef, nlay + 1, ncol, n_bnd)
-    flux_net = DA{FT}(undef, nlay + 1, ncol, n_bnd)
+    flux_up = DA{FT}(undef, ncol, nlay + 1, n_bnd)
+    flux_dn = DA{FT}(undef, ncol, nlay + 1, n_bnd)
+    flux_net = DA{FT}(undef, ncol, nlay + 1, n_bnd)
     return FluxBand{FT, typeof(flux_up)}(flux_up, flux_dn, flux_net)
 end
 
@@ -131,7 +131,7 @@ function set_band_flux_to_zero!(band::FluxBand{FT}) where {FT}
 end
 
 # Add one g-point's up/down flux (column `gcol`, per-g-point scratch `flux_up`/`flux_dn`
-# of shape `(nlev, ncol)`) into its band `ibnd`. No-op when spectral fluxes are off, so
+# of shape `(ncol, nlev)`) into its band `ibnd`. No-op when spectral fluxes are off, so
 # the broadband path pays nothing (the branch is specialized away on `::Nothing`).
 @inline accumulate_band_flux!(::Nothing, flux_up, flux_dn, gcol, ibnd, nlev) =
     nothing
@@ -145,8 +145,8 @@ end
 )
     bu, bd = band.flux_up, band.flux_dn
     @inbounds for ilev in 1:nlev
-        bu[ilev, gcol, ibnd] += flux_up[ilev, gcol]
-        bd[ilev, gcol, ibnd] += flux_dn[ilev, gcol]
+        bu[gcol, ilev, ibnd] += flux_up[gcol, ilev]
+        bd[gcol, ilev, ibnd] += flux_dn[gcol, ilev]
     end
     return nothing
 end
@@ -163,14 +163,14 @@ Compute the net flux for column `gcol` across `nlev` levels:
     (; flux_up, flux_dn, flux_net) = flux
     @inbounds begin
         for ilev in 1:nlev
-            flux_net[ilev, gcol] = flux_up[ilev, gcol] - flux_dn[ilev, gcol]
+            flux_net[gcol, ilev] = flux_up[gcol, ilev] - flux_dn[gcol, ilev]
         end
     end
     return nothing
 end
 
 @inline compute_net_flux!(flux::AbstractFlux, gcol) =
-    compute_net_flux!(flux, gcol, size(flux.flux_up, 1))
+    compute_net_flux!(flux, gcol, size(flux.flux_up, 2))
 
 """
     set_flux_to_zero!(flux::FluxLW{FT}, gcol::Int, nlev::Int) where {FT<:AbstractFloat}
@@ -185,15 +185,15 @@ Set longwave flux for column `gcol` to zero across `nlev` levels.
 ) where {FT <: AbstractFloat}
     (; flux_up, flux_dn, flux_net) = flux
     @inbounds for ilev in 1:nlev
-        flux_up[ilev, gcol] = FT(0)
-        flux_dn[ilev, gcol] = FT(0)
-        flux_net[ilev, gcol] = FT(0)
+        flux_up[gcol, ilev] = FT(0)
+        flux_dn[gcol, ilev] = FT(0)
+        flux_net[gcol, ilev] = FT(0)
     end
     return nothing
 end
 
 @inline set_flux_to_zero!(flux::FluxLW, gcol::Int) =
-    set_flux_to_zero!(flux, gcol, size(flux.flux_up, 1))
+    set_flux_to_zero!(flux, gcol, size(flux.flux_up, 2))
 
 """
     set_flux_to_zero!(flux::FluxSW{FT}, gcol::Int, nlev::Int) where {FT<:AbstractFloat}
@@ -208,16 +208,16 @@ Set shortwave flux for column `gcol` to zero across `nlev` levels.
 ) where {FT <: AbstractFloat}
     (; flux_up, flux_dn, flux_net, flux_dn_dir) = flux
     @inbounds for ilev in 1:nlev
-        flux_up[ilev, gcol] = FT(0)
-        flux_dn[ilev, gcol] = FT(0)
-        flux_net[ilev, gcol] = FT(0)
-        flux_dn_dir[ilev, gcol] = FT(0)
+        flux_up[gcol, ilev] = FT(0)
+        flux_dn[gcol, ilev] = FT(0)
+        flux_net[gcol, ilev] = FT(0)
+        flux_dn_dir[gcol, ilev] = FT(0)
     end
     return nothing
 end
 
 @inline set_flux_to_zero!(flux::FluxSW, gcol::Int) =
-    set_flux_to_zero!(flux, gcol, size(flux.flux_up, 1))
+    set_flux_to_zero!(flux, gcol, size(flux.flux_up, 2))
 
 """
     apply_metric_scaling!(flux::Union{FluxLW, FluxSW}, metric_scaling)
@@ -233,10 +233,11 @@ function apply_metric_scaling!(
     flux::AbstractFlux,
     metric_scaling::AbstractArray,
 )
-    flux.flux_up .= flux.flux_up .* metric_scaling
-    flux.flux_dn .= flux.flux_dn .* metric_scaling
-    flux.flux_net .= flux.flux_net .* metric_scaling
-    flux isa FluxSW && (flux.flux_dn_dir .= flux.flux_dn_dir .* metric_scaling)
+    sc = PermutedDimsArray(metric_scaling, (2, 1))
+    flux.flux_up .= flux.flux_up .* sc
+    flux.flux_dn .= flux.flux_dn .* sc
+    flux.flux_net .= flux.flux_net .* sc
+    flux isa FluxSW && (flux.flux_dn_dir .= flux.flux_dn_dir .* sc)
     return nothing
 end
 function apply_metric_scaling!(
@@ -252,8 +253,9 @@ end
 apply_metric_scaling!(::Nothing, metric_scaling) = nothing
 apply_metric_scaling!(band::FluxBand, metric_scaling::Nothing) = nothing
 function apply_metric_scaling!(band::FluxBand, metric_scaling::AbstractArray)
-    band.flux_up .= band.flux_up .* metric_scaling
-    band.flux_dn .= band.flux_dn .* metric_scaling
+    sc = PermutedDimsArray(metric_scaling, (2, 1))
+    band.flux_up .= band.flux_up .* sc
+    band.flux_dn .= band.flux_dn .* sc
     return nothing
 end
 
