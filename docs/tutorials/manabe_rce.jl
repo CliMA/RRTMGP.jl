@@ -129,7 +129,7 @@ println("dry adiabatic lapse rate g/cₚ = $(round(1000 * Γ_dry; digits = 1)) K
 # at a trial surface temperature ``T_s`` (hard adjustment). The lapse rate is
 # defined per unit height, yet no altitudes are needed to apply it:
 # combining ``dT/dz = -Γ`` with hydrostatic balance and the ideal-gas law gives
-# ``dT/T = (Γ R_d / g)\, dp/p``, so in the solver's native pressure coordinate
+# ``dT/T = (Γ R_d / g)\, dp/p``, so in the solver's native pressure coordinate,
 # the critical profile is the power law
 # ```math
 # T_c(p) = T_s \left(\frac{p}{p_s}\right)^{Γ R_d / g},
