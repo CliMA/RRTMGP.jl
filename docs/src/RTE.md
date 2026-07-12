@@ -162,7 +162,7 @@ The sweep needs conditions at both ends of the column. At the surface, the
 longwave upwelling radiance is the surface Planck emission scaled by the surface
 emissivity, and the shortwave reflection is set by the direct and diffuse
 albedos; the incident solar flux and the cosine of the solar zenith angle enter
-at the top. Any prescribed incident diffuse flux at the top defaults to zero.
+at the top. Any prescribed incident diffuse flux at the top defaults to zero, as does the downwelling longwave flux at the top.
 
 RRTMGP can also insert an **isothermal boundary layer**: an extra layer between
 the host model's top and the minimum pressure of the gas-optics tables, held at
