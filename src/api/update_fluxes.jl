@@ -5,9 +5,15 @@
 """
     update_lw_fluxes!(s::RRTMGPSolver)
 
-Update the longwave fluxes.
+Update the longwave fluxes, leaving the longwave flux getters consistent (the
+`(ncol, nlev)` compute buffers are transposed into the `(nlev, ncol)`
+presentation the getters expose).
 """
-update_lw_fluxes!(s::RRTMGPSolver) = update_lw_fluxes!(s, _radiation_method(s))
+function update_lw_fluxes!(s::RRTMGPSolver)
+    update_lw_fluxes!(s, _radiation_method(s))
+    Fluxes.update_presentation!(s.presented_flux_lw, s.lws.flux)
+    return nothing
+end
 
 update_lw_fluxes!(s::RRTMGPSolver, ::GrayRadiation) = RTESolver.solve_lw!(
     _longwave_solver(s),
@@ -46,9 +52,8 @@ function update_lw_fluxes!(
         lookups.lookup_lw_aero,
         ms,
     )
-    s.clear_flux_lw.flux_up .= s.lws.flux.flux_up
-    s.clear_flux_lw.flux_dn .= s.lws.flux.flux_dn
-    s.clear_flux_lw.flux_net .= s.lws.flux.flux_net
+    # snapshot the clear-sky fluxes into their (nlev, ncol) presentation
+    Fluxes.update_presentation!(s.clear_flux_lw, s.lws.flux)
     RTESolver.solve_lw!(
         lw_solver,
         as,
@@ -62,9 +67,15 @@ end
 """
     update_sw_fluxes!(s::RRTMGPSolver)
 
-Update the shortwave fluxes.
+Update the shortwave fluxes, leaving the shortwave flux getters consistent
+(the `(ncol, nlev)` compute buffers are transposed into the `(nlev, ncol)`
+presentation the getters expose).
 """
-update_sw_fluxes!(s::RRTMGPSolver) = update_sw_fluxes!(s, _radiation_method(s))
+function update_sw_fluxes!(s::RRTMGPSolver)
+    update_sw_fluxes!(s, _radiation_method(s))
+    Fluxes.update_presentation!(s.presented_flux_sw, s.sws.flux)
+    return nothing
+end
 
 update_sw_fluxes!(s::RRTMGPSolver, ::GrayRadiation) = RTESolver.solve_sw!(
     _shortwave_solver(s),
@@ -103,10 +114,8 @@ function update_sw_fluxes!(
         lookups.lookup_sw_aero,
         ms,
     )
-    s.clear_flux_sw.flux_up .= s.sws.flux.flux_up
-    s.clear_flux_sw.flux_dn .= s.sws.flux.flux_dn
-    s.clear_flux_sw.flux_dn_dir .= s.sws.flux.flux_dn_dir
-    s.clear_flux_sw.flux_net .= s.sws.flux.flux_net
+    # snapshot the clear-sky fluxes into their (nlev, ncol) presentation
+    Fluxes.update_presentation!(s.clear_flux_sw, s.sws.flux)
 
     RTESolver.solve_sw!(
         sw_solver,
@@ -156,9 +165,13 @@ Combine the longwave and shortwave net fluxes into `net_flux(s)` (and, for
 update_net_fluxes!(s::RRTMGPSolver) =
     update_net_fluxes!(s, _radiation_method(s))
 function update_net_fluxes!(s::RRTMGPSolver, ::AbstractRRTMGPMethod)
-    # Operate on the raw (boundary-extended) buffers, not `parent(getter(s))`: the
-    # getters allocate a `view` per call that would then just be stripped by `parent`.
-    s.net_flux_buffer .= s.lws.flux.flux_net .+ s.sws.flux.flux_net
+    # Operate on the raw (boundary-extended) buffers: the compute buffers are
+    # (ncol, nlev), the net-flux buffer is host-facing (nlev, ncol).
+    Fluxes.transpose_sum_into!(
+        s.net_flux_buffer,
+        s.lws.flux.flux_net,
+        s.sws.flux.flux_net,
+    )
     _update_band_net_fluxes!(s.lws)
     _update_band_net_fluxes!(s.sws)
     return nothing
@@ -167,7 +180,12 @@ function update_net_fluxes!(
     s::RRTMGPSolver,
     ::AllSkyRadiationWithClearSkyDiagnostics,
 )
-    s.net_flux_buffer .= s.lws.flux.flux_net .+ s.sws.flux.flux_net
+    Fluxes.transpose_sum_into!(
+        s.net_flux_buffer,
+        s.lws.flux.flux_net,
+        s.sws.flux.flux_net,
+    )
+    # the clear-sky snapshots are already stored (nlev, ncol)
     s.clear_net_flux_buffer .=
         s.clear_flux_lw.flux_net .+ s.clear_flux_sw.flux_net
     _update_band_net_fluxes!(s.lws)

@@ -24,8 +24,8 @@ and at the surface for no-scattering calculations.
 # Fields
 - `param_set`: Parameter set.
 - `sfc_source`: Surface source [W/m²] `(ncol)`.
-- `lay_source`: Planck source at layer average temperature [W/m²] `(nlay, ncol)`.
-- `lev_source`: Planck level source at layer edges [W/m²] `(nlay+1, ncol)`; includes
+- `lay_source`: Planck source at layer average temperature [W/m²] `(ncol, nlay)`.
+- `lev_source`: Planck level source at layer edges [W/m²] `(ncol, nlay+1)`; includes
   spectral weighting that accounts for the state-dependent frequency to g-space mapping.
 """
 struct SourceLWNoScat{S, D, PS} <: AbstractSourceLW

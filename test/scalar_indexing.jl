@@ -4,12 +4,12 @@ import ClimaComms
 import RRTMGP
 import CUDA
 
-# The `(nlev, ncol)` flux buffers are exposed through `_domain_view` (src/api/getters.jl)
-# as plain domain-masked `SubArray` views of the device array. Bringing one to the CPU
-# with `Array(getter(solver))` must not fall back to element-wise GPU scalar indexing
-# (CUDA.jl is expected to convert these strided views natively). This test pins that
-# contract for the flux getters; if it fails on GPU, an RRTMGP-owned `to_cpu` is the
-# fix -- not a `Base.Array` overload on foreign types.
+# The flux getters return plain domain-masked `SubArray` views of the
+# `(nlev, ncol)` presentation arrays that `update_fluxes!` fills from the
+# column-first compute buffers (src/api/getters.jl; `Fluxes.FluxPresentation`).
+# Bringing one to the CPU with `Array(getter(solver))` must not fall back to
+# element-wise GPU scalar indexing (CUDA.jl converts single-wrap strided views
+# natively). This test pins that contract for the flux getters.
 
 # A gray two-stream lw+sw solver with an optional isothermal boundary layer.
 function gray_solver(

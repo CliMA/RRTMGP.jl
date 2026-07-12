@@ -1,6 +1,7 @@
 using ..Fluxes
 using ..Sources
-using ..AtmosphericStates: AtmosphericState, AbstractAtmosphericState
+using ..AtmosphericStates:
+    AtmosphericState, AbstractAtmosphericState, TransposedStateCache
 using ..RTE
 using ..RTESolver
 using ..BCs
@@ -60,8 +61,12 @@ Construct it with the `RRTMGPSolver` constructor and drive it with
 - `lws`: longwave RTE solver and its flux/scratch buffers.
 - `as`: the atmospheric state (solver inputs).
 - `lookups`: the [`LookupBundle`](@ref) from `lookup_tables` (for gray radiation only the band counts are carried).
-- `clear_flux_lw`: clear-sky longwave fluxes, or `nothing`.
-- `clear_flux_sw`: clear-sky shortwave fluxes, or `nothing`.
+- `presented_flux_lw`, `presented_flux_sw`: host-facing `(nlev, ncol)`
+  [`FluxPresentation`](@ref RRTMGP.Fluxes.FluxPresentation) copies of the
+  longwave/shortwave fluxes, refreshed at the end of `update_fluxes!`; the flux
+  getters return views of these.
+- `clear_flux_lw`: clear-sky longwave fluxes (`(nlev, ncol)` presentation layout), or `nothing`.
+- `clear_flux_sw`: clear-sky shortwave fluxes (`(nlev, ncol)` presentation layout), or `nothing`.
 - `center_z`: layer-center altitudes [m], or `nothing`.
 - `face_z`: level (face) altitudes [m], or `nothing`.
 - `deep_atmosphere_inverse_scaling`: `(nlev, ncol)` factor multiplied into the fluxes for deep-atmosphere geometric scaling (the host supplies the multiplicative inverse of its metric scaling), or `nothing` (default) for the shallow-atmosphere approximation.
@@ -93,6 +98,8 @@ struct RRTMGPSolver{
     LWS,
     AS <: AbstractAtmosphericState,
     LU,
+    PFL <: Fluxes.FluxPresentation,
+    PFS <: Fluxes.FluxPresentation,
     CFLW,
     CFSW,
     ZC <: Union{AbstractArray, Nothing},
@@ -110,6 +117,8 @@ struct RRTMGPSolver{
     lws::LWS
     as::AS
     lookups::LU
+    presented_flux_lw::PFL
+    presented_flux_sw::PFS
     clear_flux_lw::CFLW
     clear_flux_sw::CFSW
     center_z::ZC
@@ -184,11 +193,19 @@ function RRTMGPSolver(
 
     flux_lw = Fluxes.FluxLW(grid_params)
     flux_sw = Fluxes.FluxSW(grid_params)
-    net_flux_buffer = similar(flux_lw.flux_net)
+    # Host-facing (nlev, ncol) presentation of the fluxes (see
+    # `Fluxes.FluxPresentation`): the flux getters return plain views of these
+    # arrays, filled by transposing copies at the end of `update_fluxes!`.
+    presented_flux_lw = Fluxes.FluxPresentation(grid_params; direct = false)
+    presented_flux_sw = Fluxes.FluxPresentation(grid_params; direct = true)
+    net_flux_buffer = similar(presented_flux_lw.flux_net)
     if radiation_method isa AllSkyRadiationWithClearSkyDiagnostics
-        clear_flux_lw = Fluxes.FluxLW(grid_params)
-        clear_flux_sw = Fluxes.FluxSW(grid_params)
-        clear_net_flux_buffer = similar(flux_lw.flux_net)
+        # The clear-sky snapshots are read only through the getters, so they
+        # are stored directly in the (nlev, ncol) presentation layout (the
+        # snapshot copy between the clear and all-sky solves transposes).
+        clear_flux_lw = Fluxes.FluxPresentation(grid_params; direct = false)
+        clear_flux_sw = Fluxes.FluxPresentation(grid_params; direct = true)
+        clear_net_flux_buffer = similar(presented_flux_lw.flux_net)
     else
         clear_flux_lw = nothing
         clear_flux_sw = nothing
@@ -212,9 +229,16 @@ function RRTMGPSolver(
         band_flux_sw = nothing
     end
 
+    # Column-first copies of the hot state arrays for coalesced gas-optics
+    # reads; one cache shared by the longwave and shortwave workspaces
+    # (refreshed at each spectral solve). Gray radiation reads its analytic
+    # state directly and needs none.
+    state_cache =
+        radiation_method isa GrayRadiation ? nothing :
+        TransposedStateCache(grid_params)
     sws =
         op_sw isa OneScalar ?
-        RTE.NoScatSWRTE(context, op_sw, bcs_sw, fluxb_sw, flux_sw) :
+        RTE.NoScatSWRTE(context, op_sw, bcs_sw, fluxb_sw, flux_sw, state_cache) :
         RTE.TwoStreamSWRTE(
             context,
             op_sw,
@@ -223,6 +247,7 @@ function RRTMGPSolver(
             fluxb_sw, # inferable, need radiation_method
             flux_sw, # views attached
             band_flux_sw, # optional per-band fluxes (or `nothing`)
+            state_cache,
         )
     lws =
         op_lw isa OneScalar ?
@@ -234,6 +259,7 @@ function RRTMGPSolver(
             fluxb_lw, # inferable, need radiation_method
             flux_lw, # views attached
             AngularDiscretizations.AngularDiscretization(grid_params, 1),
+            state_cache,
         ) :
         RTE.TwoStreamLWRTE(
             context,
@@ -243,6 +269,7 @@ function RRTMGPSolver(
             fluxb_lw, # inferable, need radiation_method
             flux_lw, # views attached
             band_flux_lw, # optional per-band fluxes (or `nothing`)
+            state_cache,
         )
     return RRTMGPSolver(
         grid_params,
@@ -254,6 +281,8 @@ function RRTMGPSolver(
         lws,
         as,
         lookups,
+        presented_flux_lw,
+        presented_flux_sw,
         clear_flux_lw,
         clear_flux_sw,
         center_z,

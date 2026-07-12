@@ -32,8 +32,14 @@ workspace's flux buffers in place, and you can read the results:
 
 ```julia
 solve_lw!(slv_lw, state, lookup_lw)   # or solve_lw!(slv_lw, state) for gray
-F = slv_lw.flux.flux_net              # (nlev, ncol) [W/m²]
+F = slv_lw.flux.flux_net              # (ncol, nlev) [W/m²]
 ```
+
+Note the axis order: the raw flux buffers are stored column-first, `(ncol,
+nlev)`, so that neighboring GPU threads (one per column) access consecutive
+memory. Only the Layer-2 getters (`net_flux`, `lw_flux_up`, ...) present the
+vertical-first `(nlev, ncol)` orientation, from presentation copies that
+`update_fluxes!` refreshes at the end of each call.
 
 This is what RRTMGP's own tests drive, and what [`RRTMGPSolver`](@ref
 RRTMGP.RRTMGPSolver) wraps behind [`update_fluxes!`](@ref RRTMGP.update_fluxes!)
@@ -81,10 +87,10 @@ slv_sw = TwoStreamSWRTE(grid_params; cos_zenith, toa_flux,
 solve_lw!(slv_lw, as)
 solve_sw!(slv_sw, as)
 
-lw_net = slv_lw.flux.flux_net   # (nlev, ncol) [W/m²]
+lw_net = slv_lw.flux.flux_net   # (ncol, nlev) [W/m²]
 sw_net = slv_sw.flux.flux_net
 net = lw_net .+ sw_net
-net[end, 1]                     # net flux at the top of the atmosphere [W/m²]
+net[1, end]                     # net flux at the top of the atmosphere [W/m²]
 ```
 
 The one-liner [`solve_gray`](@ref RRTMGP.solve_gray) wraps this.

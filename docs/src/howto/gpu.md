@@ -78,6 +78,15 @@ both backends:
   g-point's lookup-table slices hot in cache while sweeping the columns. With
   a single-threaded context, the same code runs serially.
 
+The memory layout matches the thread mapping: the internal scratch and output
+buffers are stored column-first, `(ncol, nlev)`, so consecutive GPU threads
+write consecutive addresses (coalesced access), and the frequently re-read
+state arrays (layer pressures and temperatures, level temperatures) are
+copied into a column-first `TransposedStateCache` once per solve so the
+g-point loop also reads coalesced memory. The caller-owned
+`AtmosphericState` and the getter views keep their vertical-first
+`(nlev, ncol)` presentation.
+
 ## Performance expectations
 
 CI benchmarks the kernels on GPUs (see `perf/benchmark_ratchet.jl`
