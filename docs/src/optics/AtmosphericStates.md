@@ -10,6 +10,7 @@ AtmosphericState
 GrayAtmosphericState
 CloudState
 AerosolState
+TransposedStateCache
 AbstractCloudMask
 MaxRandomOverlap
 AbstractGrayOpticalThickness
