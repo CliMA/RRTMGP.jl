@@ -240,26 +240,26 @@ Transport for no-scattering longwave problem.
     intensity_dn_ilevplus1 =
         isnothing(inc_flux) ? FT(0) :
         inc_flux[gcol, igpt] * flux_to_intensity
-    @inbounds flux_dn[nlev, gcol] =
+    @inbounds flux_dn[gcol, nlev] =
         intensity_dn_ilevplus1 * intensity_to_flux
 
     # Top of domain is index nlev
     # Downward propagation
     ilev = nlay
     @inbounds while ilev ≥ 1
-        τ_loc = τ[ilev, gcol] * Ds
+        τ_loc = τ[gcol, ilev] * Ds
         trans = exp(-τ_loc)
-        lay_src = lay_source[ilev, gcol]
+        lay_src = lay_source[gcol, ilev]
         intensity_dn_ilev =
             trans * intensity_dn_ilevplus1 + lw_noscat_source_dn(
-                lev_source[ilev, gcol],
+                lev_source[gcol, ilev],
                 lay_src,
                 τ_loc,
                 trans,
                 τ_thresh,
             )
         intensity_dn_ilevplus1 = intensity_dn_ilev
-        flux_dn[ilev, gcol] = intensity_dn_ilev * intensity_to_flux
+        flux_dn[gcol, ilev] = intensity_dn_ilev * intensity_to_flux
         ilev -= 1
     end
 
@@ -267,24 +267,23 @@ Transport for no-scattering longwave problem.
     @inbounds intensity_up_ilevminus1 =
         intensity_dn_ilevplus1 * (FT(1) - sfc_emis[ibnd, gcol]) +
         sfc_emis[ibnd, gcol] * sfc_source[gcol]
-    #flux_dn[1, gcol] * (FT(1) - sfc_emis[ibnd, gcol]) + sfc_emis[ibnd, gcol] * sfc_source[gcol]
-    @inbounds flux_up[1, gcol] = intensity_up_ilevminus1 * intensity_to_flux
+    @inbounds flux_up[gcol, 1] = intensity_up_ilevminus1 * intensity_to_flux
 
     # Upward propagation
     @inbounds for ilev in 2:(nlay + 1)
-        τ_loc = τ[ilev - 1, gcol] * Ds
+        τ_loc = τ[gcol, ilev - 1] * Ds
         trans = exp(-τ_loc)
-        lay_src = lay_source[ilev - 1, gcol]
+        lay_src = lay_source[gcol, ilev - 1]
         intensity_up_ilev =
             trans * intensity_up_ilevminus1 + lw_noscat_source_up(
-                lev_source[ilev, gcol],
+                lev_source[gcol, ilev],
                 lay_src,
                 τ_loc,
                 trans,
                 τ_thresh,
             )
         intensity_up_ilevminus1 = intensity_up_ilev
-        flux_up[ilev, gcol] = intensity_up_ilev * intensity_to_flux
+        flux_up[gcol, ilev] = intensity_up_ilev * intensity_to_flux
     end
     return nothing
 end

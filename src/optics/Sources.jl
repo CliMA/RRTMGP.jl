@@ -41,8 +41,8 @@ function SourceLWNoScat(grid_params::RRTMGPGridParams; params::RP.ARP)
     DA = ClimaComms.array_type(grid_params)
     FT = eltype(grid_params)
     sfc_source = DA{FT, 1}(undef, ncol)
-    lay_source = DA{FT, 2}(undef, nlay, ncol)
-    lev_source = DA{FT, 2}(undef, nlay + 1, ncol)
+    lay_source = DA{FT, 2}(undef, ncol, nlay)
+    lev_source = DA{FT, 2}(undef, ncol, nlay + 1)
 
     return SourceLWNoScat{
         typeof(sfc_source),
@@ -66,10 +66,10 @@ and at the surface for 2-stream calculations.
 # Fields
 - `param_set`: Parameter set.
 - `sfc_source`: Surface source [W/m²] `(ncol)`.
-- `leveldata`: Storage for level source, albedo and src `(3, nlay+1, ncol)`.
-- `lev_source`: Level source [W/m²] `(nlay+1, ncol)`; used in 2-stream calculations.
-- `albedo`: Temporary storage array `(nlay+1, ncol)`; used in 2-stream calculations.
-- `src`: Temporary storage array `(nlay+1, ncol)`; used in 2-stream calculations.
+- `leveldata`: Storage for level source, albedo and src `(ncol, nlay+1, 3)`.
+- `lev_source`: Level source [W/m²] `(ncol, nlay+1)`; used in 2-stream calculations.
+- `albedo`: Temporary storage array `(ncol, nlay+1)`; used in 2-stream calculations.
+- `src`: Temporary storage array `(ncol, nlay+1)`; used in 2-stream calculations.
 """
 struct SourceLW2Str{S, D, V, PS} <: AbstractSourceLW
     param_set::PS
@@ -83,9 +83,9 @@ end
 function Adapt.adapt_structure(to, src::SourceLW2Str)
     sfc_source = Adapt.adapt(to, src.sfc_source)
     leveldata = Adapt.adapt(to, src.leveldata)
-    lev_source = view(leveldata, 1, :, :)
-    albedo = view(leveldata, 2, :, :)
-    src_view = view(leveldata, 3, :, :)
+    lev_source = view(leveldata, :, :, 1)
+    albedo = view(leveldata, :, :, 2)
+    src_view = view(leveldata, :, :, 3)
     return SourceLW2Str{
         typeof(sfc_source),
         typeof(leveldata),
@@ -106,10 +106,10 @@ function SourceLW2Str(grid_params::RRTMGPGridParams; params::RP.ARP)
     DA = ClimaComms.array_type(grid_params)
     FT = eltype(grid_params)
     sfc_source = DA{FT, 1}(undef, ncol)
-    leveldata = DA{FT, 3}(undef, 3, nlay + 1, ncol)
-    lev_source = view(leveldata, 1, :, :)
-    albedo = view(leveldata, 2, :, :)
-    src = view(leveldata, 3, :, :)
+    leveldata = DA{FT, 3}(undef, ncol, nlay + 1, 3)
+    lev_source = view(leveldata, :, :, 1)
+    albedo = view(leveldata, :, :, 2)
+    src = view(leveldata, :, :, 3)
 
     return SourceLW2Str{
         typeof(sfc_source),
@@ -135,9 +135,9 @@ and at the surface for 2-stream calculations.
 
 # Fields
 - `sfc_source`: Surface source `(ncol)`.
-- `leveldata`: Storage for albedo and src `(2, nlay+1, ncol)`.
-- `albedo`: Albedo `(nlay+1, ncol)`.
-- `src`: Temporary storage array `(nlay+1, ncol)`; used in 2-stream calculations.
+- `leveldata`: Storage for albedo and src `(ncol, nlay+1, 2)`.
+- `albedo`: Albedo `(ncol, nlay+1)`.
+- `src`: Temporary storage array `(ncol, nlay+1)`; used in 2-stream calculations.
 """
 struct SourceSW2Str{S, D, V}
     sfc_source::S
@@ -149,8 +149,8 @@ end
 function Adapt.adapt_structure(to, src::SourceSW2Str)
     sfc_source = Adapt.adapt(to, src.sfc_source)
     leveldata = Adapt.adapt(to, src.leveldata)
-    albedo = view(leveldata, 1, :, :)
-    src_view = view(leveldata, 2, :, :)
+    albedo = view(leveldata, :, :, 1)
+    src_view = view(leveldata, :, :, 2)
     return SourceSW2Str{typeof(sfc_source), typeof(leveldata), typeof(albedo)}(
         sfc_source,
         leveldata,
@@ -164,9 +164,9 @@ function SourceSW2Str(grid_params::RRTMGPGridParams)
     DA = ClimaComms.array_type(grid_params)
     FT = eltype(grid_params)
     sfc_source = DA{FT, 1}(undef, ncol)
-    leveldata = DA{FT, 3}(undef, 2, nlay + 1, ncol)
-    albedo = view(leveldata, 1, :, :)
-    src = view(leveldata, 2, :, :)
+    leveldata = DA{FT, 3}(undef, ncol, nlay + 1, 2)
+    albedo = view(leveldata, :, :, 1)
+    src = view(leveldata, :, :, 2)
 
     return SourceSW2Str{typeof(sfc_source), typeof(leveldata), typeof(albedo)}(
         sfc_source,

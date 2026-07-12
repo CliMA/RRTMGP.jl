@@ -45,6 +45,13 @@ _domain_view(isothermal_boundary_layer::Bool, x::AbstractArray) =
 _domain_view(isothermal_boundary_layer::Bool, x::AbstractArray{<:Any, 3}) =
     view(x, 1:(size(x, 1) - Int(isothermal_boundary_layer)), :, :)
 
+_flux_domain_view(s::RRTMGPSolver, x) = _flux_domain_view(s.grid_params.isothermal_boundary_layer, x)
+_flux_domain_view(::Bool, ::Nothing) = nothing
+_flux_domain_view(isothermal_boundary_layer::Bool, x::AbstractArray{<:Any, 2}) =
+    view(PermutedDimsArray(x, (2, 1)), 1:(size(x, 2) - Int(isothermal_boundary_layer)), :)
+_flux_domain_view(isothermal_boundary_layer::Bool, x::AbstractArray{<:Any, 3}) =
+    view(PermutedDimsArray(x, (2, 1, 3)), 1:(size(x, 2) - Int(isothermal_boundary_layer)), :, :)
+
 # The clear-sky flux workspaces exist only on `AllSkyRadiationWithClearSkyDiagnostics`
 # solvers; give the `clear_*` getters an informative error elsewhere (instead of a
 # cryptic `getproperty(::Nothing, ...)`).
@@ -57,21 +64,21 @@ _require_clear_sky(x) = x
 # Potentially views
 top_of_atmosphere_lw_flux_dn(s::RRTMGPSolver)         = _maybe_transpose(s.lws.bcs.inc_flux)
 top_of_atmosphere_diffuse_sw_flux_dn(s::RRTMGPSolver) = _maybe_transpose(s.sws.bcs.inc_flux_diffuse)
-lw_flux_up(s::RRTMGPSolver)                           = _domain_view(s, s.lws.flux.flux_up)
-lw_flux_dn(s::RRTMGPSolver)                           = _domain_view(s, s.lws.flux.flux_dn)
-lw_flux_net(s::RRTMGPSolver)                          = _domain_view(s, s.lws.flux.flux_net)
-clear_lw_flux_up(s::RRTMGPSolver)                     = _domain_view(s, _require_clear_sky(s.clear_flux_lw).flux_up)
-clear_lw_flux_dn(s::RRTMGPSolver)                     = _domain_view(s, _require_clear_sky(s.clear_flux_lw).flux_dn)
-clear_lw_flux(s::RRTMGPSolver)                        = _domain_view(s, _require_clear_sky(s.clear_flux_lw).flux_net)
+lw_flux_up(s::RRTMGPSolver)                           = _flux_domain_view(s, s.lws.flux.flux_up)
+lw_flux_dn(s::RRTMGPSolver)                           = _flux_domain_view(s, s.lws.flux.flux_dn)
+lw_flux_net(s::RRTMGPSolver)                          = _flux_domain_view(s, s.lws.flux.flux_net)
+clear_lw_flux_up(s::RRTMGPSolver)                     = _flux_domain_view(s, _require_clear_sky(s.clear_flux_lw).flux_up)
+clear_lw_flux_dn(s::RRTMGPSolver)                     = _flux_domain_view(s, _require_clear_sky(s.clear_flux_lw).flux_dn)
+clear_lw_flux(s::RRTMGPSolver)                        = _flux_domain_view(s, _require_clear_sky(s.clear_flux_lw).flux_net)
 surface_emissivity(s::RRTMGPSolver)                   = s.lws.bcs.sfc_emis
-sw_flux_up(s::RRTMGPSolver)                           = _domain_view(s, s.sws.flux.flux_up)
-sw_flux_dn(s::RRTMGPSolver)                           = _domain_view(s, s.sws.flux.flux_dn)
-sw_flux_net(s::RRTMGPSolver)                          = _domain_view(s, s.sws.flux.flux_net)
-sw_direct_flux_dn(s::RRTMGPSolver)                    = _domain_view(s, s.sws.flux.flux_dn_dir)
-clear_sw_flux_up(s::RRTMGPSolver)                     = _domain_view(s, _require_clear_sky(s.clear_flux_sw).flux_up)
-clear_sw_flux_dn(s::RRTMGPSolver)                     = _domain_view(s, _require_clear_sky(s.clear_flux_sw).flux_dn)
-clear_sw_direct_flux_dn(s::RRTMGPSolver)              = _domain_view(s, _require_clear_sky(s.clear_flux_sw).flux_dn_dir)
-clear_sw_flux(s::RRTMGPSolver)                        = _domain_view(s, _require_clear_sky(s.clear_flux_sw).flux_net)
+sw_flux_up(s::RRTMGPSolver)                           = _flux_domain_view(s, s.sws.flux.flux_up)
+sw_flux_dn(s::RRTMGPSolver)                           = _flux_domain_view(s, s.sws.flux.flux_dn)
+sw_flux_net(s::RRTMGPSolver)                          = _flux_domain_view(s, s.sws.flux.flux_net)
+sw_direct_flux_dn(s::RRTMGPSolver)                    = _flux_domain_view(s, s.sws.flux.flux_dn_dir)
+clear_sw_flux_up(s::RRTMGPSolver)                     = _flux_domain_view(s, _require_clear_sky(s.clear_flux_sw).flux_up)
+clear_sw_flux_dn(s::RRTMGPSolver)                     = _flux_domain_view(s, _require_clear_sky(s.clear_flux_sw).flux_dn)
+clear_sw_direct_flux_dn(s::RRTMGPSolver)              = _flux_domain_view(s, _require_clear_sky(s.clear_flux_sw).flux_dn_dir)
+clear_sw_flux(s::RRTMGPSolver)                        = _flux_domain_view(s, _require_clear_sky(s.clear_flux_sw).flux_net)
 cloud_liquid_effective_radius(s::RRTMGPSolver)        = _domain_view(s, s.as.cloud_state.cld_r_eff_liq)
 cloud_ice_effective_radius(s::RRTMGPSolver)           = _domain_view(s, s.as.cloud_state.cld_r_eff_ice)
 cloud_liquid_water_path(s::RRTMGPSolver)              = _domain_view(s, s.as.cloud_state.cld_path_liq)
@@ -94,8 +101,8 @@ layer_temperature(s::RRTMGPSolver)                    = _domain_view(s, getview_
 layer_relative_humidity(s::RRTMGPSolver)              = _domain_view(s, getview_rel_hum(s.as))
 level_pressure(s::RRTMGPSolver)                       = _domain_view(s, s.as.p_lev)
 level_temperature(s::RRTMGPSolver)                    = _domain_view(s, s.as.t_lev)
-net_flux(s::RRTMGPSolver)                             = _domain_view(s, s.net_flux_buffer)
-clear_net_flux(s::RRTMGPSolver)                       = _domain_view(s, _require_clear_sky(s.clear_net_flux_buffer))
+net_flux(s::RRTMGPSolver)                             = _flux_domain_view(s, s.net_flux_buffer)
+clear_net_flux(s::RRTMGPSolver)                       = _flux_domain_view(s, _require_clear_sky(s.clear_net_flux_buffer))
 deep_atmosphere_inverse_scaling(s::RRTMGPSolver)      = _domain_view(s, s.deep_atmosphere_inverse_scaling)
 #! format: on
 
@@ -155,17 +162,17 @@ wavenumber range.
 The `up`/`dn`/`net` getters are views into the retained per-band buffers.
 """
 spectral_lw_flux_up(s::RRTMGPSolver) =
-    _domain_view(s, _solver_band_flux(s.lws).flux_up)
+    _flux_domain_view(s, _solver_band_flux(s.lws).flux_up)
 spectral_lw_flux_dn(s::RRTMGPSolver) =
-    _domain_view(s, _solver_band_flux(s.lws).flux_dn)
+    _flux_domain_view(s, _solver_band_flux(s.lws).flux_dn)
 spectral_lw_flux_net(s::RRTMGPSolver) =
-    _domain_view(s, _solver_band_flux(s.lws).flux_net)
+    _flux_domain_view(s, _solver_band_flux(s.lws).flux_net)
 spectral_sw_flux_up(s::RRTMGPSolver) =
-    _domain_view(s, _solver_band_flux(s.sws).flux_up)
+    _flux_domain_view(s, _solver_band_flux(s.sws).flux_up)
 spectral_sw_flux_dn(s::RRTMGPSolver) =
-    _domain_view(s, _solver_band_flux(s.sws).flux_dn)
+    _flux_domain_view(s, _solver_band_flux(s.sws).flux_dn)
 spectral_sw_flux_net(s::RRTMGPSolver) =
-    _domain_view(s, _solver_band_flux(s.sws).flux_net)
+    _flux_domain_view(s, _solver_band_flux(s.sws).flux_net)
 
 """
     lw_band_bounds(s::RRTMGPSolver)

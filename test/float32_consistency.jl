@@ -125,10 +125,10 @@ function clear_sky_fluxes(context, ::Type{FT}, ::Type{SLVLW}; ncol) where {FT, S
     solve_lw!(slv_lw, as, lookup_lw)
     solve_sw!(slv_sw, as, lookup_sw)
     return (;
-        lw_up = Array(slv_lw.flux.flux_up),
-        lw_dn = Array(slv_lw.flux.flux_dn),
-        sw_up = Array(slv_sw.flux.flux_up),
-        sw_dn = Array(slv_sw.flux.flux_dn),
+        lw_up = Array(PermutedDimsArray(slv_lw.flux.flux_up, (2, 1))),
+        lw_dn = Array(PermutedDimsArray(slv_lw.flux.flux_dn, (2, 1))),
+        sw_up = Array(PermutedDimsArray(slv_sw.flux.flux_up, (2, 1))),
+        sw_dn = Array(PermutedDimsArray(slv_sw.flux.flux_dn, (2, 1))),
     )
 end
 
@@ -187,10 +187,10 @@ function cloudy_sky_fluxes(context, ::Type{FT}, ::Type{SLVLW}; ncol) where {FT, 
     solve_lw!(slv_lw, as, lookup_lw, lookup_lw_cld)
     solve_sw!(slv_sw, as, lookup_sw, lookup_sw_cld)
     return (;
-        lw_up = Array(slv_lw.flux.flux_up),
-        lw_dn = Array(slv_lw.flux.flux_dn),
-        sw_up = Array(slv_sw.flux.flux_up),
-        sw_dn = Array(slv_sw.flux.flux_dn),
+        lw_up = Array(PermutedDimsArray(slv_lw.flux.flux_up, (2, 1))),
+        lw_dn = Array(PermutedDimsArray(slv_lw.flux.flux_dn, (2, 1))),
+        sw_up = Array(PermutedDimsArray(slv_sw.flux.flux_up, (2, 1))),
+        sw_dn = Array(PermutedDimsArray(slv_sw.flux.flux_dn, (2, 1))),
     )
 end
 

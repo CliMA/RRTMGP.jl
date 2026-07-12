@@ -46,9 +46,9 @@ function update_lw_fluxes!(
         lookups.lookup_lw_aero,
         ms,
     )
-    parent(clear_lw_flux_up(s)) .= parent(lw_flux_up(s))
-    parent(clear_lw_flux_dn(s)) .= parent(lw_flux_dn(s))
-    parent(clear_lw_flux(s)) .= parent(lw_flux_net(s))
+    s.clear_flux_lw.flux_up .= s.lws.flux.flux_up
+    s.clear_flux_lw.flux_dn .= s.lws.flux.flux_dn
+    s.clear_flux_lw.flux_net .= s.lws.flux.flux_net
     RTESolver.solve_lw!(
         lw_solver,
         as,
@@ -103,10 +103,10 @@ function update_sw_fluxes!(
         lookups.lookup_sw_aero,
         ms,
     )
-    parent(clear_sw_flux_up(s)) .= parent(sw_flux_up(s))
-    parent(clear_sw_flux_dn(s)) .= parent(sw_flux_dn(s))
-    parent(clear_sw_direct_flux_dn(s)) .= parent(sw_direct_flux_dn(s))
-    parent(clear_sw_flux(s)) .= parent(sw_flux_net(s))
+    s.clear_flux_sw.flux_up .= s.sws.flux.flux_up
+    s.clear_flux_sw.flux_dn .= s.sws.flux.flux_dn
+    s.clear_flux_sw.flux_dn_dir .= s.sws.flux.flux_dn_dir
+    s.clear_flux_sw.flux_net .= s.sws.flux.flux_net
 
     RTESolver.solve_sw!(
         sw_solver,

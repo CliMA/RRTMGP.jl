@@ -67,7 +67,9 @@ function gray_atmos_lw_equil(
         setup_gray_as_pr_grid(context, nlay, lat, p0, pe, otp, param_set, DA)
     slv_lw = SLVLW(grid_params; params = param_set, sfc_emis, inc_flux)
 
-    (; flux_up, flux_dn, flux_net) = slv_lw.flux
+    flux_up = view(PermutedDimsArray(slv_lw.flux.flux_up, (2, 1)), :, :)
+    flux_dn = view(PermutedDimsArray(slv_lw.flux.flux_dn, (2, 1)), :, :)
+    flux_net = view(PermutedDimsArray(slv_lw.flux.flux_net, (2, 1)), :, :)
     (; t_lay, p_lay, t_lev, p_lev) = gray_as
     sbc = FT(RRTMGP.Parameters.Stefan(param_set))
     cp_d_ = FT(RRTMGP.Parameters.cp_d(param_set))
@@ -199,9 +201,9 @@ function gray_atmos_sw_test(
 
     solve_sw!(slv_sw, as)
 
-    τ = Array(slv_sw.op.τ)
+    τ = Array(PermutedDimsArray(slv_sw.op.τ, (2, 1)))
     cos_zenith = Array(cos_zenith)
-    flux_dn_dir = Array(slv_sw.flux.flux_dn_dir)
+    flux_dn_dir = Array(PermutedDimsArray(slv_sw.flux.flux_dn_dir, (2, 1)))
     toa_flux = Array(toa_flux)
 
     # testing with exact solution

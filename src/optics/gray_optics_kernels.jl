@@ -37,28 +37,28 @@ function compute_optical_props!(
             p_lev_glayplus1 = p_lev[glay + 1, gcol]
             Δp = p_lev_glayplus1 - p_lev_glay
             p = p_lay[glay, gcol]
-            τ[glay, gcol] =
+            τ[gcol, glay] =
                 compute_gray_optical_thickness_lw(otp, p0, Δp, p, lat)
             p_lev_glay = p_lev_glayplus1
             # compute longwave source terms
             t_lev_inc = t_lev[glay + 1, gcol]
             t_lay_loc = t_lay[glay, gcol]
-            lay_source[glay, gcol] =
+            lay_source[gcol, glay] =
                 sbc * (t_lay_loc * t_lay_loc * t_lay_loc * t_lay_loc) / FT(π)   # computing lay_source
             lev_src_inc =
                 sbc * (t_lev_inc * t_lev_inc * t_lev_inc * t_lev_inc) / FT(π)
             lev_src_dec =
                 sbc * (t_lev_dec * t_lev_dec * t_lev_dec * t_lev_dec) / FT(π)
             if glay == 1
-                lev_source[glay, gcol] = lev_src_dec
+                lev_source[gcol, glay] = lev_src_dec
             else
-                lev_source[glay, gcol] = sqrt(lev_src_inc_prev * lev_src_dec)
+                lev_source[gcol, glay] = sqrt(lev_src_inc_prev * lev_src_dec)
             end
             lev_src_dec_prev = lev_src_dec
             lev_src_inc_prev = lev_src_inc
             t_lev_dec = t_lev_inc
         end
-        lev_source[nlay + 1, gcol] = lev_src_inc_prev
+        lev_source[gcol, nlay + 1] = lev_src_inc_prev
     end
     return nothing
 end
@@ -88,7 +88,7 @@ function compute_optical_props!(
             p_lev_glayplus1 = p_lev[glay + 1, gcol]
             Δp = p_lev_glayplus1 - p_lev_glay
             p = p_lay[glay, gcol]
-            τ[glay, gcol] =
+            τ[gcol, glay] =
                 compute_gray_optical_thickness_lw(otp, p0, Δp, p, lat)
             p_lev_glay = p_lev_glayplus1
             # compute longwave source terms
@@ -98,19 +98,19 @@ function compute_optical_props!(
             lev_src_dec =
                 sbc * (t_lev_dec * t_lev_dec * t_lev_dec * t_lev_dec) / FT(π)
             if glay == 1
-                lev_source[glay, gcol] = lev_src_dec
+                lev_source[gcol, glay] = lev_src_dec
             else
-                lev_source[glay, gcol] = sqrt(lev_src_inc_prev * lev_src_dec)
+                lev_source[gcol, glay] = sqrt(lev_src_inc_prev * lev_src_dec)
             end
             lev_src_dec_prev = lev_src_dec
             lev_src_inc_prev = lev_src_inc
             t_lev_dec = t_lev_inc
         end
-        lev_source[nlay + 1, gcol] = lev_src_inc_prev
+        lev_source[gcol, nlay + 1] = lev_src_inc_prev
     end
     zeroval = zero(FT)
-    map!(x -> zeroval, view(ssa, :, gcol), view(ssa, :, gcol))
-    map!(x -> zeroval, view(g, :, gcol), view(g, :, gcol))
+    map!(x -> zeroval, view(ssa, gcol, :), view(ssa, gcol, :))
+    map!(x -> zeroval, view(g, gcol, :), view(g, gcol, :))
     return nothing
 end
 
@@ -139,7 +139,7 @@ function compute_optical_props!(
         @inbounds p_lev_glayplus1 = p_lev[glay + 1, gcol]
         @inbounds Δp = p_lev_glayplus1 - p_lev_glay
         @inbounds p = p_lay[glay, gcol]
-        @inbounds τ[glay, gcol] =
+        @inbounds τ[gcol, glay] =
             compute_gray_optical_thickness_sw(otp, p0, Δp, p, lat)
         p_lev_glay = p_lev_glayplus1
     end
@@ -147,8 +147,8 @@ function compute_optical_props!(
         (; ssa, g) = op
         FT = eltype(τ)
         zeroval = zero(FT)
-        map!(x -> zeroval, view(ssa, :, gcol), view(ssa, :, gcol))
-        map!(x -> zeroval, view(g, :, gcol), view(g, :, gcol))
+        map!(x -> zeroval, view(ssa, gcol, :), view(ssa, gcol, :))
+        map!(x -> zeroval, view(g, gcol, :), view(g, gcol, :))
     end
     return nothing
 end

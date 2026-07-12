@@ -32,7 +32,7 @@ Compute optical properties for the longwave problem.
         totplnk = view(lkp.planck.tot_planck, :, ibnd)
         as_layerdata = AtmosphericStates.getview_layerdata(as, gcol)
         t_lev_col = view(as.t_lev, :, gcol)
-        τ = view(op.τ, :, gcol)
+        τ = view(op.τ, gcol, :)
 
         lev_src_inc_prev = zero(t_sfc)
         lev_src_dec_prev = zero(t_sfc)
@@ -57,7 +57,7 @@ Compute optical properties for the longwave problem.
             # compute longwave source terms
             t_lev_inc = t_lev_col[glay + 1]
 
-            lay_source[glay, gcol] =
+            lay_source[gcol, glay] =
                 interp1d_equispaced(t_lay, t_planck, totplnk) * planckfrac
             lev_src_inc =
                 interp1d_equispaced(t_lev_inc, t_planck, totplnk) * planckfrac
@@ -66,15 +66,15 @@ Compute optical properties for the longwave problem.
             if glay == 1
                 sfc_source[gcol] =
                     interp1d_equispaced(t_sfc, t_planck, totplnk) * planckfrac
-                lev_source[glay, gcol] = lev_src_dec
+                lev_source[gcol, glay] = lev_src_dec
             else
-                lev_source[glay, gcol] = sqrt(lev_src_inc_prev * lev_src_dec)
+                lev_source[gcol, glay] = sqrt(lev_src_inc_prev * lev_src_dec)
             end
             lev_src_dec_prev = lev_src_dec
             lev_src_inc_prev = lev_src_inc
             t_lev_dec = t_lev_inc
         end
-        lev_source[nlay + 1, gcol] = lev_src_inc_prev
+        lev_source[gcol, nlay + 1] = lev_src_inc_prev
         if !isnothing(lkp_cld)
             cloud_state = as.cloud_state
             cld_r_eff_liq = view(cloud_state.cld_r_eff_liq, :, gcol)
@@ -141,9 +141,9 @@ end
         totplnk = view(lkp.planck.tot_planck, :, ibnd)
         as_layerdata = AtmosphericStates.getview_layerdata(as, gcol)
         t_lev_col = view(as.t_lev, :, gcol)
-        τ = view(op.τ, :, gcol)
-        ssa = view(op.ssa, :, gcol)
-        g = view(op.g, :, gcol)
+        τ = view(op.τ, gcol, :)
+        ssa = view(op.ssa, gcol, :)
+        g = view(op.g, gcol, :)
     end
 
     lev_src_inc_prev = zero(t_sfc)
@@ -177,15 +177,15 @@ end
             if glay == 1
                 sfc_source[gcol] =
                     interp1d_equispaced(t_sfc, t_planck, totplnk) * planckfrac
-                lev_source[glay, gcol] = lev_src_dec
+                lev_source[gcol, glay] = lev_src_dec
             else
-                lev_source[glay, gcol] = sqrt(lev_src_inc_prev * lev_src_dec)
+                lev_source[gcol, glay] = sqrt(lev_src_inc_prev * lev_src_dec)
             end
             lev_src_dec_prev = lev_src_dec
             lev_src_inc_prev = lev_src_inc
             t_lev_dec = t_lev_inc
         end
-        lev_source[nlay + 1, gcol] = lev_src_inc_prev
+        lev_source[gcol, nlay + 1] = lev_src_inc_prev
     end
     if !isnothing(lkp_cld) # clouds need TwoStream optics
         cloud_state = as.cloud_state
@@ -257,7 +257,6 @@ Compute optical properties for the shortwave problem.
     igpt::Int,
     lkp::LookUpSW,
     ::Nothing,
-    ::Nothing,
 )
     nlay = AtmosphericStates.get_nlay(as)
     (; vmr) = as
@@ -265,7 +264,7 @@ Compute optical properties for the shortwave problem.
         ibnd = lkp.band_data.major_gpt2bnd[igpt]
         t_sfc = as.t_sfc[gcol]
         as_layerdata = AtmosphericStates.getview_layerdata(as, gcol)
-        τ = view(op.τ, :, gcol)
+        τ = view(op.τ, gcol, :)
     end
     @inbounds for glay in 1:nlay
         col_dry, p_lay, t_lay =
@@ -301,9 +300,9 @@ end
         ibnd = lkp.band_data.major_gpt2bnd[igpt]
         t_sfc = as.t_sfc[gcol]
         as_layerdata = AtmosphericStates.getview_layerdata(as, gcol)
-        τ = view(op.τ, :, gcol)
-        ssa = view(op.ssa, :, gcol)
-        g = view(op.g, :, gcol)
+        τ = view(op.τ, gcol, :)
+        ssa = view(op.ssa, gcol, :)
+        g = view(op.g, gcol, :)
     end
     @inbounds for glay in 1:nlay
         col_dry, p_lay, t_lay =

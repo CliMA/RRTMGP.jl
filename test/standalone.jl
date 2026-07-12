@@ -242,8 +242,8 @@ end
 
         RRTMGP.update_fluxes!(solver)
 
-        # internal buffers are boundary-extended; getters are domain-masked
-        @test size(solver.net_flux_buffer, 1) == nlay + 1             # full levels
+        # internal buffers are boundary-extended and coalesced (ncol, nlev); getters are domain-masked
+        @test size(solver.net_flux_buffer, 2) == nlay + 1             # full levels
         @test size(RRTMGP.net_flux(solver), 1) == domain_nlay + 1     # domain levels
         @test size(RRTMGP.level_pressure(solver), 1) == domain_nlay + 1
         @test size(RRTMGP.lw_flux_net(solver), 1) == domain_nlay + 1

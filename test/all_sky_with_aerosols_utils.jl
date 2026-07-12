@@ -288,9 +288,9 @@ function all_sky_with_aerosols(
     comp_flux_net_lw = comp_flux_up_lw .- comp_flux_dn_lw
     comp_flux_net_sw = comp_flux_up_sw .- comp_flux_dn_sw
 
-    flux_up_lw = Array(slv_lw.flux.flux_up)
-    flux_dn_lw = Array(slv_lw.flux.flux_dn)
-    flux_net_lw = Array(slv_lw.flux.flux_net)
+    flux_up_lw = Array(PermutedDimsArray(slv_lw.flux.flux_up, (2, 1)))
+    flux_dn_lw = Array(PermutedDimsArray(slv_lw.flux.flux_dn, (2, 1)))
+    flux_net_lw = Array(PermutedDimsArray(slv_lw.flux.flux_net, (2, 1)))
 
     max_err_flux_up_lw = maximum(abs.(flux_up_lw .- comp_flux_up_lw))
     max_err_flux_dn_lw = maximum(abs.(flux_dn_lw .- comp_flux_dn_lw))
@@ -319,10 +319,10 @@ function all_sky_with_aerosols(
         "L∞ relative error in flux_net = $(max_rel_err_flux_net_lw * 100) %\n",
     )
 
-    flux_up_sw = Array(slv_sw.flux.flux_up)
-    flux_dn_sw = Array(slv_sw.flux.flux_dn)
-    flux_dn_dir_sw = Array(slv_sw.flux.flux_dn_dir)
-    flux_net_sw = Array(slv_sw.flux.flux_net)
+    flux_up_sw = Array(PermutedDimsArray(slv_sw.flux.flux_up, (2, 1)))
+    flux_dn_sw = Array(PermutedDimsArray(slv_sw.flux.flux_dn, (2, 1)))
+    flux_dn_dir_sw = Array(PermutedDimsArray(slv_sw.flux.flux_dn_dir, (2, 1)))
+    flux_net_sw = Array(PermutedDimsArray(slv_sw.flux.flux_net, (2, 1)))
 
     max_err_flux_up_sw = maximum(abs.(flux_up_sw .- comp_flux_up_sw))
     max_err_flux_dn_sw = maximum(abs.(flux_dn_sw .- comp_flux_dn_sw))
@@ -400,7 +400,7 @@ function all_sky_with_aerosols(
     slv_sw = SLVSW(grid_params; swbcs...)
 
     # Use simple array to test pointwise mult op
-    metric_scaling = DA(one.(slv_sw.flux.flux_up) * FT(2))
+    metric_scaling = DA(one.(as.p_lev) * FT(2))
     solve_lw!(
         slv_lw,
         as,
@@ -425,14 +425,15 @@ function all_sky_with_aerosols(
     flux_dn_lw = DA(slv_lw.flux.flux_dn)
     flux_net_lw = DA(slv_lw.flux.flux_net)
     flux_dn_dir_sw = DA(slv_sw.flux.flux_dn_dir)
+    sc = PermutedDimsArray(metric_scaling, (2, 1))
 
-    @test all(test_flux_up_sw == flux_up_sw ./ metric_scaling)
-    @test all(test_flux_dn_sw == flux_dn_sw ./ metric_scaling)
-    @test all(test_flux_net_sw == flux_net_sw ./ metric_scaling)
-    @test all(test_flux_up_lw == flux_up_lw ./ metric_scaling)
-    @test all(test_flux_dn_lw == flux_dn_lw ./ metric_scaling)
-    @test all(test_flux_net_lw == flux_net_lw ./ metric_scaling)
-    @test all(test_flux_dn_dir_sw == flux_dn_dir_sw ./ metric_scaling)
+    @test all(test_flux_up_sw == flux_up_sw ./ sc)
+    @test all(test_flux_dn_sw == flux_dn_sw ./ sc)
+    @test all(test_flux_net_sw == flux_net_sw ./ sc)
+    @test all(test_flux_up_lw == flux_up_lw ./ sc)
+    @test all(test_flux_dn_lw == flux_dn_lw ./ sc)
+    @test all(test_flux_net_lw == flux_net_lw ./ sc)
+    @test all(test_flux_dn_dir_sw == flux_dn_dir_sw ./ sc)
 
     # Exercise the full update_fluxes! orchestrator and net-flux getters,
     # and check they reproduce the reference all-sky net flux.
