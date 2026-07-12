@@ -34,7 +34,9 @@ GPU access) when one is provided, and from `as` directly otherwise.
         t_sfc = as.t_sfc[gcol]
         ibnd = lkp.band_data.major_gpt2bnd[igpt]
         totplnk = view(lkp.planck.tot_planck, :, ibnd)
-        as_layerdata = AtmosphericStates.layerdata_view(state_cache, as, gcol)
+        col_dry_col = AtmosphericStates.col_dry_view(state_cache, as, gcol)
+        p_lay_col = AtmosphericStates.p_lay_view(state_cache, as, gcol)
+        t_lay_col = AtmosphericStates.t_lay_view(state_cache, as, gcol)
         t_lev_col = AtmosphericStates.t_lev_view(state_cache, as, gcol)
         τ = view(op.τ, gcol, :)
 
@@ -43,9 +45,8 @@ GPU access) when one is provided, and from `as` directly otherwise.
         t_lev_dec = t_lev_col[1]
 
         for glay in 1:nlay
-            col_dry, p_lay, t_lay = as_layerdata[glay, 1],
-            as_layerdata[glay, 2],
-            as_layerdata[glay, 3]
+            col_dry, p_lay, t_lay =
+                col_dry_col[glay], p_lay_col[glay], t_lay_col[glay]
             # compute gas optics
             τ[glay], _, _, planckfrac = compute_gas_optics(
                 lkp,
@@ -106,7 +107,7 @@ GPU access) when one is provided, and from `as` directly otherwise.
             aero_mask = view(as.aerosol_state.aero_mask, :, gcol)
             aero_size = view(as.aerosol_state.aero_size, :, :, gcol)
             aero_mass = view(as.aerosol_state.aero_mass, :, :, gcol)
-            rel_hum = view(as_layerdata, :, 4)
+            rel_hum = AtmosphericStates.rel_hum_view(state_cache, as, gcol)
 
             add_aerosol_optics_1scalar!(
                 τ,
@@ -144,7 +145,9 @@ end
         t_sfc = as.t_sfc[gcol]
         ibnd = lkp.band_data.major_gpt2bnd[igpt]
         totplnk = view(lkp.planck.tot_planck, :, ibnd)
-        as_layerdata = AtmosphericStates.layerdata_view(state_cache, as, gcol)
+        col_dry_col = AtmosphericStates.col_dry_view(state_cache, as, gcol)
+        p_lay_col = AtmosphericStates.p_lay_view(state_cache, as, gcol)
+        t_lay_col = AtmosphericStates.t_lay_view(state_cache, as, gcol)
         t_lev_col = AtmosphericStates.t_lev_view(state_cache, as, gcol)
         τ = view(op.τ, gcol, :)
         ssa = view(op.ssa, gcol, :)
@@ -157,9 +160,8 @@ end
     @inbounds begin
         t_lev_dec = t_lev_col[1]
         for glay in 1:nlay
-            col_dry, p_lay, t_lay = as_layerdata[glay, 1],
-            as_layerdata[glay, 2],
-            as_layerdata[glay, 3]
+            col_dry, p_lay, t_lay =
+                col_dry_col[glay], p_lay_col[glay], t_lay_col[glay]
             # compute gas optics
             τ[glay], ssa[glay], g[glay], planckfrac = compute_gas_optics(
                 lkp,
@@ -222,7 +224,7 @@ end
         aero_mask = view(as.aerosol_state.aero_mask, :, gcol)
         aero_size = view(as.aerosol_state.aero_size, :, :, gcol)
         aero_mass = view(as.aerosol_state.aero_mass, :, :, gcol)
-        rel_hum = view(as_layerdata, :, 4)
+        rel_hum = AtmosphericStates.rel_hum_view(state_cache, as, gcol)
 
         add_aerosol_optics_2stream!(
             τ,
@@ -272,12 +274,14 @@ is provided, and from `as` directly otherwise.
     @inbounds begin
         ibnd = lkp.band_data.major_gpt2bnd[igpt]
         t_sfc = as.t_sfc[gcol]
-        as_layerdata = AtmosphericStates.layerdata_view(state_cache, as, gcol)
+        col_dry_col = AtmosphericStates.col_dry_view(state_cache, as, gcol)
+        p_lay_col = AtmosphericStates.p_lay_view(state_cache, as, gcol)
+        t_lay_col = AtmosphericStates.t_lay_view(state_cache, as, gcol)
         τ = view(op.τ, gcol, :)
     end
     @inbounds for glay in 1:nlay
         col_dry, p_lay, t_lay =
-            as_layerdata[glay, 1], as_layerdata[glay, 2], as_layerdata[glay, 3]
+            col_dry_col[glay], p_lay_col[glay], t_lay_col[glay]
         # compute gas optics
         τ[glay], _, _ = compute_gas_optics(
             lkp,
@@ -309,14 +313,16 @@ end
     @inbounds begin
         ibnd = lkp.band_data.major_gpt2bnd[igpt]
         t_sfc = as.t_sfc[gcol]
-        as_layerdata = AtmosphericStates.layerdata_view(state_cache, as, gcol)
+        col_dry_col = AtmosphericStates.col_dry_view(state_cache, as, gcol)
+        p_lay_col = AtmosphericStates.p_lay_view(state_cache, as, gcol)
+        t_lay_col = AtmosphericStates.t_lay_view(state_cache, as, gcol)
         τ = view(op.τ, gcol, :)
         ssa = view(op.ssa, gcol, :)
         g = view(op.g, gcol, :)
     end
     @inbounds for glay in 1:nlay
         col_dry, p_lay, t_lay =
-            as_layerdata[glay, 1], as_layerdata[glay, 2], as_layerdata[glay, 3]
+            col_dry_col[glay], p_lay_col[glay], t_lay_col[glay]
         # compute gas optics
         τ[glay], ssa[glay], g[glay] = compute_gas_optics(
             lkp,
@@ -360,7 +366,7 @@ end
         aero_mask = view(as.aerosol_state.aero_mask, :, gcol)
         aero_size = view(as.aerosol_state.aero_size, :, :, gcol)
         aero_mass = view(as.aerosol_state.aero_mass, :, :, gcol)
-        rel_hum = view(as_layerdata, :, 4)
+        rel_hum = AtmosphericStates.rel_hum_view(state_cache, as, gcol)
 
         add_aerosol_optics_2stream!(
             τ,

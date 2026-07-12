@@ -90,8 +90,8 @@ Adapt.@adapt_structure AtmosphericState
     size(as.layerdata, 2), size(as.layerdata, 3)
 
 # Whole-column-set views of the packed layer data (each `(nlay, ncol)`); the
-# per-column `(nlay, 4)` slice used by the gas-optics kernels is
-# `layerdata_view` below.
+# per-column `(nlay,)` field slices used by the gas-optics kernels are the
+# `col_dry_view`/`p_lay_view`/`t_lay_view`/`rel_hum_view` accessors below.
 # view of column amounts of dry air [molecules per cm^2 of dry air]
 @inline getview_col_dry(as::AtmosphericState) =
     @inbounds view(as.layerdata, 1, :, :)
@@ -144,14 +144,6 @@ function TransposedStateCache(grid_params::RRTMGPGridParams)
     )
 end
 
-# Type-stable lazy permutations (the `PermutedDimsArray(x, perm)` constructor
-# does not constant-fold `perm` before Julia 1.12); used by the refresh
-# broadcasts and the no-cache fallbacks below.
-@inline _lazy_permute(x::AbstractArray{T, 2}) where {T} =
-    PermutedDimsArray{T, 2, (2, 1), (2, 1), typeof(x)}(x)
-@inline _lazy_permute(x::AbstractArray{T, 3}) where {T} =
-    PermutedDimsArray{T, 3, (3, 2, 1), (3, 2, 1), typeof(x)}(x)
-
 """
     refresh_transposed_state!(cache, as::AtmosphericState)
 
@@ -169,10 +161,13 @@ function refresh_transposed_state!(
     return nothing
 end
 
-# Device arrays: the broadcast compiles to a single transpose kernel.
-_transpose_into!(dest::AbstractArray, src) = (dest .= _lazy_permute(src); nothing)
-# Host arrays: explicit loops (the broadcast through the permuted wrapper
-# allocates a few bytes on Julia ≤ 1.11, tripping the zero-allocation tests).
+# Device arrays: `permutedims!` maps to a single native transpose kernel.
+_transpose_into!(dest::AbstractArray{T, 3}, src::AbstractArray{T, 3}) where {T} =
+    (permutedims!(dest, src, (3, 2, 1)); nothing)
+_transpose_into!(dest::AbstractArray{T, 2}, src::AbstractArray{T, 2}) where {T} =
+    (permutedims!(dest, src, (2, 1)); nothing)
+# Host arrays: explicit loops (`permutedims!` allocates a few bytes on
+# Julia ≤ 1.11, tripping the zero-allocation tests).
 function _transpose_into!(dest::Array{T, 3}, src::Array{T, 3}) where {T}
     nfld, nlay, ncol = size(src)
     @inbounds for f in 1:nfld, glay in 1:nlay, gcol in 1:ncol
@@ -188,18 +183,31 @@ function _transpose_into!(dest::Array{T, 2}, src::Array{T, 2}) where {T}
     return nothing
 end
 
-# Kernel-facing accessors for the per-column layer data (`(nlay, 4)`: dry-air
-# column amount, pressure, temperature, relative humidity — indexed
-# `[glay, fld]`) and level temperatures (`(nlev,)`). With a cache, the
-# returned views read the coalesced column-first copies; without one, they
-# lazily present the `AtmosphericState` arrays in the same orientation (with
-# the original memory access pattern, and — on Julia ≤ 1.11 — a small wrapper
-# allocation per call on the CPU; the opt-out exists for memory-constrained
-# configurations).
-@inline layerdata_view(cache::TransposedStateCache, as, gcol) =
-    @inbounds view(cache.layerdata, gcol, :, :)
-@inline layerdata_view(::Nothing, as::AtmosphericState, gcol) =
-    @inbounds view(_lazy_permute(as.layerdata), gcol, :, :)
+# Kernel-facing per-column accessors for the hot state fields (each a `(nlay,)`
+# view of dry-air column amount / layer pressure / layer temperature / relative
+# humidity, plus the `(nlev,)` level temperatures). With a cache, they read the
+# coalesced column-first copies (`cache.layerdata[gcol, :, fld]`, stride-1 over
+# columns); without one, they read the `AtmosphericState` arrays directly
+# (uncoalesced — the opt-out for memory-constrained configurations). Both cases
+# are plain `view`s, so they compile on the GPU (unlike an in-kernel
+# `PermutedDimsArray`). The cache stores the fields in the `AtmosphericState`
+# order: dry-air column amount 1, pressure 2, temperature 3, relative humidity 4.
+@inline col_dry_view(cache::TransposedStateCache, as, gcol) =
+    @inbounds view(cache.layerdata, gcol, :, 1)
+@inline col_dry_view(::Nothing, as::AtmosphericState, gcol) =
+    @inbounds view(as.layerdata, 1, :, gcol)
+@inline p_lay_view(cache::TransposedStateCache, as, gcol) =
+    @inbounds view(cache.layerdata, gcol, :, 2)
+@inline p_lay_view(::Nothing, as::AtmosphericState, gcol) =
+    @inbounds view(as.layerdata, 2, :, gcol)
+@inline t_lay_view(cache::TransposedStateCache, as, gcol) =
+    @inbounds view(cache.layerdata, gcol, :, 3)
+@inline t_lay_view(::Nothing, as::AtmosphericState, gcol) =
+    @inbounds view(as.layerdata, 3, :, gcol)
+@inline rel_hum_view(cache::TransposedStateCache, as, gcol) =
+    @inbounds view(cache.layerdata, gcol, :, 4)
+@inline rel_hum_view(::Nothing, as::AtmosphericState, gcol) =
+    @inbounds view(as.layerdata, 4, :, gcol)
 @inline t_lev_view(cache::TransposedStateCache, as, gcol) =
     @inbounds view(cache.t_lev, gcol, :)
 @inline t_lev_view(::Nothing, as::AtmosphericState, gcol) =
