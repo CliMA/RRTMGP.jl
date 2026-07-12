@@ -23,6 +23,7 @@ import RRTMGP.AtmosphericStates: GrayAtmosphericState
 import RRTMGP.AtmosphericStates: AtmosphericState
 import RRTMGP.AtmosphericStates: CloudState
 import RRTMGP.AtmosphericStates: AerosolState
+import RRTMGP.AtmosphericStates: TransposedStateCache
 import RRTMGP.AtmosphericStates
 import RRTMGP.GrayAtmosphere: update_profile_lw!
 import RRTMGP.GrayAtmosphere: compute_gray_heating_rate!

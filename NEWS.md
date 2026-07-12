@@ -3,6 +3,31 @@ RRTMGP.jl Release Notes
 
 main
 ------
+- Internal array layouts transposed to column-first `(ncol, nlay/nlev)` for
+  coalesced GPU memory access: optical properties (`OneScalar`, `TwoStream`),
+  source functions (`SourceLWNoScat`, `SourceLW2Str`, `SourceSW2Str`), and the
+  broadband flux buffers (`FluxLW`, `FluxSW`). On an A100 at DYAMOND scale
+  this cuts longwave kernel times by 25-36% and shortwave all-sky by 14-20%.
+  The Layer-2 flux getters (`lw_flux_up`, `net_flux`, ...) still present
+  plain `(nlev, ncol)` views: they read `Fluxes.FluxPresentation` arrays that
+  `update_fluxes!` fills from the compute buffers with one fused transposing
+  copy per call (so getters remain `Array`-materializable, broadcastable, and
+  reducible on the GPU). The opt-in per-band buffers (`FluxBand`) keep the
+  host-facing `(nlev, ncol, n_bnd)` layout. **Breaking for Layer-1
+  (functional-core) users**: code reading the workspace fields directly
+  (`slv.flux.flux_up`, `op.τ`, ...) must swap index order to `[gcol, ilev]`
+  or wrap the buffer in `Fluxes.lazy_transpose`. State inputs
+  (`AtmosphericState` arrays) and all boundary-condition arrays are
+  unchanged.
+- New `TransposedStateCache`: column-first copies of the hot
+  `AtmosphericState` arrays (layer pressure/temperature/dry-air column
+  amount/relative humidity, level temperatures), refreshed by one
+  `permutedims!` per spectral solve, so the gas-optics g-point loop reads
+  coalesced memory on GPUs. On by default (the RTE workspace constructors
+  build one; the `RRTMGPSolver` shares a single cache between the longwave
+  and shortwave workspaces); pass `state_cache = nothing` to a workspace
+  constructor to opt out, or pass the same cache to several workspaces to
+  share the storage.
 - Documentation reorganized along tutorial / how-to / explanation / reference
   lines: two new executable (Literate.jl) tutorials — "A first radiation
   calculation" and "Radiative-convective equilibrium", which reproduces

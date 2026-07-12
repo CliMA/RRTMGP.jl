@@ -146,6 +146,19 @@ function clear_sky(
         )) ≤ 448
     end
 
+    # The transposed state cache is a pure read-path optimization: a solver
+    # constructed without one must produce bitwise-identical fluxes.
+    slv_lw_nocache = SLVLW(
+        grid_params;
+        params = param_set,
+        sfc_emis,
+        inc_flux,
+        state_cache = nothing,
+    )
+    solve_lw!(slv_lw_nocache, as, lookup_lw, nothing, nothing, metric_scaling)
+    @test Array(slv_lw_nocache.flux.flux_up) == Array(slv_lw.flux.flux_up)
+    @test Array(slv_lw_nocache.flux.flux_dn) == Array(slv_lw.flux.flux_dn)
+
     # comparing longwave fluxes with data from RRTMGP FORTRAN code
     comp_flux_up_lw, comp_flux_dn_lw, comp_flux_up_sw, comp_flux_dn_sw =
         load_comparison_data(expt_no, bot_at_1, ncol)

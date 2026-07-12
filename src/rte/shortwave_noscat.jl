@@ -45,11 +45,12 @@ end
     op,
     bcs_sw,
     as,
+    state_cache,
     lookup_sw,
     n_gpt,
     nlev,
 )
-    compute_optical_props!(op, as, gcol, igpt, lookup_sw, nothing)
+    compute_optical_props!(op, as, state_cache, gcol, igpt, lookup_sw, nothing)
     @inbounds solar_frac = lookup_sw.solar_src_scaled[igpt]
     rte_sw_noscat!(flux, op, bcs_sw, igpt, n_gpt, solar_frac, gcol, nlev)
     _accumulate_fluxes!(flux_sw, flux, gcol, nlev, igpt)
@@ -63,6 +64,7 @@ function rte_sw_noscat_solve!(
     op::OneScalar,
     bcs_sw::SwBCs,
     as::AtmosphericState,
+    state_cache::Union{TransposedStateCache, Nothing},
     lookup_sw::LookUpSW,
 )
     nlay, ncol = AtmosphericStates.get_dims(as)
@@ -81,6 +83,7 @@ function rte_sw_noscat_solve!(
                         op,
                         bcs_sw,
                         as,
+                        state_cache,
                         lookup_sw,
                         n_gpt,
                         nlev,

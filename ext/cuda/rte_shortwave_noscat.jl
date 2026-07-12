@@ -58,11 +58,12 @@ function rte_sw_noscat_solve!(
     op::OneScalar,
     bcs_sw::SwBCs,
     as::AtmosphericState,
+    state_cache::Union{TransposedStateCache, Nothing},
     lookup_sw::LookUpSW,
 )
     nlay, ncol = AtmosphericStates.get_dims(as)
     tx, bx = _configure_threadblock(ncol)
-    args = (flux, flux_sw, op, bcs_sw, nlay, ncol, as, lookup_sw)
+    args = (flux, flux_sw, op, bcs_sw, nlay, ncol, as, state_cache, lookup_sw)
     @cuda always_inline = true threads = (tx) blocks = (bx) rte_sw_noscat_solve_CUDA!(
         args...,
     )
@@ -77,6 +78,7 @@ function rte_sw_noscat_solve_CUDA!(
     nlay,
     ncol,
     as::AtmosphericState,
+    state_cache::Union{TransposedStateCache, Nothing},
     lookup_sw::LookUpSW,
 )
     gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
@@ -95,6 +97,7 @@ function rte_sw_noscat_solve_CUDA!(
                         op,
                         bcs_sw,
                         as,
+                        state_cache,
                         lookup_sw,
                         n_gpt,
                         nlev,

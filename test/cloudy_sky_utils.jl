@@ -27,6 +27,73 @@ using RRTMGP.ArtifactPaths
 include("reference_files.jl")
 include("read_cloudy_sky.jl")
 
+# Function barrier for the type-stability and allocation checks:
+# `setup_cloudy_sky_as` is not type-stable, so calling the solvers directly
+# from `cloudy_sky` measures the call-site dispatch boxing of the test
+# function itself (a few hundred bytes) rather than solver allocations. With
+# concrete argument types, the solves must be allocation-free.
+function _test_cloudy_zero_alloc(
+    slv_lw,
+    slv_sw,
+    as,
+    lookup_lw,
+    lookup_lw_cld,
+    lookup_sw,
+    lookup_sw_cld,
+    metric_scaling,
+)
+    JET.@test_opt solve_lw!(
+        slv_lw,
+        as,
+        lookup_lw,
+        lookup_lw_cld,
+        nothing,
+        metric_scaling,
+    )
+    # `@allocated`'s first measurement after JET includes one-time setup; discard it.
+    @allocated solve_lw!(
+        slv_lw,
+        as,
+        lookup_lw,
+        lookup_lw_cld,
+        nothing,
+        metric_scaling,
+    )
+    @test (@allocated solve_lw!(
+        slv_lw,
+        as,
+        lookup_lw,
+        lookup_lw_cld,
+        nothing,
+        metric_scaling,
+    )) == 0
+    JET.@test_opt solve_sw!(
+        slv_sw,
+        as,
+        lookup_sw,
+        lookup_sw_cld,
+        nothing,
+        metric_scaling,
+    )
+    @allocated solve_sw!(
+        slv_sw,
+        as,
+        lookup_sw,
+        lookup_sw_cld,
+        nothing,
+        metric_scaling,
+    )
+    @test (@allocated solve_sw!(
+        slv_sw,
+        as,
+        lookup_sw,
+        lookup_sw_cld,
+        nothing,
+        metric_scaling,
+    )) == 0
+    return nothing
+end
+
 function cloudy_sky(
     context,
     ::Type{SLVLW},
@@ -109,45 +176,18 @@ function cloudy_sky(
     #------calling solvers
     metric_scaling = DA(one.(as.p_lev))
     solve_lw!(slv_lw, as, lookup_lw, lookup_lw_cld, nothing, metric_scaling)
-    if device isa ClimaComms.CPUSingleThreaded
-        JET.@test_opt solve_lw!(
-            slv_lw,
-            as,
-            lookup_lw,
-            lookup_lw_cld,
-            nothing,
-            metric_scaling,
-        )
-        #@test (@allocated solve_lw!(slv_lw, as, lookup_lw, lookup_lw_cld, nothing, metric_scaling)) == 0
-        @test (@allocated solve_lw!(
-            slv_lw,
-            as,
-            lookup_lw,
-            lookup_lw_cld,
-            nothing,
-            metric_scaling,
-        )) ≤ 448
-    end
-
-
     solve_sw!(slv_sw, as, lookup_sw, lookup_sw_cld, nothing, metric_scaling)
     if device isa ClimaComms.CPUSingleThreaded
-        JET.@test_opt solve_sw!(
+        _test_cloudy_zero_alloc(
+            slv_lw,
             slv_sw,
             as,
+            lookup_lw,
+            lookup_lw_cld,
             lookup_sw,
             lookup_sw_cld,
-            nothing,
             metric_scaling,
         )
-        @test (@allocated solve_sw!(
-            slv_sw,
-            as,
-            lookup_sw,
-            lookup_sw_cld,
-            nothing,
-            metric_scaling,
-        )) ≤ 368
     end
     #-------------
     # comparison
