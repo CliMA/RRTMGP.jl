@@ -111,6 +111,9 @@ function set_humidity!(solver)
     p_sfc = RRTMGP.level_pressure(solver)[1, 1]
     e = rel_hum.(p, p_sfc) .* e_sat.(T) # vapor partial pressure [Pa]
     @. vmr = max(e / (p - e), vmr_h2o_min)
+    ## Alternatively, Thermodynamics.jl can do both steps in one go:
+    ##   q  = TD.q_vap_from_RH.(td_params, p, T, rel_hum.(p, p_sfc), Ref(TD.Liquid()))
+    ##   @. vmr = max(TD.vol_vapor_mixing_ratio(td_params, q), vmr_h2o_min)
     return nothing
 end;
 

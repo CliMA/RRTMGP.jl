@@ -55,9 +55,10 @@ buffers), so an adapted solver keeps the zero-allocation property.
 ## Reproducibility caveat: McICA cloud sampling
 
 With partial cloud fractions, the all-sky methods sample cloud overlap
-stochastically (McICA) using the global RNG. On the CPU,
+stochastically (McICA) using the global RNG. On a single CPU thread,
 `update_fluxes!(solver, seed)` with `reset_rng_seed = true` makes results
-reproducible. On the GPU, the per-thread RNG state produces statistically
+reproducible. In multi-threaded settings and on the GPU (at least on CUDA 6.x),
+the per-thread RNG state produces statistically but not deterministically
 reproducible results for partially cloudy columns (overcast and clear columns
 remain deterministic).
 
@@ -97,6 +98,7 @@ multi-threaded CPU strategy against the GPU strategy across single (`Float32`) a
 ### Benchmark problem dimensions
 
 Every configuration evaluated by the benchmark (see [`perf/benchmark_ratchet.jl`](https://github.com/CliMA/RRTMGP.jl/blob/main/perf/benchmark_ratchet.jl)) operates on an identical, uniform spatial grid representative of a high-resolution atmospheric model:
+
 - **Columns (`ncol`)**: **`86,400` horizontal columns** (`30² elements × 6 panels × 4² quadrature points`).
 - **Vertical structure**: **`63` layers (`64` levels)** across every test profile (`5.53 × 10⁶` uniform 3D spatial coordinates, `ncol × nlev`), aligned with GPU warp sizes and memory boundaries.
 - **Spectral quadrature points (`ngpt`)**: **`480` spectral g-points** (`256` longwave + `224` shortwave) across all problems, resulting in approximately `2.65 × 10⁹` total cell evaluations per `solve_lw!` + `solve_sw!` step.
