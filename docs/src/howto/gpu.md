@@ -118,9 +118,9 @@ At `Float32` precision, memory traffic across lookup-table interpolations and so
 
 | Configuration | CPU (Intel Xeon, 12 threads) | GPU (NVIDIA A100 40GB) | Speedup |
 |---|---|---|---|
-| Clear-sky (two-stream) | 77.95 s | 0.95 s | 82.5× |
-| All-sky, McICA clouds | 98.42 s | 1.39 s | 70.8× |
-| All-sky with aerosols | 99.39 s | 1.52 s | 65.5× |
+| Clear-sky (two-stream) | 77.95 s | 0.95 s | 81.7× |
+| All-sky, McICA clouds | 98.42 s | 1.40 s | 70.4× |
+| All-sky with aerosols | 99.39 s | 1.54 s | 64.5× |
 
 ### Double precision (`Float64`)
 
@@ -128,6 +128,6 @@ For reference, running the identical uniform benchmark sweep in double precision
 
 | Configuration | CPU (Intel Xeon, 12 threads) | GPU (NVIDIA A100 40GB) | Speedup |
 |---|---|---|---|
-| Clear-sky (two-stream) | 79.64 s | 1.32 s | 60.1× |
-| All-sky, McICA clouds | 101.60 s | 1.93 s | 52.6× |
-| All-sky with aerosols | 106.33 s | 2.07 s | 51.4× |
+| Clear-sky (two-stream) | 79.64 s | 1.30 s | 61.1× |
+| All-sky, McICA clouds | 101.60 s | 1.91 s | 53.3× |
+| All-sky with aerosols | 106.33 s | 2.06 s | 51.6× |
