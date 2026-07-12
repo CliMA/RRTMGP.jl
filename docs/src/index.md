@@ -1,8 +1,9 @@
 # RRTMGP.jl
 
-RRTMGP.jl is a Julia implementation of the radiative transfer solver RTE and
-the RRTMGP correlated-``k`` gas optics ([pincus2019](@citet)), based on the
-reference Fortran implementation
+RRTMGP.jl is a Julia implementation of the radiative transfer solver RTE
+(Radiative Transfer for Energetics) and the RRTMGP (RRTM for General
+circulation model applications—Parallel) correlated-``k`` gas optics
+([pincus2019](@citet)), based on the reference Fortran implementation
 [rte-rrtmgp](https://github.com/earth-system-radiation/rte-rrtmgp). It
 computes longwave and shortwave fluxes and heating rates for clear, cloudy,
 and aerosol-laden atmospheres, as well as an analytic gray-radiation mode for
@@ -66,4 +67,8 @@ front door (`solve_gray`, `standard_atmosphere`, `solve`) for single-column work
 ## Authors
 
 `RRTMGP.jl` is being developed by the
-[Climate Modeling Alliance](https://clima.caltech.edu/).
+[Climate Modeling Alliance](https://clima.caltech.edu/). It is based on
+RTE+RRTMGP and its reference
+[Fortran implementation](https://github.com/earth-system-radiation/rte-rrtmgp),
+developed by Robert Pincus, Eli Mlawer, and Jennifer Delamere
+([pincus2019](@citet)).

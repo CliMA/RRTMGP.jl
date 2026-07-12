@@ -278,7 +278,7 @@ ax = Axis(
 lines!(ax, T_obs, p_lay[:, 1] ./ 100; color = :gray, linestyle = :dot, label = "standard atmosphere")
 lines!(ax, T_re[:, 1], p_lay[:, 1] ./ 100; label = "radiative equilibrium")
 lines!(ax, T_rce[:, 1], p_lay[:, 1] ./ 100; label = "RCE (Γ = 6.5 K/km)")
-axislegend(ax; position = :lt)
+axislegend(ax; position = :rt, framevisible = false, backgroundcolor = :white)
 fig
 
 # ## Climate sensitivity at fixed relative humidity
@@ -395,7 +395,7 @@ lines!(ax2, T_1x[:, 1], p_lay[:, 1] ./ 100; label = "1×CO₂ (RH)")
 lines!(ax2, T_2x_rh[:, 1], p_lay[:, 1] ./ 100; linestyle = :dash, label = "2×CO₂ (RH)")
 lines!(ax2, T_4x_rh[:, 1], p_lay[:, 1] ./ 100; linestyle = :dot, label = "4×CO₂ (RH)")
 lines!(ax2, T_4x_ah[:, 1], p_lay[:, 1] ./ 100; linestyle = :dashdot, label = "4×CO₂ (AH)")
-axislegend(ax2; position = :lt)
+axislegend(ax2; position = :rt, framevisible = false, backgroundcolor = :white)
 fig2
 
 # ## Sensitivity to the critical lapse rate
@@ -427,7 +427,7 @@ for Γ_km in (9.8, 6.5, 3.0)
     T = Array(RRTMGP.layer_temperature(slv))
     lines!(ax3, T[:, 1], p_lay[:, 1] ./ 100; label = "Γ = $(Γ_km) K/km")
 end
-axislegend(ax3; position = :lt)
+axislegend(ax3; position = :rt, framevisible = false, backgroundcolor = :white)
 fig3
 
 # ## Contributions of the individual absorbers
@@ -485,7 +485,7 @@ lines!(ax4, T_1x[:, 1], p_lay[:, 1] ./ 100; label = "all absorbers")
 lines!(ax4, T_no_h2o[:, 1], p_lay[:, 1] ./ 100; label = "no H₂O")
 lines!(ax4, T_no_co2[:, 1], p_lay[:, 1] ./ 100; label = "no CO₂")
 lines!(ax4, T_no_o3[:, 1], p_lay[:, 1] ./ 100; label = "no O₃")
-axislegend(ax4; position = :lt)
+axislegend(ax4; position = :lt, framevisible = false, backgroundcolor = :white)
 fig4
 
 # ## Where to go from here

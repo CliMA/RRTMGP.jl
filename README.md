@@ -5,7 +5,8 @@
 # RRTMGP.jl
 
 The `RRTMGP.jl` package is a Julia implementation of the radiative transfer
-solver RTE and the RRTMGP correlated-*k* gas optics
+solver RTE (Radiative Transfer for Energetics) and the RRTMGP (RRTM for General
+circulation model applications—Parallel) correlated-*k* gas optics
 ([Pincus et al., 2019](https://doi.org/10.1029/2019MS001621)), based on the
 reference Fortran implementation
 [rte-rrtmgp](https://github.com/earth-system-radiation/rte-rrtmgp). It computes
@@ -151,5 +152,6 @@ or open an issue on [GitHub](https://github.com/CliMA/RRTMGP.jl).
 ## Acknowledgments
 
 - [Robert Pincus](https://github.com/RobertPincus) for his invaluable help.
-- The authors of the [Fortran implementation](https://github.com/earth-system-radiation/rte-rrtmgp)
-  of RTE-RRTMGP, on which this code is based.
+- Robert Pincus, Eli Mlawer, and Jennifer Delamere, the developers of RTE+RRTMGP
+  and its reference [Fortran implementation](https://github.com/earth-system-radiation/rte-rrtmgp),
+  on which this code is based.

@@ -65,7 +65,7 @@ ax1 = Axis(
 lines!(ax1, Array(out.lw_net)[:, 1], p_lev[:, 1]; label = "longwave net")
 lines!(ax1, Array(out.sw_net)[:, 1], p_lev[:, 1]; label = "shortwave net")
 lines!(ax1, Array(out.net)[:, 1], p_lev[:, 1]; label = "total net")
-axislegend(ax1; position = :rb)
+axislegend(ax1; position = :rb, framevisible = false)
 ax2 = Axis(
     fig[1, 2];
     xlabel = "heating rate [K/day]",

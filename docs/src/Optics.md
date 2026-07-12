@@ -191,12 +191,29 @@ tables shipped with the rrtmgp-data artifacts
 each species and band, the tables give the optical properties per unit column
 mass of aerosol; the host supplies the per-species column mass densities and
 particle sizes (the [`aerosol_column_mass_density`](@ref RRTMGP.aerosol_column_mass_density)
-and [`aerosol_radius`](@ref RRTMGP.aerosol_radius) getters). Dust and sea salt
-are resolved into five size bins selected from the supplied particle radius;
-sea salt and sulfate are interpolated in relative humidity, as are the
-hydrophilic variants of black and organic carbon (their hydrophobic variants
-are humidity-independent). Each species' contribution ``(\tau, \omega_0, g)``
-is combined with the running optical properties by the same
-``\tau``-weighted mixing rules as for clouds, and the shortwave extinction and
-scattering aerosol optical depths in the band containing 550 nm are retained
-as diagnostics (`aod_sw_extinction`, `aod_sw_scattering`).
+and [`aerosol_radius`](@ref RRTMGP.aerosol_radius) getters), and layers
+without aerosol mass are skipped through a precomputed mask.
+
+The MERRA set comprises 15 species: dust and sea salt in five size bins each,
+sulfate, and black and organic carbon each in a hydrophilic and a hydrophobic
+variant. Dust and sea salt select their size bin from the supplied particle
+radius. The hygroscopic species — sea salt, sulfate, and the hydrophilic
+carbon variants — are additionally interpolated in relative humidity, which
+enters from the atmospheric state; keeping `layer_relative_humidity` current
+is a host responsibility (see
+[Driving RRTMGP from a host model](howto/host_model.md)). Dust and the
+hydrophobic carbon variants are humidity-independent. Internally, the species
+occupy fixed positions in the aerosol state arrays: hosts should map their
+species through [`aerosol_index_map`](@ref RRTMGP.aerosol_index_map) (or
+[`aerosol_names`](@ref RRTMGP.aerosol_names)) rather than assume an ordering,
+and the named getters above handle this lookup.
+
+What each solver family receives mirrors the treatment of gas optics. The
+non-scattering longwave path adds only the aerosol absorption optical depth
+``\tau (1 - \omega_0)``, while the two-stream path folds the full
+``(\tau, \omega_0, g)`` of each species into the running optical properties
+by the same ``\tau``-weighted mixing rules as for clouds, delta-scaled in the
+shortwave. In the shortwave band containing 550 nm, the summed extinction and
+scattering aerosol optical depths are retained as diagnostics
+(`aod_sw_extinction`, `aod_sw_scattering`), giving the standard AOD at
+negligible extra cost.
