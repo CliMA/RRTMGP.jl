@@ -1,3 +1,5 @@
+import ..Fluxes: _coalesced_3d, _coalesced_3d_zeros
+
 """
     OneScalar{D, V} <: AbstractOpticalProps
 
@@ -23,7 +25,7 @@ function OneScalar(grid_params::RRTMGPGridParams)
     (; ncol, nlay) = grid_params
     DA = ClimaComms.array_type(grid_params)
     FT = eltype(grid_params)
-    layerdata = DA{FT, 3}(undef, ncol, nlay, 1)
+    layerdata = _coalesced_3d(DA, FT, ncol, nlay, 1)
     τ = view(layerdata, :, :, 1)
     V = typeof(τ)
     return OneScalar{typeof(layerdata), V}(layerdata, τ)
@@ -62,7 +64,7 @@ function TwoStream(grid_params::RRTMGPGridParams)
     (; ncol, nlay) = grid_params
     DA = ClimaComms.array_type(grid_params)
     FT = eltype(grid_params)
-    layerdata = DA{FT, 3}(zeros(ncol, nlay, 3))
+    layerdata = _coalesced_3d_zeros(DA, FT, ncol, nlay, 3)
     V = typeof(view(layerdata, :, :, 1))
     return TwoStream{typeof(layerdata), V}(
         layerdata,

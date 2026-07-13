@@ -13,6 +13,14 @@ import ..Parameters as RP
 
 export NoScatLWRTE, TwoStreamLWRTE, NoScatSWRTE, TwoStreamSWRTE
 
+# On GPU, use the TransposedStateCache for coalesced reads across warps.
+# On CPU, pass `nothing` to read the AtmosphericState directly with its
+# cache-friendly stride-4 vertical layout.
+_default_state_cache(gp::RRTMGPGridParams) =
+    _default_state_cache(ClimaComms.device(gp), gp)
+_default_state_cache(::ClimaComms.AbstractCPUDevice, gp) = nothing
+_default_state_cache(device, gp) = TransposedStateCache(gp)
+
 """
     NoScatLWRTE(grid_params::RRTMGPGridParams; params, sfc_emis, inc_flux)
 
@@ -58,7 +66,7 @@ function NoScatLWRTE(
     params,
     sfc_emis,
     inc_flux,
-    state_cache = TransposedStateCache(grid_params),
+    state_cache = _default_state_cache(grid_params),
 )
     (; context) = grid_params
     op = OneScalar(grid_params)
@@ -118,7 +126,7 @@ function TwoStreamLWRTE(
     params,
     sfc_emis,
     inc_flux,
-    state_cache = TransposedStateCache(grid_params),
+    state_cache = _default_state_cache(grid_params),
 )
     (; context) = grid_params
     op = TwoStream(grid_params)
@@ -172,7 +180,7 @@ function NoScatSWRTE(
     sfc_alb_direct,
     inc_flux_diffuse,
     sfc_alb_diffuse,
-    state_cache = TransposedStateCache(grid_params),
+    state_cache = _default_state_cache(grid_params),
 )
     (; context) = grid_params
     op = OneScalar(grid_params)
@@ -238,7 +246,7 @@ function TwoStreamSWRTE(
     sfc_alb_direct,
     inc_flux_diffuse,
     sfc_alb_diffuse,
-    state_cache = TransposedStateCache(grid_params),
+    state_cache = _default_state_cache(grid_params),
 )
     (; context) = grid_params
     op = TwoStream(grid_params)

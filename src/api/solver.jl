@@ -235,7 +235,7 @@ function RRTMGPSolver(
     # state directly and needs none.
     state_cache =
         radiation_method isa GrayRadiation ? nothing :
-        TransposedStateCache(grid_params)
+        RTE._default_state_cache(grid_params)
     sws =
         op_sw isa OneScalar ?
         RTE.NoScatSWRTE(context, op_sw, bcs_sw, fluxb_sw, flux_sw, state_cache) :

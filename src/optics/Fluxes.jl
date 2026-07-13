@@ -33,6 +33,50 @@ lazy_transpose(x::AbstractArray{T, 2}) where {T} =
 lazy_transpose(x::AbstractArray{T, 3}) where {T} =
     PermutedDimsArray{T, 3, (2, 1, 3), (2, 1, 3), typeof(x)}(x)
 
+# Unwrap a PermutedDimsArray whose permutation is the identity swap — avoids
+# double-wrapping when the CPU uses transposed physical layout.
+lazy_transpose(x::PermutedDimsArray{T, 2, (2, 1), (2, 1)}) where {T} = parent(x)
+lazy_transpose(x::PermutedDimsArray{T, 3, (2, 1, 3), (2, 1, 3)}) where {T} = parent(x)
+
+"""
+    _coalesced_2d(DA, FT, ncol, nlev_or_nlay)
+
+Allocate a 2D buffer that kernels index as `(ncol, nlev)`. On GPU, the physical
+layout is `(ncol, nlev)` (coalesced across columns). On CPU, the physical layout
+is `(nlev, ncol)` (stride-1 vertical sweeps), wrapped in a `PermutedDimsArray`
+so the kernel indexing convention is unchanged.
+"""
+@inline _coalesced_2d(DA, ::Type{FT}, d1, d2) where {FT} =
+    DA{FT}(undef, d1, d2)  # GPU default: (ncol, nlev)
+@inline _coalesced_2d(::Type{Array}, ::Type{FT}, d1, d2) where {FT} =
+    PermutedDimsArray{FT, 2, (2, 1), (2, 1), Matrix{FT}}(
+        Matrix{FT}(undef, d2, d1),
+    )
+
+"""
+    _coalesced_3d(DA, FT, ncol, nlev_or_nlay, nfld)
+
+3D variant of [`_coalesced_2d`](@ref): on GPU `(ncol, nlev, nfld)`, on CPU the
+physical array is `(nlev, ncol, nfld)` wrapped so kernels see `(ncol, nlev, nfld)`.
+"""
+@inline _coalesced_3d(DA, ::Type{FT}, d1, d2, d3) where {FT} =
+    DA{FT}(undef, d1, d2, d3)
+@inline _coalesced_3d(::Type{Array}, ::Type{FT}, d1, d2, d3) where {FT} =
+    PermutedDimsArray{FT, 3, (2, 1, 3), (2, 1, 3), Array{FT, 3}}(
+        Array{FT, 3}(undef, d2, d1, d3),
+    )
+
+# Zeroed variant for optical properties (mirrors `zeros`).
+@inline function _coalesced_3d_zeros(DA, ::Type{FT}, d1, d2, d3) where {FT}
+    buf = DA{FT}(zeros(d1, d2, d3))
+    return buf
+end
+@inline function _coalesced_3d_zeros(::Type{Array}, ::Type{FT}, d1, d2, d3) where {FT}
+    phys = zeros(FT, d2, d1, d3)
+    return PermutedDimsArray{FT, 3, (2, 1, 3), (2, 1, 3), Array{FT, 3}}(phys)
+end
+
+
 """
     AbstractFlux
 
@@ -66,9 +110,9 @@ function FluxLW(grid_params::RRTMGPGridParams)
     (; ncol, nlay) = grid_params
     DA = ClimaComms.array_type(grid_params)
     FT = eltype(grid_params)
-    flux_up = DA{FT}(undef, ncol, nlay + 1)
-    flux_dn = DA{FT}(undef, ncol, nlay + 1)
-    flux_net = DA{FT}(undef, ncol, nlay + 1)
+    flux_up = _coalesced_2d(DA, FT, ncol, nlay + 1)
+    flux_dn = _coalesced_2d(DA, FT, ncol, nlay + 1)
+    flux_net = _coalesced_2d(DA, FT, ncol, nlay + 1)
     return FluxLW{FT, typeof(flux_net)}(flux_up, flux_dn, flux_net)
 end
 
@@ -103,10 +147,10 @@ function FluxSW(grid_params::RRTMGPGridParams)
     (; nlay, ncol) = grid_params
     FT = eltype(grid_params)
     DA = ClimaComms.array_type(grid_params)
-    flux_up = DA{FT}(undef, ncol, nlay + 1)
-    flux_dn = DA{FT}(undef, ncol, nlay + 1)
-    flux_net = DA{FT}(undef, ncol, nlay + 1)
-    flux_dn_dir = DA{FT}(undef, ncol, nlay + 1)
+    flux_up = _coalesced_2d(DA, FT, ncol, nlay + 1)
+    flux_dn = _coalesced_2d(DA, FT, ncol, nlay + 1)
+    flux_net = _coalesced_2d(DA, FT, ncol, nlay + 1)
+    flux_dn_dir = _coalesced_2d(DA, FT, ncol, nlay + 1)
     return FluxSW{FT, typeof(flux_net)}(flux_up, flux_dn, flux_net, flux_dn_dir)
 end
 
@@ -279,6 +323,16 @@ function _scale_by_transpose!(a::Array{FT, 2}, sc::Array{FT, 2}) where {FT}
     end
     return nothing
 end
+# CPU dual-layout: `a` is a PermutedDimsArray{...(2,1)...} wrapping (nlev, ncol);
+# `sc` is the plain (nlev, ncol) metric_scaling.  Access the parent directly.
+function _scale_by_transpose!(a::PermutedDimsArray{FT, 2, (2, 1), (2, 1), Matrix{FT}}, sc::Array{FT, 2}) where {FT}
+    pa = parent(a)
+    nlev, ncol = size(pa)
+    @inbounds for gcol in 1:ncol, ilev in 1:nlev
+        pa[ilev, gcol] *= sc[ilev, gcol]
+    end
+    return nothing
+end
 """
     FluxPresentation{FTA2D, FD}
 
@@ -326,13 +380,19 @@ Fill the `(nlev, ncol)` presentation arrays from the `(ncol, nlev)` compute
 buffers of `flux` (transposing copies; the direct beam only when present).
 """
 function update_presentation!(pres::FluxPresentation, flux::AbstractFlux)
-    transpose_into!(pres.flux_up, flux.flux_up)
-    transpose_into!(pres.flux_dn, flux.flux_dn)
-    transpose_into!(pres.flux_net, flux.flux_net)
+    _copy_transposed!(pres.flux_up, flux.flux_up)
+    _copy_transposed!(pres.flux_dn, flux.flux_dn)
+    _copy_transposed!(pres.flux_net, flux.flux_net)
     isnothing(pres.flux_dn_dir) ||
-        transpose_into!(pres.flux_dn_dir, flux.flux_dn_dir)
+        _copy_transposed!(pres.flux_dn_dir, flux.flux_dn_dir)
     return nothing
 end
+
+# GPU / generic path: transpose from (ncol, nlev) to (nlev, ncol).
+_copy_transposed!(dest, src) = transpose_into!(dest, src)
+# CPU dual-layout path: the PermutedDimsArray's parent is already (nlev, ncol).
+_copy_transposed!(dest::Array{FT, 2}, src::PermutedDimsArray{FT, 2, (2, 1), (2, 1), Matrix{FT}}) where {FT} =
+    (copyto!(dest, parent(src)); nothing)
 
 """
     transpose_into!(dest, src)

@@ -5,6 +5,7 @@ using Adapt
 using ClimaComms
 import ..Parameters as RP
 import ..RRTMGPGridParams
+import ..Fluxes: _coalesced_2d, _coalesced_3d
 
 export AbstractSourceLW, SourceLWNoScat, SourceLW2Str, SourceSW2Str
 
@@ -41,8 +42,8 @@ function SourceLWNoScat(grid_params::RRTMGPGridParams; params::RP.ARP)
     DA = ClimaComms.array_type(grid_params)
     FT = eltype(grid_params)
     sfc_source = DA{FT, 1}(undef, ncol)
-    lay_source = DA{FT, 2}(undef, ncol, nlay)
-    lev_source = DA{FT, 2}(undef, ncol, nlay + 1)
+    lay_source = _coalesced_2d(DA, FT, ncol, nlay)
+    lev_source = _coalesced_2d(DA, FT, ncol, nlay + 1)
 
     return SourceLWNoScat{
         typeof(sfc_source),
@@ -106,7 +107,7 @@ function SourceLW2Str(grid_params::RRTMGPGridParams; params::RP.ARP)
     DA = ClimaComms.array_type(grid_params)
     FT = eltype(grid_params)
     sfc_source = DA{FT, 1}(undef, ncol)
-    leveldata = DA{FT, 3}(undef, ncol, nlay + 1, 3)
+    leveldata = _coalesced_3d(DA, FT, ncol, nlay + 1, 3)
     lev_source = view(leveldata, :, :, 1)
     albedo = view(leveldata, :, :, 2)
     src = view(leveldata, :, :, 3)
@@ -164,7 +165,7 @@ function SourceSW2Str(grid_params::RRTMGPGridParams)
     DA = ClimaComms.array_type(grid_params)
     FT = eltype(grid_params)
     sfc_source = DA{FT, 1}(undef, ncol)
-    leveldata = DA{FT, 3}(undef, ncol, nlay + 1, 2)
+    leveldata = _coalesced_3d(DA, FT, ncol, nlay + 1, 2)
     albedo = view(leveldata, :, :, 1)
     src = view(leveldata, :, :, 2)
 
