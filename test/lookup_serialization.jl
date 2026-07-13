@@ -3,6 +3,7 @@ import ClimaComms
 @static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
 import RRTMGP
 import NCDatasets # loads the lookup-table extension
+import Serialization
 
 # LookupBundle round-trip through save_lookup_tables/load_lookup_tables: the
 # cache must reproduce the NetCDF-built bundle exactly (structure and values),
@@ -40,4 +41,26 @@ import NCDatasets # loads the lookup-table extension
     RRTMGP.save_lookup_tables(path2, gray)
     gray2 = RRTMGP.load_lookup_tables(path2, gp)
     @test gray2.nbnd_lw == 1 && isnothing(gray2.lookup_lw)
+
+    # an aerosol-only (clear-sky) bundle keeps its aerosol tables and index
+    # maps through the round-trip, with no cloud tables
+    clear_aero = RRTMGP.lookup_tables(gp, RRTMGP.ClearSkyRadiation(true))
+    path3 = joinpath(mktempdir(), "clear_aero.jls")
+    RRTMGP.save_lookup_tables(path3, clear_aero)
+    clear_aero2 = RRTMGP.load_lookup_tables(path3, gp)
+    @test isnothing(clear_aero2.lookup_lw_cld) &&
+          isnothing(clear_aero2.lookup_sw_cld)
+    @test !isnothing(clear_aero2.lookup_lw_aero) &&
+          !isnothing(clear_aero2.lookup_sw_aero)
+    @test clear_aero2.idx_aerosol_lw == clear_aero.idx_aerosol_lw
+    @test clear_aero2.idx_aerosize_sw == clear_aero.idx_aerosize_sw
+
+    # a file that was not written by save_lookup_tables is rejected with an
+    # actionable error
+    path4 = joinpath(mktempdir(), "not_a_bundle.jls")
+    Serialization.serialize(path4, (; a = 1))
+    @test_throws "did not deserialize to a LookupBundle" RRTMGP.load_lookup_tables(
+        path4,
+        gp,
+    )
 end

@@ -12,14 +12,13 @@ import Random
 """
     lookup_tables(grid_params::RRTMGPGridParams, radiation_method::AbstractRRTMGPMethod)
 
-Build the lookup tables for `radiation_method`, returning a
-[`LookupBundle`](@ref) — the gas/cloud/aerosol lookup tables, the name→index
-maps, and the band/gas counts. Build it once and pass it back to the
-`RRTMGPSolver` constructor via `lookups = ...` to avoid a second NetCDF read,
+Build the lookup tables for `radiation_method`, returning a [`LookupBundle`](@ref) containing
+the gas/cloud/aerosol lookup tables, the name→index maps, and the band/gas counts. Build it
+once and pass it back to the `RRTMGPSolver` constructor via `lookups = ...` to reuse the tables,
 or cache it on disk with [`save_lookup_tables`](@ref).
 
-The spectral (non-gray) methods are provided by an extension: load NCDatasets
-(`using NCDatasets`) first (or [`load_lookup_tables`](@ref) from a cache).
+The spectral methods are provided by an extension: load NCDatasets (`using NCDatasets`) first
+(or use [`load_lookup_tables`](@ref) from a cache).
 """
 function lookup_tables end
 
@@ -47,7 +46,7 @@ end
 Aggregate bundling everything needed to run an RRTMGP radiation calculation. It
 holds the radiation configuration, the atmospheric state, the longwave and
 shortwave solvers, the lookup tables, and the output flux buffers, and exposes
-getter methods (e.g. `layer_temperature`, `net_flux`) to read and write its data.
+getter methods (e.g., `layer_temperature`, `net_flux`) to read and write its data.
 Construct it with the `RRTMGPSolver` constructor and drive it with
 `update_fluxes!`.
 
@@ -60,14 +59,12 @@ Construct it with the `RRTMGPSolver` constructor and drive it with
 - `sws`: shortwave RTE solver and its flux/scratch buffers.
 - `lws`: longwave RTE solver and its flux/scratch buffers.
 - `as`: the atmospheric state (solver inputs).
-- `lookups`: the [`LookupBundle`](@ref) from `lookup_tables` (for gray
-  radiation the tables are `nothing` and only the band counts are carried).
+- `lookups`: the [`LookupBundle`](@ref) from `lookup_tables` (for gray radiation only the band counts are carried).
 - `clear_flux_lw`: clear-sky longwave fluxes, or `nothing`.
 - `clear_flux_sw`: clear-sky shortwave fluxes, or `nothing`.
 - `center_z`: layer-center altitudes [m], or `nothing`.
 - `face_z`: level (face) altitudes [m], or `nothing`.
-- `deep_atmosphere_inverse_scaling`: `(nlev, ncol)` factor multiplied directly into the
-  fluxes for deep-atmosphere geometric scaling, or `nothing`.
+- `deep_atmosphere_inverse_scaling`: `(nlev, ncol)` factor multiplied into the fluxes for deep-atmosphere geometric scaling (the host supplies the multiplicative inverse of its metric scaling), or `nothing` (default) for the shallow-atmosphere approximation.
 - `net_flux_buffer`: combined longwave + shortwave net flux at each level [W/m²], the full
   boundary-extended `(nlev, ncol)` buffer (read the domain-masked view via `net_flux(s)`).
 - `clear_net_flux_buffer`: combined clear-sky net-flux buffer, or `nothing`.
@@ -82,14 +79,9 @@ and shortwave boundary conditions, and the atmospheric state. Keyword arguments:
   interpolation; default `nothing`.
 - `interpolation`: scheme for filling level values from layer values; default `NoInterpolation`.
 - `bottom_extrapolation`: scheme for the bottom-level value; default `SameAsInterpolation`.
-- `deep_atmosphere_inverse_scaling`: a `(nlev, ncol)` array multiplied directly into the
-  fluxes for deep-atmosphere geometric scaling — the host supplies the multiplicative
-  inverse of its metric scaling, hence the name — or `nothing` (default) for the
-  shallow-atmosphere approximation.
-- `lookups`: prebuilt lookup tables to reuse (avoids a second NetCDF read), or `nothing`
-  (default) to build them internally.
-- `spectral_fluxes`: if `true`, also retain per-band fluxes (two-stream, non-gray only);
-  default `false`.
+- `deep_atmosphere_inverse_scaling`: a `(nlev, ncol)` array multiplied into the fluxes for deep-atmosphere geometric scaling (the host supplies the multiplicative inverse of its metric scaling), or `nothing` (default) for the shallow-atmosphere approximation.
+- `lookups`: prebuilt lookup tables to reuse, or `nothing` (default) to build them internally.
+- `spectral_fluxes`: if `true`, also retain per-band fluxes (two-stream, non-gray only); default `false`.
 """
 struct RRTMGPSolver{
     S,

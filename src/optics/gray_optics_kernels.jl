@@ -9,7 +9,7 @@
         gcol::Int,
     )
 
-Computes optical properties for the longwave gray radiation problem.
+Compute optical properties for the longwave gray radiation problem.
 """
 function compute_optical_props!(
     op::OneScalar,
@@ -122,7 +122,7 @@ end
         gcol::Int,
     )
 
-Computes optical properties for the shortwave gray radiation problem.
+Compute optical properties for the shortwave gray radiation problem.
 """
 function compute_optical_props!(
     op::AbstractOpticalProps,
@@ -162,8 +162,9 @@ end
         lat,
     ) where {FT<:AbstractFloat}
 
-This functions calculates the optical thickness based on pressure 
-and lapse rate for a gray atmosphere. 
+Calculate the optical thickness from pressure and lapse rate for a gray
+atmosphere.
+
 See Schneider 2004, J. Atmos. Sci. (2004) 61 (12): 1317–1340.
 DOI: https://doi.org/10.1175/1520-0469(2004)061<1317:TTATTS>2.0.CO;2
 """
@@ -199,10 +200,12 @@ compute_gray_optical_thickness_sw(
         lat,
     ) where {FT}
 
-This functions calculates the optical thickness based on pressure 
-and lapse rate for a gray atmosphere. 
-See O'Gorman 2008, Journal of Climate Vol 21, Page(s): 3815–3832.
-DOI: https://doi.org/10.1175/2007JCLI2065.1
+Calculate the optical thickness from pressure and lapse rate for a gray
+atmosphere.
+
+See Frierson, Held & Zurita-Gotor (2006), J. Atmos. Sci. 63, 2548-2566
+(DOI: https://doi.org/10.1175/JAS3753.1) and O'Gorman & Schneider (2008),
+J. Climate 21, 3815-3832 (DOI: https://doi.org/10.1175/2007JCLI2065.1).
 """
 function compute_gray_optical_thickness_lw(
     params::GrayOpticalThicknessOGorman2008{FT},
@@ -230,8 +233,8 @@ end
         rest...,
     ) where {FT}
  
-This functions calculates the optical thickness based on pressure 
-for a gray atmosphere. 
+Calculate the optical thickness from pressure for a gray atmosphere.
+
 See O'Gorman 2008, Journal of Climate Vol 21, Page(s): 3815–3832.
 DOI: https://doi.org/10.1175/2007JCLI2065.1
 """

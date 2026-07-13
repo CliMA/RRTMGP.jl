@@ -10,7 +10,7 @@
         lkp_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
     ) where {FT<:AbstractFloat}
 
-Computes optical properties for the longwave problem.
+Compute optical properties for the longwave problem.
 """
 @inline function compute_optical_props!(
     op::OneScalar,
@@ -244,10 +244,11 @@ end
         gcol::Int,
         igpt::Int,
         lkp::LookUpSW,
-        lkp_cld::Union{LookUpCld,Nothing} = nothing,
+        lkp_cld::Union{LookUpCld, Nothing} = nothing,
+        lkp_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
     )
 
-Computes optical properties for the shortwave problem.
+Compute optical properties for the shortwave problem.
 """
 @inline function compute_optical_props!(
     op::OneScalar,

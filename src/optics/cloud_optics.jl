@@ -64,8 +64,8 @@ end
         ibnd;
         delta_scaling = false,
     )
-This function computes the TwoStream clouds optics properties and adds them
-to the TwoStream gas optics properties.
+Compute the `TwoStream` cloud optics properties and add them
+to the `TwoStream` gas optics properties.
 """
 @inline function add_cloud_optics_2stream!(
     τ,
@@ -149,7 +149,7 @@ end
         cld_path_liq,
     )
 
-This function computes the `TwoStream` cloud liquid properties using the `LookUpTable` method.
+Compute the `TwoStream` cloud liquid properties using the `LookUpTable` method.
 """
 @inline function compute_lookup_cld_liq_props(
     nsize_liq,
@@ -202,7 +202,7 @@ end
         cld_path_ice,
     )
 
-This function computes the `TwoStream` cloud ice properties using the `LookUpTable` method.
+Compute the `TwoStream` cloud ice properties using the `LookUpTable` method.
 """
 @inline function compute_lookup_cld_ice_props(
     nsize_ice,
@@ -246,16 +246,20 @@ end
 """
     build_cloud_mask!(cld_mask, cld_frac, ::MaxRandomOverlap)
 
-Builds McICA-sampled cloud mask from cloud fraction data for maximum-random overlap
+Build a McICA-sampled cloud mask from cloud fraction data for maximum-random overlap
 
 Reference: https://github.com/AER-RC/RRTMG_SW/
 
-Determinism: the mask is drawn from the global `Random` RNG (`Random.rand()`) within the
-per-column g-point loop. On CPU with a fixed `Random.seed!` the sampling is reproducible, but
-under multithreaded/GPU execution the columns share global RNG state, so the per-column McICA
-sample is not guaranteed reproducible across runs or column orderings. Broadband fluxes are
-statistically unbiased regardless; bit-reproducible per-column sampling would require
-column-indexed seeding, deliberately not done here to keep the kernel allocation-free.
+Determinism: the mask is drawn with `Random.rand()` within the per-column g-point loop, i.e.
+from the RNG of whichever task runs that iteration. On a single CPU thread every draw comes
+from the one RNG that `Random.seed!` reseeds, so a fixed seed makes the sampling reproducible.
+Under multithreading each worker task uses its own independent task-local RNG (seeded from the
+parent at spawn, not by `Random.seed!`), and on the GPU the device RNG is keyed by a per-launch
+seed the host `Random.seed!` does not control (at least on CUDA 6.x); combined with a
+work assignment that is not fixed across runs or thread counts, the per-column McICA sample is
+then not guaranteed reproducible. Broadband fluxes are statistically unbiased regardless;
+bit-reproducible per-column sampling would require column-indexed seeding, deliberately not
+done here to keep the kernel allocation-free.
 """
 function build_cloud_mask!(
     cld_mask::AbstractArray{Bool, 1},

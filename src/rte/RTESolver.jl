@@ -24,7 +24,7 @@ include("shortwave_2stream.jl")
 
 
 """
-    solve_lw!((; context, flux, src, bcs, op)::NoScatLWRTE, as::GrayAtmosphericState, metric_scaling::M = nothing)
+    solve_lw!((; context, flux, src, bcs, op, angle_disc)::NoScatLWRTE, as::GrayAtmosphericState, metric_scaling::M = nothing)
 
 Non-scattering RTE solver for the longwave problem, using gray optics. 
 Additionally, takes an optional argument `metric_scaling` which scales the resultant fluxes by the 
@@ -57,7 +57,7 @@ end
 
 """
     solve_lw!(
-        (; context, fluxb, flux, src, bcs, op)::NoScatLWRTE,
+        (; context, fluxb, flux, src, bcs, op, angle_disc)::NoScatLWRTE,
         as::AtmosphericState,
         lookup_lw::LookUpLW,
         lookup_lw_cld::Union{LookUpCld, Nothing},
@@ -95,7 +95,7 @@ end
 
 """
     solve_lw!(
-        (; context, fluxb, flux, src, bcs, op)::TwoStreamLWRTE,
+        (; context, fluxb, flux, band_flux, src, bcs, op)::TwoStreamLWRTE,
         as::AtmosphericState,
         lookup_lw::LookUpLW,
         lookup_lw_cld::Union{LookUpCld, Nothing},
@@ -188,7 +188,7 @@ end
 
 """
     solve_sw!(
-        (; context, fluxb, flux, src, bcs, op)::TwoStreamSWRTE,
+        (; context, fluxb, flux, band_flux, src, bcs, op)::TwoStreamSWRTE,
         as::AtmosphericState,
         lookup_sw::LookUpSW,
         lookup_sw_cld::Union{LookUpCld, Nothing},

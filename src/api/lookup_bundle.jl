@@ -14,7 +14,7 @@ are `nothing`), the gas and aerosol name→index maps, and the band/gas counts.
 Built by [`lookup_tables`](@ref); pass a prebuilt bundle back to the
 `RRTMGPSolver` constructor via `lookups = ...` to avoid a second NetCDF read,
 and use [`save_lookup_tables`](@ref)/[`load_lookup_tables`](@ref) to cache it
-on disk (e.g. for standalone use without NCDatasets).
+on disk (e.g., for standalone use without NCDatasets).
 
 # Fields
 - `lookup_lw`, `lookup_sw`: gas-optics lookup tables (`nothing` for gray).
@@ -88,11 +88,11 @@ end
     save_lookup_tables(path, lookups::LookupBundle)
 
 Serialize `lookups` to `path` (host-side copies of any device arrays), so a
-later session can [`load_lookup_tables`](@ref) without NCDatasets — e.g. for
-standalone/classroom use of the spectral methods, or to skip the NetCDF read.
+later session can [`load_lookup_tables`](@ref) without NCDatasets (e.g., for
+standalone/classroom use of the spectral methods, or to skip the NetCDF read).
 Uses Julia's `Serialization` stdlib: the file is tied to the Julia version and
-package layout that wrote it and is a *cache*, not an interchange format — the
-NetCDF artifacts remain the source of truth. Returns `path`.
+package layout that wrote it and serves as a cache; the NetCDF artifacts remain
+the source of truth. Returns `path`.
 """
 function save_lookup_tables(path::AbstractString, lookups::LookupBundle)
     Serialization.serialize(path, Adapt.adapt(Array, lookups))

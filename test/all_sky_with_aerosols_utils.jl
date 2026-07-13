@@ -184,6 +184,24 @@ function all_sky_with_aerosols(
     # h2o/o3 are layer fields (2D); well-mixed gases are global means.
     @test ndims(RRTMGP.volume_mixing_ratio(solver, "h2o")) == 2
 
+    # Cloud radiative effect: the retained clear-sky diagnostics must differ
+    # from the all-sky fluxes — clouds reduce the outgoing longwave flux at
+    # the top of the atmosphere and increase the reflected shortwave flux.
+    olr_allsky = Array(RRTMGP.lw_flux_up(solver))[end, :]
+    olr_clear = Array(RRTMGP.clear_lw_flux_up(solver))[end, :]
+    @test all(olr_clear .>= olr_allsky)
+    @test maximum(olr_clear .- olr_allsky) > 0
+    sw_up_allsky = Array(RRTMGP.sw_flux_up(solver))[end, :]
+    sw_up_clear = Array(RRTMGP.clear_sw_flux_up(solver))[end, :]
+    @test all(sw_up_allsky .>= sw_up_clear)
+    @test maximum(sw_up_allsky .- sw_up_clear) > 0
+    @test maximum(
+        abs.(
+            Array(RRTMGP.clear_net_flux(solver)) .-
+            Array(RRTMGP.net_flux(solver))
+        ),
+    ) > 0
+
     # Layer-2 update_fluxes! must stay allocation-free and type-stable on the
     # all-sky (spectral + clouds + aerosols) path too; the gray path is asserted
     # in test/standalone.jl. Single-threaded only: multi-threaded `@threaded`

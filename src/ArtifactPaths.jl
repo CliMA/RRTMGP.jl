@@ -8,7 +8,7 @@ export get_lookup_filename, get_input_filename
 """
     get_lookup_filename(optics_type::Symbol, λ::Symbol)
 
-This function generates the file names for lookup table files, for a given optics type, for the
+Generate the file names for lookup table files, for a given optics type, for the
 shortwave and longwave solvers.
 
 - `:gas`, `:cloud` and `:aerosol` optics types are supported for the longwave and shortwave solvers. 
@@ -45,7 +45,7 @@ end
 """
     get_input_filename(problemtype::Symbol, λ::Symbol)
 
-This function generates the file names for input files for tests for a given problem type and wavelength type.
+Generate the file names for input files for tests, for a given problem type and wavelength type.
 `:gas`, and `:gas_clouds` and `:gas_clouds_aerosols` problem types are supported.
 `:lw` (longwave) and `:sw` (shortwave) wavelength types are supported.
 
@@ -55,7 +55,7 @@ This file provides data for loading the `AtmosphericState` struct, the provides 
 - The `:gas_clouds` option is used for the `all sky` test.
 - The `:gas_clouds_aerosols` option is used for the `all sky with aerosols` test.
 
-While these are primarily intended for the tests, some of this input data is also used in `ClimaAtmos.jl` and is therefore provided here for user's convenience.
+While these are primarily intended for the tests, some of this input data is also used in `ClimaAtmos.jl` and is therefore provided here for users' convenience.
 
 These artifacts are obtained from "Pincus, R., Mlawer, E. J., Delamere, J., Iacono, M. J., & Pernak, R. (2023). RRTMGP data (Version 1.7) [Data set]. https://github.com/earth-system-radiation/rrtmgp-data" 
 """

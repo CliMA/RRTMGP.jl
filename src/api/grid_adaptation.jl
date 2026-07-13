@@ -256,7 +256,7 @@ place and returns it.
 
 This updates only the dry-air column amount (`compute_col_gas!`); it does **not**
 recompute relative humidity. Relative humidity is a host responsibility: a caller that
-needs an up-to-date `layer_relative_humidity` (e.g. for RH-dependent aerosol optics) must
+needs an up-to-date `layer_relative_humidity` (e.g., for RH-dependent aerosol optics) must
 call `compute_relative_humidity!` itself after updating temperature, pressure, or humidity.
 """
 update_concentrations!(

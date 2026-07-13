@@ -3,7 +3,7 @@
 #####
 #
 # This is the single source of truth for the order of aerosol species in the
-# `AerosolState` arrays (`aero_mass`, `aero_size`), i.e. the meaning of the
+# `AerosolState` arrays (`aero_mass`, `aero_size`), i.e., the meaning of the
 # first index of those arrays. It MUST agree with:
 #
 #  - the integer indices hard-coded by the aerosol optics kernel

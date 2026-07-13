@@ -8,10 +8,9 @@
 
 Global toggle for input validation: when enabled with
 `RRTMGP.check_values[] = true`, [`update_fluxes!`](@ref) calls
-[`validate_inputs`](@ref) before each solve. Off by default — the checks
-reduce over device arrays, so they are intended for development and debugging,
-not for production time-stepping (with the toggle off they cost one branch and
-keep `update_fluxes!` allocation-free).
+[`validate_inputs`](@ref) before each solve. Off by default; the checks
+reduce over device arrays, so they are intended for development and debugging.
+With the toggle off, `update_fluxes!` remains allocation-free.
 """
 const check_values = Ref(false)
 

@@ -1,23 +1,21 @@
 module BCs
 
-using DocStringExtensions
 using Adapt
 import ..RRTMGPGridParams
 
 export LwBCs, SwBCs
 
 """
-    LwBCs{FT,FTA1D,FTA2DN}
+    LwBCs{FT, FTA2D, FTA2DN}
 
-Longwave boundary conditions
+Longwave boundary conditions.
 
 # Fields
-$(DocStringExtensions.FIELDS)
+- `sfc_emis`: Surface emissivity `(nbnd, ncol)`.
+- `inc_flux`: Incident flux at the top of the atmosphere [W/m²] `(ncol, ngpt)`.
 """
 struct LwBCs{FT, FTA2D, FTA2DN}
-    "Surface emissivity `[W/m²]` `(nbnd, ncol)`"
     sfc_emis::FTA2D
-    "incident flux at top of atmosphere `[W/m²]` `(ncol, ngpt)`"
     inc_flux::FTA2DN
 end
 LwBCs(sfc_emis, inc_flux) =
@@ -28,21 +26,22 @@ LwBCs(sfc_emis, inc_flux) =
 Adapt.@adapt_structure LwBCs
 
 """
-    SwBCs{FT,FTA1D}
-Shortwave boundary conditions
+    SwBCs{FT, FTA1D, FTA1DN, FTA2D}
+
+Shortwave boundary conditions.
+
 # Fields
-$(DocStringExtensions.FIELDS)
+- `cos_zenith`: Cosine of the solar zenith angle `(ncol)`.
+- `toa_flux`: Top-of-atmosphere flux `(ncol)`.
+- `sfc_alb_direct`: Surface albedo for specular (direct) radiation `(nbnd, ncol)`.
+- `inc_flux_diffuse`: Incident diffuse flux at the top of the domain [W/m²] `(ncol, ngpt)`.
+- `sfc_alb_diffuse`: Surface albedo for diffuse radiation `(nbnd, ncol)`.
 """
 struct SwBCs{FT, FTA1D, FTA1DN, FTA2D}
-    "cosine of zenith angle `(ncol)`"
     cos_zenith::FTA1D
-    "top of atmosphere flux `(ncol)`"
     toa_flux::FTA1D
-    "surface albedo for specular (direct) radiation `(nbnd, ncol)`"
     sfc_alb_direct::FTA2D
-    "incident diffuse flux at top of domain `[W/m2]` `(ncol, ngpt)`"
     inc_flux_diffuse::FTA1DN
-    "surface albedo for diffuse radiation `(nbnd, ncol)`"
     sfc_alb_diffuse::FTA2D
 end
 SwBCs(cos_zenith, toa_flux, sfc_alb_direct, inc_flux_diffuse, sfc_alb_diffuse) =

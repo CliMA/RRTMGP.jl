@@ -55,7 +55,7 @@ end
     AllSkyRadiationWithClearSkyDiagnostics(aerosol_radiation::Bool, reset_rng_seed::Bool)
 
 Like [`AllSkyRadiation`](@ref), but each call also runs a parallel **cloud-free** (clear-sky)
-solve. Those fluxes are exposed through the `clear_*` getters (e.g. `clear_net_flux`,
+solve. Those fluxes are exposed through the `clear_*` getters (e.g., `clear_net_flux`,
 `clear_lw_flux_up`); differenced against the all-sky fluxes they give the cloud radiative
 effect. Requires the lookup tables (load `NCDatasets`).
 

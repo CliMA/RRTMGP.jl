@@ -1,7 +1,6 @@
 module Fluxes
 
 using Adapt
-using DocStringExtensions
 using ClimaComms
 import ..RRTMGPGridParams
 
@@ -15,24 +14,29 @@ export AbstractFlux,
     apply_metric_scaling!,
     compute_net_flux!
 
+"""
+    AbstractFlux
+
+Abstract type for broadband radiative-flux containers: [`FluxLW`](@ref) and
+[`FluxSW`](@ref).
+"""
 abstract type AbstractFlux{FT <: AbstractFloat, FTA2D <: AbstractArray{FT, 2}} end
 
 
 """
-    FluxLW{FT,FTA2D}
+    FluxLW{FT, FTA2D}
 
 Upward, downward and net longwave fluxes at each level.
 
 # Fields
-$(DocStringExtensions.FIELDS)
+- `flux_up`: Upward flux [W/m²] `(nlev, ncol)`.
+- `flux_dn`: Downward flux [W/m²] `(nlev, ncol)`.
+- `flux_net`: Net flux [W/m²] `(nlev, ncol)`.
 """
 struct FluxLW{FT <: AbstractFloat, FTA2D <: AbstractArray{FT, 2}} <:
        AbstractFlux{FT, FTA2D}
-    "upward flux `[W/m²]` `(nlev,ncol)`"
     flux_up::FTA2D
-    "downward flux `[W/m²]` `(nlev,ncol)`"
     flux_dn::FTA2D
-    "net flux `[W/m²]` `(nlev,ncol)`"
     flux_net::FTA2D
 end
 FluxLW(flux_up, flux_dn, flux_net) =
@@ -50,22 +54,21 @@ function FluxLW(grid_params::RRTMGPGridParams)
 end
 
 """
-    FluxSW{FT,FTA2D}
+    FluxSW{FT, FTA2D}
 
 Upward, downward and net shortwave fluxes at each level.
 
 # Fields
-$(DocStringExtensions.FIELDS)
+- `flux_up`: Upward flux [W/m²] `(nlev, ncol)`.
+- `flux_dn`: Downward flux [W/m²] `(nlev, ncol)`.
+- `flux_net`: Net flux [W/m²] `(nlev, ncol)`.
+- `flux_dn_dir`: Direct downward flux [W/m²] `(nlev, ncol)`.
 """
 struct FluxSW{FT <: AbstractFloat, FTA2D <: AbstractArray{FT, 2}} <:
        AbstractFlux{FT, FTA2D}
-    "upward flux `[W/m²]` `(nlev,ncol)`"
     flux_up::FTA2D
-    "downward flux `[W/m²]` `(nlev,ncol)`"
     flux_dn::FTA2D
-    "net flux `[W/m²]` `(nlev,ncol)`"
     flux_net::FTA2D
-    "direct downward flux `[W/m²]` `(nlev,ncol)`"
     flux_dn_dir::FTA2D
 end
 FluxSW(flux_up, flux_dn, flux_net, flux_dn_dir) =
@@ -152,7 +155,7 @@ end
     compute_net_flux!(flux::AbstractFlux, gcol, nlev)
     compute_net_flux!(flux::AbstractFlux, gcol)
 
-Computes net flux for column `gcol` across `nlev` levels:
+Compute the net flux for column `gcol` across `nlev` levels:
 
 `flux.flux_net` = `flux.flux_up` - `flux.flux_dn`
 """

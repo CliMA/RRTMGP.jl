@@ -1,7 +1,6 @@
 module Sources
 
 using Adapt
-using DocStringExtensions
 
 using ClimaComms
 import ..Parameters as RP
@@ -17,23 +16,22 @@ Abstract longwave source for no-scattering and two stream longwave solvers.
 abstract type AbstractSourceLW end
 
 """
-    SourceLWNoScat{FT,FTA1D,FTA2D} <: AbstractSourceLW
+    SourceLWNoScat{S, D, PS} <: AbstractSourceLW
 
-Longwave sources: computed at layer center, layer edges, 
-and at the surface for no scattering calculations
+Longwave sources: computed at layer center, layer edges,
+and at the surface for no-scattering calculations.
 
 # Fields
-
-$(DocStringExtensions.FIELDS)
+- `param_set`: Parameter set.
+- `sfc_source`: Surface source [W/m²] `(ncol)`.
+- `lay_source`: Planck source at layer average temperature [W/m²] `(nlay, ncol)`.
+- `lev_source`: Planck level source at layer edges [W/m²] `(nlay+1, ncol)`; includes
+  spectral weighting that accounts for the state-dependent frequency to g-space mapping.
 """
 struct SourceLWNoScat{S, D, PS} <: AbstractSourceLW
-    "Parameter set"
     param_set::PS
-    "Surface source `[W/m2]` `(ncol)`"
     sfc_source::S
-    "Planck source at layer average temperature `[W/m2]` `(nlay, ncol)`"
     lay_source::D
-    "Planck level source at layer edges `[W/m2]` `(nlay+1, ncol)`, includes spectral weighting that accounts for state-dependent frequency to g-space mapping"
     lev_source::D
 end
 Adapt.@adapt_structure SourceLWNoScat
@@ -62,25 +60,23 @@ end
 """
     SourceLW2Str{S, D, V, PS} <: AbstractSourceLW
 
-Longwave sources: computed at layer center, layer edges, 
-and at the surface for 2-stream calculations
+Longwave sources: computed at layer center, layer edges,
+and at the surface for 2-stream calculations.
 
 # Fields
-
-$(DocStringExtensions.FIELDS)
+- `param_set`: Parameter set.
+- `sfc_source`: Surface source [W/m²] `(ncol)`.
+- `leveldata`: Storage for level source, albedo and src `(3, nlay+1, ncol)`.
+- `lev_source`: Level source [W/m²] `(nlay+1, ncol)`; used in 2-stream calculations.
+- `albedo`: Temporary storage array `(nlay+1, ncol)`; used in 2-stream calculations.
+- `src`: Temporary storage array `(nlay+1, ncol)`; used in 2-stream calculations.
 """
 struct SourceLW2Str{S, D, V, PS} <: AbstractSourceLW
-    "Parameter set"
     param_set::PS
-    "Surface source `[W/m2]` `(ncol)`"
     sfc_source::S
-    "storage for level source, albedo and src `(3, nlay+1, ncol)`"
     leveldata::D
-    "level source `[W/m2]` `(nlay+1, ncol)`, used in 2 stream calculations"
     lev_source::V
-    "temporary storage array, used in 2 stream calculations `(nlay + 1, ncol)`"
     albedo::V
-    "temporary storage array, used in 2 stream calculations `(nlay + 1, ncol)`"
     src::V
 end
 
@@ -132,23 +128,21 @@ end
 
 
 """
-    SourceSW2Str{S,D,V}
+    SourceSW2Str{S, D, V}
 
-Shortwave sources: computed at layer center, layer edges, 
-and at the surface for 2-stream calculations
+Shortwave sources: computed at layer center, layer edges,
+and at the surface for 2-stream calculations.
 
 # Fields
-
-$(DocStringExtensions.FIELDS)
+- `sfc_source`: Surface source `(ncol)`.
+- `leveldata`: Storage for albedo and src `(2, nlay+1, ncol)`.
+- `albedo`: Albedo `(nlay+1, ncol)`.
+- `src`: Temporary storage array `(nlay+1, ncol)`; used in 2-stream calculations.
 """
 struct SourceSW2Str{S, D, V}
-    "surface source `(ncol)`"
     sfc_source::S
-    "storage for albedo and src `(2, nlay + 1, ncol)`"
     leveldata::D
-    "albedo `(nlay + 1, ncol)`"
     albedo::V
-    "temporary storage array, used in 2 stream calculations `(nlay + 1, ncol)`"
     src::V
 end
 

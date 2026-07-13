@@ -1,6 +1,6 @@
 """
     compute_col_gas!(
-        context,
+        device,
         p_lev,
         col_dry,
         param_set,
@@ -9,8 +9,7 @@
         max_threads = Int(256),
     )
 
-This function computes the column amounts of dry or moist air.
-
+Compute the column amounts of dry or moist air.
 """
 function compute_col_gas!(
     device::ClimaComms.AbstractCPUDevice,
@@ -47,7 +46,7 @@ end
         vmr_h2o::Union{AbstractArray{FT, 2}, Nothing} = nothing,
     ) where {FT}
 
-This function computes the relative humidity.
+Compute the relative humidity.
 
 """
 function compute_relative_humidity!(

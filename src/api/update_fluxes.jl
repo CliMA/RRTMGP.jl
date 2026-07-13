@@ -5,7 +5,7 @@
 """
     update_lw_fluxes!(s::RRTMGPSolver)
 
-Updates the longwave fluxes.
+Update the longwave fluxes.
 """
 update_lw_fluxes!(s::RRTMGPSolver) = update_lw_fluxes!(s, _radiation_method(s))
 
@@ -62,7 +62,7 @@ end
 """
     update_sw_fluxes!(s::RRTMGPSolver)
 
-Updates the shortwave fluxes.
+Update the shortwave fluxes.
 """
 update_sw_fluxes!(s::RRTMGPSolver) = update_sw_fluxes!(s, _radiation_method(s))
 
@@ -185,12 +185,12 @@ end
 """
     update_fluxes!(s::RRTMGPSolver, seedval = nothing)
 
-Run the full radiation update: prepare the atmospheric state (interpolate levels,
+Run the radiation update: prepare the atmospheric state (interpolate levels,
 add the isothermal boundary layer, clip pressures/temperatures/humidity to the
 range the optics support, and compute concentrations), solve the
 longwave and shortwave problems (applying `deep_atmosphere_inverse_scaling` if present), and
-combine them into the net flux. Mutates `s` in place — its atmospheric state and
-flux buffers — and returns `nothing` (read results via `net_flux(s)` and the
+combine them into the net flux. Mutates `s` in place (its atmospheric state and
+flux buffers) and returns `nothing` (read results via `net_flux(s)` and the
 other flux getters). When the radiation method requests reproducible seeding,
 `seedval` reseeds the RNG used for cloud sampling.
 
@@ -226,11 +226,10 @@ vapor, and — for non-gray optics — temperatures outside the lookup tables'
 range), and compute the dry-air column amounts. Mutates the solver's
 atmospheric state in place and returns `nothing`.
 
-[`update_fluxes!`](@ref) calls this before solving; call it directly to inspect
+[`update_fluxes!`](@ref) calls this before solving; call it to inspect
 the prepared state (interpolated level values, column amounts) without running
-the radiative transfer — the prepare/solve split familiar from other radiation
-drivers. Relative humidity is *not* recomputed here (a host responsibility; see
-[`update_concentrations!`](@ref)).
+the radiative transfer (the prepare/solve split familiar from other radiation
+drivers). Relative humidity is managed by the host (see [`update_concentrations!`](@ref)).
 """
 function prepare_atmosphere!(s::RRTMGPSolver)
     as = _atmospheric_state(s)

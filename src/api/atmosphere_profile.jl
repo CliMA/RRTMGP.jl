@@ -11,8 +11,8 @@ consumed by [`solve`](@ref). All arrays are plain `Array{FT}` on the host;
 [`solve`](@ref) moves them to the compute device.
 
 # Fields
-- `p_lay`, `t_lay`: layer-center pressures [Pa] and temperatures [K], `(nlay, ncol)`.
-- `p_lev`, `t_lev`: level pressures [Pa] and temperatures [K], `(nlay + 1, ncol)`.
+- `p_lay`, `p_lev`: layer-center and level pressures [Pa], `(nlay, ncol)` and `(nlay + 1, ncol)`.
+- `t_lay`, `t_lev`: layer-center and level temperatures [K], `(nlay, ncol)` and `(nlay + 1, ncol)`.
 - `z_lev`: level altitudes [m], `(nlay + 1, ncol)`.
 - `t_sfc`: surface temperature [K], `(ncol,)`.
 - `lat`: latitude [degrees], `(ncol,)`.
@@ -38,7 +38,9 @@ end
 # [m], tropospheric lapse rate [K/m], stratospheric inverse lapse rate [K/m],
 # surface water-vapor vmr, default latitude [degrees].
 # The values are idealized climatological choices (inspired by the AFGL
-# reference-atmosphere climatology, but analytic rather than tabulated).
+# reference-atmosphere climatology of Anderson et al. 1986, AFGL-TR-86-0110,
+# https://apps.dtic.mil/sti/citations/ADA175173, but analytic rather than
+# tabulated).
 const _STANDARD_ATMOSPHERES = Dict(
     :tropical => (;
         t_sfc = 300.0,
@@ -112,8 +114,7 @@ levels uniformly spaced in altitude from the surface to `z_top` [m]:
 
 `kind` selects the idealized climatology: `:tropical`,
 `:midlatitude_summer` (default), or `:subarctic_winter`. The profiles are
-analytic and idealized — made for teaching and testing, not for reproducing
-tabulated reference atmospheres. All `ncol` columns are identical.
+analytic and idealized (made for teaching and testing). All `ncol` columns are identical.
 """
 function standard_atmosphere(
     ::Type{FT};

@@ -1,71 +1,103 @@
 
+"""
+    AbstractGrayOpticalThickness
+
+Abstract type for the gray-radiation optical-thickness parameterizations:
+[`GrayOpticalThicknessSchneider2004`](@ref) and
+[`GrayOpticalThicknessOGorman2008`](@ref).
+"""
 abstract type AbstractGrayOpticalThickness end
 
 """
     GrayOpticalThicknessSchneider2004{FT} <: AbstractGrayOpticalThickness
+    GrayOpticalThicknessSchneider2004(FT; α = 3.5, te = 300, tt = 200, Δt = 60)
 
-Optical thickness function parameters from Schneider 2004, J. Atmos. Sci. (2004) 61 (12): 1317–1340.
-DOI: https://doi.org/10.1175/1520-0469(2004)061<1317:TTATTS>2.0.CO;2
+Parameters of the semi-grey optical-thickness profile of [schneider2004](@cite).
+The vertical longwave optical depth scales with pressure as ``\\widehat{\\tau}(p) =
+d_0(\\phi)\\,(p/p_0)^\\alpha``, so the exponent `α` controls how the absorber is
+distributed with height (`α = 1` for a well-mixed absorber, larger `α` for one
+concentrated near the surface). The optical thickness at the surface,
+``d_0(\\phi)``, is set by the latitude-dependent radiative-equilibrium
+temperature built from `te`, `tt`, and `Δt`.
 
 # Fields
-$(DocStringExtensions.FIELDS)
+- `α`: Pressure exponent of the optical-depth profile.
+- `te`: Global-mean surface temperature [K].
+- `tt`: Temperature at the top of the atmosphere [K].
+- `Δt`: Equator-to-pole surface temperature difference [K].
 """
 struct GrayOpticalThicknessSchneider2004{FT} <: AbstractGrayOpticalThickness
-    "scaling height ratio"
     α::FT
-    "global mean surface temperature (K)"
     te::FT
-    "temp at top of atmosphere (K)"
     tt::FT
-    "Δt (K)"
     Δt::FT
 end
 Adapt.@adapt_structure GrayOpticalThicknessSchneider2004
 
-GrayOpticalThicknessSchneider2004(::Type{FT}) where {FT} =
-    GrayOpticalThicknessSchneider2004{FT}(FT(3.5), FT(300), FT(200), FT(60))
+GrayOpticalThicknessSchneider2004(
+    ::Type{FT};
+    α = 3.5,
+    te = 300,
+    tt = 200,
+    Δt = 60,
+) where {FT} =
+    GrayOpticalThicknessSchneider2004{FT}(FT(α), FT(te), FT(tt), FT(Δt))
 
 """
     GrayOpticalThicknessOGorman2008{FT} <: AbstractGrayOpticalThickness
+    GrayOpticalThicknessOGorman2008(FT; α = 1.0, fₗ = 0.2, τₑ = 7.2, τₚ = 1.8, τ₀ = 0.22)
 
-Optical thickness function parameters from O'Gorman 2008, Journal of Climate Vol 21, Page(s): 3815–3832.
-DOI: https://doi.org/10.1175/2007JCLI2065.1
+Parameters of the grey optical-thickness profile of [frierson2006](@cite) and
+[ogorman2008](@cite). The
+vertical longwave optical depth blends a linear and a quartic dependence on the
+normalized pressure ``\\sigma = p/p_0``, ``\\widehat{\\tau} \\propto f_\\ell\\,\\sigma +
+(1 - f_\\ell)\\,\\sigma^4``, so that it stays finite aloft while thickening toward
+the surface, with an equator-to-pole contrast set by `τₑ` and `τₚ`. The shortwave
+optical depth scales as ``\\sigma^2`` with amplitude `τ₀`. This is the default
+optical-thickness model for [`solve_gray`](@ref RRTMGP.solve_gray).
 
 # Fields
-$(DocStringExtensions.FIELDS)
+- `α`: Overall scaling factor for the longwave optical depth.
+- `fₗ`: Weight of the linear (versus quartic) pressure dependence.
+- `τₑ`: Longwave optical thickness at the equator.
+- `τₚ`: Longwave optical thickness at the poles.
+- `τ₀`: Shortwave optical thickness amplitude.
 """
 struct GrayOpticalThicknessOGorman2008{FT} <: AbstractGrayOpticalThickness
-    "scaling factor"
     α::FT
-    "fₗ"
     fₗ::FT
-    "longwave optical thickness at equator"
     τₑ::FT
-    "longwave optical thickness at poles"
     τₚ::FT
-    "optical thickness for shortwave radiation"
     τ₀::FT
 end
 Adapt.@adapt_structure GrayOpticalThicknessOGorman2008
 
-GrayOpticalThicknessOGorman2008(::Type{FT}) where {FT <: AbstractFloat} =
-    GrayOpticalThicknessOGorman2008{FT}(
-        FT(1.0),
-        FT(0.2),
-        FT(7.2),
-        FT(1.8),
-        FT(0.22),
-    )
+GrayOpticalThicknessOGorman2008(
+    ::Type{FT};
+    α = 1.0,
+    fₗ = 0.2,
+    τₑ = 7.2,
+    τₚ = 1.8,
+    τ₀ = 0.22,
+) where {FT <: AbstractFloat} =
+    GrayOpticalThicknessOGorman2008{FT}(FT(α), FT(fₗ), FT(τₑ), FT(τₚ), FT(τ₀))
 
 
 """
-    GrayAtmosphericState{FT,FTA1D,FTA2D} <: 
-        AbstractAtmosphericState{FT,FTA1D}
+    GrayAtmosphericState{FT, FTA1D, FTA2D, OTP} <: AbstractAtmosphericState
 
-Atmospheric conditions, used to compute optical properties with the gray atmosphere approximation
+Atmospheric conditions, used to compute optical properties with the gray atmosphere
+approximation.
 
 # Fields
-$(DocStringExtensions.FIELDS)
+- `lat`: Latitude in degrees for each column `(ncol,)`.
+- `p_lay`: Layer pressures [Pa, mb] `(nlay, ncol)`.
+- `p_lev`: Level pressures [Pa, mb] `(nlay+1, ncol)`.
+- `t_lay`: Layer temperatures [K] `(nlay, ncol)`.
+- `t_lev`: Level temperatures [K] `(nlay+1, ncol)`.
+- `z_lev`: Level altitudes [m] `(nlay+1, ncol)`.
+- `t_sfc`: Surface temperatures [K] `(ncol)`.
+- `otp`: Optical thickness parameters.
 """
 struct GrayAtmosphericState{
     FT <: AbstractFloat,
@@ -73,21 +105,13 @@ struct GrayAtmosphericState{
     FTA2D <: AbstractArray{FT, 2},
     OTP <: AbstractGrayOpticalThickness,
 } <: AbstractAtmosphericState
-    "latitude, in degrees, for each column; `(ncol,)`"
     lat::FTA1D
-    "Layer pressures `[Pa, mb]`; `(nlay, ncol)`"
     p_lay::FTA2D
-    "Level pressures `[Pa, mb]`; `(nlay+1, ncol)`"
     p_lev::FTA2D
-    "Layer temperatures `[K]`; `(nlay, ncol)`"
     t_lay::FTA2D
-    "Level temperatures `[K]`; `(nlay+1,ncol)`"
     t_lev::FTA2D
-    "Level Altitude `[m]`; `(nlay+1,ncol)`"
     z_lev::FTA2D
-    "Surface temperatures `[K]`; `(ncol)`"
     t_sfc::FTA1D
-    "optical thickness parameters"
     otp::OTP
 end
 Adapt.@adapt_structure GrayAtmosphericState
@@ -108,11 +132,25 @@ Adapt.@adapt_structure GrayAtmosphericState
 @inline getview_t_lay(as::GrayAtmosphericState, gcol) =
     @inbounds view(as.t_lay, :, gcol)
 
-# This functions sets up a model temperature and pressure 
-# distributions for a gray atmosphere based on a pressure grid
-# see Schneider 2004, J. Atmos. Sci. (2004) 61 (12): 1317–1340.
-# https://doi.org/10.1175/1520-0469(2004)061<1317:TTATTS>2.0.CO;2
+"""
+    setup_gray_as_pr_grid(
+        context::ClimaComms.AbstractCommsContext,
+        nlay::Int,
+        lat,
+        p0,
+        pe,
+        otp::AbstractGrayOpticalThickness,
+        param_set,
+        ::Type{DA},
+        step = "linear",
+    )
 
+Build a [`GrayAtmosphericState`](@ref) on a pressure grid from surface
+pressure `p0` to top-of-atmosphere pressure `pe`, with the analytic
+temperature profile of Schneider (2004), J. Atmos. Sci. 61 (12), 1317-1340
+(doi: [10.1175/1520-0469(2004)061<1317:TTATTS>2.0.CO;2](https://doi.org/10.1175/1520-0469(2004)061<1317:TTATTS>2.0.CO;2)).
+One column is built per element of `lat`, with arrays of type `DA`.
+"""
 function setup_gray_as_pr_grid(
     context::ClimaComms.AbstractCommsContext,
     nlay::Int,

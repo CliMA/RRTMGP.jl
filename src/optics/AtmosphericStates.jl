@@ -1,6 +1,5 @@
 module AtmosphericStates
 import ClimaComms
-using DocStringExtensions
 using Adapt
 import ..Parameters as RP
 
@@ -18,43 +17,64 @@ export AbstractAtmosphericState,
     GrayOpticalThicknessOGorman2008,
     AbstractGrayOpticalThickness
 
+"""
+    AbstractAtmosphericState
+
+Abstract type for atmospheric states: [`AtmosphericState`](@ref) for the
+spectral (correlated-``k``) methods and [`GrayAtmosphericState`](@ref) for
+gray radiation.
+"""
 abstract type AbstractAtmosphericState end
 
 include("gray_atmospheric_states.jl")
 
+"""
+    AbstractCloudMask
+
+Abstract type for cloud-overlap sampling masks; see [`MaxRandomOverlap`](@ref).
+"""
 abstract type AbstractCloudMask end
 
+"""
+    MaxRandomOverlap
+
+Maximum-random cloud overlap for McICA sampling: clouds in adjacent layers
+overlap maximally, and clouds separated by clear sky overlap randomly. Used
+by `build_cloud_mask!` to sample the g-point cloud masks from the cloud
+fraction.
+"""
 struct MaxRandomOverlap <: AbstractCloudMask end
 Adapt.@adapt_structure MaxRandomOverlap
 
 """
-    AtmosphericState{FTA1D,FTA1DN,FTA2D,CLDP,CLDM,VMR} <:
+    AtmosphericState{FTA1D, FTA1DN, FTA2D, D, VMR, CLD, AER} <:
         AbstractAtmosphericState
 
-Atmospheric conditions, used to compute optical properties. 
+Atmospheric conditions, used to compute optical properties.
 
 # Fields
-$(DocStringExtensions.FIELDS)
+- `lon`: Longitude in degrees `(ncol)`; optional.
+- `lat`: Latitude in degrees `(ncol)`; optional.
+- `layerdata`: Storage for `col_dry` (column amount of dry air [molecules/cm²]),
+  layer pressures [Pa, mb], layer temperatures [K], and relative humidity;
+  `(4, nlay, ncol)`.
+- `p_lev`: Level pressures [Pa, mb] `(nlay+1, ncol)`.
+- `t_lev`: Level temperatures [K] `(nlay+1, ncol)`.
+- `t_sfc`: Surface temperatures [K] `(ncol)`.
+- `vmr`: Volume mixing ratios of all relevant gases.
+- `cloud_state`: Cloud state.
+- `aerosol_state`: Aerosol state.
 """
 struct AtmosphericState{FTA1D, FTA1DN, FTA2D, D, VMR, CLD, AER} <:
        AbstractAtmosphericState
-    "longitude, in degrees (`ncol`), optional"
     lon::FTA1DN
-    "latitude, in degrees (`ncol`), optional"
     lat::FTA1DN
-    "storage for col_dry [`molecules per cm^2 of dry air`], play `[Pa, mb]`, tlay `[K]`, rel_hum; `(4, nlay, ncol)`"
     layerdata::D
-    "Level pressures `[Pa, mb]`; `(nlay+1,ncol)`"
     p_lev::FTA2D
-    "Level temperatures `[K]`; `(nlay+1,ncol)`"
     t_lev::FTA2D
-    "Surface temperatures `[K]`; `(ncol)`"
     t_sfc::FTA1D
-    "volume mixing ratio of all relevant gases"
     vmr::VMR
-    "cloud state"
     cloud_state::CLD
-    "aerosol state"
     aerosol_state::AER
 end
 Adapt.@adapt_structure AtmosphericState
@@ -98,29 +118,33 @@ Adapt.@adapt_structure AtmosphericState
     CloudState{CD, CF, CC, CM, CMT}
 
 Cloud state, used to compute optical properties.
+
+# Fields
+- `cld_r_eff_liq`: Effective radius of cloud liquid particles.
+- `cld_r_eff_ice`: Effective radius of cloud ice particles.
+- `cld_path_liq`: Cloud water path.
+- `cld_path_ice`: Cloud ice path.
+- `cld_frac`: Cloud fraction.
+- `cld_cover_sw`: McICA effective shortwave cloud cover in `[0, 1]`; `(ncol,)`, or
+  `nothing` if unused.
+- `cld_cover_lw`: McICA effective longwave cloud cover in `[0, 1]`; `(ncol,)`, or
+  `nothing` if unused.
+- `mask_lw`: Cloud mask (longwave); `true` if clouds are present.
+- `mask_sw`: Cloud mask (shortwave); `true` if clouds are present.
+- `mask_type`: Cloud mask type.
+- `ice_rgh`: Ice roughness; 1 = none, 2 = medium, 3 = rough.
 """
 struct CloudState{CD, CF, CC, CM, CMT}
-    "effective radius of cloud liquid particles"
     cld_r_eff_liq::CD
-    "effective radius of cloud ice particles"
     cld_r_eff_ice::CD
-    "cloud water path"
     cld_path_liq::CD
-    "cloud ice path"
     cld_path_ice::CD
-    "cloud fraction"
     cld_frac::CF
-    "McICA effective SW cloud cover `[0, 1]` `(ncol,)`; `nothing` if unused"
     cld_cover_sw::CC
-    "McICA effective LW cloud cover `[0, 1]` `(ncol,)`; `nothing` if unused"
     cld_cover_lw::CC
-    "cloud mask (longwave), = true if clouds are present"
     mask_lw::CM
-    "cloud mask (shortwave), = true if clouds are present"
     mask_sw::CM
-    "cloud mask type"
     mask_type::CMT
-    "ice roughness, 1 = none, 2 = medium, 3 = rough"
     ice_rgh::Int
 end
 Adapt.@adapt_structure CloudState
@@ -158,17 +182,19 @@ end
     AerosolState{A, B, D}
 
 Aerosol state, used to compute optical properties.
+
+# Fields
+- `aod_sw_ext`: Shortwave aerosol optical depth.
+- `aod_sw_sca`: Shortwave aerosol optical depth (scattering component).
+- `aero_mask`: Aerosol mask; `true` if any aerosol is present.
+- `aero_size`: Aerosol size [microns].
+- `aero_mass`: Aerosol column mass [kg/m²].
 """
 struct AerosolState{A, B, D}
-    "shortwave aerosol optical depth"
     aod_sw_ext::A
-    "shortwave aerosol optical depth (scattering component)"
     aod_sw_sca::A
-    "aerosol mask, = true if any aerosol is present"
     aero_mask::B
-    "aerosol size (microns)"
     aero_size::D
-    "aerosol mass column (kg/m2)"
     aero_mass::D
 end
 Adapt.@adapt_structure AerosolState

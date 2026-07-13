@@ -2,8 +2,8 @@
 
 RRTMGP has an API for creating various types of solvers, and accessing data
 passed to it. Hosts read and write a solver's data through named getters; their
-uniform layout/domain-masking/writability contract — the RRTMGP–ClimaCore
-decoupling mechanism — is spelled out under [The getter contract](@ref).
+uniform layout/domain-masking/writability contract (the RRTMGP–ClimaCore
+decoupling mechanism) is spelled out under [The getter contract](@ref).
 
 ```@meta
 CurrentModule = RRTMGP

@@ -6,8 +6,8 @@
 # domain-masked `view` into a solver-owned buffer (physical dimension first, `ncol` last), so
 # a host reads and writes RRTMGP's buffers without touching the packed layout -- which is how
 # RRTMGP stays free of ClimaCore. The full contract (layout, boundary-layer masking,
-# writability, and the two deliberate exceptions: the well-mixed `volume_mixing_ratio` scalar
-# and the allocating `spectral_*_flux_net`) is documented in `docs/src/getters.md`.
+# writability, and the deliberate exceptions: the well-mixed `volume_mixing_ratio` scalar
+# and the allocating `heating_rate`) is documented in `docs/src/getters.md`.
 
 import ..AtmosphericStates: getview_p_lay, getview_t_lay, getview_rel_hum
 import ..VolumeMixingRatios
@@ -113,7 +113,7 @@ function _require_spectral_lookups(s::RRTMGPSolver)
     lookups = _lookup_tables(s)
     isnothing(lookups.lookup_lw) && error(
         "spectral lookup tables are not present on this solver (gray radiation); \
-         construct it with a spectral radiation method (e.g. `ClearSkyRadiation`).",
+         construct it with a spectral radiation method (e.g., `ClearSkyRadiation`).",
     )
     return lookups
 end
@@ -147,10 +147,10 @@ _solver_band_flux(ws) =
 
 Return the spectrally-resolved (per-band) up/down/net longwave or shortwave flux [W/m²] as
 a domain-masked `(nlev, ncol, n_bnd)` array. The solver must have been constructed with
-`spectral_fluxes = true` (otherwise an informative error is raised); this is supported only
-for two-stream, non-gray radiation. Band `b`'s slice `[:, :, b]` has the same layout as the
-broadband fluxes, and summing over the band dimension recovers them. Use
-[`lw_band_bounds`](@ref) / [`sw_band_bounds`](@ref) to identify each band's wavenumber range.
+`spectral_fluxes = true` (supported for two-stream, non-gray radiation). Band `b`'s slice
+`[:, :, b]` has the same layout as the broadband fluxes, and summing over the band dimension
+recovers them. Use [`lw_band_bounds`](@ref) / [`sw_band_bounds`](@ref) to identify each band's
+wavenumber range.
 
 The `up`/`dn`/`net` getters are views into the retained per-band buffers.
 """
@@ -171,7 +171,7 @@ spectral_sw_flux_net(s::RRTMGPSolver) =
     lw_band_bounds(s::RRTMGPSolver)
 
 Return the `(2, n_bnd)` lower/upper wavenumber edges [cm⁻¹] of the longwave bands,
-identifying the spectral range of each band in the per-band fluxes (e.g.
+identifying the spectral range of each band in the per-band fluxes (e.g.,
 [`spectral_lw_flux_up`](@ref)).
 """
 lw_band_bounds(s::RRTMGPSolver) =
@@ -181,8 +181,9 @@ lw_band_bounds(s::RRTMGPSolver) =
     sw_band_bounds(s::RRTMGPSolver)
 
 Return the `(2, n_bnd)` lower/upper wavenumber edges [cm⁻¹] of the shortwave bands,
-identifying the spectral range of each band in the per-band fluxes (e.g.
-[`spectral_sw_flux_up`](@ref RRTMGP.spectral_lw_flux_up)).
+identifying the spectral range of each band in
+[the per-band fluxes](@ref RRTMGP.spectral_lw_flux_up) (`spectral_sw_flux_up`
+and companions).
 """
 sw_band_bounds(s::RRTMGPSolver) =
     _require_spectral_lookups(s).lookup_sw.band_data.bnd_lims_wn
@@ -191,7 +192,7 @@ sw_band_bounds(s::RRTMGPSolver) =
     optical_thickness_parameter(s::RRTMGPSolver)
 
 For a gray-radiation solver, return the gray optical-thickness parameters (an
-`AbstractGrayOpticalThickness`, e.g. `GrayOpticalThicknessOGorman2008`) the atmospheric
+`AbstractGrayOpticalThickness`, e.g., `GrayOpticalThicknessOGorman2008`) the atmospheric
 state was built with; `nothing` for lookup-table (non-gray) radiation, which has no such
 parameter.
 """
@@ -201,7 +202,7 @@ optical_thickness_parameter(s::RRTMGPSolver) =
 isothermal_boundary_layer(s::RRTMGPSolver) = s.grid_params.isothermal_boundary_layer
 
 """
-    aerosol_radius(s::RRTMGPSolver, name::String)
+    aerosol_radius(s::RRTMGPSolver, name::AbstractString)
 
 Return the aerosol radius for the given aerosol name.
 
@@ -219,7 +220,7 @@ function aerosol_radius(s::RRTMGPSolver, name::AbstractString)
 end
 
 """
-    aerosol_column_mass_density(s::RRTMGPSolver, name::String)
+    aerosol_column_mass_density(s::RRTMGPSolver, name::AbstractString)
 
 Return the aerosol column mass density [kg/m²] for the given aerosol name.
 
@@ -286,9 +287,8 @@ Return the volume mixing ratio for gas `name`. `"h2o"` and `"o3"` vary by layer
 and column (a domain-masked `(nlay, ncol)` view); with the global-mean `VmrGM`
 storage every other (well-mixed) gas is a single scalar.
 
-Unlike the array getters, a well-mixed scalar is returned as a **host `Number`
-copied off the device** (not a device view), so each call triggers a device→host
-synchronization on the GPU. Read these once at setup, not inside a timestep loop.
+A well-mixed scalar is returned as a host `Number` copied off the device, so each call triggers
+a device→host synchronization on the GPU. Read these during setup to maintain performance.
 
 Available names are:
 $(gas_names_sw_docs())

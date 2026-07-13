@@ -1,6 +1,5 @@
 module Optics
 
-using DocStringExtensions
 using Adapt
 using Random
 import ClimaComms
