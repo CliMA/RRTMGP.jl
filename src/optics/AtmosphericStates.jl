@@ -121,6 +121,9 @@ The cache trades one `permutedims!` per solve plus `(4 nlay + nlev) ncol`
 extra storage for coalesced reads in the g-point loop. Pass the same cache to
 the longwave and shortwave workspaces to share the storage, or `nothing` to
 opt out (the kernels then read the `AtmosphericState` directly, as before).
+The workspace constructors default to a cache on the GPU and to `nothing` on
+the CPU, where the state's vertical-first layout is already cache-friendly
+for the per-column sweeps.
 
 # Fields
 - `layerdata`: `(ncol, nlay, 4)` copy of `AtmosphericState.layerdata`

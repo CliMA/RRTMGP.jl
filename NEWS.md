@@ -3,11 +3,15 @@ RRTMGP.jl Release Notes
 
 main
 ------
-- Internal array layouts transposed to column-first `(ncol, nlay/nlev)` for
-  coalesced GPU memory access: optical properties (`OneScalar`, `TwoStream`),
-  source functions (`SourceLWNoScat`, `SourceLW2Str`, `SourceSW2Str`), and the
-  broadband flux buffers (`FluxLW`, `FluxSW`). On an A100 at DYAMOND scale
-  this cuts longwave kernel times by 25-36% and shortwave all-sky by 14-20%.
+- Internal compute buffers now use device-dependent physical layouts behind a
+  uniform column-first `(ncol, nlay/nlev)` indexing convention: optical
+  properties (`OneScalar`, `TwoStream`), source functions (`SourceLWNoScat`,
+  `SourceLW2Str`, `SourceSW2Str`), and the broadband flux buffers (`FluxLW`,
+  `FluxSW`). On the GPU the storage is column-first, giving coalesced access
+  (on an A100 at DYAMOND scale this cuts longwave kernel times by 25-36% and
+  shortwave all-sky by 14-20%); on the CPU the storage stays vertical-first
+  under a lazy `PermutedDimsArray` wrapper, preserving the stride-1 vertical
+  sweeps (and CPU performance) while running the same kernel code.
   The Layer-2 flux getters (`lw_flux_up`, `net_flux`, ...) still present
   plain `(nlev, ncol)` views: they read `Fluxes.FluxPresentation` arrays that
   `update_fluxes!` fills from the compute buffers with one fused transposing
@@ -23,11 +27,12 @@ main
   `AtmosphericState` arrays (layer pressure/temperature/dry-air column
   amount/relative humidity, level temperatures), refreshed by one
   `permutedims!` per spectral solve, so the gas-optics g-point loop reads
-  coalesced memory on GPUs. On by default (the RTE workspace constructors
-  build one; the `RRTMGPSolver` shares a single cache between the longwave
-  and shortwave workspaces); pass `state_cache = nothing` to a workspace
-  constructor to opt out, or pass the same cache to several workspaces to
-  share the storage.
+  coalesced memory on GPUs. On by default on the GPU (the RTE workspace
+  constructors build one; the `RRTMGPSolver` shares a single cache between
+  the longwave and shortwave workspaces) and off (`nothing`) on the CPU,
+  where the state's vertical-first layout is already cache-friendly; pass
+  `state_cache = nothing` to opt out, or pass the same cache to several
+  workspaces to share the storage.
 - Documentation reorganized along tutorial / how-to / explanation / reference
   lines: two new executable (Literate.jl) tutorials — "A first radiation
   calculation" and "Radiative-convective equilibrium", which reproduces

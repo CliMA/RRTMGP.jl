@@ -13,13 +13,18 @@ import ..Parameters as RP
 
 export NoScatLWRTE, TwoStreamLWRTE, NoScatSWRTE, TwoStreamSWRTE
 
-# On GPU, use the TransposedStateCache for coalesced reads across warps.
-# On CPU, pass `nothing` to read the AtmosphericState directly with its
-# cache-friendly stride-4 vertical layout.
+# Device-dependent default for the workspaces' `state_cache` keyword. On the
+# GPU, a `TransposedStateCache` gives the g-point loop coalesced state reads
+# across the warp's columns. On the CPU, the kernels read the
+# `AtmosphericState` directly (`nothing`): its vertical-first layout is
+# already cache-friendly for the per-column sweeps, and a transposed copy
+# would only add work.
 _default_state_cache(gp::RRTMGPGridParams) =
     _default_state_cache(ClimaComms.device(gp), gp)
-_default_state_cache(::ClimaComms.AbstractCPUDevice, gp) = nothing
-_default_state_cache(device, gp) = TransposedStateCache(gp)
+_default_state_cache(::ClimaComms.AbstractCPUDevice, gp::RRTMGPGridParams) =
+    nothing
+_default_state_cache(::ClimaComms.AbstractDevice, gp::RRTMGPGridParams) =
+    TransposedStateCache(gp)
 
 """
     NoScatLWRTE(grid_params::RRTMGPGridParams; params, sfc_emis, inc_flux)

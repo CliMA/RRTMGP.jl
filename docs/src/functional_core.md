@@ -35,11 +35,14 @@ solve_lw!(slv_lw, state, lookup_lw)   # or solve_lw!(slv_lw, state) for gray
 F = slv_lw.flux.flux_net              # (ncol, nlev) [W/m²]
 ```
 
-Note the axis order: the raw flux buffers are stored column-first, `(ncol,
-nlev)`, so that neighboring GPU threads (one per column) access consecutive
-memory. Only the Layer-2 getters (`net_flux`, `lw_flux_up`, ...) present the
-vertical-first `(nlev, ncol)` orientation, from presentation copies that
-`update_fluxes!` refreshes at the end of each call.
+Note the axis order: the raw flux buffers are indexed column-first, `(ncol,
+nlev)`, on every device. On the GPU they are also stored that way, so that
+neighboring threads (one per column) access consecutive memory; on the CPU
+the storage is vertical-first under a lazy wrapper, which keeps the
+per-column sweeps stride-1 without changing the indexing. Only the Layer-2
+getters (`net_flux`, `lw_flux_up`, ...) present the vertical-first
+`(nlev, ncol)` orientation, from presentation copies that `update_fluxes!`
+refreshes at the end of each call.
 
 This is what RRTMGP's own tests drive, and what [`RRTMGPSolver`](@ref
 RRTMGP.RRTMGPSolver) wraps behind [`update_fluxes!`](@ref RRTMGP.update_fluxes!)

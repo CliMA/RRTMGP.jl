@@ -41,14 +41,16 @@ lazy_transpose(x::PermutedDimsArray{T, 3, (2, 1, 3), (2, 1, 3)}) where {T} = par
 """
     _coalesced_2d(DA, FT, ncol, nlev_or_nlay)
 
-Allocate a 2D buffer that kernels index as `(ncol, nlev)`. On GPU, the physical
-layout is `(ncol, nlev)` (coalesced across columns). On CPU, the physical layout
-is `(nlev, ncol)` (stride-1 vertical sweeps), wrapped in a `PermutedDimsArray`
-so the kernel indexing convention is unchanged.
+Allocate a 2D compute buffer that the kernels index as `(ncol, nlev)`. The
+physical layout is chosen per device (by dispatch on the array type `DA`): on
+the GPU, the buffer is stored `(ncol, nlev)`, so the one-thread-per-column
+kernels access consecutive addresses (coalesced); on the CPU (`DA === Array`),
+it is stored `(nlev, ncol)` — stride-1 vertical sweeps, matching the
+per-column loop order — and wrapped in a `PermutedDimsArray` so the kernel
+indexing convention is the same on both devices.
 """
-@inline _coalesced_2d(DA, ::Type{FT}, d1, d2) where {FT} =
-    DA{FT}(undef, d1, d2)  # GPU default: (ncol, nlev)
-@inline _coalesced_2d(::Type{Array}, ::Type{FT}, d1, d2) where {FT} =
+_coalesced_2d(DA, ::Type{FT}, d1, d2) where {FT} = DA{FT}(undef, d1, d2)
+_coalesced_2d(::Type{Array}, ::Type{FT}, d1, d2) where {FT} =
     PermutedDimsArray{FT, 2, (2, 1), (2, 1), Matrix{FT}}(
         Matrix{FT}(undef, d2, d1),
     )
@@ -56,26 +58,28 @@ so the kernel indexing convention is unchanged.
 """
     _coalesced_3d(DA, FT, ncol, nlev_or_nlay, nfld)
 
-3D variant of [`_coalesced_2d`](@ref): on GPU `(ncol, nlev, nfld)`, on CPU the
-physical array is `(nlev, ncol, nfld)` wrapped so kernels see `(ncol, nlev, nfld)`.
+3D variant of [`_coalesced_2d`](@ref) for field-packed buffers: indexed
+`(ncol, nlev, nfld)` on both devices; stored `(nlev, ncol, nfld)` on the CPU.
 """
-@inline _coalesced_3d(DA, ::Type{FT}, d1, d2, d3) where {FT} =
+_coalesced_3d(DA, ::Type{FT}, d1, d2, d3) where {FT} =
     DA{FT}(undef, d1, d2, d3)
-@inline _coalesced_3d(::Type{Array}, ::Type{FT}, d1, d2, d3) where {FT} =
+_coalesced_3d(::Type{Array}, ::Type{FT}, d1, d2, d3) where {FT} =
     PermutedDimsArray{FT, 3, (2, 1, 3), (2, 1, 3), Array{FT, 3}}(
         Array{FT, 3}(undef, d2, d1, d3),
     )
 
-# Zeroed variant for optical properties (mirrors `zeros`).
-@inline function _coalesced_3d_zeros(DA, ::Type{FT}, d1, d2, d3) where {FT}
-    buf = DA{FT}(zeros(d1, d2, d3))
+# Zero-initialized variant of `_coalesced_3d` (the `TwoStream` optics start
+# from zero). Fill the physical storage, not the wrapper: `fill!` on a
+# `PermutedDimsArray` falls back to slow wrapped iteration.
+function _coalesced_3d_zeros(DA, ::Type{FT}, d1, d2, d3) where {FT}
+    buf = _coalesced_3d(DA, FT, d1, d2, d3)
+    fill!(_physical(buf), FT(0))
     return buf
 end
-@inline function _coalesced_3d_zeros(::Type{Array}, ::Type{FT}, d1, d2, d3) where {FT}
-    phys = zeros(FT, d2, d1, d3)
-    return PermutedDimsArray{FT, 3, (2, 1, 3), (2, 1, 3), Array{FT, 3}}(phys)
-end
 
+# The physical storage underlying a (possibly layout-wrapped) compute buffer.
+_physical(x::AbstractArray) = x
+_physical(x::PermutedDimsArray) = parent(x)
 
 """
     AbstractFlux
@@ -309,23 +313,19 @@ function apply_metric_scaling!(
     return nothing
 end
 
-# Multiply the column-first `(ncol, nlev[, n_bnd])` array `a` by the
-# vertical-first `(nlev, ncol)` scaling `sc`. Device arrays broadcast through
-# the lazy transpose (a single kernel); host arrays use explicit loops, since
-# broadcasts with a permuted-wrapper operand allocate a few bytes on
-# Julia ≤ 1.11, tripping the zero-allocation tests.
+# Multiply the `(ncol, nlev)`-indexed compute buffer `a` by the vertical-first
+# `(nlev, ncol)` scaling `sc`. Device arrays broadcast through the lazy
+# transpose (a single kernel); host arrays use explicit loops, since broadcasts
+# with a permuted-wrapper operand allocate a few bytes on Julia ≤ 1.11,
+# tripping the zero-allocation tests.
 _scale_by_transpose!(a::AbstractArray, sc) =
     (a .= a .* lazy_transpose(sc); nothing)
-function _scale_by_transpose!(a::Array{FT, 2}, sc::Array{FT, 2}) where {FT}
-    ncol, nlev = size(a)
-    @inbounds for ilev in 1:nlev, gcol in 1:ncol
-        a[gcol, ilev] *= sc[ilev, gcol]
-    end
-    return nothing
-end
-# CPU dual-layout: `a` is a PermutedDimsArray{...(2,1)...} wrapping (nlev, ncol);
-# `sc` is the plain (nlev, ncol) metric_scaling.  Access the parent directly.
-function _scale_by_transpose!(a::PermutedDimsArray{FT, 2, (2, 1), (2, 1), Matrix{FT}}, sc::Array{FT, 2}) where {FT}
+# CPU dual-layout buffers: the wrapper's parent and `sc` share the
+# (nlev, ncol) layout, so scale the parent directly, stride-1.
+function _scale_by_transpose!(
+    a::PermutedDimsArray{FT, 2, (2, 1), (2, 1), Matrix{FT}},
+    sc::Array{FT, 2},
+) where {FT}
     pa = parent(a)
     nlev, ncol = size(pa)
     @inbounds for gcol in 1:ncol, ilev in 1:nlev
@@ -333,6 +333,16 @@ function _scale_by_transpose!(a::PermutedDimsArray{FT, 2, (2, 1), (2, 1), Matrix
     end
     return nothing
 end
+# Defensive fallback for hand-constructed Layer-1 flux buffers that store a
+# plain (ncol, nlev) host array (the internal CPU constructors always wrap).
+function _scale_by_transpose!(a::Array{FT, 2}, sc::Array{FT, 2}) where {FT}
+    ncol, nlev = size(a)
+    @inbounds for ilev in 1:nlev, gcol in 1:ncol
+        a[gcol, ilev] *= sc[ilev, gcol]
+    end
+    return nothing
+end
+
 """
     FluxPresentation{FTA2D, FD}
 
@@ -376,8 +386,10 @@ end
 """
     update_presentation!(pres::FluxPresentation, flux::AbstractFlux)
 
-Fill the `(nlev, ncol)` presentation arrays from the `(ncol, nlev)` compute
-buffers of `flux` (transposing copies; the direct beam only when present).
+Fill the `(nlev, ncol)` presentation arrays from the `(ncol, nlev)`-indexed
+compute buffers of `flux` (the direct beam only when present). On the GPU this
+is a transposing copy; on the CPU, the compute buffers' physical parents
+already have the presentation layout, so it is a plain `copyto!`.
 """
 function update_presentation!(pres::FluxPresentation, flux::AbstractFlux)
     _copy_transposed!(pres.flux_up, flux.flux_up)

@@ -50,7 +50,11 @@ outside hot loops.
 `Adapt.adapt(Array, solver)` produces a host copy (e.g., for serialization) and
 `Adapt.adapt(CuArray, solver)` moves it back. RRTMGP's custom `adapt_structure`
 methods preserve the internal view topology (scratch views into packed
-buffers), so an adapted solver keeps the zero-allocation property.
+buffers), so an adapted solver keeps the zero-allocation property. Adapt
+preserves each buffer's physical layout, so round-tripping a GPU solver
+through the host is lossless; adapting a CPU-*constructed* solver to the GPU
+runs correctly but keeps the CPU layout (uncoalesced) — for GPU work,
+construct the solver on the GPU.
 
 ## Reproducibility caveat: McICA cloud sampling
 
@@ -78,14 +82,17 @@ both backends:
   g-point's lookup-table slices hot in cache while sweeping the columns. With
   a single-threaded context, the same code runs serially.
 
-The memory layout matches the thread mapping: the internal scratch and output
-buffers are stored column-first, `(ncol, nlev)`, so consecutive GPU threads
-write consecutive addresses (coalesced access), and the frequently re-read
-state arrays (layer pressures and temperatures, level temperatures) are
-copied into a column-first `TransposedStateCache` once per solve so the
-g-point loop also reads coalesced memory. The caller-owned
-`AtmosphericState` and the getter views keep their vertical-first
-`(nlev, ncol)` presentation.
+The memory layout matches the thread mapping on each device. On the GPU, the
+internal scratch and output buffers are stored column-first, `(ncol, nlev)`,
+so consecutive threads write consecutive addresses (coalesced access), and
+the frequently re-read state arrays (layer pressures and temperatures, level
+temperatures) are copied into a column-first `TransposedStateCache` once per
+solve so the g-point loop also reads coalesced memory. On the CPU, the same
+buffers are stored vertical-first under a lazy wrapper — each thread's
+vertical sweep is then stride-1 — and the kernels read the
+`AtmosphericState` directly, so both devices run identical kernel code on
+their preferred layout. The caller-owned `AtmosphericState` and the getter
+views keep their vertical-first `(nlev, ncol)` presentation throughout.
 
 ## Performance expectations
 
