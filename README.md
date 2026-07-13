@@ -15,29 +15,28 @@ and aerosol-laden atmospheres, and is the radiation scheme of the
 [CliMA Earth System Model](https://clima.caltech.edu).
 
 |||
-|-----------------------------:|:-------------------------------------------------|
-| **Documentation**            | [![dev][docs-latest-img]][docs-latest-url]       |
-| **Docs Build**               | [![docs build][docs-bld-img]][docs-bld-url]      |
-| **GHA CI**                   | [![gha ci][gha-ci-img]][gha-ci-url]              |
-| **Buildkite CI**             | [![buildkite][buildkite-img]][buildkite-url]     |
-| **Code Coverage**            | [![codecov][codecov-img]][codecov-url]           |
-| **Downloads**                | [![Downloads][dlt-img]][dlt-url]                 |
+|-----------------:|:-------------------------------------------------------------|
+| **Documentation**| [![stable][docs-stable-img]][docs-stable-url] [![dev][docs-dev-img]][docs-dev-url] |
+| **Version**      | [![version][version-img]][version-url]                       |
+| **License**      | [![license][license-img]][license-url]                       |
+| **Tests**        | [![gha ci][gha-ci-img]][gha-ci-url] [![buildkite][bk-ci-img]][bk-ci-url] |
+| **Code Coverage**| [![codecov][codecov-img]][codecov-url]                      |
+| **Downloads**    | [![Downloads][dlt-img]][dlt-url]                             |
 
-[docs-latest-img]: https://img.shields.io/badge/docs-latest-blue.svg
-[docs-latest-url]: https://CliMA.github.io/RRTMGP.jl/latest/
-
-[docs-bld-img]: https://github.com/CliMA/RRTMGP.jl/actions/workflows/docs.yml/badge.svg
-[docs-bld-url]: https://github.com/CliMA/RRTMGP.jl/actions/workflows/docs.yml
-
+[docs-stable-img]: https://img.shields.io/badge/docs-stable-blue.svg
+[docs-stable-url]: https://CliMA.github.io/RRTMGP.jl/stable/
+[docs-dev-img]: https://img.shields.io/badge/docs-dev-blue.svg
+[docs-dev-url]: https://CliMA.github.io/RRTMGP.jl/dev/
+[version-img]: https://juliahub.com/docs/General/RRTMGP/stable/version.svg
+[version-url]: https://juliahub.com/ui/Packages/General/RRTMGP
+[license-img]: https://img.shields.io/badge/license-Apache%202.0-blue.svg
+[license-url]: https://github.com/CliMA/RRTMGP.jl/blob/main/LICENSE
 [gha-ci-img]: https://github.com/CliMA/RRTMGP.jl/actions/workflows/OS-UnitTests.yml/badge.svg
 [gha-ci-url]: https://github.com/CliMA/RRTMGP.jl/actions/workflows/OS-UnitTests.yml
-
-[buildkite-img]: https://badge.buildkite.com/ee3a0c43cf4925ee14a966f794ac85d0b9439244d23e43b308.svg
-[buildkite-url]: https://buildkite.com/clima/rrtmgp-ci
-
+[bk-ci-img]: https://badge.buildkite.com/ee3a0c43cf4925ee14a966f794ac85d0b9439244d23e43b308.svg?branch=main
+[bk-ci-url]: https://buildkite.com/clima/rrtmgp-ci/builds?branch=main
 [codecov-img]: https://codecov.io/gh/CliMA/RRTMGP.jl/branch/main/graph/badge.svg
 [codecov-url]: https://codecov.io/gh/CliMA/RRTMGP.jl
-
 [dlt-img]: https://img.shields.io/badge/dynamic/json?url=http%3A%2F%2Fjuliapkgstats.com%2Fapi%2Fv1%2Ftotal_downloads%2FRRTMGP&query=total_requests&label=Downloads
 [dlt-url]: https://juliapkgstats.com/pkg/RRTMGP
 
