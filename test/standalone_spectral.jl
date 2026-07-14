@@ -76,6 +76,17 @@ using NCDatasets
     @test co2 isa Number
     @test co2 ≈ 420e-6
 
+    # set_volume_mixing_ratio! writes a well-mixed gas back (the getter is a copy,
+    # so broadcasting into it would not persist); read it back through the getter
+    RRTMGP.set_volume_mixing_ratio!(solver, "co2", FT(500e-6))
+    @test RRTMGP.volume_mixing_ratio(solver, "co2") ≈ 500e-6
+    # ... and writes a spatially varying gas in place (returns the value it set)
+    @test RRTMGP.set_volume_mixing_ratio!(solver, "h2o", FT(0.02)) == FT(0.02)
+    @test all(==(FT(0.02)), Array(RRTMGP.volume_mixing_ratio(solver, "h2o")))
+    # ... the continuum pseudo-gases route to the shared h2o slot
+    RRTMGP.set_volume_mixing_ratio!(solver, "h2o_self", FT(0.03))
+    @test all(==(FT(0.03)), Array(RRTMGP.volume_mixing_ratio(solver, "h2o")))
+
     # per-gas Vmr storage returns a (nlay, ncol) view for every gas
     ngas = solver.lookups.ngas_sw
     vmr_all = RRTMGP.VolumeMixingRatios.Vmr(zeros(FT, ngas, nlay, 1))
@@ -84,4 +95,7 @@ using NCDatasets
     co2_view = RRTMGP._volume_mixing_ratio(solver, vmr_all, "co2")
     @test size(co2_view) == (nlay, 1)
     @test all(==(FT(400e-6)), Array(co2_view))
+    # the Vmr setter branch broadcasts a scalar over the (nlay, ncol) field
+    RRTMGP._set_volume_mixing_ratio!(solver, vmr_all, "co2", FT(410e-6))
+    @test all(==(FT(410e-6)), Array(co2_view))
 end

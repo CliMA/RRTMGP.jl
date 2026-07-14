@@ -314,3 +314,48 @@ function _volume_mixing_ratio(
 end
 _volume_mixing_ratio(s::RRTMGPSolver, vmr::VolumeMixingRatios.Vmr, name::AbstractString) =
     _domain_view(s, view(vmr.vmr, _lookup_tables(s).idx_gases_sw[name], :, :))
+
+"""
+    set_volume_mixing_ratio!(s::RRTMGPSolver, name::AbstractString, value)
+
+Set the volume mixing ratio for gas `name` to `value`, returning `value`.
+
+This is the write counterpart to [`volume_mixing_ratio`](@ref). For `"h2o"`/`"o3"`
+(and, with per-layer `Vmr` storage, every gas), `value` broadcasts over the
+`(nlay, ncol)` field, so it may be a scalar or a domain-sized array. For a
+well-mixed gas with the default global-mean (`VmrGM`) storage, the mixing ratio
+is a single scalar; pass a scalar `value`.
+
+Unlike `volume_mixing_ratio`, this is the supported way to update a well-mixed
+gas: that getter returns a read-only host copy, so `volume_mixing_ratio(s, name) .= value`
+does not write back. Use this to update time-varying trace gases (e.g. prescribed CO₂).
+
+Available names are:
+$(gas_names_sw_docs())
+"""
+set_volume_mixing_ratio!(s::RRTMGPSolver, name::AbstractString, value) =
+    _set_volume_mixing_ratio!(s, _atmospheric_state(s).vmr, name, value)
+
+function _set_volume_mixing_ratio!(
+    s::RRTMGPSolver,
+    vmr::VolumeMixingRatios.VmrGM,
+    name::AbstractString,
+    value,
+)
+    name == "h2o" && return (_domain_view(s, vmr.vmr_h2o) .= value; value)
+    name == "o3" && return (_domain_view(s, vmr.vmr_o3) .= value; value)
+    idx = _lookup_tables(s).idx_gases_sw[name]
+    # The water-vapor continuum pseudo-gases share the h2o slot (see the getter);
+    # route them to `vmr_h2o` rather than the unused well-mixed slot 1.
+    idx == 1 && return (_domain_view(s, vmr.vmr_h2o) .= value; value)
+    # A well-mixed gas is a single value. `fill!` over a 1-element view writes the
+    # scalar without scalar-indexing the GPU (a bare `vmr.vmr[idx] = value` would).
+    fill!(view(vmr.vmr, idx:idx), value)
+    return value
+end
+_set_volume_mixing_ratio!(
+    s::RRTMGPSolver,
+    vmr::VolumeMixingRatios.Vmr,
+    name::AbstractString,
+    value,
+) = (_domain_view(s, view(vmr.vmr, _lookup_tables(s).idx_gases_sw[name], :, :)) .= value; value)

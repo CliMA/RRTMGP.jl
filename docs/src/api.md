@@ -111,6 +111,7 @@ RRTMGP.aerosol_index
 
 ```@docs
 RRTMGP.volume_mixing_ratio
+RRTMGP.set_volume_mixing_ratio!
 VolumeMixingRatios.VolumeMixingRatioGlobalMean
 ```
 

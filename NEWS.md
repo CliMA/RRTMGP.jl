@@ -4,6 +4,21 @@ RRTMGP.jl Release Notes
 main
 ------
 
+v0.22.2
+-------
+- New **`set_volume_mixing_ratio!(solver, name, value)`**, the write counterpart
+  to `volume_mixing_ratio`. It updates a gas's volume mixing ratio in place,
+  correctly for **any** gas under either storage backend, without the caller
+  knowing the storage class: for spatially varying gases (and every gas under
+  per-layer `Vmr` storage) `value` broadcasts over the `(nlay, ncol)` field; for
+  a well-mixed gas under the default global-mean (`VmrGM`) storage it writes the
+  scalar slot. This fills a gap for well-mixed gases (e.g. prescribed,
+  time-varying CO₂): `volume_mixing_ratio` returns those as a **host scalar copy**,
+  so `volume_mixing_ratio(solver, "co2") .= value` did not write back. Spatially
+  varying gases (`"h2o"`, `"o3"`) were already writable through the getter's view
+  and remain so; use whichever reads more clearly (the setter needs no
+  storage-class knowledge; the getter view supports in-place read-modify-write).
+
 v0.22.1
 -------
 - Documented and added a regression test for the **copy-free flux-getter
