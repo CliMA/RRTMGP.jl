@@ -18,16 +18,12 @@ export AbstractFlux,
     apply_metric_scaling!,
     compute_net_flux!
 
-"""
-    lazy_transpose(x)
-
-Lazily present the `(ncol, nlev[, n_bnd])` internal buffer `x` as
-`(nlev, ncol[, n_bnd])` without copying. Equivalent to
-`PermutedDimsArray(x, perm)`, but with the permutation in the type parameters:
-before Julia 1.12, the `PermutedDimsArray(x, perm)` constructor does not
-constant-fold `perm`, which would make every flux getter type-unstable (and
-allocating) on Julia 1.9–1.11.
-"""
+# lazy_transpose(x): lazily present the `(ncol, nlev[, n_bnd])` internal buffer
+# `x` as `(nlev, ncol[, n_bnd])` without copying. Equivalent to
+# `PermutedDimsArray(x, perm)`, but with the permutation in the type parameters:
+# before Julia 1.12, the `PermutedDimsArray(x, perm)` constructor does not
+# constant-fold `perm`, which would make every flux getter type-unstable (and
+# allocating) on Julia 1.9–1.11.
 lazy_transpose(x::AbstractArray{T, 2}) where {T} =
     PermutedDimsArray{T, 2, (2, 1), (2, 1), typeof(x)}(x)
 lazy_transpose(x::AbstractArray{T, 3}) where {T} =
@@ -38,29 +34,23 @@ lazy_transpose(x::AbstractArray{T, 3}) where {T} =
 lazy_transpose(x::PermutedDimsArray{T, 2, (2, 1), (2, 1)}) where {T} = parent(x)
 lazy_transpose(x::PermutedDimsArray{T, 3, (2, 1, 3), (2, 1, 3)}) where {T} = parent(x)
 
-"""
-    _coalesced_2d(DA, FT, ncol, nlev_or_nlay)
-
-Allocate a 2D compute buffer that the kernels index as `(ncol, nlev)`. The
-physical layout is chosen per device (by dispatch on the array type `DA`): on
-the GPU, the buffer is stored `(ncol, nlev)`, so the one-thread-per-column
-kernels access consecutive addresses (coalesced); on the CPU (`DA === Array`),
-it is stored `(nlev, ncol)` — stride-1 vertical sweeps, matching the
-per-column loop order — and wrapped in a `PermutedDimsArray` so the kernel
-indexing convention is the same on both devices.
-"""
+# _coalesced_2d(DA, FT, ncol, nlev_or_nlay): allocate a 2D compute buffer that
+# the kernels index as `(ncol, nlev)`. The physical layout is chosen per device
+# (by dispatch on the array type `DA`): on the GPU, the buffer is stored
+# `(ncol, nlev)`, so the one-thread-per-column kernels access consecutive
+# addresses (coalesced); on the CPU (`DA === Array`), it is stored
+# `(nlev, ncol)` — stride-1 vertical sweeps, matching the per-column loop order
+# — and wrapped in a `PermutedDimsArray` so the kernel indexing convention is
+# the same on both devices.
 _coalesced_2d(DA, ::Type{FT}, d1, d2) where {FT} = DA{FT}(undef, d1, d2)
 _coalesced_2d(::Type{Array}, ::Type{FT}, d1, d2) where {FT} =
     PermutedDimsArray{FT, 2, (2, 1), (2, 1), Matrix{FT}}(
         Matrix{FT}(undef, d2, d1),
     )
 
-"""
-    _coalesced_3d(DA, FT, ncol, nlev_or_nlay, nfld)
-
-3D variant of [`_coalesced_2d`](@ref) for field-packed buffers: indexed
-`(ncol, nlev, nfld)` on both devices; stored `(nlev, ncol, nfld)` on the CPU.
-"""
+# _coalesced_3d(DA, FT, ncol, nlev_or_nlay, nfld): 3D variant of `_coalesced_2d`
+# for field-packed buffers: indexed `(ncol, nlev, nfld)` on both devices; stored
+# `(nlev, ncol, nfld)` on the CPU.
 _coalesced_3d(DA, ::Type{FT}, d1, d2, d3) where {FT} =
     DA{FT}(undef, d1, d2, d3)
 _coalesced_3d(::Type{Array}, ::Type{FT}, d1, d2, d3) where {FT} =

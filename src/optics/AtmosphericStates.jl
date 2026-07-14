@@ -147,13 +147,10 @@ function TransposedStateCache(grid_params::RRTMGPGridParams)
     )
 end
 
-"""
-    refresh_transposed_state!(cache, as::AtmosphericState)
-
-Copy the current `AtmosphericState` layer data and level temperatures into
-the column-first [`TransposedStateCache`](@ref) `cache`. Called at the start
-of every spectral `solve_lw!`/`solve_sw!`; a no-op when `cache === nothing`.
-"""
+# refresh_transposed_state!(cache, as): copy the current `AtmosphericState`
+# layer data and level temperatures into the column-first `TransposedStateCache`
+# `cache`. Called at the start of every spectral `solve_lw!`/`solve_sw!`; a
+# no-op when `cache === nothing`.
 @inline refresh_transposed_state!(::Nothing, as::AtmosphericState) = nothing
 function refresh_transposed_state!(
     cache::TransposedStateCache,
