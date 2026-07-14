@@ -51,8 +51,17 @@ F = RRTMGP.net_flux(solver)                      # (nlev, ncol) view of the resu
 ```
 
 With ClimaCore, this forms the bridge: `array2field(getter(solver), space)`
-wraps an input view as a `Field` (writes flow into the solver's buffer), and
-`field2array(dst) .= getter(solver)` copies an output into a destination field.
+wraps a getter's view as a `Field` — for an input, writes flow into the solver's
+buffer; for an output, the `Field` reads the buffer in place — and
+`field2array(dst) .= getter(solver)` copies an output into an existing
+destination field. Both directions are copy-free: the getters are single-level
+views of plain `(nlev, ncol)` buffers, so `array2field`'s lazy `reshape` wraps
+them without materializing anything. Do **not** `copy(getter(solver))` before
+wrapping — the view is directly wrappable, and copying allocates a full
+`(nlev, ncol)` field on every call (reading many fluxes per step this way adds
+up to large per-step allocations). Likewise avoid `parent(getter(solver))` as a
+shortcut: `parent` returns the full boundary-extended buffer, undoing the domain
+masking.
 On the GPU, the returned views are plain `SubArray`s of device arrays; to
 bring one to the CPU, use `Array(getter(solver))` (or the element-wise `.=`
 copy above). One subtlety: the solver's compute buffers are indexed
