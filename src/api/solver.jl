@@ -171,6 +171,19 @@ function RRTMGPSolver(
         )
     end
 
+    # The isothermal boundary layer is an internal pad: callers seed only the
+    # physical domain, so the boundary-layer rows of the geometry inputs
+    # arrive uninitialized (the extra layer has no z-coordinate of its own).
+    # Define them here by reusing the top domain values, so no undef memory
+    # can reach `apply_metric_scaling!`. The boundary-layer fluxes are masked
+    # from all getters, so any finite, deterministic value is equivalent.
+    if grid_params.isothermal_boundary_layer
+        for arr in (deep_atmosphere_inverse_scaling, center_z, face_z)
+            isnothing(arr) && continue
+            @views arr[end, :] .= arr[end - 1, :]
+        end
+    end
+
     # Build (or reuse) the lookup tables first: the band counts are needed for the
     # optional spectral buffers below, and a host that already built them can pass them
     # in (`lookups = ...`) to avoid a second, expensive NetCDF read.
