@@ -31,7 +31,9 @@ the solver's own buffer**, following one invariant:
   have different behavior: `volume_mixing_ratio` for a well-mixed gas (with the
   global-mean `VmrGM` storage) returns a host scalar copied off the device, and
   [`heating_rate`](@ref RRTMGP.heating_rate) computes its result on demand into
-  a fresh array.
+  a fresh array. Because the well-mixed scalar is a copy, write it with
+  [`set_volume_mixing_ratio!`](@ref RRTMGP.set_volume_mixing_ratio!) rather than
+  broadcasting into the getter.
 
 Internal code that needs the full, boundary-extended buffer (rather than the
 domain view) uses the raw struct fields (e.g., `solver.net_flux_buffer`) or
@@ -160,7 +162,7 @@ mirror these: `clear_lw_flux_up`/`clear_lw_flux_dn`/`clear_lw_flux`,
 
 | Getter | Quantity |
 |---|---|
-| [`volume_mixing_ratio`](@ref RRTMGP.volume_mixing_ratio)`(s, name)` | gas volume mixing ratio: a `(nlay, ncol)` view for `"h2o"`/`"o3"`; a host scalar for well-mixed gases with the default global-mean (`VmrGM`) storage. With full per-layer `Vmr` storage, every gas is a `(nlay, ncol)` view |
+| [`volume_mixing_ratio`](@ref RRTMGP.volume_mixing_ratio)`(s, name)` | gas volume mixing ratio: a `(nlay, ncol)` view for `"h2o"`/`"o3"`; a host scalar for well-mixed gases with the default global-mean (`VmrGM`) storage. With full per-layer `Vmr` storage, every gas is a `(nlay, ncol)` view. Write with [`set_volume_mixing_ratio!`](@ref RRTMGP.set_volume_mixing_ratio!)`(s, name, value)` |
 | `center_z`, `face_z` | layer-center / level altitudes [m], or `nothing` if not provided |
 | `deep_atmosphere_inverse_scaling` | deep-atmosphere flux scaling `(nlev, ncol)`, or `nothing` |
 | [`radiation_method`](@ref RRTMGP.radiation_method) | the solver's radiation method |
