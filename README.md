@@ -153,7 +153,9 @@ or open an issue on [GitHub](https://github.com/CliMA/RRTMGP.jl).
 Contributors should follow the shared CliMA engineering standards in
 [`docs/dev-guides/`](docs/dev-guides/), which cover architecture, performance,
 code quality, documentation, and workflows. These are vendored from
-[CliMA/DeveloperGuides](https://github.com/CliMA/DeveloperGuides).
+[CliMA/DeveloperGuides](https://github.com/CliMA/DeveloperGuides). The repo's
+[`AGENTS.md`](AGENTS.md) is a starting point for AI agents with repo-specific
+guidance.
 
 ## Acknowledgments
 
