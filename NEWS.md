@@ -3,6 +3,9 @@ RRTMGP.jl Release Notes
 
 main
 ------
+
+v0.22.1
+-------
 - Documented and added a regression test for the **copy-free flux-getter
   contract**: the output flux getters (`net_flux`, `lw_flux_up`, `sw_flux_dn`,
   …) return single-level views of plain `(nlev, ncol)` presentation buffers, so
