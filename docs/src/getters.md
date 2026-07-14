@@ -53,9 +53,13 @@ F = RRTMGP.net_flux(solver)                      # (nlev, ncol) view of the resu
 With ClimaCore, this forms the bridge: `array2field(getter(solver), space)`
 wraps an input view as a `Field` (writes flow into the solver's buffer), and
 `field2array(dst) .= getter(solver)` copies an output into a destination field.
-On the GPU, the returned views are strided `SubArray`s of device arrays; to
+On the GPU, the returned views are plain `SubArray`s of device arrays; to
 bring one to the CPU, use `Array(getter(solver))` (or the element-wise `.=`
-copy above).
+copy above). One subtlety: the solver's compute buffers are indexed
+column-first, `(ncol, nlev)` (with the physical layout chosen per device for
+performance), and `update_fluxes!` ends by copying them into the
+`(nlev, ncol)` presentation arrays the flux getters expose — so read fluxes
+after `update_fluxes!`, not between manual Layer-1 solves.
 
 ## Responsibilities: what the host provides vs what RRTMGP derives
 

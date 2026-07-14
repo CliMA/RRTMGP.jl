@@ -13,6 +13,19 @@ import ..Parameters as RP
 
 export NoScatLWRTE, TwoStreamLWRTE, NoScatSWRTE, TwoStreamSWRTE
 
+# Device-dependent default for the workspaces' `state_cache` keyword. On the
+# GPU, a `TransposedStateCache` gives the g-point loop coalesced state reads
+# across the warp's columns. On the CPU, the kernels read the
+# `AtmosphericState` directly (`nothing`): its vertical-first layout is
+# already cache-friendly for the per-column sweeps, and a transposed copy
+# would only add work.
+_default_state_cache(gp::RRTMGPGridParams) =
+    _default_state_cache(ClimaComms.device(gp), gp)
+_default_state_cache(::ClimaComms.AbstractCPUDevice, gp::RRTMGPGridParams) =
+    nothing
+_default_state_cache(::ClimaComms.AbstractDevice, gp::RRTMGPGridParams) =
+    TransposedStateCache(gp)
+
 """
     NoScatLWRTE(grid_params::RRTMGPGridParams; params, sfc_emis, inc_flux)
 
@@ -28,6 +41,9 @@ configurations for a non-scattering longwave simulation.
 - `fluxb`: Temporary storage for bandwise calculations.
 - `flux`: Longwave fluxes.
 - `angle_disc`: Angular discretization.
+- `state_cache`: [`TransposedStateCache`](@ref
+  RRTMGP.AtmosphericStates.TransposedStateCache) with column-first copies of
+  the hot state arrays (refreshed at each spectral solve), or `nothing`.
 """
 struct NoScatLWRTE{
     C,
@@ -37,6 +53,7 @@ struct NoScatLWRTE{
     FXBL,
     FXL <: FluxLW,
     AD,
+    TSC,
 }
     context::C
     op::OP
@@ -45,10 +62,17 @@ struct NoScatLWRTE{
     fluxb::FXBL
     flux::FXL
     angle_disc::AD
+    state_cache::TSC
 end
 Adapt.@adapt_structure NoScatLWRTE
 
-function NoScatLWRTE(grid_params::RRTMGPGridParams; params, sfc_emis, inc_flux)
+function NoScatLWRTE(
+    grid_params::RRTMGPGridParams;
+    params,
+    sfc_emis,
+    inc_flux,
+    state_cache = _default_state_cache(grid_params),
+)
     (; context) = grid_params
     op = OneScalar(grid_params)
     src = SourceLWNoScat(grid_params; params)
@@ -56,7 +80,7 @@ function NoScatLWRTE(grid_params::RRTMGPGridParams; params, sfc_emis, inc_flux)
     fluxb = FluxLW(grid_params)
     flux = FluxLW(grid_params)
     ad = AngularDiscretization(grid_params, 1)
-    return NoScatLWRTE(context, op, src, bcs, fluxb, flux, ad)
+    return NoScatLWRTE(context, op, src, bcs, fluxb, flux, ad, state_cache)
 end
 
 """
@@ -74,6 +98,9 @@ configurations for a `2-stream` longwave simulation.
 - `fluxb`: Temporary storage for bandwise calculations.
 - `flux`: Longwave fluxes.
 - `band_flux`: Optional per-band longwave fluxes `(nlev, ncol, n_bnd)`, or `nothing`.
+- `state_cache`: [`TransposedStateCache`](@ref
+  RRTMGP.AtmosphericStates.TransposedStateCache) with column-first copies of
+  the hot state arrays (refreshed at each spectral solve), or `nothing`.
 """
 struct TwoStreamLWRTE{
     C,
@@ -83,6 +110,7 @@ struct TwoStreamLWRTE{
     FXBL,
     FXL <: FluxLW,
     FXBND,
+    TSC,
 }
     context::C
     op::OP
@@ -91,17 +119,19 @@ struct TwoStreamLWRTE{
     fluxb::FXBL
     flux::FXL
     band_flux::FXBND
+    state_cache::TSC
 end
 Adapt.@adapt_structure TwoStreamLWRTE
 # By default no per-band (spectrally-resolved) fluxes are retained.
-TwoStreamLWRTE(context, op, src, bcs, fluxb, flux) =
-    TwoStreamLWRTE(context, op, src, bcs, fluxb, flux, nothing)
+TwoStreamLWRTE(context, op, src, bcs, fluxb, flux, band_flux) =
+    TwoStreamLWRTE(context, op, src, bcs, fluxb, flux, band_flux, nothing)
 
 function TwoStreamLWRTE(
     grid_params::RRTMGPGridParams;
     params,
     sfc_emis,
     inc_flux,
+    state_cache = _default_state_cache(grid_params),
 )
     (; context) = grid_params
     op = TwoStream(grid_params)
@@ -109,7 +139,16 @@ function TwoStreamLWRTE(
     bcs = LwBCs(sfc_emis, inc_flux)
     fluxb = FluxLW(grid_params)
     flux = FluxLW(grid_params)
-    return TwoStreamLWRTE(context, op, src, bcs, fluxb, flux)
+    return TwoStreamLWRTE(
+        context,
+        op,
+        src,
+        bcs,
+        fluxb,
+        flux,
+        nothing,
+        state_cache,
+    )
 end
 
 """
@@ -125,13 +164,17 @@ configurations for a non-scattering shortwave simulation.
 - `bcs`: Shortwave boundary conditions.
 - `fluxb`: Temporary storage for bandwise calculations.
 - `flux`: Shortwave fluxes.
+- `state_cache`: [`TransposedStateCache`](@ref
+  RRTMGP.AtmosphericStates.TransposedStateCache) with column-first copies of
+  the hot state arrays (refreshed at each spectral solve), or `nothing`.
 """
-struct NoScatSWRTE{C, OP <: OneScalar, BC <: SwBCs, FXBS, FXS <: FluxSW}
+struct NoScatSWRTE{C, OP <: OneScalar, BC <: SwBCs, FXBS, FXS <: FluxSW, TSC}
     context::C
     op::OP
     bcs::BC
     fluxb::FXBS
     flux::FXS
+    state_cache::TSC
 end
 Adapt.@adapt_structure NoScatSWRTE
 
@@ -142,6 +185,7 @@ function NoScatSWRTE(
     sfc_alb_direct,
     inc_flux_diffuse,
     sfc_alb_diffuse,
+    state_cache = _default_state_cache(grid_params),
 )
     (; context) = grid_params
     op = OneScalar(grid_params)
@@ -154,7 +198,7 @@ function NoScatSWRTE(
     )
     fluxb = FluxSW(grid_params)
     flux = FluxSW(grid_params)
-    return NoScatSWRTE(context, op, bcs, fluxb, flux)
+    return NoScatSWRTE(context, op, bcs, fluxb, flux, state_cache)
 end
 
 """
@@ -172,6 +216,9 @@ configurations for a `2-stream` shortwave simulation.
 - `fluxb`: Temporary storage for bandwise calculations.
 - `flux`: Shortwave fluxes.
 - `band_flux`: Optional per-band shortwave fluxes `(nlev, ncol, n_bnd)`, or `nothing`.
+- `state_cache`: [`TransposedStateCache`](@ref
+  RRTMGP.AtmosphericStates.TransposedStateCache) with column-first copies of
+  the hot state arrays (refreshed at each spectral solve), or `nothing`.
 """
 struct TwoStreamSWRTE{
     C,
@@ -181,6 +228,7 @@ struct TwoStreamSWRTE{
     FXBS,
     FXS <: FluxSW,
     FXBND,
+    TSC,
 }
     context::C
     op::OP
@@ -189,11 +237,12 @@ struct TwoStreamSWRTE{
     fluxb::FXBS
     flux::FXS
     band_flux::FXBND
+    state_cache::TSC
 end
 Adapt.@adapt_structure TwoStreamSWRTE
 # By default no per-band (spectrally-resolved) fluxes are retained.
-TwoStreamSWRTE(context, op, src, bcs, fluxb, flux) =
-    TwoStreamSWRTE(context, op, src, bcs, fluxb, flux, nothing)
+TwoStreamSWRTE(context, op, src, bcs, fluxb, flux, band_flux) =
+    TwoStreamSWRTE(context, op, src, bcs, fluxb, flux, band_flux, nothing)
 
 function TwoStreamSWRTE(
     grid_params::RRTMGPGridParams;
@@ -202,6 +251,7 @@ function TwoStreamSWRTE(
     sfc_alb_direct,
     inc_flux_diffuse,
     sfc_alb_diffuse,
+    state_cache = _default_state_cache(grid_params),
 )
     (; context) = grid_params
     op = TwoStream(grid_params)
@@ -215,7 +265,16 @@ function TwoStreamSWRTE(
     )
     fluxb = FluxSW(grid_params)
     flux = FluxSW(grid_params)
-    return TwoStreamSWRTE(context, op, src, bcs, fluxb, flux)
+    return TwoStreamSWRTE(
+        context,
+        op,
+        src,
+        bcs,
+        fluxb,
+        flux,
+        nothing,
+        state_cache,
+    )
 end
 
 

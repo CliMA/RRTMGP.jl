@@ -50,7 +50,11 @@ outside hot loops.
 `Adapt.adapt(Array, solver)` produces a host copy (e.g., for serialization) and
 `Adapt.adapt(CuArray, solver)` moves it back. RRTMGP's custom `adapt_structure`
 methods preserve the internal view topology (scratch views into packed
-buffers), so an adapted solver keeps the zero-allocation property.
+buffers), so an adapted solver keeps the zero-allocation property. Adapt
+preserves each buffer's physical layout, so round-tripping a GPU solver
+through the host is lossless; adapting a CPU-*constructed* solver to the GPU
+runs correctly but keeps the CPU layout (uncoalesced) — for GPU work,
+construct the solver on the GPU.
 
 ## Reproducibility caveat: McICA cloud sampling
 
@@ -77,6 +81,18 @@ both backends:
   distributed across threads (`ClimaComms.@threaded`), which keeps that
   g-point's lookup-table slices hot in cache while sweeping the columns. With
   a single-threaded context, the same code runs serially.
+
+The memory layout matches the thread mapping on each device. On the GPU, the
+internal scratch and output buffers are stored column-first, `(ncol, nlev)`,
+so consecutive threads write consecutive addresses (coalesced access), and
+the frequently re-read state arrays (layer pressures and temperatures, level
+temperatures) are copied into a column-first `TransposedStateCache` once per
+solve so the g-point loop also reads coalesced memory. On the CPU, the same
+buffers are stored vertical-first under a lazy wrapper — each thread's
+vertical sweep is then stride-1 — and the kernels read the
+`AtmosphericState` directly, so both devices run identical kernel code on
+their preferred layout. The caller-owned `AtmosphericState` and the getter
+views keep their vertical-first `(nlev, ncol)` presentation throughout.
 
 ## Performance expectations
 
@@ -105,13 +121,13 @@ Every configuration evaluated by the benchmark (see [`perf/benchmark_ratchet.jl`
 
 ### Single precision (`Float32`) — Primary target
 
-At `Float32` precision, memory traffic across lookup-table interpolations is halved compared to `Float64`, enabling large GPU speedups:
+At `Float32` precision, memory traffic across lookup-table interpolations and solver evaluations is halved compared to `Float64`, enabling large GPU speedups:
 
 | Configuration | CPU (Intel Xeon, 12 threads) | GPU (NVIDIA A100 40GB) | Speedup |
 |---|---|---|---|
-| Clear-sky (two-stream) | 77.95 s | 1.24 s | 63.1× |
-| All-sky, McICA clouds | 98.42 s | 1.82 s | 54.1× |
-| All-sky with aerosols | 99.39 s | 1.95 s | 51.0× |
+| Clear-sky (two-stream) | 80.05 s | 0.95 s | 84.3× |
+| All-sky, McICA clouds | 99.44 s | 1.40 s | 71.0× |
+| All-sky with aerosols | 106.77 s | 1.56 s | 68.4× |
 
 ### Double precision (`Float64`)
 
@@ -119,6 +135,6 @@ For reference, running the identical uniform benchmark sweep in double precision
 
 | Configuration | CPU (Intel Xeon, 12 threads) | GPU (NVIDIA A100 40GB) | Speedup |
 |---|---|---|---|
-| Clear-sky (two-stream) | 79.64 s | 1.70 s | 46.8× |
-| All-sky, McICA clouds | 101.60 s | 2.43 s | 41.8× |
-| All-sky with aerosols | 106.33 s | 2.59 s | 41.1× |
+| Clear-sky (two-stream) | 81.88 s | 1.30 s | 63.0× |
+| All-sky, McICA clouds | 103.97 s | 1.92 s | 54.2× |
+| All-sky with aerosols | 108.38 s | 2.07 s | 52.4× |

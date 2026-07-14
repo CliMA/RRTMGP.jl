@@ -8,11 +8,68 @@ export AbstractFlux,
     FluxLW,
     FluxSW,
     FluxBand,
+    FluxPresentation,
+    update_presentation!,
+    transpose_into!,
+    transpose_sum_into!,
     set_flux_to_zero!,
     set_band_flux_to_zero!,
     accumulate_band_flux!,
     apply_metric_scaling!,
     compute_net_flux!
+
+# lazy_transpose(x): lazily present the `(ncol, nlev[, n_bnd])` internal buffer
+# `x` as `(nlev, ncol[, n_bnd])` without copying. Equivalent to
+# `PermutedDimsArray(x, perm)`, but with the permutation in the type parameters:
+# before Julia 1.12, the `PermutedDimsArray(x, perm)` constructor does not
+# constant-fold `perm`, which would make every flux getter type-unstable (and
+# allocating) on Julia 1.9–1.11.
+lazy_transpose(x::AbstractArray{T, 2}) where {T} =
+    PermutedDimsArray{T, 2, (2, 1), (2, 1), typeof(x)}(x)
+lazy_transpose(x::AbstractArray{T, 3}) where {T} =
+    PermutedDimsArray{T, 3, (2, 1, 3), (2, 1, 3), typeof(x)}(x)
+
+# Unwrap a PermutedDimsArray whose permutation is the identity swap — avoids
+# double-wrapping when the CPU uses transposed physical layout.
+lazy_transpose(x::PermutedDimsArray{T, 2, (2, 1), (2, 1)}) where {T} = parent(x)
+lazy_transpose(x::PermutedDimsArray{T, 3, (2, 1, 3), (2, 1, 3)}) where {T} = parent(x)
+
+# _coalesced_2d(DA, FT, ncol, nlev_or_nlay): allocate a 2D compute buffer that
+# the kernels index as `(ncol, nlev)`. The physical layout is chosen per device
+# (by dispatch on the array type `DA`): on the GPU, the buffer is stored
+# `(ncol, nlev)`, so the one-thread-per-column kernels access consecutive
+# addresses (coalesced); on the CPU (`DA === Array`), it is stored
+# `(nlev, ncol)` — stride-1 vertical sweeps, matching the per-column loop order
+# — and wrapped in a `PermutedDimsArray` so the kernel indexing convention is
+# the same on both devices.
+_coalesced_2d(DA, ::Type{FT}, d1, d2) where {FT} = DA{FT}(undef, d1, d2)
+_coalesced_2d(::Type{Array}, ::Type{FT}, d1, d2) where {FT} =
+    PermutedDimsArray{FT, 2, (2, 1), (2, 1), Matrix{FT}}(
+        Matrix{FT}(undef, d2, d1),
+    )
+
+# _coalesced_3d(DA, FT, ncol, nlev_or_nlay, nfld): 3D variant of `_coalesced_2d`
+# for field-packed buffers: indexed `(ncol, nlev, nfld)` on both devices; stored
+# `(nlev, ncol, nfld)` on the CPU.
+_coalesced_3d(DA, ::Type{FT}, d1, d2, d3) where {FT} =
+    DA{FT}(undef, d1, d2, d3)
+_coalesced_3d(::Type{Array}, ::Type{FT}, d1, d2, d3) where {FT} =
+    PermutedDimsArray{FT, 3, (2, 1, 3), (2, 1, 3), Array{FT, 3}}(
+        Array{FT, 3}(undef, d2, d1, d3),
+    )
+
+# Zero-initialized variant of `_coalesced_3d` (the `TwoStream` optics start
+# from zero). Fill the physical storage, not the wrapper: `fill!` on a
+# `PermutedDimsArray` falls back to slow wrapped iteration.
+function _coalesced_3d_zeros(DA, ::Type{FT}, d1, d2, d3) where {FT}
+    buf = _coalesced_3d(DA, FT, d1, d2, d3)
+    fill!(_physical(buf), FT(0))
+    return buf
+end
+
+# The physical storage underlying a (possibly layout-wrapped) compute buffer.
+_physical(x::AbstractArray) = x
+_physical(x::PermutedDimsArray) = parent(x)
 
 """
     AbstractFlux
@@ -29,9 +86,9 @@ abstract type AbstractFlux{FT <: AbstractFloat, FTA2D <: AbstractArray{FT, 2}} e
 Upward, downward and net longwave fluxes at each level.
 
 # Fields
-- `flux_up`: Upward flux [W/m²] `(nlev, ncol)`.
-- `flux_dn`: Downward flux [W/m²] `(nlev, ncol)`.
-- `flux_net`: Net flux [W/m²] `(nlev, ncol)`.
+- `flux_up`: Upward flux [W/m²] `(ncol, nlev)`.
+- `flux_dn`: Downward flux [W/m²] `(ncol, nlev)`.
+- `flux_net`: Net flux [W/m²] `(ncol, nlev)`.
 """
 struct FluxLW{FT <: AbstractFloat, FTA2D <: AbstractArray{FT, 2}} <:
        AbstractFlux{FT, FTA2D}
@@ -47,9 +104,9 @@ function FluxLW(grid_params::RRTMGPGridParams)
     (; ncol, nlay) = grid_params
     DA = ClimaComms.array_type(grid_params)
     FT = eltype(grid_params)
-    flux_up = DA{FT}(undef, nlay + 1, ncol)
-    flux_dn = DA{FT}(undef, nlay + 1, ncol)
-    flux_net = DA{FT}(undef, nlay + 1, ncol)
+    flux_up = _coalesced_2d(DA, FT, ncol, nlay + 1)
+    flux_dn = _coalesced_2d(DA, FT, ncol, nlay + 1)
+    flux_net = _coalesced_2d(DA, FT, ncol, nlay + 1)
     return FluxLW{FT, typeof(flux_net)}(flux_up, flux_dn, flux_net)
 end
 
@@ -59,10 +116,10 @@ end
 Upward, downward and net shortwave fluxes at each level.
 
 # Fields
-- `flux_up`: Upward flux [W/m²] `(nlev, ncol)`.
-- `flux_dn`: Downward flux [W/m²] `(nlev, ncol)`.
-- `flux_net`: Net flux [W/m²] `(nlev, ncol)`.
-- `flux_dn_dir`: Direct downward flux [W/m²] `(nlev, ncol)`.
+- `flux_up`: Upward flux [W/m²] `(ncol, nlev)`.
+- `flux_dn`: Downward flux [W/m²] `(ncol, nlev)`.
+- `flux_net`: Net flux [W/m²] `(ncol, nlev)`.
+- `flux_dn_dir`: Direct downward flux [W/m²] `(ncol, nlev)`.
 """
 struct FluxSW{FT <: AbstractFloat, FTA2D <: AbstractArray{FT, 2}} <:
        AbstractFlux{FT, FTA2D}
@@ -84,10 +141,10 @@ function FluxSW(grid_params::RRTMGPGridParams)
     (; nlay, ncol) = grid_params
     FT = eltype(grid_params)
     DA = ClimaComms.array_type(grid_params)
-    flux_up = DA{FT}(undef, nlay + 1, ncol)
-    flux_dn = DA{FT}(undef, nlay + 1, ncol)
-    flux_net = DA{FT}(undef, nlay + 1, ncol)
-    flux_dn_dir = DA{FT}(undef, nlay + 1, ncol)
+    flux_up = _coalesced_2d(DA, FT, ncol, nlay + 1)
+    flux_dn = _coalesced_2d(DA, FT, ncol, nlay + 1)
+    flux_net = _coalesced_2d(DA, FT, ncol, nlay + 1)
+    flux_dn_dir = _coalesced_2d(DA, FT, ncol, nlay + 1)
     return FluxSW{FT, typeof(flux_net)}(flux_up, flux_dn, flux_net, flux_dn_dir)
 end
 
@@ -96,8 +153,14 @@ end
 
 Optional per-band upward, downward, and net radiative fluxes at each level,
 `(nlev, ncol, n_bnd)`. Only allocated when spectrally-resolved fluxes are requested.
-Band `b`'s slice `[:, :, b]` has the same `(nlev, ncol)` layout as the broadband
-fluxes, and summing over the band dimension recovers the broadband fluxes.
+Summing over the band dimension recovers the broadband fluxes.
+
+Unlike the broadband compute buffers, the band buffers keep the host-facing
+vertical-first layout: they are an opt-in diagnostic that the `spectral_*`
+getters expose as plain views, and keeping them `(nlev, ncol, n_bnd)` avoids
+doubling their (large) memory with separate presentation copies. The
+accumulation writes are uncoalesced on the GPU, a cost paid only when
+per-band fluxes are requested.
 
 # Fields
 - `flux_up`: upward flux per band [W/m²], `(nlev, ncol, n_bnd)`.
@@ -131,7 +194,7 @@ function set_band_flux_to_zero!(band::FluxBand{FT}) where {FT}
 end
 
 # Add one g-point's up/down flux (column `gcol`, per-g-point scratch `flux_up`/`flux_dn`
-# of shape `(nlev, ncol)`) into its band `ibnd`. No-op when spectral fluxes are off, so
+# of shape `(ncol, nlev)`) into its band `ibnd`. No-op when spectral fluxes are off, so
 # the broadband path pays nothing (the branch is specialized away on `::Nothing`).
 @inline accumulate_band_flux!(::Nothing, flux_up, flux_dn, gcol, ibnd, nlev) =
     nothing
@@ -145,8 +208,8 @@ end
 )
     bu, bd = band.flux_up, band.flux_dn
     @inbounds for ilev in 1:nlev
-        bu[ilev, gcol, ibnd] += flux_up[ilev, gcol]
-        bd[ilev, gcol, ibnd] += flux_dn[ilev, gcol]
+        bu[ilev, gcol, ibnd] += flux_up[gcol, ilev]
+        bd[ilev, gcol, ibnd] += flux_dn[gcol, ilev]
     end
     return nothing
 end
@@ -163,14 +226,14 @@ Compute the net flux for column `gcol` across `nlev` levels:
     (; flux_up, flux_dn, flux_net) = flux
     @inbounds begin
         for ilev in 1:nlev
-            flux_net[ilev, gcol] = flux_up[ilev, gcol] - flux_dn[ilev, gcol]
+            flux_net[gcol, ilev] = flux_up[gcol, ilev] - flux_dn[gcol, ilev]
         end
     end
     return nothing
 end
 
 @inline compute_net_flux!(flux::AbstractFlux, gcol) =
-    compute_net_flux!(flux, gcol, size(flux.flux_up, 1))
+    compute_net_flux!(flux, gcol, size(flux.flux_up, 2))
 
 """
     set_flux_to_zero!(flux::FluxLW{FT}, gcol::Int, nlev::Int) where {FT<:AbstractFloat}
@@ -185,15 +248,15 @@ Set longwave flux for column `gcol` to zero across `nlev` levels.
 ) where {FT <: AbstractFloat}
     (; flux_up, flux_dn, flux_net) = flux
     @inbounds for ilev in 1:nlev
-        flux_up[ilev, gcol] = FT(0)
-        flux_dn[ilev, gcol] = FT(0)
-        flux_net[ilev, gcol] = FT(0)
+        flux_up[gcol, ilev] = FT(0)
+        flux_dn[gcol, ilev] = FT(0)
+        flux_net[gcol, ilev] = FT(0)
     end
     return nothing
 end
 
 @inline set_flux_to_zero!(flux::FluxLW, gcol::Int) =
-    set_flux_to_zero!(flux, gcol, size(flux.flux_up, 1))
+    set_flux_to_zero!(flux, gcol, size(flux.flux_up, 2))
 
 """
     set_flux_to_zero!(flux::FluxSW{FT}, gcol::Int, nlev::Int) where {FT<:AbstractFloat}
@@ -208,16 +271,16 @@ Set shortwave flux for column `gcol` to zero across `nlev` levels.
 ) where {FT <: AbstractFloat}
     (; flux_up, flux_dn, flux_net, flux_dn_dir) = flux
     @inbounds for ilev in 1:nlev
-        flux_up[ilev, gcol] = FT(0)
-        flux_dn[ilev, gcol] = FT(0)
-        flux_net[ilev, gcol] = FT(0)
-        flux_dn_dir[ilev, gcol] = FT(0)
+        flux_up[gcol, ilev] = FT(0)
+        flux_dn[gcol, ilev] = FT(0)
+        flux_net[gcol, ilev] = FT(0)
+        flux_dn_dir[gcol, ilev] = FT(0)
     end
     return nothing
 end
 
 @inline set_flux_to_zero!(flux::FluxSW, gcol::Int) =
-    set_flux_to_zero!(flux, gcol, size(flux.flux_up, 1))
+    set_flux_to_zero!(flux, gcol, size(flux.flux_up, 2))
 
 """
     apply_metric_scaling!(flux::Union{FluxLW, FluxSW}, metric_scaling)
@@ -233,10 +296,141 @@ function apply_metric_scaling!(
     flux::AbstractFlux,
     metric_scaling::AbstractArray,
 )
-    flux.flux_up .= flux.flux_up .* metric_scaling
-    flux.flux_dn .= flux.flux_dn .* metric_scaling
-    flux.flux_net .= flux.flux_net .* metric_scaling
-    flux isa FluxSW && (flux.flux_dn_dir .= flux.flux_dn_dir .* metric_scaling)
+    _scale_by_transpose!(flux.flux_up, metric_scaling)
+    _scale_by_transpose!(flux.flux_dn, metric_scaling)
+    _scale_by_transpose!(flux.flux_net, metric_scaling)
+    flux isa FluxSW && _scale_by_transpose!(flux.flux_dn_dir, metric_scaling)
+    return nothing
+end
+
+# Multiply the `(ncol, nlev)`-indexed compute buffer `a` by the vertical-first
+# `(nlev, ncol)` scaling `sc`. Device arrays broadcast through the lazy
+# transpose (a single kernel); host arrays use explicit loops, since broadcasts
+# with a permuted-wrapper operand allocate a few bytes on Julia ≤ 1.11,
+# tripping the zero-allocation tests.
+_scale_by_transpose!(a::AbstractArray, sc) =
+    (a .= a .* lazy_transpose(sc); nothing)
+# CPU dual-layout buffers: the wrapper's parent and `sc` share the
+# (nlev, ncol) layout, so scale the parent directly, stride-1.
+function _scale_by_transpose!(
+    a::PermutedDimsArray{FT, 2, (2, 1), (2, 1), Matrix{FT}},
+    sc::Array{FT, 2},
+) where {FT}
+    pa = parent(a)
+    nlev, ncol = size(pa)
+    @inbounds for gcol in 1:ncol, ilev in 1:nlev
+        pa[ilev, gcol] *= sc[ilev, gcol]
+    end
+    return nothing
+end
+# Defensive fallback for hand-constructed Layer-1 flux buffers that store a
+# plain (ncol, nlev) host array (the internal CPU constructors always wrap).
+function _scale_by_transpose!(a::Array{FT, 2}, sc::Array{FT, 2}) where {FT}
+    ncol, nlev = size(a)
+    @inbounds for ilev in 1:nlev, gcol in 1:ncol
+        a[gcol, ilev] *= sc[ilev, gcol]
+    end
+    return nothing
+end
+
+"""
+    FluxPresentation{FTA2D, FD}
+
+Host-facing `(nlev, ncol)` copies of a broadband flux set, filled by
+[`update_presentation!`](@ref) from the column-first `(ncol, nlev)` compute
+buffers at the end of every `update_lw_fluxes!`/`update_sw_fluxes!` (and hence
+of [`update_fluxes!`](@ref RRTMGP.update_fluxes!)). The Layer-2 flux getters
+return plain domain-masked views of these arrays, so the getter contract
+(materializable with `Array`, broadcastable, reducible — also on the GPU, where
+lazily transposed views of the compute buffers would fall outside the
+wrapper types CUDA.jl dispatches on) holds without per-getter laziness.
+
+# Fields
+- `flux_up`: upward flux [W/m²] `(nlev, ncol)`.
+- `flux_dn`: downward flux [W/m²] `(nlev, ncol)`.
+- `flux_net`: net flux [W/m²] `(nlev, ncol)`.
+- `flux_dn_dir`: direct downward flux [W/m²] `(nlev, ncol)`, or `nothing`
+  (longwave).
+"""
+struct FluxPresentation{FTA2D <: AbstractArray, FD}
+    flux_up::FTA2D
+    flux_dn::FTA2D
+    flux_net::FTA2D
+    flux_dn_dir::FD
+end
+Adapt.@adapt_structure FluxPresentation
+
+function FluxPresentation(grid_params::RRTMGPGridParams; direct::Bool)
+    (; nlay, ncol) = grid_params
+    FT = eltype(grid_params)
+    DA = ClimaComms.array_type(grid_params)
+    alloc() = DA{FT}(undef, nlay + 1, ncol)
+    return FluxPresentation(
+        alloc(),
+        alloc(),
+        alloc(),
+        direct ? alloc() : nothing,
+    )
+end
+
+"""
+    update_presentation!(pres::FluxPresentation, flux::AbstractFlux)
+
+Fill the `(nlev, ncol)` presentation arrays from the `(ncol, nlev)`-indexed
+compute buffers of `flux` (the direct beam only when present). On the GPU this
+is a transposing copy; on the CPU, the compute buffers' physical parents
+already have the presentation layout, so it is a plain `copyto!`.
+"""
+function update_presentation!(pres::FluxPresentation, flux::AbstractFlux)
+    _copy_transposed!(pres.flux_up, flux.flux_up)
+    _copy_transposed!(pres.flux_dn, flux.flux_dn)
+    _copy_transposed!(pres.flux_net, flux.flux_net)
+    isnothing(pres.flux_dn_dir) ||
+        _copy_transposed!(pres.flux_dn_dir, flux.flux_dn_dir)
+    return nothing
+end
+
+# GPU / generic path: transpose from (ncol, nlev) to (nlev, ncol).
+_copy_transposed!(dest, src) = transpose_into!(dest, src)
+# CPU dual-layout path: the PermutedDimsArray's parent is already (nlev, ncol).
+_copy_transposed!(dest::Array{FT, 2}, src::PermutedDimsArray{FT, 2, (2, 1), (2, 1), Matrix{FT}}) where {FT} =
+    (copyto!(dest, parent(src)); nothing)
+
+"""
+    transpose_into!(dest, src)
+
+Copy the 2D array `src` into `dest` with the two dimensions swapped
+(`dest[i, j] = src[j, i]`). Device arrays use a single broadcast kernel; host
+arrays use explicit loops, since broadcasts with a permuted-wrapper operand
+allocate a few bytes on Julia ≤ 1.11, tripping the zero-allocation tests.
+"""
+transpose_into!(dest::AbstractArray, src) =
+    (dest .= lazy_transpose(src); nothing)
+function transpose_into!(dest::Array{FT, 2}, src::Array{FT, 2}) where {FT}
+    n1, n2 = size(dest)
+    @inbounds for j in 1:n2, i in 1:n1
+        dest[i, j] = src[j, i]
+    end
+    return nothing
+end
+
+"""
+    transpose_sum_into!(dest, a, b)
+
+Set `dest[i, j] = a[j, i] + b[j, i]` (transposing sum of two 2D arrays); the
+device/host split follows [`transpose_into!`](@ref).
+"""
+transpose_sum_into!(dest::AbstractArray, a, b) =
+    (dest .= lazy_transpose(a) .+ lazy_transpose(b); nothing)
+function transpose_sum_into!(
+    dest::Array{FT, 2},
+    a::Array{FT, 2},
+    b::Array{FT, 2},
+) where {FT}
+    n1, n2 = size(dest)
+    @inbounds for j in 1:n2, i in 1:n1
+        dest[i, j] = a[j, i] + b[j, i]
+    end
     return nothing
 end
 function apply_metric_scaling!(
@@ -252,6 +446,8 @@ end
 apply_metric_scaling!(::Nothing, metric_scaling) = nothing
 apply_metric_scaling!(band::FluxBand, metric_scaling::Nothing) = nothing
 function apply_metric_scaling!(band::FluxBand, metric_scaling::AbstractArray)
+    # The band buffers share `metric_scaling`'s vertical-first layout, so the
+    # `(nlev, ncol)` scaling broadcasts across the band dimension directly.
     band.flux_up .= band.flux_up .* metric_scaling
     band.flux_dn .= band.flux_dn .* metric_scaling
     return nothing

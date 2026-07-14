@@ -97,8 +97,8 @@ function partial_cloud_fraction_test(
         solve_lw!(slv_lw, as, lookup_lw, lookup_lw_cld, nothing, nothing)
         solve_sw!(slv_sw, as, lookup_sw, lookup_sw_cld, nothing, nothing)
         return (
-            lw_net = copy(Array(slv_lw.flux.flux_net)),
-            sw_net = copy(Array(slv_sw.flux.flux_net)),
+            lw_net = copy(Array(PermutedDimsArray(slv_lw.flux.flux_net, (2, 1)))),
+            sw_net = copy(Array(PermutedDimsArray(slv_sw.flux.flux_net, (2, 1)))),
             cld_cover_lw = copy(Array(as.cloud_state.cld_cover_lw)),
             cld_cover_sw = copy(Array(as.cloud_state.cld_cover_sw)),
         )

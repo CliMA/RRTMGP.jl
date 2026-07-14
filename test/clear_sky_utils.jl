@@ -146,15 +146,28 @@ function clear_sky(
         )) ≤ 448
     end
 
+    # The transposed state cache is a pure read-path optimization: a solver
+    # constructed without one must produce bitwise-identical fluxes.
+    slv_lw_nocache = SLVLW(
+        grid_params;
+        params = param_set,
+        sfc_emis,
+        inc_flux,
+        state_cache = nothing,
+    )
+    solve_lw!(slv_lw_nocache, as, lookup_lw, nothing, nothing, metric_scaling)
+    @test Array(slv_lw_nocache.flux.flux_up) == Array(slv_lw.flux.flux_up)
+    @test Array(slv_lw_nocache.flux.flux_dn) == Array(slv_lw.flux.flux_dn)
+
     # comparing longwave fluxes with data from RRTMGP FORTRAN code
     comp_flux_up_lw, comp_flux_dn_lw, comp_flux_up_sw, comp_flux_dn_sw =
         load_comparison_data(expt_no, bot_at_1, ncol)
 
     comp_flux_net_lw = comp_flux_up_lw .- comp_flux_dn_lw
 
-    flux_up_lw = Array(slv_lw.flux.flux_up)
-    flux_dn_lw = Array(slv_lw.flux.flux_dn)
-    flux_net_lw = Array(slv_lw.flux.flux_net)
+    flux_up_lw = Array(PermutedDimsArray(slv_lw.flux.flux_up, (2, 1)))
+    flux_dn_lw = Array(PermutedDimsArray(slv_lw.flux.flux_dn, (2, 1)))
+    flux_net_lw = Array(PermutedDimsArray(slv_lw.flux.flux_net, (2, 1)))
 
     max_err_flux_up_lw = maximum(abs.(flux_up_lw .- comp_flux_up_lw))
     max_err_flux_dn_lw = maximum(abs.(flux_dn_lw .- comp_flux_dn_lw))
@@ -186,9 +199,9 @@ function clear_sky(
     # comparing shortwave fluxes with data from RRTMGP FORTRAN code
     comp_flux_net_sw = comp_flux_up_sw .- comp_flux_dn_sw
 
-    flux_up_sw = Array(slv_sw.flux.flux_up)
-    flux_dn_sw = Array(slv_sw.flux.flux_dn)
-    flux_net_sw = Array(slv_sw.flux.flux_net)
+    flux_up_sw = Array(PermutedDimsArray(slv_sw.flux.flux_up, (2, 1)))
+    flux_dn_sw = Array(PermutedDimsArray(slv_sw.flux.flux_dn, (2, 1)))
+    flux_net_sw = Array(PermutedDimsArray(slv_sw.flux.flux_net, (2, 1)))
 
     # Test if shortwave fluxes are zero if zenith angle is ≥ π/2
     cos_zenith = Array(cos_zenith)

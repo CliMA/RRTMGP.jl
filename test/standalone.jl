@@ -242,7 +242,7 @@ end
 
         RRTMGP.update_fluxes!(solver)
 
-        # internal buffers are boundary-extended; getters are domain-masked
+        # the net-flux buffer is boundary-extended, host-facing (nlev, ncol); getters are domain-masked
         @test size(solver.net_flux_buffer, 1) == nlay + 1             # full levels
         @test size(RRTMGP.net_flux(solver), 1) == domain_nlay + 1     # domain levels
         @test size(RRTMGP.level_pressure(solver), 1) == domain_nlay + 1
@@ -265,6 +265,12 @@ end
 # overloads must preserve that topology across a device transfer (adapt the buffer once,
 # rebuild the views into it) so a checkpoint restore stays zero-allocation.
 @testset "Adapt preserves optics/sources view topology" begin
+    # Helper to verify that every scratch view aliases its single packed parent buffer.
+    # On GPU (CuArray), contiguous 3D slices unwrap into 2D CuArrays with a distinct
+    # parent identity, so we verify memory sharing via pointer bounds checking.
+    _is_view_into(v, buf) = v isa SubArray ? parent(v) === buf :
+        (UInt(pointer(buf)) <= UInt(pointer(v)) < UInt(pointer(buf)) + UInt(sizeof(buf)))
+
     for FT in (Float32, Float64)
         nlay, ncol = 40, 4
         solver = RRTMGP.solve_gray(FT; nlay, ncol).solver # two-stream lw + sw
@@ -275,15 +281,15 @@ end
         # the adapted buffers are genuinely fresh copies, not the originals
         @test solver2.lws.op.layerdata !== solver.lws.op.layerdata
         # every scratch view aliases its own solver's single adapted buffer
-        @test parent(solver2.lws.op.τ) === solver2.lws.op.layerdata
-        @test parent(solver2.lws.op.ssa) === solver2.lws.op.layerdata
-        @test parent(solver2.lws.op.g) === solver2.lws.op.layerdata
-        @test parent(solver2.sws.op.τ) === solver2.sws.op.layerdata
-        @test parent(solver2.lws.src.lev_source) === solver2.lws.src.leveldata
-        @test parent(solver2.lws.src.albedo) === solver2.lws.src.leveldata
-        @test parent(solver2.lws.src.src) === solver2.lws.src.leveldata
-        @test parent(solver2.sws.src.albedo) === solver2.sws.src.leveldata
-        @test parent(solver2.sws.src.src) === solver2.sws.src.leveldata
+        @test _is_view_into(solver2.lws.op.τ, solver2.lws.op.layerdata)
+        @test _is_view_into(solver2.lws.op.ssa, solver2.lws.op.layerdata)
+        @test _is_view_into(solver2.lws.op.g, solver2.lws.op.layerdata)
+        @test _is_view_into(solver2.sws.op.τ, solver2.sws.op.layerdata)
+        @test _is_view_into(solver2.lws.src.lev_source, solver2.lws.src.leveldata)
+        @test _is_view_into(solver2.lws.src.albedo, solver2.lws.src.leveldata)
+        @test _is_view_into(solver2.lws.src.src, solver2.lws.src.leveldata)
+        @test _is_view_into(solver2.sws.src.albedo, solver2.sws.src.leveldata)
+        @test _is_view_into(solver2.sws.src.src, solver2.sws.src.leveldata)
 
         # functional: the adapted solver still solves and reproduces the fluxes
         RRTMGP.update_fluxes!(solver2)
@@ -298,7 +304,7 @@ end
         ncol = 3,
     )
     op1 = Adapt.adapt(CopyToArray(), RRTMGP.Optics.OneScalar(gp))
-    @test parent(op1.τ) === op1.layerdata
+    @test _is_view_into(op1.τ, op1.layerdata)
 end
 
 # Opt-in input validation: `RRTMGP.check_values[] = true` makes `update_fluxes!`
