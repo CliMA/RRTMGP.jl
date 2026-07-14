@@ -3,6 +3,9 @@ RRTMGP.jl Release Notes
 
 main
 ------
+
+v0.22.0
+-------
 - Internal compute buffers now use device-dependent physical layouts behind a
   uniform column-first `(ncol, nlay/nlev)` indexing convention: optical
   properties (`OneScalar`, `TwoStream`), source functions (`SourceLWNoScat`,
