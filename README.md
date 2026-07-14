@@ -148,6 +148,13 @@ RRTMGP.jl provides radiative fluxes and heating rates for the
 For questions, check the [documentation](https://clima.github.io/RRTMGP.jl/latest/)
 or open an issue on [GitHub](https://github.com/CliMA/RRTMGP.jl).
 
+## Contributing
+
+Contributors should follow the shared CliMA engineering standards in
+[`docs/dev-guides/`](docs/dev-guides/), which cover architecture, performance,
+code quality, documentation, and workflows. These are vendored from
+[CliMA/DeveloperGuides](https://github.com/CliMA/DeveloperGuides).
+
 ## Acknowledgments
 
 - [Robert Pincus](https://github.com/RobertPincus) for his invaluable help.
