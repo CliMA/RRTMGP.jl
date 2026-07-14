@@ -3,6 +3,14 @@ RRTMGP.jl Release Notes
 
 main
 ------
+- Documented and added a regression test for the **copy-free flux-getter
+  contract**: the output flux getters (`net_flux`, `lw_flux_up`, `sw_flux_dn`,
+  …) return single-level views of plain `(nlev, ncol)` presentation buffers, so
+  a host wraps them with ClimaCore's `array2field` without copying and in the
+  correct memory order. Hosts must not `copy(getter(solver))` before wrapping —
+  that materializes a full field per getter per call, which for a diagnostics
+  pass reading many fluxes each step caused large per-step allocations. No
+  behavior change; getters and buffers are unchanged.
 
 v0.22.0
 -------

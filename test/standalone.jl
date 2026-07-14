@@ -354,3 +354,55 @@ end
         @test (@allocated RRTMGP.update_net_fluxes!(solver)) == 0
     end
 end
+
+# The output flux getters return plain-backed `(nlev, ncol)` views (single-level
+# `SubArray`s of the presentation buffers), so a host can wrap them with ClimaCore's
+# `array2field` (a lazy `reshape`) copy-free and in the correct memory order. Regression
+# guard: a consumer must not `copy(getter(solver))` before wrapping — that materializes a
+# full `(nlev, ncol)` field per getter per call, which for a diagnostics pass reading many
+# fluxes every step adds up to large per-step allocations. Assert the views are plain-backed
+# and that reading one into a host buffer is allocation-free.
+@testset "flux getters are copy-free readable (host contract)" begin
+    context = ClimaComms.context()
+    device = ClimaComms.device(context)
+    DA = ClimaComms.array_type(device)
+    solver = RRTMGP.solve_gray(Float64; nlay = 60, ncol = 10).solver
+    RRTMGP.update_fluxes!(solver) # populate the presentation buffers the getters read
+    flux_getters = (
+        RRTMGP.net_flux,
+        RRTMGP.lw_flux_up,
+        RRTMGP.lw_flux_dn,
+        RRTMGP.lw_flux_net,
+        RRTMGP.sw_flux_up,
+        RRTMGP.sw_flux_dn,
+        RRTMGP.sw_flux_net,
+        RRTMGP.sw_direct_flux_dn,
+    )
+    for getter in flux_getters
+        g = getter(solver)
+        # A single-level view of a plain buffer: `parent` is the buffer itself (not a
+        # nested `SubArray` or a `PermutedDimsArray`), so `reshape`/`array2field` wraps it
+        # without a materializing copy and without reordering memory.
+        @test g isa SubArray
+        @test parent(g) isa DA
+    end
+    # (The all-sky and clear-sky flux getters share the identical presentation-buffer
+    # backing; the all-sky path is exercised in test/all_sky_with_aerosols_utils.jl.)
+    #
+    # Reading a getter into a host buffer must not materialize a full field, whereas
+    # `copy(getter)` does — that contrast is the whole point. Assert it directly (a
+    # version-robust relative bound; the in-place broadcast carries only small, constant
+    # SubArray overhead, far below a full `(nlev, ncol)` copy).
+    if device isa ClimaComms.CPUSingleThreaded
+        for getter in flux_getters
+            g = getter(solver)
+            dst = Array(g) # host buffer of matching shape
+            copy(g)        # warm up / compile
+            dst .= g
+            full = @allocated copy(g)          # copy materializes a full field
+            read = @allocated (dst .= g)        # reading needs no such copy
+            @test full >= length(g) * sizeof(eltype(g))
+            @test read < full ÷ 4
+        end
+    end
+end
