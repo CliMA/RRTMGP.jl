@@ -11,15 +11,21 @@ import Serialization
 
 # Small gray problem shared by these tests (the gray path needs no lookup
 # tables, so every case here runs after a bare `using RRTMGP`).
-function _gray_pieces(FT; nlay = 20, ncol = 4)
+function _gray_pieces(FT; nlay = 20, ncol = 4, isothermal_boundary_layer = false)
     context = ClimaComms.context()
     DA = ClimaComms.array_type(ClimaComms.device(context))
-    gp = RRTMGP.RRTMGPGridParams(FT; context, domain_nlay = nlay, ncol)
+    gp = RRTMGP.RRTMGPGridParams(
+        FT;
+        context,
+        domain_nlay = nlay,
+        ncol,
+        isothermal_boundary_layer,
+    )
     params = RRTMGP.default_parameters(FT)
     lat = DA{FT}(range(FT(-80), FT(80); length = ncol))
     as = RRTMGP.AtmosphericStates.setup_gray_as_pr_grid(
         context,
-        nlay,
+        gp.nlay,
         lat,
         FT(1.0e5),
         FT(9.0e3),
@@ -250,6 +256,48 @@ end
         )
             @test Array(getter(scaled)) ≈ 2 .* Array(getter(base))
         end
+    end
+end
+
+# The isothermal boundary layer is an internal pad, so callers seed only the
+# physical-domain rows of the geometry inputs. The constructor must define the
+# boundary-layer (top) rows itself -- from the top domain rows -- so undef
+# memory can never reach `apply_metric_scaling!` through the scaling array.
+@testset "constructor defines boundary-layer rows of geometry inputs" begin
+    for FT in (Float32, Float64)
+        nlay, ncol = 20, 4
+        pieces =
+            _gray_pieces(FT; nlay, ncol, isothermal_boundary_layer = true)
+        (; gp, DA) = pieces
+        @test gp.nlay == nlay + 1
+        # Seed only the physical domain; poison the boundary-layer rows.
+        center_z = DA{FT}(undef, gp.nlay, ncol)
+        face_z = DA{FT}(undef, gp.nlay + 1, ncol)
+        scaling = DA{FT}(undef, gp.nlay + 1, ncol)
+        center_z[1:nlay, :] .= FT(1)
+        face_z[1:(nlay + 1), :] .= FT(2)
+        scaling[1:(nlay + 1), :] .= FT(3)
+        center_z[end:end, :] .= FT(NaN)
+        face_z[end:end, :] .= FT(NaN)
+        scaling[end:end, :] .= FT(NaN)
+        bcs_lw = RRTMGP.BCs.LwBCs(pieces.sfc_emis, nothing)
+        solver = RRTMGP.RRTMGPSolver(
+            gp,
+            RRTMGP.GrayRadiation(),
+            pieces.params,
+            bcs_lw,
+            pieces.bcs_sw,
+            pieces.as;
+            center_z,
+            face_z,
+            deep_atmosphere_inverse_scaling = scaling,
+        )
+        @test all(Array(center_z)[end, :] .== FT(1))
+        @test all(Array(face_z)[end, :] .== FT(2))
+        @test all(
+            Array(RRTMGP.deep_atmosphere_inverse_scaling(solver))[end, :] .==
+            FT(3),
+        )
     end
 end
 
