@@ -61,10 +61,12 @@ cloud_state = CloudState(
 )
 ```
 
-The effective radii must lie within the cloud lookup tables' ranges
-(liquid 2.5–21.5 µm, ice 10–180 µm; see [Optics](../Optics.md)). `ice_rgh`
-selects the ice-particle surface roughness of the [yang2013](@citet) ice
-optics.
+The effective radii are clamped to the cloud lookup table ranges (liquid
+2.5–21.5 µm, ice 5–90 µm; see [Optics](../Optics.md)), so values outside them
+are used at the nearest table edge without warning. Note that the ice tables
+are tabulated against diameter in the NetCDF file and halved to radii on
+load. `ice_rgh` selects the ice-particle surface roughness of the
+[yang2013](@citet) ice optics.
 
 ## 3. Build the aerosol state
 

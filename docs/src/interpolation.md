@@ -56,7 +56,7 @@ For a face between the adjacent layer centers ``(p_1, T_1)`` (below) and
 ``(p_2, T_2)`` (above):
 
 | Scheme | Assumption | Face values |
-|:-------|:-----------|:------------|
+| :------- | :----------- | :------------ |
 | `NoInterpolation` | levels are supplied by the host | none computed (default) |
 | `ArithmeticMean` | none | ``T = (T_1 + T_2)/2``, ``p = (p_1 + p_2)/2`` |
 | `GeometricMean` | face midway in ``\ln p`` | ``T = \sqrt{T_1 T_2}``, ``p = \sqrt{p_1 p_2}`` |
@@ -78,10 +78,17 @@ at construction.
 
 At the top and bottom of the column, the face lies outside the layer centers
 and the schemes extrapolate instead. With ``(p^+, T^+)`` the nearest layer and
-``(p^{++}, T^{++})`` the next one in, `ArithmeticMean` and `UniformZ`
-extrapolate the temperature linearly, ``T = (3T^+ - T^{++})/2``, and
-`GeometricMean` and `UniformP` do the same in logarithms; each scheme then
-completes the ``(p, T)`` pair the same way as in its interior rule.
+``(p^{++}, T^{++})`` the next one in, each scheme extrapolates whichever of the
+two variables it averages in the interior, then completes the ``(p, T)`` pair
+by its interior rule:
+
+| Scheme | Extrapolated variable | Face value |
+| :------- | :---------------------- | :----------- |
+| `ArithmeticMean` | both, linearly | ``T = (3T^+ - T^{++})/2``, ``p = (3p^+ - p^{++})/2`` |
+| `GeometricMean` | both, in logarithms | ``T = \sqrt{(T^+)^3/T^{++}}``, ``p = \sqrt{(p^+)^3/p^{++}}`` |
+| `UniformZ` | temperature, linearly | ``T = (3T^+ - T^{++})/2``, ``p = p(T)`` from the power law |
+| `UniformP` | pressure, linearly | ``p = (3p^+ - p^{++})/2``, ``T = p^{-1}(p)`` by inverting the power law |
+| `BestFit` | temperature, linearly in ``z`` | ``T(z)`` at the true face altitude, ``p = p(T)`` from the power law |
 
 The bottom face can instead be tied to the ground through
 `bottom_extrapolation`:

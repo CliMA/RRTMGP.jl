@@ -104,9 +104,9 @@ shows the full construction, step by step.
   CUDA GPUs via [ClimaComms](https://github.com/CliMA/ClimaComms.jl).
 - **Zero-allocation driver**: `update_fluxes!` is allocation-free and
   type-stable, asserted in CI with `@allocated` and JET.
-- **Dual precision**: `Float32` and `Float64` throughout;
-  `Float32`↔`Float64` flux differences are of order 10⁻³ W/m² in the
-  longwave and 10⁻² W/m² in the shortwave, enforced by ratcheting CI
+- **Dual precision**: `Float32` and `Float64` throughout; measured
+  `Float32`↔`Float64` flux differences are a few 10⁻⁴ W/m² in the longwave
+  and a few 10⁻² W/m² in the shortwave, enforced by ratcheting CI
   thresholds.
 
 ## Design

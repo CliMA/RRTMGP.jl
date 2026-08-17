@@ -133,6 +133,39 @@ end
     )
 end
 
+# `solve` pads the profile onto RRTMGP's boundary-extended arrays when an
+# isothermal boundary layer is requested. The outputs must stay on the
+# profile's own grid, and the extra layer must actually radiate: without it the
+# top face receives no downward longwave at all.
+@testset "solve(profile) with isothermal boundary layer" begin
+    for FT in (Float32, Float64)
+        nlay, ncol = 30, 2
+        prof = RRTMGP.standard_atmosphere(FT; nlay, ncol)
+        p_lay_before = copy(prof.p_lay)
+        solve_ibl(ibl) = RRTMGP.solve(
+            prof;
+            method = RRTMGP.GrayRadiation(),
+            isothermal_boundary_layer = ibl,
+        )
+        out, out_ibl = solve_ibl(false), solve_ibl(true)
+        for o in (out, out_ibl)
+            @test size(Array(o.net)) == (nlay + 1, ncol)
+            @test size(Array(o.heating_rate)) == (nlay, ncol)
+            @test all(isfinite, Array(o.net))
+        end
+        @test all(iszero, Array(out.lw_dn)[end, :])
+        @test all(>(0), Array(out_ibl.lw_dn)[end, :])
+        # the top layer no longer radiates to space on both sides
+        @test all(
+            abs.(Array(out_ibl.heating_rate)[end, :]) .<
+            abs.(Array(out.heating_rate)[end, :]),
+        )
+        @test prof.p_lay isa Array # the profile is padded, never mutated
+        @test size(prof.p_lay, 1) == nlay
+        @test prof.p_lay == p_lay_before # values untouched by both solves
+    end
+end
+
 # Passing `op_sw = OneScalar` must route the constructor to a non-scattering
 # `NoScatSWRTE` solver (rather than the default `TwoStreamSWRTE`), and the solve
 # must run end to end. Uses gray radiation so no lookup tables are needed.

@@ -12,6 +12,7 @@ radiative properties of the atmosphere by taking the optical properties to be
 independent of wavelength, separately in the longwave and shortwave bands.
 
 ### Longwave
+
 Two options are currently supported for computing the optical depth for longwave
 radiation. The optical depth (``d``) for longwave radiation, with the
 "GrayOpticalThicknessSchneider2004" option, follows [schneider2004](@cite):
@@ -62,6 +63,7 @@ struct.
 
 The optical thickness of an atmosphere layer (the differential optical depth) of
 pressure thickness ``\Delta p`` is
+
 ```math
 \begin{align}
 \tau(\phi, p) = \alpha \frac{\Delta p}{p} \left[f_l \sigma + 4 (1 - f_l) \sigma^4 \right] \left[ \tau_e + (\tau_p - \tau_e) \sin^2\phi \right].
@@ -99,9 +101,11 @@ equations of the [RTE page](RTE.md) apply directly. The difficulty is spectral:
 across an absorption band, the monochromatic absorption coefficient ``k_\nu``
 sweeps over orders of magnitude through thousands of lines, so the band-averaged
 transmission over an absorber path ``u``,
+
 ```math
 \bar{t}(u) = \frac{1}{\Delta\nu} \int_{\Delta\nu} e^{-k_\nu u}\, d\nu,
 ```
+
 cannot be represented by any single mean absorption coefficient: the exponential
 weights weak and strong lines differently at every path length. The
 ``k``-distribution method [lacis1991](@cite) replaces the integral over
@@ -109,9 +113,11 @@ frequency by an integral over the cumulative distribution of absorption
 strength: with ``g(k)`` the fraction of the band where the absorption
 coefficient is below ``k``, reordering the spectrum by strength turns the ragged
 ``k_\nu`` into a smooth, monotonic ``k(g)`` on ``g \in [0, 1]``, and
+
 ```math
 \bar{t}(u) = \int_0^1 e^{-k(g)\,u}\, dg \approx \sum_{j=1}^{G} \omega_j\, e^{-k(g_j)\, u},
 ```
+
 a quadrature over a handful of *g-points*. The *correlated*-``k`` assumption is
 that the frequency-to-``g`` ordering is the same at all pressures and
 temperatures along the path, so a single ``g`` coordinate serves the whole
@@ -129,16 +135,20 @@ atmospheric state. (The volume mixing ratio relates to the mass fraction ``q``
 of a gas by ``\chi = q / q_d \cdot M_d / M``, where ``q_d = 1 - q_t`` is the
 dry-air mass fraction, ``M_d`` the molar mass of dry air, and ``M`` that of the
 gas.) The optical thickness of a layer splits into
+
 ```math
 \tau_g = \tau_\mathrm{major} + \tau_\mathrm{minor} + \tau_\mathrm{rayleigh},
 ```
+
 with the Rayleigh term present in the shortwave only.
 
 **Major species.** Within each band, absorption is dominated by at most two
 gases. Their relative abundance enters through the binary mixing parameter
+
 ```math
 \eta = \frac{\chi_1}{\chi_1 + r\,\chi_2},
 ```
+
 where ``r`` is the ratio of the two abundances in the reference atmosphere used
 to build the tables, so ``\eta`` runs from 0 (only species 2) to 1 (only species
 1). The absorption coefficient is tabulated on a ``(\eta, \log p, T)`` grid and
@@ -167,6 +177,7 @@ atmosphere. These per-g-point sources are where the quadrature weights of the
 weighting.
 
 ### Lookup tables
+
 The lookup tables for the spectral map between ``\nu`` and ``g`` are NetCDF
 files from the
 [rrtmgp-data](https://github.com/earth-system-radiation/rrtmgp-data) repository
@@ -231,6 +242,7 @@ radiative fluxes for highly asymmetric phase functions ([joseph1976](@cite)).
 that sees cloud (the cloud mask is described below).
 
 ### Lookup tables
+
 The lookup tables for cloud optics are NetCDF files from the same
 [rrtmgp-data](https://github.com/earth-system-radiation/rrtmgp-data) artifacts.
 The longwave and shortwave lookup tables are `rrtmgp-clouds-lw-bnd.nc` and
@@ -239,11 +251,14 @@ The tabulated information includes tabulated data of extinction coefficients,
 single scattering albedo, and asymmetry parameter for liquid and ice particles.
 The optical properties for liquid particles are computed at radius
 ``2.5\,\mathrm{\mu m} \le r_l \le 21.5\,\mathrm{\mu m}`` in increments of
-``1\,\mathrm{\mu m}``. The optical properties for ice particles are computed at
-radius ``10\,\mathrm{\mu m} \le r_i \le 180\,\mathrm{\mu m}`` in increments of
-``10\,\mathrm{\mu m}``.
+``1\,\mathrm{\mu m}``. The optical properties for ice particles are tabulated
+against diameter, ``10\,\mathrm{\mu m} \le d_i \le 180\,\mathrm{\mu m}`` in
+increments of ``10\,\mathrm{\mu m}``; `LookUpCld` halves these bounds on load,
+so the interpolation and the clamp applied to `cloud_ice_effective_radius` work
+in radius, ``5\,\mathrm{\mu m} \le r_i \le 90\,\mathrm{\mu m}``.
 
 ### Cloud overlap method
+
 Climate models predict grid-mean cloud fraction and cloud condensate, so the
 vertical overlap of clouds must be prescribed to compute radiative fluxes. The
 Monte Carlo independent column approximation (McICA) represents fractional
@@ -256,6 +271,7 @@ sky are randomly overlapped.
 Proceeding downward for each g-point, layer ``k`` sees cloud where its random
 number ``R_k`` exceeds one minus the layer's cloud fraction,
 ``R_k > 1 - \mathrm{CF}_k``, with
+
 ```math
 R_k =
 \begin{cases}
@@ -263,6 +279,7 @@ R_{k-1} & \text{if the g-point sees cloud in layer } k-1,\\
 u_k \, (1 - \mathrm{CF}_{k-1}) & \text{otherwise},
 \end{cases}
 ```
+
 where ``u_k \sim U(0, 1)`` is an independent uniform draw; the mixture of the
 two cases leaves ``R_k`` uniform on [0, 1]. Three properties follow. Each layer
 is cloudy with probability ``\mathrm{CF}_k``, so the sampled mask reproduces the

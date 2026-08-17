@@ -37,14 +37,17 @@ using CairoMakie
 # ## The column
 #
 # Start from the idealized midlatitude-summer standard atmosphere on 60 layers
-# up to 45 km. Its pressure grid, ozone profile, and well-mixed gases (CO₂ = 420
+# up to 60 km. Its pressure grid, ozone profile, and well-mixed gases (CO₂ = 420
 # ppmv, etc.) stay fixed; the temperature, and, in most experiments, the water
 # vapor, are overwritten by the RCE iteration. We keep a copy of the
 # standard-atmosphere temperature to overlay later as a reference.
+#
+# Every column in this tutorial is built with the same settings, so we
+# collect them once:
 
 const FT = Float64
-nlay = 60
-profile = RRTMGP.standard_atmosphere(FT; kind = :midlatitude_summer, nlay);
+const column = (; kind = :midlatitude_summer, nlay = 60, z_top = 60.0e3)
+profile = RRTMGP.standard_atmosphere(FT; column...);
 T_obs = copy(profile.t_lay[:, 1]);
 
 # Like Manabe and collaborators, we force the column with the **global-mean
@@ -62,9 +65,9 @@ insolation = (; cos_zenith = cosd(47.9), toa_flux = 509.0, surface_albedo = 0.3)
 # Both RRTMGP and
 # [Thermodynamics.jl](https://github.com/CliMA/Thermodynamics.jl) read their
 # physical constants from
-# [ClimaParams.jl](https://github.com/CliMA/ClimaParams.jl), the single source
-# of truth for CliMA parameters, so the constants used across the radiation and
-# thermodynamics calculations here are consistent. We build both parameter sets
+# [ClimaParams.jl](https://github.com/CliMA/ClimaParams.jl), so the constants
+# used across the radiation and thermodynamics calculations here are
+# consistent. We build both parameter sets
 # from it and take the gravitational acceleration, the dry-air gas constant, and
 # the dry-air heat capacity from them:
 
@@ -78,14 +81,28 @@ g = RRTMGP.Parameters.grav(params)   # gravitational acceleration [m/s²]
 # rebuild the level (cell-face) temperatures and pressures from the layer
 # (cell-center) values on every [`update_fluxes!`](@ref RRTMGP.update_fluxes!)
 # call: `interpolation = ArithmeticMean()` averages the adjacent layers on
-# interior faces and extrapolates linearly at the boundary faces. We collect
-# this, the parameters, and the insolation into one configuration shared by
-# every column in this tutorial. One call then builds the clear-sky solver
-# (downloading the RRTMGP lookup tables on first use) and solves the initial
-# state; its state is exposed as writable views, which the iteration overwrites
-# in place:
+# interior faces and extrapolates linearly at the boundary faces.
+#
+# We also add an **isothermal boundary layer** at the top. A column that
+# stops at 60 km receives no downward longwave flux at its top face: the
+# topmost layer emits through both faces but absorbs only through one, so it
+# cools at tens of kelvin per day. This truncation artifact can spread a
+# sawtooth temperature pattern of several kelvin amplitude through the layers
+# below. `isothermal_boundary_layer = true` extends the column with one
+# isothermal layer reaching the lookup tables' minimum pressure, which
+# supplies the missing downward flux.
+#
+# We collect this setup, the parameters, and the insolation into one shared
+# configuration. One call then builds the clear-sky solver (downloading the
+# RRTMGP lookup tables on first use) and solves the initial state; its state
+# is exposed as writable views, which the iteration overwrites in place:
 
-setup = (; params, insolation..., interpolation = RRTMGP.ArithmeticMean())
+setup = (;
+    params,
+    insolation...,
+    interpolation = RRTMGP.ArithmeticMean(),
+    isothermal_boundary_layer = true,
+)
 out = RRTMGP.solve(profile; setup...)
 solver = out.solver;
 
@@ -288,7 +305,7 @@ T_bot_re = Array(RRTMGP.level_temperature(solver_re))[1, 1]
 println("Bottom-face air temperature (radiative): $(round(T_bot_re; digits = 1)) K")
 println("Implied surface convective flux (radiative): $(round(sfc_convective_flux(solver_re); digits = 2)) W/m²")
 
-# Radiative equilibrium *without* convection leads to a surface 26 K warmer,
+# Radiative equilibrium *without* convection leads to a surface 25 K warmer,
 # with a profile that departs from the observed atmosphere (here, the idealized
 # midlatitude-summer standard atmosphere we started from) at every height: the
 # temperature decreases from the surface upward at two to three times the dry
@@ -354,7 +371,7 @@ println("Tropopause height ≈ $(round(tropopause_height(solver, Ts_1x) / 1000; 
 co2_1x = profile.well_mixed_vmr["co2"]
 
 function balanced_co2(factor; fixed_rh = true, bracket = (Ts_1x, Ts_1x + 3))
-    prof = RRTMGP.standard_atmosphere(FT; kind = :midlatitude_summer, nlay)
+    prof = RRTMGP.standard_atmosphere(FT; column...)
     prof.well_mixed_vmr["co2"] = factor * co2_1x
     slv = RRTMGP.solve(prof; lookups = solver.lookups, setup...).solver
     RRTMGP.layer_temperature(slv) .= T_1x                      # warm start
@@ -446,7 +463,7 @@ ax3 = Axis(
     title = "Sensitivity to the critical lapse rate",
 )
 for Γ_km in (9.8, 6.5, 3.0)
-    prof = RRTMGP.standard_atmosphere(FT; kind = :midlatitude_summer, nlay)
+    prof = RRTMGP.standard_atmosphere(FT; column...)
     slv = RRTMGP.solve(prof; lookups = solver.lookups, setup...).solver
     Ts = balanced_surface_temperature!(slv, FT(270), FT(292); Γ = Γ_km * 1e-3)
     z_top = tropopause_height(slv, Ts; Γ = Γ_km * 1e-3) / 1000
@@ -472,7 +489,7 @@ fig3
 # CO₂ by setting its well-mixed value to zero before the state is built.
 
 function rce_without(absorber, T1, T2)
-    prof = RRTMGP.standard_atmosphere(FT; kind = :midlatitude_summer, nlay)
+    prof = RRTMGP.standard_atmosphere(FT; column...)
     absorber === :co2 && (prof.well_mixed_vmr["co2"] = 0.0)
     slv = RRTMGP.solve(prof; lookups = solver.lookups, setup...).solver
     absorber === :o3 && (RRTMGP.volume_mixing_ratio(slv, "o3") .= 0)
@@ -500,9 +517,9 @@ end
 # the most: removing it reduces the surface temperature by 24 K, below the
 # freezing point. Carbon dioxide comes next, at a 17 K reduction. Ozone
 # contributes 4 K at the surface, but by absorbing solar ultraviolet radiation
-# it creates the stratospheric inversion. Without ozone, the inversion is gone:
-# the temperature decreases with height toward a nearly isothermal ≈ 160 K at
-# the top of the column. Without CO₂, the stratosphere runs *warmer* than the
+# it creates the stratospheric inversion. Without ozone, the pronounced
+# inversion disappears, and the upper stratosphere is nearly isothermal at
+# 165–170 K. Without CO₂, the stratosphere runs *warmer* than the
 # reference: ozone still absorbs sunlight up there, but the main emitter of
 # thermal infrared is gone, so the stratosphere must warm until the remaining
 # gases radiate the heating away.
