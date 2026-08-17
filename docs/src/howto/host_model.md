@@ -57,7 +57,8 @@ sessions.
 The host owns the [`AtmosphericState`](@ref
 RRTMGP.AtmosphericStates.AtmosphericState) (pressures, temperatures, mixing
 ratios, optional [`CloudState`](@ref RRTMGP.AtmosphericStates.CloudState) and
-[`AerosolState`](@ref RRTMGP.AtmosphericStates.AerosolState)) and the boundary
+[`AerosolState`](@ref RRTMGP.AtmosphericStates.AerosolState); see
+[How to add clouds and aerosols](clouds_aerosols.md)) and the boundary
 conditions ([`LwBCs`](@ref RRTMGP.BCs.LwBCs), [`SwBCs`](@ref RRTMGP.BCs.SwBCs)).
 All arrays live on the device described by `grid_params`, with the vertical
 dimension first and columns last. `test/read_all_sky_with_aerosols.jl` is a

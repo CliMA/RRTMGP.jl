@@ -53,8 +53,9 @@ contract](getters.md), and standalone entry points (`solve_gray`,
   experiment). Start here if you want to learn about radiative transfer and how
   to run this code.
 - **How-to guides** (task-oriented recipes): [driving RRTMGP from a host
-  model](howto/host_model.md), [running on GPUs](howto/gpu.md), [caching the
-  lookup tables](howto/lookup_cache.md), [per-band
+  model](howto/host_model.md), [adding clouds and
+  aerosols](howto/clouds_aerosols.md), [running on GPUs](howto/gpu.md),
+  [caching the lookup tables](howto/lookup_cache.md), [per-band
   fluxes](howto/spectral_fluxes.md), and [the validated test
   problems](Example.md). Start here if you are coupling RRTMGP to a climate
   model.
