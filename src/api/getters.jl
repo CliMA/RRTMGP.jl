@@ -54,48 +54,311 @@ _require_clear_sky(::Nothing) = error(
 )
 _require_clear_sky(x) = x
 
-# Potentially views
+# Potentially views. Each getter carries a one-line docstring for REPL help; the shared
+# layout/masking/writability rules live in the getter contract (docs/src/getters.md).
+
+"""
+    top_of_atmosphere_lw_flux_dn(s::RRTMGPSolver)
+
+Return the prescribed incident longwave flux [W/m²], `(ngpt, ncol)`, or `nothing`.
+"""
 top_of_atmosphere_lw_flux_dn(s::RRTMGPSolver)         = _maybe_transpose(s.lws.bcs.inc_flux)
+
+"""
+    top_of_atmosphere_diffuse_sw_flux_dn(s::RRTMGPSolver)
+
+Return the prescribed incident diffuse shortwave flux [W/m²], `(ngpt, ncol)`, or `nothing`.
+"""
 top_of_atmosphere_diffuse_sw_flux_dn(s::RRTMGPSolver) = _maybe_transpose(s.sws.bcs.inc_flux_diffuse)
+
+"""
+    lw_flux_up(s::RRTMGPSolver)
+
+Return the upward longwave flux [W/m²]: a domain-masked `(nlev, ncol)` view.
+"""
 lw_flux_up(s::RRTMGPSolver)                           = _domain_view(s, s.presented_flux_lw.flux_up)
+
+"""
+    lw_flux_dn(s::RRTMGPSolver)
+
+Return the downward longwave flux [W/m²]: a domain-masked `(nlev, ncol)` view.
+"""
 lw_flux_dn(s::RRTMGPSolver)                           = _domain_view(s, s.presented_flux_lw.flux_dn)
+
+"""
+    lw_flux_net(s::RRTMGPSolver)
+
+Return the net (up - down) longwave flux [W/m²]: a domain-masked `(nlev, ncol)` view.
+"""
 lw_flux_net(s::RRTMGPSolver)                          = _domain_view(s, s.presented_flux_lw.flux_net)
+
+"""
+    clear_lw_flux_up(s::RRTMGPSolver)
+
+Return the clear-sky upward longwave flux [W/m²], `(nlev, ncol)`
+(`AllSkyRadiationWithClearSkyDiagnostics` only).
+"""
 clear_lw_flux_up(s::RRTMGPSolver)                     = _domain_view(s, _require_clear_sky(s.clear_flux_lw).flux_up)
+
+"""
+    clear_lw_flux_dn(s::RRTMGPSolver)
+
+Return the clear-sky downward longwave flux [W/m²], `(nlev, ncol)`
+(`AllSkyRadiationWithClearSkyDiagnostics` only).
+"""
 clear_lw_flux_dn(s::RRTMGPSolver)                     = _domain_view(s, _require_clear_sky(s.clear_flux_lw).flux_dn)
+
+"""
+    clear_lw_flux(s::RRTMGPSolver)
+
+Return the clear-sky net longwave flux [W/m²], `(nlev, ncol)`
+(`AllSkyRadiationWithClearSkyDiagnostics` only).
+"""
 clear_lw_flux(s::RRTMGPSolver)                        = _domain_view(s, _require_clear_sky(s.clear_flux_lw).flux_net)
+
+"""
+    surface_emissivity(s::RRTMGPSolver)
+
+Return the longwave surface emissivity [-]: a writable `(nbnd, ncol)` device array.
+"""
 surface_emissivity(s::RRTMGPSolver)                   = s.lws.bcs.sfc_emis
+
+"""
+    sw_flux_up(s::RRTMGPSolver)
+
+Return the upward shortwave flux [W/m²]: a domain-masked `(nlev, ncol)` view.
+"""
 sw_flux_up(s::RRTMGPSolver)                           = _domain_view(s, s.presented_flux_sw.flux_up)
+
+"""
+    sw_flux_dn(s::RRTMGPSolver)
+
+Return the downward shortwave flux [W/m²]: a domain-masked `(nlev, ncol)` view.
+"""
 sw_flux_dn(s::RRTMGPSolver)                           = _domain_view(s, s.presented_flux_sw.flux_dn)
+
+"""
+    sw_flux_net(s::RRTMGPSolver)
+
+Return the net (up - down) shortwave flux [W/m²]: a domain-masked `(nlev, ncol)` view.
+"""
 sw_flux_net(s::RRTMGPSolver)                          = _domain_view(s, s.presented_flux_sw.flux_net)
+
+"""
+    sw_direct_flux_dn(s::RRTMGPSolver)
+
+Return the direct-beam downward shortwave flux [W/m²]: a domain-masked `(nlev, ncol)` view.
+"""
 sw_direct_flux_dn(s::RRTMGPSolver)                    = _domain_view(s, s.presented_flux_sw.flux_dn_dir)
+
+"""
+    clear_sw_flux_up(s::RRTMGPSolver)
+
+Return the clear-sky upward shortwave flux [W/m²], `(nlev, ncol)`
+(`AllSkyRadiationWithClearSkyDiagnostics` only).
+"""
 clear_sw_flux_up(s::RRTMGPSolver)                     = _domain_view(s, _require_clear_sky(s.clear_flux_sw).flux_up)
+
+"""
+    clear_sw_flux_dn(s::RRTMGPSolver)
+
+Return the clear-sky downward shortwave flux [W/m²], `(nlev, ncol)`
+(`AllSkyRadiationWithClearSkyDiagnostics` only).
+"""
 clear_sw_flux_dn(s::RRTMGPSolver)                     = _domain_view(s, _require_clear_sky(s.clear_flux_sw).flux_dn)
+
+"""
+    clear_sw_direct_flux_dn(s::RRTMGPSolver)
+
+Return the clear-sky direct-beam downward shortwave flux [W/m²], `(nlev, ncol)`
+(`AllSkyRadiationWithClearSkyDiagnostics` only).
+"""
 clear_sw_direct_flux_dn(s::RRTMGPSolver)              = _domain_view(s, _require_clear_sky(s.clear_flux_sw).flux_dn_dir)
+
+"""
+    clear_sw_flux(s::RRTMGPSolver)
+
+Return the clear-sky net shortwave flux [W/m²], `(nlev, ncol)`
+(`AllSkyRadiationWithClearSkyDiagnostics` only).
+"""
 clear_sw_flux(s::RRTMGPSolver)                        = _domain_view(s, _require_clear_sky(s.clear_flux_sw).flux_net)
+"""
+    cloud_liquid_effective_radius(s::RRTMGPSolver)
+
+Return the cloud liquid effective radius [µm]: a writable, domain-masked `(nlay, ncol)` view.
+"""
 cloud_liquid_effective_radius(s::RRTMGPSolver)        = _domain_view(s, s.as.cloud_state.cld_r_eff_liq)
+
+"""
+    cloud_ice_effective_radius(s::RRTMGPSolver)
+
+Return the cloud ice effective radius [µm]: a writable, domain-masked `(nlay, ncol)` view.
+"""
 cloud_ice_effective_radius(s::RRTMGPSolver)           = _domain_view(s, s.as.cloud_state.cld_r_eff_ice)
+
+"""
+    cloud_liquid_water_path(s::RRTMGPSolver)
+
+Return the cloud liquid water path [g/m²]: a writable, domain-masked `(nlay, ncol)` view.
+"""
 cloud_liquid_water_path(s::RRTMGPSolver)              = _domain_view(s, s.as.cloud_state.cld_path_liq)
+
+"""
+    cloud_ice_water_path(s::RRTMGPSolver)
+
+Return the cloud ice water path [g/m²]: a writable, domain-masked `(nlay, ncol)` view.
+"""
 cloud_ice_water_path(s::RRTMGPSolver)                 = _domain_view(s, s.as.cloud_state.cld_path_ice)
+
+"""
+    cloud_fraction(s::RRTMGPSolver)
+
+Return the cloud fraction [-]: a writable, domain-masked `(nlay, ncol)` view.
+"""
 cloud_fraction(s::RRTMGPSolver)                       = _domain_view(s, s.as.cloud_state.cld_frac)
+
+"""
+    sw_cloud_cover(s::RRTMGPSolver)
+
+Return the column cloud cover [-] diagnosed from the shortwave McICA sampling, `(ncol,)`.
+"""
 sw_cloud_cover(s::RRTMGPSolver)                       = s.as.cloud_state.cld_cover_sw
+
+"""
+    lw_cloud_cover(s::RRTMGPSolver)
+
+Return the column cloud cover [-] diagnosed from the longwave McICA sampling, `(ncol,)`.
+"""
 lw_cloud_cover(s::RRTMGPSolver)                       = s.as.cloud_state.cld_cover_lw
+
+"""
+    aod_sw_extinction(s::RRTMGPSolver)
+
+Return the aerosol extinction optical depth [-] in the shortwave band containing 550 nm,
+`(ncol,)`.
+"""
 aod_sw_extinction(s::RRTMGPSolver)                    = s.as.aerosol_state.aod_sw_ext
+
+"""
+    aod_sw_scattering(s::RRTMGPSolver)
+
+Return the aerosol scattering optical depth [-] in the shortwave band containing 550 nm,
+`(ncol,)`.
+"""
 aod_sw_scattering(s::RRTMGPSolver)                    = s.as.aerosol_state.aod_sw_sca
+
+"""
+    center_z(s::RRTMGPSolver)
+
+Return the layer-center altitudes [m], `(nlay, ncol)`, or `nothing` if not provided.
+"""
 center_z(s::RRTMGPSolver)                             = _domain_view(s, s.center_z)
+
+"""
+    face_z(s::RRTMGPSolver)
+
+Return the level (face) altitudes [m], `(nlev, ncol)`, or `nothing` if not provided.
+"""
 face_z(s::RRTMGPSolver)                               = _domain_view(s, s.face_z)
+"""
+    cos_zenith(s::RRTMGPSolver)
+
+Return the cosine of the solar zenith angle [-]: a writable `(ncol,)` device array.
+"""
 cos_zenith(s::RRTMGPSolver)                           = s.sws.bcs.cos_zenith
+
+"""
+    toa_flux(s::RRTMGPSolver)
+
+Return the incident top-of-atmosphere solar flux [W/m²]: a writable `(ncol,)` device array.
+"""
 toa_flux(s::RRTMGPSolver)                             = s.sws.bcs.toa_flux
+
+"""
+    direct_sw_surface_albedo(s::RRTMGPSolver)
+
+Return the direct-beam shortwave surface albedo [-]: a writable `(nbnd, ncol)` device array.
+"""
 direct_sw_surface_albedo(s::RRTMGPSolver)             = s.sws.bcs.sfc_alb_direct
+
+"""
+    diffuse_sw_surface_albedo(s::RRTMGPSolver)
+
+Return the diffuse shortwave surface albedo [-]: a writable `(nbnd, ncol)` device array.
+"""
 diffuse_sw_surface_albedo(s::RRTMGPSolver)            = s.sws.bcs.sfc_alb_diffuse
+
+"""
+    latitude(s::RRTMGPSolver)
+
+Return the column latitudes [degrees], `(ncol,)`, or `nothing` if not provided.
+"""
 latitude(s::RRTMGPSolver)                             = s.as.lat
+
+"""
+    surface_temperature(s::RRTMGPSolver)
+
+Return the surface temperature [K]: a writable `(ncol,)` device array.
+"""
 surface_temperature(s::RRTMGPSolver)                  = s.as.t_sfc
+
+"""
+    layer_pressure(s::RRTMGPSolver)
+
+Return the layer-center pressure [Pa]: a writable, domain-masked `(nlay, ncol)` view.
+"""
 layer_pressure(s::RRTMGPSolver)                       = _domain_view(s, getview_p_lay(s.as))
+
+"""
+    layer_temperature(s::RRTMGPSolver)
+
+Return the layer-center temperature [K]: a writable, domain-masked `(nlay, ncol)` view.
+"""
 layer_temperature(s::RRTMGPSolver)                    = _domain_view(s, getview_t_lay(s.as))
+
+"""
+    layer_relative_humidity(s::RRTMGPSolver)
+
+Return the layer-center relative humidity [-]: a writable, domain-masked `(nlay, ncol)`
+view. Feeds the humidity-dependent aerosol optics; keeping it current is the host's job.
+"""
 layer_relative_humidity(s::RRTMGPSolver)              = _domain_view(s, getview_rel_hum(s.as))
+
+"""
+    level_pressure(s::RRTMGPSolver)
+
+Return the level (face) pressure [Pa]: a writable, domain-masked `(nlev, ncol)` view.
+"""
 level_pressure(s::RRTMGPSolver)                       = _domain_view(s, s.as.p_lev)
+
+"""
+    level_temperature(s::RRTMGPSolver)
+
+Return the level (face) temperature [K]: a writable, domain-masked `(nlev, ncol)` view.
+"""
 level_temperature(s::RRTMGPSolver)                    = _domain_view(s, s.as.t_lev)
+
+"""
+    net_flux(s::RRTMGPSolver)
+
+Return the combined longwave + shortwave net flux [W/m²]: a domain-masked `(nlev, ncol)`
+view.
+"""
 net_flux(s::RRTMGPSolver)                             = _domain_view(s, s.net_flux_buffer)
+
+"""
+    clear_net_flux(s::RRTMGPSolver)
+
+Return the clear-sky combined net flux [W/m²], `(nlev, ncol)`
+(`AllSkyRadiationWithClearSkyDiagnostics` only).
+"""
 clear_net_flux(s::RRTMGPSolver)                       = _domain_view(s, _require_clear_sky(s.clear_net_flux_buffer))
+
+"""
+    deep_atmosphere_inverse_scaling(s::RRTMGPSolver)
+
+Return the deep-atmosphere flux scaling [-], `(nlev, ncol)`, or `nothing` if not provided.
+"""
 deep_atmosphere_inverse_scaling(s::RRTMGPSolver)      = _domain_view(s, s.deep_atmosphere_inverse_scaling)
 #! format: on
 
@@ -199,6 +462,12 @@ parameter.
 optical_thickness_parameter(s::RRTMGPSolver) =
     hasproperty(_atmospheric_state(s), :otp) ? _atmospheric_state(s).otp : nothing
 
+"""
+    isothermal_boundary_layer(s::RRTMGPSolver)
+
+Return whether the solver carries an internal isothermal boundary layer above the
+physical domain (which every getter masks off).
+"""
 isothermal_boundary_layer(s::RRTMGPSolver) = s.grid_params.isothermal_boundary_layer
 
 """

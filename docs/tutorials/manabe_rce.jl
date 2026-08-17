@@ -4,14 +4,13 @@
 # calculations of [manabe1964](@citet) and [manabe1967](@citet) with RRTMGP's
 # clear-sky gas optics. It calculates RCE for a single atmospheric column with
 #
-# - a **prescribed tropospheric lapse rate** (convective adjustment to
-#   6.5 K/km),
+# - a **prescribed tropospheric lapse rate** (convective adjustment to 6.5
+#   K/km),
 # - a **prescribed relative-humidity profile** (water vapor follows the
 #   temperature),
 # - a stratosphere in **radiative equilibrium**, and
-# - a **surface temperature diagnosed from the energy balance**: it is
-#   iterated until the net radiative flux at the top of the atmosphere
-#   vanishes.
+# - a **surface temperature diagnosed from the energy balance**: it is iterated
+#   until the net radiative flux at the top of the atmosphere vanishes.
 #
 # [kluft2019](@citet) used a similar setup with the single-column model
 # [konrad](https://github.com/atmtools/konrad) to revisit the calculations by
@@ -19,15 +18,15 @@
 #
 # We reproduce four of Manabe's results: the
 # radiative-versus-radiative-convective comparison, the surface warming under
-# CO₂ increases with the water-vapor feedback (fixed relative rather than
-# fixed absolute humidity), the dependence of the equilibrium on the assumed
-# lapse rate, and the decomposition of the greenhouse effect into its
-# individual absorbers (water vapor, CO₂, ozone).
+# CO₂ increases with the water-vapor feedback (fixed relative rather than fixed
+# absolute humidity), the dependence of the equilibrium on the assumed lapse
+# rate, and the decomposition of the greenhouse effect into its individual
+# absorbers (water vapor, CO₂, ozone).
 #
 # Along the way, this tutorial demonstrates the host-model workflow of
-# RRTMGP.jl: build a solver, then mutate its state via the
-# [getter contract](../getters.md) and call
-# [`update_fluxes!`](@ref RRTMGP.update_fluxes!) inside a time loop.
+# RRTMGP.jl: build a solver, then mutate its state via the [getter
+# contract](../getters.md) and call [`update_fluxes!`](@ref
+# RRTMGP.update_fluxes!) inside a time loop.
 
 using RRTMGP
 using NCDatasets # activates RRTMGP's lookup-table extension
@@ -38,9 +37,9 @@ using CairoMakie
 # ## The column
 #
 # Start from the idealized midlatitude-summer standard atmosphere on 60 layers
-# up to 45 km. Its pressure grid, ozone profile, and well-mixed gases
-# (CO₂ = 420 ppmv, etc.) stay fixed; the temperature, and, in most experiments,
-# the water vapor, are overwritten by the RCE iteration. We keep a copy of the
+# up to 45 km. Its pressure grid, ozone profile, and well-mixed gases (CO₂ = 420
+# ppmv, etc.) stay fixed; the temperature, and, in most experiments, the water
+# vapor, are overwritten by the RCE iteration. We keep a copy of the
 # standard-atmosphere temperature to overlay later as a reference.
 
 const FT = Float64
@@ -49,21 +48,22 @@ profile = RRTMGP.standard_atmosphere(FT; kind = :midlatitude_summer, nlay);
 T_obs = copy(profile.t_lay[:, 1]);
 
 # Like Manabe and collaborators, we force the column with the **global-mean
-# insolation** ``S_0/4 \approx 341`` W/m².
-# The incident flux and the zenith angle have to be chosen together, since the
-# zenith angle sets the path length available for shortwave absorption
-# [cronin2014](@cite). Like [kluft2019](@citet), we take a zenith angle of
-# 47.9° (``\cos θ \approx 0.67``); an incident flux of 509 W/m² then delivers
-# ``509 \times \cos(47.9^\circ) \approx 341`` W/m² at the top of the
-# atmosphere. The surface albedo of 0.3 stands in for the shortwave reflection
-# of the clouds, which this clear-sky column omits:
+# insolation** ``S_0/4 \approx 341`` W/m². The incident flux and the zenith
+# angle have to be chosen together, since the zenith angle sets the path length
+# available for shortwave absorption [cronin2014](@cite). Like
+# [kluft2019](@citet), we take a zenith angle of 47.9°
+# (``\cos θ \approx 0.67``); an incident flux of 509 W/m² then delivers
+# ``509 \times \cos(47.9^\circ) \approx 341`` W/m² at the top of the atmosphere.
+# The surface albedo of 0.3 stands in for the shortwave reflection of the
+# clouds, which this clear-sky column omits:
 
 insolation = (; cos_zenith = cosd(47.9), toa_flux = 509.0, surface_albedo = 0.3);
 
-# Both RRTMGP and [Thermodynamics.jl](https://github.com/CliMA/Thermodynamics.jl)
-# read their physical constants from
-# [ClimaParams.jl](https://github.com/CliMA/ClimaParams.jl), the single source of
-# truth for CliMA parameters, so the constants used across the radiation and
+# Both RRTMGP and
+# [Thermodynamics.jl](https://github.com/CliMA/Thermodynamics.jl) read their
+# physical constants from
+# [ClimaParams.jl](https://github.com/CliMA/ClimaParams.jl), the single source
+# of truth for CliMA parameters, so the constants used across the radiation and
 # thermodynamics calculations here are consistent. We build both parameter sets
 # from it and take the gravitational acceleration, the dry-air gas constant, and
 # the dry-air heat capacity from them:
@@ -76,13 +76,14 @@ g = RRTMGP.Parameters.grav(params)   # gravitational acceleration [m/s²]
 
 # The iteration below marches the layer temperatures, so we ask the solver to
 # rebuild the level (cell-face) temperatures and pressures from the layer
-# (cell-center) values on every [`update_fluxes!`](@ref RRTMGP.update_fluxes!) call:
-# `interpolation = ArithmeticMean()` averages the adjacent layers on interior
-# faces and extrapolates linearly at the boundary faces. We collect this, the
-# parameters, and the insolation into one configuration shared by every column
-# in this tutorial. One call then builds the clear-sky solver (downloading the
-# RRTMGP lookup tables on first use) and solves the initial state; its state is
-# exposed as writable views, which the iteration overwrites in place:
+# (cell-center) values on every [`update_fluxes!`](@ref RRTMGP.update_fluxes!)
+# call: `interpolation = ArithmeticMean()` averages the adjacent layers on
+# interior faces and extrapolates linearly at the boundary faces. We collect
+# this, the parameters, and the insolation into one configuration shared by
+# every column in this tutorial. One call then builds the clear-sky solver
+# (downloading the RRTMGP lookup tables on first use) and solves the initial
+# state; its state is exposed as writable views, which the iteration overwrites
+# in place:
 
 setup = (; params, insolation..., interpolation = RRTMGP.ArithmeticMean())
 out = RRTMGP.solve(profile; setup...)
@@ -91,15 +92,16 @@ solver = out.solver;
 # ## Fixed relative humidity
 #
 # Manabe and Wetherald prescribed the relative-humidity profile
-# ``h(p) = 0.77\,(p/p_s - 0.02)/(1 - 0.02)``, so the specific humidity rises
-# and falls with the temperature (the water-vapor feedback in its simplest
-# form). The saturation vapor pressure ``e^*(T)`` comes from [Thermodynamics.jl](https://github.com/CliMA/Thermodynamics.jl),
-# which integrates the Clausius-Clapeyron relation under the Rankine-Kirchhoff
+# ``h(p) = 0.77\,(p/p_s - 0.02)/(1 - 0.02)``, so the specific humidity rises and
+# falls with the temperature (the water-vapor feedback in its simplest form).
+# The saturation vapor pressure ``e^*(T)`` comes from
+# [Thermodynamics.jl](https://github.com/CliMA/Thermodynamics.jl), which
+# integrates the Clausius-Clapeyron relation under the Rankine-Kirchhoff
 # (constant heat capacity) approximation [romps2021](@cite) used throughout the
-# CliMA model stack. From the vapor partial pressure
-# ``e = h\,e^*``, the water-vapor volume mixing ratio (moles of vapor per mole
-# of dry air, RRTMGP's convention) is ``e/(p - e)``. We floor it at the
-# stratospheric minimum Manabe used (a vmr of ≈ 4.8 × 10⁻⁶).
+# CliMA model stack. From the vapor partial pressure ``e = h\,e^*``, the
+# water-vapor volume mixing ratio (moles of vapor per mole of dry air, RRTMGP's
+# convention) is ``e/(p - e)``. We floor it at the stratospheric minimum Manabe
+# used (a vmr of ≈ 4.8 × 10⁻⁶).
 
 e_sat(T) = TD.saturation_vapor_pressure(td_params, T, TD.Liquid()) # [Pa]
 rel_hum(p, p_sfc) = max(0.77 * (p / p_sfc - 0.02) / (1 - 0.02), 0.0)
@@ -133,10 +135,9 @@ println("Dry adiabatic lapse rate g/cₚ = $(round(1000 * Γ_dry; digits = 1)) K
 # is assumed to instantaneously restore the critical profile
 # ``T(z) = T_s - Γ z``, anchored at a trial surface temperature ``T_s``. The
 # lapse rate is defined as a derivative with respect to height, yet no altitudes
-# are needed to apply it:
-# combining ``dT/dz = -Γ`` with hydrostatic balance and the ideal-gas law gives
-# ``dT/T = (Γ R_d / g)\, dp/p``, so in the solver's native pressure coordinate,
-# the critical profile is the power law
+# are needed to apply it: combining ``dT/dz = -Γ`` with hydrostatic balance and
+# the ideal-gas law gives ``dT/T = (Γ R_d / g)\, dp/p``, so in the solver's
+# native pressure coordinate, the critical profile is the power law
 # ```math
 # T_c(p) = T_s \left(\frac{p}{p_s}\right)^{Γ R_d / g},
 # ```
@@ -144,13 +145,13 @@ println("Dry adiabatic lapse rate g/cₚ = $(round(1000 * Γ_dry; digits = 1)) K
 # Layers warmer than ``T_c`` (the stratosphere) are left untouched, so the
 # tropopause emerges from the calculation.
 #
-# The convective adjustment warms the layers colder than ``T_c`` and leaves the surface
-# at the trial ``T_s``, so it adds energy to the column. To reach equilibrium, the
-# surface temperature is iteratively adjusted until the net radiative flux at
-# the top of the atmosphere vanishes. Each equilibration below computes the
-# radiative-convective state of a column at a **trial** ``T_s``, and the next
-# section varies that trial value until the budget closes and equilibrium is
-# reached.
+# The convective adjustment warms the layers colder than ``T_c`` and leaves the
+# surface at the trial ``T_s``, so it adds energy to the column. To reach
+# equilibrium, the surface temperature is iteratively adjusted until the net
+# radiative flux at the top of the atmosphere vanishes. Each equilibration below
+# computes the radiative-convective state of a column at a **trial** ``T_s``,
+# and the next section varies that trial value until the budget closes and
+# equilibrium is reached.
 
 const Γ_crit = 6.5e-3 # critical lapse rate [K/m]
 
@@ -179,8 +180,8 @@ end;
 # troposphere balances convective heating.
 #
 # One iteration serves every experiment: `convection = false` gives pure
-# radiative equilibrium, `humidity = false` holds the water vapor constant
-# (used below to remove water vapor, and to prescribe an absolute humidity
+# radiative equilibrium, `humidity = false` holds the water vapor constant (used
+# below to remove water vapor, and to prescribe an absolute humidity
 # distribution), and the `Γ` keyword changes the critical lapse rate. The
 # adjustment and humidity are synced before each solve, including on the final
 # step, so the reported fluxes match the temperatures.
@@ -239,8 +240,8 @@ function balanced_surface_temperature!(
     return T2
 end
 
-# We start from two guesses for the surface temperature to obtain
-# the radiative-convective equilibrium at present-day CO₂:
+# We start from two guesses for the surface temperature to obtain the
+# radiative-convective equilibrium at present-day CO₂:
 
 Ts_1x = balanced_surface_temperature!(solver, FT(285), FT(290))
 T_1x = copy(Array(RRTMGP.layer_temperature(solver)))
@@ -249,17 +250,17 @@ vmr_1x = copy(Array(RRTMGP.volume_mixing_ratio(solver, "h2o"))) # reference vapo
 println("Equilibrium Tₛ (1 × CO₂): $(round(Ts_1x; digits = 2)) K")
 
 # Closing the budget at the top of the atmosphere leaves a residual radiative
-# flux into the ground. That residual is the sensible and latent heat flux
-# that is implicit in the RCE calculation.
+# flux into the ground. That residual is the sensible and latent heat flux that
+# is implicit in the RCE calculation.
 
 sfc_convective_flux(solver) = -RRTMGP.net_flux(solver)[1, 1]
 println("Implied surface convective flux: $(round(sfc_convective_flux(solver); digits = 1)) W/m²")
 
-# The figures below mark a column's ground temperature with a dot at the
-# surface pressure, in the color of that column's curve. The center of the
-# lowest layer lies above the surface, so the horizontal offset between a dot
-# and the bottom of its curve is the temperature difference between the ground
-# and the air above it.
+# The figures below mark a column's ground temperature with a dot at the surface
+# pressure, in the color of that column's curve. The center of the lowest layer
+# lies above the surface, so the horizontal offset between a dot and the bottom
+# of its curve is the temperature difference between the ground and the air
+# above it.
 
 p_sfc_hPa = Array(RRTMGP.level_pressure(solver))[1, 1] / 100
 mark_ground!(ax, curve, T_sfc) = scatter!(ax, [T_sfc], [p_sfc_hPa]; color = curve.color, markersize = 9)
@@ -293,7 +294,7 @@ println("Implied surface convective flux (radiative): $(round(sfc_convective_flu
 # temperature decreases from the surface upward at two to three times the dry
 # adiabatic lapse rate, runs 45 K below the standard atmosphere through the
 # middle and upper troposphere, and forms no tropopause. The air at the bottom
-# face is several kelvin colder than the ground beneath it — the surface
+# face is several kelvin colder than the ground beneath it, the surface
 # discontinuity of radiative equilibrium. This radiative equilibrium state is
 # unstable to convection, and the turbulent heat fluxes that the convective
 # adjustment stands in for erase it.
@@ -330,11 +331,10 @@ fig
 # doubled CO₂ is the equilibrium climate sensitivity of the radiative-convective
 # column.
 
-# The reference tropopause, the highest layer on the convective profile,
-# lies just above 11 km. On that profile, height and temperature are
-# interchangeable, ``z = (T_s - T)/Γ``, so the height follows from the
-# temperature of the highest adjusted layer, again with no altitude
-# reconstruction:
+# The reference tropopause, the highest layer on the convective profile, lies
+# just above 11 km. On that profile, height and temperature are interchangeable,
+# ``z = (T_s - T)/Γ``, so the height follows from the temperature of the highest
+# adjusted layer, again with no altitude reconstruction:
 
 function tropopause_height(solver, T_sfc; Γ = Γ_crit)
     T = Array(RRTMGP.layer_temperature(solver))[:, 1]
@@ -346,11 +346,10 @@ end
 println("Tropopause height ≈ $(round(tropopause_height(solver, Ts_1x) / 1000; digits = 1)) km")
 
 # Now scale the CO₂ and re-balance. `balanced_co2` builds a fresh column with a
-# scaled CO₂ concentration, starts it from the 1 × CO₂ equilibrium, and
-# finds its balanced surface temperature. With `fixed_rh = false`, the water
-# vapor is frozen at its reference (1 × CO₂) values (**fixed absolute
-# humidity**) which removes the water-vapor feedback and isolates the direct
-# effect of CO₂.
+# scaled CO₂ concentration, starts it from the 1 × CO₂ equilibrium, and finds
+# its balanced surface temperature. With `fixed_rh = false`, the water vapor is
+# frozen at its reference (1 × CO₂) values (**fixed absolute humidity**) which
+# removes the water-vapor feedback and isolates the direct effect of CO₂.
 
 co2_1x = profile.well_mixed_vmr["co2"]
 
@@ -427,14 +426,14 @@ fig2
 # ## Sensitivity to the critical lapse rate
 #
 # The assumed critical lapse rate ``Γ_c`` shapes the equilibrium. Re-balancing
-# the reference column for lapse rates between 3.0 K/km and the dry adiabat
-# (9.8 K/km) shows that a shallower lapse rate cools the surface but lifts the
-# tropopause: the troposphere stretches vertically, because the gentler
-# gradient needs more depth to bridge the surface and stratospheric
-# temperatures. Each column is balanced, so each emits to space the sunlight it
-# absorbs; the three absorb within about 1 W/m² of each other, so they settle
-# on nearly the same outgoing longwave flux from temperature profiles whose
-# surface temperatures span 9 K.
+# the reference column for lapse rates between 3.0 K/km and the dry adiabat (9.8
+# K/km) shows that a shallower lapse rate cools the surface but lifts the
+# tropopause: the troposphere stretches vertically, because the gentler gradient
+# needs more depth to bridge the surface and stratospheric temperatures. Each
+# column is balanced, so each emits to space the sunlight it absorbs; the three
+# absorb within about 1 W/m² of each other, so they settle on nearly the same
+# outgoing longwave flux from temperature profiles whose surface temperatures
+# span 9 K.
 
 fig3 = Figure(size = (500, 500))
 ax3 = Axis(
@@ -501,12 +500,12 @@ end
 # the most: removing it reduces the surface temperature by 24 K, below the
 # freezing point. Carbon dioxide comes next, at a 17 K reduction. Ozone
 # contributes 4 K at the surface, but by absorbing solar ultraviolet radiation
-# it creates the stratospheric inversion. Without ozone, the inversion is
-# gone: the temperature decreases with height toward a nearly isothermal
-# ≈ 160 K at the top of the column. Without CO₂, the stratosphere runs
-# *warmer* than the reference: ozone still absorbs sunlight up there, but the
-# main emitter of thermal infrared is gone, so the stratosphere must warm
-# until the remaining gases radiate the heating away.
+# it creates the stratospheric inversion. Without ozone, the inversion is gone:
+# the temperature decreases with height toward a nearly isothermal ≈ 160 K at
+# the top of the column. Without CO₂, the stratosphere runs *warmer* than the
+# reference: ozone still absorbs sunlight up there, but the main emitter of
+# thermal infrared is gone, so the stratosphere must warm until the remaining
+# gases radiate the heating away.
 
 fig4 = Figure(size = (500, 500))
 ax4 = Axis(
@@ -532,6 +531,6 @@ fig4
 
 # ## Where to go from here
 #
-# - Vary the critical lapse rate or the relative-humidity profile and watch
-#   the sensitivity respond (cf. [kluft2021](@citet)).
+# - Vary the critical lapse rate or the relative-humidity profile and watch the
+#   sensitivity respond (cf. [kluft2021](@citet)).
 # - Swap `:midlatitude_summer` for `:tropical` or `:subarctic_winter`.

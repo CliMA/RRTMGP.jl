@@ -2,14 +2,14 @@
 
 RRTMGP.jl is a Julia implementation of the algorithms in the reference Fortran
 package [rte-rrtmgp](https://github.com/earth-system-radiation/rte-rrtmgp)
-[pincus2019](@cite). If you know the Fortran code (or the papers it
-implements), the tables below map its `mo_*` modules, `ty_*` derived types, and
-kernel subroutines to their RRTMGP.jl counterparts, with the papers whose
-equations each kernel implements.
+[pincus2019](@cite). If you know the Fortran code (or the papers it implements),
+the tables below map its `mo_*` modules, `ty_*` derived types, and kernel
+subroutines to their RRTMGP.jl counterparts, with the papers whose equations
+each kernel implements.
 
 Fortran names follow rte-rrtmgp v1.7; where a kernel was merged or renamed
-across Fortran versions, both names are given. The shared vocabulary is the
-same in both codes: `lay` for layer centers (`nlay`), `lev` for level faces
+across Fortran versions, both names are given. The shared vocabulary is the same
+in both codes: `lay` for layer centers (`nlay`), `lev` for level faces
 (`nlev = nlay + 1`), `gpt` for correlated-``k`` g-points, `bnd` for spectral
 bands, `sfc` for surface, and the radiative-transfer symbols ``τ`` (optical
 depth), ``ω₀``/`ssa` (single-scattering albedo), ``g`` (asymmetry parameter),
@@ -90,14 +90,14 @@ The Fortran gas-optics kernels live in
 
 ## RRTMGP.jl-only layers
 
-These represent Julia-specific additions; the closest analog is the example driver
+These are Julia-specific additions; the closest analog is the example driver
 programs (`examples/rfmip-clear-sky`, `examples/all-sky`), which each user of
-the Fortran code re-writes.
+the Fortran code rewrites.
 
 | RRTMGP.jl | Role |
 |:----------|:-----|
 | `RRTMGPSolver`, `update_fluxes!`, `prepare_atmosphere!`, the named getters | Layer-2 host convenience: construct once, drive the functional core each radiation step (see [The getter contract](@ref)) |
-| `standard_atmosphere`, `solve(profile)`, `RadiationOutput`, `solve_gray` | Layer-3 standalone front door (teaching, single-column experiments) |
+| `standard_atmosphere`, `solve(profile)`, `RadiationOutput`, `solve_gray` | Layer-3 standalone entry points (teaching, single-column experiments) |
 | `GrayAtmosphere` module and the gray optics kernels | analytic gray-atmosphere radiation [schneider2004](@cite), [frierson2006](@cite), [ogorman2008](@cite) |
 | `Numerics` module (`k_min`, `τ_thresh`, `resonance_window`, `μ₀_min`) | documented numerical guard constants (hard-coded literals in the Fortran kernels) |
 | `LookupBundle` caching via `save_lookup_tables` / `load_lookup_tables` | NetCDF-free lookup reuse |

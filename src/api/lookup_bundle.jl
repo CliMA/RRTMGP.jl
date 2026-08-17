@@ -92,7 +92,7 @@ later session can [`load_lookup_tables`](@ref) without NCDatasets (e.g., for
 standalone/classroom use of the spectral methods, or to skip the NetCDF read).
 Uses Julia's `Serialization` stdlib: the file is tied to the Julia version and
 package layout that wrote it and serves as a cache; the NetCDF artifacts remain
-the source of truth. Returns `path`.
+the authoritative data. Returns `path`.
 """
 function save_lookup_tables(path::AbstractString, lookups::LookupBundle)
     Serialization.serialize(path, Adapt.adapt(Array, lookups))

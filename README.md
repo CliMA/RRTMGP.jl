@@ -51,7 +51,7 @@ Pkg.add("RRTMGP")
 
 ### Basic Usage
 
-The standalone front door provides a quick start. A gray (single-band)
+The standalone entry points provide a quick start. A gray (single-band)
 atmosphere uses analytic formulas:
 
 ```julia
@@ -87,6 +87,10 @@ RRTMGP.update_fluxes!(solver)          # allocation-free, in place
 F = RRTMGP.net_flux(solver)            # (nlev, ncol) view into solver memory
 ```
 
+This snippet is schematic;
+[How to drive RRTMGP from a host model](https://clima.github.io/RRTMGP.jl/latest/howto/host_model/)
+shows the full construction, step by step.
+
 ## Key Features
 
 - **Full RRTMGP gas optics**: longwave and shortwave correlated-*k* lookup
@@ -94,16 +98,16 @@ F = RRTMGP.net_flux(solver)            # (nlev, ncol) view into solver memory
   aerosols, validated against the Fortran rte-rrtmgp reference fluxes.
 - **Gray radiation**: analytic single-band optics for idealized-climate and
   teaching use.
-- **Two-stream and no-scattering solvers** for both bands, with optional
-  per-band (spectrally resolved) flux output.
+- **Two-stream and no-scattering solvers** for the longwave and shortwave,
+  with optional per-band (spectrally resolved) flux output.
 - **CPU and GPU**: the same code runs single-threaded, multi-threaded, and on
   CUDA GPUs via [ClimaComms](https://github.com/CliMA/ClimaComms.jl).
 - **Zero-allocation driver**: `update_fluxes!` is allocation-free and
-  type-stable (asserted in CI with `@allocated` and JET), allowing it to run
-  fast within a climate simulation.
-- **Dual precision**: `Float32` and `Float64` throughout, with high accuracy
-  (~ 1e-3 W/m²) at `Float32` and an accuracy-ratchet test pinning the
-  `Float32`↔`Float64` flux differences.
+  type-stable, asserted in CI with `@allocated` and JET.
+- **Dual precision**: `Float32` and `Float64` throughout;
+  `Float32`↔`Float64` flux differences are of order 10⁻³ W/m² in the
+  longwave and 10⁻² W/m² in the shortwave, enforced by ratcheting CI
+  thresholds.
 
 ## Design
 
@@ -116,9 +120,9 @@ RRTMGP.jl is organized in three layers:
    workspaces; hosts exchange data through documented
    [getters](https://clima.github.io/RRTMGP.jl/latest/getters/) and drive it
    with `update_fluxes!`.
-3. **Standalone front door**: `solve_gray(FT)`, `standard_atmosphere(FT)`, and
-   `solve(profile)` for classroom use, single-column experiments, and quick
-   starts.
+3. **Standalone entry points**: `solve_gray(FT)`, `standard_atmosphere(FT)`,
+   and `solve(profile)` for classroom use, single-column experiments, and
+   quick starts.
 
 Readers coming from the Fortran implementation can use the
 [Fortran and paper concordance](https://clima.github.io/RRTMGP.jl/latest/concordance/)
@@ -128,6 +132,9 @@ to map names between the two code bases and the underlying papers.
 
 - **[Documentation home](https://clima.github.io/RRTMGP.jl/latest/)**: overview
   and page index.
+- **[Tutorials](https://clima.github.io/RRTMGP.jl/latest/tutorials/getting_started/)**:
+  a first radiation calculation, and Manabe's radiative-convective equilibrium
+  experiment as a single-column climate model.
 - **[Functional core](https://clima.github.io/RRTMGP.jl/latest/functional_core/)**:
   the solver kernels, with runnable gray and clear-sky examples.
 - **[Getter contract](https://clima.github.io/RRTMGP.jl/latest/getters/)**: the
@@ -159,7 +166,8 @@ guidance.
 
 ## Acknowledgments
 
-- [Robert Pincus](https://github.com/RobertPincus) for his invaluable help.
 - Robert Pincus, Eli Mlawer, and Jennifer Delamere, the developers of RTE+RRTMGP
   and its reference [Fortran implementation](https://github.com/earth-system-radiation/rte-rrtmgp),
   on which this code is based.
+- [Robert Pincus](https://github.com/RobertPincus) for his help and advice
+  during development.
