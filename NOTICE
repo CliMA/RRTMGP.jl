@@ -1,0 +1,20 @@
+RRTMGP.jl
+Copyright 2019-2026 California Institute of Technology and other contributors
+
+This product is developed by the Climate Modeling Alliance (CliMA),
+https://clima.caltech.edu/, and is licensed under the Apache License,
+Version 2.0 (see LICENSE).
+
+RRTMGP.jl is a Julia implementation of the algorithms of RTE+RRTMGP,
+https://github.com/earth-system-radiation/rte-rrtmgp, developed by
+Robert Pincus, Eli Mlawer, and Jennifer Delamere:
+
+  Copyright (c) 2015-2025, Atmospheric and Environmental Research,
+  Regents of the University of Colorado, and Trustees of Columbia
+  University in the City of New York. Distributed under the BSD 3-Clause
+  License.
+
+The gas, cloud, and aerosol lookup tables and the validation data are
+downloaded at run time from the rrtmgp-data repository,
+https://github.com/earth-system-radiation/rrtmgp-data, and are not
+distributed with this package.
