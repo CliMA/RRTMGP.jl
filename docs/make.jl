@@ -56,6 +56,7 @@ makedocs(;
             "Functional core" => "functional_core.md",
             "RTE" => "RTE.md",
             "Optics" => "Optics.md",
+            "Level interpolation" => "interpolation.md",
             "Float32 and Float64" => "precision.md",
             "Fortran and paper concordance" => "concordance.md",
         ],

@@ -7,15 +7,15 @@
 
 # Each scheme assumes a constant lapse rate ∂T/∂z = L between the two known points
 # (z₁, p₁, T₁) and (z₂, p₂, T₂), giving T(z) = T₁ + (T₂ - T₁) / (z₂ - z₁) * (z - z₁).
-# Pressure follows hydrostatic balance when T₁ == T₂ and an isentropic p ∝ T^B law
-# otherwise:
+# Pressure follows hydrostatic balance when T₁ == T₂ and the constant-lapse-rate
+# hydrostatic power law p ∝ T^B otherwise:
 #   p(z) = T₁ == T₂ ? p₁ * (p₂ / p₁)^((z - z₁) / (z₂ - z₁))
 #                   : p₁ * (p₂ / p₁)^(log(T(z) / T₁) / log(T₂ / T₁)).
 # UniformZ, UniformP, and GeometricMean are the midpoint-in-height,
 # midpoint-in-pressure, and z = z₁ + (z₂ - z₁) / (√(T₂/T₁) + 1) special cases that
 # avoid needing altitudes; ArithmeticMean takes the plain average of p and T. The
-# full derivation is a candidate for a docs Explanation page alongside the
-# "Functional core" page.
+# full derivation is on the "Level interpolation" docs page
+# (docs/src/interpolation.md).
 
 """
     AbstractInterpolation
@@ -33,7 +33,8 @@ Subtypes:
 - `UniformP`: assume the face lies midway in pressure between the layers.
 - `BestFit`: constant-lapse-rate fit using layer altitudes; requires `center_z` and `face_z`.
 
-The derivations are summarized in the comment block above.
+The derivations, and guidance on choosing a scheme, are on the
+"Level interpolation" docs page.
 """
 abstract type AbstractInterpolation end
 struct NoInterpolation <: AbstractInterpolation end
@@ -47,8 +48,8 @@ struct BestFit <: AbstractInterpolation end
 # isentropic process, p(z) = p⁺ * (T(z) / T⁺)^(cₚ / R), where (p⁺, T⁺) is the first
 # layer above the bottom face. UseSurfaceTempAtBottom sets T(z) = Tₛ (the surface
 # temperature); HydrostaticBottom uses the dry-adiabatic lapse rate, giving
-# T(z) = T⁺ + (g / cₚ) * (z⁺ - z). The full derivation is a candidate for a docs
-# Explanation page alongside the "Functional core" page.
+# T(z) = T⁺ + (g / cₚ) * (z⁺ - z). The full derivation is on the
+# "Level interpolation" docs page (docs/src/interpolation.md).
 
 """
     AbstractBottomExtrapolation

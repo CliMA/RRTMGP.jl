@@ -61,6 +61,7 @@ contract](getters.md), and standalone entry points (`solve_gray`,
   model.
 - **Explanation** (the concepts and the math): [the functional
   core](functional_core.md), the [RTE solvers](RTE.md), the [optics](Optics.md),
+  [level interpolation](interpolation.md),
   [Float32 and Float64](precision.md), and the [Fortran and paper
   concordance](concordance.md) for readers coming from rte-rrtmgp.
 - **Reference**: the [API](api.md), the [getter contract](getters.md), and

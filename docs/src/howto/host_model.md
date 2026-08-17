@@ -117,7 +117,9 @@ If your model provides level (face) pressures and temperatures directly, keep
 the default `interpolation = NoInterpolation()`. Otherwise pick an
 [`AbstractInterpolation`](@ref RRTMGP.AbstractInterpolation) and
 [`AbstractBottomExtrapolation`](@ref RRTMGP.AbstractBottomExtrapolation);
-z-based schemes need `center_z`/`face_z` at construction.
+z-based schemes need `center_z`/`face_z` at construction. The
+[Level interpolation](../interpolation.md) page derives the schemes and gives
+guidance on choosing one.
 
 ## 5. The radiation step
 
