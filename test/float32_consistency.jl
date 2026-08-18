@@ -71,8 +71,8 @@ function gray_consistency(; nlay = 60, ncol = 8)
     end
     o32, o64 = out
     return (;
-        lw_net = maxabsdiff(o32.lw_net, o64.lw_net),
-        sw_net = maxabsdiff(o32.sw_net, o64.sw_net),
+        lw_net = maxabsdiff(o32.lw_flux_net, o64.lw_flux_net),
+        sw_net = maxabsdiff(o32.sw_flux_net, o64.sw_flux_net),
         heating_rate = maxabsdiff(o32.heating_rate, o64.heating_rate),
     )
 end

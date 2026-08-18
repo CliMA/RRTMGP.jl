@@ -3,6 +3,41 @@ RRTMGP.jl Release Notes
 
 main
 ------
+- **Breaking (renames, with deprecations):** five getters were renamed for
+  consistency within their families. `clear_lw_flux` → `clear_lw_flux_net` and
+  `clear_sw_flux` → `clear_sw_flux_net`, matching `lw_flux_net` and
+  `sw_flux_net`. The three incident-flux getters now share one `toa_` prefix:
+  `toa_flux` → `toa_sw_flux_dn`, `top_of_atmosphere_lw_flux_dn` →
+  `toa_lw_flux_dn`, and `top_of_atmosphere_diffuse_sw_flux_dn` →
+  `toa_diffuse_sw_flux_dn` (the `SwBCs` field and the `solve`/`solve_gray`
+  keyword named `toa_flux` are unchanged). The old names still work and emit a
+  deprecation warning; they will be removed in the next breaking release.
+- **Breaking:** `RadiationOutput`'s fields now carry the same names as the
+  getters: `lw_flux_up`, `lw_flux_dn`, `lw_flux_net`, `sw_flux_up`,
+  `sw_flux_dn`, `sw_direct_flux_dn`, `sw_flux_net`, and `net_flux` (previously
+  `lw_up`, `lw_dn`, `lw_net`, `sw_up`, `sw_dn`, `sw_direct_dn`, `sw_net`, and
+  `net`), so one vocabulary covers both the standalone and the solver-driven
+  paths. `heating_rate` and `solver` are unchanged.
+- **The public API is now delimited.** `RRTMGP.PUBLIC_NAMES` lists it, and
+  `test/public_api.jl` locks the list from both sides: every listed name must
+  exist and carry a docstring, and no name may sit on the module's surface
+  without being listed or made internal. On Julia 1.11 and later the list is
+  also declared with `public`. A new "Versioning and API stability" section on
+  the API page states what the version promise covers (the listed names) and
+  what it does not (submodule internals, buffer layouts, `_`-prefixed names).
+  Four helpers that were reachable but undocumented became internal:
+  `get_artifact_path`, `aerosol_names_docs`, `gas_names_sw_docs`,
+  `update_views`, and the `AEROSOL_IDX` constant are now `_`-prefixed.
+  The interpolation scheme types and their extension points
+  (`interp!`, `extrap!`, `requires_z`, `uniform_z_p`, `best_fit_p`) gained
+  docstrings and an API-page reference section; they stay public because
+  ClimaAtmos uses them.
+- `validate_inputs` now reports the incident-solar-flux violation under the
+  getter name `toa_sw_flux_dn` rather than the storage field name.
+- ClimaAtmos downstream testing moved from GitHub Actions to Buildkite, which
+  triggers the `climaatmos-downstream` pipeline against the RRTMGP commit under
+  test (the GitHub job could not finish inside its time limit). ClimaCoupler
+  still runs on GitHub Actions.
 
 v0.22.3
 -------

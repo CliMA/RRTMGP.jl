@@ -18,6 +18,10 @@ end
     include("api_contract.jl")
 end
 
+@testset "Public API surface" begin
+    include("public_api.jl")
+end
+
 @testset "RRTMGP gray radiation tests" begin
     include("gray_atm.jl")
 end

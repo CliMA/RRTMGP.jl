@@ -17,27 +17,29 @@ using ClimaComms
 
 The result of a standalone radiation solve ([`solve`](@ref) or
 [`solve_gray`](@ref)): the broadband fluxes, the heating rate, and the
-underlying solver. The field names are stable, so teaching material written
-against them remains decoupled from the getter API. The flux fields are views into
-the solver's buffers; `heating_rate` is a freshly allocated array.
+underlying solver. The flux fields are views into the solver's buffers;
+`heating_rate` is a freshly allocated array.
 
 # Fields
-- `lw_up`, `lw_dn`, `lw_net`: longwave up/down/net flux [W/m²], `(nlev, ncol)`.
-- `sw_up`, `sw_dn`, `sw_direct_dn`, `sw_net`: shortwave up/down/direct-beam/net
-  flux [W/m²], `(nlev, ncol)`.
-- `net`: combined longwave + shortwave net flux [W/m²], `(nlev, ncol)`.
+The field names match the getters of the same name, so one vocabulary covers
+both the standalone and the solver-driven paths.
+- `lw_flux_up`, `lw_flux_dn`, `lw_flux_net`: longwave up/down/net flux [W/m²],
+  `(nlev, ncol)`.
+- `sw_flux_up`, `sw_flux_dn`, `sw_direct_flux_dn`, `sw_flux_net`: shortwave
+  up/down/direct-beam/net flux [W/m²], `(nlev, ncol)`.
+- `net_flux`: combined longwave + shortwave net flux [W/m²], `(nlev, ncol)`.
 - `heating_rate`: radiative heating rate [K/s], `(nlay, ncol)`.
 - `solver`: the `RRTMGPSolver`, for getter access and re-solves.
 """
 struct RadiationOutput{A, H, S}
-    lw_up::A
-    lw_dn::A
-    lw_net::A
-    sw_up::A
-    sw_dn::A
-    sw_direct_dn::A
-    sw_net::A
-    net::A
+    lw_flux_up::A
+    lw_flux_dn::A
+    lw_flux_net::A
+    sw_flux_up::A
+    sw_flux_dn::A
+    sw_direct_flux_dn::A
+    sw_flux_net::A
+    net_flux::A
     heating_rate::H
     solver::S
 end
@@ -154,7 +156,7 @@ the underlying solver.
 ```julia
 using RRTMGP
 out = RRTMGP.solve_gray(Float64; nlay = 60, ncol = 1)
-out.net          # net flux at each level [W/m²]
+out.net_flux     # net flux at each level [W/m²]
 out.heating_rate # heating rate at each layer [K/s]
 ```
 """
@@ -218,7 +220,7 @@ Solve the radiative-transfer problem for an [`AtmosphereProfile`](@ref) and retu
 using RRTMGP, NCDatasets
 profile = RRTMGP.standard_atmosphere(Float64; kind = :tropical)
 out = RRTMGP.solve(profile)
-out.net          # net flux at each level [W/m²]
+out.net_flux     # net flux at each level [W/m²]
 out.heating_rate # heating rate at each layer [K/s]
 ```
 

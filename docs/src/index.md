@@ -28,7 +28,7 @@ NCDatasets activates it:
 ```@example index
 using NCDatasets                                # activates the gas optics
 out = RRTMGP.solve(profile)                     # clear-sky correlated-k
-out.lw_up[end, 1]                                # OLR [W/m²]
+out.lw_flux_up[end, 1]                                # OLR [W/m²]
 ```
 
 ## Code structure

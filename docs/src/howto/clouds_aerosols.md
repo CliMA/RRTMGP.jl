@@ -169,7 +169,7 @@ With `AllSkyRadiationWithClearSkyDiagnostics`, the clear-sky counterparts of
 every flux getter (`clear_lw_flux_up`, `clear_sw_flux_dn`, `clear_net_flux`,
 …) hold the fluxes the same state would produce without clouds, so the cloud
 radiative effect is, for example,
-`RRTMGP.lw_flux_net(solver) .- RRTMGP.clear_lw_flux(solver)`. The sampled
+`RRTMGP.lw_flux_net(solver) .- RRTMGP.clear_lw_flux_net(solver)`. The sampled
 column cloud covers and the 550 nm aerosol optical depths are available
 through [`lw_cloud_cover`](@ref RRTMGP.lw_cloud_cover) /
 [`sw_cloud_cover`](@ref RRTMGP.sw_cloud_cover) and

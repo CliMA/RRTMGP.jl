@@ -20,8 +20,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        package:
-          - 'ClimaAtmos.jl'
+        package: # ClimaAtmos is excluded here because Buildkite is used to test it
           - 'ClimaCoupler.jl'
         version:
           - '1.10'

@@ -20,16 +20,16 @@ Adapt.adapt_storage(::CopyToArray, x::AbstractArray) = copy(x)
         out = RRTMGP.solve_gray(FT; nlay, ncol)
         @test out isa RRTMGP.RadiationOutput
         @test out.solver isa RRTMGP.RRTMGPSolver
-        @test eltype(Array(out.net)) == FT
-        @test size(Array(out.net)) == (nlay + 1, ncol)
+        @test eltype(Array(out.net_flux)) == FT
+        @test size(Array(out.net_flux)) == (nlay + 1, ncol)
         @test size(Array(out.heating_rate)) == (nlay, ncol)
-        for f in (out.lw_net, out.sw_net, out.net, out.heating_rate)
+        for f in (out.lw_flux_net, out.sw_flux_net, out.net_flux, out.heating_rate)
             @test all(isfinite, Array(f))
         end
         # net flux is the sum of the longwave and shortwave net fluxes
-        @test Array(out.net) ≈ Array(out.lw_net) .+ Array(out.sw_net)
+        @test Array(out.net_flux) ≈ Array(out.lw_flux_net) .+ Array(out.sw_flux_net)
         # the sun is up, so there is downwelling shortwave flux
-        @test maximum(Array(out.sw_dn)) > 0
+        @test maximum(Array(out.sw_flux_dn)) > 0
     end
 end
 
@@ -109,15 +109,15 @@ end
         prof = RRTMGP.standard_atmosphere(FT; nlay, ncol)
         out = RRTMGP.solve(prof; method = RRTMGP.GrayRadiation())
         @test out isa RRTMGP.RadiationOutput
-        @test eltype(Array(out.net)) == FT
-        @test size(Array(out.net)) == (nlay + 1, ncol)
+        @test eltype(Array(out.net_flux)) == FT
+        @test size(Array(out.net_flux)) == (nlay + 1, ncol)
         @test size(Array(out.heating_rate)) == (nlay, ncol)
-        for f in (out.lw_up, out.lw_dn, out.sw_up, out.sw_dn, out.net)
+        for f in (out.lw_flux_up, out.lw_flux_dn, out.sw_flux_up, out.sw_flux_dn, out.net_flux)
             @test all(isfinite, Array(f))
         end
-        @test Array(out.net) ≈ Array(out.lw_net) .+ Array(out.sw_net)
+        @test Array(out.net_flux) ≈ Array(out.lw_flux_net) .+ Array(out.sw_flux_net)
         # OLR is positive and bounded by σT⁴ of the warmest layer
-        @test 0 < Array(out.lw_up)[end, 1] < 600
+        @test 0 < Array(out.lw_flux_up)[end, 1] < 600
         # the profile is not aliased by the solve (arrays stay host-side, unclipped)
         @test prof.p_lay isa Array
     end
@@ -149,12 +149,12 @@ end
         )
         out, out_ibl = solve_ibl(false), solve_ibl(true)
         for o in (out, out_ibl)
-            @test size(Array(o.net)) == (nlay + 1, ncol)
+            @test size(Array(o.net_flux)) == (nlay + 1, ncol)
             @test size(Array(o.heating_rate)) == (nlay, ncol)
-            @test all(isfinite, Array(o.net))
+            @test all(isfinite, Array(o.net_flux))
         end
-        @test all(iszero, Array(out.lw_dn)[end, :])
-        @test all(>(0), Array(out_ibl.lw_dn)[end, :])
+        @test all(iszero, Array(out.lw_flux_dn)[end, :])
+        @test all(>(0), Array(out_ibl.lw_flux_dn)[end, :])
         # the top layer no longer radiates to space on both sides
         @test all(
             abs.(Array(out_ibl.heating_rate)[end, :]) .<
