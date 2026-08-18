@@ -20,8 +20,8 @@ the solver's own buffer**, following one invariant:
   surface/column quantities are `(ncol,)` (except the spectral surface
   properties like emissivity and albedos, which are `(nbnd, ncol)`).
 - **Domain-masked.** When the solver carries an internal isothermal boundary
-  layer (`isothermal_boundary_layer = true`), the getters exclude that extra
-  top layer/level, so the returned arrays are sized to the physical domain
+  layer (`isothermal_boundary_layer = true`), the getters exclude that extra top
+  layer/level, so the returned arrays are sized to the physical domain
   (`domain_nlay` / `domain_nlay + 1`) and line up with the host's grid. The
   getter returns a concrete `view` type, keeping [`update_fluxes!`](@ref
   RRTMGP.update_fluxes!) type-stable.
@@ -49,28 +49,27 @@ Inputs are written *before* the solve, outputs read *after* it:
 ᶜT .= my_temperatures
 RRTMGP.update_fluxes!(solver, seed)             # runs the radiation update
 
-F = RRTMGP.net_flux(solver)                      # (nlev, ncol) view of the result
+F = RRTMGP.net_flux(solver)            # (nlev, ncol) view of the result
 ```
 
 With ClimaCore, this forms the bridge: `array2field(getter(solver), space)`
-wraps a getter's view as a `Field` — for an input, writes flow into the solver's
-buffer; for an output, the `Field` reads the buffer in place — and
+wraps a getter's view as a `Field` (for an input, writes flow into the solver's
+buffer; for an output, the `Field` reads the buffer in place), and
 `field2array(dst) .= getter(solver)` copies an output into an existing
 destination field. Both directions are copy-free: the getters are single-level
 views of plain `(nlev, ncol)` buffers, so `array2field`'s lazy `reshape` wraps
 them without materializing anything. Do **not** `copy(getter(solver))` before
-wrapping — the view is directly wrappable, and copying allocates a full
+wrapping: the view is directly wrappable, and copying allocates a full
 `(nlev, ncol)` field on every call (reading many fluxes per step this way adds
 up to large per-step allocations). Likewise avoid `parent(getter(solver))` as a
 shortcut: `parent` returns the full boundary-extended buffer, undoing the domain
-masking.
-On the GPU, the returned views are plain `SubArray`s of device arrays; to
-bring one to the CPU, use `Array(getter(solver))` (or the element-wise `.=`
+masking. On the GPU, the returned views are plain `SubArray`s of device arrays;
+to bring one to the CPU, use `Array(getter(solver))` (or the element-wise `.=`
 copy above). One subtlety: the solver's compute buffers are indexed
 column-first, `(ncol, nlev)` (with the physical layout chosen per device for
-performance), and `update_fluxes!` ends by copying them into the
-`(nlev, ncol)` presentation arrays the flux getters expose — so read fluxes
-after `update_fluxes!`, not between manual Layer-1 solves.
+performance), and `update_fluxes!` ends by copying them into the `(nlev, ncol)`
+presentation arrays the flux getters expose; read fluxes after `update_fluxes!`,
+not between manual Layer-1 solves.
 
 ## Responsibilities: what the host provides vs what RRTMGP derives
 
@@ -86,8 +85,8 @@ The host **writes** the inputs through the getters before calling
 
 RRTMGP **derives** the rest inside `update_fluxes!`: the optional preparation
 cascade (level values from centers, the isothermal boundary layer, input
-clipping, and the dry-air column amount via `compute_col_gas!`), then the
-optics and RTE solve, then the net-flux combine.
+clipping, and the dry-air column amount via `compute_col_gas!`), then the optics
+and RTE solve, then the net-flux combine.
 
 Two things are **deliberately the host's job**:
 
@@ -98,11 +97,11 @@ Two things are **deliberately the host's job**:
 
 ## Getter reference
 
-Getters marked with a link have full docstrings; the rest follow the contract
-above. All vertical/layer getters are domain-masked views into solver-owned
-buffers.
+Every getter has a docstring for REPL help; the tables below give the
+overview, and the contract above supplies the shared rules. All vertical/layer
+getters are domain-masked views into solver-owned buffers.
 
-### Layer-center state — inputs, `(nlay, ncol)`
+### Layer-center state: inputs, `(nlay, ncol)`
 
 | Getter | Quantity |
 |---|---|
@@ -110,14 +109,14 @@ buffers.
 | `layer_temperature` | layer-center temperature [K] |
 | `layer_relative_humidity` | layer-center relative humidity |
 
-### Level (face) state — inputs, `(nlev, ncol)`
+### Level (face) state: inputs, `(nlev, ncol)`
 
 | Getter | Quantity |
 |---|---|
 | `level_pressure` | level pressure [Pa] |
 | `level_temperature` | level temperature [K] |
 
-### Surface and top-of-atmosphere — inputs
+### Surface and top-of-atmosphere: inputs
 
 | Getter | Quantity | Shape |
 |---|---|---|
@@ -130,7 +129,7 @@ buffers.
 | `top_of_atmosphere_lw_flux_dn` | prescribed incident longwave flux [W/m²] | `(ngpt, ncol)`, or `nothing` |
 | `top_of_atmosphere_diffuse_sw_flux_dn` | prescribed incident diffuse shortwave flux [W/m²] | `(ngpt, ncol)`, or `nothing` |
 
-### Fluxes — outputs, `(nlev, ncol)` [W/m²]
+### Fluxes: outputs, `(nlev, ncol)` [W/m²]
 
 | Getter | Quantity |
 |---|---|
@@ -168,3 +167,51 @@ mirror these: `clear_lw_flux_up`/`clear_lw_flux_dn`/`clear_lw_flux`,
 | [`radiation_method`](@ref RRTMGP.radiation_method) | the solver's radiation method |
 | `isothermal_boundary_layer` | whether the internal boundary layer is present |
 | `optical_thickness_parameter` | gray optical-thickness parameters, or `nothing` (non-gray) |
+
+## Docstrings
+
+```@docs
+RRTMGP.layer_pressure
+RRTMGP.layer_temperature
+RRTMGP.layer_relative_humidity
+RRTMGP.level_pressure
+RRTMGP.level_temperature
+RRTMGP.surface_temperature
+RRTMGP.surface_emissivity
+RRTMGP.latitude
+RRTMGP.cos_zenith
+RRTMGP.toa_flux
+RRTMGP.direct_sw_surface_albedo
+RRTMGP.diffuse_sw_surface_albedo
+RRTMGP.top_of_atmosphere_lw_flux_dn
+RRTMGP.top_of_atmosphere_diffuse_sw_flux_dn
+RRTMGP.lw_flux_up
+RRTMGP.lw_flux_dn
+RRTMGP.lw_flux_net
+RRTMGP.sw_flux_up
+RRTMGP.sw_flux_dn
+RRTMGP.sw_flux_net
+RRTMGP.sw_direct_flux_dn
+RRTMGP.net_flux
+RRTMGP.clear_lw_flux_up
+RRTMGP.clear_lw_flux_dn
+RRTMGP.clear_lw_flux
+RRTMGP.clear_sw_flux_up
+RRTMGP.clear_sw_flux_dn
+RRTMGP.clear_sw_direct_flux_dn
+RRTMGP.clear_sw_flux
+RRTMGP.clear_net_flux
+RRTMGP.cloud_liquid_effective_radius
+RRTMGP.cloud_ice_effective_radius
+RRTMGP.cloud_liquid_water_path
+RRTMGP.cloud_ice_water_path
+RRTMGP.cloud_fraction
+RRTMGP.lw_cloud_cover
+RRTMGP.sw_cloud_cover
+RRTMGP.aod_sw_extinction
+RRTMGP.aod_sw_scattering
+RRTMGP.center_z
+RRTMGP.face_z
+RRTMGP.deep_atmosphere_inverse_scaling
+RRTMGP.isothermal_boundary_layer
+```

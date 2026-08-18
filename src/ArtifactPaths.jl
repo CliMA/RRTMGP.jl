@@ -11,21 +11,24 @@ export get_lookup_filename, get_input_filename
 Generate the file names for lookup table files, for a given optics type, for the
 shortwave and longwave solvers.
 
-- `:gas`, `:cloud` and `:aerosol` optics types are supported for the longwave and shortwave solvers. 
-  - The `:gas` option provides the file that is used to load either the `LookUpLW` or `LookUpSW` struct in `LookUpTables.jl`.
-  - The `:cloud` option provides the file that is used to load the `LookUpCld` struct in `LookUpTables.jl`.
-  - The `:aerosol` option provides the file that is used to load the `LookUpAerosolMerra` struct in `LookUpTables.jl`.
+- `:gas`, `:cloud` and `:aerosol` optics types are supported for the longwave and
+  shortwave solvers.
+  - The `:gas` option provides the file that is used to load either the `LookUpLW` or
+    `LookUpSW` struct in `LookUpTables.jl`.
+  - The `:cloud` option provides the file that is used to load the `LookUpCld` struct
+    in `LookUpTables.jl`.
+  - The `:aerosol` option provides the file that is used to load the
+    `LookUpAerosolMerra` struct in `LookUpTables.jl`.
 - `:lw` (longwave) and `:sw` (shortwave) wavelength types are supported.
 
-These artifacts are obtained from "Pincus, R., Mlawer, E. J., Delamere, J., Iacono, M. J., & Pernak, R. (2023). RRTMGP data (Version 1.7) [Data set]. https://github.com/earth-system-radiation/rrtmgp-data" 
-
-The file "rrtmgp-sw-inputs-aerosol-optics.nc" overrides the lookup table available from the artifacts. This table corrects an error in the array ordering for the aerosol optics lookup table for the shortwave sea-salt data (‘aero_salt_tbl’). This file is provided by Michael Iacono at Atmospheric and Environmental Research, via personal communication. This file is expected to replace the currently existing lookup table in the `rrtmgp-data` repository in their next public release.
+These artifacts are obtained from "Pincus, R., Mlawer, E. J., Delamere, J., Iacono,
+M. J., & Pernak, R. (2023). RRTMGP data (Version 1.9) [Data set].
+https://github.com/earth-system-radiation/rrtmgp-data"
 """
 function get_lookup_filename(optics_type::Symbol, λ::Symbol)
     @assert optics_type ∈ (:gas, :cloud, :aerosol)
     @assert λ ∈ (:lw, :sw)
     basedir = get_artifact_path()
-    currdir = @__DIR__
     config = (optics_type, λ)
 
     config == (:gas, :lw) && return joinpath(basedir, "rrtmgp-gas-lw-g256.nc")
@@ -45,19 +48,24 @@ end
 """
     get_input_filename(problemtype::Symbol, λ::Symbol)
 
-Generate the file names for input files for tests, for a given problem type and wavelength type.
+Generate the file names for input files for tests, for a given problem type and
+wavelength type.
 `:gas`, and `:gas_clouds` and `:gas_clouds_aerosols` problem types are supported.
 `:lw` (longwave) and `:sw` (shortwave) wavelength types are supported.
 
-This file provides data for loading the `AtmosphericState` struct, the provides the atmospheric conditions for computing optical properties.
+This file provides data for loading the `AtmosphericState` struct, which provides the
+atmospheric conditions for computing optical properties.
 
 - The `:gas` option is used for the `clear sky` test.
 - The `:gas_clouds` option is used for the `all sky` test.
 - The `:gas_clouds_aerosols` option is used for the `all sky with aerosols` test.
 
-While these are primarily intended for the tests, some of this input data is also used in `ClimaAtmos.jl` and is therefore provided here for users' convenience.
+While these are primarily intended for the tests, some of this input data is also used
+in `ClimaAtmos.jl` and is therefore provided here for users' convenience.
 
-These artifacts are obtained from "Pincus, R., Mlawer, E. J., Delamere, J., Iacono, M. J., & Pernak, R. (2023). RRTMGP data (Version 1.7) [Data set]. https://github.com/earth-system-radiation/rrtmgp-data" 
+These artifacts are obtained from "Pincus, R., Mlawer, E. J., Delamere, J., Iacono,
+M. J., & Pernak, R. (2023). RRTMGP data (Version 1.9) [Data set].
+https://github.com/earth-system-radiation/rrtmgp-data"
 """
 function get_input_filename(problemtype::Symbol, λ::Symbol)
     @assert problemtype ∈ (:gas, :gas_clouds, :gas_clouds_aerosols)

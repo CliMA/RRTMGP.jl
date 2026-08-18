@@ -4,6 +4,13 @@ RRTMGP.jl Release Notes
 main
 ------
 
+v0.22.3
+-------
+- Documentation cleanup and additions, including new how-to guides for interpolation and clouds/aerosols.
+- Added isothermal layer option in standalone runs and RCE calculations to remove noise.
+- RCE corrections.
+- Added NOTICE file.
+
 v0.22.2
 -------
 - New **`set_volume_mixing_ratio!(solver, name, value)`**, the write counterpart

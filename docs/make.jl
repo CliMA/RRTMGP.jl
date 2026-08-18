@@ -46,6 +46,7 @@ makedocs(;
         ],
         "How-to guides" => Any[
             "Drive RRTMGP from a host model" => "howto/host_model.md",
+            "Add clouds and aerosols" => "howto/clouds_aerosols.md",
             "Run on GPUs" => "howto/gpu.md",
             "Cache the lookup tables" => "howto/lookup_cache.md",
             "Get per-band (spectral) fluxes" => "howto/spectral_fluxes.md",
@@ -55,6 +56,7 @@ makedocs(;
             "Functional core" => "functional_core.md",
             "RTE" => "RTE.md",
             "Optics" => "Optics.md",
+            "Level interpolation" => "interpolation.md",
             "Float32 and Float64" => "precision.md",
             "Fortran and paper concordance" => "concordance.md",
         ],

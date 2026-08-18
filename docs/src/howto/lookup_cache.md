@@ -15,7 +15,8 @@ solver (and to every [`solve`](@ref RRTMGP.solve) call):
 using RRTMGP, NCDatasets
 
 lookups = RRTMGP.lookup_tables(grid_params, method)
-solver_a = RRTMGP.RRTMGPSolver(grid_params, method, params, bcs_lw, bcs_sw, as_a; lookups)
+solver_a = RRTMGP.RRTMGPSolver(grid_params, method, params, bcs_lw, bcs_sw,
+                               as_a; lookups)
 out = RRTMGP.solve(profile; lookups)
 ```
 
@@ -40,4 +41,4 @@ out = RRTMGP.solve(profile; lookups)
 !!! warning "A cache, not an interchange format"
     The file uses Julia's `Serialization` stdlib and is tied to the Julia
     version and package layout that wrote it. Regenerate it when environments
-    change; the NetCDF artifacts remain the source of truth.
+    change; the NetCDF artifacts remain the authoritative data.

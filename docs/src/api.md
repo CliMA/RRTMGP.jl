@@ -1,9 +1,10 @@
 # API
 
-RRTMGP has an API for creating various types of solvers, and accessing data
-passed to it. Hosts read and write a solver's data through named getters; their
-uniform layout/domain-masking/writability contract (the RRTMGP–ClimaCore
-decoupling mechanism) is spelled out under [The getter contract](@ref).
+This page lists the public API: the radiation methods, the solver and its
+constructors, the flux update, and the named getters through which hosts read
+and write a solver's data. The getters' layout, domain-masking, and writability
+contract (the mechanism that decouples RRTMGP from ClimaCore) is spelled out
+under [The getter contract](@ref).
 
 ```@meta
 CurrentModule = RRTMGP
@@ -70,15 +71,20 @@ RRTMGP.Numerics.μ₀_min
 RRTMGP.Numerics.pow_fast
 ```
 
-## Spectrally-resolved fluxes
+## Spectrally resolved fluxes
 
-Optional per-band fluxes, enabled with `spectral_fluxes = true` when constructing the
-[`RRTMGPSolver`](@ref RRTMGP.RRTMGPSolver). The [`spectral_lw_flux_up`](@ref
-RRTMGP.spectral_lw_flux_up) docstring covers the full `spectral_{lw,sw}_flux_{up,dn,net}`
-family.
+Optional per-band fluxes, enabled with `spectral_fluxes = true` when
+constructing the [`RRTMGPSolver`](@ref RRTMGP.RRTMGPSolver). Summing a getter
+over its band dimension recovers the corresponding broadband flux; see
+[Get per-band (spectral) fluxes](howto/spectral_fluxes.md).
 
 ```@docs
 RRTMGP.spectral_lw_flux_up
+RRTMGP.spectral_lw_flux_dn
+RRTMGP.spectral_lw_flux_net
+RRTMGP.spectral_sw_flux_up
+RRTMGP.spectral_sw_flux_dn
+RRTMGP.spectral_sw_flux_net
 RRTMGP.lw_band_bounds
 RRTMGP.sw_band_bounds
 RRTMGP.Fluxes.FluxBand

@@ -42,6 +42,26 @@ struct RadiationOutput{A, H, S}
     solver::S
 end
 
+# Copy a `(m, ncol)` profile array into a host array with `n ≥ m` rows, so it
+# fits RRTMGP's boundary-extended internal arrays. The added rows repeat the top
+# domain row, or continue its spacing when `extrapolate` (altitudes, which
+# nothing else fills in). The row-by-row fill runs on the host (`Array(x)`
+# brings a device-resident profile over first), so no device array is indexed
+# here; the caller moves the result to the device once. This runs at
+# construction.
+function _pad_top(x, n, ncol; extrapolate::Bool)
+    y_domain = Array(x) # host copy: profiles are reused, so never alias
+    m = size(y_domain, 1)
+    m == n && return y_domain
+    y = Array{eltype(y_domain)}(undef, n, ncol)
+    @views y[1:m, :] .= y_domain
+    for k in (m + 1):n
+        @views y[k, :] .=
+            extrapolate ? (2 .* y[k - 1, :] .- y[k - 2, :]) : y[m, :]
+    end
+    return y
+end
+
 _radiation_output(solver::RRTMGPSolver) = RadiationOutput(
     lw_flux_up(solver),
     lw_flux_dn(solver),
@@ -226,6 +246,11 @@ tables, so load NCDatasets first or pass cached `lookups`) or `GrayRadiation()` 
   temperatures and wants the faces kept consistent automatically.
 - `bottom_extrapolation = SameAsInterpolation()`: scheme for the bottom face
   (see [`AbstractBottomExtrapolation`](@ref)).
+- `isothermal_boundary_layer = false`: extend the column above the profile with
+  one isothermal layer reaching the lookup tables' minimum pressure (zero
+  pressure for `GrayRadiation`), so the radiation sees the mass above the
+  profile's top instead of truncating there (see [`RRTMGPGridParams`](@ref)).
+  The returned fluxes and heating rates stay on the profile's own grid.
 """
 function solve(
     profile::AtmosphereProfile;
@@ -242,14 +267,22 @@ function solve(
     ),
     interpolation::AbstractInterpolation = NoInterpolation(),
     bottom_extrapolation::AbstractBottomExtrapolation = SameAsInterpolation(),
+    isothermal_boundary_layer::Bool = false,
 )
     FT = eltype(profile.p_lay)
-    (nlay, ncol) = size(profile.p_lay)
+    (domain_nlay, ncol) = size(profile.p_lay)
     device = ClimaComms.device(context)
     DA = ClimaComms.array_type(device)
     # Copy (never alias) the profile's host arrays: the solve mutates its state
     # in place (clipping, column amounts), and the profile should stay reusable.
     dev(x) = DA{FT}(copy(x))
+    # With an isothermal boundary layer, RRTMGP's internal arrays carry one extra
+    # layer and level above the domain. `add_isothermal_boundary_layer!` refills
+    # them from the top of the domain on every solve, so the padding below only
+    # has to leave the arrays defined; `z_lev` is the exception, since nothing
+    # refills it, and it keeps the spacing of the topmost domain level.
+    pad(x, n) = DA{FT}(_pad_top(x, n, ncol; extrapolate = false))
+    pad_z(x, n) = DA{FT}(_pad_top(x, n, ncol; extrapolate = true))
 
     method isa Union{GrayRadiation, ClearSkyRadiation} || error(
         "`solve(profile)` supports `GrayRadiation` and `ClearSkyRadiation`; \
@@ -261,7 +294,15 @@ function solve(
          `ClearSkyRadiation(false)` or construct an `RRTMGPSolver` directly.",
     )
 
-    grid_params = RRTMGPGridParams(FT; context, domain_nlay = nlay, ncol)
+    grid_params = RRTMGPGridParams(
+        FT;
+        context,
+        domain_nlay,
+        ncol,
+        isothermal_boundary_layer,
+    )
+    nlay = grid_params.nlay # total layer count, boundary layer included
+    nlev = nlay + 1
     if isnothing(lookups)
         _check_lookup_support(method)
         lookups = lookup_tables(grid_params, method)
@@ -270,11 +311,11 @@ function solve(
     as = if method isa GrayRadiation
         AtmosphericStates.GrayAtmosphericState(
             dev(profile.lat),
-            dev(profile.p_lay),
-            dev(profile.p_lev),
-            dev(profile.t_lay),
-            dev(profile.t_lev),
-            dev(profile.z_lev),
+            pad(profile.p_lay, nlay),
+            pad(profile.p_lev, nlev),
+            pad(profile.t_lay, nlay),
+            pad(profile.t_lev, nlev),
+            pad_z(profile.z_lev, nlev),
             dev(profile.t_sfc),
             optical_thickness,
         )
@@ -293,24 +334,24 @@ function solve(
             vmr_wm[idx_gases[gas]] = FT(val)
         end
         vmr = VolumeMixingRatios.VmrGM(
-            dev(profile.vmr_h2o),
-            dev(profile.vmr_o3),
+            pad(profile.vmr_h2o, nlay),
+            pad(profile.vmr_o3, nlay),
             DA{FT}(vmr_wm),
         )
         # Row 1 (col_dry) is computed by `prepare_atmosphere!` inside
         # `update_fluxes!`; row 4 (rel_hum) feeds only aerosol optics, which
         # this path rejects above.
         layerdata = zeros(FT, 4, nlay, ncol)
-        layerdata[2, :, :] .= profile.p_lay
-        layerdata[3, :, :] .= profile.t_lay
+        layerdata[2, 1:domain_nlay, :] .= profile.p_lay
+        layerdata[3, 1:domain_nlay, :] .= profile.t_lay
         # `lon` is unused by RRTMGP but must match `lat`'s type; `lat` enables
         # latitude-dependent gravity in the column-amount computation.
         AtmosphericStates.AtmosphericState(
             dev(zeros(FT, ncol)),
             dev(profile.lat),
             DA{FT}(layerdata),
-            dev(profile.p_lev),
-            dev(profile.t_lev),
+            pad(profile.p_lev, nlev),
+            pad(profile.t_lev, nlev),
             dev(profile.t_sfc),
             vmr,
             nothing,

@@ -22,13 +22,14 @@ reads
 I_\lambda(\Omega')\, d\Omega',
 ```
 where ``B_\lambda(T)`` is the Planck function at the local temperature,
-``\omega_{0,\lambda}`` is the single-scattering albedo — the fraction of the
-extinction due to scattering — and ``P_\lambda(\Omega', \Omega)`` is the phase
+``\omega_{0,\lambda}`` is the single-scattering albedo (the fraction of the
+extinction due to scattering), and ``P_\lambda(\Omega', \Omega)`` is the phase
 function, the probability of scattering from direction ``\Omega'`` into
 ``\Omega``. The emission term ``B_\lambda`` follows from Kirchhoff's law under
-local thermodynamic equilibrium (absorptivity = emissivity at every
-wavelength), which is assumed to hold throughout the atmosphere RRTMGP models. The scattering integral couples all directions, which is what makes
-the general equation expensive; in the atmosphere, it matters for clouds and
+local thermodynamic equilibrium (absorptivity = emissivity at every wavelength),
+which is assumed to hold throughout the atmosphere RRTMGP models. The scattering
+integral couples all directions, which is what makes the general equation
+computationally demanding; in the atmosphere, scattering matters for clouds and
 aerosols in both the longwave and shortwave and for Rayleigh scattering in the
 shortwave. The two-stream approximation below reduces the angular coupling to
 two hemispheric fluxes.
@@ -43,12 +44,12 @@ with ``\tau_\lambda`` now the absorption optical depth.
 
 ## Two-stream approximation
 
-Resolving the full angular dependence of ``I_\lambda`` is too costly for a
+Resolving the full angular dependence of ``I_\lambda`` is impractical in a
 climate model, so the flux calculation collapses the radiation field into an
 upward flux ``F_\lambda^\uparrow`` and a downward flux ``F_\lambda^\downarrow``.
-In the plane-parallel column, the vertical optical depth ``\widehat{\tau}_\lambda``
-increases downward from zero at the top of the atmosphere. Neglecting
-scattering, the two streams obey
+In the plane-parallel column, the vertical optical depth
+``\widehat{\tau}_\lambda`` increases downward from zero at the top of the
+atmosphere. Neglecting scattering, the two streams obey
 ```math
 \frac{dF_\lambda^\uparrow}{d\widehat{\tau}_\lambda} = D\,(F_\lambda^\uparrow - \pi B_\lambda),
 \qquad
@@ -63,16 +64,16 @@ scattering albedo, and asymmetry parameter following [meador1980](@citet).
 
 ## Angular discretization
 
-The longwave no-scattering solver does better than a single diffusivity angle:
-it integrates the Schwarzschild equation along a small set of discrete zenith
+The longwave no-scattering solver improves on the single diffusivity angle: it
+integrates the Schwarzschild equation along a small set of discrete zenith
 angles and sums the results with Gauss quadrature weights, so the hemispheric
 flux is ``F_\lambda = \sum_i w_i\, I_\lambda(\mu_i)``. RRTMGP uses the
 Gauss-Jacobi-5 nodes of [hogan2024](@citet) with one to four angles
-([`AngularDiscretization`](@ref RRTMGP.AngularDiscretizations.AngularDiscretization)).
-The default single angle has secant ``D \approx 1.64``, close to Elsasser's
-classic diffusivity factor of ``1.66``, which the two-stream longwave solver
-adopts following [fu1997](@citet); adding angles improves the accuracy of the
-angular integral.
+([`AngularDiscretization`](@ref
+RRTMGP.AngularDiscretizations.AngularDiscretization)). The default single angle
+has secant ``D \approx 1.64``, close to Elsasser's classic diffusivity factor of
+``1.66``, which the two-stream longwave solver adopts following
+[fu1997](@citet); adding angles improves the accuracy of the angular integral.
 
 ## Radiative heating rate
 
@@ -83,8 +84,8 @@ net flux converges and cools where it diverges:
 \rho\, c_p \frac{\partial T}{\partial t} = -\frac{dF^{\mathrm{net}}}{dz}.
 ```
 Because the temperature tendency scales as ``1/\rho``, a given flux divergence
-warms thin, high-altitude air far more than dense air near the surface — one
-reason ozone's shortwave absorption heats the stratosphere so effectively.
+warms thin, high-altitude air more than dense air near the surface; this is one
+reason ozone's shortwave absorption heats the stratosphere effectively.
 [`heating_rate`](@ref RRTMGP.heating_rate) returns ``\partial T/\partial t`` in
 K/s.
 
@@ -127,12 +128,11 @@ from the top-of-atmosphere boundary condition, computing the downwelling flux
 F_i^{\downarrow} = \beta_i \left(T_i F_{i+1}^{\downarrow} + R_i G_i +
 S_i^{-}\right) + F_{i,\mathrm{dir}}^{\downarrow},
 ```
-where the last term is the direct solar beam, attenuated by Beer's law, and
-from it the upwelling flux ``F_i^{\uparrow} = \alpha_i F_i^{\downarrow} +
-G_i``. The result is the discrete counterpart of the integral solution of the
-transfer equation: the flux at each level accumulates every layer's emission,
-transmitted and reflected through the layers between the emitting layer and
-that level.
+where the last term is the direct solar beam, attenuated by Beer's law, and from
+it the upwelling flux ``F_i^{\uparrow} = \alpha_i F_i^{\downarrow} + G_i``. The
+result is the discrete counterpart of the integral solution of the transfer
+equation: the flux at each level accumulates every layer's emission, transmitted
+and reflected through the layers between the emitting layer and that level.
 
 ## No-scattering and two-stream solvers
 
@@ -150,11 +150,11 @@ scattering:
   is not negligible: clouds and aerosols in both bands, and Rayleigh scattering
   in the shortwave.
 
-Both families exist for the longwave and the shortwave
-([`NoScatLWRTE`](@ref RRTMGP.RTE.NoScatLWRTE) / [`TwoStreamLWRTE`](@ref RRTMGP.RTE.TwoStreamLWRTE)
-and [`NoScatSWRTE`](@ref RRTMGP.RTE.NoScatSWRTE) / [`TwoStreamSWRTE`](@ref RRTMGP.RTE.TwoStreamSWRTE)),
-and [`solve_lw!`](@ref RRTMGP.RTESolver.solve_lw!) / [`solve_sw!`](@ref RRTMGP.RTESolver.solve_sw!)
-dispatch on the workspace type.
+Both families exist for the longwave and the shortwave ([`NoScatLWRTE`](@ref
+RRTMGP.RTE.NoScatLWRTE) / [`TwoStreamLWRTE`](@ref RRTMGP.RTE.TwoStreamLWRTE) and
+[`NoScatSWRTE`](@ref RRTMGP.RTE.NoScatSWRTE) / [`TwoStreamSWRTE`](@ref
+RRTMGP.RTE.TwoStreamSWRTE)), and [`solve_lw!`](@ref RRTMGP.RTESolver.solve_lw!)
+/ [`solve_sw!`](@ref RRTMGP.RTESolver.solve_sw!) dispatch on the workspace type.
 
 ## Boundary conditions
 
@@ -162,12 +162,12 @@ The sweep needs conditions at both ends of the column. At the surface, the
 longwave upwelling radiance is the surface Planck emission scaled by the surface
 emissivity, and the shortwave reflection is set by the direct and diffuse
 albedos; the incident solar flux and the cosine of the solar zenith angle enter
-at the top. Any prescribed incident diffuse flux at the top defaults to zero, as does the downwelling longwave flux at the top.
+at the top. Any prescribed incident diffuse flux at the top defaults to zero, as
+does the downwelling longwave flux at the top.
 
 RRTMGP can also insert an **isothermal boundary layer**: an extra layer between
 the host model's top and the minimum pressure of the gas-optics tables, held at
 the model-top temperature, that represents the radiative effect of the
-atmosphere above the model lid. It is enabled through
-[`RRTMGPGridParams`](@ref RRTMGP.RRTMGPGridParams), and every getter masks it
-off so the host reads and writes arrays sized to its own grid (see
-[The getter contract](@ref)).
+atmosphere above the model lid. It is enabled through [`RRTMGPGridParams`](@ref
+RRTMGP.RRTMGPGridParams), and every getter masks it off so the host reads and
+writes arrays sized to its own grid (see [The getter contract](@ref)).
