@@ -8,14 +8,10 @@ under [The getter contract](@ref).
 
 ## Versioning and API stability
 
-`RRTMGP.PUBLIC_NAMES` lists the public API: every name on it must exist and carry a
-docstring. On Julia 1.11 and later, the same list is declared with
-`public`, so `Base.ispublic` agrees with it.
-
-Changes to a name on that list follow the package version:
-
-The getters are the intended host interface because they are the part that
-remains stable across releases.
+`RRTMGP.PUBLIC_NAMES` lists the public API. On Julia 1.11 and later, the same
+list is declared with `public`, so `Base.ispublic` agrees with it. Names on the
+list change only with the package version; anything else reachable through the
+module may change in a patch release.
 
 ```@meta
 CurrentModule = RRTMGP

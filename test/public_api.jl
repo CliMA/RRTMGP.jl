@@ -1,13 +1,10 @@
 using Test
 using RRTMGP
 
-# The public API is the version-compatibility contract: `RRTMGP.PUBLIC_NAMES`
-# lists it, and this file locks it down from both sides. A name added to or
-# removed from the module surface fails here until it is classified, so the
-# public surface cannot grow by accident.
-#
-# Internal names are excluded by convention: a leading `_`, a submodule, or a
-# deprecated name.
+# `RRTMGP.PUBLIC_NAMES` lists the public API; this file locks it from both
+# sides, so a name added to or removed from the module surface fails here until
+# it is classified. Internal names are excluded by convention: a leading `_`, a
+# submodule, or a deprecated name.
 
 const DEPRECATED_NAMES = (
     :clear_lw_flux,
@@ -52,7 +49,7 @@ end
 
 @testset "every public name has a docstring" begin
     # Check the module's documentation table by binding, not `Docs.doc`: the
-    # binding-aware `doc` method needs REPL loaded, and resolving the value
+    # binding-aware `doc` method needs the REPL loaded, and resolving the value
     # would miss docstrings attached to a constant's binding (`check_values`).
     documented = Base.Docs.meta(RRTMGP)
     undocumented = filter(

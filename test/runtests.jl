@@ -14,6 +14,10 @@ end
     include("interpolation_schemes.jl")
 end
 
+@testset "Angular discretization (multi-angle longwave) tests" begin
+    include("angular_discretization.jl")
+end
+
 @testset "API contract tests" begin
     include("api_contract.jl")
 end

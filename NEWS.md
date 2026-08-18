@@ -3,44 +3,49 @@ RRTMGP.jl Release Notes
 
 main
 ------
-- **Breaking (renames, with deprecations):** five getters were renamed for
-  consistency within their families. `clear_lw_flux` → `clear_lw_flux_net` and
-  `clear_sw_flux` → `clear_sw_flux_net`, matching `lw_flux_net` and
-  `sw_flux_net`. The three incident-flux getters now share one `toa_` prefix:
-  `toa_flux` → `toa_sw_flux_dn`, `top_of_atmosphere_lw_flux_dn` →
-  `toa_lw_flux_dn`, and `top_of_atmosphere_diffuse_sw_flux_dn` →
-  `toa_diffuse_sw_flux_dn` (the `SwBCs` field and the `solve`/`solve_gray`
-  keyword named `toa_flux` are unchanged). The old names still work and emit a
-  deprecation warning; they will be removed in the next breaking release.
-- **Breaking:** `RadiationOutput`'s fields now carry the same names as the
-  getters: `lw_flux_up`, `lw_flux_dn`, `lw_flux_net`, `sw_flux_up`,
-  `sw_flux_dn`, `sw_direct_flux_dn`, `sw_flux_net`, and `net_flux` (previously
-  `lw_up`, `lw_dn`, `lw_net`, `sw_up`, `sw_dn`, `sw_direct_dn`, `sw_net`, and
-  `net`), so one vocabulary covers both the standalone and the solver-driven
-  paths. `heating_rate` and `solver` are unchanged.
-- **The public API is now delimited.** `RRTMGP.PUBLIC_NAMES` lists it, and
-  `test/public_api.jl` locks the list from both sides: every listed name must
-  exist and carry a docstring, and no name may sit on the module's surface
-  without being listed or made internal. On Julia 1.11 and later the list is
-  also declared with `public`. A new "Versioning and API stability" section on
-  the API page states what the version promise covers (the listed names) and
-  what it does not (submodule internals, buffer layouts, `_`-prefixed names).
-  Four helpers that were reachable but undocumented became internal:
-  `get_artifact_path`, `aerosol_names_docs`, `gas_names_sw_docs`,
-  `update_views`, and the `AEROSOL_IDX` constant are now `_`-prefixed.
-  The interpolation scheme types and their extension points
-  (`interp!`, `extrap!`, `requires_z`, `uniform_z_p`, `best_fit_p`) gained
-  docstrings and an API-page reference section; they stay public because
-  ClimaAtmos uses them.
-- `validate_inputs` now reports the incident-solar-flux violation under the
-  getter name `toa_sw_flux_dn` rather than the storage field name.
-- ClimaAtmos downstream testing moved from GitHub Actions to Buildkite, which
-  triggers the `climaatmos-downstream` pipeline against the RRTMGP commit under
-  test (the GitHub job could not finish inside its time limit). ClimaCoupler
-  still runs on GitHub Actions.
+
+- **Multi-angle longwave quadrature now works.** The spectral non-scattering
+  longwave solver integrates the Schwarzschild equation along 1-4
+  Gauss-Jacobi-5 angles, selected with the `n_gauss_angles` keyword of
+  `NoScatLWRTE` or `RRTMGPSolver` (the tables existed, but every kernel read
+  only the first angle). The default remains the single-angle diffusivity
+  approximation, bit for bit. One angle reproduces the hemispheric
+  transmittance `2E₃(τ)` to about 2.5%, four angles to better than 0.1%; run
+  time grows in proportion to the number of angles. Gray radiation and the
+  two-stream longwave solver reject `n_gauss_angles > 1` rather than ignore
+  it. A prescribed incident longwave flux is now converted to intensity as
+  `F/π` (unchanged for one angle), so the angle-weighted fluxes sum back to
+  `F`. Checked by the new `test/angular_discretization.jl`.
+- **Breaking (renames, with deprecations):** `clear_lw_flux` →
+  `clear_lw_flux_net` and `clear_sw_flux` → `clear_sw_flux_net` (matching
+  `lw_flux_net`/`sw_flux_net`); `toa_flux` → `toa_sw_flux_dn`,
+  `top_of_atmosphere_lw_flux_dn` → `toa_lw_flux_dn`, and
+  `top_of_atmosphere_diffuse_sw_flux_dn` → `toa_diffuse_sw_flux_dn` (one
+  `toa_` prefix for the incident-flux getters; the `SwBCs` field and the
+  `solve`/`solve_gray` keyword `toa_flux` are unchanged). The old names
+  forward with a deprecation warning until the next breaking release.
+- **Breaking:** `RadiationOutput` fields now match the getters:
+  `lw_flux_up`/`lw_flux_dn`/`lw_flux_net`,
+  `sw_flux_up`/`sw_flux_dn`/`sw_direct_flux_dn`/`sw_flux_net`, and `net_flux`
+  (previously `lw_up`/`lw_dn`/`lw_net`, `sw_up`/`sw_dn`/`sw_direct_dn`/
+  `sw_net`, and `net`). `heating_rate` and `solver` are unchanged.
+- **The public API is delimited.** `RRTMGP.PUBLIC_NAMES` lists it,
+  `test/public_api.jl` locks it (every listed name defined and documented,
+  nothing undeclared on the module surface), and on Julia 1.11 and later the
+  list is declared with `public`. Undocumented helpers became internal
+  (`get_artifact_path`, `aerosol_names_docs`, `gas_names_sw_docs`,
+  `update_views`, and the `AEROSOL_IDX` constant are `_`-prefixed); the
+  interpolation extension points (`interp!`, `extrap!`, `requires_z`,
+  `uniform_z_p`, `best_fit_p`) gained docstrings and stay public.
+- `validate_inputs` reports the incident-solar-flux violation as
+  `toa_sw_flux_dn` rather than the storage field name.
+- ClimaAtmos downstream testing moved from GitHub Actions, whose job timed
+  out, to Buildkite, which triggers the `climaatmos-downstream` pipeline
+  against the RRTMGP commit under test. ClimaCoupler stays on GitHub Actions.
 
 v0.22.3
 -------
+
 - Documentation cleanup and additions, including new how-to guides for interpolation and clouds/aerosols.
 - Added isothermal layer option in standalone runs and RCE calculations to remove noise.
 - RCE corrections.
@@ -48,6 +53,7 @@ v0.22.3
 
 v0.22.2
 -------
+
 - New **`set_volume_mixing_ratio!(solver, name, value)`**, the write counterpart
   to `volume_mixing_ratio`. It updates a gas's volume mixing ratio in place,
   correctly for **any** gas under either storage backend, without the caller
@@ -63,6 +69,7 @@ v0.22.2
 
 v0.22.1
 -------
+
 - Documented and added a regression test for the **copy-free flux-getter
   contract**: the output flux getters (`net_flux`, `lw_flux_up`, `sw_flux_dn`,
   …) return single-level views of plain `(nlev, ncol)` presentation buffers, so
@@ -74,6 +81,7 @@ v0.22.1
 
 v0.22.0
 -------
+
 - Internal compute buffers now use device-dependent physical layouts behind a
   uniform column-first `(ncol, nlay/nlev)` indexing convention: optical
   properties (`OneScalar`, `TwoStream`), source functions (`SourceLWNoScat`,

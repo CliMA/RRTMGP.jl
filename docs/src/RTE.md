@@ -64,16 +64,37 @@ scattering albedo, and asymmetry parameter following [meador1980](@citet).
 
 ## Angular discretization
 
-The longwave no-scattering solver improves on the single diffusivity angle: it
-integrates the Schwarzschild equation along a small set of discrete zenith
-angles and sums the results with Gauss quadrature weights, so the hemispheric
-flux is ``F_\lambda = \sum_i w_i\, I_\lambda(\mu_i)``. RRTMGP uses the
-Gauss-Jacobi-5 nodes of [hogan2024](@citet) with one to four angles
-([`AngularDiscretization`](@ref
-RRTMGP.AngularDiscretizations.AngularDiscretization)). The default single angle
-has secant ``D \approx 1.64``, close to Elsasser's classic diffusivity factor of
-``1.66``, which the two-stream longwave solver adopts following
-[fu1997](@citet); adding angles improves the accuracy of the angular integral.
+The longwave no-scattering solver integrates the Schwarzschild equation along a
+set of discrete zenith angles and sums the results with quadrature weights, so
+the hemispheric flux is
+```math
+F_\lambda = \sum_i \pi\, w_i\, I_\lambda(\mu_i), \qquad \sum_i w_i = 1,
+```
+with each angle rescaling the optical path by its secant ``D_i = 1/\mu_i``. The
+nodes and weights are the Gauss-Jacobi-5 values of [hogan2024](@citet),
+tabulated for one to four angles in [`AngularDiscretization`](@ref
+RRTMGP.AngularDiscretizations.AngularDiscretization). Choose the number with the
+`n_gauss_angles` keyword of [`NoScatLWRTE`](@ref RRTMGP.RTE.NoScatLWRTE) or
+[`RRTMGPSolver`](@ref RRTMGP.RRTMGPSolver):
+
+```julia
+slv_lw =
+    NoScatLWRTE(grid_params; params, sfc_emis, inc_flux, n_gauss_angles = 3)
+```
+
+The default is one angle, with secant ``D \approx 1.64``: the diffusivity
+approximation, close to Elsasser's classic ``1.66``, which the two-stream
+longwave solver adopts following [fu1997](@citet). One angle reproduces the
+hemispheric transmittance ``2E_3(\tau)`` of an absorbing layer to about 2.5%;
+four angles bring that below 0.1% (measured in
+`test/angular_discretization.jl`). Run time grows in proportion to the number
+of angles, since each one repeats the transport sweep over a shared optical
+depth.
+
+The setting applies to the spectral non-scattering longwave solver only. The
+two-stream longwave solver has a fixed angular treatment, and gray radiation is
+a single-band idealization in which the diffusivity angle is part of the
+approximation; both raise an error for anything but one angle.
 
 ## Radiative heating rate
 

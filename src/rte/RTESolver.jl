@@ -35,6 +35,11 @@ function solve_lw!(
     as::GrayAtmosphericState,
     metric_scaling::M = nothing,
 ) where {M}
+    angle_disc.n_gauss_angles == 1 || error(
+        "gray radiation is solved with a single quadrature angle (the \
+         diffusivity approximation); `n_gauss_angles = \
+         $(angle_disc.n_gauss_angles)` applies only to spectral radiation.",
+    )
     rte_lw_noscat_solve!(context.device, flux, src, bcs, op, angle_disc, as)
     apply_metric_scaling!(flux, metric_scaling)
 end

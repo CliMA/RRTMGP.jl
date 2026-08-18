@@ -1,3 +1,8 @@
+# Gray radiation is a single-band idealization in which the diffusivity angle is
+# part of the approximation, so this driver is single-angle by construction; the
+# constructors reject `n_gauss_angles > 1` for a gray state. Keeping it that way
+# is what lets the Layer-2 solver skip allocating a longwave band buffer
+# (`fluxb`) for gray radiation.
 function rte_lw_noscat_solve!(
     device::ClimaComms.AbstractCPUDevice,
     flux_lw::FluxLW,
@@ -45,8 +50,7 @@ end
     src_lw,
     bcs_lw,
     op,
-    Ds,
-    w_μ,
+    angle_disc,
     as,
     state_cache,
     lookup_lw,
@@ -68,20 +72,26 @@ end
         lookup_lw_cld,
         lookup_lw_aero,
     )
-    rte_lw_noscat_one_angle!(
-        src_lw,
-        bcs_lw,
-        op,
-        Ds,
-        w_μ,
-        gcol,
-        flux,
-        igpt,
-        ibnd,
-        nlay,
-        nlev,
-    )
-    _accumulate_fluxes!(flux_lw, flux, gcol, nlev, igpt)
+    # The optical depth is angle-independent, so each quadrature angle reuses it
+    # and only rescales the path. Flattening (igpt, imu) into one counter makes
+    # the first transport assign and every later one accumulate.
+    n_μ = angle_disc.n_gauss_angles
+    @inbounds for imu in 1:n_μ
+        rte_lw_noscat_one_angle!(
+            src_lw,
+            bcs_lw,
+            op,
+            angle_disc.gauss_Ds[imu],
+            angle_disc.gauss_wts[imu],
+            gcol,
+            flux,
+            igpt,
+            ibnd,
+            nlay,
+            nlev,
+        )
+        _accumulate_fluxes!(flux_lw, flux, gcol, nlev, (igpt - 1) * n_μ + imu)
+    end
     return cloudy
 end
 
@@ -102,8 +112,6 @@ function rte_lw_noscat_solve!(
     nlay, ncol = AtmosphericStates.get_dims(as)
     nlev = nlay + 1
     (; major_gpt2bnd) = lookup_lw.band_data
-    Ds = angle_disc.gauss_Ds[1]
-    w_μ = angle_disc.gauss_wts[1]
     n_gpt = length(major_gpt2bnd)
     (; cloud_state, aerosol_state) = as
     track_cld_cover =
@@ -127,8 +135,7 @@ function rte_lw_noscat_solve!(
                     src_lw,
                     bcs_lw,
                     op,
-                    Ds,
-                    w_μ,
+                    angle_disc,
                     as,
                     state_cache,
                     lookup_lw,
@@ -237,13 +244,14 @@ Transport for no-scattering longwave problem.
     τ_thresh = Numerics.τ_thresh(FT) # see Numerics for the eps^(1/4) derivation
 
     intensity_to_flux = FT(π) * w_μ
-    flux_to_intensity = FT(1) / intensity_to_flux
 
-    # Transport is for intensity
-    #   convert flux at top of domain to intensity assuming azimuthal isotropy
+    # Transport is for intensity. The prescribed incident flux is hemispheric;
+    # under azimuthal and zenith isotropy it is the same intensity F/π at every
+    # quadrature angle, so summing π·wᵢ·I over the angles returns F exactly
+    # (the weights sum to one). For a single angle w = 1, so this reduces to
+    # the rte-rrtmgp expression F/(π·w).
     intensity_dn_ilevplus1 =
-        isnothing(inc_flux) ? FT(0) :
-        inc_flux[gcol, igpt] * flux_to_intensity
+        isnothing(inc_flux) ? FT(0) : inc_flux[gcol, igpt] / FT(π)
     @inbounds flux_dn[gcol, nlev] =
         intensity_dn_ilevplus1 * intensity_to_flux
 

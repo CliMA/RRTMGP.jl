@@ -2,13 +2,10 @@
 ##### The public API
 #####
 #
-# Everything listed here is covered by the package's version compatibility
-# promise; anything else (submodule internals, buffer layouts, and names
-# prefixed with `_`) may change in a patch release. `test/public_api.jl`
-# locks the list, so adding a name to the public surface is a deliberate act.
-#
-# `public` needs Julia 1.11; on older versions the list still documents the
-# contract and the test still enforces it.
+# Names listed here change only with the package version; anything else
+# (submodule internals, buffer layouts, names prefixed with `_`) may change in a
+# patch release. `test/public_api.jl` locks the list. `public` needs Julia 1.11;
+# below that the list and the test still hold.
 
 const PUBLIC_NAMES = (
     # Configuration and construction
