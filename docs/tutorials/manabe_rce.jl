@@ -77,11 +77,15 @@ R_d = TD.Parameters.R_d(td_params)
 cp_d = TD.Parameters.cp_d(td_params)
 g = RRTMGP.Parameters.grav(params)   # gravitational acceleration [m/s²]
 
-# The iteration below marches the layer temperatures, so we ask the solver to
-# rebuild the level (cell-face) temperatures and pressures from the layer
-# (cell-center) values on every [`update_fluxes!`](@ref RRTMGP.update_fluxes!)
-# call: `interpolation = ArithmeticMean()` averages the adjacent layers on
-# interior faces and extrapolates linearly at the boundary faces.
+# RRTMGP needs temperatures both at the layer centers, where the optical
+# properties are evaluated, and at the level (cell-face) boundaries, where the
+# longwave source varies. A driver has to decide which of the two it marches.
+# We march the **levels** and set each layer to the mean of the two levels
+# bounding it, so `interpolation = NoInterpolation()` leaves the level values
+# as the iteration writes them. Marching the layers instead, with levels
+# reconstructed by interpolation, admits a computational mode: a grid-scale
+# oscillation of the layer temperatures leaves the interpolated levels
+# unchanged, so the radiation cannot damp it.
 #
 # We also add an **isothermal boundary layer** at the top. A column that
 # stops at 60 km receives no downward longwave flux at its top face: the
@@ -100,7 +104,7 @@ g = RRTMGP.Parameters.grav(params)   # gravitational acceleration [m/s²]
 setup = (;
     params,
     insolation...,
-    interpolation = RRTMGP.ArithmeticMean(),
+    interpolation = RRTMGP.NoInterpolation(),
     isothermal_boundary_layer = true,
 )
 out = RRTMGP.solve(profile; setup...)
@@ -159,10 +163,10 @@ println("Dry adiabatic lapse rate g/cₚ = $(round(1000 * Γ_dry; digits = 1)) K
 # T_c(p) = T_s \left(\frac{p}{p_s}\right)^{Γ R_d / g},
 # ```
 # which reduces to the dry adiabat ``T \propto p^{R_d/c_p}`` for ``Γ = g/c_p``.
-# Layers warmer than ``T_c`` (the stratosphere) are left untouched, so the
+# Levels warmer than ``T_c`` (the stratosphere) are left untouched, so the
 # tropopause emerges from the calculation.
 #
-# The convective adjustment warms the layers colder than ``T_c`` and leaves the
+# The convective adjustment warms the levels colder than ``T_c`` and leaves the
 # surface at the trial ``T_s``, so it adds energy to the column. To reach
 # equilibrium, the surface temperature is iteratively adjusted until the net
 # radiative flux at the top of the atmosphere vanishes. Each equilibration below
@@ -173,24 +177,29 @@ println("Dry adiabatic lapse rate g/cₚ = $(round(1000 * Γ_dry; digits = 1)) K
 const Γ_crit = 6.5e-3 # critical lapse rate [K/m]
 
 function convective_adjustment!(solver, T_sfc; Γ = Γ_crit)
-    T = RRTMGP.layer_temperature(solver)
-    p = RRTMGP.layer_pressure(solver)
-    p_sfc = RRTMGP.level_pressure(solver)[1, 1]
+    T = RRTMGP.level_temperature(solver)
+    p = RRTMGP.level_pressure(solver)
+    p_sfc = p[1, 1]
     @. T = max(T, T_sfc * (p / p_sfc)^(Γ * R_d / g)) # critical profile T_c(p)
     return nothing
 end;
 
 # ## Compute radiative-convective state at a trial surface temperature
 #
-# Each step applies the convective adjustment, updates the water vapor to the
-# fixed relative humidity, solves the radiative transfer, and marches the
-# temperature with the radiative heating rate. The ground temperature enters
-# separately, through the surface-emission boundary condition
-# (`surface_temperature`); keeping the two distinct lets the air at the bottom
-# face be colder than the ground, as radiative equilibrium requires. The
-# `UseSurfaceTempAtBottom` extrapolation option ties the bottom face to the
-# ground temperature instead, which removes that difference (corresponding to
-# the limit of strong turbulent heat exchange at the surface).
+# Each step applies the convective adjustment, fills the layer temperatures
+# from the levels, updates the water vapor to the fixed relative humidity,
+# solves the radiative transfer, and marches the level temperatures with the
+# radiative heating rate. The heating rate is a layer quantity, so each
+# interior level is advanced with the mean of the heating rates of the two
+# layers meeting at it, and the bottom and top levels with the single adjacent
+# layer's.
+#
+# The ground temperature enters separately, through the surface-emission
+# boundary condition (`surface_temperature`); keeping the two distinct lets the
+# air at the bottom face be colder than the ground, as radiative equilibrium
+# requires. Where convection is active, the adjustment ties the bottom face to
+# the ground temperature, the limit of strong turbulent heat exchange at the
+# surface.
 #
 # The column has settled when successive adjusted profiles stop changing. That
 # is the equilibrium state, in which radiative cooling in the convecting
@@ -214,15 +223,24 @@ function equilibrate!(
     tol = 1e-4,
 )
     RRTMGP.surface_temperature(solver) .= T_sfc
-    T = RRTMGP.layer_temperature(solver)
-    T_prev = fill!(similar(T), 0)
+    T_lev = RRTMGP.level_temperature(solver)
+    T_lay = RRTMGP.layer_temperature(solver)
+    nlev = size(T_lev, 1)
+    nlay = nlev - 1
+    T_prev = fill!(similar(T_lev), 0)
+    dT = similar(Array(T_lev))
     for _ in 1:maxsteps
         convection && convective_adjustment!(solver, T_sfc; Γ)
+        @views @. T_lay = (T_lev[1:nlay, :] + T_lev[2:nlev, :]) / 2
         humidity && set_humidity!(solver)
         RRTMGP.update_fluxes!(solver)
-        maximum(abs, T .- T_prev) < tol && break
-        T_prev .= T
-        T .+= clamp.(dt .* Array(RRTMGP.heating_rate(solver)), -2, 2)
+        maximum(abs, T_lev .- T_prev) < tol && break
+        T_prev .= T_lev
+        Q = Array(RRTMGP.heating_rate(solver))
+        @views @. dT[2:nlay, :] = (Q[1:(nlay - 1), :] + Q[2:nlay, :]) / 2
+        @views dT[1, :] .= Q[1, :]
+        @views dT[nlev, :] .= Q[nlay, :]
+        T_lev .+= clamp.(dt .* dT, -2, 2)
     end
     return nothing
 end;
@@ -262,6 +280,7 @@ end
 
 Ts_1x = balanced_surface_temperature!(solver, FT(285), FT(290))
 T_1x = copy(Array(RRTMGP.layer_temperature(solver)))
+T_lev_1x = copy(Array(RRTMGP.level_temperature(solver))) # for warm starts
 p_lay = copy(Array(RRTMGP.layer_pressure(solver)))
 vmr_1x = copy(Array(RRTMGP.volume_mixing_ratio(solver, "h2o"))) # reference vapor
 println("Equilibrium Tₛ (1 × CO₂): $(round(Ts_1x; digits = 2)) K")
@@ -309,7 +328,7 @@ println("Implied surface convective flux (radiative): $(round(sfc_convective_flu
 # with a profile that departs from the observed atmosphere (here, the idealized
 # midlatitude-summer standard atmosphere we started from) at every height: the
 # temperature decreases from the surface upward at two to three times the dry
-# adiabatic lapse rate, runs 45 K below the standard atmosphere through the
+# adiabatic lapse rate, runs 44 K below the standard atmosphere through the
 # middle and upper troposphere, and forms no tropopause. The air at the bottom
 # face is several kelvin colder than the ground beneath it, the surface
 # discontinuity of radiative equilibrium. This radiative equilibrium state is
@@ -374,7 +393,7 @@ function balanced_co2(factor; fixed_rh = true, bracket = (Ts_1x, Ts_1x + 3))
     prof = RRTMGP.standard_atmosphere(FT; column...)
     prof.well_mixed_vmr["co2"] = factor * co2_1x
     slv = RRTMGP.solve(prof; lookups = solver.lookups, setup...).solver
-    RRTMGP.layer_temperature(slv) .= T_1x                      # warm start
+    RRTMGP.level_temperature(slv) .= T_lev_1x                  # warm start
     fixed_rh || (RRTMGP.volume_mixing_ratio(slv, "h2o") .= vmr_1x) # freeze reference vapor
     Ts = balanced_surface_temperature!(slv, bracket...; humidity = fixed_rh)
     return Ts, copy(Array(RRTMGP.layer_temperature(slv)))

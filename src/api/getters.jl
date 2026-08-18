@@ -400,33 +400,69 @@ _solver_band_flux(ws) =
     hasproperty(ws, :band_flux) ? _require_band_flux(ws.band_flux) :
     error("spectral fluxes require a two-stream, non-gray solver.")
 
+# The six per-band getters share one contract: a domain-masked
+# `(nlev, ncol, n_bnd)` view of a retained band buffer, available only when the
+# solver was built with `spectral_fluxes = true`. Each carries its own
+# docstring so REPL help works for all of them; the shared detail is on the
+# "Get per-band (spectral) fluxes" how-to page.
+
 """
     spectral_lw_flux_up(s::RRTMGPSolver)
-    spectral_lw_flux_dn(s::RRTMGPSolver)
-    spectral_lw_flux_net(s::RRTMGPSolver)
-    spectral_sw_flux_up(s::RRTMGPSolver)
-    spectral_sw_flux_dn(s::RRTMGPSolver)
-    spectral_sw_flux_net(s::RRTMGPSolver)
 
-Return the spectrally-resolved (per-band) up/down/net longwave or shortwave flux [W/m²] as
-a domain-masked `(nlev, ncol, n_bnd)` array. The solver must have been constructed with
-`spectral_fluxes = true` (supported for two-stream, non-gray radiation). Band `b`'s slice
-`[:, :, b]` has the same layout as the broadband fluxes, and summing over the band dimension
-recovers them. Use [`lw_band_bounds`](@ref) / [`sw_band_bounds`](@ref) to identify each band's
-wavenumber range.
-
-The `up`/`dn`/`net` getters are views into the retained per-band buffers.
+Return the per-band upward longwave flux [W/m²]: a domain-masked
+`(nlev, ncol, n_bnd)` view. Requires `spectral_fluxes = true`; see
+[`lw_band_bounds`](@ref) for each band's wavenumber range.
 """
 spectral_lw_flux_up(s::RRTMGPSolver) =
     _domain_view(s, _solver_band_flux(s.lws).flux_up)
+
+"""
+    spectral_lw_flux_dn(s::RRTMGPSolver)
+
+Return the per-band downward longwave flux [W/m²]: a domain-masked
+`(nlev, ncol, n_bnd)` view. Requires `spectral_fluxes = true`; see
+[`lw_band_bounds`](@ref) for each band's wavenumber range.
+"""
 spectral_lw_flux_dn(s::RRTMGPSolver) =
     _domain_view(s, _solver_band_flux(s.lws).flux_dn)
+
+"""
+    spectral_lw_flux_net(s::RRTMGPSolver)
+
+Return the per-band net (up - down) longwave flux [W/m²]: a domain-masked
+`(nlev, ncol, n_bnd)` view. Requires `spectral_fluxes = true`; see
+[`lw_band_bounds`](@ref) for each band's wavenumber range.
+"""
 spectral_lw_flux_net(s::RRTMGPSolver) =
     _domain_view(s, _solver_band_flux(s.lws).flux_net)
+
+"""
+    spectral_sw_flux_up(s::RRTMGPSolver)
+
+Return the per-band upward shortwave flux [W/m²]: a domain-masked
+`(nlev, ncol, n_bnd)` view. Requires `spectral_fluxes = true`; see
+[`sw_band_bounds`](@ref) for each band's wavenumber range.
+"""
 spectral_sw_flux_up(s::RRTMGPSolver) =
     _domain_view(s, _solver_band_flux(s.sws).flux_up)
+
+"""
+    spectral_sw_flux_dn(s::RRTMGPSolver)
+
+Return the per-band downward shortwave flux [W/m²]: a domain-masked
+`(nlev, ncol, n_bnd)` view. Requires `spectral_fluxes = true`; see
+[`sw_band_bounds`](@ref) for each band's wavenumber range.
+"""
 spectral_sw_flux_dn(s::RRTMGPSolver) =
     _domain_view(s, _solver_band_flux(s.sws).flux_dn)
+
+"""
+    spectral_sw_flux_net(s::RRTMGPSolver)
+
+Return the per-band net (up - down) shortwave flux [W/m²]: a domain-masked
+`(nlev, ncol, n_bnd)` view. Requires `spectral_fluxes = true`; see
+[`sw_band_bounds`](@ref) for each band's wavenumber range.
+"""
 spectral_sw_flux_net(s::RRTMGPSolver) =
     _domain_view(s, _solver_band_flux(s.sws).flux_net)
 

@@ -8,9 +8,12 @@ and `bottom_extrapolation` options of [`RRTMGPSolver`](@ref
 RRTMGP.RRTMGPSolver) and [`solve`](@ref RRTMGP.solve) select a scheme, and
 [`interpolate_levels!`](@ref RRTMGP.interpolate_levels!) applies it inside
 every [`update_fluxes!`](@ref RRTMGP.update_fluxes!) call, so a driver that
-marches the layer temperatures keeps consistent faces automatically (the
-[radiative-convective equilibrium tutorial](tutorials/manabe_rce.md) works
-this way). This page derives the schemes and gives guidance on choosing one.
+marches the layer temperatures keeps consistent faces automatically. A driver
+can also march the level temperatures and fill the layers itself, keeping the
+default `NoInterpolation`; the
+[radiative-convective equilibrium tutorial](tutorials/manabe_rce.md) does
+this to suppress a computational mode of layer marching. This page derives
+the schemes and gives guidance on choosing one.
 
 ## The underlying model
 

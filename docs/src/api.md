@@ -74,12 +74,17 @@ RRTMGP.Numerics.pow_fast
 ## Spectrally resolved fluxes
 
 Optional per-band fluxes, enabled with `spectral_fluxes = true` when
-constructing the [`RRTMGPSolver`](@ref RRTMGP.RRTMGPSolver). The
-[`spectral_lw_flux_up`](@ref RRTMGP.spectral_lw_flux_up) docstring covers the
-full `spectral_{lw,sw}_flux_{up,dn,net}` family.
+constructing the [`RRTMGPSolver`](@ref RRTMGP.RRTMGPSolver). Summing a getter
+over its band dimension recovers the corresponding broadband flux; see
+[Get per-band (spectral) fluxes](howto/spectral_fluxes.md).
 
 ```@docs
 RRTMGP.spectral_lw_flux_up
+RRTMGP.spectral_lw_flux_dn
+RRTMGP.spectral_lw_flux_net
+RRTMGP.spectral_sw_flux_up
+RRTMGP.spectral_sw_flux_dn
+RRTMGP.spectral_sw_flux_net
 RRTMGP.lw_band_bounds
 RRTMGP.sw_band_bounds
 RRTMGP.Fluxes.FluxBand
