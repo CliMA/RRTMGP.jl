@@ -139,3 +139,22 @@ steps:
         agents:
           slurm_ntasks: 1
           slurm_gpus: 1
+
+  - group: "Downstream tests"
+    steps:
+      # Run ClimaAtmos CI against this RRTMGP commit. ClimaAtmos's pipeline reads
+      # UPSTREAM_PACKAGES and `Pkg.add`s each `Package#rev` entry at that rev,
+      # dropping the package's [compat] bound so an unreleased RRTMGP resolves
+      # (see ClimaAtmos.jl's .buildkite/full_pipeline.yml "Downstream test hook").
+      - label: ":rocket: Downstream: trigger ClimaAtmos CI"
+        # Deliberately NOT climaatmos-ci: downstream builds run on atmos `main`,
+        # and building them in that pipeline would pollute its main-branch status
+        # badge and build history. climaatmos-downstream uses the same config but
+        # is a separate pipeline.
+        trigger: "climaatmos-downstream"
+        build:
+          branch: "main"
+          message: "Downstream test: RRTMGP ${BUILDKITE_BRANCH} @ ${BUILDKITE_COMMIT:0:8}"
+          env:
+            UPSTREAM_PACKAGES: "RRTMGP#${BUILDKITE_COMMIT}"
+        soft_fail: true # downstream test failures don't block a merge

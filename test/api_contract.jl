@@ -142,8 +142,8 @@ end
     @test RRTMGP.optical_thickness_parameter(solver) isa
           RRTMGP.AtmosphericStates.GrayOpticalThicknessOGorman2008
     @test RRTMGP.isothermal_boundary_layer(solver) == false
-    @test RRTMGP.top_of_atmosphere_lw_flux_dn(solver) === nothing
-    @test RRTMGP.top_of_atmosphere_diffuse_sw_flux_dn(solver) === nothing
+    @test RRTMGP.toa_lw_flux_dn(solver) === nothing
+    @test RRTMGP.toa_diffuse_sw_flux_dn(solver) === nothing
 end
 
 @testset "validate_inputs names the offending field" begin
@@ -155,7 +155,7 @@ end
         ("layer_pressure", s -> RRTMGP.layer_pressure(s) .= 0),
         ("layer_temperature", s -> RRTMGP.layer_temperature(s) .= -5),
         ("surface_temperature", s -> RRTMGP.surface_temperature(s) .= 0),
-        ("toa_flux", s -> RRTMGP.toa_flux(s) .= -1),
+        ("toa_sw_flux_dn", s -> RRTMGP.toa_sw_flux_dn(s) .= -1),
         ("surface_emissivity", s -> RRTMGP.surface_emissivity(s) .= 2),
         (
             "direct_sw_surface_albedo",
@@ -206,7 +206,7 @@ end
 
         inc = fill!(pieces.DA{FT}(undef, ncol, 1), FT(25))
         solver = _gray_solver(FT; inc_flux = inc)
-        toa_dn = RRTMGP.top_of_atmosphere_lw_flux_dn(solver)
+        toa_dn = RRTMGP.toa_lw_flux_dn(solver)
         @test size(toa_dn) == (1, ncol)
         @test all(==(FT(25)), Array(toa_dn))
 
@@ -310,7 +310,7 @@ end
         params = out.solver.params
         g = RRTMGP.Parameters.grav(params)
         cₚ = RRTMGP.Parameters.cp_d(params)
-        F = Array(out.net)
+        F = Array(out.net_flux)
         p = Array(RRTMGP.level_pressure(out.solver))
         expected =
             (g / cₚ) .* (F[2:end, :] .- F[1:(end - 1), :]) ./

@@ -18,17 +18,17 @@ analytic formulas and needs no input data:
 ```@example index
 using RRTMGP
 profile = RRTMGP.standard_atmosphere(Float64; kind = :tropical)
-out = RRTMGP.solve(profile; method = RRTMGP.GrayRadiation())  # gray optics
-out.heating_rate[1, 1]                # heating rate at bottom layer [K/s]
+out = RRTMGP.solve(profile; method = RRTMGP.GrayRadiation()) # gray optics
+out.heating_rate[1, 1] # heating rate at the bottom layer [K/s]
 ```
 
 The full gas optics reads lookup tables, downloaded on first use; loading
 NCDatasets activates it:
 
 ```@example index
-using NCDatasets                                # activates the gas optics
-out = RRTMGP.solve(profile)                     # clear-sky correlated-k
-out.lw_up[end, 1]                                # OLR [W/m²]
+using NCDatasets            # activates the gas optics
+out = RRTMGP.solve(profile) # clear-sky correlated-k
+out.lw_flux_up[end, 1]      # OLR [W/m²]
 ```
 
 ## Code structure

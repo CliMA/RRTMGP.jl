@@ -4,7 +4,7 @@ include("clear_sky_utils.jl")
 
 context = ClimaComms.context()
 
-toler_lw_noscat = Dict(Float64 => Float64(1e-4), Float32 => Float32(0.05))
+toler_lw_noscat = Dict(Float64 => Float64(1e-4), Float32 => Float32(5e-3))
 toler_lw_2stream = Dict(Float64 => Float64(4.5), Float32 => Float32(4.5))
 toler_sw = Dict(Float64 => Float64(1e-3), Float32 => Float32(0.04))
 

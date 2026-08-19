@@ -97,7 +97,7 @@ The two `nothing` slots are prescribed incident fluxes at the top (longwave and
 diffuse shortwave), used for offline intercomparison cases; a host model
 normally leaves them off, so the top boundary sees only the direct solar beam.
 After construction, the host updates all of these through the getters
-(`cos_zenith(solver)`, `toa_flux(solver)`, `surface_emissivity(solver)`,
+(`cos_zenith(solver)`, `toa_sw_flux_dn(solver)`, `surface_emissivity(solver)`,
 `direct_sw_surface_albedo(solver)`, `diffuse_sw_surface_albedo(solver)`) as in
 step 5, so a time-varying sun or a changing surface needs no reconstruction.
 

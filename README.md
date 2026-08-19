@@ -58,7 +58,7 @@ atmosphere uses analytic formulas:
 using RRTMGP
 
 out = RRTMGP.solve_gray(Float64; nlay = 60, ncol = 1)
-out.net          # net flux at each level [W/m²]
+out.net_flux     # net flux at each level [W/m²]
 out.heating_rate # radiative heating rate at each layer [K/s]
 ```
 
@@ -71,8 +71,8 @@ using RRTMGP, NCDatasets
 
 profile = RRTMGP.standard_atmosphere(Float64; kind = :tropical)
 out = RRTMGP.solve(profile)
-out.lw_up[end, 1]   # outgoing longwave radiation at the top of the atmosphere [W/m²]
-out.heating_rate    # radiative heating rate at each layer [K/s]
+out.lw_flux_up[end, 1] # outgoing longwave radiation at the top [W/m²]
+out.heating_rate       # radiative heating rate at each layer [K/s]
 ```
 
 ### Host-Model Usage

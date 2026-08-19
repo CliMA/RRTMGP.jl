@@ -58,18 +58,18 @@ _require_clear_sky(x) = x
 # layout/masking/writability rules live in the getter contract (docs/src/getters.md).
 
 """
-    top_of_atmosphere_lw_flux_dn(s::RRTMGPSolver)
+    toa_lw_flux_dn(s::RRTMGPSolver)
 
 Return the prescribed incident longwave flux [W/m²], `(ngpt, ncol)`, or `nothing`.
 """
-top_of_atmosphere_lw_flux_dn(s::RRTMGPSolver)         = _maybe_transpose(s.lws.bcs.inc_flux)
+toa_lw_flux_dn(s::RRTMGPSolver)         = _maybe_transpose(s.lws.bcs.inc_flux)
 
 """
-    top_of_atmosphere_diffuse_sw_flux_dn(s::RRTMGPSolver)
+    toa_diffuse_sw_flux_dn(s::RRTMGPSolver)
 
 Return the prescribed incident diffuse shortwave flux [W/m²], `(ngpt, ncol)`, or `nothing`.
 """
-top_of_atmosphere_diffuse_sw_flux_dn(s::RRTMGPSolver) = _maybe_transpose(s.sws.bcs.inc_flux_diffuse)
+toa_diffuse_sw_flux_dn(s::RRTMGPSolver) = _maybe_transpose(s.sws.bcs.inc_flux_diffuse)
 
 """
     lw_flux_up(s::RRTMGPSolver)
@@ -109,12 +109,12 @@ Return the clear-sky downward longwave flux [W/m²], `(nlev, ncol)`
 clear_lw_flux_dn(s::RRTMGPSolver)                     = _domain_view(s, _require_clear_sky(s.clear_flux_lw).flux_dn)
 
 """
-    clear_lw_flux(s::RRTMGPSolver)
+    clear_lw_flux_net(s::RRTMGPSolver)
 
-Return the clear-sky net longwave flux [W/m²], `(nlev, ncol)`
+Return the clear-sky net (up - down) longwave flux [W/m²], `(nlev, ncol)`
 (`AllSkyRadiationWithClearSkyDiagnostics` only).
 """
-clear_lw_flux(s::RRTMGPSolver)                        = _domain_view(s, _require_clear_sky(s.clear_flux_lw).flux_net)
+clear_lw_flux_net(s::RRTMGPSolver)                    = _domain_view(s, _require_clear_sky(s.clear_flux_lw).flux_net)
 
 """
     surface_emissivity(s::RRTMGPSolver)
@@ -176,12 +176,12 @@ Return the clear-sky direct-beam downward shortwave flux [W/m²], `(nlev, ncol)`
 clear_sw_direct_flux_dn(s::RRTMGPSolver)              = _domain_view(s, _require_clear_sky(s.clear_flux_sw).flux_dn_dir)
 
 """
-    clear_sw_flux(s::RRTMGPSolver)
+    clear_sw_flux_net(s::RRTMGPSolver)
 
-Return the clear-sky net shortwave flux [W/m²], `(nlev, ncol)`
+Return the clear-sky net (up - down) shortwave flux [W/m²], `(nlev, ncol)`
 (`AllSkyRadiationWithClearSkyDiagnostics` only).
 """
-clear_sw_flux(s::RRTMGPSolver)                        = _domain_view(s, _require_clear_sky(s.clear_flux_sw).flux_net)
+clear_sw_flux_net(s::RRTMGPSolver)                    = _domain_view(s, _require_clear_sky(s.clear_flux_sw).flux_net)
 """
     cloud_liquid_effective_radius(s::RRTMGPSolver)
 
@@ -268,11 +268,14 @@ Return the cosine of the solar zenith angle [-]: a writable `(ncol,)` device arr
 cos_zenith(s::RRTMGPSolver)                           = s.sws.bcs.cos_zenith
 
 """
-    toa_flux(s::RRTMGPSolver)
+    toa_sw_flux_dn(s::RRTMGPSolver)
 
-Return the incident top-of-atmosphere solar flux [W/m²]: a writable `(ncol,)` device array.
+Return the prescribed incident direct-beam shortwave flux at the top of the
+atmosphere [W/m²]: a writable `(ncol,)` device array. Companion to
+[`toa_diffuse_sw_flux_dn`](@ref) and
+[`toa_lw_flux_dn`](@ref).
 """
-toa_flux(s::RRTMGPSolver)                             = s.sws.bcs.toa_flux
+toa_sw_flux_dn(s::RRTMGPSolver)         = s.sws.bcs.toa_flux
 
 """
     direct_sw_surface_albedo(s::RRTMGPSolver)
@@ -512,7 +515,7 @@ isothermal_boundary_layer(s::RRTMGPSolver) = s.grid_params.isothermal_boundary_l
 Return the aerosol radius for the given aerosol name.
 
 Available names are:
-$(aerosol_names_docs())
+$(_aerosol_names_docs())
 """
 function aerosol_radius(s::RRTMGPSolver, name::AbstractString)
     lookups = _require_aerosol_lookups(s) # informative error before field access
@@ -530,7 +533,7 @@ end
 Return the aerosol column mass density [kg/m²] for the given aerosol name.
 
 Available names are:
-$(aerosol_names_docs())
+$(_aerosol_names_docs())
 """
 function aerosol_column_mass_density(s::RRTMGPSolver, name::AbstractString)
     lookups = _require_aerosol_lookups(s) # informative error before field access
@@ -583,7 +586,7 @@ gas_names_sw() = [
     "cf4",
     "hfc125"
 ]
-gas_names_sw_docs() = map(x->"`$x`", gas_names_sw())
+_gas_names_sw_docs() = map(x->"`$x`", gas_names_sw())
 
 """
     volume_mixing_ratio(s::RRTMGPSolver, name::AbstractString)
@@ -596,7 +599,7 @@ A well-mixed scalar is returned as a host `Number` copied off the device, so eac
 a device→host synchronization on the GPU. Read these during setup to maintain performance.
 
 Available names are:
-$(gas_names_sw_docs())
+$(_gas_names_sw_docs())
 """
 volume_mixing_ratio(s::RRTMGPSolver, name::AbstractString) =
     _volume_mixing_ratio(s, _atmospheric_state(s).vmr, name)
@@ -636,7 +639,7 @@ gas: that getter returns a read-only host copy, so `volume_mixing_ratio(s, name)
 does not write back. Use this to update time-varying trace gases (e.g. prescribed CO₂).
 
 Available names are:
-$(gas_names_sw_docs())
+$(_gas_names_sw_docs())
 """
 set_volume_mixing_ratio!(s::RRTMGPSolver, name::AbstractString, value) =
     _set_volume_mixing_ratio!(s, _atmospheric_state(s).vmr, name, value)

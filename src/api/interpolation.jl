@@ -37,11 +37,56 @@ The derivations, and guidance on choosing a scheme, are on the
 "Level interpolation" docs page.
 """
 abstract type AbstractInterpolation end
+
+"""
+    NoInterpolation()
+
+Take the level (cell-face) pressures and temperatures as the caller supplied
+them; interpolate nothing.
+"""
 struct NoInterpolation <: AbstractInterpolation end
+
+"""
+    ArithmeticMean()
+
+Set each interior face to the arithmetic mean of its two adjacent layers, in
+both pressure and temperature, and extrapolate linearly at boundary faces.
+"""
 struct ArithmeticMean <: AbstractInterpolation end
+
+"""
+    GeometricMean()
+
+Set each interior face to the geometric mean of its two adjacent layers, in both
+pressure and temperature (the constant-lapse-rate state at the log-pressure
+midpoint), and extrapolate logarithmically at boundary faces.
+"""
 struct GeometricMean <: AbstractInterpolation end
+
+"""
+    UniformZ()
+
+Place each interior face midway in height between its two adjacent layers:
+average the temperature, then take the pressure from the constant-lapse-rate
+power law.
+"""
 struct UniformZ <: AbstractInterpolation end
+
+"""
+    UniformP()
+
+Place each interior face midway in pressure between its two adjacent layers:
+average the pressure, then invert the constant-lapse-rate power law for the
+temperature.
+"""
 struct UniformP <: AbstractInterpolation end
+
+"""
+    BestFit()
+
+Place each face at its true altitude on the constant-lapse-rate profile through
+the two adjacent layers. Requires `center_z` and `face_z`.
+"""
 struct BestFit <: AbstractInterpolation end
 
 # UseSurfaceTempAtBottom and HydrostaticBottom assume a dry ideal gas in an
@@ -63,19 +108,71 @@ Subtypes:
 - `HydrostaticBottom`: assume a dry-adiabatic lapse rate; requires `center_z` and `face_z`.
 """
 abstract type AbstractBottomExtrapolation end
+
+"""
+    SameAsInterpolation()
+
+Extrapolate the bottom face with the same scheme used for the other boundary
+faces, so its air temperature is set by the atmosphere alone and may differ from
+the ground temperature.
+"""
 struct SameAsInterpolation <: AbstractBottomExtrapolation end
+
+"""
+    UseSurfaceTempAtBottom()
+
+Set the bottom-face air temperature to the surface temperature (the limit of
+strong turbulent heat exchange at the surface) and take the pressure from the
+dry isentrope through the first layer.
+"""
 struct UseSurfaceTempAtBottom <: AbstractBottomExtrapolation end
+
+"""
+    HydrostaticBottom()
+
+Extend the first layer down to the bottom face at the dry-adiabatic lapse rate,
+with the isentropic pressure. Requires `center_z` and `face_z`.
+"""
 struct HydrostaticBottom <: AbstractBottomExtrapolation end
 
+"""
+    requires_z(scheme)
+
+Return whether `scheme` needs layer and face altitudes (`center_z`, `face_z`) at
+construction: `true` for [`BestFit`](@ref) and [`HydrostaticBottom`](@ref),
+`false` for every other scheme.
+"""
 requires_z(::Any) = false
 requires_z(::Union{BestFit, HydrostaticBottom}) = true
 
+"""
+    uniform_z_p(T, p₁, T₁, p₂, T₂)
+
+Return the pressure at temperature `T` on the constant-lapse-rate hydrostatic
+power law through `(p₁, T₁)` and `(p₂, T₂)`, degenerating to the geometric mean
+of the pressures in the isothermal limit `T₁ == T₂`.
+"""
 uniform_z_p(T, p₁, T₁, p₂, T₂) =
     T₁ == T₂ ? sqrt(p₁ * p₂) : p₁ * (p₂ / p₁)^(log(T / T₁) / log(T₂ / T₁))
+"""
+    best_fit_p(T, z, p₁, T₁, z₁, p₂, T₂, z₂)
+
+Return the pressure at temperature `T` and altitude `z` on the
+constant-lapse-rate hydrostatic power law through `(p₁, T₁, z₁)` and
+`(p₂, T₂, z₂)`, using the altitudes in the isothermal limit `T₁ == T₂`.
+"""
 best_fit_p(T, z, p₁, T₁, z₁, p₂, T₂, z₂) =
     T₁ == T₂ ? p₁ * (p₂ / p₁)^((z - z₁) / (z₂ - z₁)) :
     p₁ * (p₂ / p₁)^(log(T / T₁) / log(T₂ / T₁))
 
+"""
+    interp!(scheme, p, T, pꜜ, Tꜜ, pꜛ, Tꜛ)
+    interp!(::BestFit, p, T, z, pꜜ, Tꜜ, zꜜ, pꜛ, Tꜛ, zꜛ)
+
+Fill the interior-face pressures `p` and temperatures `T` from the layers below
+(`pꜜ`, `Tꜜ`) and above (`pꜛ`, `Tꜛ`) according to `scheme`. Add a method to
+support a new [`AbstractInterpolation`](@ref).
+"""
 function interp!(::ArithmeticMean, p, T, pꜜ, Tꜜ, pꜛ, Tꜛ)
     @. T = (Tꜜ + Tꜛ) / 2
     @. p = (pꜜ + pꜛ) / 2
@@ -97,6 +194,15 @@ function interp!(::BestFit, p, T, z, pꜜ, Tꜜ, zꜜ, pꜛ, Tꜛ, zꜛ)
     @. p = best_fit_p(T, z, pꜜ, Tꜜ, zꜜ, pꜛ, Tꜛ, zꜛ)
 end
 
+"""
+    extrap!(scheme, p, T, p⁺, T⁺, p⁺⁺, T⁺⁺, Tₛ, params)
+    extrap!(::BestFit, p, T, z, p⁺, T⁺, z⁺, p⁺⁺, T⁺⁺, z⁺⁺, Tₛ, params)
+
+Fill a boundary-face pressure `p` and temperature `T` from the nearest layer
+(`p⁺`, `T⁺`), the next one in (`p⁺⁺`, `T⁺⁺`), the surface temperature `Tₛ`, and
+`params`, according to `scheme`. Add a method to support a new
+[`AbstractInterpolation`](@ref) or [`AbstractBottomExtrapolation`](@ref).
+"""
 function extrap!(::ArithmeticMean, p, T, p⁺, T⁺, p⁺⁺, T⁺⁺, Tₛ, params)
     @. T = (3 * T⁺ - T⁺⁺) / 2
     @. p = (3 * p⁺ - p⁺⁺) / 2

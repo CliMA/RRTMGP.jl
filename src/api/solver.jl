@@ -87,6 +87,10 @@ and shortwave boundary conditions, and the atmospheric state. Keyword arguments:
 - `deep_atmosphere_inverse_scaling`: a `(nlev, ncol)` array multiplied into the fluxes for deep-atmosphere geometric scaling (the host supplies the multiplicative inverse of its metric scaling), or `nothing` (default) for the shallow-atmosphere approximation.
 - `lookups`: prebuilt lookup tables to reuse, or `nothing` (default) to build them internally.
 - `spectral_fluxes`: if `true`, also retain per-band fluxes (two-stream, non-gray only); default `false`.
+- `n_gauss_angles`: number of Gauss-Jacobi-5 quadrature angles (1-4) for the
+  spectral non-scattering longwave hemispheric integral; default `1` (the
+  diffusivity approximation). Not applicable to the two-stream longwave solver
+  or to gray radiation, which reject anything but `1`.
 """
 struct RRTMGPSolver{
     S,
@@ -145,8 +149,25 @@ function RRTMGPSolver(
     deep_atmosphere_inverse_scaling = nothing,
     lookups = nothing,
     spectral_fluxes = false,
+    n_gauss_angles::Int = 1,
 )
     (; context) = grid_params
+
+    # `n_gauss_angles` applies only to the spectral non-scattering longwave
+    # solver; reject it everywhere else rather than ignore it. Gray radiation is
+    # single-band and single-angle by construction (see the gray `solve_lw!`).
+    if n_gauss_angles != 1
+        radiation_method isa GrayRadiation && error(
+            "`n_gauss_angles = $n_gauss_angles` applies only to spectral \
+             radiation; gray radiation uses the single diffusivity angle.",
+        )
+        op_lw isa Optics.OneScalar || error(
+            "`n_gauss_angles = $n_gauss_angles` applies only to the \
+             non-scattering longwave solver; pass \
+             `op_lw = OneScalar(grid_params)`, or keep `n_gauss_angles = 1` \
+             for the two-stream longwave solver.",
+        )
+    end
 
     # Non-scattering shortwave optics are only meaningful for gray radiation;
     # spectral shortwave radiation requires scattering (the spectral `NoScatSWRTE`
@@ -271,7 +292,10 @@ function RRTMGPSolver(
             bcs_lw, # has data
             fluxb_lw, # inferable, need radiation_method
             flux_lw, # views attached
-            AngularDiscretizations.AngularDiscretization(grid_params, 1),
+            AngularDiscretizations.AngularDiscretization(
+                grid_params,
+                n_gauss_angles,
+            ),
             state_cache,
         ) :
         RTE.TwoStreamLWRTE(

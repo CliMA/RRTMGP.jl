@@ -1,7 +1,7 @@
 module RRTMGP
 using Artifacts
 
-get_artifact_path() = joinpath(artifact"rrtmgp-data", "rrtmgp-data-1.9")
+_get_artifact_path() = joinpath(artifact"rrtmgp-data", "rrtmgp-data-1.9")
 
 import ClimaComms
 
@@ -54,5 +54,14 @@ include(joinpath("api", "validation.jl"))
 # ── Layer 3: standalone front door
 include(joinpath("api", "atmosphere_profile.jl"))
 include(joinpath("api", "standalone.jl"))
+
+# ── Deprecated names, kept for one release
+include(joinpath("api", "deprecated.jl"))
+
+# ── The public API surface (see test/public_api.jl)
+include(joinpath("api", "public.jl"))
+
+# ── Warm up the standalone gray solve at load time
+include("precompile.jl")
 
 end # module

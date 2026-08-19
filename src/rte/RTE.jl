@@ -27,7 +27,8 @@ _default_state_cache(::ClimaComms.AbstractDevice, gp::RRTMGPGridParams) =
     TransposedStateCache(gp)
 
 """
-    NoScatLWRTE(grid_params::RRTMGPGridParams; params, sfc_emis, inc_flux)
+    NoScatLWRTE(grid_params::RRTMGPGridParams; params, sfc_emis, inc_flux,
+                n_gauss_angles = 1)
 
 A high-level RRTMGP data structure storing the optical
 properties, sources, boundary conditions and fluxes
@@ -40,7 +41,11 @@ configurations for a non-scattering longwave simulation.
 - `bcs`: Longwave boundary conditions.
 - `fluxb`: Temporary storage for bandwise calculations.
 - `flux`: Longwave fluxes.
-- `angle_disc`: Angular discretization.
+- `angle_disc`: Angular discretization; `n_gauss_angles` sets the number of
+  Gauss-Jacobi-5 quadrature angles (1-4) used for the hemispheric integral of
+  the spectral solve. One angle is the diffusivity approximation; more angles
+  resolve the angular integral better, at proportional cost. Gray radiation is
+  single-angle and rejects anything but `1`.
 - `state_cache`: [`TransposedStateCache`](@ref
   RRTMGP.AtmosphericStates.TransposedStateCache) with column-first copies of
   the hot state arrays (refreshed at each spectral solve), or `nothing`.
@@ -72,6 +77,7 @@ function NoScatLWRTE(
     sfc_emis,
     inc_flux,
     state_cache = _default_state_cache(grid_params),
+    n_gauss_angles::Int = 1,
 )
     (; context) = grid_params
     op = OneScalar(grid_params)
@@ -79,7 +85,7 @@ function NoScatLWRTE(
     bcs = LwBCs(sfc_emis, inc_flux)
     fluxb = FluxLW(grid_params)
     flux = FluxLW(grid_params)
-    ad = AngularDiscretization(grid_params, 1)
+    ad = AngularDiscretization(grid_params, n_gauss_angles)
     return NoScatLWRTE(context, op, src, bcs, fluxb, flux, ad, state_cache)
 end
 

@@ -6,6 +6,13 @@ and write a solver's data. The getters' layout, domain-masking, and writability
 contract (the mechanism that decouples RRTMGP from ClimaCore) is spelled out
 under [The getter contract](@ref).
 
+## Versioning and API stability
+
+`RRTMGP.PUBLIC_NAMES` lists the public API. On Julia 1.11 and later, the same
+list is declared with `public`, so `Base.ispublic` agrees with it. Names on the
+list change only with the package version; anything else reachable through the
+module may change in a patch release.
+
 ```@meta
 CurrentModule = RRTMGP
 ```
@@ -101,6 +108,29 @@ RRTMGP.clip!
 RRTMGP.update_concentrations!
 RRTMGP.get_p_min
 RRTMGP.get_t_min
+RRTMGP.get_t_max
+```
+
+## Level interpolation schemes
+
+The schemes, and the two functions that define one, are derived and compared on
+the [Level interpolation and extrapolation](@ref) page.
+
+```@docs
+RRTMGP.NoInterpolation
+RRTMGP.ArithmeticMean
+RRTMGP.GeometricMean
+RRTMGP.UniformZ
+RRTMGP.UniformP
+RRTMGP.BestFit
+RRTMGP.SameAsInterpolation
+RRTMGP.UseSurfaceTempAtBottom
+RRTMGP.HydrostaticBottom
+RRTMGP.requires_z
+RRTMGP.interp!
+RRTMGP.extrap!
+RRTMGP.uniform_z_p
+RRTMGP.best_fit_p
 ```
 
 ## Aerosol properties

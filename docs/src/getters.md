@@ -79,7 +79,8 @@ The host **writes** the inputs through the getters before calling
 - layer/level pressure and temperature, gas volume mixing ratios, cloud
   properties (effective radii, water paths, fraction), and aerosol properties;
 - surface and solar boundary conditions (`surface_temperature`,
-  `surface_emissivity`, the albedos, `cos_zenith`, `toa_flux`);
+  `surface_emissivity`, the albedos, `cos_zenith`,
+  `toa_sw_flux_dn`);
 - for the deep-atmosphere GCM path, `deep_atmosphere_inverse_scaling` (computed
   from the host's geometry).
 
@@ -124,10 +125,10 @@ getters are domain-masked views into solver-owned buffers.
 | `surface_emissivity` | longwave surface emissivity | `(nbnd, ncol)` |
 | `latitude` | column latitude [degrees] | `(ncol,)`, or `nothing` |
 | `cos_zenith` | cosine of the solar zenith angle | `(ncol,)` |
-| `toa_flux` | top-of-atmosphere solar flux [W/m²] | `(ncol,)` |
+| `toa_sw_flux_dn` | prescribed incident direct-beam shortwave flux [W/m²] | `(ncol,)` |
 | `direct_sw_surface_albedo`, `diffuse_sw_surface_albedo` | shortwave surface albedo (direct / diffuse) | `(nbnd, ncol)` |
-| `top_of_atmosphere_lw_flux_dn` | prescribed incident longwave flux [W/m²] | `(ngpt, ncol)`, or `nothing` |
-| `top_of_atmosphere_diffuse_sw_flux_dn` | prescribed incident diffuse shortwave flux [W/m²] | `(ngpt, ncol)`, or `nothing` |
+| `toa_lw_flux_dn` | prescribed incident longwave flux [W/m²] | `(ngpt, ncol)`, or `nothing` |
+| `toa_diffuse_sw_flux_dn` | prescribed incident diffuse shortwave flux [W/m²] | `(ngpt, ncol)`, or `nothing` |
 
 ### Fluxes: outputs, `(nlev, ncol)` [W/m²]
 
@@ -140,9 +141,9 @@ getters are domain-masked views into solver-owned buffers.
 | [`heating_rate`](@ref RRTMGP.heating_rate) | radiative heating rate [K/s], `(nlay, ncol)` (computed on demand into a fresh array) |
 
 The clear-sky counterparts (`AllSkyRadiationWithClearSkyDiagnostics` only)
-mirror these: `clear_lw_flux_up`/`clear_lw_flux_dn`/`clear_lw_flux`,
+mirror these: `clear_lw_flux_up`/`clear_lw_flux_dn`/`clear_lw_flux_net`,
 `clear_sw_flux_up`/`clear_sw_flux_dn`/`clear_sw_direct_flux_dn`/
-`clear_sw_flux`, and `clear_net_flux`. Per-band fluxes
+`clear_sw_flux_net`, and `clear_net_flux`. Per-band fluxes
 (`spectral_{lw,sw}_flux_{up,dn,net}`, `(nlev, ncol, nbnd)`) are covered on the
 [API](@ref) page; all six are views into the retained per-band buffers.
 
@@ -180,11 +181,11 @@ RRTMGP.surface_temperature
 RRTMGP.surface_emissivity
 RRTMGP.latitude
 RRTMGP.cos_zenith
-RRTMGP.toa_flux
+RRTMGP.toa_sw_flux_dn
 RRTMGP.direct_sw_surface_albedo
 RRTMGP.diffuse_sw_surface_albedo
-RRTMGP.top_of_atmosphere_lw_flux_dn
-RRTMGP.top_of_atmosphere_diffuse_sw_flux_dn
+RRTMGP.toa_lw_flux_dn
+RRTMGP.toa_diffuse_sw_flux_dn
 RRTMGP.lw_flux_up
 RRTMGP.lw_flux_dn
 RRTMGP.lw_flux_net
@@ -195,11 +196,11 @@ RRTMGP.sw_direct_flux_dn
 RRTMGP.net_flux
 RRTMGP.clear_lw_flux_up
 RRTMGP.clear_lw_flux_dn
-RRTMGP.clear_lw_flux
+RRTMGP.clear_lw_flux_net
 RRTMGP.clear_sw_flux_up
 RRTMGP.clear_sw_flux_dn
 RRTMGP.clear_sw_direct_flux_dn
-RRTMGP.clear_sw_flux
+RRTMGP.clear_sw_flux_net
 RRTMGP.clear_net_flux
 RRTMGP.cloud_liquid_effective_radius
 RRTMGP.cloud_ice_effective_radius

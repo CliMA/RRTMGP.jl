@@ -15,7 +15,7 @@
 # is loaded, by an assertion in `ext/RRTMGPNCDatasetsExt.jl`). Do not reorder
 # these without updating the kernel indices.
 
-const AEROSOL_IDX = Dict{String, Int}(
+const _AEROSOL_IDX = Dict{String, Int}(
     "dust1" => 1,
     "sea_salt1" => 2,
     "sulfate" => 3,
@@ -61,7 +61,7 @@ Return the canonical mapping from aerosol species name to its index in the
 the optics kernel, the lookup-table loader, and the state accessors. Returns
 a fresh copy; mutating it does not affect RRTMGP.
 """
-aerosol_index_map() = copy(AEROSOL_IDX)
+aerosol_index_map() = copy(_AEROSOL_IDX)
 
 """
     aerosol_names()
@@ -72,7 +72,7 @@ arrays. Returns a fresh copy — mutating it does not affect RRTMGP.
 """
 aerosol_names() = copy(_AEROSOL_NAMES)
 
-aerosol_names_docs() = map(x -> "`$x`", aerosol_names())
+_aerosol_names_docs() = map(x -> "`$x`", aerosol_names())
 
 """
     canonical_aerosol_name(name)
@@ -80,10 +80,10 @@ aerosol_names_docs() = map(x -> "`$x`", aerosol_names())
 Resolve an aerosol `name` to its canonical name. Throws if `name` is unknown.
 """
 function canonical_aerosol_name(name::AbstractString)
-    haskey(AEROSOL_IDX, name) && return String(name)
+    haskey(_AEROSOL_IDX, name) && return String(name)
     return error(
         "unknown aerosol name $(repr(name)); known names are " *
-        "$(sort(collect(keys(AEROSOL_IDX))))",
+        "$(sort(collect(keys(_AEROSOL_IDX))))",
     )
 end
 
@@ -92,4 +92,4 @@ end
 
 Return the index, into the `AerosolState` arrays, of aerosol `name`.
 """
-aerosol_index(name::AbstractString) = AEROSOL_IDX[canonical_aerosol_name(name)]
+aerosol_index(name::AbstractString) = _AEROSOL_IDX[canonical_aerosol_name(name)]

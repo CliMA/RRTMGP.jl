@@ -45,7 +45,7 @@ Validate the solver's host-provided inputs against their physical ranges,
 raising an informative error on the first violation:
 
 - level/layer pressures and temperatures: positive and finite,
-- `cos_zenith ∈ [-1, 1]`, `toa_flux ≥ 0`,
+- `cos_zenith ∈ [-1, 1]`, `toa_sw_flux_dn ≥ 0`,
 - surface emissivity and the two shortwave surface albedos ∈ [0, 1],
 - gas volume mixing ratios ≥ 0 (spectral states).
 
@@ -61,7 +61,11 @@ function validate_inputs(s::RRTMGPSolver)
     _check(_positive_finite, getview_t_lay(as), :layer_temperature)
     _check(_positive_finite, as.t_sfc, :surface_temperature)
     _check(_in_cos_range, s.sws.bcs.cos_zenith, :cos_zenith)
-    _check(_nonnegative_finite, s.sws.bcs.toa_flux, :toa_flux)
+    _check(
+        _nonnegative_finite,
+        s.sws.bcs.toa_flux,
+        :toa_sw_flux_dn,
+    )
     _check(_in_unit_interval, s.lws.bcs.sfc_emis, :surface_emissivity)
     _check(_in_unit_interval, s.sws.bcs.sfc_alb_direct, :direct_sw_surface_albedo)
     _check(_in_unit_interval, s.sws.bcs.sfc_alb_diffuse, :diffuse_sw_surface_albedo)

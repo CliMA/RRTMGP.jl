@@ -31,16 +31,26 @@ get_p_min(as::AtmosphericState, lookup_lw) = lookup_lw.p_ref_min
 
 """
     get_t_min(as, lookup_lw)
-    get_t_max(as, lookup_lw)
 
-Return the temperature bounds of the radiation scheme's valid interpolation
-range: the longwave lookup table's first/last reference temperatures for
-non-gray radiation, and `nothing` for gray radiation (which has no temperature
-lookup and whose temperatures are left unclipped). Passing `nothing` to
-[`clip!`](@ref) makes temperature clipping a no-op.
+Return the lower temperature bound of the radiation scheme's valid
+interpolation range: the longwave lookup table's first reference temperature
+for non-gray radiation, and `nothing` for gray radiation (which has no
+temperature lookup and whose temperatures are left unclipped). Pass to
+[`clip!`](@ref); `nothing` makes its temperature clamp a no-op. See also
+[`get_t_max`](@ref).
 """
 get_t_min(as::GrayAtmosphericState, lookup_lw) = nothing
 get_t_min(as::AtmosphericState, lookup_lw) = lookup_lw.t_ref_min
+
+"""
+    get_t_max(as, lookup_lw)
+
+Return the upper temperature bound of the radiation scheme's valid
+interpolation range: the longwave lookup table's last reference temperature
+for non-gray radiation, and `nothing` for gray radiation. Pass to
+[`clip!`](@ref); `nothing` makes its temperature clamp a no-op. See also
+[`get_t_min`](@ref).
+"""
 get_t_max(as::GrayAtmosphericState, lookup_lw) = nothing
 get_t_max(as::AtmosphericState, lookup_lw) = lookup_lw.t_ref_max
 
@@ -90,19 +100,19 @@ function interpolate_levels!(
     mode = interpolation
     outs = requires_z(mode) ? (p_lev, t_lev, z_lev) : (p_lev, t_lev)
     ins = requires_z(mode) ? (p_lay, t_lay, z_lay) : (p_lay, t_lay)
-    update_views(interp!, mode, outs, ins, (), 2:nlay, 1:(nlay - 1), 2:nlay)
+    _update_views(interp!, mode, outs, ins, (), 2:nlay, 1:(nlay - 1), 2:nlay)
     others = (t_sfc, params)
-    update_views(extrap!, mode, outs, ins, others, nlay + 1, nlay, nlay - 1)
+    _update_views(extrap!, mode, outs, ins, others, nlay + 1, nlay, nlay - 1)
     mode =
         bottom_extrapolation isa SameAsInterpolation ? interpolation :
         bottom_extrapolation
     outs = requires_z(mode) ? (p_lev, t_lev, z_lev) : (p_lev, t_lev)
     ins = requires_z(mode) ? (p_lay, t_lay, z_lay) : (p_lay, t_lay)
-    update_views(extrap!, mode, outs, ins, others, 1, 1, 2)
+    _update_views(extrap!, mode, outs, ins, others, 1, 1, 2)
     return as
 end
 
-update_views(f, mode, outs, ins, others, out_range, in_range1, in_range2) = f(
+_update_views(f, mode, outs, ins, others, out_range, in_range1, in_range2) = f(
     mode,
     map(out -> view(out, out_range, :), outs)...,
     map(in -> view(in, in_range1, :), ins)...,

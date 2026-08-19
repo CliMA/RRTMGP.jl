@@ -63,9 +63,9 @@ ax1 = Axis(
     yreversed = true,
     limits = (nothing, nothing, nothing, 1000),
 )
-lines!(ax1, Array(out.lw_net)[:, 1], p_lev[:, 1]; label = "longwave net")
-lines!(ax1, Array(out.sw_net)[:, 1], p_lev[:, 1]; label = "shortwave net")
-lines!(ax1, Array(out.net)[:, 1], p_lev[:, 1]; label = "total net")
+lines!(ax1, Array(out.lw_flux_net)[:, 1], p_lev[:, 1]; label = "longwave net")
+lines!(ax1, Array(out.sw_flux_net)[:, 1], p_lev[:, 1]; label = "shortwave net")
+lines!(ax1, Array(out.net_flux)[:, 1], p_lev[:, 1]; label = "total net")
 axislegend(ax1; position = :rb, framevisible = false)
 ax2 = Axis(
     fig[1, 2];
@@ -93,7 +93,7 @@ out_wellmixed = RRTMGP.solve(
     optical_thickness = GrayOpticalThicknessSchneider2004(Float64; α = 1.0),
 );
 println("surface net flux, α = 1: ",
-        round(Array(out_wellmixed.net)[1, 1]; digits = 1), " W/m²")
+        round(Array(out_wellmixed.net_flux)[1, 1]; digits = 1), " W/m²")
 
 # ([`solve_gray`](@ref RRTMGP.solve_gray) is a related single-call entry point
 # that builds an analytic, latitude-dependent gray column internally instead of
@@ -122,7 +122,7 @@ olr(kind, lookups) = Array(
     RRTMGP.solve(
         RRTMGP.standard_atmosphere(Float64; kind);
         lookups,
-    ).lw_up,
+    ).lw_flux_up,
 )[end, 1]
 
 lookups = out_cs.solver.lookups
@@ -143,7 +143,7 @@ profile_2x = RRTMGP.standard_atmosphere(Float64; kind = :tropical, nlay = 60)
 profile_2x.well_mixed_vmr["co2"] = 2 * profile.well_mixed_vmr["co2"]
 out_2x = RRTMGP.solve(profile_2x; lookups)
 
-ΔOLR = Array(out_2x.lw_up)[end, 1] - Array(out_cs.lw_up)[end, 1]
+ΔOLR = Array(out_2x.lw_flux_up)[end, 1] - Array(out_cs.lw_flux_up)[end, 1]
 println("ΔOLR from doubling CO₂: $(round(ΔOLR; digits = 2)) W/m²")
 
 # Doubling CO₂ reduces the OLR by a few W/m², creating the energy imbalance that

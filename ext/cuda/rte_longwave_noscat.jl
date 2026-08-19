@@ -107,8 +107,6 @@ function rte_lw_noscat_solve_CUDA!(
     nlev = nlay + 1
     (; major_gpt2bnd) = lookup_lw.band_data
     n_gpt = length(major_gpt2bnd)
-    Ds = angle_disc.gauss_Ds[1]
-    w_μ = angle_disc.gauss_wts[1]
     if gcol ≤ ncol
         (; cloud_state, aerosol_state) = as
         FT = eltype(flux_lw.flux_up)
@@ -123,8 +121,7 @@ function rte_lw_noscat_solve_CUDA!(
                 src_lw,
                 bcs_lw,
                 op,
-                Ds,
-                w_μ,
+                angle_disc,
                 as,
                 state_cache,
                 lookup_lw,

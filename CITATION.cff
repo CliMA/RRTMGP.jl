@@ -1,0 +1,37 @@
+cff-version: 1.2.0
+message: >-
+  If you use RRTMGP.jl in your research, please cite both the software and the
+  paper describing the RTE+RRTMGP radiation scheme it implements.
+title: RRTMGP.jl
+abstract: >-
+  A Julia implementation of the radiative transfer solver RTE (Radiative Transfer for
+  Energetics) and the RRTMGP (RRTM for General circulation model applications-Parallel)
+  correlated-k gas optics, based on the reference Fortran implementation rte-rrtmgp. It
+  computes longwave and shortwave radiative fluxes and heating rates for clear, cloudy,
+  and aerosol-laden atmospheres on CPUs and GPUs, and is the radiation scheme of the CliMA
+  Earth System Model.
+type: software
+authors:
+  - name: The Climate Modeling Alliance
+repository-code: https://github.com/CliMA/RRTMGP.jl
+url: https://clima.github.io/RRTMGP.jl/dev/
+license: Apache-2.0
+preferred-citation:
+  type: article
+  title: >-
+    Balancing accuracy, efficiency, and flexibility in radiation calculations for
+    dynamical models
+  journal: Journal of Advances in Modeling Earth Systems
+  year: 2019
+  volume: 11
+  issue: 10
+  start: 3074
+  end: 3089
+  doi: 10.1029/2019MS001621
+  authors:
+    - family-names: Pincus
+      given-names: Robert
+    - family-names: Mlawer
+      given-names: Eli J.
+    - family-names: Delamere
+      given-names: Jennifer S.

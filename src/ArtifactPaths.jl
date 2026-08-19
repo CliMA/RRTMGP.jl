@@ -1,7 +1,7 @@
 module ArtifactPaths
 
 using Artifacts
-import ..get_artifact_path
+import .._get_artifact_path
 
 export get_lookup_filename, get_input_filename
 
@@ -28,7 +28,7 @@ https://github.com/earth-system-radiation/rrtmgp-data"
 function get_lookup_filename(optics_type::Symbol, λ::Symbol)
     @assert optics_type ∈ (:gas, :cloud, :aerosol)
     @assert λ ∈ (:lw, :sw)
-    basedir = get_artifact_path()
+    basedir = _get_artifact_path()
     config = (optics_type, λ)
 
     config == (:gas, :lw) && return joinpath(basedir, "rrtmgp-gas-lw-g256.nc")
@@ -71,7 +71,7 @@ function get_input_filename(problemtype::Symbol, λ::Symbol)
     @assert problemtype ∈ (:gas, :gas_clouds, :gas_clouds_aerosols)
     @assert λ ∈ (:lw, :sw)
 
-    basedir = get_artifact_path()
+    basedir = _get_artifact_path()
 
     if problemtype == :gas
         return joinpath(

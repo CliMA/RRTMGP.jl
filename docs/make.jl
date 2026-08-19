@@ -24,6 +24,9 @@ end
 makedocs(;
     plugins = [bib],
     sitename = "RRTMGP.jl",
+    # The CliMA documentation policy avoids jldoctest blocks, so the docs use 
+    # plain ```julia blocks and there is nothing to doctest. Runnable code 
+    # lives in `@example` blocks, which `makedocs` executes regardless of this flag.
     doctest = false,
     format = Documenter.HTML(
         prettyurls = get(ENV, "CI", nothing) == "true",

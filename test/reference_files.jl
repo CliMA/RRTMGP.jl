@@ -1,5 +1,5 @@
 using Artifacts
-import RRTMGP: get_artifact_path
+import RRTMGP: _get_artifact_path
 
 """
     get_reference_filename(problemtype::Symbol, λ::Symbol, flux_up_dn::Symbol)
@@ -21,7 +21,7 @@ function get_reference_filename(
     @assert λ ∈ (:lw, :sw)
     @assert flux_up_dn ∈ (:flux_up, :flux_dn)
 
-    basedir = get_artifact_path()
+    basedir = _get_artifact_path()
 
     if problemtype == :gas
         dir = joinpath(basedir, "examples", "rfmip-clear-sky", "reference")

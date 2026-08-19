@@ -13,7 +13,7 @@ using RRTMGP
 
 out = RRTMGP.solve_gray(Float64; nlay = 60, ncol = 1);
 
-out.net[end, 1] # net flux at the top of the atmosphere [W/m²]
+out.net_flux[end, 1] # net flux at the top of the atmosphere [W/m²]
 ```
 
 To assemble the pieces yourself (the atmospheric state, the RTE workspaces, and
