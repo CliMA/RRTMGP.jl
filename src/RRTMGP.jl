@@ -61,4 +61,7 @@ include(joinpath("api", "deprecated.jl"))
 # ── The public API surface (see test/public_api.jl)
 include(joinpath("api", "public.jl"))
 
+# ── Warm up the standalone gray solve at load time
+include("precompile.jl")
+
 end # module

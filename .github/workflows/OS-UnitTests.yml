@@ -25,6 +25,7 @@ jobs:
         version:
           - '1.10'
           - '1.11'
+          - '1.12'
         os:
           - ubuntu-latest
           - macOS-latest
@@ -33,6 +34,8 @@ jobs:
           - version: '1.10'
             timeout: 30
           - version: '1.11'
+            timeout: 45
+          - version: '1.12'
             timeout: 45
     steps:
       - uses: actions/checkout@v4

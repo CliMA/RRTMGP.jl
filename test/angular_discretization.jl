@@ -92,11 +92,18 @@ end
 # exactly π·w·B·(1 - exp(-τD)) of downward flux at the surface, and the angles
 # sum to π·B·(1 - Σ wᵢ exp(-τ Dᵢ)), which converges to the exact
 # π·B·(1 - 2E₃(τ)). This pins the weights, the secant scaling, and the
-# intensity/flux normalization without going through a driver.
+# intensity/flux normalization without going through a full driver.
+#
+# `rte_lw_noscat_one_angle!` is a per-column kernel body: it writes its buffer
+# element by element, which is legal on the GPU only from inside a launch. It
+# runs here through `ClimaComms.@threaded` — a plain loop on the CPU, a kernel
+# on the GPU — exactly as the real driver calls it, so the test exercises the
+# device path it will run on.
 @testset "one angle of transport is exact for an isothermal layer" begin
     FT = Float64
     context = ClimaComms.context()
-    DA = ClimaComms.array_type(ClimaComms.device(context))
+    device = ClimaComms.device(context)
+    DA = ClimaComms.array_type(device)
     nlay, ncol, nlev = 1, 1, 2
     params = RRTMGP.default_parameters(FT)
     gp = RRTMGP.RRTMGPGridParams(FT; context, domain_nlay = nlay, ncol)
@@ -112,19 +119,21 @@ end
         fill!(src.lay_source, B)   # isothermal: layer and level sources agree,
         fill!(src.lev_source, B)   # so the linear-in-τ term drops out
         fill!(src.sfc_source, B)
-        RRTMGP.RTESolver.rte_lw_noscat_one_angle!(
-            src,
-            bcs,
-            op,
-            Ds,
-            w_μ,
-            1,
-            flux,
-            1,
-            1,
-            nlay,
-            nlev,
-        )
+        ClimaComms.@threaded device for gcol in 1:ncol
+            RRTMGP.RTESolver.rte_lw_noscat_one_angle!(
+                src,
+                bcs,
+                op,
+                Ds,
+                w_μ,
+                gcol,
+                flux,
+                1,
+                1,
+                nlay,
+                nlev,
+            )
+        end
         return Array(flux.flux_dn)[1, 1]
     end
 
