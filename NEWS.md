@@ -4,6 +4,9 @@ RRTMGP.jl Release Notes
 main
 ------
 
+v0.23.0
+-------
+
 - **Multi-angle longwave quadrature now works.** The spectral non-scattering
   longwave solver integrates the Schwarzschild equation along 1-4
   Gauss-Jacobi-5 angles, selected with the `n_gauss_angles` keyword of
