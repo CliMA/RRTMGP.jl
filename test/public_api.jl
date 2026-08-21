@@ -3,25 +3,16 @@ using RRTMGP
 
 # `RRTMGP.PUBLIC_NAMES` lists the public API; this file locks it from both
 # sides, so a name added to or removed from the module surface fails here until
-# it is classified. Internal names are excluded by convention: a leading `_`, a
-# submodule, or a deprecated name.
+# it is classified. Internal names are excluded by convention: a leading `_` or
+# a submodule.
 
-const DEPRECATED_NAMES = (
-    :clear_lw_flux,
-    :clear_sw_flux,
-    :toa_flux,
-    :top_of_atmosphere_lw_flux_dn,
-    :top_of_atmosphere_diffuse_sw_flux_dn,
-)
-
-# Every name the module exposes that is neither internal nor deprecated.
+# Every name the module exposes that is not internal.
 function exposed_names()
     out = Symbol[]
     for n in names(RRTMGP; all = true, imported = false)
         s = String(n)
         (startswith(s, "_") || startswith(s, "#")) && continue
         n in (:RRTMGP, :eval, :include, :PUBLIC_NAMES) && continue
-        n in DEPRECATED_NAMES && continue
         isdefined(RRTMGP, n) || continue
         getfield(RRTMGP, n) isa Module && continue
         push!(out, n)
@@ -58,14 +49,6 @@ end
     )
     isempty(undocumented) || @info "Public names without docstrings" undocumented
     @test isempty(undocumented)
-end
-
-@testset "deprecated names still resolve to their replacements" begin
-    out = RRTMGP.solve_gray(Float64; nlay = 10, ncol = 2)
-    s = out.solver
-    @test (@test_deprecated RRTMGP.toa_flux(s)) === RRTMGP.toa_sw_flux_dn(s)
-    @test (@test_deprecated RRTMGP.top_of_atmosphere_lw_flux_dn(s)) ===
-          RRTMGP.toa_lw_flux_dn(s)
 end
 
 nothing

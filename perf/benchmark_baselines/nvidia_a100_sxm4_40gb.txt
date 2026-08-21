@@ -1,4 +1,4 @@
-# RRTMGP DYAMOND GPU benchmark baseline (minimum ns)
+# RRTMGP high-resolution GPU benchmark baseline (minimum ns)
 # device: NVIDIA A100-SXM4-40GB
 # julia: 1.12.6
 # recorded: local run

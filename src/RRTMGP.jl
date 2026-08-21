@@ -25,7 +25,6 @@ include(joinpath("api", "aerosols.jl"))
 
 # ── Layer 0: core containers — states, sources, optics, fluxes, BCs, lookups
 include(joinpath("optics", "VolumeMixingRatios.jl"))
-const Vmrs = VolumeMixingRatios # compat alias (deprecated name; remove in 0.24)
 include(joinpath("optics", "Fluxes.jl"))
 include(joinpath("optics", "LookUpTables.jl"))
 include(joinpath("optics", "AngularDiscretizations.jl"))
@@ -33,7 +32,6 @@ include(joinpath("optics", "AtmosphericStates.jl"))
 include(joinpath("optics", "Sources.jl"))
 include(joinpath("optics", "Optics.jl"))
 include(joinpath("optics", "GrayAtmosphere.jl"))
-const GrayUtils = GrayAtmosphere # compat alias (deprecated name; remove in 0.24)
 include(joinpath("optics", "BCs.jl"))
 
 # ── Layer 1: RTE solver workspaces and the functional solve_lw!/solve_sw! core
@@ -54,9 +52,6 @@ include(joinpath("api", "validation.jl"))
 # ── Layer 3: standalone front door
 include(joinpath("api", "atmosphere_profile.jl"))
 include(joinpath("api", "standalone.jl"))
-
-# ── Deprecated names, kept for one release
-include(joinpath("api", "deprecated.jl"))
 
 # ── The public API surface (see test/public_api.jl)
 include(joinpath("api", "public.jl"))

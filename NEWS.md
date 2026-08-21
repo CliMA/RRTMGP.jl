@@ -4,6 +4,17 @@ RRTMGP.jl Release Notes
 main
 ------
 
+v1.0.0
+------
+
+- **Breaking:** removed the deprecated getters `clear_lw_flux`, `clear_sw_flux`,
+  `toa_flux`, `top_of_atmosphere_lw_flux_dn`, and
+  `top_of_atmosphere_diffuse_sw_flux_dn`, along with the renamed-module aliases
+  `Vmrs` and `GrayUtils`. Use `clear_lw_flux_net`, `clear_sw_flux_net`,
+  `toa_sw_flux_dn`, `toa_lw_flux_dn`, `toa_diffuse_sw_flux_dn`,
+  `VolumeMixingRatios`, and `GrayAtmosphere`. (The `SwBCs` field and the
+  `solve`/`solve_gray` keyword `toa_flux` are unchanged.)
+
 v0.23.0
 -------
 
@@ -90,7 +101,7 @@ v0.22.0
   properties (`OneScalar`, `TwoStream`), source functions (`SourceLWNoScat`,
   `SourceLW2Str`, `SourceSW2Str`), and the broadband flux buffers (`FluxLW`,
   `FluxSW`). On the GPU the storage is column-first, giving coalesced access
-  (on an A100 at DYAMOND scale this cuts longwave kernel times by 25-36% and
+  (on an A100 at high resolution this cuts longwave kernel times by 25-36% and
   shortwave all-sky by 14-20%); on the CPU the storage stays vertical-first
   under a lazy `PermutedDimsArray` wrapper, preserving the stride-1 vertical
   sweeps (and CPU performance) while running the same kernel code.
@@ -135,10 +146,10 @@ v0.22.0
   cloud-radiative-effect sign checks in the all-sky tests, and the McICA
   reproducibility tests now also run in `Float32`.
 - New advisory GPU benchmark ratchet (`perf/benchmark_ratchet.jl` + a
-  soft-fail Buildkite step): the DYAMOND-scale `solve_lw!`/`solve_sw!` medians
+  soft-fail Buildkite step): the high-resolution `solve_lw!`/`solve_sw!` medians
   are compared against per-GPU baselines committed under
   `perf/benchmark_baselines/`, flagging wall-time regressions beyond 20%
-  without blocking merges. The three DYAMOND benchmark scripts are now
+  without blocking merges. The three high-resolution benchmark scripts are now
   includable (their sweeps run only when executed as scripts).
 - New docs page "Fortran and paper concordance": tables mapping RRTMGP.jl
   names (containers, RTE/gas-optics/cloud/aerosol kernels) to the Fortran

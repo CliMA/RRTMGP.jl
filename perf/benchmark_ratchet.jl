@@ -1,7 +1,7 @@
 #=
-GPU benchmark ratchet for the DYAMOND-scale solver kernels.
+GPU benchmark ratchet for the high-resolution solver kernels.
 
-Measures the minimum wall time of `solve_lw!`/`solve_sw!` at DYAMOND resolution
+Measures the minimum wall time of `solve_lw!`/`solve_sw!` at high resolution
 for the three production configurations (clear sky, all sky, all sky with
 aerosols; two-stream longwave and shortwave) in both precisions, and compares
 each against a recorded per-GPU baseline:
@@ -43,21 +43,23 @@ end
 
 using CUDA
 
-# The high-resolution DYAMOND target column count used by the benchmark scripts
-# (30² horizontal elements × 6 panels × 4² quadrature points across 64 levels / 63 layers).
-dyamond_ncol(; helems = 30, nq = 4) = Int(helems * helems * 6 * nq * nq)
-const dyamond_nlay = 63
+# The target column count used by the benchmark scripts: a cubed sphere of
+# 30² horizontal elements × 6 panels × 4² quadrature points, i.e. 86,400
+# columns at roughly 80-km spacing, across 64 levels / 63 layers.
+highres_ncol(; helems = 30, nq = 4) = Int(helems * helems * 6 * nq * nq)
+const highres_nlay = 63
 
 # Pull in benchmark_clear_sky / benchmark_all_sky /
 # benchmark_all_sky_with_aerosols; their sweep loops are guarded behind
 # `PROGRAM_FILE == @__FILE__`, so the includes only define functions.
 const test_dir = joinpath(dirname(@__DIR__), "test")
-include(joinpath(test_dir, "clear_sky_dyamond_gpu_benchmark.jl"))
-include(joinpath(test_dir, "cloudy_sky_dyamond_gpu_benchmark.jl"))
-include(joinpath(test_dir, "all_sky_with_aerosols_dyamond_gpu_benchmark.jl"))
+include(joinpath(test_dir, "clear_sky_highres_gpu_benchmark.jl"))
+include(joinpath(test_dir, "cloudy_sky_highres_gpu_benchmark.jl"))
+include(joinpath(test_dir, "all_sky_with_aerosols_highres_gpu_benchmark.jl"))
 
-# One measured case: production two-stream solvers across identical uniform DYAMOND grids.
-# Each `run` returns (trial_lw, trial_sw) from BenchmarkTools.
+# One measured case: production two-stream solvers across identical uniform
+# high-resolution grids. Each `run` returns (trial_lw, trial_sw) from
+# BenchmarkTools.
 cases = [
     (
         key = "clear_sky",
@@ -67,8 +69,8 @@ cases = [
             TwoStreamSWRTE,
             VmrGM,
             FT;
-            ncol = dyamond_ncol(),
-            nlay = dyamond_nlay,
+            ncol = highres_ncol(),
+            nlay = highres_nlay,
         ),
     ),
     (
@@ -78,8 +80,8 @@ cases = [
             TwoStreamLWRTE,
             TwoStreamSWRTE,
             FT;
-            ncol = dyamond_ncol(),
-            nlay = dyamond_nlay,
+            ncol = highres_ncol(),
+            nlay = highres_nlay,
             cldfrac = FT(1),
         ),
     ),
@@ -90,8 +92,8 @@ cases = [
             TwoStreamLWRTE,
             TwoStreamSWRTE,
             FT;
-            ncol = dyamond_ncol(),
-            nlay = dyamond_nlay,
+            ncol = highres_ncol(),
+            nlay = highres_nlay,
         ),
     ),
 ]
@@ -120,7 +122,7 @@ end
 function write_baseline(path, results; kind = "baseline")
     mkpath(dirname(path))
     open(path, "w") do io
-        println(io, "# RRTMGP DYAMOND GPU benchmark $kind (minimum ns)")
+        println(io, "# RRTMGP high-resolution GPU benchmark $kind (minimum ns)")
         println(io, "# device: $(CUDA.name(CUDA.device()))")
         println(io, "# julia: $(VERSION)")
         println(io, "# recorded: ", get(ENV, "BUILDKITE_BUILD_URL", "local run"))
@@ -139,7 +141,7 @@ const baseline = read_baseline(path)
 
 results = Dict{String, Float64}()
 for FT in (Float32, Float64), case in cases
-    @info "benchmark_ratchet: running $(case.key) ($FT) at DYAMOND resolution"
+    @info "benchmark_ratchet: running $(case.key) ($FT) at high resolution"
     trial_lw, trial_sw = case.run(FT)
     # `minimum` is the recommended timing statistic: it is the most resilient to
     # GC/scheduler noise on a shared cluster (CliMA DeveloperGuides,
