@@ -4,6 +4,17 @@ RRTMGP.jl Release Notes
 main
 ------
 
+v1.0.0
+------
+
+- **Breaking:** removed the deprecated getters `clear_lw_flux`, `clear_sw_flux`,
+  `toa_flux`, `top_of_atmosphere_lw_flux_dn`, and
+  `top_of_atmosphere_diffuse_sw_flux_dn`, along with the renamed-module aliases
+  `Vmrs` and `GrayUtils`. Use `clear_lw_flux_net`, `clear_sw_flux_net`,
+  `toa_sw_flux_dn`, `toa_lw_flux_dn`, `toa_diffuse_sw_flux_dn`,
+  `VolumeMixingRatios`, and `GrayAtmosphere`. (The `SwBCs` field and the
+  `solve`/`solve_gray` keyword `toa_flux` are unchanged.)
+
 v0.23.0
 -------
 
