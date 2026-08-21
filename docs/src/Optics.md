@@ -1,4 +1,4 @@
-# RRTMGP Optics
+# RRTMGP optics
 
 `compute_optical_props!` computes the optical properties and source functions
 given an atmospheric state. For the two-stream approximation, the optical

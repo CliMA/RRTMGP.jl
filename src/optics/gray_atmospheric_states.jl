@@ -12,7 +12,7 @@ abstract type AbstractGrayOpticalThickness end
     GrayOpticalThicknessSchneider2004{FT} <: AbstractGrayOpticalThickness
     GrayOpticalThicknessSchneider2004(FT; α = 3.5, te = 300, tt = 200, Δt = 60)
 
-Parameters of the semi-grey optical-thickness profile of [schneider2004](@cite).
+Parameters of the semi-gray optical-thickness profile of [schneider2004](@cite).
 The vertical longwave optical depth scales with pressure as ``\\widehat{\\tau}(p) =
 d_0(\\phi)\\,(p/p_0)^\\alpha``, so the exponent `α` controls how the absorber is
 distributed with height (`α = 1` for a well-mixed absorber, larger `α` for one
@@ -47,7 +47,7 @@ GrayOpticalThicknessSchneider2004(
     GrayOpticalThicknessOGorman2008{FT} <: AbstractGrayOpticalThickness
     GrayOpticalThicknessOGorman2008(FT; α = 1.0, fₗ = 0.2, τₑ = 7.2, τₚ = 1.8, τ₀ = 0.22)
 
-Parameters of the grey optical-thickness profile of [frierson2006](@cite) and
+Parameters of the gray optical-thickness profile of [frierson2006](@cite) and
 [ogorman2008](@cite). The
 vertical longwave optical depth blends a linear and a quartic dependence on the
 normalized pressure ``\\sigma = p/p_0``, ``\\widehat{\\tau} \\propto f_\\ell\\,\\sigma +

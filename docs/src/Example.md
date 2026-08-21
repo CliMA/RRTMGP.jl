@@ -20,7 +20,7 @@ To assemble the pieces yourself (the atmospheric state, the RTE workspaces, and
 `solve_lw!`/`solve_sw!`), see [The functional core](@ref), which walks through
 the gray problem and sketches the clear-sky path.
 
-Beyond that, the test suite serves as a set of complete, validated examples, run
+Beyond that, the test suite is a set of complete, validated examples, run
 from the repository root with the `test` project (`julia --project=test`). The
 gray driver checks the solvers against analytic solutions. The clear-sky and
 all-sky drivers build their states from standardized NetCDF inputs and compare

@@ -17,7 +17,7 @@ the schemes and gives guidance on choosing one.
 
 ## The underlying model
 
-Every scheme treats the atmosphere between two known points ``(p_1, T_1)`` and
+All schemes treat the atmosphere between two known points ``(p_1, T_1)`` and
 ``(p_2, T_2)`` (two layer centers, or a layer center and the surface) as a
 hydrostatic ideal-gas column with a constant lapse rate, so the temperature is
 linear in height:

@@ -27,8 +27,8 @@ include("shortwave_2stream.jl")
     solve_lw!((; context, flux, src, bcs, op, angle_disc)::NoScatLWRTE, as::GrayAtmosphericState, metric_scaling::M = nothing)
 
 Non-scattering RTE solver for the longwave problem, using gray optics. 
-Additionally, takes an optional argument `metric_scaling` which scales the resultant fluxes by the 
-corresponding factor to account for column expansion in `deep-atmosphere` configurations.
+The optional `metric_scaling` argument scales the fluxes to account for column expansion
+in `deep-atmosphere` configurations.
 """
 function solve_lw!(
     (; context, flux, src, bcs, op, angle_disc)::NoScatLWRTE,
@@ -48,8 +48,8 @@ end
     solve_lw!((; context, flux, src, bcs, op)::TwoStreamLWRTE, as::GrayAtmosphericState, metric_scaling::M = nothing)
 
 `Two Stream` RTE solver for the longwave problem, using gray optics.
-Additionally, takes an optional argument `metric_scaling` which scales the resultant fluxes by the 
-corresponding factor to account for column expansion in `deep-atmosphere` configurations.
+The optional `metric_scaling` argument scales the fluxes to account for column expansion
+in `deep-atmosphere` configurations.
 """
 function solve_lw!(
     (; context, flux, src, bcs, op)::TwoStreamLWRTE,
@@ -71,8 +71,8 @@ end
     )
 
 Non-scattering RTE solver for the longwave problem, using RRTMGP optics.
-Additionally, takes an optional argument `metric_scaling` which scales the resultant fluxes by the 
-corresponding factor to account for column expansion in `deep-atmosphere` configurations.
+The optional `metric_scaling` argument scales the fluxes to account for column expansion
+in `deep-atmosphere` configurations.
 """
 function solve_lw!(
     (; context, fluxb, flux, src, bcs, op, angle_disc, state_cache)::NoScatLWRTE,
@@ -111,8 +111,8 @@ end
     )
 
 `Two Stream` RTE solver for the longwave problem, using RRTMGP optics.
-Additionally, takes an optional argument `metric_scaling` which scales the resultant fluxes by the 
-corresponding factor to account for column expansion in `deep-atmosphere` configurations.
+The optional `metric_scaling` argument scales the fluxes to account for column expansion
+in `deep-atmosphere` configurations.
 """
 function solve_lw!(
     (; context, fluxb, flux, band_flux, src, bcs, op, state_cache)::TwoStreamLWRTE,
@@ -142,11 +142,11 @@ function solve_lw!(
 end
 
 """
-    solve_sw!((; context, flux, bcs, op)::NoScatSWRTE, as::GrayAtmosphericState)
+    solve_sw!((; context, flux, bcs, op)::NoScatSWRTE, as::GrayAtmosphericState, metric_scaling = nothing)
 
 Non-scattering RTE solver for the shortwave problem, using gray optics.
-Additionally, takes an optional argument `metric_scaling` which scales the resultant fluxes by the 
-corresponding factor to account for column expansion in `deep-atmosphere` configurations.
+The optional `metric_scaling` argument scales the fluxes to account for column expansion
+in `deep-atmosphere` configurations.
 """
 function solve_sw!(
     (; context, flux, bcs, op)::NoScatSWRTE,
@@ -161,8 +161,8 @@ end
     solve_sw!((; context, flux, src, bcs, op)::TwoStreamSWRTE, as::GrayAtmosphericState, metric_scaling = nothing)
 
 `Two Stream` RTE solver for the shortwave problem, using gray optics.
-Additionally, takes an optional argument `metric_scaling` which scales the resultant fluxes by the 
-corresponding factor to account for column expansion in `deep-atmosphere` configurations.
+The optional `metric_scaling` argument scales the fluxes to account for column expansion
+in `deep-atmosphere` configurations.
 """
 function solve_sw!(
     (; context, flux, src, bcs, op)::TwoStreamSWRTE,
@@ -182,8 +182,8 @@ end
     )
 
 Non-scattering RTE solver for the shortwave problem, using RRTMGP optics.
-Additionally, takes an optional argument `metric_scaling` which scales the resultant fluxes by the 
-corresponding factor to account for column expansion in `deep-atmosphere` configurations.
+The optional `metric_scaling` argument scales the fluxes to account for column expansion
+in `deep-atmosphere` configurations.
 """
 function solve_sw!(
     (; context, fluxb, flux, bcs, op, state_cache)::NoScatSWRTE,
@@ -216,8 +216,8 @@ end
     )
 
 `Two Stream` RTE solver for the shortwave problem, using RRTMGP optics.
-Additionally, takes an optional argument `metric_scaling` which scales the resultant fluxes by the 
-corresponding factor to account for column expansion in `deep-atmosphere` configurations.
+The optional `metric_scaling` argument scales the fluxes to account for column expansion
+in `deep-atmosphere` configurations.
 """
 function solve_sw!(
     (; context, fluxb, flux, band_flux, src, bcs, op, state_cache)::TwoStreamSWRTE,
