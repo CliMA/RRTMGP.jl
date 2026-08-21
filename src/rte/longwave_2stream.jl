@@ -153,7 +153,7 @@ approximation.
     # -------------------------------------------------------------------------------------------------
     #
     # Longwave two-stream solutions to diffuse reflectance and transmittance for a layer
-    #    with optical depth tau, single scattering albedo w0, and asymmetery parameter g.
+    #    with optical depth tau, single scattering albedo w0, and asymmetry parameter g.
     #
     # Equations are developed in Meador and Weaver, 1980,
     #    doi:10.1175/1520-0469(1980)037<0630:TSATRT>2.0.CO;2

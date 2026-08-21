@@ -56,7 +56,7 @@ contract](getters.md), and standalone entry points (`solve_gray`,
   model](howto/host_model.md), [adding clouds and
   aerosols](howto/clouds_aerosols.md), [running on GPUs](howto/gpu.md),
   [caching the lookup tables](howto/lookup_cache.md), [per-band
-  fluxes](howto/spectral_fluxes.md), and [the validated test
+  fluxes](howto/spectral_fluxes.md), and [validated test
   problems](Example.md). Start here if you are coupling RRTMGP to a climate
   model.
 - **Explanation** (the concepts and the math): [the functional
@@ -73,4 +73,6 @@ contract](getters.md), and standalone entry points (`solve_gray`,
 Alliance](https://clima.caltech.edu/). It is based on RTE+RRTMGP and its
 reference [Fortran
 implementation](https://github.com/earth-system-radiation/rte-rrtmgp), developed
-by Robert Pincus, Eli Mlawer, and Jennifer Delamere ([pincus2019](@citet)).
+by Robert Pincus, Eli Mlawer, and Jennifer Delamere ([pincus2019](@citet)),
+with several performance and robustness improvements relative to the original
+implementation.
