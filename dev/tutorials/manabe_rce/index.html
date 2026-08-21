@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Radiative-convective equilibrium · RRTMGP.jl</title><meta name="title" content="Radiative-convective equilibrium · RRTMGP.jl"/><meta property="og:title" content="Radiative-convective equilibrium · RRTMGP.jl"/><meta property="twitter:title" content="Radiative-convective equilibrium · RRTMGP.jl"/><meta name="description" content="Documentation for RRTMGP.jl."/><meta property="og:description" content="Documentation for RRTMGP.jl."/><meta property="twitter:description" content="Documentation for RRTMGP.jl."/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../search_index.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script><link href="../../assets/documentercitations/citations-hover.css" rel="stylesheet" type="text/css"/><link href="../../assets/documentercitations/citations.css" rel="stylesheet" type="text/css"/><script src="../../assets/documentercitations/citations-data.js"></script><script src="../../assets/documentercitations/citations-hover.js"></script><script src="../../assets/documentercitations/citations-backlinks.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../../"><img src="../../assets/logo.svg" alt="RRTMGP.jl logo"/></a><div class="docs-package-name"><span class="docs-autofit"><a href="../../">RRTMGP.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><span class="tocitem">Tutorials</span><ul><li><a class="tocitem" href="../getting_started/">A first radiation calculation</a></li><li class="is-active"><a class="tocitem" href>Radiative-convective equilibrium</a><ul class="internal"><li><a class="tocitem" href="#The-column"><span>The column</span></a></li><li><a class="tocitem" href="#Fixed-relative-humidity"><span>Fixed relative humidity</span></a></li><li><a class="tocitem" href="#Convective-adjustment"><span>Convective adjustment</span></a></li><li><a class="tocitem" href="#Compute-radiative-convective-state-at-a-trial-surface-temperature"><span>Compute radiative-convective state at a trial surface temperature</span></a></li><li><a class="tocitem" href="#Closing-the-energy-balance"><span>Closing the energy balance</span></a></li><li><a class="tocitem" href="#Radiative-equilibrium-versus-radiative-convective-equilibrium"><span>Radiative equilibrium versus radiative-convective equilibrium</span></a></li><li><a class="tocitem" href="#Climate-sensitivity-at-fixed-relative-humidity"><span>Climate sensitivity at fixed relative humidity</span></a></li><li><a class="tocitem" href="#Sensitivity-to-the-critical-lapse-rate"><span>Sensitivity to the critical lapse rate</span></a></li><li><a class="tocitem" href="#Contributions-of-the-individual-absorbers"><span>Contributions of the individual absorbers</span></a></li><li><a class="tocitem" href="#Where-to-go-from-here"><span>Where to go from here</span></a></li></ul></li></ul></li><li><span class="tocitem">How-to guides</span><ul><li><a class="tocitem" href="../../howto/host_model/">Drive RRTMGP from a host model</a></li><li><a class="tocitem" href="../../howto/clouds_aerosols/">Add clouds and aerosols</a></li><li><a class="tocitem" href="../../howto/gpu/">Run on GPUs</a></li><li><a class="tocitem" href="../../howto/lookup_cache/">Cache the lookup tables</a></li><li><a class="tocitem" href="../../howto/spectral_fluxes/">Get per-band (spectral) fluxes</a></li><li><a class="tocitem" href="../../Example/">Run the validated test problems</a></li></ul></li><li><span class="tocitem">Explanation</span><ul><li><a class="tocitem" href="../../functional_core/">Functional core</a></li><li><a class="tocitem" href="../../RTE/">RTE</a></li><li><a class="tocitem" href="../../Optics/">Optics</a></li><li><a class="tocitem" href="../../interpolation/">Level interpolation</a></li><li><a class="tocitem" href="../../precision/">Float32 and Float64</a></li><li><a class="tocitem" href="../../concordance/">Fortran and paper concordance</a></li></ul></li><li><span class="tocitem">Reference</span><ul><li><a class="tocitem" href="../../api/">API</a></li><li><a class="tocitem" href="../../getters/">Getter contract</a></li><li><a class="tocitem" href="../../optics/AngularDiscretizations/">Angular Discretization</a></li><li><a class="tocitem" href="../../ArtifactPaths/">Artifacts</a></li><li><a class="tocitem" href="../../optics/AtmosphericStates/">Atmospheric State</a></li><li><a class="tocitem" href="../../optics/BCs/">Boundary Conditions</a></li><li><a class="tocitem" href="../../optics/Fluxes/">Fluxes</a></li><li><a class="tocitem" href="../../optics/GrayAtmosphere/">Utilities for gray radiation simulation</a></li><li><a class="tocitem" href="../../optics/LookUpTables/">Lookup Tables</a></li><li><a class="tocitem" href="../../optics/Optics/">Optics</a></li><li><a class="tocitem" href="../../optics/RTE/">Solver struct</a></li><li><a class="tocitem" href="../../optics/Sources/">Source Functions</a></li><li><a class="tocitem" href="../../optics/VolumeMixingRatios/">Volume Mixing Ratios</a></li><li><a class="tocitem" href="../../rte/RTESolver/">RTE Solver</a></li></ul></li><li><a class="tocitem" href="../../References/">References</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Tutorials</a></li><li class="is-active"><a href>Radiative-convective equilibrium</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Radiative-convective equilibrium</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/CliMA/RRTMGP.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/CliMA/RRTMGP.jl/blob/main/docs/tutorials/manabe_rce.jl" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Radiative-convective-equilibrium-(Manabe&#39;s-classic-experiment)"><a class="docs-heading-anchor" href="#Radiative-convective-equilibrium-(Manabe&#39;s-classic-experiment)">Radiative-convective equilibrium (Manabe&#39;s classic experiment)</a><a id="Radiative-convective-equilibrium-(Manabe&#39;s-classic-experiment)-1"></a><a class="docs-heading-anchor-permalink" href="#Radiative-convective-equilibrium-(Manabe&#39;s-classic-experiment)" title="Permalink"></a></h1><p>This tutorial reproduces the classic radiative-convective equilibrium (RCE) calculations of <a href="../../References/#manabe1964" id="manabe1964-cite-1">Manabe and Strickler [6]</a> and <a href="../../References/#manabe1967" id="manabe1967-cite-1">Manabe and Wetherald [7]</a> with RRTMGP&#39;s clear-sky gas optics. It calculates RCE for a single atmospheric column with</p><ul><li>a <strong>prescribed tropospheric lapse rate</strong> (convective adjustment to 6.5 K/km),</li><li>a <strong>prescribed relative-humidity profile</strong> (water vapor follows the temperature),</li><li>a stratosphere in <strong>radiative equilibrium</strong>, and</li><li>a <strong>surface temperature diagnosed from the energy balance</strong>: it is iterated until the net radiative flux at the top of the atmosphere vanishes.</li></ul><p><a href="../../References/#kluft2019" id="kluft2019-cite-1">Kluft <em>et al.</em> [8]</a> used a similar setup with the single-column model <a href="https://github.com/atmtools/konrad">konrad</a> to revisit the calculations by Manabe and collaborators.</p><p>We reproduce four of Manabe&#39;s results: the radiative-versus-radiative-convective comparison, the surface warming under CO₂ increases with the water-vapor feedback (fixed relative rather than fixed absolute humidity), the dependence of the equilibrium on the assumed lapse rate, and the decomposition of the greenhouse effect into its individual absorbers (water vapor, CO₂, ozone).</p><p>Along the way, this tutorial demonstrates the host-model workflow of RRTMGP.jl: build a solver, then mutate its state via the <a href="../../getters/">getter contract</a> and call <a href="../../api/#RRTMGP.update_fluxes!"><code>update_fluxes!</code></a> inside a time loop.</p><pre><code class="language-julia hljs">using RRTMGP
+using NCDatasets # activates RRTMGP&#39;s lookup-table extension
+import Thermodynamics as TD
+import ClimaParams # brings in the CliMA default thermodynamic constants
+using CairoMakie</code></pre><h2 id="The-column"><a class="docs-heading-anchor" href="#The-column">The column</a><a id="The-column-1"></a><a class="docs-heading-anchor-permalink" href="#The-column" title="Permalink"></a></h2><p>Start from the idealized midlatitude-summer standard atmosphere on 60 layers up to 60 km. Its pressure grid, ozone profile, and well-mixed gases (CO₂ = 420 ppmv, etc.) stay fixed; the temperature, and, in most experiments, the water vapor, are overwritten by the RCE iteration. We keep a copy of the standard-atmosphere temperature to overlay later as a reference.</p><p>Every column in this tutorial is built with the same settings, so we collect them once:</p><pre><code class="language-julia hljs">const FT = Float64
+const column = (; kind = :midlatitude_summer, nlay = 60, z_top = 60.0e3)
+profile = RRTMGP.standard_atmosphere(FT; column...);
+T_obs = copy(profile.t_lay[:, 1]);</code></pre><p>Like Manabe and collaborators, we force the column with the <strong>global-mean insolation</strong> <span>$S_0/4 \approx 341$</span> W/m². The incident flux and the zenith angle have to be chosen together, since the zenith angle sets the path length available for shortwave absorption [<a href="../../References/#cronin2014" id="cronin2014-cite-1">9</a>]. Like <a href="../../References/#kluft2019" id="kluft2019-cite-2">Kluft <em>et al.</em> [8]</a>, we take a zenith angle of 47.9° (<span>$\cos θ \approx 0.67$</span>); an incident flux of 509 W/m² then delivers <span>$509 \times \cos(47.9^\circ) \approx 341$</span> W/m² at the top of the atmosphere. The surface albedo of 0.3 stands in for the shortwave reflection of the clouds, which this clear-sky column omits:</p><pre><code class="language-julia hljs">insolation = (; cos_zenith = cosd(47.9), toa_flux = 509.0, surface_albedo = 0.3);</code></pre><p>Both RRTMGP and <a href="https://github.com/CliMA/Thermodynamics.jl">Thermodynamics.jl</a> read their physical constants from <a href="https://github.com/CliMA/ClimaParams.jl">ClimaParams.jl</a>, so the constants used across the radiation and thermodynamics calculations here are consistent. We build both parameter sets from it and take the gravitational acceleration, the dry-air gas constant, and the dry-air heat capacity from them:</p><pre><code class="language-julia hljs">params = RRTMGP.Parameters.RRTMGPParameters(FT)
+td_params = TD.Parameters.ThermodynamicsParameters(FT)
+R_d = TD.Parameters.R_d(td_params)
+cp_d = TD.Parameters.cp_d(td_params)
+g = RRTMGP.Parameters.grav(params)   # gravitational acceleration [m/s²]</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">9.81</code></pre><p>RRTMGP needs temperatures both at the layer centers, where the optical properties are evaluated, and at the level (cell-face) boundaries, where the longwave source varies. A driver has to decide which of the two it marches. We march the <strong>levels</strong> and set each layer to the mean of the two levels bounding it, so <code>interpolation = NoInterpolation()</code> leaves the level values as the iteration writes them. Marching the layers instead, with levels reconstructed by interpolation, admits a computational mode: a grid-scale oscillation of the layer temperatures leaves the interpolated levels unchanged, so the radiation cannot damp it.</p><p>We also add an <strong>isothermal boundary layer</strong> at the top. A column that stops at 60 km receives no downward longwave flux at its top face: the topmost layer emits through both faces but absorbs only through one, so it cools at tens of kelvin per day. This truncation artifact can spread a sawtooth temperature pattern of several kelvin amplitude through the layers below. <code>isothermal_boundary_layer = true</code> extends the column with one isothermal layer reaching the lookup tables&#39; minimum pressure, which supplies the missing downward flux.</p><p>We collect this setup, the parameters, and the insolation into one shared configuration. One call then builds the clear-sky solver (downloading the RRTMGP lookup tables on first use) and solves the initial state; its state is exposed as writable views, which the iteration overwrites in place:</p><pre><code class="language-julia hljs">setup = (;
+    params,
+    insolation...,
+    interpolation = RRTMGP.NoInterpolation(),
+    isothermal_boundary_layer = true,
+)
+out = RRTMGP.solve(profile; setup...)
+solver = out.solver;</code></pre><h2 id="Fixed-relative-humidity"><a class="docs-heading-anchor" href="#Fixed-relative-humidity">Fixed relative humidity</a><a id="Fixed-relative-humidity-1"></a><a class="docs-heading-anchor-permalink" href="#Fixed-relative-humidity" title="Permalink"></a></h2><p>Manabe and Wetherald prescribed the relative-humidity profile <span>$h(p) = 0.77\,(p/p_s - 0.02)/(1 - 0.02)$</span>, so the specific humidity rises and falls with the temperature (the water-vapor feedback in its simplest form). The saturation vapor pressure <span>$e^*(T)$</span> comes from <a href="https://github.com/CliMA/Thermodynamics.jl">Thermodynamics.jl</a>, which integrates the Clausius-Clapeyron relation under the Rankine-Kirchhoff (constant heat capacity) approximation [<a href="../../References/#romps2021" id="romps2021-cite-1">10</a>] used throughout the CliMA model stack. From the vapor partial pressure <span>$e = h\,e^*$</span>, the water-vapor volume mixing ratio (moles of vapor per mole of dry air, RRTMGP&#39;s convention) is <span>$e/(p - e)$</span>. We floor it at the stratospheric minimum Manabe used (a vmr of ≈ 4.8 × 10⁻⁶).</p><pre><code class="language-julia hljs">e_sat(T) = TD.saturation_vapor_pressure(td_params, T, TD.Liquid()) # [Pa]
+rel_hum(p, p_sfc) = max(0.77 * (p / p_sfc - 0.02) / (1 - 0.02), 0.0)
+const vmr_h2o_min = 4.8e-6
+
+function set_humidity!(solver)
+    T = RRTMGP.layer_temperature(solver)
+    p = RRTMGP.layer_pressure(solver)
+    vmr = RRTMGP.volume_mixing_ratio(solver, &quot;h2o&quot;)
+    p_sfc = RRTMGP.level_pressure(solver)[1, 1]
+    e = rel_hum.(p, p_sfc) .* e_sat.(T) # vapor partial pressure [Pa]
+    @. vmr = max(e / (p - e), vmr_h2o_min)
+    # Alternatively, Thermodynamics.jl can do both steps in one go:
+    #   q  = TD.q_vap_from_RH.(td_params, p, T, rel_hum.(p, p_sfc), Ref(TD.Liquid()))
+    #   @. vmr = max(TD.vol_vapor_mixing_ratio(td_params, q), vmr_h2o_min)
+    return nothing
+end;</code></pre><h2 id="Convective-adjustment"><a class="docs-heading-anchor" href="#Convective-adjustment">Convective adjustment</a><a id="Convective-adjustment-1"></a><a class="docs-heading-anchor-permalink" href="#Convective-adjustment" title="Permalink"></a></h2><p>The steepest lapse rate a dry column sustains is the dry adiabatic value <span>$Γ_d = g/c_p$</span>, calculated from the Thermodynamics.jl constants:</p><pre><code class="language-julia hljs">Γ_dry = g / cp_d
+println(&quot;Dry adiabatic lapse rate g/cₚ = $(round(1000 * Γ_dry; digits = 1)) K/km&quot;)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Dry adiabatic lapse rate g/cₚ = 9.8 K/km</code></pre><p>Moist convection and large-scale eddies hold the observed tropospheric lapse rate to a smaller value. Like Manabe and collaborators, we impose a critical lapse rate of 6.5 K/km, which is close to the observed tropospheric mean. Wherever radiative cooling pulls the lapse rate above this value, convection is assumed to instantaneously restore the critical profile <span>$T(z) = T_s - Γ z$</span>, anchored at a trial surface temperature <span>$T_s$</span>. The lapse rate is defined as a derivative with respect to height, yet no altitudes are needed to apply it: combining <span>$dT/dz = -Γ$</span> with hydrostatic balance and the ideal-gas law gives <span>$dT/T = (Γ R_d / g)\, dp/p$</span>, so in the solver&#39;s native pressure coordinate, the critical profile is the power law</p><p class="math-container">\[T_c(p) = T_s \left(\frac{p}{p_s}\right)^{Γ R_d / g},\]</p><p>which reduces to the dry adiabat <span>$T \propto p^{R_d/c_p}$</span> for <span>$Γ = g/c_p$</span>. Levels warmer than <span>$T_c$</span> (the stratosphere) are left untouched, so the tropopause emerges from the calculation.</p><p>The convective adjustment warms the levels colder than <span>$T_c$</span> and leaves the surface at the trial <span>$T_s$</span>, so it adds energy to the column. To reach equilibrium, the surface temperature is iteratively adjusted until the net radiative flux at the top of the atmosphere vanishes. Each equilibration below computes the radiative-convective state of a column at a <strong>trial</strong> <span>$T_s$</span>, and the next section varies that trial value until the budget closes and equilibrium is reached.</p><pre><code class="language-julia hljs">const Γ_crit = 6.5e-3 # critical lapse rate [K/m]
+
+function convective_adjustment!(solver, T_sfc; Γ = Γ_crit)
+    T = RRTMGP.level_temperature(solver)
+    p = RRTMGP.level_pressure(solver)
+    p_sfc = p[1, 1]
+    @. T = max(T, T_sfc * (p / p_sfc)^(Γ * R_d / g)) # critical profile T_c(p)
+    return nothing
+end;</code></pre><h2 id="Compute-radiative-convective-state-at-a-trial-surface-temperature"><a class="docs-heading-anchor" href="#Compute-radiative-convective-state-at-a-trial-surface-temperature">Compute radiative-convective state at a trial surface temperature</a><a id="Compute-radiative-convective-state-at-a-trial-surface-temperature-1"></a><a class="docs-heading-anchor-permalink" href="#Compute-radiative-convective-state-at-a-trial-surface-temperature" title="Permalink"></a></h2><p>Each step applies the convective adjustment, fills the layer temperatures from the levels, updates the water vapor to the fixed relative humidity, solves the radiative transfer, and marches the level temperatures with the radiative heating rate. The heating rate is a layer quantity, so each interior level is advanced with the mean of the heating rates of the two layers meeting at it, and the bottom and top levels with the single adjacent layer&#39;s.</p><p>The ground temperature enters separately, through the surface-emission boundary condition (<code>surface_temperature</code>); keeping the two distinct lets the air at the bottom face be colder than the ground, as radiative equilibrium requires. Where convection is active, the adjustment ties the bottom face to the ground temperature, the limit of strong turbulent heat exchange at the surface.</p><p>The column has settled when successive adjusted profiles stop changing. That is the equilibrium state, in which radiative cooling in the convecting troposphere balances convective heating.</p><p>One iteration serves every experiment: <code>convection = false</code> gives pure radiative equilibrium, <code>humidity = false</code> holds the water vapor constant (used below to remove water vapor, and to prescribe an absolute humidity distribution), and the <code>Γ</code> keyword changes the critical lapse rate. The adjustment and humidity are synced before each solve, including on the final step, so the reported fluxes match the temperatures.</p><pre><code class="language-julia hljs">function equilibrate!(
+    solver,
+    T_sfc;
+    convection = true,
+    humidity = true,
+    Γ = Γ_crit,
+    dt = 8 * 3600.0,
+    maxsteps = 20000,
+    tol = 1e-4,
+)
+    RRTMGP.surface_temperature(solver) .= T_sfc
+    T_lev = RRTMGP.level_temperature(solver)
+    T_lay = RRTMGP.layer_temperature(solver)
+    nlev = size(T_lev, 1)
+    nlay = nlev - 1
+    T_prev = fill!(similar(T_lev), 0)
+    dT = similar(Array(T_lev))
+    for _ in 1:maxsteps
+        convection &amp;&amp; convective_adjustment!(solver, T_sfc; Γ)
+        @views @. T_lay = (T_lev[1:nlay, :] + T_lev[2:nlev, :]) / 2
+        humidity &amp;&amp; set_humidity!(solver)
+        RRTMGP.update_fluxes!(solver)
+        maximum(abs, T_lev .- T_prev) &lt; tol &amp;&amp; break
+        T_prev .= T_lev
+        Q = Array(RRTMGP.heating_rate(solver))
+        @views @. dT[2:nlay, :] = (Q[1:(nlay - 1), :] + Q[2:nlay, :]) / 2
+        @views dT[1, :] .= Q[1, :]
+        @views dT[nlev, :] .= Q[nlay, :]
+        T_lev .+= clamp.(dt .* dT, -2, 2)
+    end
+    return nothing
+end;</code></pre><h2 id="Closing-the-energy-balance"><a class="docs-heading-anchor" href="#Closing-the-energy-balance">Closing the energy balance</a><a id="Closing-the-energy-balance-1"></a><a class="docs-heading-anchor-permalink" href="#Closing-the-energy-balance" title="Permalink"></a></h2><p>The net flux at the top of the atmosphere (<code>net = up - down</code>) measures the column&#39;s energy imbalance, and it vanishes at the equilibrium surface temperature. A secant iteration on that imbalance finds it in a handful of steps, each restarting from the previous state:</p><pre><code class="language-julia hljs">toa_imbalance(solver) = RRTMGP.net_flux(solver)[end, 1]
+
+function balanced_surface_temperature!(
+    solver,
+    T1,
+    T2;
+    convection = true,
+    humidity = true,
+    Γ = Γ_crit,
+    tol = 5e-3,
+)
+    eq(T) = (equilibrate!(solver, T; convection, humidity, Γ); toa_imbalance(solver))
+    N1 = eq(T1)
+    N2 = eq(T2)
+    while abs(N2) &gt; tol &amp;&amp; abs(T2 - T1) &gt; 1e-3
+        Tn = T2 - N2 * (T2 - T1) / (N2 - N1)
+        T1, N1 = T2, N2
+        T2 = Tn
+        N2 = eq(T2)
+    end
+    return T2
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">balanced_surface_temperature! (generic function with 1 method)</code></pre><p>We start from two guesses for the surface temperature to obtain the radiative-convective equilibrium at present-day CO₂:</p><pre><code class="language-julia hljs">Ts_1x = balanced_surface_temperature!(solver, FT(285), FT(290))
+T_1x = copy(Array(RRTMGP.layer_temperature(solver)))
+T_lev_1x = copy(Array(RRTMGP.level_temperature(solver))) # for warm starts
+p_lay = copy(Array(RRTMGP.layer_pressure(solver)))
+vmr_1x = copy(Array(RRTMGP.volume_mixing_ratio(solver, &quot;h2o&quot;))) # reference vapor
+println(&quot;Equilibrium Tₛ (1 × CO₂): $(round(Ts_1x; digits = 2)) K&quot;)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Equilibrium Tₛ (1 × CO₂): 287.85 K</code></pre><p>Closing the budget at the top of the atmosphere leaves a residual radiative flux into the ground. That residual is the sensible and latent heat flux that is implicit in the RCE calculation.</p><pre><code class="language-julia hljs">sfc_convective_flux(solver) = -RRTMGP.net_flux(solver)[1, 1]
+println(&quot;Implied surface convective flux: $(round(sfc_convective_flux(solver); digits = 1)) W/m²&quot;)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Implied surface convective flux: 93.1 W/m²</code></pre><p>The figures below mark a column&#39;s ground temperature with a dot at the surface pressure, in the color of that column&#39;s curve. The center of the lowest layer lies above the surface, so the horizontal offset between a dot and the bottom of its curve is the temperature difference between the ground and the air above it.</p><pre><code class="language-julia hljs">p_sfc_hPa = Array(RRTMGP.level_pressure(solver))[1, 1] / 100
+mark_ground!(ax, curve, T_sfc) = scatter!(ax, [T_sfc], [p_sfc_hPa]; color = curve.color, markersize = 9)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">mark_ground! (generic function with 1 method)</code></pre><h2 id="Radiative-equilibrium-versus-radiative-convective-equilibrium"><a class="docs-heading-anchor" href="#Radiative-equilibrium-versus-radiative-convective-equilibrium">Radiative equilibrium versus radiative-convective equilibrium</a><a id="Radiative-equilibrium-versus-radiative-convective-equilibrium-1"></a><a class="docs-heading-anchor-permalink" href="#Radiative-equilibrium-versus-radiative-convective-equilibrium" title="Permalink"></a></h2><p>Dropping the convective adjustment and re-balancing the column reproduces Manabe and Strickler&#39;s pure radiative equilibrium baseline. That calculation predates the fixed-relative-humidity assumption and prescribed a distribution of <em>absolute</em> humidity instead. We do the same, leaving the standard atmosphere&#39;s water vapor untouched (<code>humidity = false</code>) in both columns, so that they differ only in whether convection acts.</p><pre><code class="language-julia hljs">function balanced_prescribed_humidity(; convection)
+    slv = RRTMGP.solve(profile; lookups = solver.lookups, setup...).solver
+    Ts = balanced_surface_temperature!(slv, FT(285), FT(300); convection, humidity = false)
+    return Ts, copy(Array(RRTMGP.layer_temperature(slv))), slv
+end
+
+Ts_rc, T_rc, _ = balanced_prescribed_humidity(; convection = true)
+Ts_re, T_re, solver_re = balanced_prescribed_humidity(; convection = false)
+println(&quot;Equilibrium Tₛ (radiative-convective): $(round(Ts_rc; digits = 1)) K&quot;)
+println(&quot;Equilibrium Tₛ (radiative):            $(round(Ts_re; digits = 1)) K&quot;)
+T_bot_re = Array(RRTMGP.level_temperature(solver_re))[1, 1]
+println(&quot;Bottom-face air temperature (radiative): $(round(T_bot_re; digits = 1)) K&quot;)
+println(&quot;Implied surface convective flux (radiative): $(round(sfc_convective_flux(solver_re); digits = 2)) W/m²&quot;)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Equilibrium Tₛ (radiative-convective): 288.4 K
+Equilibrium Tₛ (radiative):            313.9 K
+Bottom-face air temperature (radiative): 308.9 K
+Implied surface convective flux (radiative): -0.02 W/m²</code></pre><p>Radiative equilibrium <em>without</em> convection leads to a surface 25 K warmer, with a profile that departs from the observed atmosphere (here, the idealized midlatitude-summer standard atmosphere we started from) at every height: the temperature decreases from the surface upward at two to three times the dry adiabatic lapse rate, runs 44 K below the standard atmosphere through the middle and upper troposphere, and forms no tropopause. The air at the bottom face is several kelvin colder than the ground beneath it, the surface discontinuity of radiative equilibrium. This radiative equilibrium state is unstable to convection, and the turbulent heat fluxes that the convective adjustment stands in for erase it.</p><p>The implied surface convective flux of the radiative column checks the bookkeeping: without convection, the net radiative flux is the same at every level, so closing the budget at the top of the atmosphere closes it at the surface too, leaving no energy flux for convection to carry.</p><pre><code class="language-julia hljs">fig = Figure(size = (500, 500))
+ax = Axis(
+    fig[1, 1];
+    xlabel = &quot;Temperature [K]&quot;,
+    ylabel = &quot;Pressure [hPa]&quot;,
+    yscale = log10,
+    yreversed = true,
+    limits = (nothing, nothing, nothing, 1050),
+    title = &quot;Radiative vs. radiative-convective equilibrium&quot;,
+)
+obs = lines!(ax, T_obs, p_lay[:, 1] ./ 100; color = :gray, linestyle = :dot, label = &quot;standard atmosphere&quot;)
+re = lines!(ax, T_re[:, 1], p_lay[:, 1] ./ 100; label = &quot;radiative equilibrium&quot;)
+rc = lines!(ax, T_rc[:, 1], p_lay[:, 1] ./ 100; label = &quot;RCE (Γ = 6.5 K/km)&quot;)
+mark_ground!(ax, obs, profile.t_sfc[1])
+mark_ground!(ax, re, Ts_re)
+mark_ground!(ax, rc, Ts_rc)
+axislegend(ax; position = :rt, framevisible = false, backgroundcolor = :white)
+fig</code></pre><img src="db34de46.png" alt="Example block output"/><h2 id="Climate-sensitivity-at-fixed-relative-humidity"><a class="docs-heading-anchor" href="#Climate-sensitivity-at-fixed-relative-humidity">Climate sensitivity at fixed relative humidity</a><a id="Climate-sensitivity-at-fixed-relative-humidity-1"></a><a class="docs-heading-anchor-permalink" href="#Climate-sensitivity-at-fixed-relative-humidity" title="Permalink"></a></h2><p>Manabe and Wetherald&#39;s central experiment was to re-balance the column for increased CO₂, keeping the relative humidity fixed, and compare the balanced surface temperature against the reference state above. The difference for doubled CO₂ is the equilibrium climate sensitivity of the radiative-convective column.</p><p>The reference tropopause, the highest layer on the convective profile, lies just above 11 km. On that profile, height and temperature are interchangeable, <span>$z = (T_s - T)/Γ$</span>, so the height follows from the temperature of the highest adjusted layer, again with no altitude reconstruction:</p><pre><code class="language-julia hljs">function tropopause_height(solver, T_sfc; Γ = Γ_crit)
+    T = Array(RRTMGP.layer_temperature(solver))[:, 1]
+    p = Array(RRTMGP.layer_pressure(solver))[:, 1]
+    p_sfc = Array(RRTMGP.level_pressure(solver))[1, 1]
+    k = findlast(abs.(T .- T_sfc .* (p ./ p_sfc) .^ (Γ * R_d / g)) .&lt; 0.5)
+    return (T_sfc - T[k]) / Γ
+end
+println(&quot;Tropopause height ≈ $(round(tropopause_height(solver, Ts_1x) / 1000; digits = 1)) km&quot;)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Tropopause height ≈ 11.2 km</code></pre><p>Now scale the CO₂ and re-balance. <code>balanced_co2</code> builds a fresh column with a scaled CO₂ concentration, starts it from the 1 × CO₂ equilibrium, and finds its balanced surface temperature. With <code>fixed_rh = false</code>, the water vapor is frozen at its reference (1 × CO₂) values (<strong>fixed absolute humidity</strong>) which removes the water-vapor feedback and isolates the direct effect of CO₂.</p><pre><code class="language-julia hljs">co2_1x = profile.well_mixed_vmr[&quot;co2&quot;]
+
+function balanced_co2(factor; fixed_rh = true, bracket = (Ts_1x, Ts_1x + 3))
+    prof = RRTMGP.standard_atmosphere(FT; column...)
+    prof.well_mixed_vmr[&quot;co2&quot;] = factor * co2_1x
+    slv = RRTMGP.solve(prof; lookups = solver.lookups, setup...).solver
+    RRTMGP.level_temperature(slv) .= T_lev_1x                  # warm start
+    fixed_rh || (RRTMGP.volume_mixing_ratio(slv, &quot;h2o&quot;) .= vmr_1x) # freeze reference vapor
+    Ts = balanced_surface_temperature!(slv, bracket...; humidity = fixed_rh)
+    return Ts, copy(Array(RRTMGP.layer_temperature(slv)))
+end
+
+Ts_2x_rh, T_2x_rh = balanced_co2(2)
+Ts_4x_rh, T_4x_rh = balanced_co2(4; bracket = (Ts_1x + 3, Ts_1x + 7))
+Ts_2x_ah, T_2x_ah = balanced_co2(2; fixed_rh = false, bracket = (Ts_1x, Ts_1x + 2))
+Ts_4x_ah, T_4x_ah = balanced_co2(4; fixed_rh = false, bracket = (Ts_1x + 1, Ts_1x + 4));</code></pre><p>Collect the surface temperatures into a table. Comparing the fixed-RH and fixed-AH warming at the same forcing isolates the water-vapor feedback:</p><pre><code class="language-julia hljs">rows = (
+    (&quot;reference (1×CO₂, RH)&quot;, Ts_1x, nothing),
+    (&quot;2×CO₂, fixed RH&quot;, Ts_2x_rh, Ts_2x_rh - Ts_1x),
+    (&quot;4×CO₂, fixed RH&quot;, Ts_4x_rh, Ts_4x_rh - Ts_1x),
+    (&quot;2×CO₂, fixed AH&quot;, Ts_2x_ah, Ts_2x_ah - Ts_1x),
+    (&quot;4×CO₂, fixed AH&quot;, Ts_4x_ah, Ts_4x_ah - Ts_1x),
+)
+println(rpad(&quot;Experiment&quot;, 24), lpad(&quot;Tₛ [K]&quot;, 9), lpad(&quot;ΔTₛ [K]&quot;, 10))
+for (name, Ts, dT) in rows
+    dstr = dT === nothing ? &quot;—&quot; : string(round(dT; digits = 1))
+    println(rpad(name, 24), lpad(round(Ts; digits = 1), 9), lpad(dstr, 10))
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Experiment                 Tₛ [K]   ΔTₛ [K]
+reference (1×CO₂, RH)       287.9         —
+2×CO₂, fixed RH             290.7       2.9
+4×CO₂, fixed RH             294.2       6.3
+2×CO₂, fixed AH             289.3       1.5
+4×CO₂, fixed AH             291.0       3.1</code></pre><p>For comparison, for the same configuration with clear skies, fixed relative humidity, and a hard adjustment to a constant 6.5 K/km lapse rate, <a href="../../References/#kluft2019" id="kluft2019-cite-3">Kluft <em>et al.</em> [8]</a> found an equilibrium climate sensitivity of 2.65 K for konrad and <a href="../../References/#manabe1967" id="manabe1967-cite-2">Manabe and Wetherald [7]</a> found 2.92 K. The 2.9 K here is close to the Manabe and Wetherald result. Holding the water vapor fixed halves the warming, so the water-vapor feedback doubles the response; the same two studies give 1.34 K and 1.36 K for the fixed-absolute-humidity case, below the 1.5 K here. The warming is close to logarithmic in CO₂; each doubling warms slightly more than the last, as the forcing per doubling grows [<a href="../../References/#kluft2019" id="kluft2019-cite-4">8</a>] and the warmer column holds more water vapor. The spread among published values traces to the humidity profile, the adjustment scheme, and the ozone treatment, each of which you can vary by editing a few lines above.</p><p>The warmed column carries the fingerprint of CO₂-driven change: tropospheric warming with stratospheric cooling, predicted decades before it was observed. Fixed absolute humidity gives the same pattern with a weaker surface warming.</p><pre><code class="language-julia hljs">fig2 = Figure(size = (500, 500))
+ax2 = Axis(
+    fig2[1, 1];
+    xlabel = &quot;Temperature [K]&quot;,
+    ylabel = &quot;Pressure [hPa]&quot;,
+    yscale = log10,
+    yreversed = true,
+    limits = (nothing, nothing, nothing, 1050),
+    title = &quot;RCE response to CO₂&quot;,
+)
+for (T, Ts, style, label) in (
+    (T_1x, Ts_1x, nothing, &quot;1×CO₂ (RH)&quot;),
+    (T_2x_rh, Ts_2x_rh, :dash, &quot;2×CO₂ (RH)&quot;),
+    (T_4x_rh, Ts_4x_rh, :dot, &quot;4×CO₂ (RH)&quot;),
+    (T_4x_ah, Ts_4x_ah, :dashdot, &quot;4×CO₂ (AH)&quot;),
+)
+    curve = lines!(ax2, T[:, 1], p_lay[:, 1] ./ 100; linestyle = style, label)
+    mark_ground!(ax2, curve, Ts)
+end
+axislegend(ax2; position = :rt, framevisible = false, backgroundcolor = :white)
+fig2</code></pre><img src="05d0ad02.png" alt="Example block output"/><h2 id="Sensitivity-to-the-critical-lapse-rate"><a class="docs-heading-anchor" href="#Sensitivity-to-the-critical-lapse-rate">Sensitivity to the critical lapse rate</a><a id="Sensitivity-to-the-critical-lapse-rate-1"></a><a class="docs-heading-anchor-permalink" href="#Sensitivity-to-the-critical-lapse-rate" title="Permalink"></a></h2><p>The assumed critical lapse rate <span>$Γ_c$</span> shapes the equilibrium. Re-balancing the reference column for lapse rates between 3.0 K/km and the dry adiabat (9.8 K/km) shows that a shallower lapse rate cools the surface but lifts the tropopause: the troposphere stretches vertically, because the gentler gradient needs more depth to bridge the surface and stratospheric temperatures. Each column is balanced, so each emits to space the sunlight it absorbs; the three absorb within about 1 W/m² of each other, so they settle on nearly the same outgoing longwave flux from temperature profiles whose surface temperatures span 9 K.</p><pre><code class="language-julia hljs">fig3 = Figure(size = (500, 500))
+ax3 = Axis(
+    fig3[1, 1];
+    xlabel = &quot;Temperature [K]&quot;,
+    ylabel = &quot;Pressure [hPa]&quot;,
+    yscale = log10,
+    yreversed = true,
+    limits = (nothing, nothing, nothing, 1050),
+    title = &quot;Sensitivity to the critical lapse rate&quot;,
+)
+for Γ_km in (9.8, 6.5, 3.0)
+    prof = RRTMGP.standard_atmosphere(FT; column...)
+    slv = RRTMGP.solve(prof; lookups = solver.lookups, setup...).solver
+    Ts = balanced_surface_temperature!(slv, FT(270), FT(292); Γ = Γ_km * 1e-3)
+    z_top = tropopause_height(slv, Ts; Γ = Γ_km * 1e-3) / 1000
+    olr = Array(RRTMGP.lw_flux_up(slv))[end, 1]
+    println(
+        &quot;Γ = $(Γ_km) K/km: Tₛ = $(round(Ts; digits = 1)) K, &quot;,
+        &quot;tropopause ≈ $(round(z_top; digits = 1)) km, OLR = $(round(olr; digits = 1)) W/m²&quot;,
+    )
+    T = Array(RRTMGP.layer_temperature(slv))
+    curve = lines!(ax3, T[:, 1], p_lay[:, 1] ./ 100; label = &quot;Γ = $(Γ_km) K/km&quot;)
+    mark_ground!(ax3, curve, Ts)
+end
+axislegend(ax3; position = :rt, framevisible = false, backgroundcolor = :white)
+fig3</code></pre><img src="9b8cd69c.png" alt="Example block output"/><h2 id="Contributions-of-the-individual-absorbers"><a class="docs-heading-anchor" href="#Contributions-of-the-individual-absorbers">Contributions of the individual absorbers</a><a id="Contributions-of-the-individual-absorbers-1"></a><a class="docs-heading-anchor-permalink" href="#Contributions-of-the-individual-absorbers" title="Permalink"></a></h2><p>The absorber decomposition of <a href="../../References/#manabe1964" id="manabe1964-cite-2">Manabe and Strickler [6]</a> isolates each greenhouse gas. We remove water vapor, carbon dioxide, or ozone one at a time, find the column&#39;s balanced surface temperature, and compare against the reference (all-absorbers) profile computed above. Water vapor is removed by zeroing it and holding it there (<code>humidity = false</code>); ozone by zeroing its layer profile; CO₂ by setting its well-mixed value to zero before the state is built.</p><pre><code class="language-julia hljs">function rce_without(absorber, T1, T2)
+    prof = RRTMGP.standard_atmosphere(FT; column...)
+    absorber === :co2 &amp;&amp; (prof.well_mixed_vmr[&quot;co2&quot;] = 0.0)
+    slv = RRTMGP.solve(prof; lookups = solver.lookups, setup...).solver
+    absorber === :o3 &amp;&amp; (RRTMGP.volume_mixing_ratio(slv, &quot;o3&quot;) .= 0)
+    absorber === :h2o &amp;&amp; (RRTMGP.volume_mixing_ratio(slv, &quot;h2o&quot;) .= 0)
+    Ts = balanced_surface_temperature!(slv, T1, T2; humidity = absorber !== :h2o)
+    return Ts, copy(Array(RRTMGP.layer_temperature(slv)))
+end
+
+# Brackets straddle each case&#39;s expected surface temperature; the secant
+# method converges from either side
+Ts_no_h2o, T_no_h2o = rce_without(:h2o, FT(255), FT(272))
+Ts_no_co2, T_no_co2 = rce_without(:co2, FT(264), FT(278))
+Ts_no_o3, T_no_o3 = rce_without(:o3, FT(278), FT(288))
+
+for (name, Ts) in (
+    (&quot;all absorbers&quot;, Ts_1x),
+    (&quot;no H₂O&quot;, Ts_no_h2o),
+    (&quot;no CO₂&quot;, Ts_no_co2),
+    (&quot;no O₃&quot;, Ts_no_o3),
+)
+    println(&quot;Equilibrium Tₛ ($name): $(round(Ts; digits = 1)) K&quot;)
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Equilibrium Tₛ (all absorbers): 287.9 K
+Equilibrium Tₛ (no H₂O): 263.6 K
+Equilibrium Tₛ (no CO₂): 271.1 K
+Equilibrium Tₛ (no O₃): 283.6 K</code></pre><p>The decomposition reproduces the textbook ordering. Water vapor contributes the most: removing it reduces the surface temperature by 24 K, below the freezing point. Carbon dioxide comes next, at a 17 K reduction. Ozone contributes 4 K at the surface, but by absorbing solar ultraviolet radiation it creates the stratospheric inversion. Without ozone, the pronounced inversion disappears, and the upper stratosphere is nearly isothermal at 165–170 K. Without CO₂, the stratosphere runs <em>warmer</em> than the reference: ozone still absorbs sunlight up there, but the main emitter of thermal infrared is gone, so the stratosphere must warm until the remaining gases radiate the heating away.</p><pre><code class="language-julia hljs">fig4 = Figure(size = (500, 500))
+ax4 = Axis(
+    fig4[1, 1];
+    xlabel = &quot;Temperature [K]&quot;,
+    ylabel = &quot;Pressure [hPa]&quot;,
+    yscale = log10,
+    yreversed = true,
+    limits = (nothing, nothing, nothing, 1050),
+    title = &quot;Contribution of individual absorbers&quot;,
+)
+for (T, Ts, label) in (
+    (T_1x, Ts_1x, &quot;all absorbers&quot;),
+    (T_no_h2o, Ts_no_h2o, &quot;no H₂O&quot;),
+    (T_no_co2, Ts_no_co2, &quot;no CO₂&quot;),
+    (T_no_o3, Ts_no_o3, &quot;no O₃&quot;),
+)
+    curve = lines!(ax4, T[:, 1], p_lay[:, 1] ./ 100; label)
+    mark_ground!(ax4, curve, Ts)
+end
+axislegend(ax4; position = :lt, framevisible = false, backgroundcolor = :white)
+fig4</code></pre><img src="2a82251b.png" alt="Example block output"/><h2 id="Where-to-go-from-here"><a class="docs-heading-anchor" href="#Where-to-go-from-here">Where to go from here</a><a id="Where-to-go-from-here-1"></a><a class="docs-heading-anchor-permalink" href="#Where-to-go-from-here" title="Permalink"></a></h2><ul><li>Vary the critical lapse rate or the relative-humidity profile and watch the sensitivity respond (cf. <a href="../../References/#kluft2021" id="kluft2021-cite-1">Kluft <em>et al.</em> [11]</a>).</li><li>Swap <code>:midlatitude_summer</code> for <code>:tropical</code> or <code>:subarctic_winter</code>.</li></ul><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../getting_started/">« A first radiation calculation</a><a class="docs-footer-nextpage" href="../../howto/host_model/">Drive RRTMGP from a host model »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.17.0 on <span class="colophon-date" title="Friday 21 August 2026 19:24">Friday 21 August 2026</span>. Using Julia version 1.11.9.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
