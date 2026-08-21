@@ -103,24 +103,24 @@ steps:
           slurm_ntasks: 1
           slurm_gpus: 1
 
-      - label: "GPU clear-sky DYAMOND benchmark"
-        command: "julia --color=yes --project=test test/clear_sky_dyamond_gpu_benchmark.jl"
+      - label: "GPU clear-sky high-resolution benchmark"
+        command: "julia --color=yes --project=test test/clear_sky_highres_gpu_benchmark.jl"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
         agents:
           slurm_ntasks: 1
           slurm_gpus: 1
 
-      - label: "GPU all-sky DYAMOND benchmark"
-        command: "julia --color=yes --project=test test/cloudy_sky_dyamond_gpu_benchmark.jl"
+      - label: "GPU all-sky high-resolution benchmark"
+        command: "julia --color=yes --project=test test/cloudy_sky_highres_gpu_benchmark.jl"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
         agents:
           slurm_ntasks: 1
           slurm_gpus: 1
 
-      - label: "GPU all-sky with aerosols DYAMOND benchmark"
-        command: "julia --color=yes --project=test test/all_sky_with_aerosols_dyamond_gpu_benchmark.jl"
+      - label: "GPU all-sky with aerosols high-resolution benchmark"
+        command: "julia --color=yes --project=test test/all_sky_with_aerosols_highres_gpu_benchmark.jl"
         env:
           CLIMACOMMS_DEVICE: "CUDA"
         agents:
@@ -130,7 +130,7 @@ steps:
       # Advisory wall-time ratchet against committed per-GPU baselines
       # (perf/benchmark_baselines/). Soft-fail: flags regressions without
       # blocking merges; see the header of perf/benchmark_ratchet.jl.
-      - label: "GPU DYAMOND benchmark ratchet"
+      - label: "GPU high-resolution benchmark ratchet"
         command: "julia --color=yes --project=test perf/benchmark_ratchet.jl"
         soft_fail: true
         artifact_paths: "perf/benchmark_baselines/*"

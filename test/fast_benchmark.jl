@@ -123,11 +123,11 @@ function run_fast_benchmark()
     context = ClimaComms.context()
     FT = Float32
     helems, nlevels, nlev_test, nq = 30, 64, 73, 4
-    ncols_dyamond =
+    ncols_highres =
         Int(ceil(helems * helems * 6 * nq * nq * (nlevels / nlev_test)))
     println("\n")
     printstyled(
-        "Running FAST DYAMOND all-sky benchmark on $(context.device) device with $FT precision\n",
+        "Running FAST high-resolution all-sky benchmark on $(context.device) device with $FT precision\n",
         color = 130,
     )
     printstyled(
@@ -147,12 +147,12 @@ function run_fast_benchmark()
         NoScatLWRTE,
         TwoStreamSWRTE,
         FT;
-        ncol = ncols_dyamond,
+        ncol = ncols_highres,
         cldfrac = FT(1),
     )
     Printf.@printf(
         "%10i    |           %25s|       %25s \n",
-        ncols_dyamond,
+        ncols_highres,
         Statistics.median(trial_lw),
         Statistics.median(trial_sw)
     )
