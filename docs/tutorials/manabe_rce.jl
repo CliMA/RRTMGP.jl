@@ -343,8 +343,8 @@ println("Implied surface convective flux (radiative): $(round(sfc_convective_flu
 fig = Figure(size = (500, 500))
 ax = Axis(
     fig[1, 1];
-    xlabel = "temperature [K]",
-    ylabel = "pressure [hPa]",
+    xlabel = "Temperature [K]",
+    ylabel = "Pressure [hPa]",
     yscale = log10,
     yreversed = true,
     limits = (nothing, nothing, nothing, 1050),
@@ -440,8 +440,8 @@ end
 fig2 = Figure(size = (500, 500))
 ax2 = Axis(
     fig2[1, 1];
-    xlabel = "temperature [K]",
-    ylabel = "pressure [hPa]",
+    xlabel = "Temperature [K]",
+    ylabel = "Pressure [hPa]",
     yscale = log10,
     yreversed = true,
     limits = (nothing, nothing, nothing, 1050),
@@ -474,8 +474,8 @@ fig2
 fig3 = Figure(size = (500, 500))
 ax3 = Axis(
     fig3[1, 1];
-    xlabel = "temperature [K]",
-    ylabel = "pressure [hPa]",
+    xlabel = "Temperature [K]",
+    ylabel = "Pressure [hPa]",
     yscale = log10,
     yreversed = true,
     limits = (nothing, nothing, nothing, 1050),
@@ -546,8 +546,8 @@ end
 fig4 = Figure(size = (500, 500))
 ax4 = Axis(
     fig4[1, 1];
-    xlabel = "temperature [K]",
-    ylabel = "pressure [hPa]",
+    xlabel = "Temperature [K]",
+    ylabel = "Pressure [hPa]",
     yscale = log10,
     yreversed = true,
     limits = (nothing, nothing, nothing, 1050),
