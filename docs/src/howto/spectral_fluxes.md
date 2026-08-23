@@ -19,10 +19,15 @@ solver = RRTMGP.RRTMGPSolver(
 RRTMGP.update_fluxes!(solver)
 ```
 
-This is supported for the spectral (non-gray) methods with two-stream optics in
-both the longwave and the shortwave; other configurations raise an error at
-construction. The per-band buffers add `(nlev, ncol, n_bnd)` arrays per band
-set, so they are opt-in.
+This is supported for the spectral (non-gray) methods — gray radiation is a
+single band, and asking for per-band fluxes there is an error at construction.
+The shortwave bands are always retained, because spectral shortwave optics must
+be two-stream anyway. The longwave bands are retained only when the longwave is
+two-stream: the no-scattering (`OneScalar`) solver does not accumulate per band.
+So a mixed configuration — a no-scattering longwave with a two-stream shortwave,
+as E3SM and ERF run — retains the shortwave bands, while the `spectral_lw_*`
+getters keep raising their error. The per-band buffers add `(nlev, ncol, n_bnd)`
+arrays per band set, so they are opt-in.
 
 ## Read them
 
@@ -40,6 +45,31 @@ sum(RRTMGP.spectral_lw_flux_up(solver); dims = 3) ≈ RRTMGP.lw_flux_up(solver)
 
 The `spectral_*_flux_net` getters are views into a retained per-band net-flux
 buffer, updated on every solve like the `up`/`dn` buffers.
+
+## The shortwave direct beam, per band
+
+The shortwave additionally retains the per-band direct beam, so the surface
+downward flux can be split into direct and diffuse within each band:
+
+```julia
+dir = RRTMGP.spectral_sw_direct_flux_dn(solver)      # (nlev, ncol, nbnd_sw)
+dif = RRTMGP.spectral_sw_flux_dn(solver) .- dir      # the diffuse remainder
+```
+
+It sums over bands to the broadband direct beam, like the other band buffers:
+
+```julia
+sum(RRTMGP.spectral_sw_direct_flux_dn(solver); dims = 3) ≈
+    RRTMGP.sw_direct_flux_dn(solver)
+```
+
+This is what a land-surface scheme needs: Noah-MP and CLM-family canopies apply
+different albedos to the direct and the diffuse beam, and to the visible and
+near-infrared halves of the spectrum, so they consume four surface numbers
+(direct/diffuse x visible/near-IR) rather than one broadband flux. Sum the
+per-band surface values over the bands on each side of the 0.7 µm
+(14286 cm⁻¹) boundary, using [`sw_band_bounds`](@ref RRTMGP.sw_band_bounds) to
+classify the bands and splitting the one band that straddles it.
 
 ## Identify the bands
 

@@ -4,6 +4,26 @@ RRTMGP.jl Release Notes
 main
 ------
 
+- **The shortwave direct beam is now retained per band**, and per-band fluxes no
+  longer require two-stream optics in *both* spectral regions. `FluxBand` gained
+  a `flux_dn_dir` field (`nothing` in the longwave, which has no direct beam),
+  exposed by the new getter `spectral_sw_direct_flux_dn`; it sums over bands to
+  `sw_direct_flux_dn` like the other band buffers, and the per-band diffuse flux
+  is `spectral_sw_flux_dn` minus it. `spectral_fluxes = true` now allocates
+  per-band buffers per spectral region rather than refusing mixed optics: the
+  shortwave bands always (spectral shortwave optics must be two-stream anyway),
+  the longwave bands only when the longwave is two-stream. A no-scattering
+  longwave paired with a two-stream shortwave — how E3SM and ERF run — therefore
+  retains the shortwave bands, with the `spectral_lw_*` getters still erroring
+  as before. This is
+  what a land-surface scheme needs: Noah-MP and CLM-family canopies apply
+  separate albedos to the direct and diffuse beam in the visible and the
+  near-infrared, so they consume four surface numbers rather than one broadband
+  flux. Not a breaking change — previously-valid configurations behave
+  identically, and previously-erroring ones now work. The internal
+  `Fluxes.accumulate_band_flux!` now takes the whole per-g-point flux object
+  instead of its `flux_up`/`flux_dn` buffers.
+
 v0.23.0
 -------
 

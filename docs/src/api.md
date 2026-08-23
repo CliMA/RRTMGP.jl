@@ -92,6 +92,7 @@ RRTMGP.spectral_lw_flux_net
 RRTMGP.spectral_sw_flux_up
 RRTMGP.spectral_sw_flux_dn
 RRTMGP.spectral_sw_flux_net
+RRTMGP.spectral_sw_direct_flux_dn
 RRTMGP.lw_band_bounds
 RRTMGP.sw_band_bounds
 RRTMGP.Fluxes.FluxBand

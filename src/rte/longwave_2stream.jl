@@ -66,7 +66,7 @@ end
     rte_lw_2stream!(op, flux, src_lw, bcs_lw, gcol, igpt, ibnd, nlev, ncol)
     _accumulate_fluxes!(flux_lw, flux, gcol, nlev, igpt)
     # retain this g-point's contribution in its band (no-op when off)
-    accumulate_band_flux!(band_flux, flux.flux_up, flux.flux_dn, gcol, ibnd, nlev)
+    accumulate_band_flux!(band_flux, flux, gcol, ibnd, nlev)
     return cloudy
 end
 

@@ -89,15 +89,9 @@ end
             gcol,
         )
         _accumulate_fluxes!(flux_sw, flux, gcol, nlev, igpt)
-        # retain this g-point's contribution in its band (no-op when off)
-        accumulate_band_flux!(
-            band_flux,
-            flux.flux_up,
-            flux.flux_dn,
-            gcol,
-            ibnd,
-            nlev,
-        )
+        # retain this g-point's contribution in its band, direct beam
+        # included (no-op when off)
+        accumulate_band_flux!(band_flux, flux, gcol, ibnd, nlev)
     end
     return cloudy
 end

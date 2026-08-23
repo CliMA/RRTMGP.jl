@@ -246,14 +246,54 @@ function all_sky_with_aerosols(
             sum(RRTMGP.spectral_sw_flux_dn(solver_spec); dims = 3);
             dims = 3,
         ) ≈ RRTMGP.sw_flux_dn(solver_spec)
+        # the shortwave direct beam is retained per band, and sums to the
+        # broadband direct beam like the other band buffers
+        @test dropdims(
+            sum(RRTMGP.spectral_sw_direct_flux_dn(solver_spec); dims = 3);
+            dims = 3,
+        ) ≈ RRTMGP.sw_direct_flux_dn(solver_spec)
+        # per band, the direct beam cannot exceed the total downward flux, so
+        # the diffuse remainder a land model consumes is non-negative
+        @test all(
+            Array(RRTMGP.spectral_sw_flux_dn(solver_spec)) .-
+            Array(RRTMGP.spectral_sw_direct_flux_dn(solver_spec)) .>=
+            -sqrt(eps(FT)),
+        )
         # the band dimension matches the number of band-limit pairs
         @test size(RRTMGP.lw_band_bounds(solver_spec), 1) == 2
         @test size(RRTMGP.spectral_lw_flux_up(solver_spec), 3) ==
               size(RRTMGP.lw_band_bounds(solver_spec), 2)
         @test size(RRTMGP.spectral_sw_flux_up(solver_spec), 3) ==
               size(RRTMGP.sw_band_bounds(solver_spec), 2)
+        @test size(RRTMGP.spectral_sw_direct_flux_dn(solver_spec), 3) ==
+              size(RRTMGP.sw_band_bounds(solver_spec), 2)
         # a solver built without spectral fluxes errors informatively
         @test_throws ErrorException RRTMGP.spectral_lw_flux_up(solver)
+
+        # --- mixed optics: a no-scattering longwave with a two-stream
+        # shortwave (how E3SM and ERF run) retains the shortwave bands and
+        # leaves the longwave getters erroring.
+        solver_mixed = RRTMGPSolver(
+            grid_params,
+            radiation_method,
+            param_set,
+            bcs_lw,
+            bcs_sw,
+            as;
+            op_lw = Optics.OneScalar(grid_params),
+            op_sw,
+            spectral_fluxes = true,
+        )
+        RRTMGP.update_sw_fluxes!(solver_mixed)
+        @test dropdims(
+            sum(RRTMGP.spectral_sw_flux_dn(solver_mixed); dims = 3);
+            dims = 3,
+        ) ≈ RRTMGP.sw_flux_dn(solver_mixed)
+        @test dropdims(
+            sum(RRTMGP.spectral_sw_direct_flux_dn(solver_mixed); dims = 3);
+            dims = 3,
+        ) ≈ RRTMGP.sw_direct_flux_dn(solver_mixed)
+        @test_throws "two-stream" RRTMGP.spectral_lw_flux_up(solver_mixed)
     end
     #---------------- Exercise new api (end)
 

@@ -399,6 +399,14 @@ _require_band_flux(::Nothing) = error(
     "spectral fluxes were not retained; construct the `RRTMGPSolver` with `spectral_fluxes = true`.",
 )
 _require_band_flux(band::Fluxes.FluxBand) = band
+# The per-band direct beam exists only on shortwave band buffers allocated with
+# `direct = true` (what `spectral_fluxes = true` does; a hand-built Layer-1
+# workspace may not).
+_require_band_direct(::Nothing) = error(
+    "the per-band direct beam was not retained; this band buffer was built without \
+     `direct = true`.",
+)
+_require_band_direct(x::AbstractArray) = x
 _solver_band_flux(ws) =
     hasproperty(ws, :band_flux) ? _require_band_flux(ws.band_flux) :
     error("spectral fluxes require a two-stream, non-gray solver.")
@@ -468,6 +476,17 @@ Return the per-band net (up - down) shortwave flux [W/m²]: a domain-masked
 """
 spectral_sw_flux_net(s::RRTMGPSolver) =
     _domain_view(s, _solver_band_flux(s.sws).flux_net)
+
+"""
+    spectral_sw_direct_flux_dn(s::RRTMGPSolver)
+
+Return the per-band direct-beam downward shortwave flux [W/m²]: a domain-masked
+`(nlev, ncol, n_bnd)` view. Requires `spectral_fluxes = true`; see
+[`sw_band_bounds`](@ref) for each band's wavenumber range. The per-band diffuse
+downward flux is [`spectral_sw_flux_dn`](@ref) minus this.
+"""
+spectral_sw_direct_flux_dn(s::RRTMGPSolver) =
+    _domain_view(s, _require_band_direct(_solver_band_flux(s.sws).flux_dn_dir))
 
 """
     lw_band_bounds(s::RRTMGPSolver)

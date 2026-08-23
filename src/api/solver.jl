@@ -246,18 +246,27 @@ function RRTMGPSolver(
         clear_net_flux_buffer = nothing
     end
 
-    # Optional per-band (spectrally-resolved) flux buffers, allocated only on request.
-    # Only meaningful for spectral radiation with two-stream optics (gray radiation is a
-    # single band, and the non-scattering solvers are not wired for per-band retention).
+    # Optional per-band (spectrally-resolved) flux buffers, allocated only on
+    # request, and per spectral region: the no-scattering solvers do not
+    # accumulate per-band fluxes. Spectral shortwave optics are always
+    # two-stream (rejected above otherwise), so the shortwave bands are always
+    # retainable; the longwave is retained only when it too is two-stream. A
+    # no-scattering longwave beside a two-stream shortwave -- how E3SM and ERF
+    # run -- therefore gets the shortwave bands, and leaves the `spectral_lw_*`
+    # getters raising their usual error. Gray radiation is a single band and
+    # has nothing to resolve.
     if spectral_fluxes
         radiation_method isa GrayRadiation && error(
             "spectral_fluxes = true is not supported for GrayRadiation (a single band).",
         )
-        (op_lw isa OneScalar || op_sw isa OneScalar) && error(
-            "spectral_fluxes = true requires two-stream optics for both bands.",
-        )
-        band_flux_lw = Fluxes.FluxBand(grid_params, lookups.nbnd_lw)
-        band_flux_sw = Fluxes.FluxBand(grid_params, lookups.nbnd_sw)
+        band_flux_lw =
+            op_lw isa OneScalar ? nothing :
+            Fluxes.FluxBand(grid_params, lookups.nbnd_lw)
+        # The shortwave retains the direct beam per band as well: host
+        # land-surface schemes split the surface shortwave into
+        # direct/diffuse x visible/near-IR, which needs the beam separated
+        # inside each band.
+        band_flux_sw = Fluxes.FluxBand(grid_params, lookups.nbnd_sw; direct = true)
     else
         band_flux_lw = nothing
         band_flux_sw = nothing

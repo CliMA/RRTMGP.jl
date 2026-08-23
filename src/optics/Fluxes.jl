@@ -149,11 +149,12 @@ function FluxSW(grid_params::RRTMGPGridParams)
 end
 
 """
-    FluxBand{FT, FTA3D}
+    FluxBand{FT, FTA3D, FD}
 
 Optional per-band upward, downward, and net radiative fluxes at each level,
-`(nlev, ncol, n_bnd)`. Only allocated when spectrally-resolved fluxes are requested.
-Summing over the band dimension recovers the broadband fluxes.
+`(nlev, ncol, n_bnd)`, plus — in the shortwave — the per-band direct beam.
+Only allocated when spectrally-resolved fluxes are requested. Summing over the
+band dimension recovers the broadband fluxes.
 
 Unlike the broadband compute buffers, the band buffers keep the host-facing
 vertical-first layout: they are an opt-in diagnostic that the `spectral_*`
@@ -166,22 +167,43 @@ per-band fluxes are requested.
 - `flux_up`: upward flux per band [W/m²], `(nlev, ncol, n_bnd)`.
 - `flux_dn`: downward flux per band [W/m²], `(nlev, ncol, n_bnd)`.
 - `flux_net`: net flux per band (`flux_up - flux_dn`) [W/m²], `(nlev, ncol, n_bnd)`.
+- `flux_dn_dir`: direct-beam downward flux per band [W/m²], `(nlev, ncol, n_bnd)`,
+  or `nothing` (the longwave has no direct beam).
 """
-struct FluxBand{FT <: AbstractFloat, FTA3D <: AbstractArray{FT, 3}}
+struct FluxBand{FT <: AbstractFloat, FTA3D <: AbstractArray{FT, 3}, FD}
     flux_up::FTA3D
     flux_dn::FTA3D
     flux_net::FTA3D
+    flux_dn_dir::FD
 end
 Adapt.@adapt_structure FluxBand
 
-function FluxBand(grid_params::RRTMGPGridParams, n_bnd::Int)
+"""
+    FluxBand(grid_params::RRTMGPGridParams, n_bnd::Int; direct::Bool = false)
+
+Allocate per-band flux buffers for `n_bnd` bands. `direct = true` additionally
+allocates the per-band direct beam (shortwave only); the longwave leaves it
+`nothing`.
+"""
+function FluxBand(
+    grid_params::RRTMGPGridParams,
+    n_bnd::Int;
+    direct::Bool = false,
+)
     (; nlay, ncol) = grid_params
     FT = eltype(grid_params)
     DA = ClimaComms.array_type(grid_params)
-    flux_up = DA{FT}(undef, nlay + 1, ncol, n_bnd)
-    flux_dn = DA{FT}(undef, nlay + 1, ncol, n_bnd)
-    flux_net = DA{FT}(undef, nlay + 1, ncol, n_bnd)
-    return FluxBand{FT, typeof(flux_up)}(flux_up, flux_dn, flux_net)
+    alloc() = DA{FT}(undef, nlay + 1, ncol, n_bnd)
+    flux_up = alloc()
+    flux_dn = alloc()
+    flux_net = alloc()
+    flux_dn_dir = direct ? alloc() : nothing
+    return FluxBand{FT, typeof(flux_up), typeof(flux_dn_dir)}(
+        flux_up,
+        flux_dn,
+        flux_net,
+        flux_dn_dir,
+    )
 end
 
 # Zero a per-band flux buffer before a solve (no-op when spectral fluxes are off).
@@ -190,26 +212,45 @@ function set_band_flux_to_zero!(band::FluxBand{FT}) where {FT}
     band.flux_up .= FT(0)
     band.flux_dn .= FT(0)
     band.flux_net .= FT(0)
+    isnothing(band.flux_dn_dir) || (band.flux_dn_dir .= FT(0))
     return nothing
 end
 
-# Add one g-point's up/down flux (column `gcol`, per-g-point scratch `flux_up`/`flux_dn`
-# of shape `(ncol, nlev)`) into its band `ibnd`. No-op when spectral fluxes are off, so
-# the broadband path pays nothing (the branch is specialized away on `::Nothing`).
-@inline accumulate_band_flux!(::Nothing, flux_up, flux_dn, gcol, ibnd, nlev) =
-    nothing
+# Add one g-point's fluxes (column `gcol`, per-g-point scratch `flux` whose
+# buffers are shaped `(ncol, nlev)`) into its band `ibnd`. No-op when spectral
+# fluxes are off, so the broadband path pays nothing (the branch is specialized
+# away on `::Nothing`). A `FluxSW` also contributes its direct beam, when the
+# band buffer was allocated with `direct = true`.
+@inline accumulate_band_flux!(::Nothing, flux, gcol, ibnd, nlev) = nothing
 @inline function accumulate_band_flux!(
     band::FluxBand,
-    flux_up,
-    flux_dn,
+    flux::AbstractFlux,
     gcol,
     ibnd,
     nlev,
 )
     bu, bd = band.flux_up, band.flux_dn
+    up, dn = flux.flux_up, flux.flux_dn
     @inbounds for ilev in 1:nlev
-        bu[ilev, gcol, ibnd] += flux_up[gcol, ilev]
-        bd[ilev, gcol, ibnd] += flux_dn[gcol, ilev]
+        bu[ilev, gcol, ibnd] += up[gcol, ilev]
+        bd[ilev, gcol, ibnd] += dn[gcol, ilev]
+    end
+    _accumulate_band_direct!(band.flux_dn_dir, flux, gcol, ibnd, nlev)
+    return nothing
+end
+
+# The per-band direct beam: shortwave only, and only when it was allocated.
+@inline _accumulate_band_direct!(::Nothing, flux, gcol, ibnd, nlev) = nothing
+@inline function _accumulate_band_direct!(
+    bdir::AbstractArray{FT, 3},
+    flux::FluxSW,
+    gcol,
+    ibnd,
+    nlev,
+) where {FT}
+    dir = flux.flux_dn_dir
+    @inbounds for ilev in 1:nlev
+        bdir[ilev, gcol, ibnd] += dir[gcol, ilev]
     end
     return nothing
 end
@@ -450,6 +491,8 @@ function apply_metric_scaling!(band::FluxBand, metric_scaling::AbstractArray)
     # `(nlev, ncol)` scaling broadcasts across the band dimension directly.
     band.flux_up .= band.flux_up .* metric_scaling
     band.flux_dn .= band.flux_dn .* metric_scaling
+    isnothing(band.flux_dn_dir) ||
+        (band.flux_dn_dir .= band.flux_dn_dir .* metric_scaling)
     return nothing
 end
 

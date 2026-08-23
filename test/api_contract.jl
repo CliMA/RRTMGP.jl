@@ -92,21 +92,29 @@ end
         spectral_fluxes = true,
     )
 
-    # ... and require two-stream optics for both bands. The guard fires before
-    # the lookup tables or atmospheric state are inspected, so a placeholder
-    # bundle and the gray state suffice (no NetCDF read).
+    # Per-band retention needs a solver that accumulates per band. In the
+    # shortwave that is guaranteed: spectral shortwave optics must be
+    # two-stream, and are rejected here before per-band retention is even
+    # considered. The guard fires before the lookup tables or atmospheric
+    # state are inspected, so a placeholder bundle and the gray state suffice
+    # (no NetCDF read).
     placeholder = RRTMGP.LookupBundle(; nbnd_lw = 16, nbnd_sw = 14)
-    @test_throws "requires two-stream optics" RRTMGP.RRTMGPSolver(
+    @test_throws "requires scattering" RRTMGP.RRTMGPSolver(
         gp,
         RRTMGP.ClearSkyRadiation(false),
         params,
         bcs_lw,
         bcs_sw,
         as;
-        op_lw = RRTMGP.Optics.OneScalar(gp),
+        op_sw = RRTMGP.Optics.OneScalar(gp),
         lookups = placeholder,
         spectral_fluxes = true,
     )
+    # In the longwave it is not guaranteed: a no-scattering longwave is a
+    # legitimate spectral configuration (E3SM's, ERF's), and pairing it with
+    # per-band retention is allowed -- the shortwave bands are retained and
+    # the `spectral_lw_*` getters keep erroring. That path needs a real lookup
+    # bundle, so it lives in test/all_sky_with_aerosols_utils.jl.
 end
 
 @testset "getter guards raise informative errors (gray solver)" begin
@@ -134,6 +142,9 @@ end
         solver,
     )
     @test_throws "spectral fluxes were not retained" RRTMGP.spectral_sw_flux_dn(
+        solver,
+    )
+    @test_throws "spectral fluxes were not retained" RRTMGP.spectral_sw_direct_flux_dn(
         solver,
     )
 

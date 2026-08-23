@@ -118,6 +118,7 @@ const PUBLIC_NAMES = (
     :spectral_sw_flux_up,
     :spectral_sw_flux_dn,
     :spectral_sw_flux_net,
+    :spectral_sw_direct_flux_dn,
     :lw_band_bounds,
     :sw_band_bounds,
     # Standalone entry points
