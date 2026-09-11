@@ -9,7 +9,7 @@ function rte_sw_2stream_solve!(
     nlay, ncol = AtmosphericStates.get_dims(as)
     tx, bx = _configure_threadblock(ncol)
     args = (flux_sw, op, bcs_sw, src_sw, nlay, ncol, as)
-    @cuda always_inline = true threads = (tx) blocks = (bx) rte_sw_2stream_solve_CUDA!(
+    @cuda always_inline = true maxthreads = 256 blocks_per_sm = 2 threads = (tx) blocks = (bx) rte_sw_2stream_solve_CUDA!(
         args...,
     )
     return nothing
@@ -87,7 +87,7 @@ function rte_sw_2stream_solve!(
         lookup_sw_cld,
         lookup_sw_aero,
     )
-    @cuda always_inline = true threads = (tx) blocks = (bx) rte_sw_2stream_solve_CUDA!(
+    @cuda always_inline = true maxthreads = 256 blocks_per_sm = 2 threads = (tx) blocks = (bx) rte_sw_2stream_solve_CUDA!(
         args...,
     )
     return nothing
