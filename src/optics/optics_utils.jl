@@ -19,11 +19,31 @@ end
 Return the location of the left (lower) point of the interval in which `xi` is located in vector `x`.
 """
 @inline function loc_lower(xi, x)
+    # Binary search, not a linear scan. This is called per layer, per g-point,
+    # per aerosol species from `interp1d_loc_factor` (relative-humidity
+    # interpolation in the MERRA aerosol optics), and ncu attributes 7.2% of the
+    # shortwave kernel's total time to the two lines of the scan it replaces.
+    #
+    # The win is as much about divergence as about iteration count: a linear
+    # scan exits at a different index in every lane, so a warp pays the maximum
+    # over its 32 lanes, while this has a lane-independent trip count of
+    # ceil(log2(n)) and only the branch direction differs.
+    #
+    # Returns the same index as the scan: the largest `i` with `x[i] <= xi`,
+    # clamped to `[1, n-1]`.
+    n = length(x)
     @inbounds xi ≤ x[1] && return 1
-    @inbounds for (i, xval) in enumerate(x)
-        xi < xval && return i - 1
+    @inbounds xi ≥ x[n] && return n - 1
+    lo, hi = 1, n
+    @inbounds while hi - lo > 1
+        mid = (lo + hi) >>> 1
+        if xi < x[mid]
+            hi = mid
+        else
+            lo = mid
+        end
     end
-    return length(x) - 1
+    return lo
 end
 
 """
