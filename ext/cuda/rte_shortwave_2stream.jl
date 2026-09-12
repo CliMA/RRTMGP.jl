@@ -119,6 +119,13 @@ function rte_sw_2stream_solve_CUDA!(
         @inbounds begin
             # EXPERIMENT 2026-09-11: skip the solve entirely for night columns.
             #
+            # The test is `> eps(FT)`, NOT `> 0`. ClimaAtmos writes
+            # `cos_zenith = max(insolation.μ, eps(FT))` because RRTMGP requires a
+            # non-zero μ, so `μ₀ ≤ 0` never occurs and RRTMGP's own
+            # `set_flux_to_zero!` branch is dead code under this configuration.
+            # A first attempt testing `μ₀ > 0` therefore skipped nothing and
+            # measured -0.59%, inside the +-0.4% noise.
+            #
             # The g-point loop below runs ~224 full optics-plus-vertical-solve
             # evaluations per column, and it ran for EVERY column -- including
             # those with the sun below the horizon, whose result was then
@@ -138,7 +145,7 @@ function rte_sw_2stream_solve_CUDA!(
             # instead of the fraction diagnosed from a solve whose fluxes were
             # discarded anyway. Shortwave cloud cover at night is arguably
             # undefined; it is still a diagnostic change and must be checked.
-            if μ₀ > 0
+            if μ₀ > eps(FT)
             _compute_aero_mask!(aerosol_state, gcol)
             for igpt in 1:n_gpt
                 cloudy = sw_2stream_gpt_col!(
