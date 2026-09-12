@@ -131,35 +131,6 @@ function rte_sw_2stream_solve_CUDA!(
         μ₀ = @inbounds bcs_sw.cos_zenith[gcol]
         n_cloudy_gpts = 0  # thread-local counter for cloud cover
         @inbounds begin
-            # EXPERIMENT 2026-09-11: skip the solve entirely for night columns.
-            #
-            # The test is `> eps(FT)`, NOT `> 0`. ClimaAtmos writes
-            # `cos_zenith = max(insolation.μ, eps(FT))` because RRTMGP requires a
-            # non-zero μ, so `μ₀ ≤ 0` never occurs and RRTMGP's own
-            # `set_flux_to_zero!` branch is dead code under this configuration.
-            # A first attempt testing `μ₀ > 0` therefore skipped nothing and
-            # measured -0.59%, inside the +-0.4% noise.
-            #
-            # The g-point loop below runs ~224 full optics-plus-vertical-solve
-            # evaluations per column, and it ran for EVERY column -- including
-            # those with the sun below the horizon, whose result was then
-            # discarded by `set_flux_to_zero!`. At any instant roughly half the
-            # globe is dark, so about half this kernel's work was thrown away.
-            #
-            # This should be warp-coherent, which is what decides whether a GPU
-            # early-out pays: columns are geographically ordered, so day and
-            # night cluster rather than alternating. A criterion true at
-            # scattered points saves nothing, because a warp costs the maximum
-            # over its 32 lanes -- that is why the microphysics clear-air
-            # early-out returned only +1.79% off a 77.7% point fraction with a
-            # 21.5% warp fraction. ncu measures 24.72 of 32 active threads per
-            # warp here, consistent with a large coherent inactive fraction.
-            #
-            # BEHAVIOURAL NOTE: `cld_cover_sw` becomes 0 for night columns
-            # instead of the fraction diagnosed from a solve whose fluxes were
-            # discarded anyway. Shortwave cloud cover at night is arguably
-            # undefined; it is still a diagnostic change and must be checked.
-            if μ₀ > eps(FT)
             _compute_aero_mask!(aerosol_state, gcol)
             for igpt in 1:n_gpt
                 cloudy = sw_2stream_gpt_col!(
@@ -183,9 +154,10 @@ function rte_sw_2stream_solve_CUDA!(
                 )
                 n_cloudy_gpts += cloudy ? 1 : 0
             end
-            compute_net_flux!(flux_sw, gcol, nlev)
-            else # sun below the horizon: nothing to solve
+            if μ₀ ≤ 0 # zero out columns with zenith angle ≥ π/2
                 set_flux_to_zero!(flux_sw, gcol, nlev)
+            else
+                compute_net_flux!(flux_sw, gcol, nlev)
             end
             # write out SW cloud cover
             if cloud_state isa CloudState &&
