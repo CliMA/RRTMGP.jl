@@ -19,11 +19,21 @@ end
 Return the location of the left (lower) point of the interval in which `xi` is located in vector `x`.
 """
 @inline function loc_lower(xi, x)
+    # Binary search: lane-independent trip count, unlike a scan that exits at a
+    # different index per lane. Returns largest i with x[i] <= xi, in [1, n-1].
+    n = length(x)
     @inbounds xi ≤ x[1] && return 1
-    @inbounds for (i, xval) in enumerate(x)
-        xi < xval && return i - 1
+    @inbounds xi ≥ x[n] && return n - 1
+    lo, hi = 1, n
+    @inbounds while hi - lo > 1
+        mid = (lo + hi) >>> 1
+        if xi < x[mid]
+            hi = mid
+        else
+            lo = mid
+        end
     end
-    return length(x) - 1
+    return lo
 end
 
 """
