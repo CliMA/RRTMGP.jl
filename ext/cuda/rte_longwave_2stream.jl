@@ -7,13 +7,7 @@ function rte_lw_2stream_solve!(
     as::GrayAtmosphericState,
 )
     nlay, ncol = AtmosphericStates.get_dims(as)
-    # 64, not the default 256. At 255 registers an SM holds 256 threads either
-    # way, so occupancy is unchanged -- but 24576 columns gives 384 blocks
-    # instead of 96, and there are 108 SMs. The 96-block launch is a SINGLE
-    # WAVE: every block is resident at once, so the kernel's duration is set by
-    # the slowest block and finishing early just idles an SM. That is why the
-    # night-column skip, which is 46% warp-coherent, bought only -2.63%.
-    # More blocks than SMs lets freed SMs take remaining work.
+    # Occupancy-neutral at 255 registers, but 4x the blocks for scheduling
     tx, bx = _configure_threadblock(64, ncol)
     args = (flux_lw, src_lw, bcs_lw, op, nlay, ncol, as)
     @cuda always_inline = true threads = (tx) blocks = (bx) rte_lw_2stream_solve_CUDA!(
@@ -68,13 +62,7 @@ function rte_lw_2stream_solve!(
 )
     nlay, ncol = AtmosphericStates.get_dims(as)
     set_band_flux_to_zero!(band_flux)
-    # 64, not the default 256. At 255 registers an SM holds 256 threads either
-    # way, so occupancy is unchanged -- but 24576 columns gives 384 blocks
-    # instead of 96, and there are 108 SMs. The 96-block launch is a SINGLE
-    # WAVE: every block is resident at once, so the kernel's duration is set by
-    # the slowest block and finishing early just idles an SM. That is why the
-    # night-column skip, which is 46% warp-coherent, bought only -2.63%.
-    # More blocks than SMs lets freed SMs take remaining work.
+    # Occupancy-neutral at 255 registers, but 4x the blocks for scheduling
     tx, bx = _configure_threadblock(64, ncol)
     args = (
         flux,
