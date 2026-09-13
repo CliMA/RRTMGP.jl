@@ -19,8 +19,9 @@ end
 Return the location of the left (lower) point of the interval in which `xi` is located in vector `x`.
 """
 @inline function loc_lower(xi, x)
-    # Binary search: lane-independent trip count, unlike a scan that exits at a
-    # different index per lane. Returns largest i with x[i] <= xi, in [1, n-1].
+    # The trip count is lane-independent, so a warp does not pay for the lane
+    # whose interval is found last. Called per layer, per g-point, per aerosol
+    # species.
     n = length(x)
     @inbounds xi ≤ x[1] && return 1
     @inbounds xi ≥ x[n] && return n - 1
