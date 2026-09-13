@@ -58,8 +58,8 @@ p_lay = Array(RRTMGP.layer_pressure(out.solver)) ./ 100
 fig = Figure(size = (700, 400))
 ax1 = Axis(
     fig[1, 1];
-    xlabel = "flux [W/m²]",
-    ylabel = "pressure [hPa]",
+    xlabel = "Flux [W/m²]",
+    ylabel = "Pressure [hPa]",
     yreversed = true,
     limits = (nothing, nothing, nothing, 1000),
 )
@@ -69,7 +69,7 @@ lines!(ax1, Array(out.net_flux)[:, 1], p_lev[:, 1]; label = "total net")
 axislegend(ax1; position = :rb, framevisible = false)
 ax2 = Axis(
     fig[1, 2];
-    xlabel = "heating rate [K/day]",
+    xlabel = "Heating rate [K/day]",
     yreversed = true,
     limits = (nothing, nothing, nothing, 1000),
 )
@@ -163,8 +163,8 @@ p_cs = Array(RRTMGP.layer_pressure(out_cs.solver)) ./ 100
 fig2 = Figure(size = (400, 400))
 ax3 = Axis(
     fig2[1, 1];
-    xlabel = "heating rate [K/day]",
-    ylabel = "pressure [hPa]",
+    xlabel = "Heating rate [K/day]",
+    ylabel = "Pressure [hPa]",
     yscale = log10,
     yreversed = true,
     limits = (nothing, nothing, nothing, 1000),
