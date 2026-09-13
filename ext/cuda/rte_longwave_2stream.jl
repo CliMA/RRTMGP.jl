@@ -7,8 +7,7 @@ function rte_lw_2stream_solve!(
     as::GrayAtmosphericState,
 )
     nlay, ncol = AtmosphericStates.get_dims(as)
-    # Occupancy-neutral at 255 registers, but 4x the blocks for scheduling
-    tx, bx = _configure_threadblock(64, ncol)
+    tx, bx = _configure_threadblock(ncol)
     args = (flux_lw, src_lw, bcs_lw, op, nlay, ncol, as)
     @cuda always_inline = true threads = (tx) blocks = (bx) rte_lw_2stream_solve_CUDA!(
         args...,
@@ -62,8 +61,7 @@ function rte_lw_2stream_solve!(
 )
     nlay, ncol = AtmosphericStates.get_dims(as)
     set_band_flux_to_zero!(band_flux)
-    # Occupancy-neutral at 255 registers, but 4x the blocks for scheduling
-    tx, bx = _configure_threadblock(64, ncol)
+    tx, bx = _configure_threadblock(ncol)
     args = (
         flux,
         flux_lw,

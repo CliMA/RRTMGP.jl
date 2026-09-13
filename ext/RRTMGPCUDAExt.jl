@@ -44,7 +44,9 @@ import RRTMGP.RTESolver: sw_noscat_gpt_col!, sw_2stream_gpt_col!
 import RRTMGP.RTESolver: _compute_aero_mask!
 import CUDA: threadIdx, blockIdx, blockDim, @cuda
 
-_max_threads_cuda() = 256
+# Smaller blocks schedule better and cost no occupancy: no kernel here uses
+# shared memory or block cooperation, and 32 blocks/SM x 64 still fills an SM
+_max_threads_cuda() = 64
 
 function _configure_threadblock(max_threads, nitems)
     nthreads = min(max_threads, nitems)
