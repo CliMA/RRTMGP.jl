@@ -19,11 +19,22 @@ end
 Return the location of the left (lower) point of the interval in which `xi` is located in vector `x`.
 """
 @inline function loc_lower(xi, x)
+    # The trip count is lane-independent, so a warp does not pay for the lane
+    # whose interval is found last. Called per layer, per g-point, per aerosol
+    # species.
+    n = length(x)
     @inbounds xi ≤ x[1] && return 1
-    @inbounds for (i, xval) in enumerate(x)
-        xi < xval && return i - 1
+    @inbounds xi ≥ x[n] && return n - 1
+    lo, hi = 1, n
+    @inbounds while hi - lo > 1
+        mid = (lo + hi) >>> 1
+        if xi < x[mid]
+            hi = mid
+        else
+            lo = mid
+        end
     end
-    return length(x) - 1
+    return lo
 end
 
 """
