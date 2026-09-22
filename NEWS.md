@@ -4,6 +4,13 @@ RRTMGP.jl Release Notes
 main
 ------
 
+- [#628](https://github.com/CliMA/RRTMGP.jl/pull/628) Replaced the linear scan
+  in `loc_lower` with a binary search. It is reached per layer, per g-point and
+  per aerosol species from `interp1d_loc_factor`, which interpolates relative
+  humidity in the MERRA aerosol optics, and it returns the same index, so
+  results are unchanged. Radiation kernel time fell about 27% in a coupled AMIP
+  benchmark.
+
 v1.0.0
 ------
 
