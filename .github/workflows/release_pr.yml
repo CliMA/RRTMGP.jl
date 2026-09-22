@@ -1,0 +1,90 @@
+# Opens the release PR described in
+# docs/dev-guides/code-quality/changelogs_and_versions.md Part 3: bumps the
+# version in Project.toml, renames NEWS.md's open `main` section to that
+# version, and opens a fresh `main`. Nothing else: no source changes, and no
+# registration.
+#
+# Registration stays manual, by design and by necessity. Per the guide a
+# maintainer merges this PR and then comments `@JuliaRegistrator register` on
+# the merge commit; TagBot creates the tag and the GitHub release afterwards.
+# A comment posted with GITHUB_TOKEN would not trigger Registrator anyway.
+#
+# Prerequisites:
+#   - The repo's GitHub Actions are allowed to open pull requests
+#     (Settings → Actions → General → "Allow GitHub Actions to create and
+#     approve pull requests").
+#
+# Run it from Actions → Release PR → Run workflow.
+
+name: Release PR
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Which slot to bump (ignored when 'version' is given)"
+        default: patch
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+      version:
+        description: "Explicit version, e.g. 1.0.1. Overrides 'bump'."
+        required: false
+        type: string
+
+jobs:
+  release-pr:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      # Fails when NEWS.md has no open `main` section or nothing under it,
+      # which is the case where there is nothing to release.
+      - name: Prepare the release
+        id: prepare
+        run: |
+          python3 .github/scripts/prepare_release.py \
+            --bump '${{ inputs.bump }}' \
+            --version '${{ inputs.version }}' >> "$GITHUB_OUTPUT"
+
+      - name: Open the pull request
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.prepare.outputs.version }}
+          CURRENT: ${{ steps.prepare.outputs.current }}
+          RELEASED: ${{ steps.prepare.outputs.released }}
+        run: |
+          branch="release/v${VERSION}"
+          git checkout -b "$branch"
+          git add Project.toml NEWS.md
+          git commit -m "Release v${VERSION}"
+          git push -f origin "$branch"
+          cat > /tmp/body.md <<EOF
+          Prepared by the Release PR workflow: \`${CURRENT}\` → \`${VERSION}\`, no source changes.
+
+          ## Released in this version
+
+          ${RELEASED}
+
+          ## To finish the release
+
+          - [ ] Merge this PR.
+          - [ ] Comment \`@JuliaRegistrator register\` on the merge commit.
+          - [ ] TagBot creates the tag and GitHub release once the registry PR merges.
+
+          Registration is deliberately not automated: a comment posted with
+          \`GITHUB_TOKEN\` does not trigger Registrator, and
+          \`docs/dev-guides/code-quality/changelogs_and_versions.md\` §3.3 keeps it
+          a maintainer action.
+          EOF
+          gh pr create --base "${GITHUB_REF_NAME}" --head "$branch" \
+            --title "Release v${VERSION}" --body-file /tmp/body.md
