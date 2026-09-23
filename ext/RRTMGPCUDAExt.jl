@@ -41,7 +41,9 @@ import RRTMGP.RTESolver: rte_sw_noscat_solve!
 # device-agnostic per-(g-point, column) bodies shared with the CPU drivers
 import RRTMGP.RTESolver: lw_noscat_gpt_col!, lw_2stream_gpt_col!
 import RRTMGP.RTESolver: sw_noscat_gpt_col!, sw_2stream_gpt_col!
-import RRTMGP.RTESolver: _compute_aero_mask!
+import RRTMGP.RTESolver: _compute_aero_mask!, _build_cloud_mask!
+import RRTMGP.RTESolver: rte_lw_2stream_optics_only!
+import RRTMGP.RTESolver: rte_sw_2stream_optics_only!
 import CUDA: threadIdx, blockIdx, blockDim, @cuda
 
 _max_threads_cuda() = 256

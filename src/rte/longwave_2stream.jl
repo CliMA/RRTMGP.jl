@@ -332,3 +332,35 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
         ilev -= 1
     end
 end
+
+# --- diagnostic: the optics half of a solve -------------------------------
+#
+# With `rad: allskywithclear` the solver runs twice per radiation step and both
+# passes recompute the gas and aerosol optics; only the cloud increment differs.
+# Fusing them would save exactly one copy of the optics, so the optics share of
+# a solve is the prize. These entry points do the same per-column, per-g-point
+# optics with the two-stream sweep and flux accumulation removed, so that share
+# can be measured. Nothing in the model calls them.
+
+function rte_lw_2stream_optics_only! end
+
+function solve_lw_optics_only!(
+    (; context, src, op, state_cache)::TwoStreamLWRTE,
+    as::AtmosphericState,
+    lookup_lw::LookUpLW,
+    lookup_lw_cld::Union{LookUpCld, Nothing} = nothing,
+    lookup_lw_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
+)
+    AtmosphericStates.refresh_transposed_state!(state_cache, as)
+    rte_lw_2stream_optics_only!(
+        context.device,
+        op,
+        src,
+        as,
+        state_cache,
+        lookup_lw,
+        lookup_lw_cld,
+        lookup_lw_aero,
+    )
+    return nothing
+end

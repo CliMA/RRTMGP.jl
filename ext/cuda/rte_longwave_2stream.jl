@@ -139,3 +139,60 @@ function rte_lw_2stream_solve_CUDA!(
     end
     return nothing
 end
+
+# Diagnostic; see solve_lw_optics_only! in src/rte/longwave_2stream.jl. The body
+# is the real kernel's per-column, per-g-point work with rte_lw_2stream! and the
+# flux accumulation removed, launched the same way so the comparison is fair.
+function rte_lw_2stream_optics_only!(
+    device::ClimaComms.CUDADevice,
+    op::TwoStream,
+    src_lw::SourceLW2Str,
+    as::AtmosphericState,
+    state_cache::Union{TransposedStateCache, Nothing},
+    lookup_lw::LookUpLW,
+    lookup_lw_cld::Union{LookUpCld, Nothing},
+    lookup_lw_aero::Union{LookUpAerosolMerra, Nothing},
+)
+    nlay, ncol = AtmosphericStates.get_dims(as)
+    tx, bx = _configure_threadblock(ncol)
+    args = (op, src_lw, ncol, as, state_cache, lookup_lw, lookup_lw_cld, lookup_lw_aero)
+    @cuda always_inline = true threads = (tx) blocks = (bx) rte_lw_2stream_optics_only_CUDA!(
+        args...,
+    )
+    return nothing
+end
+
+function rte_lw_2stream_optics_only_CUDA!(
+    op::TwoStream,
+    src_lw::SourceLW2Str,
+    ncol,
+    as::AtmosphericState,
+    state_cache::Union{TransposedStateCache, Nothing},
+    lookup_lw::LookUpLW,
+    lookup_lw_cld::Union{LookUpCld, Nothing},
+    lookup_lw_aero::Union{LookUpAerosolMerra, Nothing},
+)
+    gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
+    n_gpt = length(lookup_lw.band_data.major_gpt2bnd)
+    if gcol ≤ ncol
+        (; cloud_state, aerosol_state) = as
+        @inbounds begin
+            _compute_aero_mask!(aerosol_state, gcol)
+            for igpt in 1:n_gpt
+                _build_cloud_mask!(cloud_state, Val(:mask_lw), gcol)
+                compute_optical_props!(
+                    op,
+                    as,
+                    state_cache,
+                    src_lw,
+                    gcol,
+                    igpt,
+                    lookup_lw,
+                    lookup_lw_cld,
+                    lookup_lw_aero,
+                )
+            end
+        end
+    end
+    return nothing
+end
