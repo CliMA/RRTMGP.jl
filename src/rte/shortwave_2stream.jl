@@ -390,3 +390,26 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
     end
     return nothing
 end
+
+# Shortwave counterpart of solve_lw_optics_only!; see longwave_2stream.jl.
+function rte_sw_2stream_optics_only! end
+
+function solve_sw_optics_only!(
+    (; context, op, state_cache)::TwoStreamSWRTE,
+    as::AtmosphericState,
+    lookup_sw::LookUpSW,
+    lookup_sw_cld::Union{LookUpCld, Nothing} = nothing,
+    lookup_sw_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
+)
+    AtmosphericStates.refresh_transposed_state!(state_cache, as)
+    rte_sw_2stream_optics_only!(
+        context.device,
+        op,
+        as,
+        state_cache,
+        lookup_sw,
+        lookup_sw_cld,
+        lookup_sw_aero,
+    )
+    return nothing
+end

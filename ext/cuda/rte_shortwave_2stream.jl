@@ -155,3 +155,55 @@ function rte_sw_2stream_solve_CUDA!(
     end
     return nothing
 end
+
+# Diagnostic; see solve_sw_optics_only! in src/rte/shortwave_2stream.jl.
+function rte_sw_2stream_optics_only!(
+    device::ClimaComms.CUDADevice,
+    op::TwoStream,
+    as::AtmosphericState,
+    state_cache::Union{TransposedStateCache, Nothing},
+    lookup_sw::LookUpSW,
+    lookup_sw_cld::Union{LookUpCld, Nothing},
+    lookup_sw_aero::Union{LookUpAerosolMerra, Nothing},
+)
+    nlay, ncol = AtmosphericStates.get_dims(as)
+    tx, bx = _configure_threadblock(ncol)
+    args = (op, ncol, as, state_cache, lookup_sw, lookup_sw_cld, lookup_sw_aero)
+    @cuda always_inline = true threads = (tx) blocks = (bx) rte_sw_2stream_optics_only_CUDA!(
+        args...,
+    )
+    return nothing
+end
+
+function rte_sw_2stream_optics_only_CUDA!(
+    op::TwoStream,
+    ncol,
+    as::AtmosphericState,
+    state_cache::Union{TransposedStateCache, Nothing},
+    lookup_sw::LookUpSW,
+    lookup_sw_cld::Union{LookUpCld, Nothing},
+    lookup_sw_aero::Union{LookUpAerosolMerra, Nothing},
+)
+    gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
+    n_gpt = length(lookup_sw.band_data.major_gpt2bnd)
+    if gcol ≤ ncol
+        (; cloud_state, aerosol_state) = as
+        @inbounds begin
+            _compute_aero_mask!(aerosol_state, gcol)
+            for igpt in 1:n_gpt
+                _build_cloud_mask!(cloud_state, Val(:mask_sw), gcol)
+                compute_optical_props!(
+                    op,
+                    as,
+                    state_cache,
+                    gcol,
+                    igpt,
+                    lookup_sw,
+                    lookup_sw_cld,
+                    lookup_sw_aero,
+                )
+            end
+        end
+    end
+    return nothing
+end
