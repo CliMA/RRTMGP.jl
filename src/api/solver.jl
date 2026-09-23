@@ -111,6 +111,8 @@ struct RRTMGPSolver{
     MS <: Union{AbstractArray, Nothing},
     NF,
     CNF,
+    CALW,
+    CASW,
 }
     grid_params::S
     radiation_method::RM
@@ -130,6 +132,12 @@ struct RRTMGPSolver{
     deep_atmosphere_inverse_scaling::MS
     net_flux_buffer::NF
     clear_net_flux_buffer::CNF
+    # Compute-layout (ncol, nlev) accumulators for the clear-sky half of a
+    # fused solve. The clear_flux_* fields above are the (nlev, ncol)
+    # presentation the getters read; these are what the kernel accumulates
+    # into, and are transposed into those at the end of the solve.
+    clear_acc_lw::CALW
+    clear_acc_sw::CASW
 end
 Adapt.@adapt_structure RRTMGPSolver
 
@@ -240,10 +248,16 @@ function RRTMGPSolver(
         clear_flux_lw = Fluxes.FluxPresentation(grid_params; direct = false)
         clear_flux_sw = Fluxes.FluxPresentation(grid_params; direct = true)
         clear_net_flux_buffer = similar(presented_flux_lw.flux_net)
+        # The fused solve accumulates both skies in one pass over the g-points,
+        # so the clear half needs an accumulator of its own
+        clear_acc_lw = Fluxes.FluxLW(grid_params)
+        clear_acc_sw = Fluxes.FluxSW(grid_params)
     else
         clear_flux_lw = nothing
         clear_flux_sw = nothing
         clear_net_flux_buffer = nothing
+        clear_acc_lw = nothing
+        clear_acc_sw = nothing
     end
 
     # Optional per-band (spectrally-resolved) flux buffers, allocated only on request.
@@ -327,6 +341,8 @@ function RRTMGPSolver(
         deep_atmosphere_inverse_scaling,
         net_flux_buffer,
         clear_net_flux_buffer,
+        clear_acc_lw,
+        clear_acc_sw,
     )
 end
 

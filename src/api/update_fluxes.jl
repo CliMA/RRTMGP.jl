@@ -44,24 +44,19 @@ function update_lw_fluxes!(
     lookups = _lookup_tables(s)
     lw_solver = _longwave_solver(s)
     ms = _deep_atmosphere_inverse_scaling(s)
-    RTESolver.solve_lw!(
+    # One pass over the g-points fills both skies: the shared gas and aerosol
+    # optics, which are 88% of a solve, are computed once instead of twice.
+    RTESolver.solve_lw_both!(
         lw_solver,
-        as,
-        lookups.lookup_lw,
-        nothing,
-        lookups.lookup_lw_aero,
-        ms,
-    )
-    # snapshot the clear-sky fluxes into their (nlev, ncol) presentation
-    Fluxes.update_presentation!(s.clear_flux_lw, s.lws.flux)
-    RTESolver.solve_lw!(
-        lw_solver,
+        s.clear_acc_lw,
         as,
         lookups.lookup_lw,
         lookups.lookup_lw_cld,
         lookups.lookup_lw_aero,
         ms,
     )
+    # snapshot the clear-sky fluxes into their (nlev, ncol) presentation
+    Fluxes.update_presentation!(s.clear_flux_lw, s.clear_acc_lw)
 end
 
 """
