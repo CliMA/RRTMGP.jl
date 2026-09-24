@@ -101,25 +101,18 @@ function update_sw_fluxes!(
     sw_solver = _shortwave_solver(s)
     as = _atmospheric_state(s)
     ms = _deep_atmosphere_inverse_scaling(s)
-    RTESolver.solve_sw!(
+    # One pass over the g-points fills both skies; see update_lw_fluxes!
+    RTESolver.solve_sw_both!(
         sw_solver,
-        as,
-        lookups.lookup_sw,
-        nothing,
-        lookups.lookup_sw_aero,
-        ms,
-    )
-    # snapshot the clear-sky fluxes into their (nlev, ncol) presentation
-    Fluxes.update_presentation!(s.clear_flux_sw, s.sws.flux)
-
-    RTESolver.solve_sw!(
-        sw_solver,
+        s.clear_acc_sw,
         as,
         lookups.lookup_sw,
         lookups.lookup_sw_cld,
         lookups.lookup_sw_aero,
         ms,
     )
+    # snapshot the clear-sky fluxes into their (nlev, ncol) presentation
+    Fluxes.update_presentation!(s.clear_flux_sw, s.clear_acc_sw)
 end
 
 #####

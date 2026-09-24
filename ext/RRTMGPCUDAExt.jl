@@ -46,6 +46,8 @@ import RRTMGP.RTESolver: rte_lw_2stream_optics_only!
 import RRTMGP.RTESolver: rte_lw_2stream_solve_both!
 import RRTMGP.RTESolver: lw_2stream_gpt_col_both!
 import RRTMGP.RTESolver: rte_sw_2stream_optics_only!
+import RRTMGP.RTESolver: rte_sw_2stream_solve_both!
+import RRTMGP.RTESolver: sw_2stream_gpt_col_both!
 import CUDA: threadIdx, blockIdx, blockDim, @cuda
 
 _max_threads_cuda() = 256
