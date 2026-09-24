@@ -514,3 +514,80 @@ function solve_sw_both!(
     apply_metric_scaling!(band_flux, metric_scaling)
     return nothing
 end
+
+# CPU counterpart of the fused shortwave solve; see the longwave one.
+function rte_sw_2stream_solve_both!(
+    device::ClimaComms.AbstractCPUDevice,
+    flux::FluxSW,
+    flux_sw::FluxSW,
+    flux_sw_clear::FluxSW,
+    band_flux,
+    op::TwoStream,
+    bcs_sw::SwBCs,
+    src_sw::SourceSW2Str,
+    as::AtmosphericState,
+    state_cache::Union{TransposedStateCache, Nothing},
+    lookup_sw::LookUpSW,
+    lookup_sw_cld::Union{LookUpCld, Nothing},
+    lookup_sw_aero::Union{LookUpAerosolMerra, Nothing},
+)
+    nlay, ncol = AtmosphericStates.get_dims(as)
+    nlev = nlay + 1
+    n_gpt = length(lookup_sw.solar_src_scaled)
+    set_band_flux_to_zero!(band_flux)
+    @inbounds begin
+        (; cloud_state, aerosol_state) = as
+        cos_zenith = bcs_sw.cos_zenith
+        track_cld_cover =
+            cloud_state isa CloudState && !isnothing(cloud_state.cld_cover_sw)
+        FT = eltype(flux_sw.flux_up)
+        track_cld_cover && (cloud_state.cld_cover_sw .= FT(0))
+        if aerosol_state isa AerosolState
+            ClimaComms.@threaded device for gcol in 1:ncol
+                _compute_aero_mask!(aerosol_state, gcol)
+            end
+        end
+        for igpt in 1:n_gpt
+            ibnd = lookup_sw.band_data.major_gpt2bnd[igpt]
+            ClimaComms.@threaded device for gcol in 1:ncol
+                cloudy = sw_2stream_gpt_col_both!(
+                    igpt,
+                    gcol,
+                    flux,
+                    flux_sw,
+                    flux_sw_clear,
+                    band_flux,
+                    op,
+                    bcs_sw,
+                    src_sw,
+                    as,
+                    state_cache,
+                    lookup_sw,
+                    lookup_sw_cld,
+                    lookup_sw_aero,
+                    cos_zenith[gcol],
+                    ibnd,
+                    n_gpt,
+                    nlev,
+                )
+                track_cld_cover &&
+                    (cloud_state.cld_cover_sw[gcol] += FT(cloudy))
+            end
+        end
+        if track_cld_cover
+            ClimaComms.@threaded device for gcol in 1:ncol
+                cloud_state.cld_cover_sw[gcol] /= n_gpt
+            end
+        end
+        ClimaComms.@threaded device for gcol in 1:ncol
+            if cos_zenith[gcol] > 0
+                compute_net_flux!(flux_sw, gcol, nlev)
+                compute_net_flux!(flux_sw_clear, gcol, nlev)
+            else # zero out columns with zenith angle ≥ π/2, in both skies
+                set_flux_to_zero!(flux_sw, gcol, nlev)
+                set_flux_to_zero!(flux_sw_clear, gcol, nlev)
+            end
+        end
+    end
+    return nothing
+end

@@ -463,3 +463,75 @@ function solve_lw_both!(
     apply_metric_scaling!(band_flux, metric_scaling)
     return nothing
 end
+
+# CPU counterpart of the fused solve. Same structure as the GPU kernel: one
+# pass over the g-points, both skies accumulated per column.
+function rte_lw_2stream_solve_both!(
+    device::ClimaComms.AbstractCPUDevice,
+    flux::FluxLW,
+    flux_lw::FluxLW,
+    flux_lw_clear::FluxLW,
+    band_flux,
+    src_lw::SourceLW2Str,
+    bcs_lw::LwBCs,
+    op::TwoStream,
+    as::AtmosphericState,
+    state_cache::Union{TransposedStateCache, Nothing},
+    lookup_lw::LookUpLW,
+    lookup_lw_cld::Union{LookUpCld, Nothing},
+    lookup_lw_aero::Union{LookUpAerosolMerra, Nothing},
+)
+    nlay, ncol = AtmosphericStates.get_dims(as)
+    nlev = nlay + 1
+    (; major_gpt2bnd) = lookup_lw.band_data
+    n_gpt = length(major_gpt2bnd)
+    (; cloud_state, aerosol_state) = as
+    track_cld_cover =
+        cloud_state isa CloudState && !isnothing(cloud_state.cld_cover_lw)
+    FT = eltype(flux_lw.flux_up)
+    set_band_flux_to_zero!(band_flux)
+    @inbounds begin
+        track_cld_cover && (cloud_state.cld_cover_lw .= FT(0))
+        if aerosol_state isa AerosolState
+            ClimaComms.@threaded device for gcol in 1:ncol
+                _compute_aero_mask!(aerosol_state, gcol)
+            end
+        end
+        for igpt in 1:n_gpt
+            ibnd = major_gpt2bnd[igpt]
+            ClimaComms.@threaded device for gcol in 1:ncol
+                cloudy = lw_2stream_gpt_col_both!(
+                    igpt,
+                    gcol,
+                    flux,
+                    flux_lw,
+                    flux_lw_clear,
+                    band_flux,
+                    src_lw,
+                    bcs_lw,
+                    op,
+                    as,
+                    state_cache,
+                    lookup_lw,
+                    lookup_lw_cld,
+                    lookup_lw_aero,
+                    ibnd,
+                    nlev,
+                    ncol,
+                )
+                track_cld_cover &&
+                    (cloud_state.cld_cover_lw[gcol] += FT(cloudy))
+            end
+        end
+        if track_cld_cover
+            ClimaComms.@threaded device for gcol in 1:ncol
+                cloud_state.cld_cover_lw[gcol] /= n_gpt
+            end
+        end
+        ClimaComms.@threaded device for gcol in 1:ncol
+            compute_net_flux!(flux_lw, gcol, nlev)
+            compute_net_flux!(flux_lw_clear, gcol, nlev)
+        end
+    end
+    return nothing
+end
