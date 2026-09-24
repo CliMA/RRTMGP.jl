@@ -2,6 +2,9 @@ RRTMGP.jl Release Notes
 ========================
 
 main
+----
+
+v1.0.1
 ------
 
 - [#628](https://github.com/CliMA/RRTMGP.jl/pull/628) Replaced the linear scan
