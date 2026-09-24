@@ -16,7 +16,7 @@ using ..LookUpTables
 
 export solve_lw!, solve_sw!
 export solve_lw_optics_only!, solve_sw_optics_only!
-export solve_lw_both!
+export solve_lw_both!, solve_sw_both!
 
 include("driver_utils.jl")
 include("longwave_noscat.jl")
