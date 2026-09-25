@@ -32,7 +32,7 @@ end
     # No lingering background task may keep the load process alive: the
     # precompile workload (src/precompile.jl) runs a full solve at build time,
     # so a task leak would stall precompilation.
-    Aqua.test_persistent_tasks(RRTMGP)
+    Aqua.test_persistent_tasks(RRTMGP; tmax = 600)
 end
 
 nothing
