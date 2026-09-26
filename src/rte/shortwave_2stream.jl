@@ -390,3 +390,181 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
     end
     return nothing
 end
+
+# --- fused all-sky + clear-sky solve ---------------------------------------
+#
+# See solve_lw_both! in longwave_2stream.jl. The shortwave differs in three
+# ways: the cloud increment is delta-scaled, the sweeps happen only where the
+# sun is up, and night columns are zeroed in both skies after the g-point loop.
+
+function rte_sw_2stream_solve_both! end
+
+@inline function sw_2stream_gpt_col_both!(
+    igpt,
+    gcol,
+    flux,
+    flux_sw,
+    flux_sw_clear,
+    band_flux,
+    op,
+    bcs_sw,
+    src_sw,
+    as,
+    state_cache,
+    lookup_sw,
+    lookup_sw_cld,
+    lookup_sw_aero,
+    μ₀,
+    ibnd,
+    n_gpt,
+    nlev,
+)
+    cloudy = _build_cloud_mask!(as.cloud_state, Val(:mask_sw), gcol)
+    # Gas and aerosol only: the clear sky, and the half both skies share
+    compute_optical_props!(
+        op,
+        as,
+        state_cache,
+        gcol,
+        igpt,
+        lookup_sw,
+        nothing,
+        lookup_sw_aero,
+    )
+    if μ₀ > 0
+        @inbounds solar_frac = lookup_sw.solar_src_scaled[igpt]
+        rte_sw_2stream!(
+            op, src_sw, bcs_sw, flux, solar_frac, igpt, n_gpt, ibnd, nlev, gcol,
+        )
+        _accumulate_fluxes!(flux_sw_clear, flux, gcol, nlev, igpt)
+    end
+    # Add the cloud increment to the same optics and sweep again
+    if !isnothing(lookup_sw_cld)
+        add_cloud_optics_sw!(op, as, gcol, lookup_sw_cld, ibnd)
+    end
+    if μ₀ > 0
+        @inbounds solar_frac = lookup_sw.solar_src_scaled[igpt]
+        rte_sw_2stream!(
+            op, src_sw, bcs_sw, flux, solar_frac, igpt, n_gpt, ibnd, nlev, gcol,
+        )
+        _accumulate_fluxes!(flux_sw, flux, gcol, nlev, igpt)
+        accumulate_band_flux!(
+            band_flux, flux.flux_up, flux.flux_dn, gcol, ibnd, nlev,
+        )
+    end
+    return cloudy
+end
+
+"""
+    solve_sw_both!(sw, flux_sw_clear, as, lookup_sw, lookup_sw_cld, lookup_sw_aero, metric_scaling)
+
+Solve the shortwave problem for both skies in one pass over the g-points.
+See [`solve_lw_both!`](@ref).
+"""
+function solve_sw_both!(
+    (; context, fluxb, flux, band_flux, src, bcs, op, state_cache)::TwoStreamSWRTE,
+    flux_sw_clear::FluxSW,
+    as::AtmosphericState,
+    lookup_sw::LookUpSW,
+    lookup_sw_cld::Union{LookUpCld, Nothing} = nothing,
+    lookup_sw_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
+    metric_scaling::M = nothing,
+) where {M}
+    AtmosphericStates.refresh_transposed_state!(state_cache, as)
+    rte_sw_2stream_solve_both!(
+        context.device,
+        fluxb,
+        flux,
+        flux_sw_clear,
+        band_flux,
+        op,
+        bcs,
+        src,
+        as,
+        state_cache,
+        lookup_sw,
+        lookup_sw_cld,
+        lookup_sw_aero,
+    )
+    apply_metric_scaling!(flux, metric_scaling)
+    apply_metric_scaling!(flux_sw_clear, metric_scaling)
+    apply_metric_scaling!(band_flux, metric_scaling)
+    return nothing
+end
+
+# CPU counterpart of the fused shortwave solve; see the longwave one.
+function rte_sw_2stream_solve_both!(
+    device::ClimaComms.AbstractCPUDevice,
+    flux::FluxSW,
+    flux_sw::FluxSW,
+    flux_sw_clear::FluxSW,
+    band_flux,
+    op::TwoStream,
+    bcs_sw::SwBCs,
+    src_sw::SourceSW2Str,
+    as::AtmosphericState,
+    state_cache::Union{TransposedStateCache, Nothing},
+    lookup_sw::LookUpSW,
+    lookup_sw_cld::Union{LookUpCld, Nothing},
+    lookup_sw_aero::Union{LookUpAerosolMerra, Nothing},
+)
+    nlay, ncol = AtmosphericStates.get_dims(as)
+    nlev = nlay + 1
+    n_gpt = length(lookup_sw.solar_src_scaled)
+    set_band_flux_to_zero!(band_flux)
+    @inbounds begin
+        (; cloud_state, aerosol_state) = as
+        cos_zenith = bcs_sw.cos_zenith
+        track_cld_cover =
+            cloud_state isa CloudState && !isnothing(cloud_state.cld_cover_sw)
+        FT = eltype(flux_sw.flux_up)
+        track_cld_cover && (cloud_state.cld_cover_sw .= FT(0))
+        if aerosol_state isa AerosolState
+            ClimaComms.@threaded device for gcol in 1:ncol
+                _compute_aero_mask!(aerosol_state, gcol)
+            end
+        end
+        for igpt in 1:n_gpt
+            ibnd = lookup_sw.band_data.major_gpt2bnd[igpt]
+            ClimaComms.@threaded device for gcol in 1:ncol
+                cloudy = sw_2stream_gpt_col_both!(
+                    igpt,
+                    gcol,
+                    flux,
+                    flux_sw,
+                    flux_sw_clear,
+                    band_flux,
+                    op,
+                    bcs_sw,
+                    src_sw,
+                    as,
+                    state_cache,
+                    lookup_sw,
+                    lookup_sw_cld,
+                    lookup_sw_aero,
+                    cos_zenith[gcol],
+                    ibnd,
+                    n_gpt,
+                    nlev,
+                )
+                track_cld_cover &&
+                    (cloud_state.cld_cover_sw[gcol] += FT(cloudy))
+            end
+        end
+        if track_cld_cover
+            ClimaComms.@threaded device for gcol in 1:ncol
+                cloud_state.cld_cover_sw[gcol] /= n_gpt
+            end
+        end
+        ClimaComms.@threaded device for gcol in 1:ncol
+            if cos_zenith[gcol] > 0
+                compute_net_flux!(flux_sw, gcol, nlev)
+                compute_net_flux!(flux_sw_clear, gcol, nlev)
+            else # zero out columns with zenith angle ≥ π/2, in both skies
+                set_flux_to_zero!(flux_sw, gcol, nlev)
+                set_flux_to_zero!(flux_sw_clear, gcol, nlev)
+            end
+        end
+    end
+    return nothing
+end

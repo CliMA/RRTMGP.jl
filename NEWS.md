@@ -4,6 +4,36 @@ RRTMGP.jl Release Notes
 main
 ----
 
+v1.1.0
+------
+
+- [#PR](https://github.com/CliMA/RRTMGP.jl/pull/PR) **The clear-sky diagnostics
+  no longer cost a second radiation solve.** Under
+  `AllSkyRadiationWithClearSkyDiagnostics` the solver ran twice per radiation
+  step, and the two passes differed only by the cloud increment while both
+  recomputed the gas and aerosol optics. That shared optics is 88% of a longwave
+  solve and 83% of a shortwave one in a coupled AMIP benchmark, so
+  `TwoStreamLWRTE` and `TwoStreamSWRTE` now compute it once and sweep twice:
+  longwave -43.6%, shortwave -39.8%, and four radiation kernels become two. In a
+  configuration where radiation was 36% of GPU kernel time, this was +10.9%
+  SYPD. Every diagnostic is kept.
+
+  Callers are unaffected, since `update_fluxes!` is unchanged. Solvers that
+  cannot share the optics, such as `NoScatLWRTE`, still run two solves through a
+  fallback `solve_lw_both!` / `solve_sw_both!`.
+
+  **Results are not bit-identical to the two-solve path.** The cloud mask is
+  McICA-sampled per kernel launch, so one fused launch draws a different sample
+  than the previous two did; the clear-sky fluxes, which involve no sampling,
+  are unchanged. Checked by running a 120-step coupled trajectory against the
+  same code reseeded: the fused run diverges from the two-solve path no more
+  than a different cloud draw does.
+
+- `RRTMGPSolver` gains two fields, `clear_acc_lw` and `clear_acc_sw`, holding
+  the compute-layout accumulators for the clear-sky half of a fused solve, plus
+  two corresponding type parameters. Both are `nothing` unless the radiation
+  method asks for clear-sky diagnostics.
+
 v1.0.1
 ------
 

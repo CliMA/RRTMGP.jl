@@ -170,6 +170,39 @@ function all_sky_with_aerosols(
     @test solver_reused.lookups === prebuilt_lookups
     RRTMGP.update_sw_fluxes!(solver)
     RRTMGP.update_lw_fluxes!(solver)
+
+    # The clear-sky half of a fused solve involves no cloud sampling, so it must
+    # equal a standalone clear-sky solve bit for bit. This is the only part of
+    # the fused path that can be compared for equality -- the all-sky half
+    # cannot, since McICA draws a different cloud sample per kernel launch, so
+    # one fused launch does not reproduce what two separate launches drew.
+    let lkps = solver.lookups, ms = nothing
+        fused_clear_lw = copy(Array(parent(solver.clear_acc_lw.flux_net)))
+        RTESolver.solve_lw!(
+            solver.lws,
+            as,
+            lkps.lookup_lw,
+            nothing,
+            lkps.lookup_lw_aero,
+            ms,
+        )
+        @test Array(parent(solver.lws.flux.flux_net)) == fused_clear_lw
+
+        fused_clear_sw = copy(Array(parent(solver.clear_acc_sw.flux_net)))
+        RTESolver.solve_sw!(
+            solver.sws,
+            as,
+            lkps.lookup_sw,
+            nothing,
+            lkps.lookup_sw_aero,
+            ms,
+        )
+        @test Array(parent(solver.sws.flux.flux_net)) == fused_clear_sw
+    end
+    # Those two solves left the solver holding clear-sky fluxes, so restore the
+    # all-sky state the rest of this test reads.
+    RRTMGP.update_sw_fluxes!(solver)
+    RRTMGP.update_lw_fluxes!(solver)
     RRTMGP.update_net_fluxes!(solver) # so net_flux/heating_rate read a valid buffer
     for m in api_methods
         getproperty(RRTMGP, m)(solver)

@@ -386,3 +386,74 @@ end
     end
     return nothing
 end
+
+"""
+    add_cloud_optics_lw!(op, as, gcol, lkp_cld, ibnd)
+
+Add the longwave cloud increment to optical properties that already hold the
+gas and aerosol contributions for column `gcol`.
+
+Split out of `compute_optical_props!` so a fused all-sky/clear-sky solve can
+compute the shared optics once, sweep for the clear sky, then add clouds and
+sweep again. The increment is the same one `compute_optical_props!` applies,
+with the same `delta_scaling`.
+"""
+@inline function add_cloud_optics_lw!(
+    op::TwoStream,
+    as::AtmosphericState,
+    gcol::Int,
+    lkp_cld::LookUpCld,
+    ibnd::Int,
+)
+    cloud_state = as.cloud_state
+    @inbounds begin
+        add_cloud_optics_2stream!(
+            view(op.τ, gcol, :),
+            view(op.ssa, gcol, :),
+            view(op.g, gcol, :),
+            view(cloud_state.mask_lw, :, gcol),
+            view(cloud_state.cld_r_eff_liq, :, gcol),
+            view(cloud_state.cld_r_eff_ice, :, gcol),
+            view(cloud_state.cld_path_liq, :, gcol),
+            view(cloud_state.cld_path_ice, :, gcol),
+            cloud_state.ice_rgh,
+            lkp_cld,
+            ibnd;
+            delta_scaling = false,
+        )
+    end
+    return nothing
+end
+
+"""
+    add_cloud_optics_sw!(op, as, gcol, lkp_cld, ibnd)
+
+Shortwave counterpart of [`add_cloud_optics_lw!`](@ref). Note `delta_scaling`,
+which the shortwave cloud increment applies and the longwave one does not.
+"""
+@inline function add_cloud_optics_sw!(
+    op::TwoStream,
+    as::AtmosphericState,
+    gcol::Int,
+    lkp_cld::LookUpCld,
+    ibnd::Int,
+)
+    cloud_state = as.cloud_state
+    @inbounds begin
+        add_cloud_optics_2stream!(
+            view(op.τ, gcol, :),
+            view(op.ssa, gcol, :),
+            view(op.g, gcol, :),
+            view(cloud_state.mask_sw, :, gcol),
+            view(cloud_state.cld_r_eff_liq, :, gcol),
+            view(cloud_state.cld_r_eff_ice, :, gcol),
+            view(cloud_state.cld_path_liq, :, gcol),
+            view(cloud_state.cld_path_ice, :, gcol),
+            cloud_state.ice_rgh,
+            lkp_cld,
+            ibnd;
+            delta_scaling = true,
+        )
+    end
+    return nothing
+end
