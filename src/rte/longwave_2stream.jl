@@ -399,7 +399,12 @@ end
 
 Solve the longwave problem for both skies in one pass over the g-points,
 accumulating the clear sky into `flux_lw_clear` and the all-sky into the
-solver's own flux. Equivalent to two `solve_lw!` calls, to roundoff.
+solver's own flux.
+
+The clear-sky result is bit-for-bit what a `solve_lw!` with no cloud lookup
+produces. The all-sky result is not, and cannot be: the cloud mask is
+McICA-sampled per launch, so one fused launch draws a different sample than a
+separate all-sky launch would. It is the same estimator, not the same draw.
 """
 function solve_lw_both!(
     (; context, fluxb, flux, band_flux, src, bcs, op, state_cache)::TwoStreamLWRTE,
