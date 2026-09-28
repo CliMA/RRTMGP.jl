@@ -51,7 +51,7 @@ end
     nlev,
     ncol,
 )
-    cloudy = _build_cloud_mask!(as.cloud_state, Val(:mask_lw), gcol)
+    cloudy = _build_cloud_mask!(as.cloud_state, Val(:mask_lw), gcol, igpt)
     compute_optical_props!(
         op,
         as,
@@ -401,7 +401,7 @@ function rte_lw_2stream_solve_both! end
     nlev,
     ncol,
 )
-    cloudy = _build_cloud_mask!(as.cloud_state, Val(:mask_lw), gcol)
+    cloudy = _build_cloud_mask!(as.cloud_state, Val(:mask_lw), gcol, igpt)
     # Gas and aerosol only: this is the clear sky, and the shared half
     compute_optical_props!(
         op,

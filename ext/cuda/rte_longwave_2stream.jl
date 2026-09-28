@@ -179,7 +179,7 @@ function rte_lw_2stream_optics_only_CUDA!(
         @inbounds begin
             _compute_aero_mask!(aerosol_state, gcol)
             for igpt in 1:n_gpt
-                _build_cloud_mask!(cloud_state, Val(:mask_lw), gcol)
+                _build_cloud_mask!(cloud_state, Val(:mask_lw), gcol, igpt)
                 compute_optical_props!(
                     op,
                     as,

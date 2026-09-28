@@ -244,27 +244,62 @@ Compute the `TwoStream` cloud ice properties using the `LookUpTable` method.
 end
 
 """
-    build_cloud_mask!(cld_mask, cld_frac, ::MaxRandomOverlap)
+    _keyed_uniform(FT, gcol, igpt, ilay)
+
+A uniform draw in [0, 1) determined entirely by where it is used, with no RNG
+state and no allocation: the same (column, g-point, layer) always yields the
+same number, on any device, in any launch order, at any thread count.
+
+This is what makes McICA sampling reproducible on the GPU. The device RNG is
+keyed per kernel launch, so drawing from it makes the sample depend on how many
+kernels ran rather than on the physics (RRTMGP.jl#316). Mixing is splitmix64's
+finalizer, which is a few integer operations -- the reason the docstring below
+gave for not doing this, keeping the kernel allocation-free, does not apply to a
+counter-based draw.
+"""
+@inline function _keyed_uniform(
+    ::Type{FT},
+    gcol::Integer,
+    igpt::Integer,
+    ilay::Integer,
+) where {FT}
+    z = (UInt64(gcol) * 0x9E3779B97F4A7C15) ⊻
+        (UInt64(igpt) * 0xBF58476D1CE4E5B9) ⊻
+        (UInt64(ilay) * 0x94D049BB133111EB)
+    z = (z ⊻ (z >> 30)) * 0xBF58476D1CE4E5B9
+    z = (z ⊻ (z >> 27)) * 0x94D049BB133111EB
+    z = z ⊻ (z >> 31)
+    # Top 24 bits, so the result is exact in Float32 as well as Float64
+    return FT(z >> 40) * FT(1 / (1 << 24))
+end
+
+"""
+    build_cloud_mask!(cld_mask, cld_frac, ::MaxRandomOverlap, gcol, igpt)
 
 Build a McICA-sampled cloud mask from cloud fraction data for maximum-random overlap
 
 Reference: https://github.com/AER-RC/RRTMG_SW/
 
-Determinism: the mask is drawn with `Random.rand()` within the per-column g-point loop, i.e.
-from the RNG of whichever task runs that iteration. On a single CPU thread every draw comes
-from the one RNG that `Random.seed!` reseeds, so a fixed seed makes the sampling reproducible.
-Under multithreading each worker task uses its own independent task-local RNG (seeded from the
-parent at spawn, not by `Random.seed!`), and on the GPU the device RNG is keyed by a per-launch
-seed the host `Random.seed!` does not control (at least on CUDA 6.x); combined with a
-work assignment that is not fixed across runs or thread counts, the per-column McICA sample is
-then not guaranteed reproducible. Broadband fluxes are statistically unbiased regardless;
-bit-reproducible per-column sampling would require column-indexed seeding, deliberately not
-done here to keep the kernel allocation-free.
+Determinism: the mask is drawn by [`_keyed_uniform`](@ref) from `(gcol, igpt, ilay)`, so it
+is reproducible everywhere -- one CPU thread, many threads, or the GPU -- and independent of
+launch order, launch count and work assignment. Nothing is seeded and nothing is allocated.
+
+This replaces a bare `Random.rand()`, which took the device RNG on the GPU. That RNG is keyed
+per kernel launch, so the sample depended on how many kernels had run: two identical solves
+disagreed, `reset_rng_seed` had no effect on the GPU, and restarts were not reproducible
+(RRTMGP.jl#316, #544).
+
+PROTOTYPE LIMITATION: the key carries no timestep, so every radiation step draws the SAME
+sample. That is correct for testing reproducibility and wrong for production, where McICA needs
+a fresh draw per step to average out. Production keying adds the `seedval` already passed to
+`update_fluxes!` into the key, which means threading one scalar down to here.
 """
 function build_cloud_mask!(
     cld_mask::AbstractArray{Bool, 1},
     cld_frac::AbstractArray{FT, 1},
     ::MaxRandomOverlap,
+    gcol::Integer,
+    igpt::Integer,
 ) where {FT}
     nlay = size(cld_frac, 1)
     start = _get_start(cld_frac) # first cloudy layer
@@ -276,7 +311,7 @@ function build_cloud_mask!(
         # RRTMG uses random_arr[finish] > (FT(1) - cld_frac[finish]),
         # we change > to >= to address edge cases
         @inbounds cld_frac_ilayplus1 = cld_frac[finish]
-        random_ilayplus1 = Random.rand()
+        random_ilayplus1 = _keyed_uniform(FT, gcol, igpt, finish)
         @inbounds cld_mask[finish] =
             cld_mask_ilayplus1 =
                 random_ilayplus1 >= (FT(1) - cld_frac_ilayplus1)
@@ -288,7 +323,8 @@ function build_cloud_mask!(
                 # update random numbers if layer above is not cloudy
                 random_ilay =
                     cld_mask_ilayplus1 ? random_ilayplus1 :
-                    Random.rand() * (FT(1) - cld_frac_ilayplus1)
+                    _keyed_uniform(FT, gcol, igpt, ilay) *
+                    (FT(1) - cld_frac_ilayplus1)
                 # RRTMG uses random_arr[ilay] > (FT(1) - cld_frac[ilay]), we change > to >= to address edge cases
                 cld_mask_ilay = random_ilay >= (FT(1) - cld_frac_ilay)
                 random_ilayplus1 = random_ilay
