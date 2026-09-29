@@ -244,11 +244,13 @@ Compute the `TwoStream` cloud ice properties using the `LookUpTable` method.
 end
 
 """
-    _keyed_uniform(FT, gcol, igpt, ilay)
+    _keyed_uniform(FT, key, gcol, igpt, ilay)
 
-A uniform draw in [0, 1) determined entirely by where it is used, with no RNG
-state and no allocation: the same (column, g-point, layer) always yields the
-same number, on any device, in any launch order, at any thread count.
+A uniform draw in [0, 1) determined entirely by the key and where it is used,
+with no RNG state and no allocation: the same `(key, column, g-point, layer)`
+always yields the same number, on any device, in any launch order, at any
+thread count. The key comes from the `seedval` passed to `update_fluxes!`, so
+it varies between radiation steps and repeats exactly on a rerun or restart.
 
 This is what makes McICA sampling reproducible on the GPU. The device RNG is
 keyed per kernel launch, so drawing from it makes the sample depend on how many
@@ -259,11 +261,13 @@ counter-based draw.
 """
 @inline function _keyed_uniform(
     ::Type{FT},
+    key::Unsigned,
     gcol::Integer,
     igpt::Integer,
     ilay::Integer,
 ) where {FT}
-    z = (UInt64(gcol) * 0x9E3779B97F4A7C15) ⊻
+    z = (UInt64(key) * 0xD1342543DE82EF95) ⊻
+        (UInt64(gcol) * 0x9E3779B97F4A7C15) ⊻
         (UInt64(igpt) * 0xBF58476D1CE4E5B9) ⊻
         (UInt64(ilay) * 0x94D049BB133111EB)
     z = (z ⊻ (z >> 30)) * 0xBF58476D1CE4E5B9
@@ -274,7 +278,7 @@ counter-based draw.
 end
 
 """
-    build_cloud_mask!(cld_mask, cld_frac, ::MaxRandomOverlap, gcol, igpt)
+    build_cloud_mask!(cld_mask, cld_frac, ::MaxRandomOverlap, key, gcol, igpt)
 
 Build a McICA-sampled cloud mask from cloud fraction data for maximum-random overlap
 
@@ -289,15 +293,16 @@ per kernel launch, so the sample depended on how many kernels had run: two ident
 disagreed, `reset_rng_seed` had no effect on the GPU, and restarts were not reproducible
 (RRTMGP.jl#316, #544).
 
-PROTOTYPE LIMITATION: the key carries no timestep, so every radiation step draws the SAME
-sample. That is correct for testing reproducibility and wrong for production, where McICA needs
-a fresh draw per step to average out. Production keying adds the `seedval` already passed to
-`update_fluxes!` into the key, which means threading one scalar down to here.
+The key is `cloud_state.seed`, set from the `seedval` given to `update_fluxes!` -- hosts
+typically pass the timestep index, which gives a fresh sample every radiation step and the same
+sample on a rerun. A host that passes no `seedval` gets a random key per call, i.e. the previous
+unreproducible behavior.
 """
 function build_cloud_mask!(
     cld_mask::AbstractArray{Bool, 1},
     cld_frac::AbstractArray{FT, 1},
     ::MaxRandomOverlap,
+    key::Unsigned,
     gcol::Integer,
     igpt::Integer,
 ) where {FT}
@@ -311,7 +316,7 @@ function build_cloud_mask!(
         # RRTMG uses random_arr[finish] > (FT(1) - cld_frac[finish]),
         # we change > to >= to address edge cases
         @inbounds cld_frac_ilayplus1 = cld_frac[finish]
-        random_ilayplus1 = _keyed_uniform(FT, gcol, igpt, finish)
+        random_ilayplus1 = _keyed_uniform(FT, key, gcol, igpt, finish)
         @inbounds cld_mask[finish] =
             cld_mask_ilayplus1 =
                 random_ilayplus1 >= (FT(1) - cld_frac_ilayplus1)
@@ -323,7 +328,7 @@ function build_cloud_mask!(
                 # update random numbers if layer above is not cloudy
                 random_ilay =
                     cld_mask_ilayplus1 ? random_ilayplus1 :
-                    _keyed_uniform(FT, gcol, igpt, ilay) *
+                    _keyed_uniform(FT, key, gcol, igpt, ilay) *
                     (FT(1) - cld_frac_ilayplus1)
                 # RRTMG uses random_arr[ilay] > (FT(1) - cld_frac[ilay]), we change > to >= to address edge cases
                 cld_mask_ilay = random_ilay >= (FT(1) - cld_frac_ilay)

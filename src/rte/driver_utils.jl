@@ -22,10 +22,12 @@
     igpt,
 ) where {S}
     mask = view(getproperty(cloud_state, S), :, gcol)
+    key = @inbounds cloud_state.seed[1]
     Optics.build_cloud_mask!(
         mask,
         view(cloud_state.cld_frac, :, gcol),
         cloud_state.mask_type,
+        key,
         gcol,
         igpt,
     )

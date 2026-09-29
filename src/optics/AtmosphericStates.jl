@@ -232,8 +232,12 @@ Cloud state, used to compute optical properties.
 - `mask_sw`: Cloud mask (shortwave); `true` if clouds are present.
 - `mask_type`: Cloud mask type.
 - `ice_rgh`: Ice roughness; 1 = none, 2 = medium, 3 = rough.
+- `seed`: One-element array holding the McICA key. The cloud mask is a
+  deterministic function of `(seed, column, g-point, layer)`, so this is what
+  makes sampling reproducible, and it must change between radiation steps or
+  every step draws the same clouds. `update_fluxes!(s, seedval)` sets it.
 """
-struct CloudState{CD, CF, CC, CM, CMT}
+struct CloudState{CD, CF, CC, CM, CMT, SD}
     cld_r_eff_liq::CD
     cld_r_eff_ice::CD
     cld_path_liq::CD
@@ -245,8 +249,43 @@ struct CloudState{CD, CF, CC, CM, CMT}
     mask_sw::CM
     mask_type::CMT
     ice_rgh::Int
+    seed::SD
 end
 Adapt.@adapt_structure CloudState
+
+# Constructor without a `seed`: derives the key buffer from `cld_frac`, so it
+# lands on whichever device the state lives on. Every caller that predates
+# keyed sampling -- ClimaAtmos among them -- keeps working unchanged.
+function CloudState(
+    cld_r_eff_liq,
+    cld_r_eff_ice,
+    cld_path_liq,
+    cld_path_ice,
+    cld_frac,
+    cld_cover_sw,
+    cld_cover_lw,
+    mask_lw,
+    mask_sw,
+    mask_type,
+    ice_rgh::Integer,
+)
+    seed = similar(cld_frac, UInt32, 1)
+    fill!(seed, UInt32(0))
+    return CloudState(
+        cld_r_eff_liq,
+        cld_r_eff_ice,
+        cld_path_liq,
+        cld_path_ice,
+        cld_frac,
+        cld_cover_sw,
+        cld_cover_lw,
+        mask_lw,
+        mask_sw,
+        mask_type,
+        Int(ice_rgh),
+        seed,
+    )
+end
 
 # Convenience constructor: callers that don't allocate cld_cover arrays
 # can use this 9-argument form where both covers default to `nothing`.

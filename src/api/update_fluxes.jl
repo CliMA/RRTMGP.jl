@@ -134,6 +134,23 @@ _idx_h2o(::RRTMGPSolver, ::GrayRadiation) = nothing
 _idx_h2o(s::RRTMGPSolver, ::AbstractRRTMGPMethod) =
     _lookup_tables(s).lookup_lw.idx_h2o
 
+# The McICA key. Sampling is a deterministic function of it, so it has to change
+# between radiation steps or every step draws the same clouds. A host that passes
+# the timestep index gets reproducible, restartable sampling on every device; one
+# that passes nothing gets a fresh random key per call, which is the behavior
+# before keying.
+# Gray radiation has no clouds and its state carries no `cloud_state` field at
+# all, so dispatch on the state rather than reaching for the field. A clear-sky
+# state has the field but leaves it `nothing`.
+_set_mcica_key!(as, seedval) = _set_cloud_key!(as.cloud_state, seedval)
+_set_mcica_key!(as::AtmosphericStates.GrayAtmosphericState, seedval) = nothing
+_set_cloud_key!(::Nothing, seedval) = nothing
+function _set_cloud_key!(cloud_state, seedval)
+    key = isnothing(seedval) ? rand(UInt32) : (seedval % UInt32)
+    fill!(cloud_state.seed, key)
+    return nothing
+end
+
 _maybe_reset_rng_seed!(::AbstractRRTMGPMethod, seedval) = nothing
 function _maybe_reset_rng_seed!(
     rm::Union{AllSkyRadiation, AllSkyRadiationWithClearSkyDiagnostics},
@@ -213,6 +230,7 @@ function update_fluxes!(s::RRTMGPSolver, seedval = nothing)
     # branch when off, so the zero-allocation contract is unaffected
     check_values[] && validate_inputs(s)
     _maybe_reset_rng_seed!(_radiation_method(s), seedval)
+    _set_mcica_key!(_atmospheric_state(s), seedval)
     prepare_atmosphere!(s)
     update_lw_fluxes!(s)
     update_sw_fluxes!(s)
