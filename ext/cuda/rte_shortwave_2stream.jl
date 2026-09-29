@@ -156,6 +156,14 @@ function rte_sw_2stream_solve_CUDA!(
     return nothing
 end
 
+"""
+    rte_sw_2stream_solve_both!(device::CUDADevice, ...)
+
+Host side of the fused shortwave solve: configures one thread per column and
+launches `rte_sw_2stream_solve_both_CUDA!`. Spectral radiation only --
+the gray methods above take a `GrayAtmosphericState` and have no clouds to
+sample, so there is no clear sky to separate.
+"""
 function rte_sw_2stream_solve_both!(
     device::ClimaComms.CUDADevice,
     flux::FluxSW,
@@ -196,6 +204,16 @@ function rte_sw_2stream_solve_both!(
     return nothing
 end
 
+"""
+    rte_sw_2stream_solve_both_CUDA!(...)
+
+The fused shortwave kernel: one thread per column, looping g-points and filling
+both skies in a single pass. Per g-point it computes the gas and aerosol optics
+once, sweeps and accumulates the clear sky, then adds the cloud increment to the
+same optics and sweeps again for the all-sky. The per-column body lives in
+`src/rte/shortwave_2stream.jl` as `sw_2stream_gpt_col_both!`, shared with the
+CPU driver.
+"""
 function rte_sw_2stream_solve_both_CUDA!(
     flux::FluxSW,
     flux_sw::FluxSW,
