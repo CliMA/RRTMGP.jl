@@ -6,16 +6,22 @@ using Random
 
 Test partial cloud fraction with McICA stochastic cloud masking.
 
-When `cld_frac < 1`, `build_cloud_mask!` draws from `Random.rand()` to
-stochastically sample the cloud mask (maximum-random overlap).  This test
-verifies:
+When `cld_frac < 1`, `build_cloud_mask!` samples the cloud mask stochastically
+(maximum-random overlap). The sample is a deterministic function of
+`(cloud_state.seed, column, g-point, layer)`, so it is selected by the key rather
+than drawn from an RNG's state. This test verifies:
 1. Fully overcast (`cld_frac = 1`) is deterministic — the mask is always
-   `true` regardless of random draws.
-2. Partial cloud without RNG seeding produces different fluxes across runs.
-3. Partial cloud with RNG seeding is reproducible.
+   `true` regardless of the key.
+2. One key reproduces the same fluxes exactly, on CPU and on GPU alike.
+3. A different key resamples, so successive radiation steps do not repeat one
+   cloud field.
 4. The same properties hold for spatially varying (per-layer, per-column)
    cloud fractions.
 5. Diagnosed cloud cover lies in [0, 1].
+
+Points 2 and 3 used to be asserted the other way around, and point 2 only on the
+CPU: reproducibility came from `Random.seed!`, which cannot reach the device RNG
+the GPU sampler drew from (RRTMGP.jl#316).
 """
 function partial_cloud_fraction_test(
     context,
@@ -91,9 +97,12 @@ function partial_cloud_fraction_test(
 
     # Helper: set cloud fraction, optionally seed RNG, run solvers,
     # and return copies of the result arrays.
-    function run_solve!(cld_frac_values; seed = nothing)
+    function run_solve!(cld_frac_values; key = nothing)
         as.cloud_state.cld_frac .= cld_frac_values
-        isnothing(seed) || Random.seed!(seed)
+        # The McICA sample is a function of (key, column, g-point, layer), so
+        # the key selects it. `Random.seed!` no longer has any bearing on it,
+        # which is the point of the change -- it never did on the GPU.
+        isnothing(key) || fill!(as.cloud_state.seed, UInt32(key))
         solve_lw!(slv_lw, as, lookup_lw, lookup_lw_cld, nothing, nothing)
         solve_sw!(slv_sw, as, lookup_sw, lookup_sw_cld, nothing, nothing)
         return (
@@ -104,7 +113,7 @@ function partial_cloud_fraction_test(
         )
     end
 
-    seed = 1234
+    key = 1234
 
     # ------------------------------------------------------------------
     # 1. Fully overcast (cldfrac = 1): deterministic
@@ -118,66 +127,71 @@ function partial_cloud_fraction_test(
     end
 
     # ------------------------------------------------------------------
-    # 2. Uniform partial cloud (cldfrac = 0.5): unseeded → stochastic
+    # 2. Uniform partial cloud (cldfrac = 0.5): one key reproduces, a new key
+    #    resamples. Both halves matter: without the first the sampling is not
+    #    reproducible, and without the second the key is stuck and every
+    #    radiation step would draw the same clouds.
     # ------------------------------------------------------------------
-    @testset "cldfrac = 0.5 (unseeded, non-deterministic)" begin
+    @testset "cldfrac = 0.5 (keyed sampling)" begin
         cld_frac_half = base_cld_frac .* FT(0.5)
-        r1 = run_solve!(cld_frac_half)
-        r2 = run_solve!(cld_frac_half)
-        diff_lw = maximum(abs.(r1.lw_net .- r2.lw_net))
-        diff_sw = maximum(abs.(r1.sw_net .- r2.sw_net))
-        println("cldfrac=0.5 unseeded: L∞ diff LW = $diff_lw, SW = $diff_sw")
+        r1 = run_solve!(cld_frac_half; key = 7)
+        r2 = run_solve!(cld_frac_half; key = 7)
+        @test r1.lw_net == r2.lw_net
+        @test r1.sw_net == r2.sw_net
+        r3 = run_solve!(cld_frac_half; key = 8)
+        diff_lw = maximum(abs.(r1.lw_net .- r3.lw_net))
+        diff_sw = maximum(abs.(r1.sw_net .- r3.sw_net))
+        println("cldfrac=0.5 key 7 vs 8: L∞ diff LW = $diff_lw, SW = $diff_sw")
         @test diff_lw > 0
         @test diff_sw > 0
     end
 
     # ------------------------------------------------------------------
-    # 3. Uniform partial cloud (cldfrac = 0.5): seeded → reproducible
-    #    Seeded reproducibility relies on the CPU global RNG (`Random.seed!`);
-    #    on the GPU the McICA draws come from the device RNG, which a host
-    #    reseed does not control (production reproducibility is handled at the
-    #    ClimaAtmos level by `reset_rng_seed`). So assert this on CPU only.
+    # 3. Uniform partial cloud (cldfrac = 0.5): reproducible on EVERY device.
+    #    This used to be asserted on CPU only, because reproducibility came from
+    #    `Random.seed!` and the GPU draws from a device RNG a host reseed cannot
+    #    control. The sample is now a function of the key and the coordinates,
+    #    so there is nothing device-specific left to exclude.
     # ------------------------------------------------------------------
-    if device isa ClimaComms.AbstractCPUDevice
-        @testset "cldfrac = 0.5 (seeded, reproducible)" begin
-            cld_frac_half = base_cld_frac .* FT(0.5)
-            r1 = run_solve!(cld_frac_half; seed)
-            r2 = run_solve!(cld_frac_half; seed)
-            @test r1.lw_net == r2.lw_net
-            @test r1.sw_net == r2.sw_net
-        end
+    @testset "cldfrac = 0.5 (keyed, reproducible on any device)" begin
+        cld_frac_half = base_cld_frac .* FT(0.5)
+        r1 = run_solve!(cld_frac_half; key)
+        r2 = run_solve!(cld_frac_half; key)
+        @test r1.lw_net == r2.lw_net
+        @test r1.sw_net == r2.sw_net
     end
 
     # ------------------------------------------------------------------
-    # 4. Spatially varying cloud fractions: unseeded → stochastic
+    # 4. Spatially varying cloud fractions: the same contract as 2
     # ------------------------------------------------------------------
-    @testset "spatially varying cldfrac (unseeded, non-deterministic)" begin
+    @testset "spatially varying cldfrac (keyed sampling)" begin
         Random.seed!(42)
         cld_frac_vary = base_cld_frac .* DA(rand(FT, nlay, ncol))
-        r1 = run_solve!(cld_frac_vary)
-        r2 = run_solve!(cld_frac_vary)
-        diff_lw = maximum(abs.(r1.lw_net .- r2.lw_net))
-        diff_sw = maximum(abs.(r1.sw_net .- r2.sw_net))
+        r1 = run_solve!(cld_frac_vary; key = 11)
+        r2 = run_solve!(cld_frac_vary; key = 11)
+        @test r1.lw_net == r2.lw_net
+        @test r1.sw_net == r2.sw_net
+        r3 = run_solve!(cld_frac_vary; key = 12)
+        diff_lw = maximum(abs.(r1.lw_net .- r3.lw_net))
+        diff_sw = maximum(abs.(r1.sw_net .- r3.sw_net))
         println(
-            "varying cldfrac unseeded: L∞ diff LW = $diff_lw, SW = $diff_sw",
+            "varying cldfrac key 11 vs 12: L∞ diff LW = $diff_lw, SW = $diff_sw",
         )
         @test diff_lw > 0
         @test diff_sw > 0
     end
 
     # ------------------------------------------------------------------
-    # 5. Spatially varying cloud fractions: seeded → reproducible
-    #    CPU only, for the reason given in section 3.
+    # 5. Spatially varying cloud fractions: reproducible on every device, for
+    #    the reason given in section 3.
     # ------------------------------------------------------------------
-    if device isa ClimaComms.AbstractCPUDevice
-        @testset "spatially varying cldfrac (seeded, reproducible)" begin
-            Random.seed!(42)
-            cld_frac_vary = base_cld_frac .* DA(rand(FT, nlay, ncol))
-            r1 = run_solve!(cld_frac_vary; seed)
-            r2 = run_solve!(cld_frac_vary; seed)
-            @test r1.lw_net == r2.lw_net
-            @test r1.sw_net == r2.sw_net
-        end
+    @testset "spatially varying cldfrac (keyed, reproducible)" begin
+        Random.seed!(42)
+        cld_frac_vary = base_cld_frac .* DA(rand(FT, nlay, ncol))
+        r1 = run_solve!(cld_frac_vary; key)
+        r2 = run_solve!(cld_frac_vary; key)
+        @test r1.lw_net == r2.lw_net
+        @test r1.sw_net == r2.sw_net
     end
 
     # ------------------------------------------------------------------
@@ -185,7 +199,7 @@ function partial_cloud_fraction_test(
     # ------------------------------------------------------------------
     @testset "cloud cover bounds (partial cloud)" begin
         cld_frac_half = base_cld_frac .* FT(0.5)
-        r = run_solve!(cld_frac_half; seed)
+        r = run_solve!(cld_frac_half; key)
         @test all(r.cld_cover_lw .>= 0)
         @test all(r.cld_cover_lw .<= 1)
         @test all(r.cld_cover_sw .>= 0)

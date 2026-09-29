@@ -7,7 +7,28 @@ main
 v1.1.0
 ------
 
-- [#PR](https://github.com/CliMA/RRTMGP.jl/pull/PR) **The clear-sky diagnostics
+- [#631](https://github.com/CliMA/RRTMGP.jl/pull/631) **McICA cloud sampling is
+  reproducible, on the GPU as well as the CPU.** The cloud mask was drawn from
+  `Random.rand()`, which on the GPU is a device RNG keyed per kernel launch, so
+  the sample depended on how many kernels had run rather than on the physics:
+  two identical solves disagreed, `reset_rng_seed` had no effect there, and
+  restarts could not be reproduced. Closes the four-year-old #316, and #544 for
+  the GPU.
+
+  The mask is now a deterministic function of `(key, column, g-point, layer)`,
+  where the key is `cloud_state.seed`, set from the `seedval` passed to
+  `update_fluxes!`. Hosts that pass the timestep index -- ClimaAtmos does --
+  get a fresh sample every radiation step and the same sample on a rerun. A
+  host that passes no `seedval` gets a random key per call, which is the old
+  behavior. `reset_rng_seed` is retained but no longer affects the sampler,
+  since it does not go through the global RNG any more.
+
+  **This changes results.** The draw sequence differs from the old one, so
+  fluxes move by about what reseeding moved them by before; the estimator is
+  unchanged. `CloudState` gains a `seed` field, with a constructor that derives
+  it so existing callers are unaffected.
+
+- [#631](https://github.com/CliMA/RRTMGP.jl/pull/631) **The clear-sky diagnostics
   no longer cost a second radiation solve.** Under
   `AllSkyRadiationWithClearSkyDiagnostics` the solver ran twice per radiation
   step, and the two passes differed only by the cloud increment while both

@@ -34,6 +34,15 @@ A solver that can share the gas and aerosol optics between the two skies
 specializes these and computes the shared part once; `TwoStreamLWRTE` and
 `TwoStreamSWRTE` do. This fallback is for the others, and runs two independent
 solves -- exactly what the caller used to do inline.
+
+Reachability differs between the bands, which is worth knowing before trusting
+test coverage here. `NoScatLWRTE` is a supported spectral longwave solver, so
+the longwave fallback is live and the suite exercises it. Spectral shortwave
+requires scattering -- `OneScalar` shortwave optics are rejected for anything but
+`GrayRadiation` -- so `TwoStreamSWRTE` is currently the only shortwave solver
+that can reach `update_sw_fluxes!`, and the shortwave fallback is unreachable.
+It is kept for symmetry, and so that `update_sw_fluxes!` stays correct rather
+than merely lucky if another shortwave solver is added.
 """
 function solve_lw_both!(
     solver,

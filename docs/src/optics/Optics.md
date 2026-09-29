@@ -11,6 +11,8 @@ TwoStream
 compute_col_gas!
 compute_relative_humidity!
 compute_optical_props!
+add_cloud_optics_lw!
+add_cloud_optics_sw!
 ```
 
 ```@docs
