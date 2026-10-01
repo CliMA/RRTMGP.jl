@@ -157,14 +157,13 @@ function rte_sw_2stream_solve_CUDA!(
 end
 
 """
-    rte_sw_2stream_solve_both!(device::CUDADevice, ...)
+    rte_sw_2stream_solve_both_skies!(device::CUDADevice, ...)
 
-Host side of the fused shortwave solve: configures one thread per column and
-launches `rte_sw_2stream_solve_both_CUDA!`. Spectral radiation only --
-the gray methods above take a `GrayAtmosphericState` and have no clouds to
-sample, so there is no clear sky to separate.
+Host side of the fused shortwave solve: one thread per column, launching
+`rte_sw_2stream_solve_both_skies_CUDA!`. Spectral only -- the identically
+named gray methods above take a `GrayAtmosphericState` and have no clouds.
 """
-function rte_sw_2stream_solve_both!(
+function rte_sw_2stream_solve_both_skies!(
     device::ClimaComms.CUDADevice,
     flux::FluxSW,
     flux_sw::FluxSW,
@@ -198,23 +197,24 @@ function rte_sw_2stream_solve_both!(
         lookup_sw_cld,
         lookup_sw_aero,
     )
-    @cuda always_inline = true threads = (tx) blocks = (bx) rte_sw_2stream_solve_both_CUDA!(
+    @cuda always_inline = true threads = (tx) blocks = (bx) rte_sw_2stream_solve_both_skies_CUDA!(
         args...,
     )
     return nothing
 end
 
 """
-    rte_sw_2stream_solve_both_CUDA!(...)
+    rte_sw_2stream_solve_both_skies_CUDA!(...)
 
-The fused shortwave kernel: one thread per column, looping g-points and filling
-both skies in a single pass. Per g-point it computes the gas and aerosol optics
-once, sweeps and accumulates the clear sky, then adds the cloud increment to the
-same optics and sweeps again for the all-sky. The per-column body lives in
-`src/rte/shortwave_2stream.jl` as `sw_2stream_gpt_col_both!`, shared with the
+The fused shortwave kernel: one thread per column, looping g-points. Per g-point
+it computes the optics once, sweeps and accumulates the clear sky, then adds the
+cloud increment to the same optics and sweeps again. Per-column body is
+`sw_2stream_gpt_col_both_skies!` in `src/rte/shortwave_2stream.jl`, shared with the
 CPU driver.
 """
-function rte_sw_2stream_solve_both_CUDA!(
+# Duplicated for the CPU in src/rte/shortwave_2stream.jl: the cloud-cover tally,
+# net-flux finalize and night-column zeroing are in both. Change both.
+function rte_sw_2stream_solve_both_skies_CUDA!(
     flux::FluxSW,
     flux_sw::FluxSW,
     flux_sw_clear::FluxSW,
@@ -241,7 +241,7 @@ function rte_sw_2stream_solve_both_CUDA!(
         @inbounds begin
             _compute_aero_mask!(aerosol_state, gcol)
             for igpt in 1:n_gpt
-                cloudy = sw_2stream_gpt_col_both!(
+                cloudy = sw_2stream_gpt_col_both_skies!(
                     igpt,
                     gcol,
                     flux,

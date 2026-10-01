@@ -232,10 +232,9 @@ Cloud state, used to compute optical properties.
 - `mask_sw`: Cloud mask (shortwave); `true` if clouds are present.
 - `mask_type`: Cloud mask type.
 - `ice_rgh`: Ice roughness; 1 = none, 2 = medium, 3 = rough.
-- `seed`: One-element array holding the McICA key. The cloud mask is a
-  deterministic function of `(seed, column, g-point, layer)`, so this is what
-  makes sampling reproducible, and it must change between radiation steps or
-  every step draws the same clouds. `update_fluxes!(s, seedval)` sets it.
+- `seed`: One-element array holding the McICA key; the cloud mask is a function
+  of `(seed, column, g-point, layer)`. Set by `update_fluxes!(s, seedval)`, and
+  must change between radiation steps.
 """
 struct CloudState{CD, CF, CC, CM, CMT, SD}
     cld_r_eff_liq::CD
@@ -253,9 +252,8 @@ struct CloudState{CD, CF, CC, CM, CMT, SD}
 end
 Adapt.@adapt_structure CloudState
 
-# Constructor without a `seed`: derives the key buffer from `cld_frac`, so it
-# lands on whichever device the state lives on. Every caller that predates
-# keyed sampling -- ClimaAtmos among them -- keeps working unchanged.
+# Without a `seed`, the key buffer is derived from `cld_frac` so it lands on the
+# same device.
 function CloudState(
     cld_r_eff_liq,
     cld_r_eff_ice,

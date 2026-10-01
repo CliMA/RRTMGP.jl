@@ -41,7 +41,7 @@ v1.1.0
 
   Callers are unaffected, since `update_fluxes!` is unchanged. Solvers that
   cannot share the optics, such as `NoScatLWRTE`, still run two solves through a
-  fallback `solve_lw_both!` / `solve_sw_both!`.
+  fallback `solve_lw_both_skies!` / `solve_sw_both_skies!`.
 
   **Results are not bit-identical to the two-solve path.** The cloud mask is
   McICA-sampled per kernel launch, so one fused launch draws a different sample
@@ -50,7 +50,7 @@ v1.1.0
   same code reseeded: the fused run diverges from the two-solve path no more
   than a different cloud draw does.
 
-- `RRTMGPSolver` gains two fields, `clear_acc_lw` and `clear_acc_sw`, holding
+- `RRTMGPSolver` gains two fields, `clear_flux_acc_lw` and `clear_flux_acc_sw`, holding
   the compute-layout accumulators for the clear-sky half of a fused solve, plus
   two corresponding type parameters. Both are `nothing` unless the radiation
   method asks for clear-sky diagnostics.

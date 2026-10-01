@@ -44,11 +44,11 @@ function update_lw_fluxes!(
     lookups = _lookup_tables(s)
     lw_solver = _longwave_solver(s)
     ms = _deep_atmosphere_inverse_scaling(s)
-    # One pass over the g-points fills both skies: the shared gas and aerosol
-    # optics, which are 88% of a solve, are computed once instead of twice.
-    RTESolver.solve_lw_both!(
+    # One pass over the g-points fills both skies, computing the optics they
+    # share once instead of twice.
+    RTESolver.solve_lw_both_skies!(
         lw_solver,
-        s.clear_acc_lw,
+        s.clear_flux_acc_lw,
         as,
         lookups.lookup_lw,
         lookups.lookup_lw_cld,
@@ -56,7 +56,7 @@ function update_lw_fluxes!(
         ms,
     )
     # snapshot the clear-sky fluxes into their (nlev, ncol) presentation
-    Fluxes.update_presentation!(s.clear_flux_lw, s.clear_acc_lw)
+    Fluxes.update_presentation!(s.clear_flux_lw, s.clear_flux_acc_lw)
 end
 
 """
@@ -102,9 +102,9 @@ function update_sw_fluxes!(
     as = _atmospheric_state(s)
     ms = _deep_atmosphere_inverse_scaling(s)
     # One pass over the g-points fills both skies; see update_lw_fluxes!
-    RTESolver.solve_sw_both!(
+    RTESolver.solve_sw_both_skies!(
         sw_solver,
-        s.clear_acc_sw,
+        s.clear_flux_acc_sw,
         as,
         lookups.lookup_sw,
         lookups.lookup_sw_cld,
@@ -112,7 +112,7 @@ function update_sw_fluxes!(
         ms,
     )
     # snapshot the clear-sky fluxes into their (nlev, ncol) presentation
-    Fluxes.update_presentation!(s.clear_flux_sw, s.clear_acc_sw)
+    Fluxes.update_presentation!(s.clear_flux_sw, s.clear_flux_acc_sw)
 end
 
 #####
@@ -134,14 +134,10 @@ _idx_h2o(::RRTMGPSolver, ::GrayRadiation) = nothing
 _idx_h2o(s::RRTMGPSolver, ::AbstractRRTMGPMethod) =
     _lookup_tables(s).lookup_lw.idx_h2o
 
-# The McICA key. Sampling is a deterministic function of it, so it has to change
-# between radiation steps or every step draws the same clouds. A host that passes
-# the timestep index gets reproducible, restartable sampling on every device; one
-# that passes nothing gets a fresh random key per call, which is the behavior
-# before keying.
-# Gray radiation has no clouds and its state carries no `cloud_state` field at
-# all, so dispatch on the state rather than reaching for the field. A clear-sky
-# state has the field but leaves it `nothing`.
+# Sampling is determined by this key, so it must change between radiation steps
+# or every step draws the same clouds. No `seedval` means a random key.
+# `GrayAtmosphericState` has no `cloud_state` field, hence the dispatch; a
+# clear-sky state has it but leaves it `nothing`.
 _set_mcica_key!(as, seedval) = _set_cloud_key!(as.cloud_state, seedval)
 _set_mcica_key!(as::AtmosphericStates.GrayAtmosphericState, seedval) = nothing
 _set_cloud_key!(::Nothing, seedval) = nothing

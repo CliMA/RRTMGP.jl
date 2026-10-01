@@ -15,7 +15,7 @@ using ..Optics
 using ..LookUpTables
 
 export solve_lw!, solve_sw!
-export solve_lw_both!, solve_sw_both!
+export solve_lw_both_skies!, solve_sw_both_skies!
 
 include("driver_utils.jl")
 include("longwave_noscat.jl")
@@ -24,8 +24,8 @@ include("shortwave_noscat.jl")
 include("shortwave_2stream.jl")
 
 """
-    solve_lw_both!(solver, flux_lw_clear, as, lookup_lw, lookup_lw_cld, lookup_lw_aero, metric_scaling = nothing)
-    solve_sw_both!(solver, flux_sw_clear, as, lookup_sw, lookup_sw_cld, lookup_sw_aero, metric_scaling = nothing)
+    solve_lw_both_skies!(solver, flux_lw_clear, as, lookup_lw, lookup_lw_cld, lookup_lw_aero, metric_scaling = nothing)
+    solve_sw_both_skies!(solver, flux_sw_clear, as, lookup_sw, lookup_sw_cld, lookup_sw_aero, metric_scaling = nothing)
 
 Fill the clear-sky and all-sky fluxes for one band, leaving the all-sky result in
 the solver's own flux and the clear-sky result in `flux_*_clear`.
@@ -44,7 +44,7 @@ that can reach `update_sw_fluxes!`, and the shortwave fallback is unreachable.
 It is kept for symmetry, and so that `update_sw_fluxes!` stays correct rather
 than merely lucky if another shortwave solver is added.
 """
-function solve_lw_both!(
+function solve_lw_both_skies!(
     solver,
     flux_lw_clear::FluxLW,
     as::AtmosphericState,
@@ -66,7 +66,7 @@ function solve_lw_both!(
     return nothing
 end
 
-function solve_sw_both!(
+function solve_sw_both_skies!(
     solver,
     flux_sw_clear::FluxSW,
     as::AtmosphericState,

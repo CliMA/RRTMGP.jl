@@ -337,8 +337,9 @@ end
 #
 # With `rad: allskywithclear` the solver runs twice per radiation step and both
 # passes recompute the gas and aerosol optics; only the cloud increment differs.
-# Measured on the AMIP benchmark, that shared optics is 88% of a longwave solve,
-# so computing it once and sweeping twice removes ~44% of the pair.
+# That shared optics dominates a solve, so computing it once and sweeping twice
+# removes most of the second pass. Figures live in the pull request, not in two
+# source comments that would drift apart.
 #
 # The sweep is safe to run twice against one optics computation: rte_lw_2stream!
 # writes only `albedo` and `src` as scratch, both recomputed from `lev_source`
@@ -348,9 +349,9 @@ end
 # aerosol increments are weighted sums applied per component, so adding aerosol
 # before cloud rather than after changes summation order and nothing else.
 
-function rte_lw_2stream_solve_both! end
+function rte_lw_2stream_solve_both_skies! end
 
-@inline function lw_2stream_gpt_col_both!(
+@inline function lw_2stream_gpt_col_both_skies!(
     igpt,
     gcol,
     flux,
@@ -395,7 +396,7 @@ function rte_lw_2stream_solve_both! end
 end
 
 """
-    solve_lw_both!(lw, flux_lw_clear, as, lookup_lw, lookup_lw_cld, lookup_lw_aero, metric_scaling)
+    solve_lw_both_skies!(lw, flux_lw_clear, as, lookup_lw, lookup_lw_cld, lookup_lw_aero, metric_scaling)
 
 Solve the longwave problem for both skies in one pass over the g-points,
 accumulating the clear sky into `flux_lw_clear` and the all-sky into the
@@ -406,7 +407,7 @@ produces. The all-sky result is not, and cannot be: the cloud mask is
 McICA-sampled per launch, so one fused launch draws a different sample than a
 separate all-sky launch would. It is the same estimator, not the same draw.
 """
-function solve_lw_both!(
+function solve_lw_both_skies!(
     (; context, fluxb, flux, band_flux, src, bcs, op, state_cache)::TwoStreamLWRTE,
     flux_lw_clear::FluxLW,
     as::AtmosphericState,
@@ -416,7 +417,7 @@ function solve_lw_both!(
     metric_scaling::M = nothing,
 ) where {M}
     AtmosphericStates.refresh_transposed_state!(state_cache, as)
-    rte_lw_2stream_solve_both!(
+    rte_lw_2stream_solve_both_skies!(
         context.device,
         fluxb,
         flux,
@@ -439,7 +440,9 @@ end
 
 # CPU counterpart of the fused solve. Same structure as the GPU kernel: one
 # pass over the g-points, both skies accumulated per column.
-function rte_lw_2stream_solve_both!(
+# Duplicated for the GPU in ext/cuda/rte_longwave_2stream.jl: the cloud-cover
+# tally, net-flux finalize are in both. Change both.
+function rte_lw_2stream_solve_both_skies!(
     device::ClimaComms.AbstractCPUDevice,
     flux::FluxLW,
     flux_lw::FluxLW,
@@ -473,7 +476,7 @@ function rte_lw_2stream_solve_both!(
         for igpt in 1:n_gpt
             ibnd = major_gpt2bnd[igpt]
             ClimaComms.@threaded device for gcol in 1:ncol
-                cloudy = lw_2stream_gpt_col_both!(
+                cloudy = lw_2stream_gpt_col_both_skies!(
                     igpt,
                     gcol,
                     flux,

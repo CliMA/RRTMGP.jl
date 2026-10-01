@@ -243,20 +243,9 @@ Compute the `TwoStream` cloud ice properties using the `LookUpTable` method.
     return (τi, τi_ssa, τi_ssag)
 end
 
-# A uniform draw in [0, 1) determined entirely by the key and where it is used,
-# with no RNG state and no allocation: the same (key, column, g-point, layer)
-# always yields the same number, on any device, in any launch order, at any
-# thread count. The key comes from the `seedval` passed to `update_fluxes!`, so
-# it varies between radiation steps and repeats exactly on a rerun or restart.
-#
-# This is what makes McICA sampling reproducible on the GPU. The device RNG is
-# keyed per kernel launch, so drawing from it makes the sample depend on how many
-# kernels ran rather than on the physics (RRTMGP.jl#316). Mixing is splitmix64's
-# finalizer, a few integer operations -- so the reason build_cloud_mask! gave for
-# not doing this, keeping the kernel allocation-free, does not apply.
-#
-# Internal, and deliberately not a docstring: Documenter runs with checkdocs, so
-# a docstring here would have to be carried in the public manual.
+# Uniform draw in [0, 1) from the key and the coordinates alone -- no RNG state,
+# no allocation -- so the same (key, column, g-point, layer) always gives the
+# same number, on any device and in any launch order. splitmix64's finalizer.
 @inline function _keyed_uniform(
     ::Type{FT},
     key::Unsigned,
@@ -282,19 +271,10 @@ Build a McICA-sampled cloud mask from cloud fraction data for maximum-random ove
 
 Reference: https://github.com/AER-RC/RRTMG_SW/
 
-Determinism: the mask is drawn by `_keyed_uniform` from `(key, gcol, igpt, ilay)`, so it
-is reproducible everywhere -- one CPU thread, many threads, or the GPU -- and independent of
-launch order, launch count and work assignment. Nothing is seeded and nothing is allocated.
-
-This replaces a bare `Random.rand()`, which took the device RNG on the GPU. That RNG is keyed
-per kernel launch, so the sample depended on how many kernels had run: two identical solves
-disagreed, `reset_rng_seed` had no effect on the GPU, and restarts were not reproducible
-(RRTMGP.jl#316, #544).
-
-The key is `cloud_state.seed`, set from the `seedval` given to `update_fluxes!` -- hosts
-typically pass the timestep index, which gives a fresh sample every radiation step and the same
-sample on a rerun. A host that passes no `seedval` gets a random key per call, i.e. the previous
-unreproducible behavior.
+Determinism: the mask comes from `_keyed_uniform` on `(key, gcol, igpt, ilay)`, so it is
+reproducible on any device and independent of launch order and thread count. The key is
+`cloud_state.seed`, which `update_fluxes!` sets from its `seedval`; hosts pass the timestep
+index, so each radiation step samples afresh. No `seedval` means a random key per call.
 """
 function build_cloud_mask!(
     cld_mask::AbstractArray{Bool, 1},

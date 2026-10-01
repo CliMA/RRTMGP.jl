@@ -393,13 +393,13 @@ end
 
 # --- fused all-sky + clear-sky solve ---------------------------------------
 #
-# See solve_lw_both! in longwave_2stream.jl. The shortwave differs in three
+# See solve_lw_both_skies! in longwave_2stream.jl. The shortwave differs in three
 # ways: the cloud increment is delta-scaled, the sweeps happen only where the
 # sun is up, and night columns are zeroed in both skies after the g-point loop.
 
-function rte_sw_2stream_solve_both! end
+function rte_sw_2stream_solve_both_skies! end
 
-@inline function sw_2stream_gpt_col_both!(
+@inline function sw_2stream_gpt_col_both_skies!(
     igpt,
     gcol,
     flux,
@@ -456,12 +456,12 @@ function rte_sw_2stream_solve_both! end
 end
 
 """
-    solve_sw_both!(sw, flux_sw_clear, as, lookup_sw, lookup_sw_cld, lookup_sw_aero, metric_scaling)
+    solve_sw_both_skies!(sw, flux_sw_clear, as, lookup_sw, lookup_sw_cld, lookup_sw_aero, metric_scaling)
 
 Solve the shortwave problem for both skies in one pass over the g-points.
-See [`solve_lw_both!`](@ref).
+See [`solve_lw_both_skies!`](@ref).
 """
-function solve_sw_both!(
+function solve_sw_both_skies!(
     (; context, fluxb, flux, band_flux, src, bcs, op, state_cache)::TwoStreamSWRTE,
     flux_sw_clear::FluxSW,
     as::AtmosphericState,
@@ -471,7 +471,7 @@ function solve_sw_both!(
     metric_scaling::M = nothing,
 ) where {M}
     AtmosphericStates.refresh_transposed_state!(state_cache, as)
-    rte_sw_2stream_solve_both!(
+    rte_sw_2stream_solve_both_skies!(
         context.device,
         fluxb,
         flux,
@@ -493,7 +493,9 @@ function solve_sw_both!(
 end
 
 # CPU counterpart of the fused shortwave solve; see the longwave one.
-function rte_sw_2stream_solve_both!(
+# Duplicated for the GPU in ext/cuda/rte_shortwave_2stream.jl: the cloud-cover
+# tally, net-flux finalize and night-column zeroing are in both. Change both.
+function rte_sw_2stream_solve_both_skies!(
     device::ClimaComms.AbstractCPUDevice,
     flux::FluxSW,
     flux_sw::FluxSW,
@@ -527,7 +529,7 @@ function rte_sw_2stream_solve_both!(
         for igpt in 1:n_gpt
             ibnd = lookup_sw.band_data.major_gpt2bnd[igpt]
             ClimaComms.@threaded device for gcol in 1:ncol
-                cloudy = sw_2stream_gpt_col_both!(
+                cloudy = sw_2stream_gpt_col_both_skies!(
                     igpt,
                     gcol,
                     flux,

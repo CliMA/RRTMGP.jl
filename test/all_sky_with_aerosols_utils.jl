@@ -177,7 +177,7 @@ function all_sky_with_aerosols(
     # cannot, since McICA draws a different cloud sample per kernel launch, so
     # one fused launch does not reproduce what two separate launches drew.
     let lkps = solver.lookups, ms = nothing
-        fused_clear_lw = copy(Array(parent(solver.clear_acc_lw.flux_net)))
+        fused_clear_lw = copy(Array(parent(solver.clear_flux_acc_lw.flux_net)))
         RTESolver.solve_lw!(
             solver.lws,
             as,
@@ -188,7 +188,7 @@ function all_sky_with_aerosols(
         )
         @test Array(parent(solver.lws.flux.flux_net)) == fused_clear_lw
 
-        fused_clear_sw = copy(Array(parent(solver.clear_acc_sw.flux_net)))
+        fused_clear_sw = copy(Array(parent(solver.clear_flux_acc_sw.flux_net)))
         RTESolver.solve_sw!(
             solver.sws,
             as,
@@ -209,7 +209,7 @@ function all_sky_with_aerosols(
     # they can be checked on solver configurations this file has no reference
     # data for. That is what makes the no-scattering case below possible, and it
     # is the only thing in the suite that exercises the generic
-    # solve_lw_both!/solve_sw_both! fallback for BOTH bands -- the path a
+    # solve_lw_both_skies!/solve_sw_both_skies! fallback for BOTH bands -- the path a
     # MethodError hid in until these tests caught it.
     #
     # Note what is NOT asserted here: that a different key resamples. This
@@ -237,8 +237,8 @@ function all_sky_with_aerosols(
         RRTMGP.update_fluxes!(slv, UInt32(42))
         lw_a = copy(Array(parent(slv.lws.flux.flux_net)))
         sw_a = copy(Array(parent(slv.sws.flux.flux_net)))
-        clear_lw_a = copy(Array(parent(slv.clear_acc_lw.flux_net)))
-        clear_sw_a = copy(Array(parent(slv.clear_acc_sw.flux_net)))
+        clear_lw_a = copy(Array(parent(slv.clear_flux_acc_lw.flux_net)))
+        clear_sw_a = copy(Array(parent(slv.clear_flux_acc_sw.flux_net)))
 
         # One key reproduces exactly. This is the contract #316 asked for, and
         # it holds on whichever device the suite is running on.

@@ -195,27 +195,7 @@ end
         lev_source[gcol, nlay + 1] = lev_src_inc_prev
     end
     if !isnothing(lkp_cld) # clouds need TwoStream optics
-        cloud_state = as.cloud_state
-        cld_r_eff_liq = view(cloud_state.cld_r_eff_liq, :, gcol)
-        cld_r_eff_ice = view(cloud_state.cld_r_eff_ice, :, gcol)
-        cld_path_liq = view(cloud_state.cld_path_liq, :, gcol)
-        cld_path_ice = view(cloud_state.cld_path_ice, :, gcol)
-        cld_mask = view(cloud_state.mask_lw, :, gcol)
-
-        add_cloud_optics_2stream!(
-            τ,
-            ssa,
-            g,
-            cld_mask,
-            cld_r_eff_liq,
-            cld_r_eff_ice,
-            cld_path_liq,
-            cld_path_ice,
-            cloud_state.ice_rgh,
-            lkp_cld,
-            ibnd;
-            delta_scaling = false,
-        )
+        add_cloud_optics_lw!(op, as, gcol, lkp_cld, ibnd)
     end
     if !isnothing(lkp_aero)
         aod_sw_ext = nothing
@@ -337,27 +317,7 @@ end
         )
     end
     if !isnothing(lkp_cld) # clouds need TwoStream optics
-        cloud_state = as.cloud_state
-        cld_r_eff_liq = view(cloud_state.cld_r_eff_liq, :, gcol)
-        cld_r_eff_ice = view(cloud_state.cld_r_eff_ice, :, gcol)
-        cld_path_liq = view(cloud_state.cld_path_liq, :, gcol)
-        cld_path_ice = view(cloud_state.cld_path_ice, :, gcol)
-        cld_mask = view(cloud_state.mask_sw, :, gcol)
-
-        add_cloud_optics_2stream!(
-            τ,
-            ssa,
-            g,
-            cld_mask,
-            cld_r_eff_liq,
-            cld_r_eff_ice,
-            cld_path_liq,
-            cld_path_ice,
-            cloud_state.ice_rgh,
-            lkp_cld,
-            ibnd;
-            delta_scaling = true,
-        )
+        add_cloud_optics_sw!(op, as, gcol, lkp_cld, ibnd)
     end
     if !isnothing(lkp_aero)
         (; iband_550nm) = lkp_aero
@@ -393,10 +353,11 @@ end
 Add the longwave cloud increment to optical properties that already hold the
 gas and aerosol contributions for column `gcol`.
 
-Split out of `compute_optical_props!` so a fused all-sky/clear-sky solve can
-compute the shared optics once, sweep for the clear sky, then add clouds and
-sweep again. The increment is the same one `compute_optical_props!` applies,
-with the same `delta_scaling`.
+The only implementation of the longwave cloud increment: `compute_optical_props!`
+calls it too, rather than keeping a copy. That matters because a fused
+all-sky/clear-sky solve applies the increment separately -- shared optics once,
+sweep for the clear sky, add clouds, sweep again -- and two copies of this block
+could drift apart without anything noticing.
 """
 @inline function add_cloud_optics_lw!(
     op::TwoStream,
@@ -428,8 +389,9 @@ end
 """
     add_cloud_optics_sw!(op, as, gcol, lkp_cld, ibnd)
 
-Shortwave counterpart of [`add_cloud_optics_lw!`](@ref). Note `delta_scaling`,
-which the shortwave cloud increment applies and the longwave one does not.
+Shortwave counterpart of [`add_cloud_optics_lw!`](@ref), and likewise the only
+implementation. Note `delta_scaling`, which the shortwave cloud increment applies
+and the longwave one does not.
 """
 @inline function add_cloud_optics_sw!(
     op::TwoStream,
