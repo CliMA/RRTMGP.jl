@@ -273,7 +273,7 @@ Reference: https://github.com/AER-RC/RRTMG_SW/
 
 Determinism: the mask comes from `_keyed_uniform` on `(key, gcol, igpt, ilay)`, so it is
 reproducible on any device and independent of launch order and thread count. The key is
-`cloud_state.seed`, which `update_fluxes!` sets from its `seedval`; hosts pass the timestep
+`cloud_state.mcica_key`, which `update_fluxes!` sets from its `seedval`; hosts pass the timestep
 index, so each radiation step samples afresh. No `seedval` means a random key per call.
 """
 function build_cloud_mask!(

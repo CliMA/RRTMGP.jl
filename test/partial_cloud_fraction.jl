@@ -8,7 +8,7 @@ Test partial cloud fraction with McICA stochastic cloud masking.
 
 When `cld_frac < 1`, `build_cloud_mask!` samples the cloud mask stochastically
 (maximum-random overlap). The sample is a deterministic function of
-`(cloud_state.seed, column, g-point, layer)`, so it is selected by the key rather
+`(cloud_state.mcica_key, column, g-point, layer)`, so it is selected by the key rather
 than drawn from an RNG's state. This test verifies:
 1. Fully overcast (`cld_frac = 1`) is deterministic — the mask is always
    `true` regardless of the key.
@@ -95,14 +95,14 @@ function partial_cloud_fraction_test(
     )
     printstyled("device = $device\n\n", color = color)
 
-    # Helper: set cloud fraction, optionally seed RNG, run solvers,
+    # Helper: set cloud fraction, optionally set the McICA key, run solvers,
     # and return copies of the result arrays.
     function run_solve!(cld_frac_values; key = nothing)
         as.cloud_state.cld_frac .= cld_frac_values
         # The McICA sample is a function of (key, column, g-point, layer), so
         # the key selects it. `Random.seed!` no longer has any bearing on it,
         # which is the point of the change -- it never did on the GPU.
-        isnothing(key) || fill!(as.cloud_state.seed, UInt32(key))
+        isnothing(key) || fill!(as.cloud_state.mcica_key, UInt32(key))
         solve_lw!(slv_lw, as, lookup_lw, lookup_lw_cld, nothing, nothing)
         solve_sw!(slv_sw, as, lookup_sw, lookup_sw_cld, nothing, nothing)
         return (

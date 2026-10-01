@@ -214,7 +214,7 @@ end
     @inbounds view(as.t_lev, :, gcol)
 
 """
-    CloudState{CD, CF, CC, CM, CMT}
+    CloudState{CD, CF, CC, CM, CMT, SD}
 
 Cloud state, used to compute optical properties.
 
@@ -232,9 +232,11 @@ Cloud state, used to compute optical properties.
 - `mask_sw`: Cloud mask (shortwave); `true` if clouds are present.
 - `mask_type`: Cloud mask type.
 - `ice_rgh`: Ice roughness; 1 = none, 2 = medium, 3 = rough.
-- `seed`: One-element array holding the McICA key; the cloud mask is a function
-  of `(seed, column, g-point, layer)`. Set by `update_fluxes!(s, seedval)`, and
-  must change between radiation steps.
+- `mcica_key`: One-element array holding the McICA key; the cloud mask is a
+  function of `(mcica_key, column, g-point, layer)`. Set by
+  `update_fluxes!(s, seedval)`, and must change between radiation steps. A key
+  rather than a seed: it indexes a stateless draw, so the result does not depend
+  on how many draws came before.
 """
 struct CloudState{CD, CF, CC, CM, CMT, SD}
     cld_r_eff_liq::CD
@@ -248,12 +250,12 @@ struct CloudState{CD, CF, CC, CM, CMT, SD}
     mask_sw::CM
     mask_type::CMT
     ice_rgh::Int
-    seed::SD
+    mcica_key::SD
 end
 Adapt.@adapt_structure CloudState
 
-# Without a `seed`, the key buffer is derived from `cld_frac` so it lands on the
-# same device.
+# Without a key, the buffer is derived from `cld_frac` so it lands on the same
+# device.
 function CloudState(
     cld_r_eff_liq,
     cld_r_eff_ice,
@@ -267,8 +269,8 @@ function CloudState(
     mask_type,
     ice_rgh::Integer,
 )
-    seed = similar(cld_frac, UInt32, 1)
-    fill!(seed, UInt32(0))
+    mcica_key = similar(cld_frac, UInt32, 1)
+    fill!(mcica_key, UInt32(0))
     return CloudState(
         cld_r_eff_liq,
         cld_r_eff_ice,
@@ -281,7 +283,7 @@ function CloudState(
         mask_sw,
         mask_type,
         Int(ice_rgh),
-        seed,
+        mcica_key,
     )
 end
 

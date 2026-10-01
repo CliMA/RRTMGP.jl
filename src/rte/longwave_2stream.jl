@@ -403,9 +403,9 @@ accumulating the clear sky into `flux_lw_clear` and the all-sky into the
 solver's own flux.
 
 The clear-sky result is bit-for-bit what a `solve_lw!` with no cloud lookup
-produces. The all-sky result is not, and cannot be: the cloud mask is
-McICA-sampled per launch, so one fused launch draws a different sample than a
-separate all-sky launch would. It is the same estimator, not the same draw.
+produces. For a given key the all-sky result uses the same cloud mask as two
+separate solves would, and agrees with them to roundoff: the cloud increment is
+applied to optics that have already been swept, so the arithmetic order differs.
 """
 function solve_lw_both_skies!(
     (; context, fluxb, flux, band_flux, src, bcs, op, state_cache)::TwoStreamLWRTE,

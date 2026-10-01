@@ -22,7 +22,10 @@
     igpt,
 ) where {S}
     mask = view(getproperty(cloud_state, S), :, gcol)
-    key = @inbounds cloud_state.seed[1]
+    # The band is part of the key: the two bands sample independently, and
+    # without this they would draw the same mask for a given column and g-point.
+    band_key = S === :mask_sw ? 0x9e3779b9 % UInt32 : 0x00000000 % UInt32
+    key = (@inbounds cloud_state.mcica_key[1]) ⊻ band_key
     Optics.build_cloud_mask!(
         mask,
         view(cloud_state.cld_frac, :, gcol),

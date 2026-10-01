@@ -43,7 +43,7 @@ using NCDatasets
 
 method = RRTMGP.AllSkyRadiationWithClearSkyDiagnostics(
     true,  # aerosol_radiation
-    false, # reset_rng_seed (McICA reproducibility)
+    false, # reset_rng_seed (vestigial; pass seedval instead)
 )
 lookups = RRTMGP.lookup_tables(grid_params, method)
 ```

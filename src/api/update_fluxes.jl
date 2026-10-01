@@ -9,7 +9,8 @@ Update the longwave fluxes, leaving the longwave flux getters consistent (the
 `(ncol, nlev)` compute buffers are transposed into the `(nlev, ncol)`
 presentation the getters expose).
 """
-function update_lw_fluxes!(s::RRTMGPSolver)
+function update_lw_fluxes!(s::RRTMGPSolver, seedval = nothing)
+    _set_mcica_key!(_atmospheric_state(s), seedval)
     update_lw_fluxes!(s, _radiation_method(s))
     Fluxes.update_presentation!(s.presented_flux_lw, s.lws.flux)
     return nothing
@@ -66,7 +67,8 @@ Update the shortwave fluxes, leaving the shortwave flux getters consistent
 (the `(ncol, nlev)` compute buffers are transposed into the `(nlev, ncol)`
 presentation the getters expose).
 """
-function update_sw_fluxes!(s::RRTMGPSolver)
+function update_sw_fluxes!(s::RRTMGPSolver, seedval = nothing)
+    _set_mcica_key!(_atmospheric_state(s), seedval)
     update_sw_fluxes!(s, _radiation_method(s))
     Fluxes.update_presentation!(s.presented_flux_sw, s.sws.flux)
     return nothing
@@ -143,7 +145,7 @@ _set_mcica_key!(as::AtmosphericStates.GrayAtmosphericState, seedval) = nothing
 _set_cloud_key!(::Nothing, seedval) = nothing
 function _set_cloud_key!(cloud_state, seedval)
     key = isnothing(seedval) ? rand(UInt32) : (seedval % UInt32)
-    fill!(cloud_state.seed, key)
+    fill!(cloud_state.mcica_key, key)
     return nothing
 end
 
@@ -226,10 +228,9 @@ function update_fluxes!(s::RRTMGPSolver, seedval = nothing)
     # branch when off, so the zero-allocation contract is unaffected
     check_values[] && validate_inputs(s)
     _maybe_reset_rng_seed!(_radiation_method(s), seedval)
-    _set_mcica_key!(_atmospheric_state(s), seedval)
     prepare_atmosphere!(s)
-    update_lw_fluxes!(s)
-    update_sw_fluxes!(s)
+    update_lw_fluxes!(s, seedval)
+    update_sw_fluxes!(s, seedval)
     update_net_fluxes!(s)
     return nothing
 end

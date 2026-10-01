@@ -18,7 +18,7 @@ using RRTMGP, NCDatasets
 
 method = RRTMGP.AllSkyRadiationWithClearSkyDiagnostics(
     true,  # aerosol_radiation
-    false, # reset_rng_seed (see step 5)
+    false, # reset_rng_seed (vestigial; see step 5)
 )
 lookups = RRTMGP.lookup_tables(grid_params, method)
 ```
@@ -148,20 +148,18 @@ both states from data.
 ## 5. McICA sampling and reproducibility
 
 With partial cloud fractions (`0 < cld_frac < 1`), the solvers sample the
-cloud masks stochastically on every solve (McICA with maximum-random overlap;
-see [Optics](../Optics.md)), drawing from the global random-number generator.
-For reproducible fluxes, construct the method with `reset_rng_seed = true` and
-pass a seed to the solve:
+cloud masks stochastically (McICA with maximum-random overlap; see
+[Optics](../Optics.md)). The sample is a function of `(key, column, g-point,
+layer)`, where the key comes from the `seedval` you pass:
 
 ```julia
-RRTMGP.update_fluxes!(solver, seed)   # reseeds the RNG before sampling
+RRTMGP.update_fluxes!(solver, seedval)   # seedval selects the cloud sample
 ```
 
-Without `reset_rng_seed = true`, the seed argument is ignored. On multiple
-threads and on the GPU, the sampling of partially cloudy columns is
-statistically but not bitwise reproducible; see the caveat in
-[How to run on GPUs](gpu.md). Overcast (`cld_frac = 1`) and clear layers are
-deterministic.
+Pass the timestep index and the fluxes are reproducible on any device, at any
+thread count, and across a restart; pass nothing and each call draws afresh.
+`reset_rng_seed` no longer affects sampling, which does not use the global RNG.
+Overcast (`cld_frac = 1`) and clear layers are deterministic regardless.
 
 ## 6. Read the diagnostics
 

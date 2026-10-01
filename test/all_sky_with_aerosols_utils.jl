@@ -171,33 +171,40 @@ function all_sky_with_aerosols(
     RRTMGP.update_sw_fluxes!(solver)
     RRTMGP.update_lw_fluxes!(solver)
 
-    # The clear-sky half of a fused solve involves no cloud sampling, so it must
-    # equal a standalone clear-sky solve bit for bit. This is the only part of
-    # the fused path that can be compared for equality -- the all-sky half
-    # cannot, since McICA draws a different cloud sample per kernel launch, so
-    # one fused launch does not reproduce what two separate launches drew.
+    # Clear sky involves no sampling, so it must equal a standalone clear-sky
+    # solve exactly. All-sky is keyed, so the fused pass and two separate solves
+    # draw the SAME mask and must agree too -- to roundoff rather than exactly,
+    # because the fused path adds the cloud increment to optics it has already
+    # swept, changing the arithmetic order.
     let lkps = solver.lookups, ms = nothing
         fused_clear_lw = copy(Array(parent(solver.clear_flux_acc_lw.flux_net)))
+        fused_all_lw = copy(Array(parent(solver.lws.flux.flux_net)))
+        fused_clear_sw = copy(Array(parent(solver.clear_flux_acc_sw.flux_net)))
+        fused_all_sw = copy(Array(parent(solver.sws.flux.flux_net)))
+
         RTESolver.solve_lw!(
-            solver.lws,
-            as,
-            lkps.lookup_lw,
-            nothing,
-            lkps.lookup_lw_aero,
-            ms,
+            solver.lws, as, lkps.lookup_lw, nothing, lkps.lookup_lw_aero, ms,
         )
         @test Array(parent(solver.lws.flux.flux_net)) == fused_clear_lw
+        RTESolver.solve_lw!(
+            solver.lws, as, lkps.lookup_lw, lkps.lookup_lw_cld,
+            lkps.lookup_lw_aero, ms,
+        )
+        two_all_lw = Array(parent(solver.lws.flux.flux_net))
+        @test maximum(abs, two_all_lw .- fused_all_lw) <=
+              1e-4 * maximum(abs, two_all_lw)
 
-        fused_clear_sw = copy(Array(parent(solver.clear_flux_acc_sw.flux_net)))
         RTESolver.solve_sw!(
-            solver.sws,
-            as,
-            lkps.lookup_sw,
-            nothing,
-            lkps.lookup_sw_aero,
-            ms,
+            solver.sws, as, lkps.lookup_sw, nothing, lkps.lookup_sw_aero, ms,
         )
         @test Array(parent(solver.sws.flux.flux_net)) == fused_clear_sw
+        RTESolver.solve_sw!(
+            solver.sws, as, lkps.lookup_sw, lkps.lookup_sw_cld,
+            lkps.lookup_sw_aero, ms,
+        )
+        two_all_sw = Array(parent(solver.sws.flux.flux_net))
+        @test maximum(abs, two_all_sw .- fused_all_sw) <=
+              1e-4 * maximum(abs, two_all_sw)
     end
     # Those two solves left the solver holding clear-sky fluxes, so restore the
     # all-sky state the rest of this test reads.

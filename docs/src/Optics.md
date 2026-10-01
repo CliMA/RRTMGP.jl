@@ -289,11 +289,10 @@ next wherever the fractions allow, so a contiguous cloudy block has total cloud
 cover ``\max_k \mathrm{CF}_k``. Cloudy blocks separated by clear air are
 uncorrelated. Because every g-point carries an independent subcolumn, the
 broadband flux averages over the samples: the McICA estimate is unbiased, and
-its sampling noise largely cancels in the spectral integration. The all-sky
-methods' `reset_rng_seed` option reseeds the generator on each
-[`update_fluxes!`](@ref RRTMGP.update_fluxes!) call to make the sampling
-reproducible (see the reproducibility caveat in [How to run on
-GPUs](howto/gpu.md)).
+its sampling noise largely cancels in the spectral integration. The sample is
+selected by a key rather than drawn from generator state, so passing `seedval`
+to [`update_fluxes!`](@ref RRTMGP.update_fluxes!) reproduces it on any device
+(see [How to run on GPUs](howto/gpu.md)).
 
 ## Aerosol optics
 
