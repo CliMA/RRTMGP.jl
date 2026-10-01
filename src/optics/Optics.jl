@@ -1,7 +1,6 @@
 module Optics
 
 using Adapt
-using Random
 import ClimaComms
 
 using ..VolumeMixingRatios

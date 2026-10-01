@@ -261,7 +261,16 @@ end
     z = (z ⊻ (z >> 27)) * 0x94D049BB133111EB
     z = z ⊻ (z >> 31)
     # Top 24 bits, so the result is exact in Float32 as well as Float64
-    return FT(z >> 40) * FT(1 / (1 << 24))
+    # Use the mantissa the format actually has: 24 bits is exact in Float32,
+    # and taking only 24 for Float64 would quantize cloud probability in steps
+    # of 2^-24 and make fractions below ~6e-8 unreachable.
+    return _uniform_from_bits(FT, z)
+end
+
+@inline _uniform_from_bits(::Type{Float32}, z::UInt64) =
+    Float32(z >> 40) * Float32(1 / (1 << 24))
+@inline function _uniform_from_bits(::Type{FT}, z::UInt64) where {FT}
+    return FT(z >> 11) * FT(1 / (UInt64(1) << 53))
 end
 
 """

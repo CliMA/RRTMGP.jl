@@ -8,7 +8,6 @@ using ..BCs
 using ..Optics
 using ClimaComms
 import Adapt
-import Random
 
 """
     lookup_tables(grid_params::RRTMGPGridParams, radiation_method::AbstractRRTMGPMethod)

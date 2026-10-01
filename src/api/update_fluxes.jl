@@ -149,14 +149,9 @@ function _set_cloud_key!(cloud_state, seedval)
     return nothing
 end
 
-_maybe_reset_rng_seed!(::AbstractRRTMGPMethod, seedval) = nothing
-function _maybe_reset_rng_seed!(
-    rm::Union{AllSkyRadiation, AllSkyRadiationWithClearSkyDiagnostics},
-    seedval,
-)
-    rm.reset_rng_seed && !isnothing(seedval) && Random.seed!(seedval)
-    return nothing
-end
+# `reset_rng_seed` used to reseed the global RNG, which the McICA sampler drew
+# from. The sampler is keyed now, so reseeding would only perturb the host's
+# unrelated randomness; the flag is accepted and ignored.
 
 """
     update_net_fluxes!(s::RRTMGPSolver)
@@ -212,8 +207,8 @@ range the optics support, and compute concentrations), solve the
 longwave and shortwave problems (applying `deep_atmosphere_inverse_scaling` if present), and
 combine them into the net flux. Mutates `s` in place (its atmospheric state and
 flux buffers) and returns `nothing` (read results via `net_flux(s)` and the
-other flux getters). When the radiation method requests reproducible seeding,
-`seedval` reseeds the RNG used for cloud sampling.
+other flux getters). `seedval` sets the key the McICA cloud mask is drawn from,
+so passing it reproduces the sampling; see `build_cloud_mask!`.
 
 This is designed to be allocation-free and type-stable, which matters because a
 host calls it every radiation step. CI asserts `@allocated == 0` and
@@ -227,7 +222,6 @@ function update_fluxes!(s::RRTMGPSolver, seedval = nothing)
     # opt-in input validation (see `check_values`/`validate_inputs`); a single
     # branch when off, so the zero-allocation contract is unaffected
     check_values[] && validate_inputs(s)
-    _maybe_reset_rng_seed!(_radiation_method(s), seedval)
     prepare_atmosphere!(s)
     update_lw_fluxes!(s, seedval)
     update_sw_fluxes!(s, seedval)

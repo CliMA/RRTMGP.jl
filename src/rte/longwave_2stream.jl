@@ -404,8 +404,14 @@ solver's own flux.
 
 The clear-sky result is bit-for-bit what a `solve_lw!` with no cloud lookup
 produces. For a given key the all-sky result uses the same cloud mask as two
-separate solves would, and agrees with them to roundoff: the cloud increment is
-applied to optics that have already been swept, so the arithmetic order differs.
+separate solves would, but is not bit-identical: this path applies the
+increments in the order gas, aerosol, cloud, where `compute_optical_props!`
+applies gas, cloud, aerosol. Combining optical properties normalizes with
+`max(eps(FT), ...)`, so that reordering is not associative and the difference in
+`ssa` and `g` can exceed roundoff near the optically thin limit. Measured on an
+AMIP state it is ~1e-7 of the field in the worst cell. Matching the old order
+would mean applying the aerosol increment after the cloud one, i.e. recomputing
+it, which is the saving this exists for.
 """
 function solve_lw_both_skies!(
     (; context, fluxb, flux, band_flux, src, bcs, op, state_cache)::TwoStreamLWRTE,

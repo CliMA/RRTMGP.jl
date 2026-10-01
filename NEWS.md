@@ -9,15 +9,15 @@ v1.1.0
 
 - [#631](https://github.com/CliMA/RRTMGP.jl/pull/631) McICA cloud sampling is
   reproducible on every device: the mask is now a function of
-  `(cloud_state.seed, column, g-point, layer)`, the key coming from the `seedval`
+  `(cloud_state.mcica_key, column, g-point, layer)`, the key coming from the `seedval`
   already passed to `update_fluxes!`, in place of a `Random.rand()` whose GPU
   stream was keyed per kernel launch (closes #316, and #544 for the GPU). On top
   of that, `AllSkyRadiationWithClearSkyDiagnostics` no longer runs the whole
   solver twice -- `TwoStreamLWRTE` and `TwoStreamSWRTE` compute the gas and
   aerosol optics the two passes share once and sweep twice, which is most of the
   cost of the second pass. Results change, since the draw sequence differs, and
-  `CloudState` gains a `seed` field that existing constructor calls derive
-  automatically.
+  `CloudState` gains an `mcica_key` field that existing constructor calls
+  derive automatically.
 
 v1.0.1
 ------
