@@ -7,53 +7,17 @@ main
 v1.1.0
 ------
 
-- [#631](https://github.com/CliMA/RRTMGP.jl/pull/631) **McICA cloud sampling is
-  reproducible, on the GPU as well as the CPU.** The cloud mask was drawn from
-  `Random.rand()`, which on the GPU is a device RNG keyed per kernel launch, so
-  the sample depended on how many kernels had run rather than on the physics:
-  two identical solves disagreed, `reset_rng_seed` had no effect there, and
-  restarts could not be reproduced. Closes the four-year-old #316, and #544 for
-  the GPU.
-
-  The mask is now a deterministic function of `(key, column, g-point, layer)`,
-  where the key is `cloud_state.seed`, set from the `seedval` passed to
-  `update_fluxes!`. Hosts that pass the timestep index -- ClimaAtmos does --
-  get a fresh sample every radiation step and the same sample on a rerun. A
-  host that passes no `seedval` gets a random key per call, which is the old
-  behavior. `reset_rng_seed` is retained but no longer affects the sampler,
-  since it does not go through the global RNG any more.
-
-  **This changes results.** The draw sequence differs from the old one, so
-  fluxes move by about what reseeding moved them by before; the estimator is
-  unchanged. `CloudState` gains a `seed` field, with a constructor that derives
-  it so existing callers are unaffected.
-
-- [#631](https://github.com/CliMA/RRTMGP.jl/pull/631) **The clear-sky diagnostics
-  no longer cost a second radiation solve.** Under
-  `AllSkyRadiationWithClearSkyDiagnostics` the solver ran twice per radiation
-  step, and the two passes differed only by the cloud increment while both
-  recomputed the gas and aerosol optics. That shared optics is 88% of a longwave
-  solve and 83% of a shortwave one in a coupled AMIP benchmark, so
-  `TwoStreamLWRTE` and `TwoStreamSWRTE` now compute it once and sweep twice:
-  longwave -43.6%, shortwave -39.8%, and four radiation kernels become two. In a
-  configuration where radiation was 36% of GPU kernel time, this was +10.9%
-  SYPD. Every diagnostic is kept.
-
-  Callers are unaffected, since `update_fluxes!` is unchanged. Solvers that
-  cannot share the optics, such as `NoScatLWRTE`, still run two solves through a
-  fallback `solve_lw_both_skies!` / `solve_sw_both_skies!`.
-
-  **Results are not bit-identical to the two-solve path.** The cloud mask is
-  McICA-sampled per kernel launch, so one fused launch draws a different sample
-  than the previous two did; the clear-sky fluxes, which involve no sampling,
-  are unchanged. Checked by running a 120-step coupled trajectory against the
-  same code reseeded: the fused run diverges from the two-solve path no more
-  than a different cloud draw does.
-
-- `RRTMGPSolver` gains two fields, `clear_flux_acc_lw` and `clear_flux_acc_sw`, holding
-  the compute-layout accumulators for the clear-sky half of a fused solve, plus
-  two corresponding type parameters. Both are `nothing` unless the radiation
-  method asks for clear-sky diagnostics.
+- [#631](https://github.com/CliMA/RRTMGP.jl/pull/631) McICA cloud sampling is
+  reproducible on every device: the mask is now a function of
+  `(cloud_state.seed, column, g-point, layer)`, the key coming from the `seedval`
+  already passed to `update_fluxes!`, in place of a `Random.rand()` whose GPU
+  stream was keyed per kernel launch (closes #316, and #544 for the GPU). On top
+  of that, `AllSkyRadiationWithClearSkyDiagnostics` no longer runs the whole
+  solver twice -- `TwoStreamLWRTE` and `TwoStreamSWRTE` compute the gas and
+  aerosol optics the two passes share once and sweep twice, which is most of the
+  cost of the second pass. Results change, since the draw sequence differs, and
+  `CloudState` gains a `seed` field that existing constructor calls derive
+  automatically.
 
 v1.0.1
 ------
