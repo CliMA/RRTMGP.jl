@@ -56,15 +56,14 @@ lossless; adapting a CPU-*constructed* solver to the GPU runs correctly but
 keeps the CPU layout (uncoalesced), so for GPU work, construct the solver on the
 GPU.
 
-## Reproducibility caveat: McICA cloud sampling
+## McICA cloud sampling reproducibility
 
 With partial cloud fractions, the all-sky methods sample cloud overlap
-stochastically (McICA) using the global RNG. On a single CPU thread,
-`update_fluxes!(solver, seed)` with `reset_rng_seed = true` makes results
-reproducible. In multi-threaded settings and on the GPU (at least on CUDA 6.x),
-the per-thread RNG state produces statistically but not deterministically
-reproducible results for partially cloudy columns (overcast and clear columns
-remain deterministic).
+stochastically (McICA), but not from an RNG's state: the sample is a function of
+`(key, column, g-point, layer)`, with the key taken from the `seedval` given to
+`update_fluxes!`. The same `seedval` therefore gives the same fluxes on the GPU,
+on one CPU thread, and on many, because nothing depends on launch order, launch
+count or how work is assigned.
 
 ## Parallelization strategy
 

@@ -39,12 +39,10 @@ by McICA. Requires the lookup tables (load `NCDatasets`).
 
 # Fields
  - `aerosol_radiation::Bool`: include aerosol optics.
- - `reset_rng_seed::Bool`: when `true`, `update_fluxes!(s, seedval)` reseeds the RNG with
-   `seedval` before the solve (hosts typically pass the timestep number); with no `seedval`
-   the flag has no effect. Because the McICA cloud sampler draws random numbers, reseeding
-   makes a CPU run fully reproducible and restartable; disable it for production runs. On
-   the GPU the sampler draws from the device RNG, which this does not seed — per-column
-   McICA sampling is not reproducible there (see `build_cloud_mask!`).
+ - `reset_rng_seed::Bool`: retained for compatibility and no longer affects McICA
+   sampling, which does not use the global RNG. Reproducibility comes from the `seedval`
+   passed to `update_fluxes!`: it sets the key the cloud mask is drawn from, on any device
+   (see `build_cloud_mask!`). Hosts typically pass the timestep number.
 """
 struct AllSkyRadiation <: AbstractRRTMGPMethod
     aerosol_radiation::Bool

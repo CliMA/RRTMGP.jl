@@ -195,27 +195,7 @@ end
         lev_source[gcol, nlay + 1] = lev_src_inc_prev
     end
     if !isnothing(lkp_cld) # clouds need TwoStream optics
-        cloud_state = as.cloud_state
-        cld_r_eff_liq = view(cloud_state.cld_r_eff_liq, :, gcol)
-        cld_r_eff_ice = view(cloud_state.cld_r_eff_ice, :, gcol)
-        cld_path_liq = view(cloud_state.cld_path_liq, :, gcol)
-        cld_path_ice = view(cloud_state.cld_path_ice, :, gcol)
-        cld_mask = view(cloud_state.mask_lw, :, gcol)
-
-        add_cloud_optics_2stream!(
-            τ,
-            ssa,
-            g,
-            cld_mask,
-            cld_r_eff_liq,
-            cld_r_eff_ice,
-            cld_path_liq,
-            cld_path_ice,
-            cloud_state.ice_rgh,
-            lkp_cld,
-            ibnd;
-            delta_scaling = false,
-        )
+        add_cloud_optics_lw!(op, as, gcol, lkp_cld, ibnd)
     end
     if !isnothing(lkp_aero)
         aod_sw_ext = nothing
@@ -337,27 +317,7 @@ end
         )
     end
     if !isnothing(lkp_cld) # clouds need TwoStream optics
-        cloud_state = as.cloud_state
-        cld_r_eff_liq = view(cloud_state.cld_r_eff_liq, :, gcol)
-        cld_r_eff_ice = view(cloud_state.cld_r_eff_ice, :, gcol)
-        cld_path_liq = view(cloud_state.cld_path_liq, :, gcol)
-        cld_path_ice = view(cloud_state.cld_path_ice, :, gcol)
-        cld_mask = view(cloud_state.mask_sw, :, gcol)
-
-        add_cloud_optics_2stream!(
-            τ,
-            ssa,
-            g,
-            cld_mask,
-            cld_r_eff_liq,
-            cld_r_eff_ice,
-            cld_path_liq,
-            cld_path_ice,
-            cloud_state.ice_rgh,
-            lkp_cld,
-            ibnd;
-            delta_scaling = true,
-        )
+        add_cloud_optics_sw!(op, as, gcol, lkp_cld, ibnd)
     end
     if !isnothing(lkp_aero)
         (; iband_550nm) = lkp_aero
@@ -381,6 +341,79 @@ end
             lkp_aero,
             ibnd,
             iband_550nm,
+            delta_scaling = true,
+        )
+    end
+    return nothing
+end
+
+"""
+    add_cloud_optics_lw!(op, as, gcol, lkp_cld, ibnd)
+
+Add the longwave cloud increment to optical properties that already hold the
+gas and aerosol contributions for column `gcol`.
+
+The only implementation of the longwave cloud increment: `compute_optical_props!`
+calls it too, rather than keeping a copy. That matters because a fused
+all-sky/clear-sky solve applies the increment separately -- shared optics once,
+sweep for the clear sky, add clouds, sweep again -- and two copies of this block
+could drift apart without anything noticing.
+"""
+@inline function add_cloud_optics_lw!(
+    op::TwoStream,
+    as::AtmosphericState,
+    gcol::Int,
+    lkp_cld::LookUpCld,
+    ibnd::Int,
+)
+    cloud_state = as.cloud_state
+    @inbounds begin
+        add_cloud_optics_2stream!(
+            view(op.τ, gcol, :),
+            view(op.ssa, gcol, :),
+            view(op.g, gcol, :),
+            view(cloud_state.mask_lw, :, gcol),
+            view(cloud_state.cld_r_eff_liq, :, gcol),
+            view(cloud_state.cld_r_eff_ice, :, gcol),
+            view(cloud_state.cld_path_liq, :, gcol),
+            view(cloud_state.cld_path_ice, :, gcol),
+            cloud_state.ice_rgh,
+            lkp_cld,
+            ibnd;
+            delta_scaling = false,
+        )
+    end
+    return nothing
+end
+
+"""
+    add_cloud_optics_sw!(op, as, gcol, lkp_cld, ibnd)
+
+Shortwave counterpart of [`add_cloud_optics_lw!`](@ref), and likewise the only
+implementation. Note `delta_scaling`, which the shortwave cloud increment applies
+and the longwave one does not.
+"""
+@inline function add_cloud_optics_sw!(
+    op::TwoStream,
+    as::AtmosphericState,
+    gcol::Int,
+    lkp_cld::LookUpCld,
+    ibnd::Int,
+)
+    cloud_state = as.cloud_state
+    @inbounds begin
+        add_cloud_optics_2stream!(
+            view(op.τ, gcol, :),
+            view(op.ssa, gcol, :),
+            view(op.g, gcol, :),
+            view(cloud_state.mask_sw, :, gcol),
+            view(cloud_state.cld_r_eff_liq, :, gcol),
+            view(cloud_state.cld_r_eff_ice, :, gcol),
+            view(cloud_state.cld_path_liq, :, gcol),
+            view(cloud_state.cld_path_ice, :, gcol),
+            cloud_state.ice_rgh,
+            lkp_cld,
+            ibnd;
             delta_scaling = true,
         )
     end

@@ -60,7 +60,7 @@ end
     nlay,
     nlev,
 )
-    cloudy = _build_cloud_mask!(as.cloud_state, Val(:mask_lw), gcol)
+    cloudy = _build_cloud_mask!(as.cloud_state, Val(:mask_lw), gcol, igpt)
     compute_optical_props!(
         op,
         as,

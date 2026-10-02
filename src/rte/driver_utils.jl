@@ -14,17 +14,25 @@
 
 # McICA cloud mask for one column and g-point; returns whether any layer is
 # cloudy (for the cloud-cover diagnostic). `S` selects `:mask_lw`/`:mask_sw`.
-@inline _build_cloud_mask!(::Nothing, ::Val, gcol) = false
+@inline _build_cloud_mask!(::Nothing, ::Val, gcol, igpt) = false
 @inline function _build_cloud_mask!(
     cloud_state::CloudState,
     ::Val{S},
     gcol,
+    igpt,
 ) where {S}
     mask = view(getproperty(cloud_state, S), :, gcol)
+    # The band is part of the key: the two bands sample independently, and
+    # without this they would draw the same mask for a given column and g-point.
+    band_key = S === :mask_sw ? 0x9e3779b9 % UInt32 : 0x00000000 % UInt32
+    key = (@inbounds cloud_state.mcica_key[1]) ⊻ band_key
     Optics.build_cloud_mask!(
         mask,
         view(cloud_state.cld_frac, :, gcol),
         cloud_state.mask_type,
+        key,
+        gcol,
+        igpt,
     )
     return any(mask)
 end

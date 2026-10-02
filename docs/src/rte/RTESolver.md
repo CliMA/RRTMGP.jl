@@ -8,6 +8,8 @@ CurrentModule = RRTMGP.RTESolver
 apply_metric_scaling!
 solve_lw!
 solve_sw!
+solve_lw_both_skies!
+solve_sw_both_skies!
 ```
 
 ```@docs

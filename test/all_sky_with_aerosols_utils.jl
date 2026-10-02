@@ -170,6 +170,102 @@ function all_sky_with_aerosols(
     @test solver_reused.lookups === prebuilt_lookups
     RRTMGP.update_sw_fluxes!(solver)
     RRTMGP.update_lw_fluxes!(solver)
+
+    # Clear sky involves no sampling, so it must equal a standalone clear-sky
+    # solve exactly. All-sky is keyed, so the fused pass and two separate solves
+    # draw the SAME mask and must agree too -- to roundoff rather than exactly,
+    # because the fused path adds the cloud increment to optics it has already
+    # swept, changing the arithmetic order.
+    let lkps = solver.lookups, ms = nothing
+        fused_clear_lw = copy(Array(parent(solver.clear_flux_acc_lw.flux_net)))
+        fused_all_lw = copy(Array(parent(solver.lws.flux.flux_net)))
+        fused_clear_sw = copy(Array(parent(solver.clear_flux_acc_sw.flux_net)))
+        fused_all_sw = copy(Array(parent(solver.sws.flux.flux_net)))
+
+        RTESolver.solve_lw!(
+            solver.lws, as, lkps.lookup_lw, nothing, lkps.lookup_lw_aero, ms,
+        )
+        @test Array(parent(solver.lws.flux.flux_net)) == fused_clear_lw
+        RTESolver.solve_lw!(
+            solver.lws, as, lkps.lookup_lw, lkps.lookup_lw_cld,
+            lkps.lookup_lw_aero, ms,
+        )
+        two_all_lw = Array(parent(solver.lws.flux.flux_net))
+        @test maximum(abs, two_all_lw .- fused_all_lw) <=
+              1e-4 * maximum(abs, two_all_lw)
+
+        RTESolver.solve_sw!(
+            solver.sws, as, lkps.lookup_sw, nothing, lkps.lookup_sw_aero, ms,
+        )
+        @test Array(parent(solver.sws.flux.flux_net)) == fused_clear_sw
+        RTESolver.solve_sw!(
+            solver.sws, as, lkps.lookup_sw, lkps.lookup_sw_cld,
+            lkps.lookup_sw_aero, ms,
+        )
+        two_all_sw = Array(parent(solver.sws.flux.flux_net))
+        @test maximum(abs, two_all_sw .- fused_all_sw) <=
+              1e-4 * maximum(abs, two_all_sw)
+    end
+    # Those two solves left the solver holding clear-sky fluxes, so restore the
+    # all-sky state the rest of this test reads.
+    RRTMGP.update_sw_fluxes!(solver)
+    RRTMGP.update_lw_fluxes!(solver)
+
+    # --- the fallback and the key, asserted without reference fluxes ---------
+    # Reproducibility and clear-sky equality are self-consistency properties, so
+    # they can be checked on solver configurations this file has no reference
+    # data for. That is what makes the no-scattering case below possible, and it
+    # is the only thing in the suite that exercises the generic
+    # solve_lw_both_skies!/solve_sw_both_skies! fallback for BOTH bands -- the path a
+    # MethodError hid in until these tests caught it.
+    #
+    # Note what is NOT asserted here: that a different key resamples. This
+    # harness runs cldfrac = 1, where the mask is `true` everywhere and McICA has
+    # nothing to sample, so every key gives the same answer. That half of the
+    # contract belongs with partial cloud fraction, and is asserted there.
+    # OneScalar shortwave is rejected for spectral radiation -- scattering is
+    # required -- so the second configuration is no-scattering longwave against
+    # two-stream shortwave. That is what reaches the generic longwave fallback.
+    for (op_lw_t, op_sw_t) in (
+        (Optics.TwoStream(grid_params), Optics.TwoStream(grid_params)),
+        (Optics.OneScalar(grid_params), Optics.TwoStream(grid_params)),
+    )
+        slv = RRTMGPSolver(
+            grid_params,
+            radiation_method,
+            param_set,
+            bcs_lw,
+            bcs_sw,
+            as;
+            op_lw = op_lw_t,
+            op_sw = op_sw_t,
+            lookups = prebuilt_lookups,
+        )
+        RRTMGP.update_fluxes!(slv, UInt32(42))
+        lw_a = copy(Array(parent(slv.lws.flux.flux_net)))
+        sw_a = copy(Array(parent(slv.sws.flux.flux_net)))
+        clear_lw_a = copy(Array(parent(slv.clear_flux_acc_lw.flux_net)))
+        clear_sw_a = copy(Array(parent(slv.clear_flux_acc_sw.flux_net)))
+
+        # One key reproduces exactly. This is the contract #316 asked for, and
+        # it holds on whichever device the suite is running on.
+        RRTMGP.update_fluxes!(slv, UInt32(42))
+        @test Array(parent(slv.lws.flux.flux_net)) == lw_a
+        @test Array(parent(slv.sws.flux.flux_net)) == sw_a
+
+        # The clear-sky half of a fused or fallback solve must equal a standalone
+        # clear-sky solve bit for bit -- it involves no cloud sampling at all.
+        RTESolver.solve_lw!(
+            slv.lws, as, prebuilt_lookups.lookup_lw, nothing,
+            prebuilt_lookups.lookup_lw_aero, nothing,
+        )
+        @test Array(parent(slv.lws.flux.flux_net)) == clear_lw_a
+        RTESolver.solve_sw!(
+            slv.sws, as, prebuilt_lookups.lookup_sw, nothing,
+            prebuilt_lookups.lookup_sw_aero, nothing,
+        )
+        @test Array(parent(slv.sws.flux.flux_net)) == clear_sw_a
+    end
     RRTMGP.update_net_fluxes!(solver) # so net_flux/heating_rate read a valid buffer
     for m in api_methods
         getproperty(RRTMGP, m)(solver)
