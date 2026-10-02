@@ -56,7 +56,7 @@ lossless; adapting a CPU-*constructed* solver to the GPU runs correctly but
 keeps the CPU layout (uncoalesced), so for GPU work, construct the solver on the
 GPU.
 
-## McICA cloud sampling is reproducible
+## McICA cloud sampling reproducibility
 
 With partial cloud fractions, the all-sky methods sample cloud overlap
 stochastically (McICA), but not from an RNG's state: the sample is a function of
