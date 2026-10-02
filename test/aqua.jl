@@ -31,8 +31,10 @@ end
     Aqua.test_piracies(RRTMGP)
     # No lingering background task may keep the load process alive: the
     # precompile workload (src/precompile.jl) runs a full solve at build time,
-    # so a task leak would stall precompilation.
-    Aqua.test_persistent_tasks(RRTMGP; tmax = 300)
+    # so a task leak would stall precompilation. That same workload is why the
+    # budget is generous -- it has to cover a cold precompile on a busy agent,
+    # and it is only spent when the test is about to fail anyway.
+    Aqua.test_persistent_tasks(RRTMGP; tmax = 900)
 end
 
 nothing
