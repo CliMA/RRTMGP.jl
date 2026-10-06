@@ -154,16 +154,12 @@ function _set_cloud_key!(cloud_state, seedval, context)
     return nothing
 end
 
-# Columns are indexed within a rank, so a key that ignored the rank would give
-# column i the same mask on every rank -- the same sampling noise repeated over
-# each subdomain instead of drawn independently. Zero on one rank, so serial
-# runs keep the keys they had.
+# Columns are indexed within a rank, so a key ignoring the rank would give
+# column i the same mask on every rank. Zero on one rank.
 _rank_salt(context) = (ClimaComms.mypid(context) % UInt32 - 0x00000001) *
                       0x9e3779b9
 
-# Integers index the hash directly. Integral floats are converted rather than
-# rejected, because `seedval` was ignored unless `reset_rng_seed` was set and
-# hosts passed floats into it; a non-integral one cannot be a key and says so.
+# Integral floats convert; a non-integral value cannot be a key.
 _mcica_key(seedval::Integer) = seedval % UInt32
 function _mcica_key(seedval::Real)
     isinteger(seedval) || throw(
@@ -172,9 +168,8 @@ function _mcica_key(seedval::Real)
     return unsafe_trunc(Int64, seedval) % UInt32
 end
 
-# `reset_rng_seed` used to reseed the global RNG, which the McICA sampler drew
-# from. The sampler is keyed now, so reseeding would only perturb the host's
-# unrelated randomness; the flag is accepted and ignored.
+# `reset_rng_seed` is accepted and ignored: the sampler is keyed, so there is no
+# RNG state for it to reset.
 
 """
     update_net_fluxes!(s::RRTMGPSolver)

@@ -105,8 +105,7 @@ function mcica_sampling_quality_test(::Type{FT}) where {FT}
     end
 
     @testset "seedval conversion" begin
-        # `seedval` was ignored unless reset_rng_seed was set, so hosts have
-        # passed floats into it; an integral one must not throw.
+        # An integral float must not throw.
         @test _mcica_key(3) === _mcica_key(3.0) === 0x00000003
         @test _mcica_key(-1) === _mcica_key(-1.0)
         @test_throws ArgumentError _mcica_key(3.5)

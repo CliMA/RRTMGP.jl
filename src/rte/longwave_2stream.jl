@@ -335,19 +335,15 @@ end
 
 # --- fused all-sky + clear-sky solve ---------------------------------------
 #
-# With `rad: allskywithclear` the solver runs twice per radiation step and both
-# passes recompute the gas and aerosol optics; only the cloud increment differs.
-# That shared optics dominates a solve, so computing it once and sweeping twice
-# removes most of the second pass. Figures live in the pull request, not in two
-# source comments that would drift apart.
+# Under `rad: allskywithclear` the two passes differ only by the cloud
+# increment, so the optics they share is computed once and swept twice.
 #
-# The sweep is safe to run twice against one optics computation: rte_lw_2stream!
+# Sweeping twice against one optics computation is safe because rte_lw_2stream!
 # writes only `albedo` and `src` as scratch, both recomputed from `lev_source`
 # and `sfc_source`, which only the optics pass writes.
 #
-# Results differ from two separate solves at roundoff only: the cloud and
-# aerosol increments are weighted sums applied per component, so adding aerosol
-# before cloud rather than after changes summation order and nothing else.
+# The increments are weighted sums applied per component, so applying aerosol
+# before cloud rather than after changes summation order.
 
 function rte_lw_2stream_solve_both_skies! end
 
