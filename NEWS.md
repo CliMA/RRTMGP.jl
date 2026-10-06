@@ -17,7 +17,9 @@ v1.1.0
   aerosol optics the two passes share once and sweep twice, which is most of the
   cost of the second pass. Results change, since the draw sequence differs, and
   `CloudState` gains an `mcica_key` field that existing constructor calls
-  derive automatically.
+  derive automatically. The key mixes in the MPI rank, so columns are sampled
+  independently across a distributed run (unchanged on one rank), and `seedval`
+  must be an integer that changes between radiation steps.
 
 v1.0.1
 ------

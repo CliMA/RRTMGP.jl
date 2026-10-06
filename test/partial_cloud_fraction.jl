@@ -204,5 +204,10 @@ function partial_cloud_fraction_test(
         @test all(r.cld_cover_lw .<= 1)
         @test all(r.cld_cover_sw .>= 0)
         @test all(r.cld_cover_sw .<= 1)
+        # The two bands sample independently, so with one key and partial cloud
+        # their diagnosed covers must not come out identical. This runs through
+        # _build_cloud_mask!, so it catches the band term going missing from the
+        # key, which a test that mixes the key itself cannot.
+        @test r.cld_cover_lw != r.cld_cover_sw
     end
 end

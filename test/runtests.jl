@@ -112,6 +112,13 @@ printstyled(
     color = color1,
 )
 printstyled("=================================\n\n", color = color1)
+@testset "McICA keyed sampling quality" begin
+    include("mcica_sampling_quality.jl")
+    for FT in (Float32, Float64)
+        mcica_sampling_quality_test(FT)
+    end
+end
+
 @testset "RRTMGP partial cloud fraction reproducibility tests" begin
     include("partial_cloud_fraction.jl")
     context = ClimaComms.context()

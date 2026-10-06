@@ -10,7 +10,7 @@ Update the longwave fluxes, leaving the longwave flux getters consistent (the
 presentation the getters expose).
 """
 function update_lw_fluxes!(s::RRTMGPSolver, seedval = nothing)
-    _set_mcica_key!(_atmospheric_state(s), seedval)
+    _set_mcica_key!(_atmospheric_state(s), seedval, s.grid_params.context)
     update_lw_fluxes!(s, _radiation_method(s))
     Fluxes.update_presentation!(s.presented_flux_lw, s.lws.flux)
     return nothing
@@ -68,7 +68,7 @@ Update the shortwave fluxes, leaving the shortwave flux getters consistent
 presentation the getters expose).
 """
 function update_sw_fluxes!(s::RRTMGPSolver, seedval = nothing)
-    _set_mcica_key!(_atmospheric_state(s), seedval)
+    _set_mcica_key!(_atmospheric_state(s), seedval, s.grid_params.context)
     update_sw_fluxes!(s, _radiation_method(s))
     Fluxes.update_presentation!(s.presented_flux_sw, s.sws.flux)
     return nothing
@@ -140,13 +140,36 @@ _idx_h2o(s::RRTMGPSolver, ::AbstractRRTMGPMethod) =
 # or every step draws the same clouds. No `seedval` means a random key.
 # `GrayAtmosphericState` has no `cloud_state` field, hence the dispatch; a
 # clear-sky state has it but leaves it `nothing`.
-_set_mcica_key!(as, seedval) = _set_cloud_key!(as.cloud_state, seedval)
-_set_mcica_key!(as::AtmosphericStates.GrayAtmosphericState, seedval) = nothing
-_set_cloud_key!(::Nothing, seedval) = nothing
-function _set_cloud_key!(cloud_state, seedval)
-    key = isnothing(seedval) ? rand(UInt32) : (seedval % UInt32)
-    fill!(cloud_state.mcica_key, key)
+_set_mcica_key!(as, seedval, context) =
+    _set_cloud_key!(as.cloud_state, seedval, context)
+_set_mcica_key!(
+    as::AtmosphericStates.GrayAtmosphericState,
+    seedval,
+    context,
+) = nothing
+_set_cloud_key!(::Nothing, seedval, context) = nothing
+function _set_cloud_key!(cloud_state, seedval, context)
+    base = isnothing(seedval) ? rand(UInt32) : _mcica_key(seedval)
+    fill!(cloud_state.mcica_key, base ⊻ _rank_salt(context))
     return nothing
+end
+
+# Columns are indexed within a rank, so a key that ignored the rank would give
+# column i the same mask on every rank -- the same sampling noise repeated over
+# each subdomain instead of drawn independently. Zero on one rank, so serial
+# runs keep the keys they had.
+_rank_salt(context) = (ClimaComms.mypid(context) % UInt32 - 0x00000001) *
+                      0x9e3779b9
+
+# Integers index the hash directly. Integral floats are converted rather than
+# rejected, because `seedval` was ignored unless `reset_rng_seed` was set and
+# hosts passed floats into it; a non-integral one cannot be a key and says so.
+_mcica_key(seedval::Integer) = seedval % UInt32
+function _mcica_key(seedval::Real)
+    isinteger(seedval) || throw(
+        ArgumentError("seedval must be an integer, got $seedval"),
+    )
+    return unsafe_trunc(Int64, seedval) % UInt32
 end
 
 # `reset_rng_seed` used to reseed the global RNG, which the McICA sampler drew
@@ -208,7 +231,11 @@ longwave and shortwave problems (applying `deep_atmosphere_inverse_scaling` if p
 combine them into the net flux. Mutates `s` in place (its atmospheric state and
 flux buffers) and returns `nothing` (read results via `net_flux(s)` and the
 other flux getters). `seedval` sets the key the McICA cloud mask is drawn from,
-so passing it reproduces the sampling; see `build_cloud_mask!`.
+so passing it reproduces the sampling; see `build_cloud_mask!`. It must be an
+integer, and it must CHANGE between radiation steps -- a constant draws the same
+clouds every step. Hosts typically pass the step index. The rank is mixed in, so
+columns are sampled independently across a distributed run; the key is left
+unchanged on a single rank.
 
 This is designed to be allocation-free and type-stable, which matters because a
 host calls it every radiation step. CI asserts `@allocated == 0` and
