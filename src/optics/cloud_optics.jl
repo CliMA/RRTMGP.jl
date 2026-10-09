@@ -245,7 +245,15 @@ end
 
 # Uniform draw in [0, 1) from the key and the coordinates alone -- no RNG state,
 # no allocation -- so the same (key, column, g-point, layer) always gives the
-# same number, on any device and in any launch order. splitmix64's finalizer.
+# same number, on any device and in any launch order.
+#
+# The four multipliers mix each coordinate into its own part of the word before
+# they are combined; the two that follow are splitmix64's finalizer, which is
+# what makes the combined word avalanche. They are from Steele, Lea and Flood,
+# "Fast splittable pseudorandom number generators" (OOPSLA 2014), via
+# https://prng.di.unimi.it/splitmix64.c -- chosen for their mixing behavior,
+# with no arithmetic meaning beyond being odd. 0x9E3779B97F4A7C15 is 2^64/phi,
+# the usual golden-ratio choice.
 @inline function _keyed_uniform(
     ::Type{FT},
     key::Unsigned,
@@ -260,7 +268,6 @@ end
     z = (z ⊻ (z >> 30)) * 0xBF58476D1CE4E5B9
     z = (z ⊻ (z >> 27)) * 0x94D049BB133111EB
     z = z ⊻ (z >> 31)
-    # Top 24 bits, so the result is exact in Float32 as well as Float64
     # Use the mantissa the format actually has: 24 bits is exact in Float32,
     # and taking only 24 for Float64 would quantize cloud probability in steps
     # of 2^-24 and make fractions below ~6e-8 unreachable.

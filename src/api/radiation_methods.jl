@@ -59,8 +59,8 @@ effect. Requires the lookup tables (load `NCDatasets`).
 
 # Fields
  - `aerosol_radiation::Bool`: include aerosol optics.
- - `reset_rng_seed::Bool`: reseed the RNG from the `seedval` passed to `update_fluxes!`
-   (see [`AllSkyRadiation`](@ref)).
+ - `reset_rng_seed::Bool`: retained for compatibility and no longer affects McICA
+   sampling (see [`AllSkyRadiation`](@ref)).
 """
 struct AllSkyRadiationWithClearSkyDiagnostics <: AbstractRRTMGPMethod
     aerosol_radiation::Bool

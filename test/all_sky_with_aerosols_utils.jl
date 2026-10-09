@@ -168,14 +168,17 @@ function all_sky_with_aerosols(
         lookups = prebuilt_lookups,
     )
     @test solver_reused.lookups === prebuilt_lookups
-    RRTMGP.update_sw_fluxes!(solver)
-    RRTMGP.update_lw_fluxes!(solver)
+    # One explicit key for both bands, so the standalone solves below sample the
+    # mask the fused pass sampled. Bare calls leave each band on its own key,
+    # which made the shortwave comparison vacuous.
+    fused_key = UInt32(20250317)
+    RRTMGP.update_sw_fluxes!(solver, fused_key)
+    RRTMGP.update_lw_fluxes!(solver, fused_key)
 
     # Clear sky involves no sampling, so it must equal a standalone clear-sky
-    # solve exactly. All-sky is keyed, so the fused pass and two separate solves
-    # draw the SAME mask and must agree too -- to roundoff rather than exactly,
-    # because the fused path adds the cloud increment to optics it has already
-    # swept, changing the arithmetic order.
+    # solve exactly. All-sky shares the key and both paths add the increments in
+    # the same order, so they agree to the roundoff of the fused pass reusing
+    # the optics it already swept.
     let lkps = solver.lookups, ms = nothing
         fused_clear_lw = copy(Array(parent(solver.clear_flux_acc_lw.flux_net)))
         fused_all_lw = copy(Array(parent(solver.lws.flux.flux_net)))
@@ -192,7 +195,7 @@ function all_sky_with_aerosols(
         )
         two_all_lw = Array(parent(solver.lws.flux.flux_net))
         @test maximum(abs, two_all_lw .- fused_all_lw) <=
-              1e-4 * maximum(abs, two_all_lw)
+              1e-6 * maximum(abs, two_all_lw)
 
         RTESolver.solve_sw!(
             solver.sws, as, lkps.lookup_sw, nothing, lkps.lookup_sw_aero, ms,
@@ -204,10 +207,41 @@ function all_sky_with_aerosols(
         )
         two_all_sw = Array(parent(solver.sws.flux.flux_net))
         @test maximum(abs, two_all_sw .- fused_all_sw) <=
-              1e-4 * maximum(abs, two_all_sw)
+              1e-6 * maximum(abs, two_all_sw)
     end
-    # Those two solves left the solver holding clear-sky fluxes, so restore the
-    # all-sky state the rest of this test reads.
+    # The comparison above runs at cldfrac = 1, where the mask is `true`
+    # everywhere and the key is never consulted, so it compares the two paths'
+    # arithmetic but not their sampling. Repeat it on a partial cloud fraction,
+    # which is the only place the fused path is checked against a drawn mask.
+    let lkps = solver.lookups, ms = nothing
+        base_cld_frac = copy(as.cloud_state.cld_frac)
+        as.cloud_state.cld_frac .= FT(0.5)
+
+        RRTMGP.update_lw_fluxes!(solver, fused_key)
+        part_fused_lw = copy(Array(parent(solver.lws.flux.flux_net)))
+        RTESolver.solve_lw!(
+            solver.lws, as, lkps.lookup_lw, lkps.lookup_lw_cld,
+            lkps.lookup_lw_aero, ms,
+        )
+        part_two_lw = Array(parent(solver.lws.flux.flux_net))
+        @test maximum(abs, part_two_lw .- part_fused_lw) <=
+              1e-6 * maximum(abs, part_two_lw)
+
+        RRTMGP.update_sw_fluxes!(solver, fused_key)
+        part_fused_sw = copy(Array(parent(solver.sws.flux.flux_net)))
+        RTESolver.solve_sw!(
+            solver.sws, as, lkps.lookup_sw, lkps.lookup_sw_cld,
+            lkps.lookup_sw_aero, ms,
+        )
+        part_two_sw = Array(parent(solver.sws.flux.flux_net))
+        @test maximum(abs, part_two_sw .- part_fused_sw) <=
+              1e-6 * maximum(abs, part_two_sw)
+
+        as.cloud_state.cld_frac .= base_cld_frac
+    end
+
+    # Those solves left the solver holding clear-sky and partial-cloud fluxes,
+    # so restore the all-sky state the rest of this test reads.
     RRTMGP.update_sw_fluxes!(solver)
     RRTMGP.update_lw_fluxes!(solver)
 

@@ -20,6 +20,16 @@ v1.1.0
   derive automatically. The key mixes in the MPI rank, so columns are sampled
   independently across a distributed run (unchanged on one rank), and `seedval`
   must be an integer that changes between radiation steps.
+  `reset_rng_seed` is now accepted and ignored: there is no RNG state left for
+  it to reset, and reproducibility comes from `seedval` instead. Passing no
+  `seedval` takes one key from the global RNG per `update_fluxes!` call.
+  `update_lw_fluxes!`/`update_sw_fluxes!` set the key only when passed a
+  `seedval`, so re-solving one band does not discard the step's cloud sample.
+  Finally, `compute_optical_props!` now adds the aerosol increment before the
+  cloud one, matching the fused solves, so `AllSkyRadiation` and
+  `AllSkyRadiationWithClearSkyDiagnostics` agree on the all-sky fluxes;
+  combining optical properties is not associative, so this moves
+  `AllSkyRadiation` results by roundoff.
 
 v1.0.1
 ------

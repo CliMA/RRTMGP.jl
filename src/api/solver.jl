@@ -72,6 +72,9 @@ Construct it with the `RRTMGPSolver` constructor and drive it with
 - `net_flux_buffer`: combined longwave + shortwave net flux at each level [W/m²], the full
   boundary-extended `(nlev, ncol)` buffer (read the domain-masked view via `net_flux(s)`).
 - `clear_net_flux_buffer`: combined clear-sky net-flux buffer, or `nothing`.
+- `clear_flux_acc_lw`: what the fused longwave solve accumulates the clear sky
+  into, in the `(ncol, nlev)` compute layout, or `nothing`.
+- `clear_flux_acc_sw`: the shortwave counterpart, or `nothing`.
 
 # Constructor
     RRTMGPSolver(grid_params, radiation_method, params, bcs_lw, bcs_sw, as; <keyword arguments>)

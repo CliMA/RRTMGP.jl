@@ -3,14 +3,22 @@
 #####
 
 """
-    update_lw_fluxes!(s::RRTMGPSolver)
+    update_lw_fluxes!(s::RRTMGPSolver, seedval = nothing)
 
 Update the longwave fluxes, leaving the longwave flux getters consistent (the
 `(ncol, nlev)` compute buffers are transposed into the `(nlev, ncol)`
 presentation the getters expose).
+
+`seedval` sets the McICA key as in [`update_fluxes!`](@ref). Omitting it reuses
+the key already in the state rather than drawing a new one, so re-solving one
+band keeps the sample the other band drew against; a host that only ever calls
+the per-band functions has to pass a `seedval` to sample at all.
 """
 function update_lw_fluxes!(s::RRTMGPSolver, seedval = nothing)
-    _set_mcica_key!(_atmospheric_state(s), seedval, s.grid_params.context)
+    # Only when given, so a bare call cannot overwrite the key that
+    # `update_fluxes!` set.
+    isnothing(seedval) ||
+        _set_mcica_key!(_atmospheric_state(s), seedval, s.grid_params.context)
     update_lw_fluxes!(s, _radiation_method(s))
     Fluxes.update_presentation!(s.presented_flux_lw, s.lws.flux)
     return nothing
@@ -61,14 +69,22 @@ function update_lw_fluxes!(
 end
 
 """
-    update_sw_fluxes!(s::RRTMGPSolver)
+    update_sw_fluxes!(s::RRTMGPSolver, seedval = nothing)
 
 Update the shortwave fluxes, leaving the shortwave flux getters consistent
 (the `(ncol, nlev)` compute buffers are transposed into the `(nlev, ncol)`
 presentation the getters expose).
+
+`seedval` sets the McICA key as in [`update_fluxes!`](@ref). Omitting it reuses
+the key already in the state rather than drawing a new one, so re-solving one
+band keeps the sample the other band drew against; a host that only ever calls
+the per-band functions has to pass a `seedval` to sample at all.
 """
 function update_sw_fluxes!(s::RRTMGPSolver, seedval = nothing)
-    _set_mcica_key!(_atmospheric_state(s), seedval, s.grid_params.context)
+    # Only when given, so a bare call cannot overwrite the key that
+    # `update_fluxes!` set.
+    isnothing(seedval) ||
+        _set_mcica_key!(_atmospheric_state(s), seedval, s.grid_params.context)
     update_sw_fluxes!(s, _radiation_method(s))
     Fluxes.update_presentation!(s.presented_flux_sw, s.sws.flux)
     return nothing
@@ -137,7 +153,8 @@ _idx_h2o(s::RRTMGPSolver, ::AbstractRRTMGPMethod) =
     _lookup_tables(s).lookup_lw.idx_h2o
 
 # Sampling is determined by this key, so it must change between radiation steps
-# or every step draws the same clouds. No `seedval` means a random key.
+# or every step draws the same clouds. `update_fluxes!` has already resolved a
+# missing `seedval` to a random key, so `seedval` is concrete here.
 # `GrayAtmosphericState` has no `cloud_state` field, hence the dispatch; a
 # clear-sky state has it but leaves it `nothing`.
 _set_mcica_key!(as, seedval, context) =
@@ -149,15 +166,15 @@ _set_mcica_key!(
 ) = nothing
 _set_cloud_key!(::Nothing, seedval, context) = nothing
 function _set_cloud_key!(cloud_state, seedval, context)
-    base = isnothing(seedval) ? rand(UInt32) : _mcica_key(seedval)
-    fill!(cloud_state.mcica_key, base ⊻ _rank_salt(context))
+    fill!(cloud_state.mcica_key, _mcica_key(seedval) ⊻ _rank_salt(context))
     return nothing
 end
 
 # Columns are indexed within a rank, so a key ignoring the rank would give
 # column i the same mask on every rank. Zero on one rank.
-_rank_salt(context) = (ClimaComms.mypid(context) % UInt32 - 0x00000001) *
-                      0x9e3779b9
+_rank_salt(context) =
+    (ClimaComms.mypid(context) % UInt32 - 0x00000001) *
+    AtmosphericStates.MCICA_RANK_SALT
 
 # Integral floats convert; a non-integral value cannot be a key.
 _mcica_key(seedval::Integer) = seedval % UInt32
@@ -165,6 +182,8 @@ function _mcica_key(seedval::Real)
     isinteger(seedval) || throw(
         ArgumentError("seedval must be an integer, got $seedval"),
     )
+    # Signed truncation then a wrapping `%`, not `unsafe_trunc(UInt32, ...)`:
+    # `fptoui` of a negative value is undefined, both steps here are defined.
     return unsafe_trunc(Int64, seedval) % UInt32
 end
 
@@ -245,8 +264,11 @@ function update_fluxes!(s::RRTMGPSolver, seedval = nothing)
     # branch when off, so the zero-allocation contract is unaffected
     check_values[] && validate_inputs(s)
     prepare_atmosphere!(s)
-    update_lw_fluxes!(s, seedval)
-    update_sw_fluxes!(s, seedval)
+    # Resolved once: the two bands share the key and salt it apart themselves,
+    # so no `seedval` means one random key, not one per band.
+    key = isnothing(seedval) ? rand(UInt32) : seedval
+    update_lw_fluxes!(s, key)
+    update_sw_fluxes!(s, key)
     update_net_fluxes!(s)
     return nothing
 end

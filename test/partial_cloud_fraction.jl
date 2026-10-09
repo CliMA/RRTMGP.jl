@@ -210,4 +210,19 @@ function partial_cloud_fraction_test(
         # key, which a test that mixes the key itself cannot.
         @test r.cld_cover_lw != r.cld_cover_sw
     end
+
+    # ------------------------------------------------------------------
+    # 7. The rank and band salts do not cancel
+    # ------------------------------------------------------------------
+    # Both are XORed into the same key, so a band salt that equals some rank's
+    # salt makes that rank's shortwave key another rank's longwave key. The
+    # rank salt is odd, hence invertible mod 2^32, so a collision exists for
+    # exactly one rank index and the test is that it is out of reach.
+    @testset "McICA key salts do not cancel" begin
+        AS = RRTMGP.AtmosphericStates
+        rank_salts =
+            Set((UInt32(r) - 0x00000001) * AS.MCICA_RANK_SALT for r in 1:4096)
+        @test !(AS.MCICA_BAND_SALT_SW in rank_salts)
+        @test AS.MCICA_BAND_SALT_LW != AS.MCICA_BAND_SALT_SW
+    end
 end

@@ -254,6 +254,16 @@ struct CloudState{CD, CF, CC, CM, CMT, SD}
 end
 Adapt.@adapt_structure CloudState
 
+# McICA key salts, XORed into the key by `update_fluxes!` (rank) and
+# `_build_cloud_mask!` (band). They must not cancel. `MCICA_RANK_SALT` is odd
+# and so invertible mod 2^32, which means ANY band salt equals some rank's salt
+# at exactly one rank index; the constant is chosen so that index is
+# unreachable. Using `0x9e3779b9` for both put it at rank 2, where rank 1's
+# shortwave key equaled rank 2's longwave key.
+const MCICA_RANK_SALT = 0x9e3779b9
+const MCICA_BAND_SALT_LW = 0x00000000
+const MCICA_BAND_SALT_SW = 0x85ebca6b
+
 # Without a key, the buffer is derived from `cld_frac` so it lands on the same
 # device.
 function CloudState(

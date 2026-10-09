@@ -157,8 +157,9 @@ RRTMGP.update_fluxes!(solver, seedval)   # seedval selects the cloud sample
 ```
 
 Pass the timestep index and the fluxes are reproducible on any device, at any
-thread count, and across a restart; pass nothing and each call draws afresh.
-`reset_rng_seed` no longer affects sampling, which does not use the global RNG.
+thread count, and across a restart; pass nothing and `update_fluxes!` takes one
+key from the global RNG, so the draw is fresh but not reproducible. The sampler
+itself holds no RNG state, and `reset_rng_seed` no longer affects it.
 Overcast (`cld_frac = 1`) and clear layers are deterministic regardless.
 
 ## 6. Read the diagnostics

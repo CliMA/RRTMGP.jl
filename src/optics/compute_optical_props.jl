@@ -80,26 +80,10 @@ GPU access) when one is provided, and from `as` directly otherwise.
             t_lev_dec = t_lev_inc
         end
         lev_source[gcol, nlay + 1] = lev_src_inc_prev
-        if !isnothing(lkp_cld)
-            cloud_state = as.cloud_state
-            cld_r_eff_liq = view(cloud_state.cld_r_eff_liq, :, gcol)
-            cld_r_eff_ice = view(cloud_state.cld_r_eff_ice, :, gcol)
-            cld_path_liq = view(cloud_state.cld_path_liq, :, gcol)
-            cld_path_ice = view(cloud_state.cld_path_ice, :, gcol)
-            cld_mask = view(cloud_state.mask_lw, :, gcol)
-
-            add_cloud_optics_1scalar!(
-                τ,
-                cld_mask,
-                cld_r_eff_liq,
-                cld_r_eff_ice,
-                cld_path_liq,
-                cld_path_ice,
-                cloud_state.ice_rgh,
-                lkp_cld,
-                ibnd;
-            )
-        end
+        # Aerosol before cloud, matching solve_lw_both_skies! and
+        # solve_sw_both_skies!, so both all-sky methods return the same
+        # fluxes. Combining optical properties is not associative, so the
+        # order is observable at roundoff.
         if !isnothing(lkp_aero)
             aod_sw_ext = nothing
             aod_sw_sca = nothing
@@ -120,6 +104,26 @@ GPU access) when one is provided, and from `as` directly otherwise.
                 lkp_aero,
                 ibnd,
                 iband_550nm,
+            )
+        end
+        if !isnothing(lkp_cld)
+            cloud_state = as.cloud_state
+            cld_r_eff_liq = view(cloud_state.cld_r_eff_liq, :, gcol)
+            cld_r_eff_ice = view(cloud_state.cld_r_eff_ice, :, gcol)
+            cld_path_liq = view(cloud_state.cld_path_liq, :, gcol)
+            cld_path_ice = view(cloud_state.cld_path_ice, :, gcol)
+            cld_mask = view(cloud_state.mask_lw, :, gcol)
+
+            add_cloud_optics_1scalar!(
+                τ,
+                cld_mask,
+                cld_r_eff_liq,
+                cld_r_eff_ice,
+                cld_path_liq,
+                cld_path_ice,
+                cloud_state.ice_rgh,
+                lkp_cld,
+                ibnd;
             )
         end
     end
@@ -194,9 +198,10 @@ end
         end
         lev_source[gcol, nlay + 1] = lev_src_inc_prev
     end
-    if !isnothing(lkp_cld) # clouds need TwoStream optics
-        add_cloud_optics_lw!(op, as, gcol, lkp_cld, ibnd)
-    end
+    # Aerosol before cloud, matching solve_lw_both_skies! and
+    # solve_sw_both_skies!, so both all-sky methods return the same
+    # fluxes. Combining optical properties is not associative, so the
+    # order is observable at roundoff.
     if !isnothing(lkp_aero)
         aod_sw_ext = nothing
         aod_sw_sca = nothing
@@ -220,6 +225,9 @@ end
             ibnd,
             iband_550nm,
         )
+    end
+    if !isnothing(lkp_cld) # clouds need TwoStream optics
+        add_cloud_optics_lw!(op, as, gcol, lkp_cld, ibnd)
     end
     return nothing
 end
@@ -316,9 +324,10 @@ end
             gcol,
         )
     end
-    if !isnothing(lkp_cld) # clouds need TwoStream optics
-        add_cloud_optics_sw!(op, as, gcol, lkp_cld, ibnd)
-    end
+    # Aerosol before cloud, matching solve_lw_both_skies! and
+    # solve_sw_both_skies!, so both all-sky methods return the same
+    # fluxes. Combining optical properties is not associative, so the
+    # order is observable at roundoff.
     if !isnothing(lkp_aero)
         (; iband_550nm) = lkp_aero
         aod_sw_ext = view(as.aerosol_state.aod_sw_ext, gcol)
@@ -343,6 +352,9 @@ end
             iband_550nm,
             delta_scaling = true,
         )
+    end
+    if !isnothing(lkp_cld) # clouds need TwoStream optics
+        add_cloud_optics_sw!(op, as, gcol, lkp_cld, ibnd)
     end
     return nothing
 end
