@@ -214,7 +214,7 @@ end
     @inbounds view(as.t_lev, :, gcol)
 
 """
-    CloudState{CD, CF, CC, CM, CMT}
+    CloudState{CD, CF, CC, CM, CMT, SD}
 
 Cloud state, used to compute optical properties.
 
@@ -232,8 +232,13 @@ Cloud state, used to compute optical properties.
 - `mask_sw`: Cloud mask (shortwave); `true` if clouds are present.
 - `mask_type`: Cloud mask type.
 - `ice_rgh`: Ice roughness; 1 = none, 2 = medium, 3 = rough.
+- `mcica_key`: One-element array holding the McICA key; the cloud mask is a
+  function of `(mcica_key, column, g-point, layer)`. Set by
+  `update_fluxes!(s, seedval)`, and must change between radiation steps. A key
+  rather than a seed: it indexes a stateless draw, so the result does not depend
+  on how many draws came before.
 """
-struct CloudState{CD, CF, CC, CM, CMT}
+struct CloudState{CD, CF, CC, CM, CMT, SD}
     cld_r_eff_liq::CD
     cld_r_eff_ice::CD
     cld_path_liq::CD
@@ -245,8 +250,52 @@ struct CloudState{CD, CF, CC, CM, CMT}
     mask_sw::CM
     mask_type::CMT
     ice_rgh::Int
+    mcica_key::SD
 end
 Adapt.@adapt_structure CloudState
+
+# McICA key salts, XORed into the key by `update_fluxes!` (rank) and
+# `_build_cloud_mask!` (band). They must not cancel. `MCICA_RANK_SALT` is odd
+# and so invertible mod 2^32, which means ANY band salt equals some rank's salt
+# at exactly one rank index; the constant is chosen so that index is
+# unreachable. Using `0x9e3779b9` for both put it at rank 2, where rank 1's
+# shortwave key equaled rank 2's longwave key.
+const MCICA_RANK_SALT = 0x9e3779b9
+const MCICA_BAND_SALT_LW = 0x00000000
+const MCICA_BAND_SALT_SW = 0x85ebca6b
+
+# Without a key, the buffer is derived from `cld_frac` so it lands on the same
+# device.
+function CloudState(
+    cld_r_eff_liq,
+    cld_r_eff_ice,
+    cld_path_liq,
+    cld_path_ice,
+    cld_frac,
+    cld_cover_sw,
+    cld_cover_lw,
+    mask_lw,
+    mask_sw,
+    mask_type,
+    ice_rgh::Integer,
+)
+    mcica_key = similar(cld_frac, UInt32, 1)
+    fill!(mcica_key, UInt32(0))
+    return CloudState(
+        cld_r_eff_liq,
+        cld_r_eff_ice,
+        cld_path_liq,
+        cld_path_ice,
+        cld_frac,
+        cld_cover_sw,
+        cld_cover_lw,
+        mask_lw,
+        mask_sw,
+        mask_type,
+        Int(ice_rgh),
+        mcica_key,
+    )
+end
 
 # Convenience constructor: callers that don't allocate cld_cover arrays
 # can use this 9-argument form where both covers default to `nothing`.

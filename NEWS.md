@@ -4,6 +4,33 @@ RRTMGP.jl Release Notes
 main
 ----
 
+v1.1.0
+------
+
+- [#631](https://github.com/CliMA/RRTMGP.jl/pull/631) McICA cloud sampling is
+  reproducible on every device: the mask is now a function of
+  `(cloud_state.mcica_key, column, g-point, layer)`, the key coming from the `seedval`
+  already passed to `update_fluxes!`, in place of a `Random.rand()` whose GPU
+  stream was keyed per kernel launch (closes #316, and #544 for the GPU). On top
+  of that, `AllSkyRadiationWithClearSkyDiagnostics` no longer runs the whole
+  solver twice -- `TwoStreamLWRTE` and `TwoStreamSWRTE` compute the gas and
+  aerosol optics the two passes share once and sweep twice, which is most of the
+  cost of the second pass. Results change, since the draw sequence differs, and
+  `CloudState` gains an `mcica_key` field that existing constructor calls
+  derive automatically. The key mixes in the MPI rank, so columns are sampled
+  independently across a distributed run (unchanged on one rank), and `seedval`
+  must be an integer that changes between radiation steps.
+  `reset_rng_seed` is now accepted and ignored: there is no RNG state left for
+  it to reset, and reproducibility comes from `seedval` instead. Passing no
+  `seedval` takes one key from the global RNG per `update_fluxes!` call.
+  `update_lw_fluxes!`/`update_sw_fluxes!` set the key only when passed a
+  `seedval`, so re-solving one band does not discard the step's cloud sample.
+  Finally, `compute_optical_props!` now adds the aerosol increment before the
+  cloud one, matching the fused solves, so `AllSkyRadiation` and
+  `AllSkyRadiationWithClearSkyDiagnostics` agree on the all-sky fluxes;
+  combining optical properties is not associative, so this moves
+  `AllSkyRadiation` results by roundoff.
+
 v1.0.1
 ------
 

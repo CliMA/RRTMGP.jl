@@ -3,13 +3,22 @@
 #####
 
 """
-    update_lw_fluxes!(s::RRTMGPSolver)
+    update_lw_fluxes!(s::RRTMGPSolver, seedval = nothing)
 
 Update the longwave fluxes, leaving the longwave flux getters consistent (the
 `(ncol, nlev)` compute buffers are transposed into the `(nlev, ncol)`
 presentation the getters expose).
+
+`seedval` sets the McICA key as in [`update_fluxes!`](@ref). Omitting it reuses
+the key already in the state rather than drawing a new one, so re-solving one
+band keeps the sample the other band drew against; a host that only ever calls
+the per-band functions has to pass a `seedval` to sample at all.
 """
-function update_lw_fluxes!(s::RRTMGPSolver)
+function update_lw_fluxes!(s::RRTMGPSolver, seedval = nothing)
+    # Only when given, so a bare call cannot overwrite the key that
+    # `update_fluxes!` set.
+    isnothing(seedval) ||
+        _set_mcica_key!(_atmospheric_state(s), seedval, s.grid_params.context)
     update_lw_fluxes!(s, _radiation_method(s))
     Fluxes.update_presentation!(s.presented_flux_lw, s.lws.flux)
     return nothing
@@ -44,34 +53,38 @@ function update_lw_fluxes!(
     lookups = _lookup_tables(s)
     lw_solver = _longwave_solver(s)
     ms = _deep_atmosphere_inverse_scaling(s)
-    RTESolver.solve_lw!(
+    # One pass over the g-points fills both skies, computing the optics they
+    # share once instead of twice.
+    RTESolver.solve_lw_both_skies!(
         lw_solver,
-        as,
-        lookups.lookup_lw,
-        nothing,
-        lookups.lookup_lw_aero,
-        ms,
-    )
-    # snapshot the clear-sky fluxes into their (nlev, ncol) presentation
-    Fluxes.update_presentation!(s.clear_flux_lw, s.lws.flux)
-    RTESolver.solve_lw!(
-        lw_solver,
+        s.clear_flux_acc_lw,
         as,
         lookups.lookup_lw,
         lookups.lookup_lw_cld,
         lookups.lookup_lw_aero,
         ms,
     )
+    # snapshot the clear-sky fluxes into their (nlev, ncol) presentation
+    Fluxes.update_presentation!(s.clear_flux_lw, s.clear_flux_acc_lw)
 end
 
 """
-    update_sw_fluxes!(s::RRTMGPSolver)
+    update_sw_fluxes!(s::RRTMGPSolver, seedval = nothing)
 
 Update the shortwave fluxes, leaving the shortwave flux getters consistent
 (the `(ncol, nlev)` compute buffers are transposed into the `(nlev, ncol)`
 presentation the getters expose).
+
+`seedval` sets the McICA key as in [`update_fluxes!`](@ref). Omitting it reuses
+the key already in the state rather than drawing a new one, so re-solving one
+band keeps the sample the other band drew against; a host that only ever calls
+the per-band functions has to pass a `seedval` to sample at all.
 """
-function update_sw_fluxes!(s::RRTMGPSolver)
+function update_sw_fluxes!(s::RRTMGPSolver, seedval = nothing)
+    # Only when given, so a bare call cannot overwrite the key that
+    # `update_fluxes!` set.
+    isnothing(seedval) ||
+        _set_mcica_key!(_atmospheric_state(s), seedval, s.grid_params.context)
     update_sw_fluxes!(s, _radiation_method(s))
     Fluxes.update_presentation!(s.presented_flux_sw, s.sws.flux)
     return nothing
@@ -106,25 +119,18 @@ function update_sw_fluxes!(
     sw_solver = _shortwave_solver(s)
     as = _atmospheric_state(s)
     ms = _deep_atmosphere_inverse_scaling(s)
-    RTESolver.solve_sw!(
+    # One pass over the g-points fills both skies; see update_lw_fluxes!
+    RTESolver.solve_sw_both_skies!(
         sw_solver,
-        as,
-        lookups.lookup_sw,
-        nothing,
-        lookups.lookup_sw_aero,
-        ms,
-    )
-    # snapshot the clear-sky fluxes into their (nlev, ncol) presentation
-    Fluxes.update_presentation!(s.clear_flux_sw, s.sws.flux)
-
-    RTESolver.solve_sw!(
-        sw_solver,
+        s.clear_flux_acc_sw,
         as,
         lookups.lookup_sw,
         lookups.lookup_sw_cld,
         lookups.lookup_sw_aero,
         ms,
     )
+    # snapshot the clear-sky fluxes into their (nlev, ncol) presentation
+    Fluxes.update_presentation!(s.clear_flux_sw, s.clear_flux_acc_sw)
 end
 
 #####
@@ -146,14 +152,43 @@ _idx_h2o(::RRTMGPSolver, ::GrayRadiation) = nothing
 _idx_h2o(s::RRTMGPSolver, ::AbstractRRTMGPMethod) =
     _lookup_tables(s).lookup_lw.idx_h2o
 
-_maybe_reset_rng_seed!(::AbstractRRTMGPMethod, seedval) = nothing
-function _maybe_reset_rng_seed!(
-    rm::Union{AllSkyRadiation, AllSkyRadiationWithClearSkyDiagnostics},
+# Sampling is determined by this key, so it must change between radiation steps
+# or every step draws the same clouds. `update_fluxes!` has already resolved a
+# missing `seedval` to a random key, so `seedval` is concrete here.
+# `GrayAtmosphericState` has no `cloud_state` field, hence the dispatch; a
+# clear-sky state has it but leaves it `nothing`.
+_set_mcica_key!(as, seedval, context) =
+    _set_cloud_key!(as.cloud_state, seedval, context)
+_set_mcica_key!(
+    as::AtmosphericStates.GrayAtmosphericState,
     seedval,
-)
-    rm.reset_rng_seed && !isnothing(seedval) && Random.seed!(seedval)
+    context,
+) = nothing
+_set_cloud_key!(::Nothing, seedval, context) = nothing
+function _set_cloud_key!(cloud_state, seedval, context)
+    fill!(cloud_state.mcica_key, _mcica_key(seedval) ⊻ _rank_salt(context))
     return nothing
 end
+
+# Columns are indexed within a rank, so a key ignoring the rank would give
+# column i the same mask on every rank. Zero on one rank.
+_rank_salt(context) =
+    (ClimaComms.mypid(context) % UInt32 - 0x00000001) *
+    AtmosphericStates.MCICA_RANK_SALT
+
+# Integral floats convert; a non-integral value cannot be a key.
+_mcica_key(seedval::Integer) = seedval % UInt32
+function _mcica_key(seedval::Real)
+    isinteger(seedval) || throw(
+        ArgumentError("seedval must be an integer, got $seedval"),
+    )
+    # Signed truncation then a wrapping `%`, not `unsafe_trunc(UInt32, ...)`:
+    # `fptoui` of a negative value is undefined, both steps here are defined.
+    return unsafe_trunc(Int64, seedval) % UInt32
+end
+
+# `reset_rng_seed` is accepted and ignored: the sampler is keyed, so there is no
+# RNG state for it to reset.
 
 """
     update_net_fluxes!(s::RRTMGPSolver)
@@ -209,8 +244,12 @@ range the optics support, and compute concentrations), solve the
 longwave and shortwave problems (applying `deep_atmosphere_inverse_scaling` if present), and
 combine them into the net flux. Mutates `s` in place (its atmospheric state and
 flux buffers) and returns `nothing` (read results via `net_flux(s)` and the
-other flux getters). When the radiation method requests reproducible seeding,
-`seedval` reseeds the RNG used for cloud sampling.
+other flux getters). `seedval` sets the key the McICA cloud mask is drawn from,
+so passing it reproduces the sampling; see `build_cloud_mask!`. It must be an
+integer, and it must CHANGE between radiation steps -- a constant draws the same
+clouds every step. Hosts typically pass the step index. The rank is mixed in, so
+columns are sampled independently across a distributed run; the key is left
+unchanged on a single rank.
 
 This is designed to be allocation-free and type-stable, which matters because a
 host calls it every radiation step. CI asserts `@allocated == 0` and
@@ -224,10 +263,12 @@ function update_fluxes!(s::RRTMGPSolver, seedval = nothing)
     # opt-in input validation (see `check_values`/`validate_inputs`); a single
     # branch when off, so the zero-allocation contract is unaffected
     check_values[] && validate_inputs(s)
-    _maybe_reset_rng_seed!(_radiation_method(s), seedval)
     prepare_atmosphere!(s)
-    update_lw_fluxes!(s)
-    update_sw_fluxes!(s)
+    # Resolved once: the two bands share the key and salt it apart themselves,
+    # so no `seedval` means one random key, not one per band.
+    key = isnothing(seedval) ? rand(UInt32) : seedval
+    update_lw_fluxes!(s, key)
+    update_sw_fluxes!(s, key)
     update_net_fluxes!(s)
     return nothing
 end

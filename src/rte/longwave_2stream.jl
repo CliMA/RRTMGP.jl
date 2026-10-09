@@ -51,7 +51,7 @@ end
     nlev,
     ncol,
 )
-    cloudy = _build_cloud_mask!(as.cloud_state, Val(:mask_lw), gcol)
+    cloudy = _build_cloud_mask!(as.cloud_state, Val(:mask_lw), gcol, igpt)
     compute_optical_props!(
         op,
         as,
@@ -331,4 +331,185 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
         lev_src_top = lev_src_bot
         ilev -= 1
     end
+end
+
+# --- fused all-sky + clear-sky solve ---------------------------------------
+#
+# Under `rad: allskywithclear` the two passes differ only by the cloud
+# increment, so the optics they share is computed once and swept twice.
+#
+# Sweeping twice against one optics computation is safe because rte_lw_2stream!
+# writes only `albedo` and `src` as scratch, both recomputed from `lev_source`
+# and `sfc_source`, which only the optics pass writes.
+#
+# The increments are weighted sums applied per component, so applying aerosol
+# before cloud rather than after changes summation order.
+
+function rte_lw_2stream_solve_both_skies! end
+
+@inline function lw_2stream_gpt_col_both_skies!(
+    igpt,
+    gcol,
+    flux,
+    flux_lw,
+    flux_lw_clear,
+    band_flux,
+    src_lw,
+    bcs_lw,
+    op,
+    as,
+    state_cache,
+    lookup_lw,
+    lookup_lw_cld,
+    lookup_lw_aero,
+    ibnd,
+    nlev,
+    ncol,
+)
+    cloudy = _build_cloud_mask!(as.cloud_state, Val(:mask_lw), gcol, igpt)
+    # Gas and aerosol only: this is the clear sky, and the shared half
+    compute_optical_props!(
+        op,
+        as,
+        state_cache,
+        src_lw,
+        gcol,
+        igpt,
+        lookup_lw,
+        nothing,
+        lookup_lw_aero,
+    )
+    rte_lw_2stream!(op, flux, src_lw, bcs_lw, gcol, igpt, ibnd, nlev, ncol)
+    _accumulate_fluxes!(flux_lw_clear, flux, gcol, nlev, igpt)
+    # Add the cloud increment on top of the same optics and sweep again
+    if !isnothing(lookup_lw_cld)
+        add_cloud_optics_lw!(op, as, gcol, lookup_lw_cld, ibnd)
+    end
+    rte_lw_2stream!(op, flux, src_lw, bcs_lw, gcol, igpt, ibnd, nlev, ncol)
+    _accumulate_fluxes!(flux_lw, flux, gcol, nlev, igpt)
+    accumulate_band_flux!(band_flux, flux.flux_up, flux.flux_dn, gcol, ibnd, nlev)
+    return cloudy
+end
+
+"""
+    solve_lw_both_skies!(lw, flux_lw_clear, as, lookup_lw, lookup_lw_cld, lookup_lw_aero, metric_scaling)
+
+Solve the longwave problem for both skies in one pass over the g-points,
+accumulating the clear sky into `flux_lw_clear` and the all-sky into the
+solver's own flux.
+
+The clear-sky result is bit-for-bit what a `solve_lw!` with no cloud lookup
+produces. For a given key the all-sky result uses the same cloud mask as two
+separate solves would, and agrees with them to the roundoff of reusing the
+already-swept gas and aerosol optics rather than recomputing them. Both paths
+apply the increments in the order gas, aerosol, cloud: combining optical
+properties normalizes with `max(eps(FT), ...)` and so is not associative, which
+is why `compute_optical_props!` had to adopt this order instead of the fused
+path adopting its gas, cloud, aerosol one -- applying the aerosol increment
+after the cloud one would mean recomputing it, which is the saving this
+exists for.
+"""
+function solve_lw_both_skies!(
+    (; context, fluxb, flux, band_flux, src, bcs, op, state_cache)::TwoStreamLWRTE,
+    flux_lw_clear::FluxLW,
+    as::AtmosphericState,
+    lookup_lw::LookUpLW,
+    lookup_lw_cld::Union{LookUpCld, Nothing} = nothing,
+    lookup_lw_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
+    metric_scaling::M = nothing,
+) where {M}
+    AtmosphericStates.refresh_transposed_state!(state_cache, as)
+    rte_lw_2stream_solve_both_skies!(
+        context.device,
+        fluxb,
+        flux,
+        flux_lw_clear,
+        band_flux,
+        src,
+        bcs,
+        op,
+        as,
+        state_cache,
+        lookup_lw,
+        lookup_lw_cld,
+        lookup_lw_aero,
+    )
+    apply_metric_scaling!(flux, metric_scaling)
+    apply_metric_scaling!(flux_lw_clear, metric_scaling)
+    apply_metric_scaling!(band_flux, metric_scaling)
+    return nothing
+end
+
+# CPU counterpart of the fused solve. Same structure as the GPU kernel: one
+# pass over the g-points, both skies accumulated per column.
+# Duplicated for the GPU in ext/cuda/rte_longwave_2stream.jl: the cloud-cover
+# tally, net-flux finalize are in both. Change both.
+function rte_lw_2stream_solve_both_skies!(
+    device::ClimaComms.AbstractCPUDevice,
+    flux::FluxLW,
+    flux_lw::FluxLW,
+    flux_lw_clear::FluxLW,
+    band_flux,
+    src_lw::SourceLW2Str,
+    bcs_lw::LwBCs,
+    op::TwoStream,
+    as::AtmosphericState,
+    state_cache::Union{TransposedStateCache, Nothing},
+    lookup_lw::LookUpLW,
+    lookup_lw_cld::Union{LookUpCld, Nothing},
+    lookup_lw_aero::Union{LookUpAerosolMerra, Nothing},
+)
+    nlay, ncol = AtmosphericStates.get_dims(as)
+    nlev = nlay + 1
+    (; major_gpt2bnd) = lookup_lw.band_data
+    n_gpt = length(major_gpt2bnd)
+    (; cloud_state, aerosol_state) = as
+    track_cld_cover =
+        cloud_state isa CloudState && !isnothing(cloud_state.cld_cover_lw)
+    FT = eltype(flux_lw.flux_up)
+    set_band_flux_to_zero!(band_flux)
+    @inbounds begin
+        track_cld_cover && (cloud_state.cld_cover_lw .= FT(0))
+        if aerosol_state isa AerosolState
+            ClimaComms.@threaded device for gcol in 1:ncol
+                _compute_aero_mask!(aerosol_state, gcol)
+            end
+        end
+        for igpt in 1:n_gpt
+            ibnd = major_gpt2bnd[igpt]
+            ClimaComms.@threaded device for gcol in 1:ncol
+                cloudy = lw_2stream_gpt_col_both_skies!(
+                    igpt,
+                    gcol,
+                    flux,
+                    flux_lw,
+                    flux_lw_clear,
+                    band_flux,
+                    src_lw,
+                    bcs_lw,
+                    op,
+                    as,
+                    state_cache,
+                    lookup_lw,
+                    lookup_lw_cld,
+                    lookup_lw_aero,
+                    ibnd,
+                    nlev,
+                    ncol,
+                )
+                track_cld_cover &&
+                    (cloud_state.cld_cover_lw[gcol] += FT(cloudy))
+            end
+        end
+        if track_cld_cover
+            ClimaComms.@threaded device for gcol in 1:ncol
+                cloud_state.cld_cover_lw[gcol] /= n_gpt
+            end
+        end
+        ClimaComms.@threaded device for gcol in 1:ncol
+            compute_net_flux!(flux_lw, gcol, nlev)
+            compute_net_flux!(flux_lw_clear, gcol, nlev)
+        end
+    end
+    return nothing
 end

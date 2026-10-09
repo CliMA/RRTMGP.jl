@@ -15,12 +15,93 @@ using ..Optics
 using ..LookUpTables
 
 export solve_lw!, solve_sw!
+export solve_lw_both_skies!, solve_sw_both_skies!
 
 include("driver_utils.jl")
 include("longwave_noscat.jl")
 include("longwave_2stream.jl")
 include("shortwave_noscat.jl")
 include("shortwave_2stream.jl")
+
+"""
+    solve_lw_both_skies!(solver, flux_lw_clear, as, lookup_lw, lookup_lw_cld, lookup_lw_aero, metric_scaling = nothing)
+    solve_sw_both_skies!(solver, flux_sw_clear, as, lookup_sw, lookup_sw_cld, lookup_sw_aero, metric_scaling = nothing)
+
+Fill the clear-sky and all-sky fluxes for one band, leaving the all-sky result in
+the solver's own flux and the clear-sky result in `flux_*_clear`.
+
+A solver that can share the gas and aerosol optics between the two skies
+specializes these and computes the shared part once; `TwoStreamLWRTE` and
+`TwoStreamSWRTE` do. This fallback is for the others, and runs two independent
+solves -- exactly what the caller used to do inline.
+
+Reachability differs between the bands, which is worth knowing before trusting
+test coverage here. `NoScatLWRTE` is a supported spectral longwave solver, so
+the longwave fallback is live and the suite exercises it. Spectral shortwave
+requires scattering -- `OneScalar` shortwave optics are rejected for anything but
+`GrayRadiation` -- so `TwoStreamSWRTE` is currently the only shortwave solver
+that can reach `update_sw_fluxes!`, and the shortwave fallback is unreachable.
+It is kept for symmetry, and so that `update_sw_fluxes!` stays correct rather
+than merely lucky if another shortwave solver is added.
+"""
+function solve_lw_both_skies!(
+    solver,
+    flux_lw_clear::FluxLW,
+    as::AtmosphericState,
+    lookup_lw::LookUpLW,
+    lookup_lw_cld::Union{LookUpCld, Nothing} = nothing,
+    lookup_lw_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
+    metric_scaling = nothing,
+)
+    solve_lw!(solver, as, lookup_lw, nothing, lookup_lw_aero, metric_scaling)
+    _copy_flux!(flux_lw_clear, solver.flux)
+    solve_lw!(
+        solver,
+        as,
+        lookup_lw,
+        lookup_lw_cld,
+        lookup_lw_aero,
+        metric_scaling,
+    )
+    return nothing
+end
+
+function solve_sw_both_skies!(
+    solver,
+    flux_sw_clear::FluxSW,
+    as::AtmosphericState,
+    lookup_sw::LookUpSW,
+    lookup_sw_cld::Union{LookUpCld, Nothing} = nothing,
+    lookup_sw_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
+    metric_scaling = nothing,
+)
+    solve_sw!(solver, as, lookup_sw, nothing, lookup_sw_aero, metric_scaling)
+    _copy_flux!(flux_sw_clear, solver.flux)
+    solve_sw!(
+        solver,
+        as,
+        lookup_sw,
+        lookup_sw_cld,
+        lookup_sw_aero,
+        metric_scaling,
+    )
+    return nothing
+end
+
+function _copy_flux!(dst::FluxLW, src::FluxLW)
+    dst.flux_up .= src.flux_up
+    dst.flux_dn .= src.flux_dn
+    dst.flux_net .= src.flux_net
+    return nothing
+end
+
+function _copy_flux!(dst::FluxSW, src::FluxSW)
+    dst.flux_up .= src.flux_up
+    dst.flux_dn .= src.flux_dn
+    dst.flux_net .= src.flux_net
+    dst.flux_dn_dir .= src.flux_dn_dir
+    return nothing
+end
 
 
 """
