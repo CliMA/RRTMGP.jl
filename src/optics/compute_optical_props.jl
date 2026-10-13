@@ -390,7 +390,7 @@ could drift apart without anything noticing.
             view(op.τ, gcol, :),
             view(op.ssa, gcol, :),
             view(op.g, gcol, :),
-            view(cloud_state.mask_lw, :, gcol),        # mask_sw in the SW version
+            view(cloud_state.mask_lw, :, gcol),
             view(cloud_state.cld_r_eff_liq, :, gcol),
             view(cloud_state.cld_r_eff_ice, :, gcol),
             view(cloud_state.cld_path_liq, :, gcol),
@@ -402,7 +402,7 @@ could drift apart without anything noticing.
             cld_r_eff_sno = _view_or_nothing(cloud_state.cld_r_eff_sno, gcol),
             cld_path_rai = _view_or_nothing(cloud_state.cld_path_rai, gcol),
             cld_path_sno = _view_or_nothing(cloud_state.cld_path_sno, gcol),
-            delta_scaling = false,                      # true in the SW version
+            delta_scaling = false,
         )
     end
     return nothing
@@ -428,7 +428,7 @@ and the longwave one does not.
             view(op.τ, gcol, :),
             view(op.ssa, gcol, :),
             view(op.g, gcol, :),
-            view(cloud_state.mask_lw, :, gcol),        # mask_sw in the SW version
+            view(cloud_state.mask_sw, :, gcol)
             view(cloud_state.cld_r_eff_liq, :, gcol),
             view(cloud_state.cld_r_eff_ice, :, gcol),
             view(cloud_state.cld_path_liq, :, gcol),
@@ -440,7 +440,7 @@ and the longwave one does not.
             cld_r_eff_sno = _view_or_nothing(cloud_state.cld_r_eff_sno, gcol),
             cld_path_rai = _view_or_nothing(cloud_state.cld_path_rai, gcol),
             cld_path_sno = _view_or_nothing(cloud_state.cld_path_sno, gcol),
-            delta_scaling = false,                      # true in the SW version
+            delta_scaling = true,
         )
     end
     return nothing

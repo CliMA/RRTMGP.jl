@@ -19,7 +19,7 @@
         extice, ssaice, asyice = LookUpTables.getview_icedata(lkp_cld, ibnd, ice_rgh)
         _, _, nsize_liq, nsize_ice, _ = lkp_cld.dims
         radliq_lwr, radliq_upr, radice_lwr, radice_upr = lkp_cld.bounds
-        use_precip = LookUpTables.has_precip_optics(lkp_cld)
+        use_precip = LookUpTables.has_precip_optics(lkp_cld) && !isnothing(cld_path_rai)
         if use_precip
             extrai, ssarai, asyrai = LookUpTables.getview_raindata(lkp_cld, ibnd)
             extsno, ssasno, asysno = LookUpTables.getview_snowdata(lkp_cld, ibnd)
@@ -107,7 +107,7 @@ species; otherwise the precip keywords are ignored.
     extice, ssaice, asyice = LookUpTables.getview_icedata(lkp_cld, ibnd, ice_rgh)
     _, _, nsize_liq, nsize_ice, _ = lkp_cld.dims
     radliq_lwr, radliq_upr, radice_lwr, radice_upr = lkp_cld.bounds
-    use_precip = LookUpTables.has_precip_optics(lkp_cld)
+    use_precip = LookUpTables.has_precip_optics(lkp_cld) && !isnothing(cld_path_rai)
     if use_precip
         extrai, ssarai, asyrai = LookUpTables.getview_raindata(lkp_cld, ibnd)
         extsno, ssasno, asysno = LookUpTables.getview_snowdata(lkp_cld, ibnd)
