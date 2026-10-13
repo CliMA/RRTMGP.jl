@@ -214,7 +214,7 @@ end
     @inbounds view(as.t_lev, :, gcol)
 
 """
-    CloudState{CD, CF, CC, CM, CMT, SD}
+    CloudState{CD, PD, CF, CC, CM, CMT, SD}
 
 Cloud state, used to compute optical properties.
 
@@ -223,13 +223,19 @@ Cloud state, used to compute optical properties.
 - `cld_r_eff_ice`: Effective radius of cloud ice particles.
 - `cld_path_liq`: Cloud water path.
 - `cld_path_ice`: Cloud ice path.
+- `cld_r_eff_rai`: Effective radius of rain particles, or `nothing`.
+- `cld_r_eff_sno`: Effective radius of snow particles, or `nothing`.
+- `cld_path_rai`: Rain water path, or `nothing`.
+- `cld_path_sno`: Snow water path, or `nothing`.
 - `cld_frac`: Cloud fraction.
 - `cld_cover_sw`: McICA effective shortwave cloud cover in `[0, 1]`; `(ncol,)`, or
   `nothing` if unused.
 - `cld_cover_lw`: McICA effective longwave cloud cover in `[0, 1]`; `(ncol,)`, or
   `nothing` if unused.
-- `mask_lw`: Cloud mask (longwave); `true` if clouds are present.
-- `mask_sw`: Cloud mask (shortwave); `true` if clouds are present.
+- `mask_lw`: Cloud mask (longwave); `true` if clouds are present. Also gates the
+  rain/snow increment — precip radiates only in sampled-cloudy layers.
+- `mask_sw`: Cloud mask (shortwave); `true` if clouds are present. Also gates the
+  rain/snow increment.
 - `mask_type`: Cloud mask type.
 - `ice_rgh`: Ice roughness; 1 = none, 2 = medium, 3 = rough.
 - `mcica_key`: One-element array holding the McICA key; the cloud mask is a
@@ -238,11 +244,15 @@ Cloud state, used to compute optical properties.
   rather than a seed: it indexes a stateless draw, so the result does not depend
   on how many draws came before.
 """
-struct CloudState{CD, CF, CC, CM, CMT, SD}
+struct CloudState{CD, PD, CF, CC, CM, CMT, SD}
     cld_r_eff_liq::CD
     cld_r_eff_ice::CD
     cld_path_liq::CD
     cld_path_ice::CD
+    cld_r_eff_rai::PD
+    cld_r_eff_sno::PD
+    cld_path_rai::PD
+    cld_path_sno::PD
     cld_frac::CF
     cld_cover_sw::CC
     cld_cover_lw::CC
@@ -277,7 +287,11 @@ function CloudState(
     mask_lw,
     mask_sw,
     mask_type,
-    ice_rgh::Integer,
+    ice_rgh::Integer;
+    cld_r_eff_rai = nothing,
+    cld_r_eff_sno = nothing,
+    cld_path_rai = nothing,
+    cld_path_sno = nothing,
 )
     mcica_key = similar(cld_frac, UInt32, 1)
     fill!(mcica_key, UInt32(0))
@@ -286,6 +300,10 @@ function CloudState(
         cld_r_eff_ice,
         cld_path_liq,
         cld_path_ice,
+        cld_r_eff_rai,
+        cld_r_eff_sno,
+        cld_path_rai,
+        cld_path_sno,
         cld_frac,
         cld_cover_sw,
         cld_cover_lw,
@@ -298,7 +316,7 @@ function CloudState(
 end
 
 # Convenience constructor: callers that don't allocate cld_cover arrays
-# can use this 9-argument form where both covers default to `nothing`.
+# can use this form where both covers default to `nothing`.
 function CloudState(
     cld_r_eff_liq,
     cld_r_eff_ice,
@@ -308,7 +326,11 @@ function CloudState(
     mask_lw,
     mask_sw,
     mask_type,
-    ice_rgh,
+    ice_rgh;
+    cld_r_eff_rai = nothing,
+    cld_r_eff_sno = nothing,
+    cld_path_rai = nothing,
+    cld_path_sno = nothing,
 )
     return CloudState(
         cld_r_eff_liq,
@@ -321,10 +343,13 @@ function CloudState(
         mask_lw,
         mask_sw,
         mask_type,
-        Int(ice_rgh),
+        Int(ice_rgh);
+        cld_r_eff_rai,
+        cld_r_eff_sno,
+        cld_path_rai,
+        cld_path_sno,
     )
 end
-
 
 """
     AerosolState{A, B, D}

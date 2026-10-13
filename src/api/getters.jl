@@ -211,6 +211,38 @@ Return the cloud ice water path [g/m²]: a writable, domain-masked `(nlay, ncol)
 cloud_ice_water_path(s::RRTMGPSolver)                 = _domain_view(s, s.as.cloud_state.cld_path_ice)
 
 """
+    cloud_rain_effective_radius(s::RRTMGPSolver)
+
+Return the rain effective radius [µm]: a writable, domain-masked `(nlay, ncol)` view,
+or `nothing` if the solver carries no precipitation optics.
+"""
+cloud_rain_effective_radius(s::RRTMGPSolver)          = _domain_view(s, s.as.cloud_state.cld_r_eff_rai)
+
+"""
+    cloud_snow_effective_radius(s::RRTMGPSolver)
+
+Return the snow effective radius [µm]: a writable, domain-masked `(nlay, ncol)` view,
+or `nothing` if the solver carries no precipitation optics.
+"""
+cloud_snow_effective_radius(s::RRTMGPSolver)          = _domain_view(s, s.as.cloud_state.cld_r_eff_sno)
+
+"""
+    cloud_rain_water_path(s::RRTMGPSolver)
+
+Return the rain water path [g/m²]: a writable, domain-masked `(nlay, ncol)` view,
+or `nothing` if the solver carries no precipitation optics.
+"""
+cloud_rain_water_path(s::RRTMGPSolver)                = _domain_view(s, s.as.cloud_state.cld_path_rai)
+
+"""
+    cloud_snow_water_path(s::RRTMGPSolver)
+
+Return the snow water path [g/m²]: a writable, domain-masked `(nlay, ncol)` view,
+or `nothing` if the solver carries no precipitation optics.
+"""
+cloud_snow_water_path(s::RRTMGPSolver)                = _domain_view(s, s.as.cloud_state.cld_path_sno)
+
+"""
     cloud_fraction(s::RRTMGPSolver)
 
 Return the cloud fraction [-]: a writable, domain-masked `(nlay, ncol)` view.
