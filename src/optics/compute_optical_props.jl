@@ -1,3 +1,5 @@
+@inline _view_or_nothing(x, gcol) = isnothing(x) ? nothing : view(x, :, gcol)
+
 """
     compute_optical_props!(
         op::AbstractOpticalProps,
@@ -114,17 +116,21 @@ GPU access) when one is provided, and from `as` directly otherwise.
             cld_path_ice = view(cloud_state.cld_path_ice, :, gcol)
             cld_mask = view(cloud_state.mask_lw, :, gcol)
 
-            add_cloud_optics_1scalar!(
-                τ,
-                cld_mask,
-                cld_r_eff_liq,
-                cld_r_eff_ice,
-                cld_path_liq,
-                cld_path_ice,
-                cloud_state.ice_rgh,
-                lkp_cld,
-                ibnd;
-            )
+        add_cloud_optics_1scalar!(
+            τ,
+            cld_mask,
+            cld_r_eff_liq,
+            cld_r_eff_ice,
+            cld_path_liq,
+            cld_path_ice,
+            cloud_state.ice_rgh,
+            lkp_cld,
+            ibnd;
+            cld_r_eff_rai = _view_or_nothing(cloud_state.cld_r_eff_rai, gcol),
+            cld_r_eff_sno = _view_or_nothing(cloud_state.cld_r_eff_sno, gcol),
+            cld_path_rai = _view_or_nothing(cloud_state.cld_path_rai, gcol),
+            cld_path_sno = _view_or_nothing(cloud_state.cld_path_sno, gcol),
+        )
         end
     end
     return nothing
@@ -384,7 +390,7 @@ could drift apart without anything noticing.
             view(op.τ, gcol, :),
             view(op.ssa, gcol, :),
             view(op.g, gcol, :),
-            view(cloud_state.mask_lw, :, gcol),
+            view(cloud_state.mask_lw, :, gcol),        # mask_sw in the SW version
             view(cloud_state.cld_r_eff_liq, :, gcol),
             view(cloud_state.cld_r_eff_ice, :, gcol),
             view(cloud_state.cld_path_liq, :, gcol),
@@ -392,7 +398,11 @@ could drift apart without anything noticing.
             cloud_state.ice_rgh,
             lkp_cld,
             ibnd;
-            delta_scaling = false,
+            cld_r_eff_rai = _view_or_nothing(cloud_state.cld_r_eff_rai, gcol),
+            cld_r_eff_sno = _view_or_nothing(cloud_state.cld_r_eff_sno, gcol),
+            cld_path_rai = _view_or_nothing(cloud_state.cld_path_rai, gcol),
+            cld_path_sno = _view_or_nothing(cloud_state.cld_path_sno, gcol),
+            delta_scaling = false,                      # true in the SW version
         )
     end
     return nothing
@@ -418,7 +428,7 @@ and the longwave one does not.
             view(op.τ, gcol, :),
             view(op.ssa, gcol, :),
             view(op.g, gcol, :),
-            view(cloud_state.mask_sw, :, gcol),
+            view(cloud_state.mask_lw, :, gcol),        # mask_sw in the SW version
             view(cloud_state.cld_r_eff_liq, :, gcol),
             view(cloud_state.cld_r_eff_ice, :, gcol),
             view(cloud_state.cld_path_liq, :, gcol),
@@ -426,7 +436,11 @@ and the longwave one does not.
             cloud_state.ice_rgh,
             lkp_cld,
             ibnd;
-            delta_scaling = true,
+            cld_r_eff_rai = _view_or_nothing(cloud_state.cld_r_eff_rai, gcol),
+            cld_r_eff_sno = _view_or_nothing(cloud_state.cld_r_eff_sno, gcol),
+            cld_path_rai = _view_or_nothing(cloud_state.cld_path_rai, gcol),
+            cld_path_sno = _view_or_nothing(cloud_state.cld_path_sno, gcol),
+            delta_scaling = false,                      # true in the SW version
         )
     end
     return nothing

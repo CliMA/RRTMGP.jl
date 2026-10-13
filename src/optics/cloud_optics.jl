@@ -8,41 +8,48 @@
     ice_rgh,
     lkp_cld::LookUpCld,
     ibnd;
+    cld_r_eff_rai = nothing,
+    cld_r_eff_sno = nothing,
+    cld_path_rai = nothing,
+    cld_path_sno = nothing,
 )
     @inbounds begin
         nlay = length(τ)
         extliq, ssaliq, asyliq = LookUpTables.getview_liqdata(lkp_cld, ibnd)
-        extice, ssaice, asyice =
-            LookUpTables.getview_icedata(lkp_cld, ibnd, ice_rgh)
+        extice, ssaice, asyice = LookUpTables.getview_icedata(lkp_cld, ibnd, ice_rgh)
         _, _, nsize_liq, nsize_ice, _ = lkp_cld.dims
         radliq_lwr, radliq_upr, radice_lwr, radice_upr = lkp_cld.bounds
-
+        use_precip = LookUpTables.has_precip_optics(lkp_cld)
+        if use_precip
+            extrai, ssarai, asyrai = LookUpTables.getview_raindata(lkp_cld, ibnd)
+            extsno, ssasno, asysno = LookUpTables.getview_snowdata(lkp_cld, ibnd)
+            nsize_rai = LookUpTables.get_nsize_rai(lkp_cld)
+            nsize_sno = LookUpTables.get_nsize_sno(lkp_cld)
+            radrai_lwr, radrai_upr = lkp_cld.rai_bounds
+            radsno_lwr, radsno_upr = lkp_cld.sno_bounds
+        end
         for glay in 1:nlay
             if cld_mask[glay]
-                # cloud liquid particles
                 τl, τl_ssa, _ = compute_lookup_cld_liq_props(
-                    nsize_liq,
-                    radliq_lwr,
-                    radliq_upr,
-                    extliq,
-                    ssaliq,
-                    asyliq,
-                    cld_r_eff_liq[glay],
-                    cld_path_liq[glay],
+                    nsize_liq, radliq_lwr, radliq_upr, extliq, ssaliq, asyliq,
+                    cld_r_eff_liq[glay], cld_path_liq[glay],
                 )
-                # cloud ice particles
                 τi, τi_ssa, _ = compute_lookup_cld_ice_props(
-                    nsize_ice,
-                    radice_lwr,
-                    radice_upr,
-                    extice,
-                    ssaice,
-                    asyice,
-                    cld_r_eff_ice[glay],
-                    cld_path_ice[glay],
+                    nsize_ice, radice_lwr, radice_upr, extice, ssaice, asyice,
+                    cld_r_eff_ice[glay], cld_path_ice[glay],
                 )
-                # add cloud optical optics
                 τ[glay] += (τl - τl_ssa) + (τi - τi_ssa)
+                if use_precip
+                    τr, τr_ssa, _ = compute_lookup_cld_liq_props(
+                        nsize_rai, radrai_lwr, radrai_upr, extrai, ssarai, asyrai,
+                        cld_r_eff_rai[glay], cld_path_rai[glay],
+                    )
+                    τs, τs_ssa, _ = compute_lookup_cld_liq_props(
+                        nsize_sno, radsno_lwr, radsno_upr, extsno, ssasno, asysno,
+                        cld_r_eff_sno[glay], cld_path_sno[glay],
+                    )
+                    τ[glay] += (τr - τr_ssa) + (τs - τs_ssa)
+                end
             end
         end
     end
@@ -62,10 +69,19 @@ end
         ice_rgh,
         lkp_cld,
         ibnd;
+        cld_r_eff_rai = nothing,
+        cld_r_eff_sno = nothing,
+        cld_path_rai = nothing,
+        cld_path_sno = nothing,
         delta_scaling = false,
     )
-Compute the `TwoStream` cloud optics properties and add them
-to the `TwoStream` gas optics properties.
+
+Compute the `TwoStream` cloud optics properties and add them to the `TwoStream`
+gas optics properties. When the lookup table carries precipitation optics
+(`LookUpTables.has_precip_optics(lkp_cld)` is `true`), the rain and snow water
+paths (`cld_path_rai`, `cld_path_sno`) and effective radii (`cld_r_eff_rai`,
+`cld_r_eff_sno`) are combined into each layer as two additional condensate
+species; otherwise the precip keywords are ignored.
 """
 @inline function add_cloud_optics_2stream!(
     τ,
@@ -79,58 +95,64 @@ to the `TwoStream` gas optics properties.
     ice_rgh,
     lkp_cld::LookUpCld,
     ibnd;
+    cld_r_eff_rai = nothing,
+    cld_r_eff_sno = nothing,
+    cld_path_rai = nothing,
+    cld_path_sno = nothing,
     delta_scaling = false,
 )
     nlay = length(τ)
     FT = eltype(τ)
     extliq, ssaliq, asyliq = LookUpTables.getview_liqdata(lkp_cld, ibnd)
-    extice, ssaice, asyice =
-        LookUpTables.getview_icedata(lkp_cld, ibnd, ice_rgh)
+    extice, ssaice, asyice = LookUpTables.getview_icedata(lkp_cld, ibnd, ice_rgh)
     _, _, nsize_liq, nsize_ice, _ = lkp_cld.dims
     radliq_lwr, radliq_upr, radice_lwr, radice_upr = lkp_cld.bounds
+    use_precip = LookUpTables.has_precip_optics(lkp_cld)
+    if use_precip
+        extrai, ssarai, asyrai = LookUpTables.getview_raindata(lkp_cld, ibnd)
+        extsno, ssasno, asysno = LookUpTables.getview_snowdata(lkp_cld, ibnd)
+        nsize_rai = LookUpTables.get_nsize_rai(lkp_cld)
+        nsize_sno = LookUpTables.get_nsize_sno(lkp_cld)
+        radrai_lwr, radrai_upr = lkp_cld.rai_bounds
+        radsno_lwr, radsno_upr = lkp_cld.sno_bounds
+    end
     @inbounds begin
         for glay in 1:nlay
             if cld_mask[glay]
-                # cloud liquid particles
+                # cloud liquid + ice
                 τl, τl_ssa, τl_ssag = compute_lookup_cld_liq_props(
-                    nsize_liq,
-                    radliq_lwr,
-                    radliq_upr,
-                    extliq,
-                    ssaliq,
-                    asyliq,
-                    cld_r_eff_liq[glay],
-                    cld_path_liq[glay],
+                    nsize_liq, radliq_lwr, radliq_upr, extliq, ssaliq, asyliq,
+                    cld_r_eff_liq[glay], cld_path_liq[glay],
                 )
-                # cloud ice particles
                 τi, τi_ssa, τi_ssag = compute_lookup_cld_ice_props(
-                    nsize_ice,
-                    radice_lwr,
-                    radice_upr,
-                    extice,
-                    ssaice,
-                    asyice,
-                    cld_r_eff_ice[glay],
-                    cld_path_ice[glay],
+                    nsize_ice, radice_lwr, radice_upr, extice, ssaice, asyice,
+                    cld_r_eff_ice[glay], cld_path_ice[glay],
                 )
-
                 τ_cl = τl + τi
-                ssa_cl = τl_ssa + τi_ssa
-                g_cl = (τl_ssag + τi_ssag) / max(eps(FT), ssa_cl)
+                ssa_cl = τl_ssa + τi_ssa      # running Σ τ*ssa
+                ssag_cl = τl_ssag + τi_ssag   # running Σ τ*ssa*g
+                # precipitation (rain + snow), reusing the liquid-style interpolator
+                if use_precip
+                    τr, τr_ssa, τr_ssag = compute_lookup_cld_liq_props(
+                        nsize_rai, radrai_lwr, radrai_upr, extrai, ssarai, asyrai,
+                        cld_r_eff_rai[glay], cld_path_rai[glay],
+                    )
+                    τs, τs_ssa, τs_ssag = compute_lookup_cld_liq_props(
+                        nsize_sno, radsno_lwr, radsno_upr, extsno, ssasno, asysno,
+                        cld_r_eff_sno[glay], cld_path_sno[glay],
+                    )
+                    τ_cl += τr + τs
+                    ssa_cl += τr_ssa + τs_ssa
+                    ssag_cl += τr_ssag + τs_ssag
+                end
+                # g = Σ(τ*ssa*g) / Σ(τ*ssa); ssa = Σ(τ*ssa) / Σ(τ)  (same order as before)
+                g_cl = ssag_cl / max(eps(FT), ssa_cl)
                 ssa_cl /= max(eps(FT), τ_cl)
-
-                if delta_scaling # delta scaling is applied for shortwave problem
+                if delta_scaling # shortwave only
                     τ_cl, ssa_cl, g_cl = delta_scale(τ_cl, ssa_cl, g_cl)
                 end
-                # compute cloud optical optics
-                τ[glay], ssa[glay], g[glay] = increment_2stream(
-                    τ[glay],
-                    ssa[glay],
-                    g[glay],
-                    τ_cl,
-                    ssa_cl,
-                    g_cl,
-                )
+                τ[glay], ssa[glay], g[glay] =
+                    increment_2stream(τ[glay], ssa[glay], g[glay], τ_cl, ssa_cl, g_cl)
             end
         end
     end
@@ -149,7 +171,9 @@ end
         cld_path_liq,
     )
 
-Compute the `TwoStream` cloud liquid properties using the `LookUpTable` method.
+Compute `TwoStream` optical properties (τ, τ*ssa, τ*ssa*g) for a single
+condensate species via the `LookUpTable` method. Used for cloud liquid, and
+reused for rain and snow.
 """
 @inline function compute_lookup_cld_liq_props(
     nsize_liq,

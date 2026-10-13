@@ -216,56 +216,64 @@ Adapt.@adapt_structure LookUpSW
 
 @inline get_n_η(lkp::LookUpSW) = size(lkp.kmajor, 1)
 """
-    LookUpCld{D, B, L, I, W} <: AbstractLookUp
+    LookUpCld{D, B, L, I, R, S, RB, SB, W} <: AbstractLookUp
 
-Lookup table for cloud optics.
+Lookup table for cloud (and, optionally, precipitation) optics.
 
-This struct stores the lookup tables for determining the extinction coefficient,
-single-scattering albedo, and asymmetry parameter g as a function of effective radius.
-We compute the optical depth tau (= extinction coefficient * condensed water path)
-and the products tau*ssa and tau*ssa*g for liquid and ice cloud separately.
-These are used to determine the optical properties of ice and water cloud together.
+Stores extinction coefficient, single-scattering albedo, and asymmetry parameter
+g as a function of effective radius, from which we form τ (= ext * water path)
+and the products τ*ssa and τ*ssa*g for each condensate species. Liquid and ice
+are always present; rain and snow are present when `raindata`/`snowdata` are not
+`nothing`.
 
 # Fields
 - `dims`: Dimensions `nband`, `nrghice`, `nsize_liq`, `nsize_ice`, `pair`.
-- `bounds`: Particle size lower and upper bounds and factor for LUT interpolation for
-  liquid and ice particles.
-- `liqdata`: Liquid extinction coefficient, single scattering albedo and asymmetry
-  parameter `(3*nsize_liq, nbnd)`.
-- `icedata`: Ice extinction coefficient, single scattering albedo and asymmetry
-  parameter `(3*nsize_ice, nbnd, nrghice)`.
+- `bounds`: Liquid/ice particle size lower and upper bounds and LUT interpolation
+  factor: `(radliq_lwr, radliq_upr, radice_lwr, radice_upr)`.
+- `liqdata`: Liquid ext, ssa, asymmetry `(3*nsize_liq, nbnd)`.
+- `icedata`: Ice ext, ssa, asymmetry `(3*nsize_ice, nbnd, nrghice)`.
+- `raindata`: Rain ext, ssa, asymmetry `(3*nsize_rai, nbnd)`, or `nothing`.
+- `snowdata`: Snow ext, ssa, asymmetry `(3*nsize_sno, nbnd)`, or `nothing`.
+- `rai_bounds`: `(radrai_lwr, radrai_upr)`, or `nothing`.
+- `sno_bounds`: `(radsno_lwr, radsno_upr)`, or `nothing`.
 - `bnd_lims_wn`: Beginning and ending wavenumber for each band [cm⁻¹] `(2, nband)`.
 """
-struct LookUpCld{D, B, L, I, W} <: AbstractLookUp
+struct LookUpCld{D, B, L, I, R, S, RB, SB, W} <: AbstractLookUp
     dims::D
     bounds::B
     liqdata::L
     icedata::I
+    raindata::R
+    snowdata::S
+    rai_bounds::RB
+    sno_bounds::SB
     bnd_lims_wn::W
 end
 Adapt.@adapt_structure LookUpCld
 
+# Backward-compatible constructor: cloud-only (no precip) tables.
+LookUpCld(dims, bounds, liqdata, icedata, bnd_lims_wn) =
+    LookUpCld(dims, bounds, liqdata, icedata, nothing, nothing, nothing, nothing, bnd_lims_wn)
+
+# True when rain/snow optics are available.
+@inline has_precip_optics(lkp::LookUpCld) = !isnothing(lkp.raindata)
+
 @inline get_dims(lkp::LookUpCld) = lkp.dims
-# number of bands (cloud lookup table dimension)
 @inline get_nband(lkp::LookUpCld) = @inbounds lkp.dims[1]
-# number of ice roughness types (cloud lookup table dimension)
 @inline get_nrghice(lkp::LookUpCld) = @inbounds lkp.dims[2]
-# number of liquid particle sizes (cloud lookup table dimension)
 @inline get_nsize_liq(lkp::LookUpCld) = @inbounds lkp.dims[3]
-# number of ice particle sizes (cloud lookup table dimension)
 @inline get_nsize_ice(lkp::LookUpCld) = @inbounds lkp.dims[4]
-# pair = 2 (cloud lookup table dimension)
 @inline get_pair(lkp::LookUpCld) = @inbounds lkp.dims[5]
+# Derived from the data arrays (ext/ssa/asy packed along dim 1), so no dims change.
+@inline get_nsize_rai(lkp::LookUpCld) = size(lkp.raindata, 1) ÷ 3
+@inline get_nsize_sno(lkp::LookUpCld) = size(lkp.snowdata, 1) ÷ 3
 
 @inline function getview_liqdata(lkp::LookUpCld, ibnd)
     n = get_nsize_liq(lkp)
     liqdata = lkp.liqdata
     return @inbounds (
-        # LUT liquid extinction coefficient (`nsize_liq, nbnd`) m²/g
         view(liqdata, 1:n, ibnd),
-        # LUT liquid single scattering albedo (`nsize_liq, nbnd`)
         view(liqdata, (n + 1):(n * 2), ibnd),
-        # LUT liquid asymmetry parameter (`nsize_liq, nbnd`)
         view(liqdata, (n * 2 + 1):(n * 3), ibnd),
     )
 end
@@ -274,15 +282,31 @@ end
     n = get_nsize_ice(lkp)
     icedata = lkp.icedata
     return @inbounds (
-        # LUT ice extinction coefficient (`nsize_ice, nband, nrghice`) m²/g
         view(icedata, 1:n, ibnd, ice_rgh),
-        # LUT ice single scattering albedo (`nsize_ice, nband, nrghice`)
         view(icedata, (n + 1):(n * 2), ibnd, ice_rgh),
-        # LUT ice asymmetry parameter (`nsize_ice, nband, nrghice`)
         view(icedata, (n * 2 + 1):(n * 3), ibnd, ice_rgh),
     )
 end
 
+@inline function getview_raindata(lkp::LookUpCld, ibnd)
+    n = get_nsize_rai(lkp)
+    raindata = lkp.raindata
+    return @inbounds (
+        view(raindata, 1:n, ibnd),
+        view(raindata, (n + 1):(n * 2), ibnd),
+        view(raindata, (n * 2 + 1):(n * 3), ibnd),
+    )
+end
+
+@inline function getview_snowdata(lkp::LookUpCld, ibnd)
+    n = get_nsize_sno(lkp)
+    snowdata = lkp.snowdata
+    return @inbounds (
+        view(snowdata, 1:n, ibnd),
+        view(snowdata, (n + 1):(n * 2), ibnd),
+        view(snowdata, (n * 2 + 1):(n * 3), ibnd),
+    )
+end
 """
     LookUpAerosolMerra{D, D1, D2, D3, D4, W} <: AbstractLookUp
 
