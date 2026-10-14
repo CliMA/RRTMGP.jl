@@ -90,7 +90,6 @@ const PUBLIC_NAMES = (
     :cloud_rain_water_path,
     :cloud_snow_water_path,
     :cloud_fraction,
-    :cloud_fraction,
     :aerosol_column_mass_density,
     :aerosol_radius,
     :optical_thickness_parameter,

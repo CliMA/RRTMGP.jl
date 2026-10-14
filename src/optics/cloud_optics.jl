@@ -19,15 +19,12 @@
         extice, ssaice, asyice = LookUpTables.getview_icedata(lkp_cld, ibnd, ice_rgh)
         _, _, nsize_liq, nsize_ice, _ = lkp_cld.dims
         radliq_lwr, radliq_upr, radice_lwr, radice_upr = lkp_cld.bounds
-        use_precip = LookUpTables.has_precip_optics(lkp_cld) && !isnothing(cld_path_rai)
-        if use_precip
-            extrai, ssarai, asyrai = LookUpTables.getview_raindata(lkp_cld, ibnd)
-            extsno, ssasno, asysno = LookUpTables.getview_snowdata(lkp_cld, ibnd)
-            nsize_rai = LookUpTables.get_nsize_rai(lkp_cld)
-            nsize_sno = LookUpTables.get_nsize_sno(lkp_cld)
-            radrai_lwr, radrai_upr = lkp_cld.rai_bounds
-            radsno_lwr, radsno_upr = lkp_cld.sno_bounds
-        end
+
+        # Placeholder precip optics: rain → liquid LUT, snow → ice LUT.
+        # Independently gated on their water paths.
+        use_rain = !isnothing(cld_path_rai)
+        use_snow = !isnothing(cld_path_sno)
+
         for glay in 1:nlay
             if cld_mask[glay]
                 τl, τl_ssa, _ = compute_lookup_cld_liq_props(
@@ -39,16 +36,22 @@
                     cld_r_eff_ice[glay], cld_path_ice[glay],
                 )
                 τ[glay] += (τl - τl_ssa) + (τi - τi_ssa)
-                if use_precip
+                if use_rain
+                    # rain: liquid LUT at constant r_eff = radliq_upr
                     τr, τr_ssa, _ = compute_lookup_cld_liq_props(
-                        nsize_rai, radrai_lwr, radrai_upr, extrai, ssarai, asyrai,
-                        cld_r_eff_rai[glay], cld_path_rai[glay],
+                        nsize_liq, radliq_lwr, radliq_upr, extliq, ssaliq, asyliq,
+                        radliq_upr, cld_path_rai[glay],
                     )
-                    τs, τs_ssa, _ = compute_lookup_cld_liq_props(
-                        nsize_sno, radsno_lwr, radsno_upr, extsno, ssasno, asysno,
-                        cld_r_eff_sno[glay], cld_path_sno[glay],
+                    τ[glay] += (τr - τr_ssa)
+                end
+                if use_snow
+                    # snow: ice LUT, r_eff capped at radice_upr
+                    r_eff_sno = min(cld_r_eff_sno[glay], radice_upr)
+                    τs, τs_ssa, _ = compute_lookup_cld_ice_props(
+                        nsize_ice, radice_lwr, radice_upr, extice, ssaice, asyice,
+                        r_eff_sno, cld_path_sno[glay],
                     )
-                    τ[glay] += (τr - τr_ssa) + (τs - τs_ssa)
+                    τ[glay] += (τs - τs_ssa)
                 end
             end
         end
@@ -107,15 +110,12 @@ species; otherwise the precip keywords are ignored.
     extice, ssaice, asyice = LookUpTables.getview_icedata(lkp_cld, ibnd, ice_rgh)
     _, _, nsize_liq, nsize_ice, _ = lkp_cld.dims
     radliq_lwr, radliq_upr, radice_lwr, radice_upr = lkp_cld.bounds
-    use_precip = LookUpTables.has_precip_optics(lkp_cld) && !isnothing(cld_path_rai)
-    if use_precip
-        extrai, ssarai, asyrai = LookUpTables.getview_raindata(lkp_cld, ibnd)
-        extsno, ssasno, asysno = LookUpTables.getview_snowdata(lkp_cld, ibnd)
-        nsize_rai = LookUpTables.get_nsize_rai(lkp_cld)
-        nsize_sno = LookUpTables.get_nsize_sno(lkp_cld)
-        radrai_lwr, radrai_upr = lkp_cld.rai_bounds
-        radsno_lwr, radsno_upr = lkp_cld.sno_bounds
-    end
+
+    # Placeholder precip optics: rain reuses the liquid LUT, snow the ice LUT.
+    # Gated independently on their water paths — enable either, both, or neither.
+    use_rain = !isnothing(cld_path_rai)
+    use_snow = !isnothing(cld_path_sno)
+
     @inbounds begin
         for glay in 1:nlay
             if cld_mask[glay]
@@ -132,18 +132,26 @@ species; otherwise the precip keywords are ignored.
                 ssa_cl = τl_ssa + τi_ssa      # running Σ τ*ssa
                 ssag_cl = τl_ssag + τi_ssag   # running Σ τ*ssa*g
                 # precipitation (rain + snow), reusing the liquid-style interpolator
-                if use_precip
+                if use_rain
+                    # rain: liquid LUT at constant r_eff = radliq_upr
                     τr, τr_ssa, τr_ssag = compute_lookup_cld_liq_props(
-                        nsize_rai, radrai_lwr, radrai_upr, extrai, ssarai, asyrai,
-                        cld_r_eff_rai[glay], cld_path_rai[glay],
+                        nsize_liq, radliq_lwr, radliq_upr, extliq, ssaliq, asyliq,
+                        radliq_upr, cld_path_rai[glay],
                     )
-                    τs, τs_ssa, τs_ssag = compute_lookup_cld_liq_props(
-                        nsize_sno, radsno_lwr, radsno_upr, extsno, ssasno, asysno,
-                        cld_r_eff_sno[glay], cld_path_sno[glay],
+                    τ_cl += τr
+                    ssa_cl += τr_ssa
+                    ssag_cl += τr_ssag
+                end
+                if use_snow
+                    # snow: ice LUT, r_eff capped at radice_upr
+                    r_eff_sno = min(cld_r_eff_sno[glay], radice_upr)
+                    τs, τs_ssa, τs_ssag = compute_lookup_cld_ice_props(
+                        nsize_ice, radice_lwr, radice_upr, extice, ssaice, asyice,
+                        r_eff_sno, cld_path_sno[glay],
                     )
-                    τ_cl += τr + τs
-                    ssa_cl += τr_ssa + τs_ssa
-                    ssag_cl += τr_ssag + τs_ssag
+                    τ_cl += τs
+                    ssa_cl += τs_ssa
+                    ssag_cl += τs_ssag
                 end
                 # g = Σ(τ*ssa*g) / Σ(τ*ssa); ssa = Σ(τ*ssa) / Σ(τ)  (same order as before)
                 g_cl = ssag_cl / max(eps(FT), ssa_cl)
