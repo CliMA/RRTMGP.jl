@@ -293,6 +293,19 @@ function CloudState(
     cld_path_rai = nothing,
     cld_path_sno = nothing,
 )
+    # Rain optics are not implemented in radiation (negligible effect; a
+    # placeholder radius would be badly off — see the Precipitation docs). The
+    # fields are kept for a future implementation, but populating them now is a
+    # hard error, not a silent no-op. Remove this when rain optics land.
+    (isnothing(cld_path_rai) && isnothing(cld_r_eff_rai)) || error(
+        "rain optics are not implemented in radiation; leave cld_path_rai and \
+         cld_r_eff_rai as nothing",
+    )
+    # Snow needs both its path and radius, or neither: the optics kernel indexes
+    # cld_r_eff_sno per layer, so a missing one would fault mid-kernel on GPU.
+    isnothing(cld_path_sno) == isnothing(cld_r_eff_sno) || error(
+        "snow optics need both cld_path_sno and cld_r_eff_sno, or neither",
+    )
     mcica_key = similar(cld_frac, UInt32, 1)
     fill!(mcica_key, UInt32(0))
     return CloudState(

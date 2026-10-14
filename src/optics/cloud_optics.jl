@@ -22,7 +22,6 @@
 
         # Placeholder precip optics: rain → liquid LUT, snow → ice LUT.
         # Independently gated on their water paths.
-        use_rain = !isnothing(cld_path_rai)
         use_snow = !isnothing(cld_path_sno)
 
         for glay in 1:nlay
@@ -36,14 +35,6 @@
                     cld_r_eff_ice[glay], cld_path_ice[glay],
                 )
                 τ[glay] += (τl - τl_ssa) + (τi - τi_ssa)
-                if use_rain
-                    # rain: liquid LUT at constant r_eff = radliq_upr
-                    τr, τr_ssa, _ = compute_lookup_cld_liq_props(
-                        nsize_liq, radliq_lwr, radliq_upr, extliq, ssaliq, asyliq,
-                        radliq_upr, cld_path_rai[glay],
-                    )
-                    τ[glay] += (τr - τr_ssa)
-                end
                 if use_snow
                     # snow: ice LUT, r_eff capped at radice_upr
                     r_eff_sno = min(cld_r_eff_sno[glay], radice_upr)
@@ -113,7 +104,6 @@ species; otherwise the precip keywords are ignored.
 
     # Placeholder precip optics: rain reuses the liquid LUT, snow the ice LUT.
     # Gated independently on their water paths — enable either, both, or neither.
-    use_rain = !isnothing(cld_path_rai)
     use_snow = !isnothing(cld_path_sno)
 
     @inbounds begin
@@ -131,17 +121,6 @@ species; otherwise the precip keywords are ignored.
                 τ_cl = τl + τi
                 ssa_cl = τl_ssa + τi_ssa      # running Σ τ*ssa
                 ssag_cl = τl_ssag + τi_ssag   # running Σ τ*ssa*g
-                # precipitation (rain + snow), reusing the liquid-style interpolator
-                if use_rain
-                    # rain: liquid LUT at constant r_eff = radliq_upr
-                    τr, τr_ssa, τr_ssag = compute_lookup_cld_liq_props(
-                        nsize_liq, radliq_lwr, radliq_upr, extliq, ssaliq, asyliq,
-                        radliq_upr, cld_path_rai[glay],
-                    )
-                    τ_cl += τr
-                    ssa_cl += τr_ssa
-                    ssag_cl += τr_ssag
-                end
                 if use_snow
                     # snow: ice LUT, r_eff capped at radice_upr
                     r_eff_sno = min(cld_r_eff_sno[glay], radice_upr)

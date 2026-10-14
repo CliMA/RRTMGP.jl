@@ -238,25 +238,14 @@ are always present; rain and snow are present when `raindata`/`snowdata` are not
 - `sno_bounds`: `(radsno_lwr, radsno_upr)`, or `nothing`.
 - `bnd_lims_wn`: Beginning and ending wavenumber for each band [cm⁻¹] `(2, nband)`.
 """
-struct LookUpCld{D, B, L, I, R, S, RB, SB, W} <: AbstractLookUp
+struct LookUpCld{D, B, L, I, W} <: AbstractLookUp
     dims::D
     bounds::B
     liqdata::L
     icedata::I
-    raindata::R
-    snowdata::S
-    rai_bounds::RB
-    sno_bounds::SB
     bnd_lims_wn::W
 end
 Adapt.@adapt_structure LookUpCld
-
-# Backward-compatible constructor: cloud-only (no precip) tables.
-LookUpCld(dims, bounds, liqdata, icedata, bnd_lims_wn) =
-    LookUpCld(dims, bounds, liqdata, icedata, nothing, nothing, nothing, nothing, bnd_lims_wn)
-
-# True when rain/snow optics are available.
-@inline has_precip_optics(lkp::LookUpCld) = !isnothing(lkp.raindata)
 
 @inline get_dims(lkp::LookUpCld) = lkp.dims
 @inline get_nband(lkp::LookUpCld) = @inbounds lkp.dims[1]
@@ -264,9 +253,6 @@ LookUpCld(dims, bounds, liqdata, icedata, bnd_lims_wn) =
 @inline get_nsize_liq(lkp::LookUpCld) = @inbounds lkp.dims[3]
 @inline get_nsize_ice(lkp::LookUpCld) = @inbounds lkp.dims[4]
 @inline get_pair(lkp::LookUpCld) = @inbounds lkp.dims[5]
-# Derived from the data arrays (ext/ssa/asy packed along dim 1), so no dims change.
-@inline get_nsize_rai(lkp::LookUpCld) = size(lkp.raindata, 1) ÷ 3
-@inline get_nsize_sno(lkp::LookUpCld) = size(lkp.snowdata, 1) ÷ 3
 
 @inline function getview_liqdata(lkp::LookUpCld, ibnd)
     n = get_nsize_liq(lkp)
@@ -288,64 +274,6 @@ end
     )
 end
 
-@inline function getview_raindata(lkp::LookUpCld, ibnd)
-    n = get_nsize_rai(lkp)
-    raindata = lkp.raindata
-    return @inbounds (
-        view(raindata, 1:n, ibnd),
-        view(raindata, (n + 1):(n * 2), ibnd),
-        view(raindata, (n * 2 + 1):(n * 3), ibnd),
-    )
-end
-
-@inline function getview_snowdata(lkp::LookUpCld, ibnd)
-    n = get_nsize_sno(lkp)
-    snowdata = lkp.snowdata
-    return @inbounds (
-        view(snowdata, 1:n, ibnd),
-        view(snowdata, (n + 1):(n * 2), ibnd),
-        view(snowdata, (n * 2 + 1):(n * 3), ibnd),
-    )
-end
-"""
-    with_ice_snow_liquid_rain(lkp::LookUpCld; ice_rgh = 1) -> LookUpCld
-
-STOPGAP / TEST ONLY. Returns a copy of `lkp` whose precip optics are aliased to
-existing cloud tables: rain → liquid table (bounds = liquid's), snow → ice table
-at roughness `ice_rgh` (bounds = ice's). Because rain/snow effective radii exceed
-these bounds, every precip layer clamps to the largest tabulated particle — rain
-gets liquid-at-max-radius optics, snow gets ice-at-max-radius optics. This
-validates the precip plumbing end-to-end; it is NOT physically meaningful (no
-precip-sized scattering, no size dependence). Replace with real rain/snow LUTs.
-"""
-function with_ice_snow_liquid_rain(lkp::LookUpCld; ice_rgh::Integer = 1)
-    LookUpTables.has_precip_optics(lkp) && @warn "with_ice_snow_liquid_rain: table already has precip optics; overwriting with aliased stopgap data."
-
-    DA = typeof(lkp.liqdata)
-    BT = eltype(lkp.bounds)
-    precip_bounds(lwr, upr) = DA(BT[BT(lwr), BT(upr)])
-
-    radliq_lwr, radliq_upr, radice_lwr, radice_upr = lkp.bounds
-
-    # rain → liquid table (already (3*nsize_liq, nbnd), no roughness dim)
-    raindata = DA(copy(lkp.liqdata))
-
-    # snow → ice table at one roughness level; icedata is
-    # (3*nsize_ice, nbnd, nrghice), flatten to (3*nsize_ice, nbnd)
-    snowdata = DA(lkp.icedata[:, :, ice_rgh])
-
-    return LookUpCld(
-        lkp.dims,
-        lkp.bounds,
-        lkp.liqdata,
-        lkp.icedata,
-        raindata,
-        snowdata,
-        precip_bounds(radliq_lwr, radliq_upr),   # rai_bounds = liquid bounds
-        precip_bounds(radice_lwr, radice_upr),   # sno_bounds = ice bounds
-        lkp.bnd_lims_wn,
-    )
-end
 """
     LookUpAerosolMerra{D, D1, D2, D3, D4, W} <: AbstractLookUp
 

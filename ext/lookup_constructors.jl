@@ -744,40 +744,5 @@ function LookUpCld(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
         DA(vcat(Array(ds["extice"]), Array(ds["ssaice"]), Array(ds["asyice"])))
     bnd_lims_wn = DA(Array(ds["bnd_limits_wavenumber"]))
 
-    # Precip optics are present only if the file carries the rain/snow tables.
-    # Detect on rain extinction; once any precip variable appears, require the
-    # full set, so a partial file is a hard error rather than a half-on state.
-    # NOTE: variable/bound names below are PLACEHOLDERS — match them to the real
-    # LUT schema. If rain/snow sizes are stored as diameters (like `diamice_*`),
-    # divide the bounds by 2 as the ice branch does.
-    if haskey(ds, "extrai")
-        for v in ("ssarai", "asyrai", "extsno", "ssasno", "asysno")
-            haskey(ds, v) || error(
-                "cloud-optics file has `extrai` but is missing `$v`: a complete \
-                 precipitation table needs extrai/ssarai/asyrai and \
-                 extsno/ssasno/asysno.",
-            )
-        end
-        raindata = DA(
-            vcat(Array(ds["extrai"]), Array(ds["ssarai"]), Array(ds["asyrai"])),
-        )
-        snowdata = DA(
-            vcat(Array(ds["extsno"]), Array(ds["ssasno"]), Array(ds["asysno"])),
-        )
-        rai_bounds = DA([FT(ds["radrai_lwr"][]), FT(ds["radrai_upr"][])])
-        sno_bounds = DA([FT(ds["radsno_lwr"][]), FT(ds["radsno_upr"][])])
-        return LookUpCld(
-            dims,
-            bounds,
-            liqdata,
-            icedata,
-            raindata,
-            snowdata,
-            rai_bounds,
-            sno_bounds,
-            bnd_lims_wn,
-        )
-    end
-
     return LookUpCld(dims, bounds, liqdata, icedata, bnd_lims_wn)
 end
