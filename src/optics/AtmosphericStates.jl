@@ -249,9 +249,9 @@ struct CloudState{CD, PD, CF, CC, CM, CMT, SD}
     cld_r_eff_ice::CD
     cld_path_liq::CD
     cld_path_ice::CD
-    cld_r_eff_rai::PD
+    cld_r_eff_rai::Nothing
     cld_r_eff_sno::PD
-    cld_path_rai::PD
+    cld_path_rai::Nothing
     cld_path_sno::PD
     cld_frac::CF
     cld_cover_sw::CC
