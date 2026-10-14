@@ -257,6 +257,34 @@ increments of ``10\,\mathrm{\mu m}``; `LookUpCld` halves these bounds on load,
 so the interpolation and the clamp applied to `cloud_ice_effective_radius` work
 in radius, ``5\,\mathrm{\mu m} \le r_i \le 90\,\mathrm{\mu m}``.
 
+### Precipitation (placeholder)
+
+Snow can optionally be added to the cloud increment as a **placeholder**. There
+is no snow optics table; snow instead reuses the ice lookup table with its
+effective radius capped at the ice-table maximum (``r_i = 90\,\mathrm{\mu m}``).
+When a snow water path is supplied, snow enters the same ``\tau``-weighted mixing
+as liquid and ice above, as an additional ice-like term
+``\tau_s = \mu_i\!\left(\min(r_s, 90\,\mathrm{\mu m})\right)\,\mathrm{swp}`` in
+each of ``\tau_c``, ``\omega_{0c}``, and ``g_c``. Snow is active per column when a
+snow water path is set on `CloudState` (both `cld_path_sno` and `cld_r_eff_sno`
+are required, or neither), and like cloud it radiates only in layers the McICA
+mask marks cloudy.
+
+This is not physically accurate snow scattering. Real snow effective radii
+(hundreds of ``\mathrm{\mu m}``) exceed the ``90\,\mathrm{\mu m}`` ceiling, so
+snow is clamped there — roughly ``2\text{–}3\times`` too optically thick per unit
+water path, and carrying ice single-scattering albedo and asymmetry rather than
+snow's. A dedicated snow optics table is needed to remove these approximations.
+
+**Rain is not radiated.** Its radiative effect is small and a placeholder radius
+would be far off: raindrop effective radii are
+``\mathcal{O}(10^3\,\mathrm{\mu m})``, well above the liquid-table ceiling of
+``21.5\,\mathrm{\mu m}``, so clamping there would overestimate rain extinction
+per unit water path by roughly ``40\text{–}50\times`` (mass-specific extinction
+scales as ``1/r_\mathrm{eff}`` in the geometric-optics limit). The
+`cld_path_rai`/`cld_r_eff_rai` fields exist for a future implementation, but
+populating them raises an error at `CloudState` construction.
+
 ### Cloud overlap method
 
 Climate models predict grid-mean cloud fraction and cloud condensate, so the

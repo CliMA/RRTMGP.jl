@@ -1,3 +1,26 @@
+"""
+    add_cloud_optics_1scalar!(
+        τ,
+        cld_mask,
+        cld_r_eff_liq,
+        cld_r_eff_ice,
+        cld_path_liq,
+        cld_path_ice,
+        ice_rgh,
+        lkp_cld,
+        ibnd;
+        cld_r_eff_rai = nothing,
+        cld_r_eff_sno = nothing,
+        cld_path_rai = nothing,
+        cld_path_sno = nothing,
+    )
+
+Compute the `OneScalar` (longwave) cloud optics properties and add them to the
+gas optics. When a snow water path is supplied (`cld_path_sno` non-`nothing`),
+snow is added as a PLACEHOLDER species reusing the ice lookup table with its
+effective radius capped at the ice-table maximum. Rain is not radiated; the rain
+keywords exist only for a future implementation and must be `nothing`.
+"""
 @inline function add_cloud_optics_1scalar!(
     τ,
     cld_mask,
@@ -20,8 +43,10 @@
         _, _, nsize_liq, nsize_ice, _ = lkp_cld.dims
         radliq_lwr, radliq_upr, radice_lwr, radice_upr = lkp_cld.bounds
 
-        # Placeholder precip optics: rain → liquid LUT, snow → ice LUT.
-        # Independently gated on their water paths.
+        # Snow is radiated as a placeholder: it reuses the ICE lookup table with
+        # r_eff capped at the ice-table maximum. Rain is NOT radiated (guarded off
+        # at CloudState construction), so cld_path_rai is always nothing here; its
+        # kwargs are kept only to preserve the interface. See Optics.md for caveats.
         use_snow = !isnothing(cld_path_sno)
 
         for glay in 1:nlay
@@ -71,11 +96,13 @@ end
     )
 
 Compute the `TwoStream` cloud optics properties and add them to the `TwoStream`
-gas optics properties. When the lookup table carries precipitation optics
-(`LookUpTables.has_precip_optics(lkp_cld)` is `true`), the rain and snow water
-paths (`cld_path_rai`, `cld_path_sno`) and effective radii (`cld_r_eff_rai`,
-`cld_r_eff_sno`) are combined into each layer as two additional condensate
-species; otherwise the precip keywords are ignored.
+gas optics properties. When a snow water path is supplied (`cld_path_sno`
+non-`nothing`), snow is added as an extra condensate species — a PLACEHOLDER
+that reuses the ice lookup table with its effective radius capped at the
+ice-table maximum. Rain is not radiated; the `cld_path_rai`/`cld_r_eff_rai`
+keywords exist only for a future implementation and are checked to be `nothing`
+at `CloudState` construction. See the cloud/precipitation optics notes in the
+docs for caveats.
 """
 @inline function add_cloud_optics_2stream!(
     τ,
@@ -102,8 +129,10 @@ species; otherwise the precip keywords are ignored.
     _, _, nsize_liq, nsize_ice, _ = lkp_cld.dims
     radliq_lwr, radliq_upr, radice_lwr, radice_upr = lkp_cld.bounds
 
-    # Placeholder precip optics: rain reuses the liquid LUT, snow the ice LUT.
-    # Gated independently on their water paths — enable either, both, or neither.
+    # Snow is radiated as a placeholder: it reuses the ICE lookup table with
+    # r_eff capped at the ice-table maximum. Rain is NOT radiated (guarded off at
+    # CloudState construction), so cld_path_rai is always nothing here; its kwargs
+    # are kept only to preserve the interface. See Optics.md for caveats.
     use_snow = !isnothing(cld_path_sno)
 
     @inbounds begin
@@ -158,9 +187,8 @@ end
         cld_path_liq,
     )
 
-Compute `TwoStream` optical properties (τ, τ*ssa, τ*ssa*g) for a single
-condensate species via the `LookUpTable` method. Used for cloud liquid, and
-reused for rain and snow.
+Compute `TwoStream` optical properties (τ, τ*ssa, τ*ssa*g) for cloud liquid via
+the `LookUpTable` method.
 """
 @inline function compute_lookup_cld_liq_props(
     nsize_liq,
@@ -214,6 +242,8 @@ end
     )
 
 Compute the `TwoStream` cloud ice properties using the `LookUpTable` method.
+Also used for the snow placeholder, where the caller caps the effective radius
+at the ice-table maximum (`radice_upr`).
 """
 @inline function compute_lookup_cld_ice_props(
     nsize_ice,

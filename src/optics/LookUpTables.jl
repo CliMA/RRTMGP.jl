@@ -215,16 +215,15 @@ Adapt.@adapt_structure LookUpSW
 @inline get_n_gases(lkp::LookUpSW) = size(lkp.ref_points.vmr_ref, 2)
 
 @inline get_n_η(lkp::LookUpSW) = size(lkp.kmajor, 1)
-"""
-    LookUpCld{D, B, L, I, R, S, RB, SB, W} <: AbstractLookUp
 
-Lookup table for cloud (and, optionally, precipitation) optics.
+"""
+    LookUpCld{D, B, L, I, W} <: AbstractLookUp
+
+Lookup table for cloud optics.
 
 Stores extinction coefficient, single-scattering albedo, and asymmetry parameter
 g as a function of effective radius, from which we form τ (= ext * water path)
-and the products τ*ssa and τ*ssa*g for each condensate species. Liquid and ice
-are always present; rain and snow are present when `raindata`/`snowdata` are not
-`nothing`.
+and the products τ*ssa and τ*ssa*g for cloud liquid and ice.
 
 # Fields
 - `dims`: Dimensions `nband`, `nrghice`, `nsize_liq`, `nsize_ice`, `pair`.
@@ -232,10 +231,6 @@ are always present; rain and snow are present when `raindata`/`snowdata` are not
   factor: `(radliq_lwr, radliq_upr, radice_lwr, radice_upr)`.
 - `liqdata`: Liquid ext, ssa, asymmetry `(3*nsize_liq, nbnd)`.
 - `icedata`: Ice ext, ssa, asymmetry `(3*nsize_ice, nbnd, nrghice)`.
-- `raindata`: Rain ext, ssa, asymmetry `(3*nsize_rai, nbnd)`, or `nothing`.
-- `snowdata`: Snow ext, ssa, asymmetry `(3*nsize_sno, nbnd)`, or `nothing`.
-- `rai_bounds`: `(radrai_lwr, radrai_upr)`, or `nothing`.
-- `sno_bounds`: `(radsno_lwr, radsno_upr)`, or `nothing`.
 - `bnd_lims_wn`: Beginning and ending wavenumber for each band [cm⁻¹] `(2, nband)`.
 """
 struct LookUpCld{D, B, L, I, W} <: AbstractLookUp

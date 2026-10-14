@@ -214,7 +214,8 @@ cloud_ice_water_path(s::RRTMGPSolver)                 = _domain_view(s, s.as.clo
     cloud_rain_effective_radius(s::RRTMGPSolver)
 
 Return the rain effective radius [µm]: a writable, domain-masked `(nlay, ncol)` view,
-or `nothing` if the solver carries no precipitation optics.
+or `nothing`. Rain is not radiated in the current implementation, so this is
+`nothing` unless set for a future one.
 """
 cloud_rain_effective_radius(s::RRTMGPSolver)          = _domain_view(s, s.as.cloud_state.cld_r_eff_rai)
 

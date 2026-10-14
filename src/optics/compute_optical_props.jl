@@ -116,21 +116,21 @@ GPU access) when one is provided, and from `as` directly otherwise.
             cld_path_ice = view(cloud_state.cld_path_ice, :, gcol)
             cld_mask = view(cloud_state.mask_lw, :, gcol)
 
-        add_cloud_optics_1scalar!(
-            τ,
-            cld_mask,
-            cld_r_eff_liq,
-            cld_r_eff_ice,
-            cld_path_liq,
-            cld_path_ice,
-            cloud_state.ice_rgh,
-            lkp_cld,
-            ibnd;
-            cld_r_eff_rai = _view_or_nothing(cloud_state.cld_r_eff_rai, gcol),
-            cld_r_eff_sno = _view_or_nothing(cloud_state.cld_r_eff_sno, gcol),
-            cld_path_rai = _view_or_nothing(cloud_state.cld_path_rai, gcol),
-            cld_path_sno = _view_or_nothing(cloud_state.cld_path_sno, gcol),
-        )
+            add_cloud_optics_1scalar!(
+                τ,
+                cld_mask,
+                cld_r_eff_liq,
+                cld_r_eff_ice,
+                cld_path_liq,
+                cld_path_ice,
+                cloud_state.ice_rgh,
+                lkp_cld,
+                ibnd;
+                cld_r_eff_rai = _view_or_nothing(cloud_state.cld_r_eff_rai, gcol),
+                cld_r_eff_sno = _view_or_nothing(cloud_state.cld_r_eff_sno, gcol),
+                cld_path_rai = _view_or_nothing(cloud_state.cld_path_rai, gcol),
+                cld_path_sno = _view_or_nothing(cloud_state.cld_path_sno, gcol),
+            )
         end
     end
     return nothing

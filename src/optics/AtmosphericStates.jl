@@ -223,19 +223,19 @@ Cloud state, used to compute optical properties.
 - `cld_r_eff_ice`: Effective radius of cloud ice particles.
 - `cld_path_liq`: Cloud water path.
 - `cld_path_ice`: Cloud ice path.
-- `cld_r_eff_rai`: Effective radius of rain particles, or `nothing`.
+- `cld_r_eff_rai`: Rain effective radius. Rain is not radiated; must be `nothing`.
 - `cld_r_eff_sno`: Effective radius of snow particles, or `nothing`.
-- `cld_path_rai`: Rain water path, or `nothing`.
-- `cld_path_sno`: Snow water path, or `nothing`.
+- `cld_path_rai`: Rain water path. Rain is not radiated; must be `nothing`.
+- `cld_path_sno`: Snow water path, or `nothing` to disable snow.
 - `cld_frac`: Cloud fraction.
 - `cld_cover_sw`: McICA effective shortwave cloud cover in `[0, 1]`; `(ncol,)`, or
   `nothing` if unused.
 - `cld_cover_lw`: McICA effective longwave cloud cover in `[0, 1]`; `(ncol,)`, or
   `nothing` if unused.
 - `mask_lw`: Cloud mask (longwave); `true` if clouds are present. Also gates the
-  rain/snow increment — precip radiates only in sampled-cloudy layers.
+  snow increment — snow radiates only in sampled-cloudy layers.
 - `mask_sw`: Cloud mask (shortwave); `true` if clouds are present. Also gates the
-  rain/snow increment.
+  snow increment.
 - `mask_type`: Cloud mask type.
 - `ice_rgh`: Ice roughness; 1 = none, 2 = medium, 3 = rough.
 - `mcica_key`: One-element array holding the McICA key; the cloud mask is a
