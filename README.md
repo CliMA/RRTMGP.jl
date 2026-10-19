@@ -27,8 +27,8 @@ and aerosol-laden atmospheres, and is the radiation scheme of the
 [docs-stable-url]: https://CliMA.github.io/RRTMGP.jl/stable/
 [docs-dev-img]: https://img.shields.io/badge/docs-dev-blue.svg
 [docs-dev-url]: https://CliMA.github.io/RRTMGP.jl/dev/
-[version-img]: https://juliahub.com/docs/General/RRTMGP/stable/version.svg
-[version-url]: https://juliahub.com/ui/Packages/General/RRTMGP
+[version-img]: https://img.shields.io/github/v/release/CliMA/RRTMGP.jl
+[version-url]: https://github.com/CliMA/RRTMGP.jl/releases
 [license-img]: https://img.shields.io/badge/license-Apache%202.0-blue.svg
 [license-url]: https://github.com/CliMA/RRTMGP.jl/blob/main/LICENSE
 [gha-ci-img]: https://github.com/CliMA/RRTMGP.jl/actions/workflows/OS-UnitTests.yml/badge.svg
