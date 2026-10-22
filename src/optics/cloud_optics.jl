@@ -1,3 +1,23 @@
+"""
+    add_cloud_optics_1scalar!(
+        τ,
+        cld_mask,
+        cld_r_eff_liq,
+        cld_r_eff_ice,
+        cld_path_liq,
+        cld_path_ice,
+        ice_rgh,
+        lkp_cld,
+        ibnd;
+        cld_r_eff_sno = nothing,
+        cld_path_sno = nothing,
+    )
+
+Compute the `OneScalar` (longwave) cloud optics properties and add them to the
+gas optics. When a snow water path is supplied (`cld_path_sno` non-`nothing`),
+snow is added as a PLACEHOLDER species reusing the ice lookup table with its
+effective radius capped at the ice-table maximum. Rain is not radiated.
+"""
 @inline function add_cloud_optics_1scalar!(
     τ,
     cld_mask,
@@ -8,41 +28,41 @@
     ice_rgh,
     lkp_cld::LookUpCld,
     ibnd;
+    cld_r_eff_sno = nothing,
+    cld_path_sno = nothing,
 )
     @inbounds begin
         nlay = length(τ)
         extliq, ssaliq, asyliq = LookUpTables.getview_liqdata(lkp_cld, ibnd)
-        extice, ssaice, asyice =
-            LookUpTables.getview_icedata(lkp_cld, ibnd, ice_rgh)
+        extice, ssaice, asyice = LookUpTables.getview_icedata(lkp_cld, ibnd, ice_rgh)
         _, _, nsize_liq, nsize_ice, _ = lkp_cld.dims
         radliq_lwr, radliq_upr, radice_lwr, radice_upr = lkp_cld.bounds
 
+        # Snow is radiated as a placeholder: it reuses the ICE lookup table with
+        # r_eff capped at the ice-table maximum. Rain is NOT radiated.
+        # See Optics.md for caveats.
+        use_snow = !isnothing(cld_path_sno)
+
         for glay in 1:nlay
             if cld_mask[glay]
-                # cloud liquid particles
                 τl, τl_ssa, _ = compute_lookup_cld_liq_props(
-                    nsize_liq,
-                    radliq_lwr,
-                    radliq_upr,
-                    extliq,
-                    ssaliq,
-                    asyliq,
-                    cld_r_eff_liq[glay],
-                    cld_path_liq[glay],
+                    nsize_liq, radliq_lwr, radliq_upr, extliq, ssaliq, asyliq,
+                    cld_r_eff_liq[glay], cld_path_liq[glay],
                 )
-                # cloud ice particles
                 τi, τi_ssa, _ = compute_lookup_cld_ice_props(
-                    nsize_ice,
-                    radice_lwr,
-                    radice_upr,
-                    extice,
-                    ssaice,
-                    asyice,
-                    cld_r_eff_ice[glay],
-                    cld_path_ice[glay],
+                    nsize_ice, radice_lwr, radice_upr, extice, ssaice, asyice,
+                    cld_r_eff_ice[glay], cld_path_ice[glay],
                 )
-                # add cloud optical optics
                 τ[glay] += (τl - τl_ssa) + (τi - τi_ssa)
+                if use_snow
+                    # snow: ice LUT, r_eff capped at radice_upr
+                    r_eff_sno = min(cld_r_eff_sno[glay], radice_upr)
+                    τs, τs_ssa, _ = compute_lookup_cld_ice_props(
+                        nsize_ice, radice_lwr, radice_upr, extice, ssaice, asyice,
+                        r_eff_sno, cld_path_sno[glay],
+                    )
+                    τ[glay] += (τs - τs_ssa)
+                end
             end
         end
     end
@@ -62,10 +82,17 @@ end
         ice_rgh,
         lkp_cld,
         ibnd;
+        cld_r_eff_sno = nothing,
+        cld_path_sno = nothing,
         delta_scaling = false,
     )
-Compute the `TwoStream` cloud optics properties and add them
-to the `TwoStream` gas optics properties.
+
+Compute the `TwoStream` cloud optics properties and add them to the `TwoStream`
+gas optics properties. When a snow water path is supplied (`cld_path_sno`
+non-`nothing`), snow is added as an extra condensate species — a PLACEHOLDER
+that reuses the ice lookup table with its effective radius capped at the
+ice-table maximum. Rain is not radiated. See the cloud/precipitation optics
+notes in the docs for caveats.
 """
 @inline function add_cloud_optics_2stream!(
     τ,
@@ -79,58 +106,56 @@ to the `TwoStream` gas optics properties.
     ice_rgh,
     lkp_cld::LookUpCld,
     ibnd;
+    cld_r_eff_sno = nothing,
+    cld_path_sno = nothing,
     delta_scaling = false,
 )
     nlay = length(τ)
     FT = eltype(τ)
     extliq, ssaliq, asyliq = LookUpTables.getview_liqdata(lkp_cld, ibnd)
-    extice, ssaice, asyice =
-        LookUpTables.getview_icedata(lkp_cld, ibnd, ice_rgh)
+    extice, ssaice, asyice = LookUpTables.getview_icedata(lkp_cld, ibnd, ice_rgh)
     _, _, nsize_liq, nsize_ice, _ = lkp_cld.dims
     radliq_lwr, radliq_upr, radice_lwr, radice_upr = lkp_cld.bounds
+
+    # Snow is radiated as a placeholder: it reuses the ICE lookup table with
+    # r_eff capped at the ice-table maximum. Rain is NOT radiated.
+    # See Optics.md for caveats.
+    use_snow = !isnothing(cld_path_sno)
+
     @inbounds begin
         for glay in 1:nlay
             if cld_mask[glay]
-                # cloud liquid particles
+                # cloud liquid + ice
                 τl, τl_ssa, τl_ssag = compute_lookup_cld_liq_props(
-                    nsize_liq,
-                    radliq_lwr,
-                    radliq_upr,
-                    extliq,
-                    ssaliq,
-                    asyliq,
-                    cld_r_eff_liq[glay],
-                    cld_path_liq[glay],
+                    nsize_liq, radliq_lwr, radliq_upr, extliq, ssaliq, asyliq,
+                    cld_r_eff_liq[glay], cld_path_liq[glay],
                 )
-                # cloud ice particles
                 τi, τi_ssa, τi_ssag = compute_lookup_cld_ice_props(
-                    nsize_ice,
-                    radice_lwr,
-                    radice_upr,
-                    extice,
-                    ssaice,
-                    asyice,
-                    cld_r_eff_ice[glay],
-                    cld_path_ice[glay],
+                    nsize_ice, radice_lwr, radice_upr, extice, ssaice, asyice,
+                    cld_r_eff_ice[glay], cld_path_ice[glay],
                 )
-
                 τ_cl = τl + τi
-                ssa_cl = τl_ssa + τi_ssa
-                g_cl = (τl_ssag + τi_ssag) / max(eps(FT), ssa_cl)
+                ssa_cl = τl_ssa + τi_ssa      # running Σ τ*ssa
+                ssag_cl = τl_ssag + τi_ssag   # running Σ τ*ssa*g
+                if use_snow
+                    # snow: ice LUT, r_eff capped at radice_upr
+                    r_eff_sno = min(cld_r_eff_sno[glay], radice_upr)
+                    τs, τs_ssa, τs_ssag = compute_lookup_cld_ice_props(
+                        nsize_ice, radice_lwr, radice_upr, extice, ssaice, asyice,
+                        r_eff_sno, cld_path_sno[glay],
+                    )
+                    τ_cl += τs
+                    ssa_cl += τs_ssa
+                    ssag_cl += τs_ssag
+                end
+                # g = Σ(τ*ssa*g) / Σ(τ*ssa); ssa = Σ(τ*ssa) / Σ(τ)  (same order as before)
+                g_cl = ssag_cl / max(eps(FT), ssa_cl)
                 ssa_cl /= max(eps(FT), τ_cl)
-
-                if delta_scaling # delta scaling is applied for shortwave problem
+                if delta_scaling # shortwave only
                     τ_cl, ssa_cl, g_cl = delta_scale(τ_cl, ssa_cl, g_cl)
                 end
-                # compute cloud optical optics
-                τ[glay], ssa[glay], g[glay] = increment_2stream(
-                    τ[glay],
-                    ssa[glay],
-                    g[glay],
-                    τ_cl,
-                    ssa_cl,
-                    g_cl,
-                )
+                τ[glay], ssa[glay], g[glay] =
+                    increment_2stream(τ[glay], ssa[glay], g[glay], τ_cl, ssa_cl, g_cl)
             end
         end
     end
@@ -149,7 +174,8 @@ end
         cld_path_liq,
     )
 
-Compute the `TwoStream` cloud liquid properties using the `LookUpTable` method.
+Compute `TwoStream` optical properties (τ, τ*ssa, τ*ssa*g) for cloud liquid via
+the `LookUpTable` method.
 """
 @inline function compute_lookup_cld_liq_props(
     nsize_liq,
@@ -203,6 +229,8 @@ end
     )
 
 Compute the `TwoStream` cloud ice properties using the `LookUpTable` method.
+Also used for the snow placeholder, where the caller caps the effective radius
+at the ice-table maximum (`radice_upr`).
 """
 @inline function compute_lookup_cld_ice_props(
     nsize_ice,

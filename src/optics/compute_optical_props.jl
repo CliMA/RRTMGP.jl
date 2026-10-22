@@ -1,3 +1,5 @@
+@inline _view_or_nothing(x, gcol) = isnothing(x) ? nothing : view(x, :, gcol)
+
 """
     compute_optical_props!(
         op::AbstractOpticalProps,
@@ -124,6 +126,8 @@ GPU access) when one is provided, and from `as` directly otherwise.
                 cloud_state.ice_rgh,
                 lkp_cld,
                 ibnd;
+                cld_r_eff_sno = _view_or_nothing(cloud_state.cld_r_eff_sno, gcol),
+                cld_path_sno = _view_or_nothing(cloud_state.cld_path_sno, gcol),
             )
         end
     end
@@ -392,6 +396,8 @@ could drift apart without anything noticing.
             cloud_state.ice_rgh,
             lkp_cld,
             ibnd;
+            cld_r_eff_sno = _view_or_nothing(cloud_state.cld_r_eff_sno, gcol),
+            cld_path_sno = _view_or_nothing(cloud_state.cld_path_sno, gcol),
             delta_scaling = false,
         )
     end
@@ -426,6 +432,8 @@ and the longwave one does not.
             cloud_state.ice_rgh,
             lkp_cld,
             ibnd;
+            cld_r_eff_sno = _view_or_nothing(cloud_state.cld_r_eff_sno, gcol),
+            cld_path_sno = _view_or_nothing(cloud_state.cld_path_sno, gcol),
             delta_scaling = true,
         )
     end

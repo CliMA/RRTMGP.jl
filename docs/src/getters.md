@@ -204,8 +204,10 @@ RRTMGP.clear_sw_flux_net
 RRTMGP.clear_net_flux
 RRTMGP.cloud_liquid_effective_radius
 RRTMGP.cloud_ice_effective_radius
+RRTMGP.cloud_snow_effective_radius
 RRTMGP.cloud_liquid_water_path
 RRTMGP.cloud_ice_water_path
+RRTMGP.cloud_snow_water_path
 RRTMGP.cloud_fraction
 RRTMGP.lw_cloud_cover
 RRTMGP.sw_cloud_cover

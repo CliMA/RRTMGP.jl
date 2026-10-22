@@ -182,6 +182,15 @@ function _extend_boundary_cloud!(cloud_state::CloudState)
     @views cloud_state.cld_path_ice[end, :] .=
         cloud_state.cld_path_ice[end - 1, :]
     @views cloud_state.cld_frac[end, :] .= cloud_state.cld_frac[end - 1, :]
+    _extend_boundary_snow!(cloud_state.cld_r_eff_sno, cloud_state.cld_path_sno)
+    return nothing
+end
+
+# snow off (PD === Nothing): dead-code-eliminated, no boundary work
+_extend_boundary_snow!(::Nothing, ::Nothing) = nothing
+function _extend_boundary_snow!(cld_r_eff_sno, cld_path_sno)
+    @views cld_r_eff_sno[end, :] .= cld_r_eff_sno[end - 1, :]
+    @views cld_path_sno[end, :] .= cld_path_sno[end - 1, :]
     return nothing
 end
 
