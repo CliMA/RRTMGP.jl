@@ -140,6 +140,16 @@ function rte_lw_2stream_solve_CUDA!(
     return nothing
 end
 
+# BOUNDING EXPERIMENT, NOT A RESULT -- the fluxes this produces are WRONG.
+# Splits the g-point loop across NGPT_GROUPS threads per column to price the
+# parallelism, without the per-group scratch and reduction a correct version
+# needs: the threads of one column race on `op`, `flux` and the accumulators.
+# It answers one question -- does more resident parallelism make this kernel
+# faster -- which section 4l of docs/learnings.md could not settle, because at one
+# thread per column the entire grid is a single wave and removing 46% of the work
+# bought only 4%. Shortwave is deliberately left alone as the control.
+const NGPT_GROUPS = 4
+
 """
     rte_lw_2stream_solve_both_skies!(device::CUDADevice, ...)
 
@@ -163,7 +173,7 @@ function rte_lw_2stream_solve_both_skies!(
     lookup_lw_aero::Union{LookUpAerosolMerra, Nothing},
 )
     nlay, ncol = AtmosphericStates.get_dims(as)
-    tx, bx = _configure_threadblock(ncol)
+    tx, bx = _configure_threadblock(ncol * NGPT_GROUPS)
     set_band_flux_to_zero!(band_flux)
     args = (
         flux,
@@ -214,7 +224,9 @@ function rte_lw_2stream_solve_both_skies_CUDA!(
     lookup_lw_cld::Union{LookUpCld, Nothing},
     lookup_lw_aero::Union{LookUpAerosolMerra, Nothing},
 )
-    gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
+    tid = threadIdx().x + (blockIdx().x - 1) * blockDim().x
+    gcol = (tid - 1) ÷ NGPT_GROUPS + 1   # column
+    grp = (tid - 1) % NGPT_GROUPS + 1    # which stride of the g-point loop
     nlev = nlay + 1
     (; major_gpt2bnd) = lookup_lw.band_data
     n_gpt = length(major_gpt2bnd)
@@ -223,7 +235,7 @@ function rte_lw_2stream_solve_both_skies_CUDA!(
         FT = eltype(flux_lw.flux_up)
         _compute_aero_mask!(aerosol_state, gcol)
         n_cloudy_gpts = 0  # thread-local counter for LW cloud cover
-        @inbounds for igpt in 1:n_gpt
+        @inbounds for igpt in grp:NGPT_GROUPS:n_gpt
             cloudy = lw_2stream_gpt_col_both_skies!(
                 igpt,
                 gcol,
@@ -245,7 +257,7 @@ function rte_lw_2stream_solve_both_skies_CUDA!(
             )
             n_cloudy_gpts += cloudy ? 1 : 0
         end
-        @inbounds begin
+        @inbounds if grp == 1
             compute_net_flux!(flux_lw, gcol, nlev)
             compute_net_flux!(flux_lw_clear, gcol, nlev)
             if cloud_state isa CloudState &&
