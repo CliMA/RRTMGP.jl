@@ -148,7 +148,7 @@ end
 # faster -- which section 4l of docs/learnings.md could not settle, because at one
 # thread per column the entire grid is a single wave and removing 46% of the work
 # bought only 4%. Shortwave is deliberately left alone as the control.
-const NGPT_GROUPS = 4
+const NGPT_GROUPS = 16
 
 """
     rte_lw_2stream_solve_both_skies!(device::CUDADevice, ...)
