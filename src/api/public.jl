@@ -85,6 +85,8 @@ const PUBLIC_NAMES = (
     :cloud_ice_effective_radius,
     :cloud_liquid_water_path,
     :cloud_ice_water_path,
+    :cloud_snow_effective_radius,
+    :cloud_snow_water_path,
     :cloud_fraction,
     :aerosol_column_mass_density,
     :aerosol_radius,
