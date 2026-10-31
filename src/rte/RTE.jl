@@ -12,6 +12,7 @@ using ..BCs
 import ..Parameters as RP
 
 export NoScatLWRTE, TwoStreamLWRTE, NoScatSWRTE, TwoStreamSWRTE
+export LWGptGroups, n_gpt_groups
 
 # Device-dependent default for the workspaces' `state_cache` keyword. On the
 # GPU, a `TransposedStateCache` gives the g-point loop coalesced state reads
@@ -25,6 +26,14 @@ _default_state_cache(::ClimaComms.AbstractCPUDevice, gp::RRTMGPGridParams) =
     nothing
 _default_state_cache(::ClimaComms.AbstractDevice, gp::RRTMGPGridParams) =
     TransposedStateCache(gp)
+
+# How many pieces the fused longwave g-point loop is split into. One is the
+# serial loop every other solver uses; above one the solve runs that many
+# concurrent kernels per spectral solve, trading the memory for the per-group
+# workspaces against resident parallelism the single wave cannot otherwise get.
+const DEFAULT_NGPT_GROUPS = 16
+
+include("gpt_groups.jl")
 
 """
     NoScatLWRTE(grid_params::RRTMGPGridParams; params, sfc_emis, inc_flux,
@@ -117,6 +126,7 @@ struct TwoStreamLWRTE{
     FXL <: FluxLW,
     FXBND,
     TSC,
+    GG,
 }
     context::C
     op::OP
@@ -126,11 +136,25 @@ struct TwoStreamLWRTE{
     flux::FXL
     band_flux::FXBND
     state_cache::TSC
+    gpt_groups::GG
 end
 Adapt.@adapt_structure TwoStreamLWRTE
-# By default no per-band (spectrally-resolved) fluxes are retained.
+# By default no per-band (spectrally-resolved) fluxes are retained, and the
+# g-point loop is not split.
 TwoStreamLWRTE(context, op, src, bcs, fluxb, flux, band_flux) =
     TwoStreamLWRTE(context, op, src, bcs, fluxb, flux, band_flux, nothing)
+TwoStreamLWRTE(context, op, src, bcs, fluxb, flux, band_flux, state_cache) =
+    TwoStreamLWRTE(
+        context,
+        op,
+        src,
+        bcs,
+        fluxb,
+        flux,
+        band_flux,
+        state_cache,
+        nothing,
+    )
 
 function TwoStreamLWRTE(
     grid_params::RRTMGPGridParams;
@@ -138,6 +162,7 @@ function TwoStreamLWRTE(
     sfc_emis,
     inc_flux,
     state_cache = _default_state_cache(grid_params),
+    ngpt_groups::Int = DEFAULT_NGPT_GROUPS,
 )
     (; context) = grid_params
     op = TwoStream(grid_params)
@@ -145,6 +170,10 @@ function TwoStreamLWRTE(
     bcs = LwBCs(sfc_emis, inc_flux)
     fluxb = FluxLW(grid_params)
     flux = FluxLW(grid_params)
+    # Only the fused both-skies solve reads these; the others ignore them.
+    gpt_groups =
+        ngpt_groups > 1 ? LWGptGroups(grid_params, ngpt_groups; params) :
+        nothing
     return TwoStreamLWRTE(
         context,
         op,
@@ -154,6 +183,7 @@ function TwoStreamLWRTE(
         flux,
         nothing,
         state_cache,
+        gpt_groups,
     )
 end
 

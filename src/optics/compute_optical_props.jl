@@ -381,6 +381,7 @@ could drift apart without anything noticing.
     gcol::Int,
     lkp_cld::LookUpCld,
     ibnd::Int,
+    mask_store = as.cloud_state.mask_lw,
 )
     cloud_state = as.cloud_state
     @inbounds begin
@@ -388,7 +389,7 @@ could drift apart without anything noticing.
             view(op.τ, gcol, :),
             view(op.ssa, gcol, :),
             view(op.g, gcol, :),
-            view(cloud_state.mask_lw, :, gcol),
+            view(mask_store, :, gcol),
             view(cloud_state.cld_r_eff_liq, :, gcol),
             view(cloud_state.cld_r_eff_ice, :, gcol),
             view(cloud_state.cld_path_liq, :, gcol),

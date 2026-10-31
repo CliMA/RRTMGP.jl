@@ -159,6 +159,7 @@ function RRTMGPSolver(
     lookups = nothing,
     spectral_fluxes = false,
     n_gauss_angles::Int = 1,
+    ngpt_groups::Int = RTE.DEFAULT_NGPT_GROUPS,
 )
     (; context) = grid_params
 
@@ -297,6 +298,17 @@ function RRTMGPSolver(
             band_flux_sw, # optional per-band fluxes (or `nothing`)
             state_cache,
         )
+    # Workspaces for the g-point-grouped fused longwave solve. Only that solve
+    # reads them, so they are allocated only where it can run: two-stream
+    # spectral longwave with no per-band fluxes to accumulate per g-point.
+    gpt_groups_lw =
+        (
+            !(op_lw isa OneScalar) &&
+            !(radiation_method isa GrayRadiation) &&
+            isnothing(band_flux_lw) &&
+            ngpt_groups > 1
+        ) ? RTE.LWGptGroups(grid_params, ngpt_groups; params) :
+        nothing
     lws =
         op_lw isa OneScalar ?
         RTE.NoScatLWRTE(
@@ -321,6 +333,7 @@ function RRTMGPSolver(
             flux_lw, # views attached
             band_flux_lw, # optional per-band fluxes (or `nothing`)
             state_cache,
+            gpt_groups_lw, # per-group workspaces, or `nothing` for one group
         )
     return RRTMGPSolver(
         grid_params,

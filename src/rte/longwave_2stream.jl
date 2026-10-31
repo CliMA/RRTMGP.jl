@@ -365,8 +365,11 @@ function rte_lw_2stream_solve_both_skies! end
     ibnd,
     nlev,
     ncol,
+    mask_store = as.cloud_state isa CloudState ? as.cloud_state.mask_lw : nothing,
+    first_igpt = 1,
 )
-    cloudy = _build_cloud_mask!(as.cloud_state, Val(:mask_lw), gcol, igpt)
+    cloudy =
+        _build_cloud_mask!(as.cloud_state, Val(:mask_lw), gcol, igpt, mask_store)
     # Gas and aerosol only: this is the clear sky, and the shared half
     compute_optical_props!(
         op,
@@ -380,13 +383,13 @@ function rte_lw_2stream_solve_both_skies! end
         lookup_lw_aero,
     )
     rte_lw_2stream!(op, flux, src_lw, bcs_lw, gcol, igpt, ibnd, nlev, ncol)
-    _accumulate_fluxes!(flux_lw_clear, flux, gcol, nlev, igpt)
+    _accumulate_fluxes!(flux_lw_clear, flux, gcol, nlev, igpt, first_igpt)
     # Add the cloud increment on top of the same optics and sweep again
     if !isnothing(lookup_lw_cld)
-        add_cloud_optics_lw!(op, as, gcol, lookup_lw_cld, ibnd)
+        add_cloud_optics_lw!(op, as, gcol, lookup_lw_cld, ibnd, mask_store)
     end
     rte_lw_2stream!(op, flux, src_lw, bcs_lw, gcol, igpt, ibnd, nlev, ncol)
-    _accumulate_fluxes!(flux_lw, flux, gcol, nlev, igpt)
+    _accumulate_fluxes!(flux_lw, flux, gcol, nlev, igpt, first_igpt)
     accumulate_band_flux!(band_flux, flux.flux_up, flux.flux_dn, gcol, ibnd, nlev)
     return cloudy
 end
@@ -410,7 +413,17 @@ after the cloud one would mean recomputing it, which is the saving this
 exists for.
 """
 function solve_lw_both_skies!(
-    (; context, fluxb, flux, band_flux, src, bcs, op, state_cache)::TwoStreamLWRTE,
+    (;
+        context,
+        fluxb,
+        flux,
+        band_flux,
+        src,
+        bcs,
+        op,
+        state_cache,
+        gpt_groups,
+    )::TwoStreamLWRTE,
     flux_lw_clear::FluxLW,
     as::AtmosphericState,
     lookup_lw::LookUpLW,
@@ -433,6 +446,7 @@ function solve_lw_both_skies!(
         lookup_lw,
         lookup_lw_cld,
         lookup_lw_aero,
+        gpt_groups,
     )
     apply_metric_scaling!(flux, metric_scaling)
     apply_metric_scaling!(flux_lw_clear, metric_scaling)
@@ -458,6 +472,7 @@ function rte_lw_2stream_solve_both_skies!(
     lookup_lw::LookUpLW,
     lookup_lw_cld::Union{LookUpCld, Nothing},
     lookup_lw_aero::Union{LookUpAerosolMerra, Nothing},
+    gpt_groups = nothing,
 )
     nlay, ncol = AtmosphericStates.get_dims(as)
     nlev = nlay + 1
