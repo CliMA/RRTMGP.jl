@@ -278,43 +278,31 @@ end
 ##### The g-point-grouped fused longwave solve.
 #####
 
-# One stream per group plus the events that fork and join them, created on first
-# use and kept, since the solve runs at every radiation step. The cache is tied
-# to whatever context was current when it was filled, which is why it assumes
-# what the rest of this driver assumes: one device, one solve in flight.
-const _GPT_STREAMS = CUDA.CuStream[]
-const _GPT_JOINS = CUDA.CuEvent[]
-const _GPT_FORK = CUDA.CuEvent[]
-
-function _gpt_concurrency(ngroups)
-    while length(_GPT_STREAMS) < ngroups
-        push!(_GPT_STREAMS, CUDA.CuStream())
-        push!(_GPT_JOINS, CUDA.CuEvent())
-    end
-    isempty(_GPT_FORK) &&
-        push!(_GPT_FORK, CUDA.CuEvent())
-    return _GPT_STREAMS, _GPT_JOINS, _GPT_FORK[1]
-end
-
 """
     _solve_lw_both_skies_grouped!(groups, flux_lw, flux_lw_clear, bcs_lw, as, ...)
 
-Run the fused longwave solve as `n_gpt_groups(groups)` concurrent kernels, each
-taking every `ngroups`-th g-point, and reduce their partial fluxes.
+Run the fused longwave solve as one kernel over `ncol * n_gpt_groups(groups)`
+threads, each taking every `ngroups`-th g-point of one column, then reduce
+their partial fluxes.
 
-The point is resident parallelism: one thread per column is 96 blocks on 108
-SMs, a single wave with no second wave to hide its latency behind. The groups
-are separate launches on separate streams rather than one wider grid because
-that way each group's workspaces arrive as kernel arguments already pointing at
-its own memory, so the solve kernel compiles to exactly what the ungrouped one
-does -- a kernel this close to the register ceiling cannot afford to compute
-workspace offsets per thread.
+The gain is waves, not occupancy. The kernel's 255 registers pin it to one
+block per SM either way, so the grouped grid has exactly as much work resident
+at any instant as the ungrouped one; what changes is that blocks are now queued
+behind it, so an SM that finishes a cheap column is handed another instead of
+idling until the launch's slowest column is done.
 
-Fork and join through events rather than `synchronize`: the host must not block
-here, since it is otherwise free to queue the next steps' work.
+One grid rather than one launch per group is the whole point. At one thread per
+column the grid is already 0.89 of the device's resident capacity, so separate
+concurrent launches cannot co-reside -- measured overlap was 1.97x for sixteen
+of them -- and the parallelism has to come from more blocks in the one grid.
+
+A thread's wide column index is its own id: `wcol = gcol + (grp - 1) * ncol`
+selects its slice of every workspace, and consecutive threads are consecutive
+columns of one group, so the state reads and the scratch writes both stay
+coalesced.
 
 The fluxes are **not** bit-for-bit with the ungrouped solve. Summing a column's
-g-points in 16 interleaved partials and then adding the partials is a different
+g-points as `ngroups` interleaved partials and adding those is a different
 order of the same floating-point sum. Everything else is unchanged, including
 which mask each g-point draws -- the McICA key indexes a stateless draw in
 `(key, column, g-point, layer)`, so splitting the loop cannot shift it.
@@ -334,50 +322,40 @@ function _solve_lw_both_skies_grouped!(
     nlev = nlay + 1
     n_gpt = length(lookup_lw.band_data.major_gpt2bnd)
     ngroups = n_gpt_groups(groups)
-    tx, bx = _configure_threadblock(ncol)
     (; aerosol_state, cloud_state) = as
 
     # The aerosol mask depends on the column alone, so it is computed once here
     # instead of identically by every group.
     if aerosol_state isa AerosolState
-        @cuda always_inline = true threads = (tx) blocks = (bx) _lw_aero_mask_CUDA!(
+        atx, abx = _configure_threadblock(ncol)
+        @cuda always_inline = true threads = (atx) blocks = (abx) _lw_aero_mask_CUDA!(
             aerosol_state,
             ncol,
         )
     end
 
-    streams, joins, fork = _gpt_concurrency(ngroups)
-    CUDA.record(fork)
-    for g in 1:ngroups
-        s = streams[g]
-        CUDA.wait(fork, s)
-        args = (
-            groups.fluxb[g],
-            groups.acc[g],
-            groups.acc_clear[g],
-            groups.src[g],
-            bcs_lw,
-            groups.op[g],
-            groups.mask[g],
-            view(groups.cloudy, :, g),
-            nlay,
-            ncol,
-            as,
-            state_cache,
-            lookup_lw,
-            lookup_lw_cld,
-            lookup_lw_aero,
-            g,
-            ngroups,
-        )
-        @cuda always_inline = true threads = (tx) blocks = (bx) stream = s rte_lw_2stream_solve_group_CUDA!(
-            args...,
-        )
-        CUDA.record(joins[g], s)
-    end
-    for g in 1:ngroups
-        CUDA.wait(joins[g])
-    end
+    tx, bx = _configure_threadblock(ncol * ngroups)
+    args = (
+        groups.fluxb,
+        groups.acc,
+        groups.acc_clear,
+        groups.src,
+        bcs_lw,
+        groups.op,
+        groups.mask,
+        groups.cloudy,
+        nlay,
+        ncol,
+        as,
+        state_cache,
+        lookup_lw,
+        lookup_lw_cld,
+        lookup_lw_aero,
+        ngroups,
+    )
+    @cuda always_inline = true threads = (tx) blocks = (bx) rte_lw_2stream_solve_grouped_CUDA!(
+        args...,
+    )
 
     rtx, rbx = _configure_threadblock(ncol * nlev)
     @cuda always_inline = true threads = (rtx) blocks = (rbx) _reduce_lw_groups_CUDA!(
@@ -395,18 +373,18 @@ function _solve_lw_both_skies_grouped!(
     return nothing
 end
 
-# Aerosol mask for every column, hoisted out of the group kernels.
+# Aerosol mask for every column, hoisted out of the grouped kernel.
 function _lw_aero_mask_CUDA!(aerosol_state::AerosolState, ncol)
     gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x
     gcol ≤ ncol && _compute_aero_mask!(aerosol_state, gcol)
     return nothing
 end
 
-# One group's share of the fused longwave g-point loop. The per-column body is
-# the same `lw_2stream_gpt_col_both_skies!` the ungrouped kernel calls, handed
-# this group's workspaces and told which g-point starts its stride, so the
-# accumulators are assigned on the first one and added to afterwards.
-function rte_lw_2stream_solve_group_CUDA!(
+# The fused longwave g-point loop over `(column, group)` pairs. The per-column
+# body is the same `lw_2stream_gpt_col_both_skies!` the ungrouped kernel calls,
+# handed this thread's wide column index and told which g-point starts its
+# stride, so the accumulators are assigned on the first one and added to after.
+function rte_lw_2stream_solve_grouped_CUDA!(
     flux::FluxLW,
     acc::FluxLW,
     acc_clear::FluxLW,
@@ -422,24 +400,27 @@ function rte_lw_2stream_solve_group_CUDA!(
     lookup_lw::LookUpLW,
     lookup_lw_cld::Union{LookUpCld, Nothing},
     lookup_lw_aero::Union{LookUpAerosolMerra, Nothing},
-    grp,
     ngroups,
 )
-    gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x
+    wcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x
     nlev = nlay + 1
     (; major_gpt2bnd) = lookup_lw.band_data
     n_gpt = length(major_gpt2bnd)
-    if gcol ≤ ncol
+    if wcol ≤ ncol * ngroups
+        # Columns vary fastest, so a warp spans 32 consecutive columns of one
+        # group and every read it makes is still contiguous.
+        gcol = (wcol - 1) % ncol + 1
+        grp = (wcol - 1) ÷ ncol + 1
         FT = eltype(acc.flux_up)
         n_cloudy_gpts = 0
         if grp > n_gpt
-            # More groups than g-points: this one has no work, and the reduction
-            # reads its slice regardless.
+            # More groups than g-points: this one has no work, and the
+            # reduction reads its slice regardless.
             @inbounds for ilev in 1:nlev
-                acc.flux_up[gcol, ilev] = FT(0)
-                acc.flux_dn[gcol, ilev] = FT(0)
-                acc_clear.flux_up[gcol, ilev] = FT(0)
-                acc_clear.flux_dn[gcol, ilev] = FT(0)
+                acc.flux_up[wcol, ilev] = FT(0)
+                acc.flux_dn[wcol, ilev] = FT(0)
+                acc_clear.flux_up[wcol, ilev] = FT(0)
+                acc_clear.flux_dn[wcol, ilev] = FT(0)
             end
         else
             @inbounds for igpt in grp:ngroups:n_gpt
@@ -463,11 +444,12 @@ function rte_lw_2stream_solve_group_CUDA!(
                     ncol,
                     mask,
                     grp,
+                    wcol,
                 )
                 n_cloudy_gpts += cloudy ? 1 : 0
             end
         end
-        @inbounds cloudy_count[gcol] = Int32(n_cloudy_gpts)
+        @inbounds cloudy_count[wcol] = Int32(n_cloudy_gpts)
     end
     return nothing
 end
@@ -493,10 +475,11 @@ function _reduce_lw_groups_CUDA!(
         FT = eltype(flux_lw.flux_up)
         up, dn, cup, cdn = FT(0), FT(0), FT(0), FT(0)
         @inbounds for g in 1:ngroups
-            up += acc_data[gcol, ilev, 1, g]
-            dn += acc_data[gcol, ilev, 2, g]
-            cup += acc_clear_data[gcol, ilev, 1, g]
-            cdn += acc_clear_data[gcol, ilev, 2, g]
+            wcol = gcol + (g - 1) * ncol
+            up += acc_data[wcol, ilev, 1]
+            dn += acc_data[wcol, ilev, 2]
+            cup += acc_clear_data[wcol, ilev, 1]
+            cdn += acc_clear_data[wcol, ilev, 2]
         end
         @inbounds begin
             flux_lw.flux_up[gcol, ilev] = up
@@ -508,7 +491,7 @@ function _reduce_lw_groups_CUDA!(
             if ilev == 1 && !isnothing(cld_cover_lw)
                 n = 0
                 for g in 1:ngroups
-                    n += cloudy_count[gcol, g]
+                    n += cloudy_count[gcol + (g - 1) * ncol]
                 end
                 cld_cover_lw[gcol] = FT(n) / n_gpt
             end

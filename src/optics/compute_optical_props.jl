@@ -143,7 +143,7 @@ end
     igpt::Int,
     lkp::LookUpLW,
     lkp_cld::Union{LookUpCld, Nothing} = nothing,
-    lkp_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
+    lkp_aero::Union{LookUpAerosolMerra, Nothing} = nothing,    wcol::Int = gcol,
 )
     nlay = AtmosphericStates.get_nlay(as)
     (; vmr) = as
@@ -157,9 +157,9 @@ end
         p_lay_col = AtmosphericStates.p_lay_view(state_cache, as, gcol)
         t_lay_col = AtmosphericStates.t_lay_view(state_cache, as, gcol)
         t_lev_col = AtmosphericStates.t_lev_view(state_cache, as, gcol)
-        τ = view(op.τ, gcol, :)
-        ssa = view(op.ssa, gcol, :)
-        g = view(op.g, gcol, :)
+        τ = view(op.τ, wcol, :)
+        ssa = view(op.ssa, wcol, :)
+        g = view(op.g, wcol, :)
     end
 
     lev_src_inc_prev = zero(t_sfc)
@@ -190,17 +190,17 @@ end
             lev_src_dec =
                 interp1d_equispaced(t_lev_dec, t_planck, totplnk) * planckfrac
             if glay == 1
-                sfc_source[gcol] =
+                sfc_source[wcol] =
                     interp1d_equispaced(t_sfc, t_planck, totplnk) * planckfrac
-                lev_source[gcol, glay] = lev_src_dec
+                lev_source[wcol, glay] = lev_src_dec
             else
-                lev_source[gcol, glay] = sqrt(lev_src_inc_prev * lev_src_dec)
+                lev_source[wcol, glay] = sqrt(lev_src_inc_prev * lev_src_dec)
             end
             lev_src_dec_prev = lev_src_dec
             lev_src_inc_prev = lev_src_inc
             t_lev_dec = t_lev_inc
         end
-        lev_source[gcol, nlay + 1] = lev_src_inc_prev
+        lev_source[wcol, nlay + 1] = lev_src_inc_prev
     end
     # Aerosol before cloud, matching solve_lw_both_skies! and
     # solve_sw_both_skies!, so both all-sky methods return the same
@@ -231,7 +231,15 @@ end
         )
     end
     if !isnothing(lkp_cld) # clouds need TwoStream optics
-        add_cloud_optics_lw!(op, as, gcol, lkp_cld, ibnd)
+        add_cloud_optics_lw!(
+            op,
+            as,
+            gcol,
+            lkp_cld,
+            ibnd,
+            as.cloud_state.mask_lw,
+            wcol,
+        )
     end
     return nothing
 end
@@ -382,14 +390,15 @@ could drift apart without anything noticing.
     lkp_cld::LookUpCld,
     ibnd::Int,
     mask_store = as.cloud_state.mask_lw,
+    wcol::Int = gcol,
 )
     cloud_state = as.cloud_state
     @inbounds begin
         add_cloud_optics_2stream!(
-            view(op.τ, gcol, :),
-            view(op.ssa, gcol, :),
-            view(op.g, gcol, :),
-            view(mask_store, :, gcol),
+            view(op.τ, wcol, :),
+            view(op.ssa, wcol, :),
+            view(op.g, wcol, :),
+            view(mask_store, :, wcol),
             view(cloud_state.cld_r_eff_liq, :, gcol),
             view(cloud_state.cld_r_eff_ice, :, gcol),
             view(cloud_state.cld_path_liq, :, gcol),

@@ -248,14 +248,15 @@ function all_sky_with_aerosols(
     RRTMGP.update_lw_fluxes!(solver)
 
     # --- the g-point-grouped longwave solve, against the serial one ----------
-    # Grouping splits a column's g-point loop across concurrent kernels, each
-    # accumulating its own partial flux for a reduction to sum, so the result is
-    # a different summation order of the same 256 terms -- close, but not the
-    # exact equality the clear-sky assertion above demands, which is why the
-    # solver it uses is pinned to one group. Anything else that went wrong with
-    # the split -- a dropped g-point, groups racing on shared scratch, a mask
-    # drawn for the wrong g-point -- moves the fluxes far more than roundoff,
-    # and 3 groups is deliberately not a divisor of the g-point count.
+    # Grouping splits a column's g-point loop across the threads of one wider
+    # grid, each accumulating its own partial flux for a reduction to sum, so
+    # the result is a different summation order of the same 256 terms -- close,
+    # but not the exact equality the clear-sky assertion above demands, which
+    # is why the solver it uses is pinned to one group. Anything else that
+    # went wrong with the split -- a dropped g-point, groups racing on shared
+    # scratch, a mask drawn for the wrong g-point -- moves the fluxes far more
+    # than roundoff, and 3 groups is deliberately not a divisor of the g-point
+    # count.
     if SLVLW == TwoStreamLWRTE
         # Both arms must draw from the same key, and the cover lives on the
         # shared `as`, so each arm's results are read before the next solve.
