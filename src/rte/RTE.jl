@@ -28,9 +28,9 @@ _default_state_cache(::ClimaComms.AbstractDevice, gp::RRTMGPGridParams) =
     TransposedStateCache(gp)
 
 # How many pieces the fused longwave g-point loop is split into. One is the
-# serial loop every other solver uses; above one the solve runs that many
-# concurrent kernels per spectral solve, trading the memory for the per-group
-# workspaces against resident parallelism the single wave cannot otherwise get.
+# serial loop every other solver uses; above one the solve widens its
+# workspaces to `ncol * ngroups` and covers them in a single kernel launch,
+# trading that memory for blocks the one wave cannot otherwise fill.
 const DEFAULT_NGPT_GROUPS = 16
 
 include("gpt_groups.jl")
