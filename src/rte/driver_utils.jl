@@ -14,14 +14,23 @@
 
 # McICA cloud mask for one column and g-point; returns whether any layer is
 # cloudy (for the cloud-cover diagnostic). `S` selects `:mask_lw`/`:mask_sw`.
-@inline _build_cloud_mask!(::Nothing, ::Val, gcol, igpt) = false
+@inline _build_cloud_mask!(
+    ::Nothing,
+    ::Val,
+    gcol,
+    igpt,
+    mask_store = nothing,
+    wcol = gcol,
+) = false
 @inline function _build_cloud_mask!(
     cloud_state::CloudState,
     ::Val{S},
     gcol,
     igpt,
+    mask_store = getproperty(cloud_state, S),
+    wcol = gcol,
 ) where {S}
-    mask = view(getproperty(cloud_state, S), :, gcol)
+    mask = view(mask_store, :, wcol)
     # The band is part of the key: the two bands sample independently, and
     # without this they would draw the same mask for a given column and g-point.
     band_key =
@@ -50,10 +59,11 @@ end
     gcol,
     nlev,
     igpt,
+    first_igpt = 1,
 )
     acc_up, acc_dn = flux_acc.flux_up, flux_acc.flux_dn
     up, dn = flux.flux_up, flux.flux_dn
-    if igpt == 1
+    if igpt == first_igpt
         @inbounds for ilev in 1:nlev
             acc_up[gcol, ilev] = up[gcol, ilev]
             acc_dn[gcol, ilev] = dn[gcol, ilev]
@@ -73,11 +83,12 @@ end
     gcol,
     nlev,
     igpt,
+    first_igpt = 1,
 )
     acc_up, acc_dn, acc_dir =
         flux_acc.flux_up, flux_acc.flux_dn, flux_acc.flux_dn_dir
     up, dn, dir = flux.flux_up, flux.flux_dn, flux.flux_dn_dir
-    if igpt == 1
+    if igpt == first_igpt
         @inbounds for ilev in 1:nlev
             acc_up[gcol, ilev] = up[gcol, ilev]
             acc_dn[gcol, ilev] = dn[gcol, ilev]
