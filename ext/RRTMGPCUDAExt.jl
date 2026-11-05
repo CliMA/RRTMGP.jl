@@ -43,7 +43,7 @@ import RRTMGP.RTESolver: lw_noscat_gpt_col!, lw_2stream_gpt_col!
 import RRTMGP.RTESolver: sw_noscat_gpt_col!, sw_2stream_gpt_col!
 import RRTMGP.RTESolver: _compute_aero_mask!, _build_cloud_mask!
 import RRTMGP.RTESolver: rte_lw_2stream_solve_both_skies!
-import RRTMGP.RTE: LWGptGroups, n_gpt_groups
+import RRTMGP.RTE: LWGptGroups, SWGptGroups, n_gpt_groups
 import RRTMGP.RTESolver: lw_2stream_gpt_col_both_skies!
 import RRTMGP.RTESolver: rte_sw_2stream_solve_both_skies!
 import RRTMGP.RTESolver: sw_2stream_gpt_col_both_skies!
