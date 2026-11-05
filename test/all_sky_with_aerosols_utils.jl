@@ -298,6 +298,61 @@ function all_sky_with_aerosols(
         RRTMGP.update_lw_fluxes!(solver)
     end
 
+    # --- the g-point-grouped shortwave solve, against the serial one ---------
+    # Same split as the longwave above, with three shortwave-specific things to
+    # assert. The direct beam is a third accumulated profile. A night column
+    # takes neither sweep, so its partials are never assigned and the kernel has
+    # to zero them instead of summing whatever the workspace last held. And the
+    # 550 nm aerosol optical depth is a per-column read-modify-write, which is
+    # bit-for-bit only because one g-point is nominated to write it -- if every
+    # group wrote, their partial sums would interleave.
+    if SLVSW == TwoStreamSWRTE
+        track_cover = !isnothing(as.cloud_state.cld_cover_sw)
+        RRTMGP.update_sw_fluxes!(solver, fused_key)
+        serial_all = copy(Array(parent(solver.sws.flux.flux_net)))
+        serial_dir = copy(Array(parent(solver.sws.flux.flux_dn_dir)))
+        serial_clear = copy(Array(parent(solver.clear_flux_acc_sw.flux_net)))
+        serial_cover =
+            track_cover ? copy(Array(as.cloud_state.cld_cover_sw)) : nothing
+        serial_aod_ext = copy(Array(as.aerosol_state.aod_sw_ext))
+        serial_aod_sca = copy(Array(as.aerosol_state.aod_sw_sca))
+        for ng in (3, 16)
+            grouped = RRTMGPSolver(
+                grid_params,
+                radiation_method,
+                param_set,
+                bcs_lw,
+                bcs_sw,
+                as;
+                op_lw = Optics.TwoStream(grid_params),
+                op_sw = Optics.TwoStream(grid_params),
+                lookups = prebuilt_lookups,
+                ngpt_groups = ng,
+            )
+            @test n_gpt_groups(grouped.sws.gpt_groups) == ng
+            RRTMGP.update_sw_fluxes!(grouped, fused_key)
+            grouped_all = Array(parent(grouped.sws.flux.flux_net))
+            grouped_dir = Array(parent(grouped.sws.flux.flux_dn_dir))
+            grouped_clear = Array(parent(grouped.clear_flux_acc_sw.flux_net))
+            grouped_cover =
+                track_cover ? Array(as.cloud_state.cld_cover_sw) : nothing
+            for (g, ser) in (
+                (grouped_all, serial_all),
+                (grouped_dir, serial_dir),
+                (grouped_clear, serial_clear),
+            )
+                @test maximum(abs, g .- ser) <= 1e-5 * maximum(abs, ser)
+            end
+            # The cover is a count of cloudy g-points summed over the groups, so
+            # splitting the loop must not change it at all.
+            track_cover && @test grouped_cover == serial_cover
+            # One nominated writer, so this is equality rather than a tolerance.
+            @test Array(as.aerosol_state.aod_sw_ext) == serial_aod_ext
+            @test Array(as.aerosol_state.aod_sw_sca) == serial_aod_sca
+        end
+        RRTMGP.update_sw_fluxes!(solver)
+    end
+
     # --- the fallback and the key, asserted without reference fluxes ---------
     # Reproducibility and clear-sky equality are self-consistency properties, so
     # they can be checked on solver configurations this file has no reference

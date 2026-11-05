@@ -143,7 +143,8 @@ end
     igpt::Int,
     lkp::LookUpLW,
     lkp_cld::Union{LookUpCld, Nothing} = nothing,
-    lkp_aero::Union{LookUpAerosolMerra, Nothing} = nothing,    wcol::Int = gcol,
+    lkp_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
+    wcol::Int = gcol,
 )
     nlay = AtmosphericStates.get_nlay(as)
     (; vmr) = as
@@ -307,6 +308,8 @@ end
     lkp::LookUpSW,
     lkp_cld::Union{LookUpCld, Nothing} = nothing,
     lkp_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
+    wcol::Int = gcol,
+    collect_aod::Bool = true,
 )
     nlay = AtmosphericStates.get_nlay(as)
     (; vmr) = as
@@ -316,9 +319,9 @@ end
         col_dry_col = AtmosphericStates.col_dry_view(state_cache, as, gcol)
         p_lay_col = AtmosphericStates.p_lay_view(state_cache, as, gcol)
         t_lay_col = AtmosphericStates.t_lay_view(state_cache, as, gcol)
-        τ = view(op.τ, gcol, :)
-        ssa = view(op.ssa, gcol, :)
-        g = view(op.g, gcol, :)
+        τ = view(op.τ, wcol, :)
+        ssa = view(op.ssa, wcol, :)
+        g = view(op.g, wcol, :)
     end
     @inbounds for glay in 1:nlay
         col_dry, p_lay, t_lay =
@@ -342,8 +345,13 @@ end
     # order is observable at roundoff.
     if !isnothing(lkp_aero)
         (; iband_550nm) = lkp_aero
-        aod_sw_ext = view(as.aerosol_state.aod_sw_ext, gcol)
-        aod_sw_sca = view(as.aerosol_state.aod_sw_sca, gcol)
+        # Zeroed and re-accumulated per g-point, so it is a read-modify-write
+        # on one per-column address: concurrent groups would interleave their
+        # partial sums. `collect_aod` nominates a single writer.
+        aod_sw_ext =
+            collect_aod ? view(as.aerosol_state.aod_sw_ext, gcol) : nothing
+        aod_sw_sca =
+            collect_aod ? view(as.aerosol_state.aod_sw_sca, gcol) : nothing
         aero_mask = view(as.aerosol_state.aero_mask, :, gcol)
         aero_size = view(as.aerosol_state.aero_size, :, :, gcol)
         aero_mass = view(as.aerosol_state.aero_mass, :, :, gcol)
@@ -427,14 +435,16 @@ and the longwave one does not.
     gcol::Int,
     lkp_cld::LookUpCld,
     ibnd::Int,
+    mask_store = as.cloud_state.mask_sw,
+    wcol::Int = gcol,
 )
     cloud_state = as.cloud_state
     @inbounds begin
         add_cloud_optics_2stream!(
-            view(op.τ, gcol, :),
-            view(op.ssa, gcol, :),
-            view(op.g, gcol, :),
-            view(cloud_state.mask_sw, :, gcol),
+            view(op.τ, wcol, :),
+            view(op.ssa, wcol, :),
+            view(op.g, wcol, :),
+            view(mask_store, :, wcol),
             view(cloud_state.cld_r_eff_liq, :, gcol),
             view(cloud_state.cld_r_eff_ice, :, gcol),
             view(cloud_state.cld_path_liq, :, gcol),

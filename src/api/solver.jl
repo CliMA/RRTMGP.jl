@@ -285,6 +285,15 @@ function RRTMGPSolver(
     state_cache =
         radiation_method isa GrayRadiation ? nothing :
         RTE._default_state_cache(grid_params)
+    # Workspaces for the g-point-grouped fused shortwave solve, allocated on the
+    # same terms as the longwave ones below.
+    gpt_groups_sw =
+        (
+            !(op_sw isa OneScalar) &&
+            !(radiation_method isa GrayRadiation) &&
+            isnothing(band_flux_sw) &&
+            ngpt_groups > 1
+        ) ? RTE.SWGptGroups(grid_params, ngpt_groups) : nothing
     sws =
         op_sw isa OneScalar ?
         RTE.NoScatSWRTE(context, op_sw, bcs_sw, fluxb_sw, flux_sw, state_cache) :
@@ -297,6 +306,7 @@ function RRTMGPSolver(
             flux_sw, # views attached
             band_flux_sw, # optional per-band fluxes (or `nothing`)
             state_cache,
+            gpt_groups_sw, # per-group workspaces, or `nothing` for one group
         )
     # Workspaces for the g-point-grouped fused longwave solve. Only that solve
     # reads them, so they are allocated only where it can run: two-stream

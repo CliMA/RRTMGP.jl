@@ -12,7 +12,7 @@ using ..BCs
 import ..Parameters as RP
 
 export NoScatLWRTE, TwoStreamLWRTE, NoScatSWRTE, TwoStreamSWRTE
-export LWGptGroups, n_gpt_groups
+export LWGptGroups, SWGptGroups, n_gpt_groups
 
 # Device-dependent default for the workspaces' `state_cache` keyword. On the
 # GPU, a `TransposedStateCache` gives the g-point loop coalesced state reads
@@ -265,6 +265,7 @@ struct TwoStreamSWRTE{
     FXS <: FluxSW,
     FXBND,
     TSC,
+    GG,
 }
     context::C
     op::OP
@@ -274,11 +275,24 @@ struct TwoStreamSWRTE{
     flux::FXS
     band_flux::FXBND
     state_cache::TSC
+    gpt_groups::GG
 end
 Adapt.@adapt_structure TwoStreamSWRTE
 # By default no per-band (spectrally-resolved) fluxes are retained.
 TwoStreamSWRTE(context, op, src, bcs, fluxb, flux, band_flux) =
     TwoStreamSWRTE(context, op, src, bcs, fluxb, flux, band_flux, nothing)
+TwoStreamSWRTE(context, op, src, bcs, fluxb, flux, band_flux, state_cache) =
+    TwoStreamSWRTE(
+        context,
+        op,
+        src,
+        bcs,
+        fluxb,
+        flux,
+        band_flux,
+        state_cache,
+        nothing,
+    )
 
 function TwoStreamSWRTE(
     grid_params::RRTMGPGridParams;
@@ -288,6 +302,7 @@ function TwoStreamSWRTE(
     inc_flux_diffuse,
     sfc_alb_diffuse,
     state_cache = _default_state_cache(grid_params),
+    ngpt_groups::Int = DEFAULT_NGPT_GROUPS,
 )
     (; context) = grid_params
     op = TwoStream(grid_params)
@@ -301,6 +316,9 @@ function TwoStreamSWRTE(
     )
     fluxb = FluxSW(grid_params)
     flux = FluxSW(grid_params)
+    # Only the fused both-skies solve reads these; the others ignore them.
+    gpt_groups =
+        ngpt_groups > 1 ? SWGptGroups(grid_params, ngpt_groups) : nothing
     return TwoStreamSWRTE(
         context,
         op,
@@ -310,6 +328,7 @@ function TwoStreamSWRTE(
         flux,
         nothing,
         state_cache,
+        gpt_groups,
     )
 end
 

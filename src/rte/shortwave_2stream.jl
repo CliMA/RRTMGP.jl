@@ -308,6 +308,7 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
     ibnd::Int,
     nlev::Int,
     gcol::Int,
+    wcol::Int = gcol,
 ) where {FT}
     nlay = nlev - 1
     @inbounds begin
@@ -319,27 +320,27 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
     # cumulative optical depth and stored for the two passes below.
     flux_dn_dir_top = toa_flux * solar_frac * μ₀
     inv_μ₀ = FT(1) / max(μ₀, Numerics.μ₀_min(FT))
-    @inbounds flux_dn_dir[gcol, nlev] = flux_dn_dir_top
+    @inbounds flux_dn_dir[wcol, nlev] = flux_dn_dir_top
     τ_cum = FT(0)
     @inbounds for ilev in nlay:-1:1
-        τ_cum += τ[gcol, ilev]
-        flux_dn_dir[gcol, ilev] = flux_dn_dir_top * exp(-τ_cum * inv_μ₀)
+        τ_cum += τ[wcol, ilev]
+        flux_dn_dir[wcol, ilev] = flux_dn_dir_top * exp(-τ_cum * inv_μ₀)
     end
-    flux_dn_dir_bot = @inbounds flux_dn_dir[gcol, 1] # surface value
+    flux_dn_dir_bot = @inbounds flux_dn_dir[wcol, 1] # surface value
     sfc_source = flux_dn_dir_bot * sfc_alb_direct
 
-    @inbounds flux_dn[gcol, nlev] = FT(0) # set to incoming flux when provided?
+    @inbounds flux_dn[wcol, nlev] = FT(0) # set to incoming flux when provided?
     # Albedo of lowest level is the surface albedo...
     @inbounds surface_albedo =
-        albedo[gcol, 1] = bcs_sw.sfc_alb_diffuse[ibnd, gcol]
+        albedo[wcol, 1] = bcs_sw.sfc_alb_diffuse[ibnd, gcol]
     # ... and source of diffuse radiation is surface emission
-    @inbounds src[gcol, 1] = sfc_source
+    @inbounds src[wcol, 1] = sfc_source
     # From bottom to top of atmosphere --
     #   compute albedo and source of upward radiation
     albedo_ilev, src_ilev = surface_albedo, sfc_source
     @inbounds for ilev in 1:nlay
         τ_ilev, ssa_ilev, g_ilev =
-            τ[gcol, ilev], ssa[gcol, ilev], g[gcol, ilev]
+            τ[wcol, ilev], ssa[wcol, ilev], g[wcol, ilev]
         (Rdir, Tdir, _, Rdif, Tdif) =
             sw_2stream_coeffs(τ_ilev, ssa_ilev, g_ilev, μ₀)
         denom = FT(1) / (FT(1) - Rdif * albedo_ilev)  # Eq 10
@@ -348,43 +349,43 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
         # Equation 11 -- source is emitted upward radiation at top of layer plus
         # radiation emitted at bottom of layer,
         # transmitted through the layer and reflected from layers below (Tdiff*src*albedo)
-        flux_dn_dir_ilevplus1 = flux_dn_dir[gcol, ilev + 1]
+        flux_dn_dir_ilevplus1 = flux_dn_dir[wcol, ilev + 1]
         src_up_ilev = Rdir * flux_dn_dir_ilevplus1
         src_dn_ilev = Tdir * flux_dn_dir_ilevplus1
         src_ilevplus1 =
             src_up_ilev +
             Tdif * denom * (src_ilev + albedo_ilev * src_dn_ilev)
-        albedo[gcol, ilev + 1], src[gcol, ilev + 1] =
+        albedo[wcol, ilev + 1], src[wcol, ilev + 1] =
             albedo_ilevplus1, src_ilevplus1
         albedo_ilev = albedo_ilevplus1
         src_ilev = src_ilevplus1
     end
     # Eq 12, at the top of the domain upwelling diffuse is due to ...
-    @inbounds flux_up[gcol, nlev] =
-        flux_dn[gcol, nlev] * albedo[gcol, nlev] + # ... reflection of incident diffuse and
-        src[gcol, nlev]                          # scattering by the direct beam below
+    @inbounds flux_up[wcol, nlev] =
+        flux_dn[wcol, nlev] * albedo[wcol, nlev] + # ... reflection of incident diffuse and
+        src[wcol, nlev]                          # scattering by the direct beam below
 
     # From the top of the atmosphere downward -- compute fluxes
-    @inbounds flux_dn_ilevplus1 = flux_dn[gcol, nlev]
-    @inbounds flux_dn[gcol, nlev] += flux_dn_dir_top
+    @inbounds flux_dn_ilevplus1 = flux_dn[wcol, nlev]
+    @inbounds flux_dn[wcol, nlev] += flux_dn_dir_top
 
     ilev = nlay
     @inbounds while ilev ≥ 1
         τ_ilev, ssa_ilev, g_ilev =
-            τ[gcol, ilev], ssa[gcol, ilev], g[gcol, ilev]
-        albedo_ilev, src_ilev = albedo[gcol, ilev], src[gcol, ilev]
+            τ[wcol, ilev], ssa[wcol, ilev], g[wcol, ilev]
+        albedo_ilev, src_ilev = albedo[wcol, ilev], src[wcol, ilev]
         (_, Tdir, _, Rdif, Tdif) =
             sw_2stream_coeffs(τ_ilev, ssa_ilev, g_ilev, μ₀)
         denom = FT(1) / (FT(1) - Rdif * albedo_ilev)  # Eq 10
-        src_dn_ilev = Tdir * flux_dn_dir[gcol, ilev + 1]
+        src_dn_ilev = Tdir * flux_dn_dir[wcol, ilev + 1]
         flux_dn_ilev =
             (Tdif * flux_dn_ilevplus1 + # Equation 13
              Rdif * src_ilev +
              src_dn_ilev) * denom
-        flux_up[gcol, ilev] =
+        flux_up[wcol, ilev] =
             flux_dn_ilev * albedo_ilev + # Equation 12
             src_ilev
-        flux_dn[gcol, ilev] = flux_dn_ilev + flux_dn_dir[gcol, ilev]
+        flux_dn[wcol, ilev] = flux_dn_ilev + flux_dn_dir[wcol, ilev]
         flux_dn_ilevplus1 = flux_dn_ilev
         ilev -= 1
     end
@@ -418,8 +419,20 @@ function rte_sw_2stream_solve_both_skies! end
     ibnd,
     n_gpt,
     nlev,
+    mask_store = as.cloud_state isa CloudState ? as.cloud_state.mask_sw :
+                 nothing,
+    first_igpt = 1,
+    wcol = gcol,
+    collect_aod = true,
 )
-    cloudy = _build_cloud_mask!(as.cloud_state, Val(:mask_sw), gcol, igpt)
+    cloudy = _build_cloud_mask!(
+        as.cloud_state,
+        Val(:mask_sw),
+        gcol,
+        igpt,
+        mask_store,
+        wcol,
+    )
     # Gas and aerosol only: the clear sky, and the half both skies share
     compute_optical_props!(
         op,
@@ -430,24 +443,43 @@ function rte_sw_2stream_solve_both_skies! end
         lookup_sw,
         nothing,
         lookup_sw_aero,
+        wcol,
+        collect_aod,
     )
     if μ₀ > 0
         @inbounds solar_frac = lookup_sw.solar_src_scaled[igpt]
         rte_sw_2stream!(
-            op, src_sw, bcs_sw, flux, solar_frac, igpt, n_gpt, ibnd, nlev, gcol,
+            op, src_sw, bcs_sw, flux, solar_frac, igpt, n_gpt, ibnd, nlev,
+            gcol, wcol,
         )
-        _accumulate_fluxes!(flux_sw_clear, flux, gcol, nlev, igpt)
+        _accumulate_fluxes!(
+            flux_sw_clear,
+            flux,
+            wcol,
+            nlev,
+            igpt,
+            first_igpt,
+        )
     end
     # Add the cloud increment to the same optics and sweep again
     if !isnothing(lookup_sw_cld)
-        add_cloud_optics_sw!(op, as, gcol, lookup_sw_cld, ibnd)
+        add_cloud_optics_sw!(
+            op,
+            as,
+            gcol,
+            lookup_sw_cld,
+            ibnd,
+            mask_store,
+            wcol,
+        )
     end
     if μ₀ > 0
         @inbounds solar_frac = lookup_sw.solar_src_scaled[igpt]
         rte_sw_2stream!(
-            op, src_sw, bcs_sw, flux, solar_frac, igpt, n_gpt, ibnd, nlev, gcol,
+            op, src_sw, bcs_sw, flux, solar_frac, igpt, n_gpt, ibnd, nlev,
+            gcol, wcol,
         )
-        _accumulate_fluxes!(flux_sw, flux, gcol, nlev, igpt)
+        _accumulate_fluxes!(flux_sw, flux, wcol, nlev, igpt, first_igpt)
         accumulate_band_flux!(
             band_flux, flux.flux_up, flux.flux_dn, gcol, ibnd, nlev,
         )
@@ -462,7 +494,17 @@ Solve the shortwave problem for both skies in one pass over the g-points.
 See [`solve_lw_both_skies!`](@ref).
 """
 function solve_sw_both_skies!(
-    (; context, fluxb, flux, band_flux, src, bcs, op, state_cache)::TwoStreamSWRTE,
+    (;
+        context,
+        fluxb,
+        flux,
+        band_flux,
+        src,
+        bcs,
+        op,
+        state_cache,
+        gpt_groups,
+    )::TwoStreamSWRTE,
     flux_sw_clear::FluxSW,
     as::AtmosphericState,
     lookup_sw::LookUpSW,
@@ -485,6 +527,7 @@ function solve_sw_both_skies!(
         lookup_sw,
         lookup_sw_cld,
         lookup_sw_aero,
+        gpt_groups,
     )
     apply_metric_scaling!(flux, metric_scaling)
     apply_metric_scaling!(flux_sw_clear, metric_scaling)
@@ -509,6 +552,7 @@ function rte_sw_2stream_solve_both_skies!(
     lookup_sw::LookUpSW,
     lookup_sw_cld::Union{LookUpCld, Nothing},
     lookup_sw_aero::Union{LookUpAerosolMerra, Nothing},
+    gpt_groups = nothing,
 )
     nlay, ncol = AtmosphericStates.get_dims(as)
     nlev = nlay + 1
