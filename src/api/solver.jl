@@ -159,6 +159,7 @@ function RRTMGPSolver(
     lookups = nothing,
     spectral_fluxes = false,
     n_gauss_angles::Int = 1,
+    ngpt_groups::Int = RTE.default_ngpt_groups(grid_params),
 )
     (; context) = grid_params
 
@@ -284,6 +285,15 @@ function RRTMGPSolver(
     state_cache =
         radiation_method isa GrayRadiation ? nothing :
         RTE._default_state_cache(grid_params)
+    # Workspaces for the g-point-grouped fused shortwave solve, allocated on the
+    # same terms as the longwave ones below.
+    gpt_groups_sw =
+        (
+            !(op_sw isa OneScalar) &&
+            !(radiation_method isa GrayRadiation) &&
+            isnothing(band_flux_sw) &&
+            ngpt_groups > 1
+        ) ? RTE.SWGptGroups(grid_params, ngpt_groups) : nothing
     sws =
         op_sw isa OneScalar ?
         RTE.NoScatSWRTE(context, op_sw, bcs_sw, fluxb_sw, flux_sw, state_cache) :
@@ -296,7 +306,19 @@ function RRTMGPSolver(
             flux_sw, # views attached
             band_flux_sw, # optional per-band fluxes (or `nothing`)
             state_cache,
+            gpt_groups_sw, # per-group workspaces, or `nothing` for one group
         )
+    # Workspaces for the g-point-grouped fused longwave solve. Only that solve
+    # reads them, so they are allocated only where it can run: two-stream
+    # spectral longwave with no per-band fluxes to accumulate per g-point.
+    gpt_groups_lw =
+        (
+            !(op_lw isa OneScalar) &&
+            !(radiation_method isa GrayRadiation) &&
+            isnothing(band_flux_lw) &&
+            ngpt_groups > 1
+        ) ? RTE.LWGptGroups(grid_params, ngpt_groups; params) :
+        nothing
     lws =
         op_lw isa OneScalar ?
         RTE.NoScatLWRTE(
@@ -321,6 +343,7 @@ function RRTMGPSolver(
             flux_lw, # views attached
             band_flux_lw, # optional per-band fluxes (or `nothing`)
             state_cache,
+            gpt_groups_lw, # per-group workspaces, or `nothing` for one group
         )
     return RRTMGPSolver(
         grid_params,
