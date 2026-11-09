@@ -20,4 +20,5 @@ workspaces that make that possible.
 ```@docs
 LWGptGroups
 SWGptGroups
+default_ngpt_groups
 ```

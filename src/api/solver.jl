@@ -159,7 +159,7 @@ function RRTMGPSolver(
     lookups = nothing,
     spectral_fluxes = false,
     n_gauss_angles::Int = 1,
-    ngpt_groups::Int = RTE.DEFAULT_NGPT_GROUPS,
+    ngpt_groups::Int = RTE.default_ngpt_groups(grid_params),
 )
     (; context) = grid_params
 

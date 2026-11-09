@@ -27,11 +27,34 @@ _default_state_cache(::ClimaComms.AbstractCPUDevice, gp::RRTMGPGridParams) =
 _default_state_cache(::ClimaComms.AbstractDevice, gp::RRTMGPGridParams) =
     TransposedStateCache(gp)
 
-# How many pieces the fused longwave g-point loop is split into. One is the
-# serial loop every other solver uses; above one the solve widens its
-# workspaces to `ncol * ngroups` and covers them in a single kernel launch,
-# trading that memory for blocks the one wave cannot otherwise fill.
-const DEFAULT_NGPT_GROUPS = 16
+# How many pieces the fused g-point loop is split into. One is the serial loop
+# every other solver uses; above one the solve widens its workspaces to
+# `ncol * ngroups` and covers them in a single kernel launch, trading that
+# memory for blocks the one wave cannot otherwise fill.
+const MAX_NGPT_GROUPS = 16
+
+# Wide columns the default group count aims for. 393,216 is 1,536 blocks of 256
+# threads, some fourteen waves on 108 SMs, which is where the imbalance between
+# columns stops showing; past it another group adds no parallelism the scheduler
+# can use. Every widened workspace is linear in `ngroups`, so this is also what
+# bounds their memory: the accumulators alone are `ncol * ngroups * nlev` by
+# three fields in the longwave and four in the shortwave.
+const TARGET_GPT_GROUP_COLUMNS = 393216
+
+"""
+    default_ngpt_groups(grid_params::RRTMGPGridParams)
+
+How many g-point groups a two-stream solver widens to when the caller names
+none: enough to reach `TARGET_GPT_GROUP_COLUMNS` wide columns, capped at
+`MAX_NGPT_GROUPS`.
+
+A column count that already fills the device gets one group, because the grid it
+launches is wide enough without them and the workspaces cost memory linearly in
+the group count either way. Pass `ngpt_groups` explicitly to override this in
+either direction.
+"""
+default_ngpt_groups(grid_params::RRTMGPGridParams) =
+    clamp(cld(TARGET_GPT_GROUP_COLUMNS, grid_params.ncol), 1, MAX_NGPT_GROUPS)
 
 include("gpt_groups.jl")
 
@@ -162,7 +185,7 @@ function TwoStreamLWRTE(
     sfc_emis,
     inc_flux,
     state_cache = _default_state_cache(grid_params),
-    ngpt_groups::Int = DEFAULT_NGPT_GROUPS,
+    ngpt_groups::Int = default_ngpt_groups(grid_params),
 )
     (; context) = grid_params
     op = TwoStream(grid_params)
@@ -302,7 +325,7 @@ function TwoStreamSWRTE(
     inc_flux_diffuse,
     sfc_alb_diffuse,
     state_cache = _default_state_cache(grid_params),
-    ngpt_groups::Int = DEFAULT_NGPT_GROUPS,
+    ngpt_groups::Int = default_ngpt_groups(grid_params),
 )
     (; context) = grid_params
     op = TwoStream(grid_params)
