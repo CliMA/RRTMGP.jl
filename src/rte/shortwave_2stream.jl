@@ -58,6 +58,7 @@ end
     lookup_sw,
     lookup_sw_cld,
     lookup_sw_aero,
+    lookup_sw_precip,
     μ₀,
     ibnd,
     n_gpt,
@@ -73,6 +74,7 @@ end
         lookup_sw,
         lookup_sw_cld,
         lookup_sw_aero,
+        lookup_sw_precip,
     )
     if μ₀ > 0
         @inbounds solar_frac = lookup_sw.solar_src_scaled[igpt]
@@ -115,6 +117,7 @@ function rte_sw_2stream_solve!(
     lookup_sw::LookUpSW,
     lookup_sw_cld::Union{LookUpCld, Nothing} = nothing,
     lookup_sw_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
+    lookup_sw_precip::Union{LookUpPrecip, Nothing} = nothing,
 )
     nlay, ncol = AtmosphericStates.get_dims(as)
     nlev = nlay + 1
@@ -150,6 +153,7 @@ function rte_sw_2stream_solve!(
                     lookup_sw,
                     lookup_sw_cld,
                     lookup_sw_aero,
+                    lookup_sw_precip,
                     cos_zenith[gcol],
                     ibnd,
                     n_gpt,
@@ -226,7 +230,9 @@ doi:10.1175/1520-0469(1980)037<0630:TSATRT>2.0.CO;2
     # See Numerics.resonance_window for the sqrt(eps) choice.
     diff = FT(1) - k_μ2
     if abs(diff) < Numerics.resonance_window(FT)
-        k_μ2 = diff ≥ 0 ? FT(1) - Numerics.resonance_window(FT) : FT(1) + Numerics.resonance_window(FT)
+        k_μ2 =
+            diff ≥ 0 ? FT(1) - Numerics.resonance_window(FT) :
+            FT(1) + Numerics.resonance_window(FT)
         k_μ = sqrt(k_μ2)
     end
     k_γ3 = k * γ3
@@ -338,8 +344,7 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
     #   compute albedo and source of upward radiation
     albedo_ilev, src_ilev = surface_albedo, sfc_source
     @inbounds for ilev in 1:nlay
-        τ_ilev, ssa_ilev, g_ilev =
-            τ[gcol, ilev], ssa[gcol, ilev], g[gcol, ilev]
+        τ_ilev, ssa_ilev, g_ilev = τ[gcol, ilev], ssa[gcol, ilev], g[gcol, ilev]
         (Rdir, Tdir, _, Rdif, Tdif) =
             sw_2stream_coeffs(τ_ilev, ssa_ilev, g_ilev, μ₀)
         denom = FT(1) / (FT(1) - Rdif * albedo_ilev)  # Eq 10
@@ -352,8 +357,7 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
         src_up_ilev = Rdir * flux_dn_dir_ilevplus1
         src_dn_ilev = Tdir * flux_dn_dir_ilevplus1
         src_ilevplus1 =
-            src_up_ilev +
-            Tdif * denom * (src_ilev + albedo_ilev * src_dn_ilev)
+            src_up_ilev + Tdif * denom * (src_ilev + albedo_ilev * src_dn_ilev)
         albedo[gcol, ilev + 1], src[gcol, ilev + 1] =
             albedo_ilevplus1, src_ilevplus1
         albedo_ilev = albedo_ilevplus1
@@ -370,8 +374,7 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
 
     ilev = nlay
     @inbounds while ilev ≥ 1
-        τ_ilev, ssa_ilev, g_ilev =
-            τ[gcol, ilev], ssa[gcol, ilev], g[gcol, ilev]
+        τ_ilev, ssa_ilev, g_ilev = τ[gcol, ilev], ssa[gcol, ilev], g[gcol, ilev]
         albedo_ilev, src_ilev = albedo[gcol, ilev], src[gcol, ilev]
         (_, Tdir, _, Rdif, Tdif) =
             sw_2stream_coeffs(τ_ilev, ssa_ilev, g_ilev, μ₀)
@@ -414,6 +417,7 @@ function rte_sw_2stream_solve_both_skies! end
     lookup_sw,
     lookup_sw_cld,
     lookup_sw_aero,
+    lookup_sw_precip,
     μ₀,
     ibnd,
     n_gpt,
@@ -434,42 +438,83 @@ function rte_sw_2stream_solve_both_skies! end
     if μ₀ > 0
         @inbounds solar_frac = lookup_sw.solar_src_scaled[igpt]
         rte_sw_2stream!(
-            op, src_sw, bcs_sw, flux, solar_frac, igpt, n_gpt, ibnd, nlev, gcol,
+            op,
+            src_sw,
+            bcs_sw,
+            flux,
+            solar_frac,
+            igpt,
+            n_gpt,
+            ibnd,
+            nlev,
+            gcol,
         )
         _accumulate_fluxes!(flux_sw_clear, flux, gcol, nlev, igpt)
     end
     # Add the cloud increment to the same optics and sweep again
     if !isnothing(lookup_sw_cld)
-        add_cloud_optics_sw!(op, as, gcol, lookup_sw_cld, ibnd)
+        add_cloud_optics_sw!(
+            op,
+            as,
+            gcol,
+            lookup_sw_cld,
+            ibnd,
+            lookup_sw_precip,
+        )
     end
     if μ₀ > 0
         @inbounds solar_frac = lookup_sw.solar_src_scaled[igpt]
         rte_sw_2stream!(
-            op, src_sw, bcs_sw, flux, solar_frac, igpt, n_gpt, ibnd, nlev, gcol,
+            op,
+            src_sw,
+            bcs_sw,
+            flux,
+            solar_frac,
+            igpt,
+            n_gpt,
+            ibnd,
+            nlev,
+            gcol,
         )
         _accumulate_fluxes!(flux_sw, flux, gcol, nlev, igpt)
         accumulate_band_flux!(
-            band_flux, flux.flux_up, flux.flux_dn, gcol, ibnd, nlev,
+            band_flux,
+            flux.flux_up,
+            flux.flux_dn,
+            gcol,
+            ibnd,
+            nlev,
         )
     end
     return cloudy
 end
 
 """
-    solve_sw_both_skies!(sw, flux_sw_clear, as, lookup_sw, lookup_sw_cld, lookup_sw_aero, metric_scaling)
+    solve_sw_both_skies!(sw, flux_sw_clear, as, lookup_sw, lookup_sw_cld, lookup_sw_aero, metric_scaling, lookup_sw_precip)
 
 Solve the shortwave problem for both skies in one pass over the g-points.
 See [`solve_lw_both_skies!`](@ref).
 """
 function solve_sw_both_skies!(
-    (; context, fluxb, flux, band_flux, src, bcs, op, state_cache)::TwoStreamSWRTE,
+    (;
+        context,
+        fluxb,
+        flux,
+        band_flux,
+        src,
+        bcs,
+        op,
+        state_cache,
+    )::TwoStreamSWRTE,
     flux_sw_clear::FluxSW,
     as::AtmosphericState,
     lookup_sw::LookUpSW,
     lookup_sw_cld::Union{LookUpCld, Nothing} = nothing,
     lookup_sw_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
     metric_scaling::M = nothing,
+    lookup_sw_precip::Union{LookUpPrecip, Nothing} = nothing,
 ) where {M}
+    _check_precip_lookup(as, lookup_sw_cld, lookup_sw_precip)
     AtmosphericStates.refresh_transposed_state!(state_cache, as)
     rte_sw_2stream_solve_both_skies!(
         context.device,
@@ -485,6 +530,7 @@ function solve_sw_both_skies!(
         lookup_sw,
         lookup_sw_cld,
         lookup_sw_aero,
+        lookup_sw_precip,
     )
     apply_metric_scaling!(flux, metric_scaling)
     apply_metric_scaling!(flux_sw_clear, metric_scaling)
@@ -509,6 +555,7 @@ function rte_sw_2stream_solve_both_skies!(
     lookup_sw::LookUpSW,
     lookup_sw_cld::Union{LookUpCld, Nothing},
     lookup_sw_aero::Union{LookUpAerosolMerra, Nothing},
+    lookup_sw_precip::Union{LookUpPrecip, Nothing} = nothing,
 )
     nlay, ncol = AtmosphericStates.get_dims(as)
     nlev = nlay + 1
@@ -544,6 +591,7 @@ function rte_sw_2stream_solve_both_skies!(
                     lookup_sw,
                     lookup_sw_cld,
                     lookup_sw_aero,
+                    lookup_sw_precip,
                     cos_zenith[gcol],
                     ibnd,
                     n_gpt,

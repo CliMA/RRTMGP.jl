@@ -17,6 +17,22 @@ using ..LookUpTables
 export solve_lw!, solve_sw!
 export solve_lw_both_skies!, solve_sw_both_skies!
 
+@inline function _check_precip_lookup(
+    as::AtmosphericState,
+    lookup_cld::Union{LookUpCld, Nothing},
+    lookup_precip::Union{LookUpPrecip, Nothing},
+)
+    if !isnothing(lookup_cld) &&
+       as.cloud_state isa CloudState &&
+       !isnothing(as.cloud_state.cld_path_sno) &&
+       isnothing(lookup_precip)
+        error(
+            "snow optics requested (cld_path_sno !== nothing), but no LookUpPrecip lookup table was provided",
+        )
+    end
+    return nothing
+end
+
 include("driver_utils.jl")
 include("longwave_noscat.jl")
 include("longwave_2stream.jl")
@@ -24,8 +40,8 @@ include("shortwave_noscat.jl")
 include("shortwave_2stream.jl")
 
 """
-    solve_lw_both_skies!(solver, flux_lw_clear, as, lookup_lw, lookup_lw_cld, lookup_lw_aero, metric_scaling = nothing)
-    solve_sw_both_skies!(solver, flux_sw_clear, as, lookup_sw, lookup_sw_cld, lookup_sw_aero, metric_scaling = nothing)
+    solve_lw_both_skies!(solver, flux_lw_clear, as, lookup_lw, lookup_lw_cld, lookup_lw_aero, metric_scaling = nothing, lookup_lw_precip = nothing)
+    solve_sw_both_skies!(solver, flux_sw_clear, as, lookup_sw, lookup_sw_cld, lookup_sw_aero, metric_scaling = nothing, lookup_sw_precip = nothing)
 
 Fill the clear-sky and all-sky fluxes for one band, leaving the all-sky result in
 the solver's own flux and the clear-sky result in `flux_*_clear`.
@@ -52,7 +68,9 @@ function solve_lw_both_skies!(
     lookup_lw_cld::Union{LookUpCld, Nothing} = nothing,
     lookup_lw_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
     metric_scaling = nothing,
+    lookup_lw_precip::Union{LookUpPrecip, Nothing} = nothing,
 )
+    _check_precip_lookup(as, lookup_lw_cld, lookup_lw_precip)
     solve_lw!(solver, as, lookup_lw, nothing, lookup_lw_aero, metric_scaling)
     _copy_flux!(flux_lw_clear, solver.flux)
     solve_lw!(
@@ -62,6 +80,7 @@ function solve_lw_both_skies!(
         lookup_lw_cld,
         lookup_lw_aero,
         metric_scaling,
+        lookup_lw_precip,
     )
     return nothing
 end
@@ -74,7 +93,9 @@ function solve_sw_both_skies!(
     lookup_sw_cld::Union{LookUpCld, Nothing} = nothing,
     lookup_sw_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
     metric_scaling = nothing,
+    lookup_sw_precip::Union{LookUpPrecip, Nothing} = nothing,
 )
+    _check_precip_lookup(as, lookup_sw_cld, lookup_sw_precip)
     solve_sw!(solver, as, lookup_sw, nothing, lookup_sw_aero, metric_scaling)
     _copy_flux!(flux_sw_clear, solver.flux)
     solve_sw!(
@@ -84,6 +105,7 @@ function solve_sw_both_skies!(
         lookup_sw_cld,
         lookup_sw_aero,
         metric_scaling,
+        lookup_sw_precip,
     )
     return nothing
 end
@@ -146,9 +168,10 @@ end
         (; context, fluxb, flux, src, bcs, op, angle_disc)::NoScatLWRTE,
         as::AtmosphericState,
         lookup_lw::LookUpLW,
-        lookup_lw_cld::Union{LookUpCld, Nothing},
-        lookup_lw_aero::Union{LookUpAerosolMerra, Nothing},
-        metric_scaling = nothing
+        lookup_lw_cld::Union{LookUpCld, Nothing} = nothing,
+        lookup_lw_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
+        metric_scaling = nothing,
+        lookup_lw_precip::Union{LookUpPrecip, Nothing} = nothing,
     )
 
 Non-scattering RTE solver for the longwave problem, using RRTMGP optics.
@@ -156,13 +179,24 @@ The optional `metric_scaling` argument scales the fluxes to account for column e
 in `deep-atmosphere` configurations.
 """
 function solve_lw!(
-    (; context, fluxb, flux, src, bcs, op, angle_disc, state_cache)::NoScatLWRTE,
+    (;
+        context,
+        fluxb,
+        flux,
+        src,
+        bcs,
+        op,
+        angle_disc,
+        state_cache,
+    )::NoScatLWRTE,
     as::AtmosphericState,
     lookup_lw::LookUpLW,
     lookup_lw_cld::Union{LookUpCld, Nothing} = nothing,
     lookup_lw_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
     metric_scaling::M = nothing,
+    lookup_lw_precip::Union{LookUpPrecip, Nothing} = nothing,
 ) where {M}
+    _check_precip_lookup(as, lookup_lw_cld, lookup_lw_precip)
     AtmosphericStates.refresh_transposed_state!(state_cache, as)
     rte_lw_noscat_solve!(
         context.device,
@@ -177,6 +211,7 @@ function solve_lw!(
         lookup_lw,
         lookup_lw_cld,
         lookup_lw_aero,
+        lookup_lw_precip,
     )
     apply_metric_scaling!(flux, metric_scaling)
 end
@@ -186,9 +221,10 @@ end
         (; context, fluxb, flux, band_flux, src, bcs, op)::TwoStreamLWRTE,
         as::AtmosphericState,
         lookup_lw::LookUpLW,
-        lookup_lw_cld::Union{LookUpCld, Nothing},
-        lookup_lw_aero::Union{LookUpAerosolMerra, Nothing},
-        metric_scaling = nothing
+        lookup_lw_cld::Union{LookUpCld, Nothing} = nothing,
+        lookup_lw_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
+        metric_scaling = nothing,
+        lookup_lw_precip::Union{LookUpPrecip, Nothing} = nothing,
     )
 
 `Two Stream` RTE solver for the longwave problem, using RRTMGP optics.
@@ -196,13 +232,24 @@ The optional `metric_scaling` argument scales the fluxes to account for column e
 in `deep-atmosphere` configurations.
 """
 function solve_lw!(
-    (; context, fluxb, flux, band_flux, src, bcs, op, state_cache)::TwoStreamLWRTE,
+    (;
+        context,
+        fluxb,
+        flux,
+        band_flux,
+        src,
+        bcs,
+        op,
+        state_cache,
+    )::TwoStreamLWRTE,
     as::AtmosphericState,
     lookup_lw::LookUpLW,
     lookup_lw_cld::Union{LookUpCld, Nothing} = nothing,
     lookup_lw_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
     metric_scaling::M = nothing,
+    lookup_lw_precip::Union{LookUpPrecip, Nothing} = nothing,
 ) where {M}
+    _check_precip_lookup(as, lookup_lw_cld, lookup_lw_precip)
     AtmosphericStates.refresh_transposed_state!(state_cache, as)
     rte_lw_2stream_solve!(
         context.device,
@@ -217,6 +264,7 @@ function solve_lw!(
         lookup_lw,
         lookup_lw_cld,
         lookup_lw_aero,
+        lookup_lw_precip,
     )
     apply_metric_scaling!(flux, metric_scaling)
     apply_metric_scaling!(band_flux, metric_scaling)
@@ -291,9 +339,10 @@ end
         (; context, fluxb, flux, band_flux, src, bcs, op)::TwoStreamSWRTE,
         as::AtmosphericState,
         lookup_sw::LookUpSW,
-        lookup_sw_cld::Union{LookUpCld, Nothing},
-        lookup_sw_aero::Union{LookUpAerosolMerra, Nothing},
-        metric_scaling = nothing
+        lookup_sw_cld::Union{LookUpCld, Nothing} = nothing,
+        lookup_sw_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
+        metric_scaling = nothing,
+        lookup_sw_precip::Union{LookUpPrecip, Nothing} = nothing,
     )
 
 `Two Stream` RTE solver for the shortwave problem, using RRTMGP optics.
@@ -301,13 +350,24 @@ The optional `metric_scaling` argument scales the fluxes to account for column e
 in `deep-atmosphere` configurations.
 """
 function solve_sw!(
-    (; context, fluxb, flux, band_flux, src, bcs, op, state_cache)::TwoStreamSWRTE,
+    (;
+        context,
+        fluxb,
+        flux,
+        band_flux,
+        src,
+        bcs,
+        op,
+        state_cache,
+    )::TwoStreamSWRTE,
     as::AtmosphericState,
     lookup_sw::LookUpSW,
     lookup_sw_cld::Union{LookUpCld, Nothing} = nothing,
     lookup_sw_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
     metric_scaling::M = nothing,
+    lookup_sw_precip::Union{LookUpPrecip, Nothing} = nothing,
 ) where {M}
+    _check_precip_lookup(as, lookup_sw_cld, lookup_sw_precip)
     AtmosphericStates.refresh_transposed_state!(state_cache, as)
     rte_sw_2stream_solve!(
         context.device,
@@ -322,6 +382,7 @@ function solve_sw!(
         lookup_sw,
         lookup_sw_cld,
         lookup_sw_aero,
+        lookup_sw_precip,
     )
     apply_metric_scaling!(flux, metric_scaling)
     apply_metric_scaling!(band_flux, metric_scaling)
