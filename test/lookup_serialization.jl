@@ -10,12 +10,7 @@ import Serialization
 # so the spectral methods can run from the cache without NCDatasets.
 @testset "lookup-table serialization round-trip" begin
     context = ClimaComms.context()
-    gp = RRTMGP.RRTMGPGridParams(
-        Float64;
-        context,
-        domain_nlay = 10,
-        ncol = 2,
-    )
+    gp = RRTMGP.RRTMGPGridParams(Float64; context, domain_nlay = 10, ncol = 2)
     method = RRTMGP.AllSkyRadiationWithClearSkyDiagnostics(true, false)
     bundle = RRTMGP.lookup_tables(gp, method)
     @test bundle isa RRTMGP.LookupBundle
@@ -35,6 +30,20 @@ import Serialization
     @test Array(loaded.lookup_sw.solar_src_scaled) ==
           Array(bundle.lookup_sw.solar_src_scaled)
     @test !isnothing(loaded.lookup_lw_cld) && !isnothing(loaded.lookup_sw_aero)
+    # verify snow and rain lookup tables are populated and preserved
+    for cld_lkp in (loaded.lookup_lw_cld, loaded.lookup_sw_cld)
+        @test RRTMGP.LookUpTables.get_nsize_sno(cld_lkp) == 64
+        @test RRTMGP.LookUpTables.get_nsize_rai(cld_lkp) == 64
+        bnds = Array(cld_lkp.bounds)
+        @test length(bnds) == 8
+        @test bnds[5] ≈ 5.0 && bnds[6] ≈ 1100.0
+        @test bnds[7] ≈ 5.0 && bnds[8] ≈ 5000.0
+        extsno, ssasno, asysno = RRTMGP.LookUpTables.getview_snodata(cld_lkp, 1)
+        # Extinction decreases monotonically with particle radius for large snow
+        @test Array(extsno)[end] < Array(extsno)[1]
+        @test all(0 .<= Array(ssasno) .<= 1)
+        @test all(0 .<= Array(asysno) .<= 1)
+    end
     # gray bundles round-trip too (all-nothing tables)
     gray = RRTMGP.lookup_tables(gp, RRTMGP.GrayRadiation())
     path2 = joinpath(mktempdir(), "gray.jls")

@@ -1,7 +1,7 @@
 module ArtifactPaths
 
 using Artifacts
-import .._get_artifact_path
+import .._get_artifact_path, .._get_cloud_artifact_path
 
 export get_lookup_filename, get_input_filename
 
@@ -35,9 +35,9 @@ function get_lookup_filename(optics_type::Symbol, λ::Symbol)
     config == (:gas, :sw) && return joinpath(basedir, "rrtmgp-gas-sw-g224.nc")
 
     config == (:cloud, :lw) &&
-        return joinpath(basedir, "rrtmgp-clouds-lw-bnd.nc")
+        return joinpath(_get_cloud_artifact_path(), "rrtmgp-clouds-lw-bnd.nc")
     config == (:cloud, :sw) &&
-        return joinpath(basedir, "rrtmgp-clouds-sw-bnd.nc")
+        return joinpath(_get_cloud_artifact_path(), "rrtmgp-clouds-sw-bnd.nc")
 
     config == (:aerosol, :lw) &&
         return joinpath(basedir, "rrtmgp-aerosols-merra-lw.nc")

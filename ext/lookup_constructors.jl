@@ -725,27 +725,73 @@ function LookUpSW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
 end
 
 function LookUpCld(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
+    has_sno = haskey(ds.dim, "nsize_sno")
+    has_rai = haskey(ds.dim, "nsize_rai")
+    nsize_sno = has_sno ? Int(ds.dim["nsize_sno"]) : Int(ds.dim["nsize_ice"])
+    nsize_rai = has_rai ? Int(ds.dim["nsize_rai"]) : Int(ds.dim["nsize_liq"])
     dims = DA([
         Int(ds.dim["nband"]),
         Int(ds.dim["nrghice"]),
         Int(ds.dim["nsize_liq"]),
         Int(ds.dim["nsize_ice"]),
         Int(ds.dim["pair"]),
+        nsize_sno,
+        nsize_rai,
     ])
+    radliq_lwr = FT(ds["radliq_lwr"][])
+    radliq_upr = FT(ds["radliq_upr"][])
+    radice_lwr = FT(ds["diamice_lwr"][]) / 2
+    radice_upr = FT(ds["diamice_upr"][]) / 2
+    radsno_lwr = has_sno ? FT(ds["radsno_lwr"][]) : radice_lwr
+    radsno_upr = has_sno ? FT(ds["radsno_upr"][]) : radice_upr
+    radrai_lwr = has_rai ? FT(ds["radrai_lwr"][]) : radliq_lwr
+    radrai_upr = has_rai ? FT(ds["radrai_upr"][]) : radliq_upr
     bounds = DA([
-        # liquid particle size lower bound for LUT interpolation
-        FT(ds["radliq_lwr"][]),
-        # liquid particle size upper bound for LUT interpolation
-        FT(ds["radliq_upr"][]),
-        # ice particle size lower bound for LUT interpolation
-        FT(ds["diamice_lwr"][]) / 2,
-        # ice particle size upper bound for LUT interpolation
-        FT(ds["diamice_upr"][]) / 2,
+        radliq_lwr,
+        radliq_upr,
+        radice_lwr,
+        radice_upr,
+        radsno_lwr,
+        radsno_upr,
+        radrai_lwr,
+        radrai_upr,
     ])
-    liqdata =
-        DA(vcat(Array(ds["extliq"]), Array(ds["ssaliq"]), Array(ds["asyliq"])))
-    icedata =
-        DA(vcat(Array(ds["extice"]), Array(ds["ssaice"]), Array(ds["asyice"])))
-    bnd_lims_wn = DA(Array(ds["bnd_limits_wavenumber"]))
-    return LookUpCld(dims, bounds, liqdata, icedata, bnd_lims_wn)
+    liqdata_cpu = vcat(
+        Array{FT}(ds["extliq"]),
+        Array{FT}(ds["ssaliq"]),
+        Array{FT}(ds["asyliq"]),
+    )
+    icedata_cpu = vcat(
+        Array{FT}(ds["extice"]),
+        Array{FT}(ds["ssaice"]),
+        Array{FT}(ds["asyice"]),
+    )
+    snodata_cpu =
+        has_sno ?
+        vcat(
+            Array{FT}(ds["extsno"]),
+            Array{FT}(ds["ssasno"]),
+            Array{FT}(ds["asysno"]),
+        ) : icedata_cpu[:, :, 2]
+    raidata_cpu =
+        has_rai ?
+        vcat(
+            Array{FT}(ds["extrai"]),
+            Array{FT}(ds["ssarai"]),
+            Array{FT}(ds["asyrai"]),
+        ) : liqdata_cpu
+    liqdata = DA(liqdata_cpu)
+    icedata = DA(icedata_cpu)
+    bnd_lims_wn = DA(Array{FT}(ds["bnd_limits_wavenumber"]))
+    snodata = DA(snodata_cpu)
+    raidata = DA(raidata_cpu)
+    return LookUpCld(
+        dims,
+        bounds,
+        liqdata,
+        icedata,
+        bnd_lims_wn,
+        snodata,
+        raidata,
+    )
 end
