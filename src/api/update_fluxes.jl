@@ -44,6 +44,7 @@ update_lw_fluxes!(s::RRTMGPSolver, ::AllSkyRadiation) = RTESolver.solve_lw!(
     _lookup_tables(s).lookup_lw_cld,
     _lookup_tables(s).lookup_lw_aero,
     _deep_atmosphere_inverse_scaling(s),
+    _lookup_tables(s).lookup_lw_precip,
 )
 function update_lw_fluxes!(
     s::RRTMGPSolver,
@@ -63,6 +64,7 @@ function update_lw_fluxes!(
         lookups.lookup_lw_cld,
         lookups.lookup_lw_aero,
         ms,
+        lookups.lookup_lw_precip,
     )
     # snapshot the clear-sky fluxes into their (nlev, ncol) presentation
     Fluxes.update_presentation!(s.clear_flux_lw, s.clear_flux_acc_lw)
@@ -110,6 +112,7 @@ update_sw_fluxes!(s::RRTMGPSolver, ::AllSkyRadiation) = RTESolver.solve_sw!(
     _lookup_tables(s).lookup_sw_cld,
     _lookup_tables(s).lookup_sw_aero,
     _deep_atmosphere_inverse_scaling(s),
+    _lookup_tables(s).lookup_sw_precip,
 )
 function update_sw_fluxes!(
     s::RRTMGPSolver,
@@ -128,6 +131,7 @@ function update_sw_fluxes!(
         lookups.lookup_sw_cld,
         lookups.lookup_sw_aero,
         ms,
+        lookups.lookup_sw_precip,
     )
     # snapshot the clear-sky fluxes into their (nlev, ncol) presentation
     Fluxes.update_presentation!(s.clear_flux_sw, s.clear_flux_acc_sw)
@@ -159,11 +163,8 @@ _idx_h2o(s::RRTMGPSolver, ::AbstractRRTMGPMethod) =
 # clear-sky state has it but leaves it `nothing`.
 _set_mcica_key!(as, seedval, context) =
     _set_cloud_key!(as.cloud_state, seedval, context)
-_set_mcica_key!(
-    as::AtmosphericStates.GrayAtmosphericState,
-    seedval,
-    context,
-) = nothing
+_set_mcica_key!(as::AtmosphericStates.GrayAtmosphericState, seedval, context) =
+    nothing
 _set_cloud_key!(::Nothing, seedval, context) = nothing
 function _set_cloud_key!(cloud_state, seedval, context)
     fill!(cloud_state.mcica_key, _mcica_key(seedval) ⊻ _rank_salt(context))
@@ -179,9 +180,8 @@ _rank_salt(context) =
 # Integral floats convert; a non-integral value cannot be a key.
 _mcica_key(seedval::Integer) = seedval % UInt32
 function _mcica_key(seedval::Real)
-    isinteger(seedval) || throw(
-        ArgumentError("seedval must be an integer, got $seedval"),
-    )
+    isinteger(seedval) ||
+        throw(ArgumentError("seedval must be an integer, got $seedval"))
     # Signed truncation then a wrapping `%`, not `unsafe_trunc(UInt32, ...)`:
     # `fptoui` of a negative value is undefined, both steps here are defined.
     return unsafe_trunc(Int64, seedval) % UInt32
@@ -228,7 +228,9 @@ function update_net_fluxes!(
     return nothing
 end
 
-_update_band_net_fluxes!(ws) = _update_band_net_fluxes!(hasproperty(ws, :band_flux) ? ws.band_flux : nothing)
+_update_band_net_fluxes!(ws) = _update_band_net_fluxes!(
+    hasproperty(ws, :band_flux) ? ws.band_flux : nothing,
+)
 _update_band_net_fluxes!(::Nothing) = nothing
 function _update_band_net_fluxes!(band::Fluxes.FluxBand)
     band.flux_net .= band.flux_up .- band.flux_dn

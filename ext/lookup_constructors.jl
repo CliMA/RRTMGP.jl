@@ -1,5 +1,10 @@
 import RRTMGP.LookUpTables:
-    LookUpAerosolMerra, LookUpLW, LookUpSW, LookUpCld, LookUpPlanck
+    LookUpAerosolMerra,
+    LookUpLW,
+    LookUpSW,
+    LookUpCld,
+    LookUpPrecip,
+    LookUpPlanck
 import RRTMGP.LookUpTables: LookUpMinor, ReferencePoints, BandData
 
 # The RTE/optics kernels hard-code the water-vapor and ozone slots of the gas
@@ -725,73 +730,66 @@ function LookUpSW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
 end
 
 function LookUpCld(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
-    has_sno = haskey(ds.dim, "nsize_sno")
-    has_rai = haskey(ds.dim, "nsize_rai")
-    nsize_sno = has_sno ? Int(ds.dim["nsize_sno"]) : Int(ds.dim["nsize_ice"])
-    nsize_rai = has_rai ? Int(ds.dim["nsize_rai"]) : Int(ds.dim["nsize_liq"])
     dims = DA([
         Int(ds.dim["nband"]),
         Int(ds.dim["nrghice"]),
         Int(ds.dim["nsize_liq"]),
         Int(ds.dim["nsize_ice"]),
         Int(ds.dim["pair"]),
-        nsize_sno,
-        nsize_rai,
     ])
     radliq_lwr = FT(ds["radliq_lwr"][])
     radliq_upr = FT(ds["radliq_upr"][])
     radice_lwr = FT(ds["diamice_lwr"][]) / 2
     radice_upr = FT(ds["diamice_upr"][]) / 2
-    radsno_lwr = has_sno ? FT(ds["radsno_lwr"][]) : radice_lwr
-    radsno_upr = has_sno ? FT(ds["radsno_upr"][]) : radice_upr
-    radrai_lwr = has_rai ? FT(ds["radrai_lwr"][]) : radliq_lwr
-    radrai_upr = has_rai ? FT(ds["radrai_upr"][]) : radliq_upr
-    bounds = DA([
-        radliq_lwr,
-        radliq_upr,
-        radice_lwr,
-        radice_upr,
-        radsno_lwr,
-        radsno_upr,
-        radrai_lwr,
-        radrai_upr,
+    bounds = DA([radliq_lwr, radliq_upr, radice_lwr, radice_upr])
+    liqdata = DA(
+        vcat(
+            Array{FT}(ds["extliq"]),
+            Array{FT}(ds["ssaliq"]),
+            Array{FT}(ds["asyliq"]),
+        ),
+    )
+    icedata = DA(
+        vcat(
+            Array{FT}(ds["extice"]),
+            Array{FT}(ds["ssaice"]),
+            Array{FT}(ds["asyice"]),
+        ),
+    )
+    bnd_lims_wn = DA(Array{FT}(ds["bnd_limits_wavenumber"]))
+    return LookUpCld(dims, bounds, liqdata, icedata, bnd_lims_wn)
+end
+
+function LookUpPrecip(
+    ds,
+    ::Type{FT},
+    ::Type{DA},
+) where {FT <: AbstractFloat, DA}
+    dims = DA([
+        Int(ds.dim["nband"]),
+        Int(ds.dim["nsize_sno"]),
+        Int(ds.dim["nsize_rai"]),
+        Int(ds.dim["pair"]),
     ])
-    liqdata_cpu = vcat(
-        Array{FT}(ds["extliq"]),
-        Array{FT}(ds["ssaliq"]),
-        Array{FT}(ds["asyliq"]),
-    )
-    icedata_cpu = vcat(
-        Array{FT}(ds["extice"]),
-        Array{FT}(ds["ssaice"]),
-        Array{FT}(ds["asyice"]),
-    )
-    snodata_cpu =
-        has_sno ?
+    radsno_lwr = FT(ds["radsno_lwr"][])
+    radsno_upr = FT(ds["radsno_upr"][])
+    radrai_lwr = FT(ds["radrai_lwr"][])
+    radrai_upr = FT(ds["radrai_upr"][])
+    bounds = DA([radsno_lwr, radsno_upr, radrai_lwr, radrai_upr])
+    snodata = DA(
         vcat(
             Array{FT}(ds["extsno"]),
             Array{FT}(ds["ssasno"]),
             Array{FT}(ds["asysno"]),
-        ) : icedata_cpu[:, :, 2]
-    raidata_cpu =
-        has_rai ?
+        ),
+    )
+    raidata = DA(
         vcat(
             Array{FT}(ds["extrai"]),
             Array{FT}(ds["ssarai"]),
             Array{FT}(ds["asyrai"]),
-        ) : liqdata_cpu
-    liqdata = DA(liqdata_cpu)
-    icedata = DA(icedata_cpu)
-    bnd_lims_wn = DA(Array{FT}(ds["bnd_limits_wavenumber"]))
-    snodata = DA(snodata_cpu)
-    raidata = DA(raidata_cpu)
-    return LookUpCld(
-        dims,
-        bounds,
-        liqdata,
-        icedata,
-        bnd_lims_wn,
-        snodata,
-        raidata,
+        ),
     )
+    bnd_lims_wn = DA(Array{FT}(ds["bnd_limits_wavenumber"]))
+    return LookUpPrecip(dims, bounds, snodata, raidata, bnd_lims_wn)
 end

@@ -151,8 +151,8 @@ mirror these: `clear_lw_flux_up`/`clear_lw_flux_dn`/`clear_lw_flux_net`,
 
 | Getter | Quantity | Shape |
 |---|---|---|
-| `cloud_liquid_effective_radius`, `cloud_ice_effective_radius` | cloud effective radii [µm] | `(nlay, ncol)` |
-| `cloud_liquid_water_path`, `cloud_ice_water_path` | cloud water paths [g/m²] | `(nlay, ncol)` |
+| `cloud_liquid_effective_radius`, `cloud_ice_effective_radius`, `cloud_snow_effective_radius` | cloud and snow effective radii [µm] | `(nlay, ncol)` |
+| `cloud_liquid_water_path`, `cloud_ice_water_path`, `cloud_snow_water_path` | cloud and snow water paths [g/m²] | `(nlay, ncol)` |
 | `cloud_fraction` | cloud fraction | `(nlay, ncol)` |
 | `lw_cloud_cover`, `sw_cloud_cover` | diagnosed column cloud cover | `(ncol,)` |
 | [`aerosol_radius`](@ref RRTMGP.aerosol_radius)`(s, name)`, [`aerosol_column_mass_density`](@ref RRTMGP.aerosol_column_mass_density)`(s, name)` | per-species aerosol size / column mass | `(nlay, ncol)` |

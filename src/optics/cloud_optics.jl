@@ -9,15 +9,18 @@
         ice_rgh,
         lkp_cld,
         ibnd;
+        lkp_precip = nothing,
         cld_r_eff_sno = nothing,
         cld_path_sno = nothing,
     )
 
-Compute the `OneScalar` (longwave) cloud optics properties and add them to the
-gas optics. When a snow water path is supplied (`cld_path_sno` non-`nothing`),
-snow optical depth is computed from the dedicated snow lookup table (`snodata`,
-log-uniform in effective radius from `radsno_lwr` to `radsno_upr`) via
-[`compute_lookup_cld_log_props`](@ref).
+Compute the `OneScalar` (longwave) cloud and snow optical depths and add them to
+the gas optical depth in layers where `cld_mask` is `true` (sampled from
+`cloud_fraction`). When a snow water path is supplied (`cld_path_sno`
+non-`nothing`), `lkp_precip::LookUpPrecip` must also be provided; snow optical
+depth is evaluated from `lkp_precip` (`snodata`, log-uniform in effective radius
+from `radsno_lwr` to `radsno_upr`) via [`compute_lookup_precip_props`](@ref).
+Rain optics are not yet wired here.
 """
 @inline function add_cloud_optics_1scalar!(
     τ,
@@ -29,20 +32,23 @@ log-uniform in effective radius from `radsno_lwr` to `radsno_upr`) via
     ice_rgh,
     lkp_cld::LookUpCld,
     ibnd;
+    lkp_precip::Union{LookUpPrecip, Nothing} = nothing,
     cld_r_eff_sno = nothing,
     cld_path_sno = nothing,
 )
+    use_snow = !isnothing(cld_path_sno)
+    if use_snow && isnothing(lkp_precip)
+        error(
+            "snow optics requested (cld_path_sno !== nothing), but no LookUpPrecip lookup table was provided",
+        )
+    end
     @inbounds begin
         nlay = length(τ)
         extliq, ssaliq, asyliq = LookUpTables.getview_liqdata(lkp_cld, ibnd)
         extice, ssaice, asyice =
             LookUpTables.getview_icedata(lkp_cld, ibnd, ice_rgh)
-        extsno, ssasno, asysno = LookUpTables.getview_snodata(lkp_cld, ibnd)
-        _, _, nsize_liq, nsize_ice, _, nsize_sno = lkp_cld.dims
-        radliq_lwr, radliq_upr, radice_lwr, radice_upr, radsno_lwr, radsno_upr =
-            lkp_cld.bounds
-
-        use_snow = !isnothing(cld_path_sno)
+        _, _, nsize_liq, nsize_ice, _ = lkp_cld.dims
+        radliq_lwr, radliq_upr, radice_lwr, radice_upr = lkp_cld.bounds
 
         for glay in 1:nlay
             if cld_mask[glay]
@@ -68,7 +74,12 @@ log-uniform in effective radius from `radsno_lwr` to `radsno_upr`) via
                 )
                 τ[glay] += (τl - τl_ssa) + (τi - τi_ssa)
                 if use_snow
-                    τs, τs_ssa, _ = compute_lookup_cld_log_props(
+                    extsno, ssasno, asysno =
+                        LookUpTables.getview_snodata(lkp_precip, ibnd)
+                    nsize_sno = LookUpTables.get_nsize_sno(lkp_precip)
+                    radsno_lwr, radsno_upr =
+                        lkp_precip.bounds[1], lkp_precip.bounds[2]
+                    τs, τs_ssa, _ = compute_lookup_precip_props(
                         nsize_sno,
                         radsno_lwr,
                         radsno_upr,
@@ -99,17 +110,20 @@ end
         ice_rgh,
         lkp_cld,
         ibnd;
+        lkp_precip = nothing,
         cld_r_eff_sno = nothing,
         cld_path_sno = nothing,
         delta_scaling = false,
     )
 
-Compute the `TwoStream` cloud optics properties and add them to the `TwoStream`
-gas optics properties. When a snow water path is supplied (`cld_path_sno`
-non-`nothing`), snow optical properties (`τ`, `τ*ssa`, `τ*ssa*g`) are computed
-from the dedicated snow lookup table (`snodata`, log-uniform in effective radius
-from `radsno_lwr` to `radsno_upr`) via [`compute_lookup_cld_log_props`](@ref)
-and combined with cloud liquid and ice before delta-scaling.
+Compute the `TwoStream` cloud and snow optical properties and add them to the
+`TwoStream` gas/aerosol optical properties in layers where `cld_mask` is `true`
+(sampled from `cloud_fraction`). When a snow water path is supplied
+(`cld_path_sno` non-`nothing`), `lkp_precip::LookUpPrecip` must also be
+provided; snow optical properties (`τ`, `τ*ssa`, `τ*ssa*g`) are computed from
+`lkp_precip` (`snodata`, log-uniform in effective radius from `radsno_lwr` to
+`radsno_upr`) via [`compute_lookup_precip_props`](@ref) and combined with cloud
+liquid and ice before delta-scaling. Rain optics are not yet wired here.
 """
 @inline function add_cloud_optics_2stream!(
     τ,
@@ -123,21 +137,24 @@ and combined with cloud liquid and ice before delta-scaling.
     ice_rgh,
     lkp_cld::LookUpCld,
     ibnd;
+    lkp_precip::Union{LookUpPrecip, Nothing} = nothing,
     cld_r_eff_sno = nothing,
     cld_path_sno = nothing,
     delta_scaling = false,
 )
+    use_snow = !isnothing(cld_path_sno)
+    if use_snow && isnothing(lkp_precip)
+        error(
+            "snow optics requested (cld_path_sno !== nothing), but no LookUpPrecip lookup table was provided",
+        )
+    end
     nlay = length(τ)
     FT = eltype(τ)
     extliq, ssaliq, asyliq = LookUpTables.getview_liqdata(lkp_cld, ibnd)
     extice, ssaice, asyice =
         LookUpTables.getview_icedata(lkp_cld, ibnd, ice_rgh)
-    extsno, ssasno, asysno = LookUpTables.getview_snodata(lkp_cld, ibnd)
-    _, _, nsize_liq, nsize_ice, _, nsize_sno = lkp_cld.dims
-    radliq_lwr, radliq_upr, radice_lwr, radice_upr, radsno_lwr, radsno_upr =
-        lkp_cld.bounds
-
-    use_snow = !isnothing(cld_path_sno)
+    @inbounds _, _, nsize_liq, nsize_ice, _ = lkp_cld.dims
+    @inbounds radliq_lwr, radliq_upr, radice_lwr, radice_upr = lkp_cld.bounds
 
     @inbounds begin
         for glay in 1:nlay
@@ -167,7 +184,12 @@ and combined with cloud liquid and ice before delta-scaling.
                 ssa_cl = τl_ssa + τi_ssa      # running Σ τ*ssa
                 ssag_cl = τl_ssag + τi_ssag   # running Σ τ*ssa*g
                 if use_snow
-                    τs, τs_ssa, τs_ssag = compute_lookup_cld_log_props(
+                    extsno, ssasno, asysno =
+                        LookUpTables.getview_snodata(lkp_precip, ibnd)
+                    nsize_sno = LookUpTables.get_nsize_sno(lkp_precip)
+                    radsno_lwr, radsno_upr =
+                        lkp_precip.bounds[1], lkp_precip.bounds[2]
+                    τs, τs_ssa, τs_ssag = compute_lookup_precip_props(
                         nsize_sno,
                         radsno_lwr,
                         radsno_upr,
@@ -309,7 +331,7 @@ Compute the `TwoStream` cloud ice properties using the `LookUpTable` method.
 end
 
 """
-    compute_lookup_cld_log_props(
+    compute_lookup_precip_props(
         nsize,
         rad_lwr,
         rad_upr,
@@ -317,17 +339,18 @@ end
         ssa_tbl,
         asy_tbl,
         re,
-        cld_path,
+        water_path,
     )
 
 Compute `TwoStream` optical properties (`τ`, `τ*ssa`, `τ*ssa*g`) for a
-hydrometeor species (such as snow or rain) tabulated on a log-uniform
-effective-radius grid `r_k = rad_lwr * (rad_upr / rad_lwr)^((k - 1) / (nsize - 1))`.
+precipitation species (such as snow, or rain when wired) tabulated in
+[`LookUpPrecip`](@ref) on a log-uniform effective-radius grid
+`r_k = rad_lwr * (rad_upr / rad_lwr)^((k - 1) / (nsize - 1))`.
 Because `log(r_k)` is uniformly spaced with step
 `Δlog_r = log(rad_upr / rad_lwr) / (nsize - 1)`, the table index and
-interpolation weight are computed in ``O(1)`` without binary search.
+interpolation weight are computed in `O(1)` without binary search.
 """
-@inline function compute_lookup_cld_log_props(
+@inline function compute_lookup_precip_props(
     nsize,
     rad_lwr,
     rad_upr,
@@ -335,11 +358,11 @@ interpolation weight are computed in ``O(1)`` without binary search.
     ssa_tbl,
     asy_tbl,
     re,
-    cld_path,
+    water_path,
 )
     FT = eltype(re)
     τp, τp_ssa, τp_ssag = FT(0), FT(0), FT(0)
-    if cld_path > eps(FT)
+    if water_path > eps(FT)
         log_lwr = log(rad_lwr)
         Δlog_r = (log(rad_upr) - log_lwr) / FT(nsize - 1)
         re_clamped = max(min(re, rad_upr), rad_lwr)
@@ -357,7 +380,7 @@ interpolation weight are computed in ``O(1)`` without binary search.
         fc1 = FT(1) - fac
         @inbounds begin
             τp = max(
-                (fc1 * ext_tbl[loc] + fac * ext_tbl[loc + 1]) * cld_path,
+                (fc1 * ext_tbl[loc] + fac * ext_tbl[loc + 1]) * water_path,
                 FT(0),
             )
             τp_ssa = (fc1 * ssa_tbl[loc] + fac * ssa_tbl[loc + 1]) * τp
