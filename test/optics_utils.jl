@@ -136,16 +136,16 @@ end
     DA = ClimaComms.array_type(ClimaComms.device(context))
 
     lkp_cld_lw = NCDataset(get_lookup_filename(:cloud, :lw), "r") do ds
-        LookUpCld(ds, FT, DA)
+        LookUpCld(ds, FT, Array)
     end
     lkp_cld_sw = NCDataset(get_lookup_filename(:cloud, :sw), "r") do ds
-        LookUpCld(ds, FT, DA)
+        LookUpCld(ds, FT, Array)
     end
     lkp_precip_lw = NCDataset(get_lookup_filename(:precip, :lw), "r") do ds
-        LookUpPrecip(ds, FT, DA)
+        LookUpPrecip(ds, FT, Array)
     end
     lkp_precip_sw = NCDataset(get_lookup_filename(:precip, :sw), "r") do ds
-        LookUpPrecip(ds, FT, DA)
+        LookUpPrecip(ds, FT, Array)
     end
 
     # 1. Direct kernel checks: add_cloud_optics_1scalar! & add_cloud_optics_2stream!
@@ -290,9 +290,9 @@ end
         idx > 0 && (vmr_wm[idx] = FT(val))
     end
     make_vmr() = RRTMGP.VolumeMixingRatios.VmrGM(
-        DA{FT}(copy(prof.vmr_h2o)),
-        DA{FT}(copy(prof.vmr_o3)),
-        DA{FT}(copy(vmr_wm)),
+        DA(copy(prof.vmr_h2o)),
+        DA(copy(prof.vmr_o3)),
+        DA(copy(vmr_wm)),
     )
 
     make_cs() = CloudState(
@@ -303,8 +303,8 @@ end
         DA(zeros(FT, nlay_atm, ncol)),
         DA(zeros(FT, ncol)),
         DA(zeros(FT, ncol)),
-        DA(falses(nlay_atm, ncol)),
-        DA(falses(nlay_atm, ncol)),
+        DA(zeros(Bool, nlay_atm, ncol)),
+        DA(zeros(Bool, nlay_atm, ncol)),
         MaxRandomOverlap(),
         3;
         cld_r_eff_sno = DA(fill(FT(250), nlay_atm, ncol)),
@@ -370,12 +370,8 @@ end
         fill!(cf, FT(0))
         fill!(swp, FT(0))
         fill!(sre, FT(250))
-        Array_cf = Array(cf)
-        Array_swp = Array(swp)
-        Array_cf[18:24, :] .= FT(1)
-        Array_swp[18:24, :] .= FT(120)
-        copyto!(cf, Array_cf)
-        copyto!(swp, Array_swp)
+        fill!(view(cf, 18:24, :), FT(1))
+        fill!(view(swp, 18:24, :), FT(120))
     end
 
     RRTMGP.update_fluxes!(solver_diag, key)
@@ -393,9 +389,14 @@ end
     @test Array(RRTMGP.sw_flux_net(solver_diag)) ≈
           Array(RRTMGP.sw_flux_net(solver_allsky))
 
-    # Zero-allocation and type-stability checks with active snow
-    _test_snow_solver_zero_alloc(solver_diag, key)
-    _test_snow_solver_zero_alloc(solver_allsky, key)
+    # Zero-allocation and type-stability checks with active snow.
+    # Single-threaded CPU only: multi-threaded `@threaded` loops allocate task
+    # state, and host-side `JET` / `@allocated` are CPU-only (matching
+    # `test/standalone.jl` and `test/all_sky_with_aerosols_utils.jl`).
+    if ClimaComms.device(context) isa ClimaComms.CPUSingleThreaded
+        _test_snow_solver_zero_alloc(solver_diag, key)
+        _test_snow_solver_zero_alloc(solver_allsky, key)
+    end
 
     # Functional-core error check when cld_path_sno !== nothing and lookup_*_precip === nothing
     @test_throws "LookUpPrecip" solve_lw!(
