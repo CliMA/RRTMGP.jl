@@ -339,13 +339,13 @@ end
         ssa_tbl,
         asy_tbl,
         re,
-        water_path,
+        precip_path,
     )
 
 Compute `TwoStream` optical properties (`τ`, `τ*ssa`, `τ*ssa*g`) for a
-precipitation species (such as snow, or rain when wired) tabulated in
-[`LookUpPrecip`](@ref) on a log-uniform effective-radius grid
-`r_k = rad_lwr * (rad_upr / rad_lwr)^((k - 1) / (nsize - 1))`.
+precipitation species (such as snow, or rain when wired) with per-layer mass
+path `precip_path` [g/m²], tabulated in [`LookUpPrecip`](@ref) on a log-uniform
+effective-radius grid `r_k = rad_lwr * (rad_upr / rad_lwr)^((k - 1) / (nsize - 1))`.
 Because `log(r_k)` is uniformly spaced with step
 `Δlog_r = log(rad_upr / rad_lwr) / (nsize - 1)`, the table index and
 interpolation weight are computed in `O(1)` without binary search.
@@ -358,11 +358,11 @@ interpolation weight are computed in `O(1)` without binary search.
     ssa_tbl,
     asy_tbl,
     re,
-    water_path,
+    precip_path,
 )
     FT = eltype(re)
     τp, τp_ssa, τp_ssag = FT(0), FT(0), FT(0)
-    if water_path > eps(FT)
+    if precip_path > eps(FT)
         log_lwr = log(rad_lwr)
         Δlog_r = (log(rad_upr) - log_lwr) / FT(nsize - 1)
         re_clamped = max(min(re, rad_upr), rad_lwr)
@@ -380,7 +380,7 @@ interpolation weight are computed in `O(1)` without binary search.
         fc1 = FT(1) - fac
         @inbounds begin
             τp = max(
-                (fc1 * ext_tbl[loc] + fac * ext_tbl[loc + 1]) * water_path,
+                (fc1 * ext_tbl[loc] + fac * ext_tbl[loc + 1]) * precip_path,
                 FT(0),
             )
             τp_ssa = (fc1 * ssa_tbl[loc] + fac * ssa_tbl[loc + 1]) * τp
