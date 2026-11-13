@@ -341,15 +341,20 @@ include("plots/optics_lut_plots.jl") # hide
 fig1 # hide
 ```
 
-Next, we inspect the **existing cloud liquid and cloud ice lookup tables**
-across all 16 longwave and 14 shortwave bands at several particle sizes:
+Next, we inspect the **existing cloud liquid and cloud ice (medium surface
+roughness, `ice_rgh = 2`) lookup tables** as 2D functions of effective radius
+``r_\mathrm{eff}`` and spectral wavenumber across all 16 longwave (10–3250 cm⁻¹;
+far-IR Band 1 clipped at 100 cm⁻¹ for display) and 14 shortwave (820–50000 cm⁻¹)
+bands, using the same axes and color scales as Figures 4 and 6 of
+[feng2025](@citet):
 
 ```@example optics_lut
 fig2 # hide
 ```
 
-Finally, we visualize the full 2D `(band, r_eff)` **snow and rain lookup tables**
-across all longwave and shortwave bands:
+Finally, we visualize the **rain and snow lookup tables** across the same
+longwave and shortwave spectral bands and extended effective-radius ranges
+(cf. Figures 4 and 6 of [feng2025](@citet)):
 
 ```@example optics_lut
 fig3 # hide

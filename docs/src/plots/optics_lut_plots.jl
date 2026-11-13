@@ -42,7 +42,8 @@ function eval_lut_curve(
     return ext_out, ssa_out, asy_out
 end
 
-# Representative bands: SW Band 10 (625–778 nm) and LW Band 6 (820–980 cm⁻¹, ~10.2–12.2 µm)
+# Representative bands: SW Band 10 (12850–16000 cm⁻¹, 625–778 nm) and
+# LW Band 6 (820–980 cm⁻¹, 10.2–12.2 µm)
 ib_sw, ib_lw = 10, 6
 
 fig1 = Figure(size = (1050, 820), fontsize = 13)
@@ -220,260 +221,234 @@ Legend(
     framevisible = true,
 )
 
-fig2 = Figure(size = (1050, 780), fontsize = 13)
-Label(
-    fig2[0, 1:2],
-    "Existing RRTMGP Cloud Liquid & Ice Lookup Tables Across All Spectral Bands",
-    fontsize = 16,
-    font = :bold,
-)
+# Shared 2D (r_eff, wavenumber) lookup-table grid plotter styled after
+# Figures 4 and 6 of Feng, Menzel, & Paynter (2025):
+# - x-axis: effective radius r_eff [µm] (log₁₀ scale)
+# - y-axis: spectral wavenumber [cm⁻¹] (log₁₀ scale, exact RRTMGP band bounds)
+# - Row 1: mass extinction coefficient [m²/g] (log₁₀ color scale, 10⁻³·⁵–10⁰)
+# - Row 2: single-scattering albedo ω₀ [-] (co-albedo log₁₀(1 - ω₀) scale,
+#          matching Feng et al.'s 0, 0.9, 0.99, 0.999, 0.9999 ticks)
+# - Row 3: asymmetry parameter g [-] (linear 0–1 scale)
+function build_lut_2d_figure(fig_title, specs; nr = 128)
+    fig = Figure(size = (1180, 820), fontsize = 12)
+    Label(fig[0, 1:4], fig_title, fontsize = 16, font = :bold)
 
-for (col, (lkp, wave_label)) in
-    enumerate(((lkp_lw, "Longwave"), (lkp_sw, "Shortwave")))
-    nband, _, nsize_liq, nsize_ice = lkp.dims
-    radliq_lwr, radliq_upr, radice_lwr, radice_upr = lkp.bounds
-    bands = 1:nband
+    hm_ext, hm_ssa, hm_asy = nothing, nothing, nothing
+    for (col, spec) in enumerate(specs)
+        (;
+            col_title,
+            band_regime,
+            bnd_lims_wn,
+            r_lwr,
+            r_upr,
+            xticks,
+            get_band,
+        ) = spec
+        nband = size(bnd_lims_wn, 2)
+        wn_edges = Float64[bnd_lims_wn[1, 1]; bnd_lims_wn[2, :]]
+        if band_regime === :lw
+            # Clamp far-IR Band 1 lower display edge (10 cm⁻¹) to 100 cm⁻¹ so
+            # a single band does not occupy over half of the log₁₀ y-axis,
+            # matching Figures 4 and 6 of Feng et al. (2025).
+            wn_edges[1] = max(wn_edges[1], 100.0)
+            yticks = (
+                [100, 250, 500, 1000, 2500],
+                ["100", "250", "500", "1000", "2500"],
+            )
+            ylims = (100.0, 3250.0)
+        else
+            yticks = (
+                [1000, 3000, 10000, 20000, 50000],
+                ["1000", "3000", "10000", "20000", "50000"],
+            )
+            ylims = (820.0, 50000.0)
+        end
 
-    ax_e = Axis(
-        fig2[1, col],
-        title = "$wave_label Bands (1–$nband)",
-        ylabel = col == 1 ? "Extinction [m²/g]" : "",
-        yscale = log10,
-    )
-    ax_s = Axis(
-        fig2[2, col],
-        ylabel = col == 1 ? "Single-scattering albedo ω₀ [-]" : "",
-    )
-    ax_g = Axis(
-        fig2[3, col],
-        xlabel = "$wave_label band index",
-        ylabel = col == 1 ? "Asymmetry parameter g [-]" : "",
-    )
+        log_r_edges = range(log(r_lwr), log(r_upr), length = nr + 1)
+        r_edges = exp.(log_r_edges)
+        r_centers =
+            exp.(0.5 .* (log_r_edges[1:(end - 1)] .+ log_r_edges[2:end]))
 
-    for (r_l, c_l) in ((5.0, :royalblue1), (10.0, :dodgerblue3), (20.0, :navy))
-        ext_b = [
-            OP.compute_lookup_cld_liq_props(
-                nsize_liq,
-                radliq_lwr,
-                radliq_upr,
-                LT.getview_liqdata(lkp, b)...,
-                r_l,
-                1.0,
-            )[1] for b in bands
-        ]
-        ssa_b = [
-            begin
-                τ, τs, _ = OP.compute_lookup_cld_liq_props(
-                    nsize_liq,
-                    radliq_lwr,
-                    radliq_upr,
-                    LT.getview_liqdata(lkp, b)...,
-                    r_l,
-                    1.0,
-                )
-                τs / τ
-            end for b in bands
-        ]
-        asy_b = [
-            begin
-                _, τs, τsg = OP.compute_lookup_cld_liq_props(
-                    nsize_liq,
-                    radliq_lwr,
-                    radliq_upr,
-                    LT.getview_liqdata(lkp, b)...,
-                    r_l,
-                    1.0,
-                )
-                τsg / τs
-            end for b in bands
-        ]
-        scatterlines!(
-            ax_e,
-            bands,
-            ext_b,
-            color = c_l,
-            linewidth = 2,
-            markersize = 6,
-            label = "Liquid r_eff = $(Int(r_l)) µm",
+        ext_mat = zeros(nr, nband)
+        ssa_mat = zeros(nr, nband)
+        asy_mat = zeros(nr, nband)
+        for b in 1:nband
+            e_b, s_b, g_b = get_band(b, r_centers)
+            ext_mat[:, b] .= log10.(max.(e_b, 10.0^(-3.5)))
+            ssa_mat[:, b] .= -log10.(clamp.(1.0 .- s_b, 1e-4, 1.0))
+            asy_mat[:, b] .= g_b
+        end
+
+        ax1 = Axis(
+            fig[1, col],
+            title = col_title,
+            ylabel = col == 1 ? "Wavenumber [cm⁻¹]" : "",
+            xscale = log10,
+            yscale = log10,
+            xticks = xticks,
+            yticks = yticks,
+            limits = ((r_lwr, r_upr), ylims),
         )
-        scatterlines!(
-            ax_s,
-            bands,
-            ssa_b,
-            color = c_l,
-            linewidth = 2,
-            markersize = 6,
+        ax2 = Axis(
+            fig[2, col],
+            ylabel = col == 1 ? "Wavenumber [cm⁻¹]" : "",
+            xscale = log10,
+            yscale = log10,
+            xticks = xticks,
+            yticks = yticks,
+            limits = ((r_lwr, r_upr), ylims),
         )
-        scatterlines!(
-            ax_g,
-            bands,
-            asy_b,
-            color = c_l,
-            linewidth = 2,
-            markersize = 6,
+        ax3 = Axis(
+            fig[3, col],
+            xlabel = "r_eff [µm]",
+            ylabel = col == 1 ? "Wavenumber [cm⁻¹]" : "",
+            xscale = log10,
+            yscale = log10,
+            xticks = xticks,
+            yticks = yticks,
+            limits = ((r_lwr, r_upr), ylims),
+        )
+        hidexdecorations!(ax1, grid = false, ticks = false)
+        hidexdecorations!(ax2, grid = false, ticks = false)
+
+        hm_ext = heatmap!(
+            ax1,
+            r_edges,
+            wn_edges,
+            ext_mat,
+            colormap = :viridis,
+            colorrange = (-3.5, 0.0),
+        )
+        hm_ssa = heatmap!(
+            ax2,
+            r_edges,
+            wn_edges,
+            ssa_mat,
+            colormap = Reverse(:turbo),
+            colorrange = (0.0, 4.0),
+        )
+        hm_asy = heatmap!(
+            ax3,
+            r_edges,
+            wn_edges,
+            asy_mat,
+            colormap = :turbo,
+            colorrange = (0.0, 1.0),
         )
     end
 
-    for (r_i, c_i) in
-        ((10.0, :gold3), (30.0, :darkorange2), (80.0, :firebrick3))
-        ext_b = [
-            OP.compute_lookup_cld_ice_props(
-                nsize_ice,
-                radice_lwr,
-                radice_upr,
-                LT.getview_icedata(lkp, b, 2)...,
-                r_i,
-                1.0,
-            )[1] for b in bands
-        ]
-        ssa_b = [
-            begin
-                τ, τs, _ = OP.compute_lookup_cld_ice_props(
-                    nsize_ice,
-                    radice_lwr,
-                    radice_upr,
-                    LT.getview_icedata(lkp, b, 2)...,
-                    r_i,
-                    1.0,
-                )
-                τs / τ
-            end for b in bands
-        ]
-        asy_b = [
-            begin
-                _, τs, τsg = OP.compute_lookup_cld_ice_props(
-                    nsize_ice,
-                    radice_lwr,
-                    radice_upr,
-                    LT.getview_icedata(lkp, b, 2)...,
-                    r_i,
-                    1.0,
-                )
-                τsg / τs
-            end for b in bands
-        ]
-        scatterlines!(
-            ax_e,
-            bands,
-            ext_b,
-            color = c_i,
-            linestyle = :dash,
-            linewidth = 2,
-            markersize = 6,
-            label = "Ice (med. rgh) r_eff = $(Int(r_i)) µm",
-        )
-        scatterlines!(
-            ax_s,
-            bands,
-            ssa_b,
-            color = c_i,
-            linestyle = :dash,
-            linewidth = 2,
-            markersize = 6,
-        )
-        scatterlines!(
-            ax_g,
-            bands,
-            asy_b,
-            color = c_i,
-            linestyle = :dash,
-            linewidth = 2,
-            markersize = 6,
-        )
-    end
+    Colorbar(
+        fig[1, 5],
+        hm_ext,
+        label = "Extinction [m²/g]",
+        ticks = ([-3, -2, -1, 0], ["10⁻³", "10⁻²", "10⁻¹", "10⁰"]),
+    )
+    Colorbar(
+        fig[2, 5],
+        hm_ssa,
+        label = "Single-scattering albedo ω₀ [-]",
+        ticks = ([0, 1, 2, 3, 4], ["0", "0.9", "0.99", "0.999", "0.9999"]),
+    )
+    Colorbar(
+        fig[3, 5],
+        hm_asy,
+        label = "Asymmetry factor g [-]",
+        ticks = 0.0:0.2:1.0,
+    )
+    colgap!(fig.layout, 14)
+    rowgap!(fig.layout, 12)
+    return fig
 end
 
-Legend(
-    fig2[4, 1:2],
-    fig2.content[2],
-    orientation = :horizontal,
-    nbanks = 2,
-    framevisible = true,
-)
+function cld_liq_spec(col_title, band_regime, lkp)
+    _, _, nsize_liq, _, _ = lkp.dims
+    r_lwr, r_upr = lkp.bounds[1], lkp.bounds[2]
+    return (;
+        col_title,
+        band_regime,
+        bnd_lims_wn = lkp.bnd_lims_wn,
+        r_lwr,
+        r_upr,
+        xticks = ([2.5, 5, 10, 20], ["2.5", "5", "10", "20"]),
+        get_band = (b, r_vec) -> eval_lut_curve(
+            OP.compute_lookup_cld_liq_props,
+            nsize_liq,
+            r_lwr,
+            r_upr,
+            LT.getview_liqdata(lkp, b)...,
+            r_vec,
+        ),
+    )
+end
 
-fig3 = Figure(size = (1100, 820), fontsize = 12)
-Label(
-    fig3[0, 1:4],
-    "RRTMGP Snow & Rain Optical Lookup Tables Across All Bands and Effective Radii",
-    fontsize = 16,
-    font = :bold,
-)
+function cld_ice_spec(col_title, band_regime, lkp; irgh = 2)
+    _, _, _, nsize_ice, _ = lkp.dims
+    r_lwr, r_upr = lkp.bounds[3], lkp.bounds[4]
+    return (;
+        col_title,
+        band_regime,
+        bnd_lims_wn = lkp.bnd_lims_wn,
+        r_lwr,
+        r_upr,
+        xticks = ([5, 10, 20, 50, 90], ["5", "10", "20", "50", "90"]),
+        get_band = (b, r_vec) -> eval_lut_curve(
+            OP.compute_lookup_cld_ice_props,
+            nsize_ice,
+            r_lwr,
+            r_upr,
+            LT.getview_icedata(lkp, b, irgh)...,
+            r_vec,
+        ),
+    )
+end
 
-datasets = (
-    ("Snow LW", lkp_precip_lw, :sno),
-    ("Snow SW", lkp_precip_sw, :sno),
-    ("Rain LW", lkp_precip_lw, :rai),
-    ("Rain SW", lkp_precip_sw, :rai),
-)
-
-for (col, (label_str, lkp_prc, kind)) in enumerate(datasets)
-    nband, nsize_sno, nsize_rai = lkp_prc.dims
-    radsno_lwr, radsno_upr, radrai_lwr, radrai_upr = lkp_prc.bounds
+function precip_spec(col_title, band_regime, lkp, kind)
+    _, nsize_sno, nsize_rai = lkp.dims
+    radsno_lwr, radsno_upr, radrai_lwr, radrai_upr = lkp.bounds
     nsize = kind === :sno ? nsize_sno : nsize_rai
     r_lwr = kind === :sno ? radsno_lwr : radrai_lwr
     r_upr = kind === :sno ? radsno_upr : radrai_upr
-    r_grid = exp.(range(log(r_lwr), log(r_upr), length = nsize))
-
-    ext_mat = zeros(nsize, nband)
-    ssa_mat = zeros(nsize, nband)
-    asy_mat = zeros(nsize, nband)
-    for b in 1:nband
-        ev, sv, gv =
-            kind === :sno ? LT.getview_snodata(lkp_prc, b) :
-            LT.getview_raidata(lkp_prc, b)
-        ext_mat[:, b] .= ev
-        ssa_mat[:, b] .= sv
-        asy_mat[:, b] .= gv
-    end
-
-    ax1 = Axis(
-        fig3[1, col],
-        title = "$label_str: log₁₀(ext [m²/g])",
-        ylabel = col == 1 ? "r_eff [µm]" : "",
-        yscale = log10,
+    xticks =
+        kind === :sno ?
+        ([5, 20, 100, 500, 1100], ["5", "20", "100", "500", "1100"]) :
+        ([5, 50, 500, 5000], ["5", "50", "500", "5000"])
+    return (;
+        col_title,
+        band_regime,
+        bnd_lims_wn = lkp.bnd_lims_wn,
+        r_lwr,
+        r_upr,
+        xticks,
+        get_band = (b, r_vec) -> eval_lut_curve(
+            OP.compute_lookup_precip_props,
+            nsize,
+            r_lwr,
+            r_upr,
+            (
+                kind === :sno ? LT.getview_snodata(lkp, b) :
+                LT.getview_raidata(lkp, b)
+            )...,
+            r_vec,
+        ),
     )
-    ax2 = Axis(
-        fig3[2, col],
-        title = "$label_str: ω₀ [-]",
-        ylabel = col == 1 ? "r_eff [µm]" : "",
-        yscale = log10,
-    )
-    ax3 = Axis(
-        fig3[3, col],
-        title = "$label_str: g [-]",
-        xlabel = "Band index",
-        ylabel = col == 1 ? "r_eff [µm]" : "",
-        yscale = log10,
-    )
-
-    hm1 = heatmap!(
-        ax1,
-        1:nband,
-        r_grid,
-        log10.(max.(ext_mat', 1e-5)),
-        colormap = :viridis,
-        colorrange = (-3.5, 0.5),
-    )
-    hm2 = heatmap!(
-        ax2,
-        1:nband,
-        r_grid,
-        ssa_mat',
-        colormap = :plasma,
-        colorrange = (0.4, 1.0),
-    )
-    hm3 = heatmap!(
-        ax3,
-        1:nband,
-        r_grid,
-        asy_mat',
-        colormap = :cividis,
-        colorrange = (0.5, 1.0),
-    )
-
-    if col == 4
-        Colorbar(fig3[1, 5], hm1, label = "log₁₀(ext [m²/g])")
-        Colorbar(fig3[2, 5], hm2, label = "ω₀ [-]")
-        Colorbar(fig3[3, 5], hm3, label = "g [-]")
-    end
 end
+
+fig2 = build_lut_2d_figure(
+    "Existing RRTMGP Cloud Liquid & Ice (Medium Roughness) Lookup Tables",
+    (
+        cld_liq_spec("Cloud Liquid — LW", :lw, lkp_lw),
+        cld_liq_spec("Cloud Liquid — SW", :sw, lkp_sw),
+        cld_ice_spec("Cloud Ice (med. rgh) — LW", :lw, lkp_lw; irgh = 2),
+        cld_ice_spec("Cloud Ice (med. rgh) — SW", :sw, lkp_sw; irgh = 2),
+    ),
+)
+
+fig3 = build_lut_2d_figure(
+    "RRTMGP Rain & Snow Optical Lookup Tables (Feng et al., 2025)",
+    (
+        precip_spec("Rain — LW", :lw, lkp_precip_lw, :rai),
+        precip_spec("Rain — SW", :sw, lkp_precip_sw, :rai),
+        precip_spec("Snow — LW", :lw, lkp_precip_lw, :sno),
+        precip_spec("Snow — SW", :sw, lkp_precip_sw, :sno),
+    ),
+)
