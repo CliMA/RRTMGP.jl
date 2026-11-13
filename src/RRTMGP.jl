@@ -2,6 +2,7 @@ module RRTMGP
 using Artifacts
 
 _get_artifact_path() = joinpath(artifact"rrtmgp-data", "rrtmgp-data-1.9")
+_get_precip_artifact_path() = artifact"rrtmgp-precip-optics-data"
 
 import ClimaComms
 

@@ -107,6 +107,8 @@ function lookup_tables(
         end
     lookup_lw_cld = artifact(:cloud, :lw, :LookUpCld)
     lookup_sw_cld = artifact(:cloud, :sw, :LookUpCld)
+    lookup_lw_precip = artifact(:precip, :lw, :LookUpPrecip)
+    lookup_sw_precip = artifact(:precip, :sw, :LookUpPrecip)
     b = lookup_tables(
         ClearSkyRadiation(radiation_method.aerosol_radiation),
         device,
@@ -117,6 +119,8 @@ function lookup_tables(
         b.lookup_sw,
         lookup_lw_cld,
         lookup_sw_cld,
+        lookup_lw_precip,
+        lookup_sw_precip,
         b.lookup_lw_aero,
         b.lookup_sw_aero,
         b.idx_gases_lw,

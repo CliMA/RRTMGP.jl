@@ -13,3 +13,10 @@ git-tree-sha1 = "5080a733a316b74accf4d5897f5bf6641141c41d"
     [[rrtmgp-data-v181.download]]
     sha256 = "8dcf7ba2442c7093e707a5d3c0c3c76b249eb8905d3478cb3fe87535b51455bb"
     url = "https://github.com/earth-system-radiation/rrtmgp-data/archive/refs/tags/v1.8.1.tar.gz"
+
+[rrtmgp-precip-optics-data]
+git-tree-sha1 = "9c016801b7dee25f0aee7db507476f628f310021"
+
+    [[rrtmgp-precip-optics-data.download]]
+    sha256 = "987fff092409aa723d5ffd8b06683c77f331aecfc5ff54569e66e546c603cb48"
+    url = "https://caltech.box.com/shared/static/76dpttpi9exl8n467qa6fkxy5q9593lv.gz"

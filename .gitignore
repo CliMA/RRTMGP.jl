@@ -34,6 +34,7 @@ docs/site/
 
 Manifest.toml
 test/Manifest.toml
+scripts/Manifest.toml
 
 # Literate.jl-generated tutorial pages
 docs/src/tutorials/

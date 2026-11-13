@@ -19,6 +19,7 @@ on disk (e.g., for standalone use without NCDatasets).
 # Fields
 - `lookup_lw`, `lookup_sw`: gas-optics lookup tables (`nothing` for gray).
 - `lookup_lw_cld`, `lookup_sw_cld`: cloud-optics tables (all-sky methods only).
+- `lookup_lw_precip`, `lookup_sw_precip`: precipitation-optics tables (all-sky methods only).
 - `lookup_lw_aero`, `lookup_sw_aero`: aerosol tables (`aerosol_radiation` only).
 - `idx_gases_lw`, `idx_gases_sw`: gas name → index maps.
 - `idx_aerosol_lw`, `idx_aerosol_sw`, `idx_aerosize_lw`, `idx_aerosize_sw`:
@@ -26,11 +27,28 @@ on disk (e.g., for standalone use without NCDatasets).
 - `nbnd_lw`, `nbnd_sw`: band counts (1 for gray).
 - `ngas_lw`, `ngas_sw`: gas counts (0 for gray).
 """
-struct LookupBundle{LLW, LSW, LLWC, LSWC, LLWA, LSWA, IGL, IGS, IAL, IAS, ZL, ZS}
+struct LookupBundle{
+    LLW,
+    LSW,
+    LLWC,
+    LSWC,
+    LLWP,
+    LSWP,
+    LLWA,
+    LSWA,
+    IGL,
+    IGS,
+    IAL,
+    IAS,
+    ZL,
+    ZS,
+}
     lookup_lw::LLW
     lookup_sw::LSW
     lookup_lw_cld::LLWC
     lookup_sw_cld::LSWC
+    lookup_lw_precip::LLWP
+    lookup_sw_precip::LSWP
     lookup_lw_aero::LLWA
     lookup_sw_aero::LSWA
     idx_gases_lw::IGL
@@ -51,6 +69,8 @@ function LookupBundle(;
     lookup_sw = nothing,
     lookup_lw_cld = nothing,
     lookup_sw_cld = nothing,
+    lookup_lw_precip = nothing,
+    lookup_sw_precip = nothing,
     lookup_lw_aero = nothing,
     lookup_sw_aero = nothing,
     idx_gases_lw = nothing,
@@ -69,6 +89,8 @@ function LookupBundle(;
         lookup_sw,
         lookup_lw_cld,
         lookup_sw_cld,
+        lookup_lw_precip,
+        lookup_sw_precip,
         lookup_lw_aero,
         lookup_sw_aero,
         idx_gases_lw,
