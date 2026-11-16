@@ -332,7 +332,15 @@ function all_sky_with_aerosols(
             end
             RRTMGP.update_lw_fluxes!(solver)
         end
+        # The last pass solved at the partial fraction, so the solver still
+        # holds those fluxes, and restoring `cld_frac` does not undo that.
+        # The invariants later in this test read the solver, and at a partial
+        # fraction a column can draw an all-clear sample, which leaves all-sky
+        # and clear-sky differing only by summation order -- enough to put
+        # `all_sky >= clear` the wrong side of zero. Re-solve at the restored
+        # fraction, as the two-pass comparison above does for the same reason.
         as.cloud_state.cld_frac .= base_cld_frac
+        RRTMGP.update_lw_fluxes!(solver)
     end
 
     # --- the g-point-grouped shortwave solve, against the serial one ---------
@@ -429,7 +437,15 @@ function all_sky_with_aerosols(
             end
             RRTMGP.update_sw_fluxes!(solver)
         end
+        # The last pass solved at the partial fraction, so the solver still
+        # holds those fluxes, and restoring `cld_frac` does not undo that.
+        # The invariants later in this test read the solver, and at a partial
+        # fraction a column can draw an all-clear sample, which leaves all-sky
+        # and clear-sky differing only by summation order -- enough to put
+        # `all_sky >= clear` the wrong side of zero. Re-solve at the restored
+        # fraction, as the two-pass comparison above does for the same reason.
         as.cloud_state.cld_frac .= base_cld_frac
+        RRTMGP.update_sw_fluxes!(solver)
     end
 
     # --- the fallback and the key, asserted without reference fluxes ---------
