@@ -50,10 +50,15 @@ none: enough to reach `TARGET_GPT_GROUP_COLUMNS` wide columns, capped at
 
 A column count that already fills the device gets one group, because the grid it
 launches is wide enough without them and the workspaces cost memory linearly in
-the group count either way. Pass `ngpt_groups` explicitly to override this in
-either direction.
+the group count either way. A CPU gets one group whatever its column count: the
+CPU driver solves the whole g-point loop per column and ignores the workspaces,
+so grouping there buys nothing and costs the memory anyway -- and because the
+count rises as columns fall, an ungated default gives the smallest runs the
+widest workspaces. Pass `ngpt_groups` explicitly to override this in either
+direction.
 """
 default_ngpt_groups(grid_params::RRTMGPGridParams) =
+    ClimaComms.device(grid_params) isa ClimaComms.AbstractCPUDevice ? 1 :
     clamp(cld(TARGET_GPT_GROUP_COLUMNS, grid_params.ncol), 1, MAX_NGPT_GROUPS)
 
 include("gpt_groups.jl")
