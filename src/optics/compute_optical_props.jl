@@ -374,7 +374,15 @@ end
         )
     end
     if !isnothing(lkp_cld) # clouds need TwoStream optics
-        add_cloud_optics_sw!(op, as, gcol, lkp_cld, ibnd)
+        add_cloud_optics_sw!(
+            op,
+            as,
+            gcol,
+            lkp_cld,
+            ibnd,
+            as.cloud_state.mask_sw,
+            wcol,
+        )
     end
     return nothing
 end
@@ -397,6 +405,11 @@ could drift apart without anything noticing.
     gcol::Int,
     lkp_cld::LookUpCld,
     ibnd::Int,
+    # The default store is the narrow one, indexed by column. A caller
+    # solving over wide columns writes `op` at `wcol`, so it has to pass a
+    # store that is wide too -- `LWGptGroups.mask` is that store, and the
+    # grouped solvers pass it. The default is correct only when the two
+    # indices are the same.
     mask_store = as.cloud_state.mask_lw,
     wcol::Int = gcol,
 )
@@ -435,6 +448,7 @@ and the longwave one does not.
     gcol::Int,
     lkp_cld::LookUpCld,
     ibnd::Int,
+    # Narrow by default; see `add_cloud_optics_lw!`.
     mask_store = as.cloud_state.mask_sw,
     wcol::Int = gcol,
 )
