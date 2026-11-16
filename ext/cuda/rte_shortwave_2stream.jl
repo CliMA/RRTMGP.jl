@@ -424,8 +424,8 @@ end
 # stride, so the accumulators are assigned on the first one and added to after.
 function rte_sw_2stream_solve_grouped_CUDA!(
     flux::FluxSW,
-    acc::FluxSW,
-    acc_clear::FluxSW,
+    acc::NamedTuple,
+    acc_clear::NamedTuple,
     src_sw::SourceSW2Str,
     bcs_sw::SwBCs,
     op::TwoStream,
@@ -621,8 +621,8 @@ end
 # pass over the rounds.
 function _sw_group_sweeps_CUDA!(
     flux::FluxSW,
-    acc::FluxSW,
-    acc_clear::FluxSW,
+    acc::NamedTuple,
+    acc_clear::NamedTuple,
     src_sw::SourceSW2Str,
     bcs_sw::SwBCs,
     op::TwoStream,

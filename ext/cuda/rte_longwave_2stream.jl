@@ -403,8 +403,8 @@ end
 # stride, so the accumulators are assigned on the first one and added to after.
 function rte_lw_2stream_solve_grouped_CUDA!(
     flux::FluxLW,
-    acc::FluxLW,
-    acc_clear::FluxLW,
+    acc::NamedTuple,
+    acc_clear::NamedTuple,
     src_lw::SourceLW2Str,
     bcs_lw::LwBCs,
     op::TwoStream,
@@ -589,8 +589,8 @@ end
 # the fused kernel does the same, before its loop rather than at round one.
 function _lw_group_sweeps_CUDA!(
     flux::FluxLW,
-    acc::FluxLW,
-    acc_clear::FluxLW,
+    acc::NamedTuple,
+    acc_clear::NamedTuple,
     src_lw::SourceLW2Str,
     bcs_lw::LwBCs,
     op::TwoStream,

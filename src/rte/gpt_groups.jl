@@ -51,7 +51,7 @@ struct LWGptGroups{OP, SL, FB, MK, FX, A3, CT}
     acc::FX
     "clear-sky partial accumulator, a view into `acc_clear_data`"
     acc_clear::FX
-    "`(ncol * ngroups, nlev, 3)`; the field axis is up, down, net as in `FluxLW`"
+    "`(ncol * ngroups, nlev, 2)`; the field axis is up then down"
     acc_data::A3
     acc_clear_data::A3
     "`(ncol * ngroups)`: cloudy g-points seen by each group, summed for the cover"
@@ -79,11 +79,15 @@ function LWGptGroups(
         ncolw,
         isothermal_boundary_layer,
     )
-    acc_data = DA{FT}(undef, ncolw, nlev, 3)
-    acc_clear_data = DA{FT}(undef, ncolw, nlev, 3)
+    # Up and down only: the reduction recomputes net from them, so a third
+    # plane would be allocated per wide column and never written. The field
+    # names match `FluxLW` because that is what these accumulate, but the type
+    # does not, which is the point -- a `FluxLW` would carry the net plane.
+    acc_data = DA{FT}(undef, ncolw, nlev, 2)
+    acc_clear_data = DA{FT}(undef, ncolw, nlev, 2)
     # `view(d, :, :, k)` is a contiguous block, so the accumulators index as
     # cheaply as the plain arrays the ungrouped path uses.
-    fluxes(d) = FluxLW(view(d, :, :, 1), view(d, :, :, 2), view(d, :, :, 3))
+    fluxes(d) = (flux_up = view(d, :, :, 1), flux_dn = view(d, :, :, 2))
     return LWGptGroups(
         ngroups,
         split_optics,
@@ -138,7 +142,7 @@ struct SWGptGroups{OP, SS, FB, MK, FX, A3, CT}
     acc::FX
     "clear-sky partial accumulator, a view into `acc_clear_data`"
     acc_clear::FX
-    "`(ncol * ngroups, nlev, 4)`; the field axis is up, down, net, direct as in `FluxSW`"
+    "`(ncol * ngroups, nlev, 3)`; the field axis is up, down, direct"
     acc_data::A3
     acc_clear_data::A3
     "`(ncol * ngroups)`: cloudy g-points seen by each group, summed for the cover"
@@ -165,13 +169,14 @@ function SWGptGroups(
         ncolw,
         isothermal_boundary_layer,
     )
-    acc_data = DA{FT}(undef, ncolw, nlev, 4)
-    acc_clear_data = DA{FT}(undef, ncolw, nlev, 4)
-    fluxes(d) = FluxSW(
-        view(d, :, :, 1),
-        view(d, :, :, 2),
-        view(d, :, :, 3),
-        view(d, :, :, 4),
+    # Up, down and direct: the reduction recomputes net from up and down, so a
+    # net plane would never be written (see `LWGptGroups`).
+    acc_data = DA{FT}(undef, ncolw, nlev, 3)
+    acc_clear_data = DA{FT}(undef, ncolw, nlev, 3)
+    fluxes(d) = (
+        flux_up = view(d, :, :, 1),
+        flux_dn = view(d, :, :, 2),
+        flux_dn_dir = view(d, :, :, 3),
     )
     return SWGptGroups(
         ngroups,
