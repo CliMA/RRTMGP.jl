@@ -482,6 +482,13 @@ end
 # is read, against the 8 the fused kernel reaches at any block size.
 const OPTICS_BLOCK_THREADS = 128
 
+# The sweeps half is narrow for the same reason, measured rather than assumed:
+# it carries the cloud mask, both vertical sweeps, the cloud increment between
+# them and both accumulations, which is 140 registers in the longwave and 117
+# in the shortwave. At 256 threads the longwave half gets 8 warps per SM, the
+# same as the kernel it replaced; at 128 it gets 12.
+const SWEEPS_BLOCK_THREADS = 128
+
 # One round of the grouped g-point loop is two launches: every thread's gas and
 # aerosol optics, then every thread's sweeps over the optics now in `op`. The
 # round index replaces the `for igpt in grp:ngroups:n_gpt` the fused kernel
@@ -501,7 +508,7 @@ function _lw_grouped_rounds!(
 )
     nwide = ncol * ngroups
     otx, obx = _configure_threadblock(OPTICS_BLOCK_THREADS, nwide)
-    stx, sbx = _configure_threadblock(nwide)
+    stx, sbx = _configure_threadblock(SWEEPS_BLOCK_THREADS, nwide)
     for round in 1:cld(n_gpt, ngroups)
         @cuda always_inline = true threads = (otx) blocks = (obx) _lw_group_optics_CUDA!(
             groups.op,

@@ -535,7 +535,7 @@ function _sw_grouped_rounds!(
 )
     nwide = ncol * ngroups
     otx, obx = _configure_threadblock(OPTICS_BLOCK_THREADS, nwide)
-    stx, sbx = _configure_threadblock(nwide)
+    stx, sbx = _configure_threadblock(SWEEPS_BLOCK_THREADS, nwide)
     for round in 1:cld(n_gpt, ngroups)
         @cuda always_inline = true threads = (otx) blocks = (obx) _sw_group_optics_CUDA!(
             groups.op,
