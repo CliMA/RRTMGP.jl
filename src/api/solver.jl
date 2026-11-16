@@ -290,8 +290,8 @@ function RRTMGPSolver(
     # same terms as the longwave ones below.
     gpt_groups_sw =
         (
+            radiation_method isa AllSkyRadiationWithClearSkyDiagnostics &&
             !(op_sw isa OneScalar) &&
-            !(radiation_method isa GrayRadiation) &&
             isnothing(band_flux_sw) &&
             ngpt_groups > 1
         ) ? RTE.SWGptGroups(grid_params, ngpt_groups; split_optics) : nothing
@@ -309,13 +309,17 @@ function RRTMGPSolver(
             state_cache,
             gpt_groups_sw, # per-group workspaces, or `nothing` for one group
         )
-    # Workspaces for the g-point-grouped fused longwave solve. Only that solve
-    # reads them, so they are allocated only where it can run: two-stream
-    # spectral longwave with no per-band fluxes to accumulate per g-point.
+    # Workspaces for the g-point-grouped fused longwave solve. Only
+    # `update_lw_fluxes!(_, ::AllSkyRadiationWithClearSkyDiagnostics)` reaches
+    # that solve, so the method is part of the gate: the other methods never
+    # read these, and at 24,576 columns the default group count makes them
+    # gigabytes. The rest of the gate is what the solve itself needs:
+    # two-stream spectral longwave with no per-band fluxes to accumulate per
+    # g-point. `GrayRadiation` is excluded by the method test already.
     gpt_groups_lw =
         (
+            radiation_method isa AllSkyRadiationWithClearSkyDiagnostics &&
             !(op_lw isa OneScalar) &&
-            !(radiation_method isa GrayRadiation) &&
             isnothing(band_flux_lw) &&
             ngpt_groups > 1
         ) ? RTE.LWGptGroups(grid_params, ngpt_groups; params, split_optics) :
