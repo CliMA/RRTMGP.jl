@@ -294,6 +294,31 @@ function all_sky_with_aerosols(
             # The cover is a count of cloudy g-points summed over the groups, so
             # splitting the loop must not change it at all.
             track_cover && @test grouped_cover == serial_cover
+            # The grouped arm above also splits the optics out of the sweeps,
+            # which is the default. That split moves no arithmetic -- both
+            # halves address the same wide column, and the gas and aerosol
+            # optics never read the cloud mask the sweeps draw -- so the two
+            # grouped kernels must agree exactly rather than to a tolerance.
+            fused = RRTMGPSolver(
+                grid_params,
+                radiation_method,
+                param_set,
+                bcs_lw,
+                bcs_sw,
+                as;
+                op_lw = Optics.TwoStream(grid_params),
+                op_sw = Optics.TwoStream(grid_params),
+                lookups = prebuilt_lookups,
+                ngpt_groups = ng,
+                split_optics = false,
+            )
+            @test !fused.lws.gpt_groups.split_optics
+            RRTMGP.update_lw_fluxes!(fused, fused_key)
+            @test Array(parent(fused.lws.flux.flux_net)) == grouped_all
+            @test Array(parent(fused.clear_flux_acc_lw.flux_net)) ==
+                  grouped_clear
+            track_cover &&
+                @test Array(as.cloud_state.cld_cover_lw) == grouped_cover
         end
         RRTMGP.update_lw_fluxes!(solver)
     end
@@ -349,6 +374,36 @@ function all_sky_with_aerosols(
             # One nominated writer, so this is equality rather than a tolerance.
             @test Array(as.aerosol_state.aod_sw_ext) == serial_aod_ext
             @test Array(as.aerosol_state.aod_sw_sca) == serial_aod_sca
+            grouped_aod_ext = Array(as.aerosol_state.aod_sw_ext)
+            grouped_aod_sca = Array(as.aerosol_state.aod_sw_sca)
+            # Exact, for the reason the longwave block above gives. The
+            # shortwave adds two things the split has to get right on its own:
+            # a night column's partials are zeroed on the first round rather
+            # than after the last, and the 550 nm optical depth is collected in
+            # the optics half while the sun is tested in the sweeps half.
+            fused = RRTMGPSolver(
+                grid_params,
+                radiation_method,
+                param_set,
+                bcs_lw,
+                bcs_sw,
+                as;
+                op_lw = Optics.TwoStream(grid_params),
+                op_sw = Optics.TwoStream(grid_params),
+                lookups = prebuilt_lookups,
+                ngpt_groups = ng,
+                split_optics = false,
+            )
+            @test !fused.sws.gpt_groups.split_optics
+            RRTMGP.update_sw_fluxes!(fused, fused_key)
+            @test Array(parent(fused.sws.flux.flux_net)) == grouped_all
+            @test Array(parent(fused.sws.flux.flux_dn_dir)) == grouped_dir
+            @test Array(parent(fused.clear_flux_acc_sw.flux_net)) ==
+                  grouped_clear
+            track_cover &&
+                @test Array(as.cloud_state.cld_cover_sw) == grouped_cover
+            @test Array(as.aerosol_state.aod_sw_ext) == grouped_aod_ext
+            @test Array(as.aerosol_state.aod_sw_sca) == grouped_aod_sca
         end
         RRTMGP.update_sw_fluxes!(solver)
     end

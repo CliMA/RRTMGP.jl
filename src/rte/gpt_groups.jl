@@ -6,7 +6,8 @@
     LWGptGroups(grid_params::RRTMGPGridParams, ngroups; params)
 
 Workspaces for solving a column's longwave g-point loop in `ngroups`
-independent pieces, all in one kernel launch.
+independent pieces, covered by one grid rather than by one column's serial
+loop.
 
 At one thread per column the solve's grid is 96 blocks of 256 threads, and the
 kernel's 255 registers pin it to one block per SM, so 108 SMs hold 0.89 of that
@@ -28,6 +29,18 @@ and solves the whole g-point loop per column, which is correct either way.
 """
 struct LWGptGroups{OP, SL, FB, MK, FX, A3, CT}
     ngroups::Int
+    """
+    Solve each round of the g-point loop as two kernels, the gas and aerosol
+    optics and then the sweeps, instead of one fused kernel.
+
+    The fused kernel needs 255 registers, which pins it to one block per SM.
+    Compiled on its own the optics phase needs 156 in the longwave and 128 in
+    the shortwave with 32 bytes of stack, so it reaches 12 and 16 warps per SM
+    where the fused kernel reaches 8. `op` and `src` are already device arrays
+    that both halves address by wide column, so the phases exchange nothing a
+    kernel boundary cannot carry and the split result is bit-for-bit.
+    """
+    split_optics::Bool
     "columns per group, so `wcol = gcol + (grp - 1) * ncol`"
     ncol::Int
     op::OP
@@ -46,7 +59,12 @@ struct LWGptGroups{OP, SL, FB, MK, FX, A3, CT}
 end
 Adapt.@adapt_structure LWGptGroups
 
-function LWGptGroups(grid_params::RRTMGPGridParams, ngroups::Int; params)
+function LWGptGroups(
+    grid_params::RRTMGPGridParams,
+    ngroups::Int;
+    params,
+    split_optics::Bool = true,
+)
     ngroups ≥ 1 || error("ngroups must be at least 1, got $ngroups")
     (; context, ncol, nlay, isothermal_boundary_layer) = grid_params
     DA = ClimaComms.array_type(grid_params)
@@ -68,6 +86,7 @@ function LWGptGroups(grid_params::RRTMGPGridParams, ngroups::Int; params)
     fluxes(d) = FluxLW(view(d, :, :, 1), view(d, :, :, 2), view(d, :, :, 3))
     return LWGptGroups(
         ngroups,
+        split_optics,
         ncol,
         TwoStream(wide),
         SourceLW2Str(wide; params),
@@ -84,11 +103,14 @@ end
 n_gpt_groups(::Nothing) = 1
 n_gpt_groups(g::LWGptGroups) = g.ngroups
 
+splits_optics(g) = g.split_optics
+
 """
     SWGptGroups(grid_params::RRTMGPGridParams, ngroups)
 
 Workspaces for solving a column's shortwave g-point loop in `ngroups`
-independent pieces, all in one kernel launch.
+independent pieces, covered by one grid rather than by one column's serial
+loop.
 
 [`LWGptGroups`](@ref) carries the reasoning, and it holds here unchanged: the
 shortwave solve's grid is also 96 blocks of 256 threads pinned to one block per
@@ -104,6 +126,8 @@ while the grid was one wave.
 """
 struct SWGptGroups{OP, SS, FB, MK, FX, A3, CT}
     ngroups::Int
+    "split the optics out of the sweeps; see [`LWGptGroups`](@ref)"
+    split_optics::Bool
     "columns per group, so `wcol = gcol + (grp - 1) * ncol`"
     ncol::Int
     op::OP
@@ -122,7 +146,11 @@ struct SWGptGroups{OP, SS, FB, MK, FX, A3, CT}
 end
 Adapt.@adapt_structure SWGptGroups
 
-function SWGptGroups(grid_params::RRTMGPGridParams, ngroups::Int)
+function SWGptGroups(
+    grid_params::RRTMGPGridParams,
+    ngroups::Int;
+    split_optics::Bool = true,
+)
     ngroups >= 1 || error("ngroups must be at least 1, got $ngroups")
     (; context, ncol, nlay, isothermal_boundary_layer) = grid_params
     DA = ClimaComms.array_type(grid_params)
@@ -147,6 +175,7 @@ function SWGptGroups(grid_params::RRTMGPGridParams, ngroups::Int)
     )
     return SWGptGroups(
         ngroups,
+        split_optics,
         ncol,
         TwoStream(wide),
         SourceSW2Str(wide),

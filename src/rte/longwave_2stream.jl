@@ -391,6 +391,52 @@ function rte_lw_2stream_solve_both_skies! end
         lookup_lw_aero,
         wcol,
     )
+    lw_2stream_gpt_col_sweeps!(
+        igpt,
+        gcol,
+        flux,
+        flux_lw,
+        flux_lw_clear,
+        band_flux,
+        src_lw,
+        bcs_lw,
+        op,
+        as,
+        lookup_lw_cld,
+        ibnd,
+        nlev,
+        ncol,
+        mask_store,
+        first_igpt,
+        wcol,
+    )
+    return cloudy
+end
+
+# Everything the body above does once the gas and aerosol optics are in `op`:
+# the clear-sky sweep, the cloud increment on those same optics, the all-sky
+# sweep, and both accumulations. It reads `op` and writes fluxes, so it needs
+# nothing the optics half left in a register and can be a kernel of its own --
+# which is what `_solve_lw_both_skies_split!` in ext/cuda builds from it.
+@inline function lw_2stream_gpt_col_sweeps!(
+    igpt,
+    gcol,
+    flux,
+    flux_lw,
+    flux_lw_clear,
+    band_flux,
+    src_lw,
+    bcs_lw,
+    op,
+    as,
+    lookup_lw_cld,
+    ibnd,
+    nlev,
+    ncol,
+    mask_store,
+    first_igpt,
+    wcol,
+)
     rte_lw_2stream!(op, flux, src_lw, bcs_lw, gcol, igpt, ibnd, nlev, ncol, wcol)
     _accumulate_fluxes!(flux_lw_clear, flux, wcol, nlev, igpt, first_igpt)
     # Add the cloud increment on top of the same optics and sweep again
@@ -410,7 +456,7 @@ function rte_lw_2stream_solve_both_skies! end
     # `band_flux` has no group axis, so a grouped caller must pass none; its
     # driver solves the ungrouped path whenever one is being kept.
     accumulate_band_flux!(band_flux, flux.flux_up, flux.flux_dn, gcol, ibnd, nlev)
-    return cloudy
+    return nothing
 end
 
 """

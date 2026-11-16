@@ -356,28 +356,44 @@ function _solve_sw_both_skies_grouped!(
         )
     end
 
-    tx, bx = _configure_threadblock(ncol * ngroups)
-    args = (
-        groups.fluxb,
-        groups.acc,
-        groups.acc_clear,
-        groups.src,
-        bcs_sw,
-        groups.op,
-        groups.mask,
-        groups.cloudy,
-        nlay,
-        ncol,
-        as,
-        state_cache,
-        lookup_sw,
-        lookup_sw_cld,
-        lookup_sw_aero,
-        ngroups,
-    )
-    @cuda always_inline = true threads = (tx) blocks = (bx) rte_sw_2stream_solve_grouped_CUDA!(
-        args...,
-    )
+    if splits_optics(groups)
+        _sw_grouped_rounds!(
+            groups,
+            bcs_sw,
+            as,
+            state_cache,
+            lookup_sw,
+            lookup_sw_cld,
+            lookup_sw_aero,
+            nlay,
+            ncol,
+            ngroups,
+            n_gpt,
+        )
+    else
+        tx, bx = _configure_threadblock(ncol * ngroups)
+        args = (
+            groups.fluxb,
+            groups.acc,
+            groups.acc_clear,
+            groups.src,
+            bcs_sw,
+            groups.op,
+            groups.mask,
+            groups.cloudy,
+            nlay,
+            ncol,
+            as,
+            state_cache,
+            lookup_sw,
+            lookup_sw_cld,
+            lookup_sw_aero,
+            ngroups,
+        )
+        @cuda always_inline = true threads = (tx) blocks = (bx) rte_sw_2stream_solve_grouped_CUDA!(
+            args...,
+        )
+    end
 
     rtx, rbx = _configure_threadblock(ncol * nlev)
     @cuda always_inline = true threads = (rtx) blocks = (rbx) _reduce_sw_groups_CUDA!(
@@ -490,6 +506,185 @@ end
         acc_clear.flux_up[wcol, ilev] = FT(0)
         acc_clear.flux_dn[wcol, ilev] = FT(0)
         acc_clear.flux_dn_dir[wcol, ilev] = FT(0)
+    end
+    return nothing
+end
+
+#####
+##### The same solve with the optics split out of the sweeps.
+#####
+
+# One round of the grouped g-point loop as two launches; `_lw_grouped_rounds!`
+# in rte_longwave_2stream.jl carries the reasoning. The shortwave optics phase
+# needs 128 registers on its own, which reaches 16 warps per SM at either block
+# size, so the narrow optics launch is not needed here -- it is used anyway, so
+# that one constant describes both bands and neither has a block size of its
+# own to explain.
+function _sw_grouped_rounds!(
+    groups::SWGptGroups,
+    bcs_sw::SwBCs,
+    as::AtmosphericState,
+    state_cache::Union{TransposedStateCache, Nothing},
+    lookup_sw::LookUpSW,
+    lookup_sw_cld::Union{LookUpCld, Nothing},
+    lookup_sw_aero::Union{LookUpAerosolMerra, Nothing},
+    nlay,
+    ncol,
+    ngroups,
+    n_gpt,
+)
+    nwide = ncol * ngroups
+    otx, obx = _configure_threadblock(OPTICS_BLOCK_THREADS, nwide)
+    stx, sbx = _configure_threadblock(nwide)
+    for round in 1:cld(n_gpt, ngroups)
+        @cuda always_inline = true threads = (otx) blocks = (obx) _sw_group_optics_CUDA!(
+            groups.op,
+            as,
+            state_cache,
+            lookup_sw,
+            lookup_sw_aero,
+            ncol,
+            ngroups,
+            n_gpt,
+            round,
+        )
+        @cuda always_inline = true threads = (stx) blocks = (sbx) _sw_group_sweeps_CUDA!(
+            groups.fluxb,
+            groups.acc,
+            groups.acc_clear,
+            groups.src,
+            bcs_sw,
+            groups.op,
+            groups.mask,
+            groups.cloudy,
+            nlay,
+            ncol,
+            as,
+            lookup_sw,
+            lookup_sw_cld,
+            ngroups,
+            n_gpt,
+            round,
+        )
+    end
+    return nothing
+end
+
+# This round's gas and aerosol optics for every `(column, group)` pair. It runs
+# for a night column too: the 550 nm aerosol optical depth is collected here
+# and does not depend on the sun being up, which is also why the fused kernel
+# computes the optics before it tests the zenith angle.
+function _sw_group_optics_CUDA!(
+    op::TwoStream,
+    as::AtmosphericState,
+    state_cache::Union{TransposedStateCache, Nothing},
+    lookup_sw::LookUpSW,
+    lookup_sw_aero::Union{LookUpAerosolMerra, Nothing},
+    ncol,
+    ngroups,
+    n_gpt,
+    round,
+)
+    wcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x
+    (; major_gpt2bnd) = lookup_sw.band_data
+    if wcol <= ncol * ngroups
+        gcol = (wcol - 1) % ncol + 1
+        grp = (wcol - 1) ÷ ncol + 1
+        igpt = grp + (round - 1) * ngroups
+        if igpt <= n_gpt
+            @inbounds compute_optical_props!(
+                op,
+                as,
+                state_cache,
+                gcol,
+                igpt,
+                lookup_sw,
+                nothing,
+                lookup_sw_aero,
+                wcol,
+                # G-points are contiguous within a band, so this is the last
+                # one of its own band: exactly one thread writes the 550 nm
+                # optical depth, and it is the g-point the ungrouped loop
+                # leaves standing.
+                igpt == n_gpt ||
+                major_gpt2bnd[igpt + 1] != major_gpt2bnd[igpt],
+            )
+        end
+    end
+    return nothing
+end
+
+# The cloud mask and both sweeps for this round, over the optics the kernel
+# above left in `op`. The partials of a night column and of a group with no
+# g-point are zeroed on the first round rather than after the last: neither
+# ever assigns one, so zeroing first is the same result and costs no second
+# pass over the rounds.
+function _sw_group_sweeps_CUDA!(
+    flux::FluxSW,
+    acc::FluxSW,
+    acc_clear::FluxSW,
+    src_sw::SourceSW2Str,
+    bcs_sw::SwBCs,
+    op::TwoStream,
+    mask,
+    cloudy_count,
+    nlay,
+    ncol,
+    as::AtmosphericState,
+    lookup_sw::LookUpSW,
+    lookup_sw_cld::Union{LookUpCld, Nothing},
+    ngroups,
+    n_gpt,
+    round,
+)
+    wcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x
+    nlev = nlay + 1
+    (; major_gpt2bnd) = lookup_sw.band_data
+    if wcol <= ncol * ngroups
+        gcol = (wcol - 1) % ncol + 1
+        grp = (wcol - 1) ÷ ncol + 1
+        FT = eltype(acc.flux_up)
+        μ₀ = @inbounds bcs_sw.cos_zenith[gcol]
+        igpt = grp + (round - 1) * ngroups
+        if round == 1
+            @inbounds cloudy_count[wcol] = Int32(0)
+            (grp > n_gpt || μ₀ <= 0) &&
+                _zero_sw_partials!(acc, acc_clear, wcol, nlev, FT)
+        end
+        if igpt <= n_gpt
+            @inbounds begin
+                cloudy = _build_cloud_mask!(
+                    as.cloud_state,
+                    Val(:mask_sw),
+                    gcol,
+                    igpt,
+                    mask,
+                    wcol,
+                )
+                sw_2stream_gpt_col_sweeps!(
+                    igpt,
+                    gcol,
+                    flux,
+                    acc,
+                    acc_clear,
+                    nothing,
+                    op,
+                    bcs_sw,
+                    src_sw,
+                    as,
+                    lookup_sw,
+                    lookup_sw_cld,
+                    μ₀,
+                    major_gpt2bnd[igpt],
+                    n_gpt,
+                    nlev,
+                    mask,
+                    grp,
+                    wcol,
+                )
+                cloudy && (cloudy_count[wcol] += Int32(1))
+            end
+        end
     end
     return nothing
 end

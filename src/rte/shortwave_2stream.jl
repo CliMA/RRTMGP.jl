@@ -446,6 +446,54 @@ function rte_sw_2stream_solve_both_skies! end
         wcol,
         collect_aod,
     )
+    sw_2stream_gpt_col_sweeps!(
+        igpt,
+        gcol,
+        flux,
+        flux_sw,
+        flux_sw_clear,
+        band_flux,
+        op,
+        bcs_sw,
+        src_sw,
+        as,
+        lookup_sw,
+        lookup_sw_cld,
+        μ₀,
+        ibnd,
+        n_gpt,
+        nlev,
+        mask_store,
+        first_igpt,
+        wcol,
+    )
+    return cloudy
+end
+
+# Everything the body above does once the gas and aerosol optics are in `op`.
+# See `lw_2stream_gpt_col_sweeps!`; `_solve_sw_both_skies_split!` in ext/cuda
+# builds a kernel from this half alone.
+@inline function sw_2stream_gpt_col_sweeps!(
+    igpt,
+    gcol,
+    flux,
+    flux_sw,
+    flux_sw_clear,
+    band_flux,
+    op,
+    bcs_sw,
+    src_sw,
+    as,
+    lookup_sw,
+    lookup_sw_cld,
+    μ₀,
+    ibnd,
+    n_gpt,
+    nlev,
+    mask_store,
+    first_igpt,
+    wcol,
+)
     if μ₀ > 0
         @inbounds solar_frac = lookup_sw.solar_src_scaled[igpt]
         rte_sw_2stream!(
@@ -484,7 +532,7 @@ function rte_sw_2stream_solve_both_skies! end
             band_flux, flux.flux_up, flux.flux_dn, gcol, ibnd, nlev,
         )
     end
-    return cloudy
+    return nothing
 end
 
 """

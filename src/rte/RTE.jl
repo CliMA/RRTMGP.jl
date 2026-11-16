@@ -186,6 +186,7 @@ function TwoStreamLWRTE(
     inc_flux,
     state_cache = _default_state_cache(grid_params),
     ngpt_groups::Int = default_ngpt_groups(grid_params),
+    split_optics::Bool = true,
 )
     (; context) = grid_params
     op = TwoStream(grid_params)
@@ -195,8 +196,8 @@ function TwoStreamLWRTE(
     flux = FluxLW(grid_params)
     # Only the fused both-skies solve reads these; the others ignore them.
     gpt_groups =
-        ngpt_groups > 1 ? LWGptGroups(grid_params, ngpt_groups; params) :
-        nothing
+        ngpt_groups > 1 ?
+        LWGptGroups(grid_params, ngpt_groups; params, split_optics) : nothing
     return TwoStreamLWRTE(
         context,
         op,
@@ -326,6 +327,7 @@ function TwoStreamSWRTE(
     sfc_alb_diffuse,
     state_cache = _default_state_cache(grid_params),
     ngpt_groups::Int = default_ngpt_groups(grid_params),
+    split_optics::Bool = true,
 )
     (; context) = grid_params
     op = TwoStream(grid_params)
@@ -341,7 +343,8 @@ function TwoStreamSWRTE(
     flux = FluxSW(grid_params)
     # Only the fused both-skies solve reads these; the others ignore them.
     gpt_groups =
-        ngpt_groups > 1 ? SWGptGroups(grid_params, ngpt_groups) : nothing
+        ngpt_groups > 1 ?
+        SWGptGroups(grid_params, ngpt_groups; split_optics) : nothing
     return TwoStreamSWRTE(
         context,
         op,
