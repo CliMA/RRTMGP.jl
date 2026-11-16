@@ -287,6 +287,14 @@ taking every `ngroups`-th g-point of one column, then reduce their partial
 fluxes. With `groups.split_optics` each round of that g-point loop is two
 kernels rather than one; see `_lw_grouped_rounds!`.
 
+`split_optics` defaults on and is the faster path, so this fused one is not what
+a run uses. It stays because it is the oracle the split is checked against: the
+split moves no arithmetic, so the two must agree bit for bit, and the test suite
+asserts exactly that at two group counts and two cloud fractions. Deleting it
+would halve the kernels a change to this file has to touch and would also delete
+the only check that the split is still exact, which is the claim the split is
+worth having at all.
+
 The grouping's own gain is waves, not occupancy. The fused kernel's 255
 registers pin it to one block per SM either way, so the grouped grid has
 exactly as much work resident at any instant as the ungrouped one; what changes
@@ -427,12 +435,7 @@ function rte_lw_2stream_solve_grouped_CUDA!(
         if grp > n_gpt
             # More groups than g-points: this one has no work, and the
             # reduction reads its slice regardless.
-            @inbounds for ilev in 1:nlev
-                acc.flux_up[wcol, ilev] = FT(0)
-                acc.flux_dn[wcol, ilev] = FT(0)
-                acc_clear.flux_up[wcol, ilev] = FT(0)
-                acc_clear.flux_dn[wcol, ilev] = FT(0)
-            end
+            _zero_lw_partials!(acc, acc_clear, wcol, nlev, FT)
         else
             @inbounds for igpt in grp:ngroups:n_gpt
                 cloudy = lw_2stream_gpt_col_both_skies!(
@@ -461,6 +464,20 @@ function rte_lw_2stream_solve_grouped_CUDA!(
             end
         end
         @inbounds cloudy_count[wcol] = Int32(n_cloudy_gpts)
+    end
+    return nothing
+end
+
+# Zero a group's slice of the partial accumulators. The reduction reads every
+# slice whether or not a group had work, so a group with none has to write zeros
+# rather than leave whatever the workspace last held. The shortwave counterpart
+# is `_zero_sw_partials!`.
+@inline function _zero_lw_partials!(acc, acc_clear, wcol, nlev, ::Type{FT}) where {FT}
+    @inbounds for ilev in 1:nlev
+        acc.flux_up[wcol, ilev] = FT(0)
+        acc.flux_dn[wcol, ilev] = FT(0)
+        acc_clear.flux_up[wcol, ilev] = FT(0)
+        acc_clear.flux_dn[wcol, ilev] = FT(0)
     end
     return nothing
 end
@@ -609,14 +626,7 @@ function _lw_group_sweeps_CUDA!(
         igpt = grp + (round - 1) * ngroups
         if round == 1
             @inbounds cloudy_count[wcol] = Int32(0)
-            if grp > n_gpt
-                @inbounds for ilev in 1:nlev
-                    acc.flux_up[wcol, ilev] = FT(0)
-                    acc.flux_dn[wcol, ilev] = FT(0)
-                    acc_clear.flux_up[wcol, ilev] = FT(0)
-                    acc_clear.flux_dn[wcol, ilev] = FT(0)
-                end
-            end
+            grp > n_gpt && _zero_lw_partials!(acc, acc_clear, wcol, nlev, FT)
         end
         if igpt ≤ n_gpt
             @inbounds begin
