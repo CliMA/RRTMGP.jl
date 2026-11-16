@@ -214,7 +214,8 @@ cloud increment to the same optics and sweeps again. Per-column body is
 CPU driver.
 """
 # Duplicated for the CPU in src/rte/longwave_2stream.jl: the cloud-cover tally
-# and net-flux finalize are in both. Change both.
+# and net-flux finalize are in both, and the grouped reduction below holds a
+# third copy of the finalize. Change all three.
 function rte_lw_2stream_solve_both_skies_CUDA!(
     flux::FluxLW,
     flux_lw::FluxLW,
@@ -329,7 +330,7 @@ function _solve_lw_both_skies_grouped!(
     # instead of identically by every group.
     if aerosol_state isa AerosolState
         atx, abx = _configure_threadblock(ncol)
-        @cuda always_inline = true threads = (atx) blocks = (abx) _lw_aero_mask_CUDA!(
+        @cuda always_inline = true threads = (atx) blocks = (abx) _aero_mask_CUDA!(
             aerosol_state,
             ncol,
         )
@@ -387,13 +388,6 @@ function _solve_lw_both_skies_grouped!(
         ncol,
         nlev,
     )
-    return nothing
-end
-
-# Aerosol mask for every column, hoisted out of the grouped kernel.
-function _lw_aero_mask_CUDA!(aerosol_state::AerosolState, ncol)
-    gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x
-    gcol ≤ ncol && _compute_aero_mask!(aerosol_state, gcol)
     return nothing
 end
 

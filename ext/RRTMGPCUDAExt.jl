@@ -62,6 +62,14 @@ end
 _configure_threadblock(nitems) =
     _configure_threadblock(_max_threads_cuda(), nitems)
 
+# Aerosol mask for every column, hoisted out of the grouped solves of both
+# bands, which need it per column rather than per wide column.
+function _aero_mask_CUDA!(aerosol_state::AerosolState, ncol)
+    gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x
+    gcol ≤ ncol && _compute_aero_mask!(aerosol_state, gcol)
+    return nothing
+end
+
 include(joinpath("cuda", "gray_atmospheric_states.jl"))
 include(joinpath("cuda", "rte_longwave_2stream.jl"))
 include(joinpath("cuda", "optics.jl"))

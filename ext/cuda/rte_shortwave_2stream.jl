@@ -230,7 +230,9 @@ cloud increment to the same optics and sweeps again. Per-column body is
 CPU driver.
 """
 # Duplicated for the CPU in src/rte/shortwave_2stream.jl: the cloud-cover tally,
-# net-flux finalize and night-column zeroing are in both. Change both.
+# net-flux finalize and night-column zeroing are in both, and the grouped
+# reduction below holds a third copy of the finalize and the zeroing. Change all
+# three.
 function rte_sw_2stream_solve_both_skies_CUDA!(
     flux::FluxSW,
     flux_sw::FluxSW,
@@ -301,9 +303,11 @@ end
 """
     _solve_sw_both_skies_grouped!(groups, flux_sw, flux_sw_clear, bcs_sw, as, ...)
 
-Run the fused shortwave solve as one kernel over `ncol * n_gpt_groups(groups)`
-threads, each taking every `ngroups`-th g-point of one column, then reduce their
-partial fluxes. The longwave counterpart `_solve_lw_both_skies_grouped!` carries
+Run the shortwave solve over `ncol * n_gpt_groups(groups)` threads, each taking
+every `ngroups`-th g-point of one column, then reduce their partial fluxes. A
+round is one fused kernel, or two when `splits_optics(groups)` separates the gas
+and aerosol optics from the sweeps, so the solve launches `cld(n_gpt, ngroups)`
+kernels or twice that. The longwave counterpart `_solve_lw_both_skies_grouped!` carries
 the reasoning for why this is one grid rather than one launch per group.
 
 Two things are specific to the shortwave. The partials carry a direct-beam
@@ -350,7 +354,7 @@ function _solve_sw_both_skies_grouped!(
     # instead of identically by every group.
     if aerosol_state isa AerosolState
         atx, abx = _configure_threadblock(ncol)
-        @cuda always_inline = true threads = (atx) blocks = (abx) _sw_aero_mask_CUDA!(
+        @cuda always_inline = true threads = (atx) blocks = (abx) _aero_mask_CUDA!(
             aerosol_state,
             ncol,
         )
@@ -408,13 +412,6 @@ function _solve_sw_both_skies_grouped!(
         ncol,
         nlev,
     )
-    return nothing
-end
-
-# Aerosol mask for every column, hoisted out of the grouped kernel.
-function _sw_aero_mask_CUDA!(aerosol_state::AerosolState, ncol)
-    gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x
-    gcol <= ncol && _compute_aero_mask!(aerosol_state, gcol)
     return nothing
 end
 
