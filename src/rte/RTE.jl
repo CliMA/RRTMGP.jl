@@ -56,6 +56,16 @@ so grouping there buys nothing and costs the memory anyway -- and because the
 count rises as columns fall, an ungated default gives the smallest runs the
 widest workspaces. Pass `ngpt_groups` explicitly to override this in either
 direction.
+
+Grouping changes the order in which a column's g-points are summed, since each
+group accumulates its own partial flux for a reduction to add, and floating-point
+addition is not associative. So grouped fluxes differ from a serial solve at
+roundoff -- about 1e-6 relative in the configurations tested -- and the clear-sky
+half of a both-skies solve no longer equals a standalone clear-sky solve exactly.
+Pass `ngpt_groups = 1` where bit-for-bit agreement with the serial solve is
+required. Nothing else about the result moves: the cloud-cover tally is a count
+of g-points and stays exact, and splitting the optics out of the sweeps is
+bit-for-bit.
 """
 default_ngpt_groups(grid_params::RRTMGPGridParams) =
     ClimaComms.device(grid_params) isa ClimaComms.AbstractCPUDevice ? 1 :
