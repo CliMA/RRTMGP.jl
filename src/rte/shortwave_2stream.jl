@@ -471,8 +471,8 @@ function rte_sw_2stream_solve_both_skies! end
 end
 
 # Everything the body above does once the gas and aerosol optics are in `op`.
-# See `lw_2stream_gpt_col_sweeps!`; `_solve_sw_both_skies_split!` in ext/cuda
-# builds a kernel from this half alone.
+# See `lw_2stream_gpt_col_sweeps!`; `_sw_grouped_rounds!` in ext/cuda builds a
+# kernel from this half alone.
 @inline function sw_2stream_gpt_col_sweeps!(
     igpt,
     gcol,

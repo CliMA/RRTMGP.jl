@@ -33,10 +33,10 @@ _default_state_cache(::ClimaComms.AbstractDevice, gp::RRTMGPGridParams) =
 # memory for blocks the one wave cannot otherwise fill.
 const MAX_NGPT_GROUPS = 16
 
-# Wide columns the default group count aims for. 393,216 is 1,536 blocks of 256
-# threads, some fourteen waves on 108 SMs, which is where the imbalance between
-# columns stops showing; past it another group adds no parallelism the scheduler
-# can use. Every widened workspace is linear in `ngroups`, so this is also what
+# Wide columns the default group count aims for. 393,216 threads is 3,072 blocks
+# at the split kernels' 128 threads, or 1,536 at 256, which is many waves over
+# 108 SMs and is where the imbalance between columns stops showing; past it
+# another group adds no parallelism the scheduler can use. Every widened workspace is linear in `ngroups`, so this is also what
 # bounds their memory: the accumulators alone are `ncol * ngroups * nlev` by
 # three fields in the longwave and four in the shortwave.
 const TARGET_GPT_GROUP_COLUMNS = 393216

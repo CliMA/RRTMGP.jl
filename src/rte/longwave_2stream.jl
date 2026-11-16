@@ -417,7 +417,7 @@ end
 # the clear-sky sweep, the cloud increment on those same optics, the all-sky
 # sweep, and both accumulations. It reads `op` and writes fluxes, so it needs
 # nothing the optics half left in a register and can be a kernel of its own --
-# which is what `_solve_lw_both_skies_split!` in ext/cuda builds from it.
+# which is what `_lw_grouped_rounds!` in ext/cuda builds from it.
 @inline function lw_2stream_gpt_col_sweeps!(
     igpt,
     gcol,
