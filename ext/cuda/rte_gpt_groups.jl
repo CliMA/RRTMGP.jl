@@ -10,8 +10,6 @@ const GROUP_BLOCK_THREADS = 128
 # What the two bands do not share: the kernels a round launches, the source the
 # longwave optics writes and the shortwave has none of, and the cloud-cover
 # array the reduction fills.
-@inline _fused_kernel(::LWGptGroups) = rte_lw_2stream_solve_grouped_CUDA!
-@inline _fused_kernel(::SWGptGroups) = rte_sw_2stream_solve_grouped_CUDA!
 @inline _optics_kernel(::LWGptGroups) = _lw_group_optics_CUDA!
 @inline _optics_kernel(::SWGptGroups) = _sw_group_optics_CUDA!
 @inline _sweeps_kernel(::LWGptGroups) = _lw_group_sweeps_CUDA!
@@ -30,27 +28,22 @@ const GROUP_BLOCK_THREADS = 128
 
 Run the fused both-skies solve over `ncol * n_gpt_groups(groups)` threads, each
 taking every `ngroups`-th g-point of one column, then reduce their partial
-fluxes. `groups` is the band: `LWGptGroups` or `SWGptGroups`. With
-`groups.split_optics` each round of that g-point loop is two kernels rather than
-one; see `_grouped_rounds!`.
+fluxes. `groups` is the band: `LWGptGroups` or `SWGptGroups`. Each round of that
+g-point loop is two kernels, the gas and aerosol optics and then the sweeps; see
+`_grouped_rounds!`.
 
 A thread's wide column index is its own id: `wcol = gcol + (grp - 1) * ncol`
 selects its slice of every workspace, and consecutive threads are consecutive
 columns of one group, so the state reads and the scratch writes stay coalesced.
 
-The gain is waves rather than occupancy. The fused kernel's 255 registers pin it
-to one block per multiprocessor either way, so what grouping changes is that
-blocks queue behind it instead of a multiprocessor idling until the launch's
-slowest column is done.
+The gain is waves rather than occupancy. A round's kernels are register-bound
+whatever the grid, so what grouping changes is that blocks queue behind them
+instead of a multiprocessor idling until the launch's slowest column is done.
 
 The fluxes are **not** bit-for-bit with the ungrouped solve: summing a column's
 g-points as `ngroups` interleaved partials is a different order of the same sum.
 Which mask each g-point draws is unchanged, since the McICA key indexes a
 stateless draw in `(key, column, g-point, layer)`.
-
-`split_optics` defaults on, so the fused path is the oracle the split is checked
-against rather than one a run takes: the split moves no arithmetic, and the tests
-assert that the two agree bit for bit.
 
 Two things are specific to the shortwave. The partials carry a direct-beam
 profile as well as up and down, so the reduction sums three. And a night column
@@ -87,45 +80,19 @@ function _solve_both_skies_grouped!(
         )
     end
 
-    if splits_optics(groups)
-        _grouped_rounds!(
-            groups,
-            bcs,
-            as,
-            state_cache,
-            lookup,
-            lookup_cld,
-            lookup_aero,
-            nlay,
-            ncol,
-            ngroups,
-            n_gpt,
-        )
-    else
-        tx, bx = _configure_threadblock(ncol * ngroups)
-        args = (
-            groups.fluxb,
-            groups.acc,
-            groups.acc_clear,
-            groups.src,
-            bcs,
-            groups.op,
-            groups.mask,
-            groups.cloudy,
-            nlay,
-            ncol,
-            as,
-            state_cache,
-            lookup,
-            lookup_cld,
-            lookup_aero,
-            ngroups,
-        )
-        fused! = _fused_kernel(groups)
-        @cuda always_inline = true threads = (tx) blocks = (bx) fused!(
-            args...,
-        )
-    end
+    _grouped_rounds!(
+        groups,
+        bcs,
+        as,
+        state_cache,
+        lookup,
+        lookup_cld,
+        lookup_aero,
+        nlay,
+        ncol,
+        ngroups,
+        n_gpt,
+    )
 
     rtx, rbx = _configure_threadblock(ncol * nlev)
     reduce_args = (
@@ -149,8 +116,8 @@ end
 
 # One round of the grouped g-point loop is two launches: every thread's gas and
 # aerosol optics, then every thread's sweeps over the optics now in `op`. The
-# round index replaces the `for igpt in grp:ngroups:n_gpt` the fused kernel
-# walks, so round `r` is that loop's `r`th iteration for every group at once.
+# round index replaces a thread's own `for igpt in grp:ngroups:n_gpt`, so round
+# `r` is that loop's `r`th iteration for every group at once.
 function _grouped_rounds!(
     groups::Union{LWGptGroups, SWGptGroups},
     bcs,

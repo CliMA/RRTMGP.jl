@@ -160,7 +160,6 @@ function RRTMGPSolver(
     spectral_fluxes = false,
     n_gauss_angles::Int = 1,
     ngpt_groups::Int = RTE.default_ngpt_groups(grid_params),
-    split_optics::Bool = true,
 )
     (; context) = grid_params
 
@@ -299,7 +298,7 @@ function RRTMGPSolver(
             !(op_sw isa OneScalar) &&
             isnothing(band_flux_sw) &&
             ngpt_groups > 1
-        ) ? RTE.SWGptGroups(grid_params, ngpt_groups; split_optics) : nothing
+        ) ? RTE.SWGptGroups(grid_params, ngpt_groups) : nothing
     sws =
         op_sw isa OneScalar ?
         RTE.NoScatSWRTE(context, op_sw, bcs_sw, fluxb_sw, flux_sw, state_cache) :
@@ -325,7 +324,7 @@ function RRTMGPSolver(
             !(op_lw isa OneScalar) &&
             isnothing(band_flux_lw) &&
             ngpt_groups > 1
-        ) ? RTE.LWGptGroups(grid_params, ngpt_groups; params, split_optics) :
+        ) ? RTE.LWGptGroups(grid_params, ngpt_groups; params) :
         nothing
     lws =
         op_lw isa OneScalar ?

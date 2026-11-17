@@ -300,86 +300,6 @@ function rte_sw_2stream_solve_both_skies_CUDA!(
     return nothing
 end
 
-# The fused shortwave g-point loop over `(column, group)` pairs. The per-column
-# body is the same `sw_2stream_gpt_col_both_skies!` the ungrouped kernel calls,
-# handed this thread's wide column index and told which g-point starts its
-# stride, so the accumulators are assigned on the first one and added to after.
-function rte_sw_2stream_solve_grouped_CUDA!(
-    flux::FluxSW,
-    acc::NamedTuple,
-    acc_clear::NamedTuple,
-    src_sw::SourceSW2Str,
-    bcs_sw::SwBCs,
-    op::TwoStream,
-    mask,
-    cloudy_count,
-    nlay,
-    ncol,
-    as::AtmosphericState,
-    state_cache::Union{TransposedStateCache, Nothing},
-    lookup_sw::LookUpSW,
-    lookup_sw_cld::Union{LookUpCld, Nothing},
-    lookup_sw_aero::Union{LookUpAerosolMerra, Nothing},
-    ngroups,
-)
-    wcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x
-    nlev = nlay + 1
-    (; major_gpt2bnd) = lookup_sw.band_data
-    n_gpt = length(major_gpt2bnd)
-    if wcol <= ncol * ngroups
-        # Columns vary fastest, so a warp spans 32 consecutive columns of one
-        # group and every read it makes is still contiguous.
-        gcol = (wcol - 1) % ncol + 1
-        grp = (wcol - 1) ÷ ncol + 1
-        FT = eltype(acc.flux_up)
-        μ₀ = @inbounds bcs_sw.cos_zenith[gcol]
-        n_cloudy_gpts = 0
-        if grp > n_gpt
-            # More groups than g-points: this one has no work, and the
-            # reduction reads its slice regardless.
-            _zero_sw_partials!(acc, acc_clear, wcol, nlev, FT)
-        else
-            @inbounds for igpt in grp:ngroups:n_gpt
-                cloudy = sw_2stream_gpt_col_both_skies!(
-                    igpt,
-                    gcol,
-                    flux,
-                    acc,
-                    acc_clear,
-                    nothing,
-                    op,
-                    bcs_sw,
-                    src_sw,
-                    as,
-                    state_cache,
-                    lookup_sw,
-                    lookup_sw_cld,
-                    lookup_sw_aero,
-                    μ₀,
-                    major_gpt2bnd[igpt],
-                    n_gpt,
-                    nlev,
-                    mask,
-                    grp,
-                    wcol,
-                    # G-points are contiguous within a band, so this is the
-                    # last one of its own band: exactly one thread writes the
-                    # 550 nm optical depth, and it is the g-point the ungrouped
-                    # loop leaves standing.
-                    igpt == n_gpt ||
-                    major_gpt2bnd[igpt + 1] != major_gpt2bnd[igpt],
-                )
-                n_cloudy_gpts += cloudy ? 1 : 0
-            end
-            # The sun is down, so the loop above drew this column's masks but
-            # never swept and never assigned a partial.
-            μ₀ <= 0 && _zero_sw_partials!(acc, acc_clear, wcol, nlev, FT)
-        end
-        @inbounds cloudy_count[wcol] = Int32(n_cloudy_gpts)
-    end
-    return nothing
-end
-
 @inline function _zero_sw_partials!(acc, acc_clear, wcol, nlev, ::Type{FT}) where {FT}
     @inbounds for ilev in 1:nlev
         acc.flux_up[wcol, ilev] = FT(0)
@@ -393,13 +313,13 @@ end
 end
 
 #####
-##### The same solve with the optics split out of the sweeps.
+##### The g-point-grouped shortwave solve, as optics and then sweeps.
 #####
 
 # This round's gas and aerosol optics for every `(column, group)` pair. It runs
 # for a night column too: the 550 nm aerosol optical depth is collected here
-# and does not depend on the sun being up, which is also why the fused kernel
-# computes the optics before it tests the zenith angle.
+# and does not depend on the sun being up, which is also why the ungrouped
+# kernel computes the optics before it tests the zenith angle.
 function _sw_group_optics_CUDA!(
     op::TwoStream,
     as::AtmosphericState,

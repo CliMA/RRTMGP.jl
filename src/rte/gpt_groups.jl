@@ -25,15 +25,6 @@ and solves the whole g-point loop per column, which is correct either way.
 """
 struct LWGptGroups{OP, SL, FB, MK, FX, CT}
     ngroups::Int
-    """
-    Solve each round of the g-point loop as two kernels, the gas and aerosol
-    optics and then the sweeps, instead of one fused kernel. Each half needs
-    fewer registers than the fused kernel's 255 and so holds more warps per
-    multiprocessor. `op` and `src` are device arrays that both halves address by
-    wide column, so the phases exchange nothing a kernel boundary cannot carry
-    and the split is bit-for-bit.
-    """
-    split_optics::Bool
     op::OP
     src::SL
     fluxb::FB
@@ -51,7 +42,6 @@ function LWGptGroups(
     grid_params::RRTMGPGridParams,
     ngroups::Int;
     params,
-    split_optics::Bool = true,
 )
     ngroups ≥ 1 || error("ngroups must be at least 1, got $ngroups")
     (; context, ncol, nlay, isothermal_boundary_layer) = grid_params
@@ -78,7 +68,6 @@ function LWGptGroups(
     fluxes(d) = (flux_up = view(d, :, :, 1), flux_dn = view(d, :, :, 2))
     return LWGptGroups(
         ngroups,
-        split_optics,
         TwoStream(wide),
         SourceLW2Str(wide; params),
         FluxLW(wide),
@@ -91,8 +80,6 @@ end
 
 n_gpt_groups(::Nothing) = 1
 n_gpt_groups(g::LWGptGroups) = g.ngroups
-
-splits_optics(g) = g.split_optics
 
 """
     SWGptGroups(grid_params::RRTMGPGridParams, ngroups)
@@ -110,8 +97,6 @@ which is the imbalance more blocks than one wave can absorb.
 """
 struct SWGptGroups{OP, SS, FB, MK, FX, CT}
     ngroups::Int
-    "split the optics out of the sweeps; see [`LWGptGroups`](@ref)"
-    split_optics::Bool
     op::OP
     src::SS
     fluxb::FB
@@ -128,7 +113,6 @@ Adapt.@adapt_structure SWGptGroups
 function SWGptGroups(
     grid_params::RRTMGPGridParams,
     ngroups::Int;
-    split_optics::Bool = true,
 )
     ngroups >= 1 || error("ngroups must be at least 1, got $ngroups")
     (; context, ncol, nlay, isothermal_boundary_layer) = grid_params
@@ -155,7 +139,6 @@ function SWGptGroups(
     )
     return SWGptGroups(
         ngroups,
-        split_optics,
         TwoStream(wide),
         SourceSW2Str(wide),
         FluxSW(wide),

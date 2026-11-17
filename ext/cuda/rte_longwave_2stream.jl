@@ -276,77 +276,8 @@ function rte_lw_2stream_solve_both_skies_CUDA!(
 end
 
 #####
-##### The g-point-grouped fused longwave solve.
+##### The g-point-grouped longwave solve, as optics and then sweeps.
 #####
-
-# The fused longwave g-point loop over `(column, group)` pairs. The per-column
-# body is the same `lw_2stream_gpt_col_both_skies!` the ungrouped kernel calls,
-# handed this thread's wide column index and told which g-point starts its
-# stride, so the accumulators are assigned on the first one and added to after.
-function rte_lw_2stream_solve_grouped_CUDA!(
-    flux::FluxLW,
-    acc::NamedTuple,
-    acc_clear::NamedTuple,
-    src_lw::SourceLW2Str,
-    bcs_lw::LwBCs,
-    op::TwoStream,
-    mask,
-    cloudy_count,
-    nlay,
-    ncol,
-    as::AtmosphericState,
-    state_cache::Union{TransposedStateCache, Nothing},
-    lookup_lw::LookUpLW,
-    lookup_lw_cld::Union{LookUpCld, Nothing},
-    lookup_lw_aero::Union{LookUpAerosolMerra, Nothing},
-    ngroups,
-)
-    wcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x
-    nlev = nlay + 1
-    (; major_gpt2bnd) = lookup_lw.band_data
-    n_gpt = length(major_gpt2bnd)
-    if wcol ≤ ncol * ngroups
-        # Columns vary fastest, so a warp spans 32 consecutive columns of one
-        # group and every read it makes is still contiguous.
-        gcol = (wcol - 1) % ncol + 1
-        grp = (wcol - 1) ÷ ncol + 1
-        FT = eltype(acc.flux_up)
-        n_cloudy_gpts = 0
-        if grp > n_gpt
-            # More groups than g-points: this one has no work, and the
-            # reduction reads its slice regardless.
-            _zero_lw_partials!(acc, acc_clear, wcol, nlev, FT)
-        else
-            @inbounds for igpt in grp:ngroups:n_gpt
-                cloudy = lw_2stream_gpt_col_both_skies!(
-                    igpt,
-                    gcol,
-                    flux,
-                    acc,
-                    acc_clear,
-                    nothing,
-                    src_lw,
-                    bcs_lw,
-                    op,
-                    as,
-                    state_cache,
-                    lookup_lw,
-                    lookup_lw_cld,
-                    lookup_lw_aero,
-                    major_gpt2bnd[igpt],
-                    nlev,
-                    ncol,
-                    mask,
-                    grp,
-                    wcol,
-                )
-                n_cloudy_gpts += cloudy ? 1 : 0
-            end
-        end
-        @inbounds cloudy_count[wcol] = Int32(n_cloudy_gpts)
-    end
-    return nothing
-end
 
 # Zero a group's slice of the partial accumulators. The reduction reads every
 # slice whether or not a group had work, so a group with none has to write zeros
@@ -361,10 +292,6 @@ end
     end
     return nothing
 end
-
-#####
-##### The same solve with the optics split out of the sweeps.
-#####
 
 # This round's gas and aerosol optics for every `(column, group)` pair, into
 # the wide `op` and `src` the sweep kernel reads. The cloud mask is not drawn
@@ -407,8 +334,7 @@ end
 
 # The cloud mask and both sweeps for this round, over the optics the kernel
 # above left in `op`. A group with no g-point of its own is zeroed on the first
-# round, because the reduction reads its slice whether it was swept or not --
-# the fused kernel does the same, before its loop rather than at round one.
+# round, because the reduction reads its slice whether it was swept or not.
 function _lw_group_sweeps_CUDA!(
     flux::FluxLW,
     acc::NamedTuple,

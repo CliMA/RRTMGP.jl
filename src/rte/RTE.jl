@@ -59,8 +59,10 @@ floating-point addition is not associative, so grouped fluxes differ from a
 serial solve at roundoff -- about 1e-6 relative in the configurations tested --
 and the clear-sky half of a both-skies solve no longer equals a standalone
 clear-sky solve exactly. Pass `ngpt_groups = 1` where bit-for-bit agreement is
-required. The cloud-cover tally is a count of g-points and stays exact, and
-splitting the optics out of the sweeps is bit-for-bit.
+required. The cloud-cover tally is a count of g-points and stays exact. What
+grouping does to a sum is the whole of the difference: at one group the g-points
+are taken in the serial order, and the solve is then bit-for-bit with the serial
+one, which is what the tests assert.
 """
 default_ngpt_groups(grid_params::RRTMGPGridParams) =
     ClimaComms.device(grid_params) isa ClimaComms.AbstractCPUDevice ? 1 :
@@ -196,7 +198,6 @@ function TwoStreamLWRTE(
     inc_flux,
     state_cache = _default_state_cache(grid_params),
     ngpt_groups::Int = default_ngpt_groups(grid_params),
-    split_optics::Bool = true,
 )
     (; context) = grid_params
     op = TwoStream(grid_params)
@@ -207,7 +208,7 @@ function TwoStreamLWRTE(
     # Only the fused both-skies solve reads these; the others ignore them.
     gpt_groups =
         ngpt_groups > 1 ?
-        LWGptGroups(grid_params, ngpt_groups; params, split_optics) : nothing
+        LWGptGroups(grid_params, ngpt_groups; params) : nothing
     return TwoStreamLWRTE(
         context,
         op,
@@ -337,7 +338,6 @@ function TwoStreamSWRTE(
     sfc_alb_diffuse,
     state_cache = _default_state_cache(grid_params),
     ngpt_groups::Int = default_ngpt_groups(grid_params),
-    split_optics::Bool = true,
 )
     (; context) = grid_params
     op = TwoStream(grid_params)
@@ -354,7 +354,7 @@ function TwoStreamSWRTE(
     # Only the fused both-skies solve reads these; the others ignore them.
     gpt_groups =
         ngpt_groups > 1 ?
-        SWGptGroups(grid_params, ngpt_groups; split_optics) : nothing
+        SWGptGroups(grid_params, ngpt_groups) : nothing
     return TwoStreamSWRTE(
         context,
         op,
