@@ -49,12 +49,14 @@
 end
 
 # Accumulate one g-point's fluxes into the broadband accumulator for one
-# column: copy on the first g-point, add afterwards. `flux_net` is not
+# column: copy on the first g-point, add afterwards. The accumulator is a
+# `FluxLW`/`FluxSW` on the serial path and a NamedTuple of views on the grouped
+# one, so only `flux` selects the band. `flux_net` is not
 # accumulated — the drivers recompute it from the broadband up/dn once, after
 # the g-point loop. For shortwave, the direct beam is accumulated at every
 # level, so the broadband `flux_dn_dir` is a true per-level profile.
 @inline function _accumulate_fluxes!(
-    flux_acc::FluxLW,
+    flux_acc,
     flux::FluxLW,
     gcol,
     nlev,
@@ -78,7 +80,7 @@ end
 end
 
 @inline function _accumulate_fluxes!(
-    flux_acc::FluxSW,
+    flux_acc,
     flux::FluxSW,
     gcol,
     nlev,
