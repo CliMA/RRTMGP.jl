@@ -314,13 +314,11 @@ function RRTMGPSolver(
             state_cache,
             gpt_groups_sw, # per-group workspaces, or `nothing` for one group
         )
-    # Workspaces for the g-point-grouped fused longwave solve. Only
-    # `update_lw_fluxes!(_, ::AllSkyRadiationWithClearSkyDiagnostics)` reaches
-    # that solve, so the method is part of the gate: the other methods never
-    # read these, and at 24,576 columns the default group count makes them
-    # gigabytes. The rest of the gate is what the solve itself needs:
-    # two-stream spectral longwave with no per-band fluxes to accumulate per
-    # g-point. `GrayRadiation` is excluded by the method test already.
+    # Workspaces for the g-point-grouped fused longwave solve. The radiation
+    # method is part of the gate because only its `update_lw_fluxes!` reaches
+    # that solve, and these workspaces run to gigabytes at AMIP column counts.
+    # The rest of the gate is what the solve needs: two-stream spectral
+    # longwave with no per-band fluxes to accumulate per g-point.
     gpt_groups_lw =
         (
             radiation_method isa AllSkyRadiationWithClearSkyDiagnostics &&

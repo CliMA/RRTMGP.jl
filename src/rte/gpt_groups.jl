@@ -9,20 +9,16 @@ Workspaces for solving a column's longwave g-point loop in `ngroups`
 independent pieces, covered by one grid rather than by one column's serial
 loop.
 
-At one thread per column the solve's grid is 96 blocks of 256 threads, and the
-kernel's 255 registers pin it to one block per SM, so 108 SMs hold 0.89 of that
-grid at once. The device is already full. Splitting the g-point loop multiplies
-the number of blocks instead: `ncol * ngroups` threads is some 14 waves, and the
-scheduler refills an SM as each block retires, which is what absorbs the tail
-and the imbalance between columns. This is the restructure priced in section 4l
-of the profiling study.
+At one thread per column the solve fills the device in a single wave of blocks,
+so its tail and the imbalance between columns cannot be absorbed. Splitting the
+g-point loop multiplies the blocks instead, and the scheduler refills a
+multiprocessor as each retires.
 
-Every workspace the solve indexes by column is widened to `ncol * ngroups`
-columns, so a thread's `(column, group)` pair selects its own slice by a single
-index and the kernel body is the ungrouped one with that index substituted for
-the column wherever it touches scratch. Nothing is per-group-allocated and
-nothing has a group axis to walk: the reduction recovers the group from the
-wide column index.
+Every workspace the solve indexes by column is widened to `ncol * ngroups`, so a
+thread's `(column, group)` pair selects its slice by one index and the kernel
+body is the ungrouped one with that index substituted wherever it touches
+scratch. Nothing is allocated or walked per group: the reduction recovers the
+group from the wide column index.
 
 `ngroups > 1` is implemented for CUDA. The CPU driver ignores these workspaces
 and solves the whole g-point loop per column, which is correct either way.
@@ -31,18 +27,13 @@ struct LWGptGroups{OP, SL, FB, MK, FX, CT}
     ngroups::Int
     """
     Solve each round of the g-point loop as two kernels, the gas and aerosol
-    optics and then the sweeps, instead of one fused kernel.
-
-    The fused kernel needs 255 registers, which pins it to one block per SM.
-    Compiled on its own the optics phase needs 156 in the longwave and 128 in
-    the shortwave with 32 bytes of stack, so it reaches 12 and 16 warps per SM
-    where the fused kernel reaches 8. `op` and `src` are already device arrays
-    that both halves address by wide column, so the phases exchange nothing a
-    kernel boundary cannot carry and the split result is bit-for-bit.
+    optics and then the sweeps, instead of one fused kernel. Each half needs
+    fewer registers than the fused kernel's 255 and so holds more warps per
+    multiprocessor. `op` and `src` are device arrays that both halves address by
+    wide column, so the phases exchange nothing a kernel boundary cannot carry
+    and the split is bit-for-bit.
     """
     split_optics::Bool
-    "columns per group, so `wcol = gcol + (grp - 1) * ncol`"
-    ncol::Int
     op::OP
     src::SL
     fluxb::FB
@@ -88,7 +79,6 @@ function LWGptGroups(
     return LWGptGroups(
         ngroups,
         split_optics,
-        ncol,
         TwoStream(wide),
         SourceLW2Str(wide; params),
         FluxLW(wide),
@@ -111,24 +101,17 @@ Workspaces for solving a column's shortwave g-point loop in `ngroups`
 independent pieces, covered by one grid rather than by one column's serial
 loop.
 
-[`LWGptGroups`](@ref) carries the reasoning, and it holds here unchanged: the
-shortwave solve's grid is also 96 blocks of 256 threads pinned to one block per
-SM by 255 registers, so 108 SMs hold 0.89 of it and the parallelism has to come
-from more blocks rather than from more occupancy.
+[`LWGptGroups`](@ref) carries the reasoning, which holds here unchanged.
 
 Two things differ from the longwave. `FluxSW` carries a direct-beam profile, so
-a group accumulates three of them rather than two. And the shortwave sweeps only
-where the sun is up, so every group of a night column exits its loop at once --
-at fourteen waves an SM that retires such a block is handed another, which is
-the load imbalance section 4l of the profiling study measured as unobtainable
-while the grid was one wave.
+a group accumulates three planes rather than two. And the shortwave sweeps only
+where the sun is up, so every group of a night column exits its loop at once,
+which is the imbalance more blocks than one wave can absorb.
 """
 struct SWGptGroups{OP, SS, FB, MK, FX, CT}
     ngroups::Int
     "split the optics out of the sweeps; see [`LWGptGroups`](@ref)"
     split_optics::Bool
-    "columns per group, so `wcol = gcol + (grp - 1) * ncol`"
-    ncol::Int
     op::OP
     src::SS
     fluxb::FB
@@ -173,7 +156,6 @@ function SWGptGroups(
     return SWGptGroups(
         ngroups,
         split_optics,
-        ncol,
         TwoStream(wide),
         SourceSW2Str(wide),
         FluxSW(wide),

@@ -33,12 +33,12 @@ _default_state_cache(::ClimaComms.AbstractDevice, gp::RRTMGPGridParams) =
 # memory for blocks the one wave cannot otherwise fill.
 const MAX_NGPT_GROUPS = 16
 
-# Wide columns the default group count aims for. 393,216 threads is 3,072 blocks
-# at the split kernels' 128 threads, or 1,536 at 256, which is many waves over
-# 108 SMs and is where the imbalance between columns stops showing; past it
-# another group adds no parallelism the scheduler can use. Every widened workspace is linear in `ngroups`, so this is also what
-# bounds their memory: the accumulators alone are `ncol * ngroups * nlev` by
-# three fields in the longwave and four in the shortwave.
+# Wide columns the default group count aims for: enough blocks to cover an A100
+# many waves over, which is where the imbalance between columns stops showing,
+# and past which another group adds no parallelism the scheduler can use. Every
+# widened workspace is linear in `ngroups`, so this also bounds their memory --
+# the accumulators are `ncol * ngroups * nlev` by two planes in the longwave and
+# three in the shortwave.
 const TARGET_GPT_GROUP_COLUMNS = 393216
 
 """
@@ -48,24 +48,19 @@ How many g-point groups a two-stream solver widens to when the caller names
 none: enough to reach `TARGET_GPT_GROUP_COLUMNS` wide columns, capped at
 `MAX_NGPT_GROUPS`.
 
-A column count that already fills the device gets one group, because the grid it
-launches is wide enough without them and the workspaces cost memory linearly in
-the group count either way. A CPU gets one group whatever its column count: the
-CPU driver solves the whole g-point loop per column and ignores the workspaces,
-so grouping there buys nothing and costs the memory anyway -- and because the
-count rises as columns fall, an ungated default gives the smallest runs the
-widest workspaces. Pass `ngpt_groups` explicitly to override this in either
-direction.
+A column count that already fills the device gets one group, and so does a CPU,
+whose driver solves the whole g-point loop per column and ignores the workspaces.
+Both gates matter because the count rises as columns fall, so an ungated default
+would give the smallest runs the widest workspaces. Pass `ngpt_groups` to
+override in either direction.
 
-Grouping changes the order in which a column's g-points are summed, since each
-group accumulates its own partial flux for a reduction to add, and floating-point
-addition is not associative. So grouped fluxes differ from a serial solve at
-roundoff -- about 1e-6 relative in the configurations tested -- and the clear-sky
-half of a both-skies solve no longer equals a standalone clear-sky solve exactly.
-Pass `ngpt_groups = 1` where bit-for-bit agreement with the serial solve is
-required. Nothing else about the result moves: the cloud-cover tally is a count
-of g-points and stays exact, and splitting the optics out of the sweeps is
-bit-for-bit.
+Grouping changes the order in which a column's g-points are summed, and
+floating-point addition is not associative, so grouped fluxes differ from a
+serial solve at roundoff -- about 1e-6 relative in the configurations tested --
+and the clear-sky half of a both-skies solve no longer equals a standalone
+clear-sky solve exactly. Pass `ngpt_groups = 1` where bit-for-bit agreement is
+required. The cloud-cover tally is a count of g-points and stays exact, and
+splitting the optics out of the sweeps is bit-for-bit.
 """
 default_ngpt_groups(grid_params::RRTMGPGridParams) =
     ClimaComms.device(grid_params) isa ClimaComms.AbstractCPUDevice ? 1 :
