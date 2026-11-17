@@ -471,7 +471,7 @@ function rte_sw_2stream_solve_both_skies! end
 end
 
 # Everything the body above does once the gas and aerosol optics are in `op`.
-# See `lw_2stream_gpt_col_sweeps!`; `_sw_grouped_rounds!` in ext/cuda builds a
+# See `lw_2stream_gpt_col_sweeps!`; `_grouped_rounds!` in ext/cuda builds a
 # kernel from this half alone.
 @inline function sw_2stream_gpt_col_sweeps!(
     igpt,
@@ -512,13 +512,7 @@ end
     # Add the cloud increment to the same optics and sweep again
     if !isnothing(lookup_sw_cld)
         add_cloud_optics_sw!(
-            op,
-            as,
-            gcol,
-            lookup_sw_cld,
-            ibnd,
-            mask_store,
-            wcol,
+            op, as, gcol, lookup_sw_cld, ibnd, wcol, mask_store,
         )
     end
     if μ₀ > 0

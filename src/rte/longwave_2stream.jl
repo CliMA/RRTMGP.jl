@@ -417,7 +417,7 @@ end
 # the clear-sky sweep, the cloud increment on those same optics, the all-sky
 # sweep, and both accumulations. It reads `op` and writes fluxes, so it needs
 # nothing the optics half left in a register and can be a kernel of its own --
-# which is what `_lw_grouped_rounds!` in ext/cuda builds from it.
+# which is what `_grouped_rounds!` in ext/cuda builds from it.
 @inline function lw_2stream_gpt_col_sweeps!(
     igpt,
     gcol,
@@ -442,13 +442,7 @@ end
     # Add the cloud increment on top of the same optics and sweep again
     if !isnothing(lookup_lw_cld)
         add_cloud_optics_lw!(
-            op,
-            as,
-            gcol,
-            lookup_lw_cld,
-            ibnd,
-            mask_store,
-            wcol,
+            op, as, gcol, lookup_lw_cld, ibnd, wcol, mask_store,
         )
     end
     rte_lw_2stream!(op, flux, src_lw, bcs_lw, gcol, igpt, ibnd, nlev, ncol, wcol)

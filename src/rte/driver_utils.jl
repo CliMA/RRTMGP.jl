@@ -14,14 +14,7 @@
 
 # McICA cloud mask for one column and g-point; returns whether any layer is
 # cloudy (for the cloud-cover diagnostic). `S` selects `:mask_lw`/`:mask_sw`.
-@inline _build_cloud_mask!(
-    ::Nothing,
-    ::Val,
-    gcol,
-    igpt,
-    mask_store = nothing,
-    wcol = gcol,
-) = false
+@inline _build_cloud_mask!(::Nothing, ::Val, gcol, igpt, args...) = false
 @inline function _build_cloud_mask!(
     cloud_state::CloudState,
     ::Val{S},
