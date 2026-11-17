@@ -27,7 +27,7 @@ wide column index.
 `ngroups > 1` is implemented for CUDA. The CPU driver ignores these workspaces
 and solves the whole g-point loop per column, which is correct either way.
 """
-struct LWGptGroups{OP, SL, FB, MK, FX, A3, CT}
+struct LWGptGroups{OP, SL, FB, MK, FX, CT}
     ngroups::Int
     """
     Solve each round of the g-point loop as two kernels, the gas and aerosol
@@ -47,13 +47,10 @@ struct LWGptGroups{OP, SL, FB, MK, FX, A3, CT}
     src::SL
     fluxb::FB
     mask::MK
-    "all-sky partial accumulator over the wide columns, a view into `acc_data`"
+    "all-sky partial accumulator over the wide columns, as views by flux name"
     acc::FX
-    "clear-sky partial accumulator, a view into `acc_clear_data`"
+    "clear-sky partial accumulator, as views by flux name"
     acc_clear::FX
-    "`(ncol * ngroups, nlev, 2)`; the field axis is up then down"
-    acc_data::A3
-    acc_clear_data::A3
     "`(ncol * ngroups)`: cloudy g-points seen by each group, summed for the cover"
     cloudy::CT
 end
@@ -98,8 +95,6 @@ function LWGptGroups(
         DA{Bool}(undef, nlay, ncolw),
         fluxes(acc_data),
         fluxes(acc_clear_data),
-        acc_data,
-        acc_clear_data,
         DA{Int32}(undef, ncolw),
     )
 end
@@ -128,7 +123,7 @@ at fourteen waves an SM that retires such a block is handed another, which is
 the load imbalance section 4l of the profiling study measured as unobtainable
 while the grid was one wave.
 """
-struct SWGptGroups{OP, SS, FB, MK, FX, A3, CT}
+struct SWGptGroups{OP, SS, FB, MK, FX, CT}
     ngroups::Int
     "split the optics out of the sweeps; see [`LWGptGroups`](@ref)"
     split_optics::Bool
@@ -138,13 +133,10 @@ struct SWGptGroups{OP, SS, FB, MK, FX, A3, CT}
     src::SS
     fluxb::FB
     mask::MK
-    "all-sky partial accumulator over the wide columns, a view into `acc_data`"
+    "all-sky partial accumulator over the wide columns, as views by flux name"
     acc::FX
-    "clear-sky partial accumulator, a view into `acc_clear_data`"
+    "clear-sky partial accumulator, as views by flux name"
     acc_clear::FX
-    "`(ncol * ngroups, nlev, 3)`; the field axis is up, down, direct"
-    acc_data::A3
-    acc_clear_data::A3
     "`(ncol * ngroups)`: cloudy g-points seen by each group, summed for the cover"
     cloudy::CT
 end
@@ -188,8 +180,6 @@ function SWGptGroups(
         DA{Bool}(undef, nlay, ncolw),
         fluxes(acc_data),
         fluxes(acc_clear_data),
-        acc_data,
-        acc_clear_data,
         DA{Int32}(undef, ncolw),
     )
 end
