@@ -247,9 +247,8 @@ function all_sky_with_aerosols(
     RRTMGP.update_sw_fluxes!(solver)
     RRTMGP.update_lw_fluxes!(solver)
 
-    # The four grouped solvers below differ only in the group count and in
-    # whether the optics are split out of the sweeps, which is the default.
-    grouped_solver(ng; split_optics = true) = RRTMGPSolver(
+    # The grouped solvers below differ only in the group count.
+    grouped_solver(ng) = RRTMGPSolver(
         grid_params,
         radiation_method,
         param_set,
@@ -260,7 +259,43 @@ function all_sky_with_aerosols(
         op_sw = Optics.TwoStream(grid_params),
         lookups = prebuilt_lookups,
         ngpt_groups = ng,
-        split_optics,
+    )
+
+    # One group takes a column's g-points in the serial order, so it
+    # reassociates nothing and has to reproduce the serial solve exactly. That
+    # is the exact check on the whole grouped path -- the wide indexing, the
+    # accumulators, the reduction, the cover tally and the nominated writer of
+    # the aerosol optical depth -- against a reference that is not itself
+    # grouped. It is not a fast configuration, launching two kernels per g-point
+    # where the serial solve launches one, so `RRTMGPSolver` refuses one group
+    # and these build the workspaces directly.
+    one_group_lw() = (
+        TwoStreamLWRTE(
+            grid_params.context,
+            TwoStream(grid_params),
+            SourceLW2Str(grid_params; params = param_set),
+            bcs_lw,
+            FluxLW(grid_params),
+            FluxLW(grid_params),
+            nothing,
+            TransposedStateCache(grid_params),
+            LWGptGroups(grid_params, 1; params = param_set),
+        ),
+        FluxLW(grid_params),
+    )
+    one_group_sw() = (
+        TwoStreamSWRTE(
+            grid_params.context,
+            TwoStream(grid_params),
+            SourceSW2Str(grid_params),
+            bcs_sw,
+            FluxSW(grid_params),
+            FluxSW(grid_params),
+            nothing,
+            TransposedStateCache(grid_params),
+            SWGptGroups(grid_params, 1),
+        ),
+        FluxSW(grid_params),
     )
 
     # --- the g-point-grouped longwave solve, against the serial one ----------
@@ -292,6 +327,21 @@ function all_sky_with_aerosols(
             serial_clear = copy(Array(parent(solver.clear_flux_acc_lw.flux_net)))
             serial_cover =
                 track_cover ? copy(Array(as.cloud_state.cld_cover_lw)) : nothing
+            (lws_one, clear_one) = one_group_lw()
+            solve_lw_both_skies!(
+                lws_one,
+                clear_one,
+                as,
+                prebuilt_lookups.lookup_lw,
+                prebuilt_lookups.lookup_lw_cld,
+                prebuilt_lookups.lookup_lw_aero,
+                RRTMGP._deep_atmosphere_inverse_scaling(solver),
+            )
+            @test Array(parent(lws_one.flux.flux_net)) == serial_all
+            @test Array(parent(clear_one.flux_net)) == serial_clear
+            track_cover &&
+                @test Array(as.cloud_state.cld_cover_lw) == serial_cover
+
             for ng in (3, 16)
                 grouped = grouped_solver(ng)
                 @test n_gpt_groups(grouped.lws.gpt_groups) == ng
@@ -309,19 +359,6 @@ function all_sky_with_aerosols(
                 # The cover is a count of cloudy g-points summed over the groups, so
                 # splitting the loop must not change it at all.
                 track_cover && @test grouped_cover == serial_cover
-                # The grouped arm above also splits the optics out of the sweeps,
-                # which is the default. That split moves no arithmetic -- both
-                # halves address the same wide column, and the gas and aerosol
-                # optics never read the cloud mask the sweeps draw -- so the two
-                # grouped kernels must agree exactly rather than to a tolerance.
-                fused = grouped_solver(ng; split_optics = false)
-                @test !fused.lws.gpt_groups.split_optics
-                RRTMGP.update_lw_fluxes!(fused, fused_key)
-                @test Array(parent(fused.lws.flux.flux_net)) == grouped_all
-                @test Array(parent(fused.clear_flux_acc_lw.flux_net)) ==
-                      grouped_clear
-                track_cover &&
-                    @test Array(as.cloud_state.cld_cover_lw) == grouped_cover
             end
             RRTMGP.update_lw_fluxes!(solver)
         end
@@ -364,6 +401,29 @@ function all_sky_with_aerosols(
                 track_cover ? copy(Array(as.cloud_state.cld_cover_sw)) : nothing
             serial_aod_ext = copy(Array(as.aerosol_state.aod_sw_ext))
             serial_aod_sca = copy(Array(as.aerosol_state.aod_sw_sca))
+            (sws_one, clear_one) = one_group_sw()
+            solve_sw_both_skies!(
+                sws_one,
+                clear_one,
+                as,
+                prebuilt_lookups.lookup_sw,
+                prebuilt_lookups.lookup_sw_cld,
+                prebuilt_lookups.lookup_sw_aero,
+                RRTMGP._deep_atmosphere_inverse_scaling(solver),
+            )
+            # Exactly the serial result, which also pins the two things the
+            # shortwave has to get right on its own: a night column's partials
+            # are zeroed rather than summed from whatever the workspace held,
+            # and the 550 nm optical depth is collected in the optics half while
+            # the sun is tested in the sweeps half.
+            @test Array(parent(sws_one.flux.flux_net)) == serial_all
+            @test Array(parent(sws_one.flux.flux_dn_dir)) == serial_dir
+            @test Array(parent(clear_one.flux_net)) == serial_clear
+            @test Array(as.aerosol_state.aod_sw_ext) == serial_aod_ext
+            @test Array(as.aerosol_state.aod_sw_sca) == serial_aod_sca
+            track_cover &&
+                @test Array(as.cloud_state.cld_cover_sw) == serial_cover
+
             for ng in (3, 16)
                 grouped = grouped_solver(ng)
                 @test n_gpt_groups(grouped.sws.gpt_groups) == ng
@@ -386,24 +446,6 @@ function all_sky_with_aerosols(
                 # One nominated writer, so this is equality rather than a tolerance.
                 @test Array(as.aerosol_state.aod_sw_ext) == serial_aod_ext
                 @test Array(as.aerosol_state.aod_sw_sca) == serial_aod_sca
-                grouped_aod_ext = Array(as.aerosol_state.aod_sw_ext)
-                grouped_aod_sca = Array(as.aerosol_state.aod_sw_sca)
-                # Exact, for the reason the longwave block above gives. The
-                # shortwave adds two things the split has to get right on its own:
-                # a night column's partials are zeroed on the first round rather
-                # than after the last, and the 550 nm optical depth is collected in
-                # the optics half while the sun is tested in the sweeps half.
-                fused = grouped_solver(ng; split_optics = false)
-                @test !fused.sws.gpt_groups.split_optics
-                RRTMGP.update_sw_fluxes!(fused, fused_key)
-                @test Array(parent(fused.sws.flux.flux_net)) == grouped_all
-                @test Array(parent(fused.sws.flux.flux_dn_dir)) == grouped_dir
-                @test Array(parent(fused.clear_flux_acc_sw.flux_net)) ==
-                      grouped_clear
-                track_cover &&
-                    @test Array(as.cloud_state.cld_cover_sw) == grouped_cover
-                @test Array(as.aerosol_state.aod_sw_ext) == grouped_aod_ext
-                @test Array(as.aerosol_state.aod_sw_sca) == grouped_aod_sca
             end
             RRTMGP.update_sw_fluxes!(solver)
         end
