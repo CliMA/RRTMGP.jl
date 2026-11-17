@@ -247,6 +247,22 @@ function all_sky_with_aerosols(
     RRTMGP.update_sw_fluxes!(solver)
     RRTMGP.update_lw_fluxes!(solver)
 
+    # The four grouped solvers below differ only in the group count and in
+    # whether the optics are split out of the sweeps, which is the default.
+    grouped_solver(ng; split_optics = true) = RRTMGPSolver(
+        grid_params,
+        radiation_method,
+        param_set,
+        bcs_lw,
+        bcs_sw,
+        as;
+        op_lw = Optics.TwoStream(grid_params),
+        op_sw = Optics.TwoStream(grid_params),
+        lookups = prebuilt_lookups,
+        ngpt_groups = ng,
+        split_optics,
+    )
+
     # --- the g-point-grouped longwave solve, against the serial one ----------
     # Grouping splits a column's g-point loop across the threads of one wider
     # grid, each accumulating its own partial flux for a reduction to sum, so
@@ -277,18 +293,7 @@ function all_sky_with_aerosols(
             serial_cover =
                 track_cover ? copy(Array(as.cloud_state.cld_cover_lw)) : nothing
             for ng in (3, 16)
-                grouped = RRTMGPSolver(
-                    grid_params,
-                    radiation_method,
-                    param_set,
-                    bcs_lw,
-                    bcs_sw,
-                    as;
-                    op_lw = Optics.TwoStream(grid_params),
-                    op_sw = Optics.TwoStream(grid_params),
-                    lookups = prebuilt_lookups,
-                    ngpt_groups = ng,
-                )
+                grouped = grouped_solver(ng)
                 @test n_gpt_groups(grouped.lws.gpt_groups) == ng
                 RRTMGP.update_lw_fluxes!(grouped, fused_key)
                 grouped_all = Array(parent(grouped.lws.flux.flux_net))
@@ -309,19 +314,7 @@ function all_sky_with_aerosols(
                 # halves address the same wide column, and the gas and aerosol
                 # optics never read the cloud mask the sweeps draw -- so the two
                 # grouped kernels must agree exactly rather than to a tolerance.
-                fused = RRTMGPSolver(
-                    grid_params,
-                    radiation_method,
-                    param_set,
-                    bcs_lw,
-                    bcs_sw,
-                    as;
-                    op_lw = Optics.TwoStream(grid_params),
-                    op_sw = Optics.TwoStream(grid_params),
-                    lookups = prebuilt_lookups,
-                    ngpt_groups = ng,
-                    split_optics = false,
-                )
+                fused = grouped_solver(ng; split_optics = false)
                 @test !fused.lws.gpt_groups.split_optics
                 RRTMGP.update_lw_fluxes!(fused, fused_key)
                 @test Array(parent(fused.lws.flux.flux_net)) == grouped_all
@@ -372,18 +365,7 @@ function all_sky_with_aerosols(
             serial_aod_ext = copy(Array(as.aerosol_state.aod_sw_ext))
             serial_aod_sca = copy(Array(as.aerosol_state.aod_sw_sca))
             for ng in (3, 16)
-                grouped = RRTMGPSolver(
-                    grid_params,
-                    radiation_method,
-                    param_set,
-                    bcs_lw,
-                    bcs_sw,
-                    as;
-                    op_lw = Optics.TwoStream(grid_params),
-                    op_sw = Optics.TwoStream(grid_params),
-                    lookups = prebuilt_lookups,
-                    ngpt_groups = ng,
-                )
+                grouped = grouped_solver(ng)
                 @test n_gpt_groups(grouped.sws.gpt_groups) == ng
                 RRTMGP.update_sw_fluxes!(grouped, fused_key)
                 grouped_all = Array(parent(grouped.sws.flux.flux_net))
@@ -411,19 +393,7 @@ function all_sky_with_aerosols(
                 # a night column's partials are zeroed on the first round rather
                 # than after the last, and the 550 nm optical depth is collected in
                 # the optics half while the sun is tested in the sweeps half.
-                fused = RRTMGPSolver(
-                    grid_params,
-                    radiation_method,
-                    param_set,
-                    bcs_lw,
-                    bcs_sw,
-                    as;
-                    op_lw = Optics.TwoStream(grid_params),
-                    op_sw = Optics.TwoStream(grid_params),
-                    lookups = prebuilt_lookups,
-                    ngpt_groups = ng,
-                    split_optics = false,
-                )
+                fused = grouped_solver(ng; split_optics = false)
                 @test !fused.sws.gpt_groups.split_optics
                 RRTMGP.update_sw_fluxes!(fused, fused_key)
                 @test Array(parent(fused.sws.flux.flux_net)) == grouped_all
