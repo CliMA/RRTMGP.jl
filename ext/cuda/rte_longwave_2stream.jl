@@ -387,8 +387,8 @@ function _solve_lw_both_skies_grouped!(
     @cuda always_inline = true threads = (rtx) blocks = (rbx) _reduce_lw_groups_CUDA!(
         flux_lw,
         flux_lw_clear,
-        groups.acc_data,
-        groups.acc_clear_data,
+        groups.acc,
+        groups.acc_clear,
         groups.cloudy,
         cloud_state isa CloudState ? cloud_state.cld_cover_lw : nothing,
         ngroups,
@@ -669,8 +669,8 @@ end
 function _reduce_lw_groups_CUDA!(
     flux_lw::FluxLW,
     flux_lw_clear::FluxLW,
-    acc_data,
-    acc_clear_data,
+    acc,
+    acc_clear,
     cloudy_count,
     cld_cover_lw,
     ngroups,
@@ -686,10 +686,10 @@ function _reduce_lw_groups_CUDA!(
         up, dn, cup, cdn = FT(0), FT(0), FT(0), FT(0)
         @inbounds for g in 1:ngroups
             wcol = gcol + (g - 1) * ncol
-            up += acc_data[wcol, ilev, 1]
-            dn += acc_data[wcol, ilev, 2]
-            cup += acc_clear_data[wcol, ilev, 1]
-            cdn += acc_clear_data[wcol, ilev, 2]
+            up += acc.flux_up[wcol, ilev]
+            dn += acc.flux_dn[wcol, ilev]
+            cup += acc_clear.flux_up[wcol, ilev]
+            cdn += acc_clear.flux_dn[wcol, ilev]
         end
         @inbounds begin
             flux_lw.flux_up[gcol, ilev] = up
