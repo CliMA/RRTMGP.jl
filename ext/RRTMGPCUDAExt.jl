@@ -77,5 +77,6 @@ include(joinpath("cuda", "rte_shortwave_noscat.jl"))
 include(joinpath("cuda", "gray_atmosphere.jl"))
 include(joinpath("cuda", "rte_shortwave_2stream.jl"))
 include(joinpath("cuda", "rte_longwave_noscat.jl"))
+include(joinpath("cuda", "rte_gpt_groups.jl"))
 
 end
