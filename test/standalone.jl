@@ -23,11 +23,13 @@ Adapt.adapt_storage(::CopyToArray, x::AbstractArray) = copy(x)
         @test eltype(Array(out.net_flux)) == FT
         @test size(Array(out.net_flux)) == (nlay + 1, ncol)
         @test size(Array(out.heating_rate)) == (nlay, ncol)
-        for f in (out.lw_flux_net, out.sw_flux_net, out.net_flux, out.heating_rate)
+        for f in
+            (out.lw_flux_net, out.sw_flux_net, out.net_flux, out.heating_rate)
             @test all(isfinite, Array(f))
         end
         # net flux is the sum of the longwave and shortwave net fluxes
-        @test Array(out.net_flux) ≈ Array(out.lw_flux_net) .+ Array(out.sw_flux_net)
+        @test Array(out.net_flux) ≈
+              Array(out.lw_flux_net) .+ Array(out.sw_flux_net)
         # the sun is up, so there is downwelling shortwave flux
         @test maximum(Array(out.sw_flux_dn)) > 0
     end
@@ -79,22 +81,29 @@ end
         @test all(diff(prof.p_lev[:, 1]) .< 0)
         @test all(diff(prof.p_lay[:, 1]) .< 0)
         # layers sit between their bounding levels
-        @test all(prof.p_lev[2:end, 1] .< prof.p_lay[:, 1] .<= prof.p_lev[1:(end - 1), 1])
+        @test all(
+            prof.p_lev[2:end, 1] .<
+            prof.p_lay[:, 1] .<=
+            prof.p_lev[1:(end - 1), 1],
+        )
         # surface temperature and the tropical tropopause
         @test prof.t_lev[1, 1] == 300
         @test 180 < minimum(prof.t_lev) < 210
         # water vapor decays to the stratospheric floor; ozone peaks aloft
         @test prof.vmr_h2o[1, 1] > 1e-2
         @test minimum(prof.vmr_h2o) ≈ 4.0e-6
-        @test 20e3 <
-              prof.z_lev[argmax(prof.vmr_o3[:, 1]), 1] <
-              40e3
+        @test 20e3 < prof.z_lev[argmax(prof.vmr_o3[:, 1]), 1] < 40e3
         @test prof.well_mixed_vmr["co2"] ≈ 420e-6
     end
     # the three kinds are ordered warm → cold at the surface
     t_sfc(kind) = RRTMGP.standard_atmosphere(Float64; kind).t_sfc[1]
-    @test t_sfc(:tropical) > t_sfc(:midlatitude_summer) > t_sfc(:subarctic_winter)
-    @test_throws ErrorException RRTMGP.standard_atmosphere(Float64; kind = :venus)
+    @test t_sfc(:tropical) >
+          t_sfc(:midlatitude_summer) >
+          t_sfc(:subarctic_winter)
+    @test_throws ErrorException RRTMGP.standard_atmosphere(
+        Float64;
+        kind = :venus,
+    )
 end
 
 @testset "gray solve(profile)" begin
@@ -106,10 +115,17 @@ end
         @test eltype(Array(out.net_flux)) == FT
         @test size(Array(out.net_flux)) == (nlay + 1, ncol)
         @test size(Array(out.heating_rate)) == (nlay, ncol)
-        for f in (out.lw_flux_up, out.lw_flux_dn, out.sw_flux_up, out.sw_flux_dn, out.net_flux)
+        for f in (
+            out.lw_flux_up,
+            out.lw_flux_dn,
+            out.sw_flux_up,
+            out.sw_flux_dn,
+            out.net_flux,
+        )
             @test all(isfinite, Array(f))
         end
-        @test Array(out.net_flux) ≈ Array(out.lw_flux_net) .+ Array(out.sw_flux_net)
+        @test Array(out.net_flux) ≈
+              Array(out.lw_flux_net) .+ Array(out.sw_flux_net)
         # OLR is positive and bounded by σT⁴ of the warmest layer
         @test 0 < Array(out.lw_flux_up)[end, 1] < 600
         # the profile is not aliased by the solve (arrays stay host-side, unclipped)
@@ -295,8 +311,13 @@ end
     # Helper to verify that every scratch view aliases its single packed parent buffer.
     # On GPU (CuArray), contiguous 3D slices unwrap into 2D CuArrays with a distinct
     # parent identity, so we verify memory sharing via pointer bounds checking.
-    _is_view_into(v, buf) = v isa SubArray ? parent(v) === buf :
-        (UInt(pointer(buf)) <= UInt(pointer(v)) < UInt(pointer(buf)) + UInt(sizeof(buf)))
+    _is_view_into(v, buf) =
+        v isa SubArray ? parent(v) === buf :
+        (
+            UInt(pointer(buf)) <=
+            UInt(pointer(v)) <
+            UInt(pointer(buf)) + UInt(sizeof(buf))
+        )
 
     for FT in (Float32, Float64)
         nlay, ncol = 40, 4
@@ -312,7 +333,10 @@ end
         @test _is_view_into(solver2.lws.op.ssa, solver2.lws.op.layerdata)
         @test _is_view_into(solver2.lws.op.g, solver2.lws.op.layerdata)
         @test _is_view_into(solver2.sws.op.τ, solver2.sws.op.layerdata)
-        @test _is_view_into(solver2.lws.src.lev_source, solver2.lws.src.leveldata)
+        @test _is_view_into(
+            solver2.lws.src.lev_source,
+            solver2.lws.src.leveldata,
+        )
         @test _is_view_into(solver2.lws.src.albedo, solver2.lws.src.leveldata)
         @test _is_view_into(solver2.lws.src.src, solver2.lws.src.leveldata)
         @test _is_view_into(solver2.sws.src.albedo, solver2.sws.src.leveldata)

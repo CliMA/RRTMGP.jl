@@ -111,7 +111,17 @@ end
         # GeometricMean continues the geometric progression of the two layers
         # above to the boundary face half a layer below, so the boundary/nearest
         # ratio is the square root of the layer-to-layer ratio.
-        RRTMGP.extrap!(RRTMGP.GeometricMean(), p, T, p⁺, T⁺, p⁺⁺, T⁺⁺, Tₛ, params)
+        RRTMGP.extrap!(
+            RRTMGP.GeometricMean(),
+            p,
+            T,
+            p⁺,
+            T⁺,
+            p⁺⁺,
+            T⁺⁺,
+            Tₛ,
+            params,
+        )
         @test T ./ T⁺ ≈ sqrt.(T⁺ ./ T⁺⁺)
         @test p ./ p⁺ ≈ sqrt.(p⁺ ./ p⁺⁺)
         @test all(T .> T⁺) && all(p .> p⁺) # continues downward

@@ -255,17 +255,18 @@ Compute optical thickness, single scattering albedo, and asymmetry parameter.
     glay,
     gcol,
 )
-    τ_major, τ_minor, tropo, vmr_h2o, jftemp, jfη, jfpress = compute_gas_optics_core(
-        lkp,
-        vmr,
-        col_dry,
-        igpt,
-        ibnd,
-        p_lay,
-        t_lay,
-        glay,
-        gcol,
-    )
+    τ_major, τ_minor, tropo, vmr_h2o, jftemp, jfη, jfpress =
+        compute_gas_optics_core(
+            lkp,
+            vmr,
+            col_dry,
+            igpt,
+            ibnd,
+            p_lay,
+            t_lay,
+            glay,
+            gcol,
+        )
     # compute Planck fraction
     @inbounds planck_fraction = view(lkp.planck.planck_fraction, :, :, :, igpt)
     pfrac = interp3d(jfη..., jftemp..., jfpress..., planck_fraction)
@@ -286,17 +287,18 @@ end
     glay,
     gcol,
 )
-    τ_major, τ_minor, tropo, vmr_h2o, jftemp, jfη, jfpress = compute_gas_optics_core(
-        lkp,
-        vmr,
-        col_dry,
-        igpt,
-        ibnd,
-        p_lay,
-        t_lay,
-        glay,
-        gcol,
-    )
+    τ_major, τ_minor, tropo, vmr_h2o, jftemp, jfη, jfpress =
+        compute_gas_optics_core(
+            lkp,
+            vmr,
+            col_dry,
+            igpt,
+            ibnd,
+            p_lay,
+            t_lay,
+            glay,
+            gcol,
+        )
     # compute τ_Rayleigh
     @inbounds rayleigh_coeff =
         tropo == 1 ? view(lkp.rayl_lower, :, :, igpt) :

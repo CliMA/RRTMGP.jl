@@ -47,7 +47,8 @@ end
         n -> !haskey(documented, Base.Docs.Binding(RRTMGP, n)),
         collect(RRTMGP.PUBLIC_NAMES),
     )
-    isempty(undocumented) || @info "Public names without docstrings" undocumented
+    isempty(undocumented) ||
+        @info "Public names without docstrings" undocumented
     @test isempty(undocumented)
 end
 

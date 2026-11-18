@@ -72,7 +72,8 @@ const _STANDARD_ATMOSPHERES = Dict(
 # z_trop, then linear warming Γ_strat above (an idealized stratosphere).
 function _standard_T(z, prm)
     z ≤ prm.z_trop && return prm.t_sfc - prm.Γ_trop * z
-    return (prm.t_sfc - prm.Γ_trop * prm.z_trop) + prm.Γ_strat * (z - prm.z_trop)
+    return (prm.t_sfc - prm.Γ_trop * prm.z_trop) +
+           prm.Γ_strat * (z - prm.z_trop)
 end
 
 # Hydrostatic pressure for the two-segment profile (exact closed form for a
@@ -82,7 +83,8 @@ end
 function _standard_p(z, prm, p_sfc, grav, R_d)
     T_trop = prm.t_sfc - prm.Γ_trop * prm.z_trop
     if z ≤ prm.z_trop
-        return p_sfc * (_standard_T(z, prm) / prm.t_sfc)^(grav / (R_d * prm.Γ_trop))
+        return p_sfc *
+               (_standard_T(z, prm) / prm.t_sfc)^(grav / (R_d * prm.Γ_trop))
     end
     p_trop = p_sfc * (T_trop / prm.t_sfc)^(grav / (R_d * prm.Γ_trop))
     return p_trop * (_standard_T(z, prm) / T_trop)^(-grav / (R_d * prm.Γ_strat))

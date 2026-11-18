@@ -79,7 +79,7 @@ function setup_clear_sky_as(
     col_dry = FTA2D(undef, nlay, ncol)
     rel_hum = FTA2D(undef, nlay, ncol)
 
-    # Reading volume mixing ratios 
+    # Reading volume mixing ratios
 
     vmr_h2o = (Array(ds_lw_in["water_vapor"])[lay_ind, :, expt_no]) # vmr of H2O and O3
     vmr_o3 = (Array(ds_lw_in["ozone"])[lay_ind, :, expt_no])       # vary with height

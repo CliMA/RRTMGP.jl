@@ -222,7 +222,7 @@ function setup_gray_as_pr_grid(
     )
 end
 
-# This functions sets up a model temperature and pressure 
+# This functions sets up a model temperature and pressure
 # distributions for a gray atmosphere based on an altitude grid
 # with internal GLL point distribution within each cell
 # see Schneider 2004, J. Atmos. Sci. (2004) 61 (12): 1317–1340.

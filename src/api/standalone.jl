@@ -290,11 +290,13 @@ function solve(
         "`solve(profile)` supports `GrayRadiation` and `ClearSkyRadiation`; \
          for cloud or aerosol radiation, construct an `RRTMGPSolver` directly.",
     )
-    method isa ClearSkyRadiation && method.aerosol_radiation && error(
-        "`solve(profile)` does not support aerosol radiation (an \
-         `AtmosphereProfile` carries no aerosol state); use \
-         `ClearSkyRadiation(false)` or construct an `RRTMGPSolver` directly.",
-    )
+    method isa ClearSkyRadiation &&
+        method.aerosol_radiation &&
+        error(
+            "`solve(profile)` does not support aerosol radiation (an \
+             `AtmosphereProfile` carries no aerosol state); use \
+             `ClearSkyRadiation(false)` or construct an `RRTMGPSolver` directly.",
+        )
 
     grid_params = RRTMGPGridParams(
         FT;
@@ -361,7 +363,8 @@ function solve(
         )
     end
 
-    sfc_emis = fill!(DA{FT}(undef, lookups.nbnd_lw, ncol), FT(surface_emissivity))
+    sfc_emis =
+        fill!(DA{FT}(undef, lookups.nbnd_lw, ncol), FT(surface_emissivity))
     bcs_lw = BCs.LwBCs(sfc_emis, nothing)
     cos_zen = fill!(DA{FT}(undef, ncol), FT(cos_zenith))
     toa = fill!(DA{FT}(undef, ncol), FT(toa_flux))
