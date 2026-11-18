@@ -47,6 +47,7 @@ end
     lookup_lw,
     lookup_lw_cld,
     lookup_lw_aero,
+    lookup_lw_precip,
     ibnd,
     nlev,
     ncol,
@@ -62,11 +63,19 @@ end
         lookup_lw,
         lookup_lw_cld,
         lookup_lw_aero,
+        lookup_lw_precip,
     )
     rte_lw_2stream!(op, flux, src_lw, bcs_lw, gcol, igpt, ibnd, nlev, ncol)
     _accumulate_fluxes!(flux_lw, flux, gcol, nlev, igpt)
     # retain this g-point's contribution in its band (no-op when off)
-    accumulate_band_flux!(band_flux, flux.flux_up, flux.flux_dn, gcol, ibnd, nlev)
+    accumulate_band_flux!(
+        band_flux,
+        flux.flux_up,
+        flux.flux_dn,
+        gcol,
+        ibnd,
+        nlev,
+    )
     return cloudy
 end
 
@@ -83,6 +92,7 @@ function rte_lw_2stream_solve!(
     lookup_lw::LookUpLW,
     lookup_lw_cld::Union{LookUpCld, Nothing} = nothing,
     lookup_lw_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
+    lookup_lw_precip::Union{LookUpPrecip, Nothing} = nothing,
 )
     nlay, ncol = AtmosphericStates.get_dims(as)
     nlev = nlay + 1
@@ -118,6 +128,7 @@ function rte_lw_2stream_solve!(
                     lookup_lw,
                     lookup_lw_cld,
                     lookup_lw_aero,
+                    lookup_lw_precip,
                     ibnd,
                     nlev,
                     ncol,
@@ -205,9 +216,7 @@ approximation.
         one_p_e1 = 1 + e1
         # layer emissivity factor, 1 − Rdif − Tdif
         emis_fac =
-            om1 *
-            (k * om1 + lw_diff_sec * (FT(1) - ssa) * one_p_e1) *
-            RT_term
+            om1 * (k * om1 + lw_diff_sec * (FT(1) - ssa) * one_p_e1) * RT_term
         # Z·(1 + Rdif − Tdif), as ΔB times a well-conditioned factor
         ΔBz =
             ΔB * (om1 / τ) * (k * om1 + γ_sum * one_p_e1) * RT_term /
@@ -274,15 +283,9 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
     @inbounds lev_src_bot = lev_source[gcol, 1]
     @inbounds for ilev in 1:nlay
         lev_src_top = lev_source[gcol, ilev + 1]
-        τ_lay, ssa_lay, g_lay =
-            τ[gcol, ilev], ssa[gcol, ilev], g[gcol, ilev]
-        Rdif, Tdif, src_up, src_dn = lw_2stream_coeffs(
-            τ_lay,
-            ssa_lay,
-            g_lay,
-            lev_src_bot,
-            lev_src_top,
-        )
+        τ_lay, ssa_lay, g_lay = τ[gcol, ilev], ssa[gcol, ilev], g[gcol, ilev]
+        Rdif, Tdif, src_up, src_dn =
+            lw_2stream_coeffs(τ_lay, ssa_lay, g_lay, lev_src_bot, lev_src_top)
         denom = FT(1) / (FT(1) - Rdif * albedo_ilev)  # Eq 10
         albedo_ilevplus1 = Rdif + Tdif * Tdif * albedo_ilev * denom # Equation 9
         # 
@@ -308,15 +311,9 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
     @inbounds while ilev ≥ 1
         lev_src_bot, albedo_ilev, src_ilev =
             lev_source[gcol, ilev], albedo[gcol, ilev], src[gcol, ilev]
-        τ_lay, ssa_lay, g_lay =
-            τ[gcol, ilev], ssa[gcol, ilev], g[gcol, ilev]
-        Rdif, Tdif, _, src_dn = lw_2stream_coeffs(
-            τ_lay,
-            ssa_lay,
-            g_lay,
-            lev_src_bot,
-            lev_src_top,
-        )
+        τ_lay, ssa_lay, g_lay = τ[gcol, ilev], ssa[gcol, ilev], g[gcol, ilev]
+        Rdif, Tdif, _, src_dn =
+            lw_2stream_coeffs(τ_lay, ssa_lay, g_lay, lev_src_bot, lev_src_top)
 
         denom = FT(1) / (FT(1) - Rdif * albedo_ilev)  # Eq 10
         flux_dn_ilev =
@@ -362,6 +359,7 @@ function rte_lw_2stream_solve_both_skies! end
     lookup_lw,
     lookup_lw_cld,
     lookup_lw_aero,
+    lookup_lw_precip,
     ibnd,
     nlev,
     ncol,
@@ -383,16 +381,30 @@ function rte_lw_2stream_solve_both_skies! end
     _accumulate_fluxes!(flux_lw_clear, flux, gcol, nlev, igpt)
     # Add the cloud increment on top of the same optics and sweep again
     if !isnothing(lookup_lw_cld)
-        add_cloud_optics_lw!(op, as, gcol, lookup_lw_cld, ibnd)
+        add_cloud_optics_lw!(
+            op,
+            as,
+            gcol,
+            lookup_lw_cld,
+            ibnd,
+            lookup_lw_precip,
+        )
     end
     rte_lw_2stream!(op, flux, src_lw, bcs_lw, gcol, igpt, ibnd, nlev, ncol)
     _accumulate_fluxes!(flux_lw, flux, gcol, nlev, igpt)
-    accumulate_band_flux!(band_flux, flux.flux_up, flux.flux_dn, gcol, ibnd, nlev)
+    accumulate_band_flux!(
+        band_flux,
+        flux.flux_up,
+        flux.flux_dn,
+        gcol,
+        ibnd,
+        nlev,
+    )
     return cloudy
 end
 
 """
-    solve_lw_both_skies!(lw, flux_lw_clear, as, lookup_lw, lookup_lw_cld, lookup_lw_aero, metric_scaling)
+    solve_lw_both_skies!(lw, flux_lw_clear, as, lookup_lw, lookup_lw_cld, lookup_lw_aero, metric_scaling, lookup_lw_precip)
 
 Solve the longwave problem for both skies in one pass over the g-points,
 accumulating the clear sky into `flux_lw_clear` and the all-sky into the
@@ -410,14 +422,25 @@ after the cloud one would mean recomputing it, which is the saving this
 exists for.
 """
 function solve_lw_both_skies!(
-    (; context, fluxb, flux, band_flux, src, bcs, op, state_cache)::TwoStreamLWRTE,
+    (;
+        context,
+        fluxb,
+        flux,
+        band_flux,
+        src,
+        bcs,
+        op,
+        state_cache,
+    )::TwoStreamLWRTE,
     flux_lw_clear::FluxLW,
     as::AtmosphericState,
     lookup_lw::LookUpLW,
     lookup_lw_cld::Union{LookUpCld, Nothing} = nothing,
     lookup_lw_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
     metric_scaling::M = nothing,
+    lookup_lw_precip::Union{LookUpPrecip, Nothing} = nothing,
 ) where {M}
+    _check_precip_lookup(as, lookup_lw_cld, lookup_lw_precip)
     AtmosphericStates.refresh_transposed_state!(state_cache, as)
     rte_lw_2stream_solve_both_skies!(
         context.device,
@@ -433,6 +456,7 @@ function solve_lw_both_skies!(
         lookup_lw,
         lookup_lw_cld,
         lookup_lw_aero,
+        lookup_lw_precip,
     )
     apply_metric_scaling!(flux, metric_scaling)
     apply_metric_scaling!(flux_lw_clear, metric_scaling)
@@ -458,6 +482,7 @@ function rte_lw_2stream_solve_both_skies!(
     lookup_lw::LookUpLW,
     lookup_lw_cld::Union{LookUpCld, Nothing},
     lookup_lw_aero::Union{LookUpAerosolMerra, Nothing},
+    lookup_lw_precip::Union{LookUpPrecip, Nothing} = nothing,
 )
     nlay, ncol = AtmosphericStates.get_dims(as)
     nlev = nlay + 1
@@ -493,6 +518,7 @@ function rte_lw_2stream_solve_both_skies!(
                     lookup_lw,
                     lookup_lw_cld,
                     lookup_lw_aero,
+                    lookup_lw_precip,
                     ibnd,
                     nlev,
                     ncol,

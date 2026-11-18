@@ -1,5 +1,10 @@
 import RRTMGP.LookUpTables:
-    LookUpAerosolMerra, LookUpLW, LookUpSW, LookUpCld, LookUpPlanck
+    LookUpAerosolMerra,
+    LookUpLW,
+    LookUpSW,
+    LookUpCld,
+    LookUpPrecip,
+    LookUpPlanck
 import RRTMGP.LookUpTables: LookUpMinor, ReferencePoints, BandData
 
 # The RTE/optics kernels hard-code the water-vapor and ozone slots of the gas
@@ -732,20 +737,59 @@ function LookUpCld(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
         Int(ds.dim["nsize_ice"]),
         Int(ds.dim["pair"]),
     ])
-    bounds = DA([
-        # liquid particle size lower bound for LUT interpolation
-        FT(ds["radliq_lwr"][]),
-        # liquid particle size upper bound for LUT interpolation
-        FT(ds["radliq_upr"][]),
-        # ice particle size lower bound for LUT interpolation
-        FT(ds["diamice_lwr"][]) / 2,
-        # ice particle size upper bound for LUT interpolation
-        FT(ds["diamice_upr"][]) / 2,
-    ])
-    liqdata =
-        DA(vcat(Array(ds["extliq"]), Array(ds["ssaliq"]), Array(ds["asyliq"])))
-    icedata =
-        DA(vcat(Array(ds["extice"]), Array(ds["ssaice"]), Array(ds["asyice"])))
-    bnd_lims_wn = DA(Array(ds["bnd_limits_wavenumber"]))
+    radliq_lwr = FT(ds["radliq_lwr"][])
+    radliq_upr = FT(ds["radliq_upr"][])
+    radice_lwr = FT(ds["diamice_lwr"][]) / 2
+    radice_upr = FT(ds["diamice_upr"][]) / 2
+    bounds = DA([radliq_lwr, radliq_upr, radice_lwr, radice_upr])
+    liqdata = DA(
+        vcat(
+            Array{FT}(ds["extliq"]),
+            Array{FT}(ds["ssaliq"]),
+            Array{FT}(ds["asyliq"]),
+        ),
+    )
+    icedata = DA(
+        vcat(
+            Array{FT}(ds["extice"]),
+            Array{FT}(ds["ssaice"]),
+            Array{FT}(ds["asyice"]),
+        ),
+    )
+    bnd_lims_wn = DA(Array{FT}(ds["bnd_limits_wavenumber"]))
     return LookUpCld(dims, bounds, liqdata, icedata, bnd_lims_wn)
+end
+
+function LookUpPrecip(
+    ds,
+    ::Type{FT},
+    ::Type{DA},
+) where {FT <: AbstractFloat, DA}
+    dims = DA([
+        Int(ds.dim["nband"]),
+        Int(ds.dim["nsize_sno"]),
+        Int(ds.dim["nsize_rai"]),
+        Int(ds.dim["pair"]),
+    ])
+    radsno_lwr = FT(ds["radsno_lwr"][])
+    radsno_upr = FT(ds["radsno_upr"][])
+    radrai_lwr = FT(ds["radrai_lwr"][])
+    radrai_upr = FT(ds["radrai_upr"][])
+    bounds = DA([radsno_lwr, radsno_upr, radrai_lwr, radrai_upr])
+    snodata = DA(
+        vcat(
+            Array{FT}(ds["extsno"]),
+            Array{FT}(ds["ssasno"]),
+            Array{FT}(ds["asysno"]),
+        ),
+    )
+    raidata = DA(
+        vcat(
+            Array{FT}(ds["extrai"]),
+            Array{FT}(ds["ssarai"]),
+            Array{FT}(ds["asyrai"]),
+        ),
+    )
+    bnd_lims_wn = DA(Array{FT}(ds["bnd_limits_wavenumber"]))
+    return LookUpPrecip(dims, bounds, snodata, raidata, bnd_lims_wn)
 end
