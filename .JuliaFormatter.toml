@@ -3,3 +3,10 @@ indent = 4
 always_for_in = true
 whitespace_typedefs = true
 whitespace_ops_in_indices = true
+
+# Vendored from CliMA/DeveloperGuides, so formatting them here would churn
+# lines this repo does not own and fight the next `update_dev_guides` run.
+# `.pre-commit-config.yaml` excludes the same paths; this entry is what keeps a
+# directory-walking `format(".")` in agreement with the hook, which JuliaFormatter
+# applies only when it walks a directory itself.
+ignore = ["docs/dev-guides", ".github"]
