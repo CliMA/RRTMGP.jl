@@ -56,6 +56,7 @@ end
     lookup_lw,
     lookup_lw_cld,
     lookup_lw_aero,
+    lookup_lw_precip,
     ibnd,
     nlay,
     nlev,
@@ -71,6 +72,7 @@ end
         lookup_lw,
         lookup_lw_cld,
         lookup_lw_aero,
+        lookup_lw_precip,
     )
     # The optical depth is angle-independent, so each quadrature angle reuses it
     # and only rescales the path. Flattening (igpt, imu) into one counter makes
@@ -108,6 +110,7 @@ function rte_lw_noscat_solve!(
     lookup_lw::LookUpLW,
     lookup_lw_cld::Union{LookUpCld, Nothing} = nothing,
     lookup_lw_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
+    lookup_lw_precip::Union{LookUpPrecip, Nothing} = nothing,
 )
     nlay, ncol = AtmosphericStates.get_dims(as)
     nlev = nlay + 1
@@ -141,6 +144,7 @@ function rte_lw_noscat_solve!(
                     lookup_lw,
                     lookup_lw_cld,
                     lookup_lw_aero,
+                    lookup_lw_precip,
                     ibnd,
                     nlay,
                     nlev,
@@ -252,8 +256,7 @@ Transport for no-scattering longwave problem.
     # the rte-rrtmgp expression F/(π·w).
     intensity_dn_ilevplus1 =
         isnothing(inc_flux) ? FT(0) : inc_flux[gcol, igpt] / FT(π)
-    @inbounds flux_dn[gcol, nlev] =
-        intensity_dn_ilevplus1 * intensity_to_flux
+    @inbounds flux_dn[gcol, nlev] = intensity_dn_ilevplus1 * intensity_to_flux
 
     # Top of domain is index nlev
     # Downward propagation

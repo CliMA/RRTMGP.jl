@@ -63,6 +63,7 @@ function _solve_both_skies_grouped!(
     lookup,
     lookup_cld::Union{LookUpCld, Nothing},
     lookup_aero::Union{LookUpAerosolMerra, Nothing},
+    lookup_precip::Union{LookUpPrecip, Nothing} = nothing,
 )
     nlay, ncol = AtmosphericStates.get_dims(as)
     nlev = nlay + 1
@@ -88,6 +89,7 @@ function _solve_both_skies_grouped!(
         lookup,
         lookup_cld,
         lookup_aero,
+        lookup_precip,
         nlay,
         ncol,
         ngroups,
@@ -126,6 +128,7 @@ function _grouped_rounds!(
     lookup,
     lookup_cld::Union{LookUpCld, Nothing},
     lookup_aero::Union{LookUpAerosolMerra, Nothing},
+    lookup_precip::Union{LookUpPrecip, Nothing},
     nlay,
     ncol,
     ngroups,
@@ -164,6 +167,7 @@ function _grouped_rounds!(
             as,
             lookup,
             lookup_cld,
+            lookup_precip,
             ngroups,
             n_gpt,
             round,

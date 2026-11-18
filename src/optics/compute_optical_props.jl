@@ -11,6 +11,7 @@
         lkp::LookUpLW{FT},
         lkp_cld::Union{LookUpCld,Nothing} = nothing,
         lkp_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
+        lkp_precip::Union{LookUpPrecip, Nothing} = nothing,
     ) where {FT<:AbstractFloat}
 
 Compute optical properties for the longwave problem. The layer data and level
@@ -27,6 +28,7 @@ GPU access) when one is provided, and from `as` directly otherwise.
     lkp::LookUpLW,
     lkp_cld::Union{LookUpCld, Nothing} = nothing,
     lkp_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
+    lkp_precip::Union{LookUpPrecip, Nothing} = nothing,
 )
     nlay = AtmosphericStates.get_nlay(as)
     (; vmr) = as
@@ -126,7 +128,11 @@ GPU access) when one is provided, and from `as` directly otherwise.
                 cloud_state.ice_rgh,
                 lkp_cld,
                 ibnd;
-                cld_r_eff_sno = _view_or_nothing(cloud_state.cld_r_eff_sno, gcol),
+                lkp_precip,
+                cld_r_eff_sno = _view_or_nothing(
+                    cloud_state.cld_r_eff_sno,
+                    gcol,
+                ),
                 cld_path_sno = _view_or_nothing(cloud_state.cld_path_sno, gcol),
             )
         end
@@ -144,6 +150,7 @@ end
     lkp::LookUpLW,
     lkp_cld::Union{LookUpCld, Nothing} = nothing,
     lkp_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
+    lkp_precip::Union{LookUpPrecip, Nothing} = nothing,
     wcol::Int = gcol,
 )
     nlay = AtmosphericStates.get_nlay(as)
@@ -232,7 +239,7 @@ end
         )
     end
     if !isnothing(lkp_cld) # clouds need TwoStream optics
-        add_cloud_optics_lw!(op, as, gcol, lkp_cld, ibnd, wcol)
+        add_cloud_optics_lw!(op, as, gcol, lkp_cld, ibnd, lkp_precip, wcol)
     end
     return nothing
 end
@@ -247,6 +254,7 @@ end
         lkp::LookUpSW,
         lkp_cld::Union{LookUpCld, Nothing} = nothing,
         lkp_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
+        lkp_precip::Union{LookUpPrecip, Nothing} = nothing,
     )
 
 Compute optical properties for the shortwave problem. The layer data are read
@@ -300,6 +308,7 @@ end
     lkp::LookUpSW,
     lkp_cld::Union{LookUpCld, Nothing} = nothing,
     lkp_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
+    lkp_precip::Union{LookUpPrecip, Nothing} = nothing,
     wcol::Int = gcol,
     collect_aod::Bool = true,
 )
@@ -366,16 +375,16 @@ end
         )
     end
     if !isnothing(lkp_cld) # clouds need TwoStream optics
-        add_cloud_optics_sw!(op, as, gcol, lkp_cld, ibnd, wcol)
+        add_cloud_optics_sw!(op, as, gcol, lkp_cld, ibnd, lkp_precip, wcol)
     end
     return nothing
 end
 
 """
-    add_cloud_optics_lw!(op, as, gcol, lkp_cld, ibnd)
+    add_cloud_optics_lw!(op, as, gcol, lkp_cld, ibnd, lkp_precip = nothing)
 
-Add the longwave cloud increment to optical properties that already hold the
-gas and aerosol contributions for column `gcol`.
+Add the longwave cloud and snow increment to optical properties that already
+hold the gas and aerosol contributions for column `gcol`.
 
 The only implementation of the longwave cloud increment: `compute_optical_props!`
 calls it too, rather than keeping a copy. That matters because a fused
@@ -389,6 +398,7 @@ could drift apart without anything noticing.
     gcol::Int,
     lkp_cld::LookUpCld,
     ibnd::Int,
+    lkp_precip::Union{LookUpPrecip, Nothing} = nothing,
     wcol::Int = gcol,
     # A caller solving over wide columns writes `op` at `wcol`, so it passes a
     # mask store that is wide too (`LWGptGroups.mask`); the narrow default is
@@ -409,6 +419,7 @@ could drift apart without anything noticing.
             cloud_state.ice_rgh,
             lkp_cld,
             ibnd;
+            lkp_precip,
             cld_r_eff_sno = _view_or_nothing(cloud_state.cld_r_eff_sno, gcol),
             cld_path_sno = _view_or_nothing(cloud_state.cld_path_sno, gcol),
             delta_scaling = false,
@@ -418,7 +429,7 @@ could drift apart without anything noticing.
 end
 
 """
-    add_cloud_optics_sw!(op, as, gcol, lkp_cld, ibnd)
+    add_cloud_optics_sw!(op, as, gcol, lkp_cld, ibnd, lkp_precip = nothing)
 
 Shortwave counterpart of [`add_cloud_optics_lw!`](@ref), and likewise the only
 implementation. Note `delta_scaling`, which the shortwave cloud increment applies
@@ -430,6 +441,7 @@ and the longwave one does not.
     gcol::Int,
     lkp_cld::LookUpCld,
     ibnd::Int,
+    lkp_precip::Union{LookUpPrecip, Nothing} = nothing,
     wcol::Int = gcol,
     # Narrow by default; see `add_cloud_optics_lw!`.
     mask_store = as.cloud_state.mask_sw,
@@ -448,6 +460,7 @@ and the longwave one does not.
             cloud_state.ice_rgh,
             lkp_cld,
             ibnd;
+            lkp_precip,
             cld_r_eff_sno = _view_or_nothing(cloud_state.cld_r_eff_sno, gcol),
             cld_path_sno = _view_or_nothing(cloud_state.cld_path_sno, gcol),
             delta_scaling = true,

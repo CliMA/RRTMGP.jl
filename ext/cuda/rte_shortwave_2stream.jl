@@ -68,6 +68,7 @@ function rte_sw_2stream_solve!(
     lookup_sw::LookUpSW,
     lookup_sw_cld::Union{LookUpCld, Nothing} = nothing,
     lookup_sw_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
+    lookup_sw_precip::Union{LookUpPrecip, Nothing} = nothing,
 )
     nlay, ncol = AtmosphericStates.get_dims(as)
     set_band_flux_to_zero!(band_flux)
@@ -86,6 +87,7 @@ function rte_sw_2stream_solve!(
         lookup_sw,
         lookup_sw_cld,
         lookup_sw_aero,
+        lookup_sw_precip,
     )
     @cuda always_inline = true threads = (tx) blocks = (bx) rte_sw_2stream_solve_CUDA!(
         args...,
@@ -107,6 +109,7 @@ function rte_sw_2stream_solve_CUDA!(
     lookup_sw::LookUpSW,
     lookup_sw_cld::Union{LookUpCld, Nothing} = nothing,
     lookup_sw_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
+    lookup_sw_precip::Union{LookUpPrecip, Nothing} = nothing,
 )
     gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
     nlev = nlay + 1
@@ -133,6 +136,7 @@ function rte_sw_2stream_solve_CUDA!(
                     lookup_sw,
                     lookup_sw_cld,
                     lookup_sw_aero,
+                    lookup_sw_precip,
                     μ₀,
                     lookup_sw.band_data.major_gpt2bnd[igpt],
                     n_gpt,
@@ -177,6 +181,7 @@ function rte_sw_2stream_solve_both_skies!(
     lookup_sw::LookUpSW,
     lookup_sw_cld::Union{LookUpCld, Nothing},
     lookup_sw_aero::Union{LookUpAerosolMerra, Nothing},
+    lookup_sw_precip::Union{LookUpPrecip, Nothing} = nothing,
     gpt_groups = nothing,
 )
     nlay, ncol = AtmosphericStates.get_dims(as)
@@ -196,6 +201,7 @@ function rte_sw_2stream_solve_both_skies!(
             lookup_sw,
             lookup_sw_cld,
             lookup_sw_aero,
+            lookup_sw_precip,
         )
     end
     args = (
@@ -213,6 +219,7 @@ function rte_sw_2stream_solve_both_skies!(
         lookup_sw,
         lookup_sw_cld,
         lookup_sw_aero,
+        lookup_sw_precip,
     )
     @cuda always_inline = true threads = (tx) blocks = (bx) rte_sw_2stream_solve_both_skies_CUDA!(
         args...,
@@ -248,6 +255,7 @@ function rte_sw_2stream_solve_both_skies_CUDA!(
     lookup_sw::LookUpSW,
     lookup_sw_cld::Union{LookUpCld, Nothing},
     lookup_sw_aero::Union{LookUpAerosolMerra, Nothing},
+    lookup_sw_precip::Union{LookUpPrecip, Nothing} = nothing,
 )
     gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
     nlev = nlay + 1
@@ -275,6 +283,7 @@ function rte_sw_2stream_solve_both_skies_CUDA!(
                     lookup_sw,
                     lookup_sw_cld,
                     lookup_sw_aero,
+                    lookup_sw_precip,
                     μ₀,
                     lookup_sw.band_data.major_gpt2bnd[igpt],
                     n_gpt,
@@ -347,6 +356,7 @@ function _sw_group_optics_CUDA!(
                 lookup_sw,
                 nothing,
                 lookup_sw_aero,
+                nothing,
                 wcol,
                 # G-points are contiguous within a band, so this is the last
                 # one of its own band: exactly one thread writes the 550 nm
@@ -379,6 +389,7 @@ function _sw_group_sweeps_CUDA!(
     as::AtmosphericState,
     lookup_sw::LookUpSW,
     lookup_sw_cld::Union{LookUpCld, Nothing},
+    lookup_sw_precip::Union{LookUpPrecip, Nothing},
     ngroups,
     n_gpt,
     round,
@@ -420,6 +431,7 @@ function _sw_group_sweeps_CUDA!(
                     as,
                     lookup_sw,
                     lookup_sw_cld,
+                    lookup_sw_precip,
                     μ₀,
                     major_gpt2bnd[igpt],
                     n_gpt,

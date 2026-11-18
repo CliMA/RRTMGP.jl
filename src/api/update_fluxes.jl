@@ -37,14 +37,19 @@ update_lw_fluxes!(s::RRTMGPSolver, ::ClearSkyRadiation) = RTESolver.solve_lw!(
     _lookup_tables(s).lookup_lw_aero,
     _deep_atmosphere_inverse_scaling(s),
 )
-update_lw_fluxes!(s::RRTMGPSolver, ::AllSkyRadiation) = RTESolver.solve_lw!(
-    _longwave_solver(s),
-    _atmospheric_state(s),
-    _lookup_tables(s).lookup_lw,
-    _lookup_tables(s).lookup_lw_cld,
-    _lookup_tables(s).lookup_lw_aero,
-    _deep_atmosphere_inverse_scaling(s),
-)
+function update_lw_fluxes!(s::RRTMGPSolver, ::AllSkyRadiation)
+    as = _atmospheric_state(s)
+    lookups = _lookup_tables(s)
+    return RTESolver.solve_lw!(
+        _longwave_solver(s),
+        as,
+        lookups.lookup_lw,
+        lookups.lookup_lw_cld,
+        lookups.lookup_lw_aero,
+        _deep_atmosphere_inverse_scaling(s),
+        _active_lw_precip(as, lookups),
+    )
+end
 function update_lw_fluxes!(
     s::RRTMGPSolver,
     ::AllSkyRadiationWithClearSkyDiagnostics,
@@ -63,6 +68,7 @@ function update_lw_fluxes!(
         lookups.lookup_lw_cld,
         lookups.lookup_lw_aero,
         ms,
+        _active_lw_precip(as, lookups),
     )
     # snapshot the clear-sky fluxes into their (nlev, ncol) presentation
     Fluxes.update_presentation!(s.clear_flux_lw, s.clear_flux_acc_lw)
@@ -103,14 +109,19 @@ update_sw_fluxes!(s::RRTMGPSolver, ::ClearSkyRadiation) = RTESolver.solve_sw!(
     _lookup_tables(s).lookup_sw_aero,
     _deep_atmosphere_inverse_scaling(s),
 )
-update_sw_fluxes!(s::RRTMGPSolver, ::AllSkyRadiation) = RTESolver.solve_sw!(
-    _shortwave_solver(s),
-    _atmospheric_state(s),
-    _lookup_tables(s).lookup_sw,
-    _lookup_tables(s).lookup_sw_cld,
-    _lookup_tables(s).lookup_sw_aero,
-    _deep_atmosphere_inverse_scaling(s),
-)
+function update_sw_fluxes!(s::RRTMGPSolver, ::AllSkyRadiation)
+    as = _atmospheric_state(s)
+    lookups = _lookup_tables(s)
+    return RTESolver.solve_sw!(
+        _shortwave_solver(s),
+        as,
+        lookups.lookup_sw,
+        lookups.lookup_sw_cld,
+        lookups.lookup_sw_aero,
+        _deep_atmosphere_inverse_scaling(s),
+        _active_sw_precip(as, lookups),
+    )
+end
 function update_sw_fluxes!(
     s::RRTMGPSolver,
     ::AllSkyRadiationWithClearSkyDiagnostics,
@@ -128,6 +139,7 @@ function update_sw_fluxes!(
         lookups.lookup_sw_cld,
         lookups.lookup_sw_aero,
         ms,
+        _active_sw_precip(as, lookups),
     )
     # snapshot the clear-sky fluxes into their (nlev, ncol) presentation
     Fluxes.update_presentation!(s.clear_flux_sw, s.clear_flux_acc_sw)
@@ -136,6 +148,19 @@ end
 #####
 ##### Orchestration
 #####
+
+# Only forward `LookUpPrecip` into the RTE/optics drivers when snow is active
+# (`cld_path_sno !== nothing`). Because `CloudState` parameterizes the snow
+# field type (`Nothing` when snow is disabled), this folds at compile time:
+# snow-off runs pass `nothing` (`::Nothing`) into the CPU/GPU kernels rather
+# than carrying an unused `LookUpPrecip` descriptor.
+@inline _active_lw_precip(as, lookups) =
+    _has_snow(as.cloud_state) ? lookups.lookup_lw_precip : nothing
+@inline _active_sw_precip(as, lookups) =
+    _has_snow(as.cloud_state) ? lookups.lookup_sw_precip : nothing
+@inline _has_snow(::Nothing) = false
+@inline _has_snow(cs::AtmosphericStates.CloudState) =
+    !isnothing(cs.cld_path_sno)
 
 _deep_atmosphere_inverse_scaling(s::RRTMGPSolver) =
     s.deep_atmosphere_inverse_scaling
@@ -159,11 +184,8 @@ _idx_h2o(s::RRTMGPSolver, ::AbstractRRTMGPMethod) =
 # clear-sky state has it but leaves it `nothing`.
 _set_mcica_key!(as, seedval, context) =
     _set_cloud_key!(as.cloud_state, seedval, context)
-_set_mcica_key!(
-    as::AtmosphericStates.GrayAtmosphericState,
-    seedval,
-    context,
-) = nothing
+_set_mcica_key!(as::AtmosphericStates.GrayAtmosphericState, seedval, context) =
+    nothing
 _set_cloud_key!(::Nothing, seedval, context) = nothing
 function _set_cloud_key!(cloud_state, seedval, context)
     fill!(cloud_state.mcica_key, _mcica_key(seedval) ⊻ _rank_salt(context))
@@ -179,9 +201,8 @@ _rank_salt(context) =
 # Integral floats convert; a non-integral value cannot be a key.
 _mcica_key(seedval::Integer) = seedval % UInt32
 function _mcica_key(seedval::Real)
-    isinteger(seedval) || throw(
-        ArgumentError("seedval must be an integer, got $seedval"),
-    )
+    isinteger(seedval) ||
+        throw(ArgumentError("seedval must be an integer, got $seedval"))
     # Signed truncation then a wrapping `%`, not `unsafe_trunc(UInt32, ...)`:
     # `fptoui` of a negative value is undefined, both steps here are defined.
     return unsafe_trunc(Int64, seedval) % UInt32
@@ -228,7 +249,9 @@ function update_net_fluxes!(
     return nothing
 end
 
-_update_band_net_fluxes!(ws) = _update_band_net_fluxes!(hasproperty(ws, :band_flux) ? ws.band_flux : nothing)
+_update_band_net_fluxes!(ws) = _update_band_net_fluxes!(
+    hasproperty(ws, :band_flux) ? ws.band_flux : nothing,
+)
 _update_band_net_fluxes!(::Nothing) = nothing
 function _update_band_net_fluxes!(band::Fluxes.FluxBand)
     band.flux_net .= band.flux_up .- band.flux_dn

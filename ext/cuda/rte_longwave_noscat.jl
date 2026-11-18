@@ -64,6 +64,7 @@ function rte_lw_noscat_solve!(
     lookup_lw::LookUpLW,
     lookup_lw_cld::Union{LookUpCld, Nothing} = nothing,
     lookup_lw_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
+    lookup_lw_precip::Union{LookUpPrecip, Nothing} = nothing,
 )
     nlay, ncol = AtmosphericStates.get_dims(as)
     tx, bx = _configure_threadblock(ncol)
@@ -81,6 +82,7 @@ function rte_lw_noscat_solve!(
         lookup_lw,
         lookup_lw_cld,
         lookup_lw_aero,
+        lookup_lw_precip,
     )
     @cuda always_inline = true threads = (tx) blocks = (bx) rte_lw_noscat_solve_CUDA!(
         args...,
@@ -102,6 +104,7 @@ function rte_lw_noscat_solve_CUDA!(
     lookup_lw::LookUpLW,
     lookup_lw_cld::Union{LookUpCld, Nothing},
     lookup_lw_aero::Union{LookUpAerosolMerra, Nothing},
+    lookup_lw_precip::Union{LookUpPrecip, Nothing} = nothing,
 )
     gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
     nlev = nlay + 1
@@ -127,6 +130,7 @@ function rte_lw_noscat_solve_CUDA!(
                 lookup_lw,
                 lookup_lw_cld,
                 lookup_lw_aero,
+                lookup_lw_precip,
                 major_gpt2bnd[igpt],
                 nlay,
                 nlev,
