@@ -186,7 +186,7 @@ end
 Compute cell properties (transmittance and reflectance) for direct and diffuse radiation
 Two-stream solutions to direct and diffuse reflectance and transmittance for a layer
 with optical depth tau, single scattering albedo w0, and asymmetry parameter g.
- 
+
 Equations are developed in Meador and Weaver, 1980,
 doi:10.1175/1520-0469(1980)037<0630:TSATRT>2.0.CO;2
 """
@@ -261,16 +261,16 @@ doi:10.1175/1520-0469(1980)037<0630:TSATRT>2.0.CO;2
             FT(2) * (k_γ4 + α1 * k_μ) * exp_minusktau
         )
     # Final check that energy is not spuriously created, by recognizing that
-    # the beam can either be reflected, penetrate unscattered to the base of a layer, 
+    # the beam can either be reflected, penetrate unscattered to the base of a layer,
     # or penetrate through but be scattered on the way - the rest is absorbed
     # Makes the equations safer in single precision. Credit: Robin Hogan, Peter Ukkonen
     # Note: Unlike Eqs. 9 and 10 in Ukkonen & Hogan (2024), "Twelve times faster yet
     # accurate ..." (doi:10.1029/2023MS003932), where the upper bounds are
     # scaled by μ₀ (the cosine of the solar zenith angle), here they are not scaled.
-    # This is because in RRTMGP, Rdir and Tdir are defined as fractional quantities 
-    # relative to the horizontal incident direct flux (which already includes the μ₀ 
-    # factor), whereas in ecRad (the model in the paper), they are normalized relative 
-    # to the perpendicular incident intensity. Thus, the maximum fractional reflectance 
+    # This is because in RRTMGP, Rdir and Tdir are defined as fractional quantities
+    # relative to the horizontal incident direct flux (which already includes the μ₀
+    # factor), whereas in ecRad (the model in the paper), they are normalized relative
+    # to the perpendicular incident intensity. Thus, the maximum fractional reflectance
     # Rdir is bounded by 1 - T₀, and must not be scaled by μ₀.
     Rdir = max(FT(0), Rdir_unconstrained)
     Tdir = max(FT(0), Tdir_unconstrained)

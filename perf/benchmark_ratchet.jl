@@ -125,7 +125,11 @@ function write_baseline(path, results; kind = "baseline")
         println(io, "# RRTMGP high-resolution GPU benchmark $kind (minimum ns)")
         println(io, "# device: $(CUDA.name(CUDA.device()))")
         println(io, "# julia: $(VERSION)")
-        println(io, "# recorded: ", get(ENV, "BUILDKITE_BUILD_URL", "local run"))
+        println(
+            io,
+            "# recorded: ",
+            get(ENV, "BUILDKITE_BUILD_URL", "local run"),
+        )
         println(io, "# regenerate with RRTMGP_BENCH_WRITE_BASELINE=1")
         for (name, ns) in sort(collect(results); by = first)
             println(io, "$name $ns")

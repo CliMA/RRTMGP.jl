@@ -40,8 +40,8 @@ function mcica_sampling_quality_test(::Type{FT}) where {FT}
     key = 0x5eed1234 % UInt32
 
     draws = [
-        Float64(_keyed_uniform(FT, key, gcol, igpt, ilay)) for igpt in 1:ngpt,
-        ilay in 1:nlay, gcol in 1:ncol
+        Float64(_keyed_uniform(FT, key, gcol, igpt, ilay)) for
+        igpt in 1:ngpt, ilay in 1:nlay, gcol in 1:ncol
     ]
     n = length(draws)
 
@@ -72,8 +72,8 @@ function mcica_sampling_quality_test(::Type{FT}) where {FT}
         # Hosts pass consecutive timestep indices, so adjacent keys must not
         # produce similar samples.
         next = [
-            Float64(_keyed_uniform(FT, key + UInt32(1), gcol, igpt, ilay)) for
-            igpt in 1:ngpt, ilay in 1:nlay, gcol in 1:ncol
+            Float64(_keyed_uniform(FT, key + UInt32(1), gcol, igpt, ilay))
+            for igpt in 1:ngpt, ilay in 1:nlay, gcol in 1:ncol
         ]
         @test abs(_cor(draws, next)) < 0.01
     end
@@ -98,9 +98,7 @@ function mcica_sampling_quality_test(::Type{FT}) where {FT}
         @test allunique(salts)
         # One rank must keep the keys it had, or this changes serial results.
         @test _rank_salt(_FakeCtx(1)) == 0x00000000
-        keyed = [
-            Float64(_keyed_uniform(FT, key ⊻ s, 1, 1, 1)) for s in salts
-        ]
+        keyed = [Float64(_keyed_uniform(FT, key ⊻ s, 1, 1, 1)) for s in salts]
         @test allunique(keyed)
     end
 
