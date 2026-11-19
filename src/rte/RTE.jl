@@ -27,32 +27,59 @@ _default_state_cache(::ClimaComms.AbstractCPUDevice, gp::RRTMGPGridParams) =
 _default_state_cache(::ClimaComms.AbstractDevice, gp::RRTMGPGridParams) =
     TransposedStateCache(gp)
 
-# How many pieces the fused g-point loop is split into. One is the serial loop
-# every other solver uses; above one the solve widens its workspaces to
-# `ncol * ngroups` and covers them in a single kernel launch, trading that
-# memory for blocks the one wave cannot otherwise fill.
+# The most pieces the fused g-point loop may be split into. One is the serial
+# loop every other solver uses; above one the solve widens its workspaces to
+# `ncol * ngroups` and covers them in one launch, so its grid is `ngroups` times
+# the blocks the serial loop would have launched. This ceiling is a memory one:
+# see `TARGET_GPT_GROUP_COLUMNS` for what each group costs.
 const MAX_NGPT_GROUPS = 16
 
-# Wide columns the default group count aims for: enough blocks to cover an A100
-# many waves over, which is where the imbalance between columns stops showing,
-# and past which another group adds no parallelism the scheduler can use. Every
-# widened workspace is linear in `ngroups`, so this also bounds their memory --
-# the accumulators are `ncol * ngroups * nlev` by two planes in the longwave and
-# three in the shortwave.
+# Wide columns the default group count aims for, and where the number comes
+# from: the benchmark it was swept on runs 24,576 columns, and 16 groups of
+# those is what `MAX_NGPT_GROUPS` allows. At the grouped rounds' 128 threads
+# that is a grid of 3,072 blocks, of which the driver holds 3 of the longwave
+# optics kernel resident per multiprocessor and 4 of the shortwave's, so an
+# A100's 108 multiprocessors see about 9 waves in the longwave and 7 in the
+# shortwave where the ungrouped solve launches one.
+#
+# It is not the count past which another group buys nothing: the sweep has most
+# of its gain in by 8 groups and its best at 32, about 2% beyond 16. It is where
+# the workspaces stop being worth that 2%, because every one of them is linear
+# in `ngroups` -- the accumulators alone are `ncol * ngroups * nlev` by two flux
+# planes in the longwave and three in the shortwave.
 const TARGET_GPT_GROUP_COLUMNS = 393216
+
+# Device bytes one wide column of workspace costs per level, both bands
+# together: 53 in the longwave and 61 in the shortwave, measured by building
+# them and reading the free-memory delta, of which the two partial accumulators
+# are the bulk. A coupled run builds both, so the default prices both.
+const GPT_GROUP_BYTES_PER_WIDE_COLUMN_LEVEL = 114
+
+# The most device memory the default will commit to those workspaces. The
+# column target above is a floor on how wide the solve wants to be, not a
+# licence to allocate: `nlev` is in the workspace's size and not in that target,
+# so without this bound the same column count commits four times the memory on
+# a 128-level grid as on a 32-level one, and a run can fail to allocate at a
+# default it never chose. This is inert at every resolution measured -- it first
+# binds above 80 layers at the benchmark's column count -- and a device too
+# small for it wants an explicit `ngpt_groups` rather than a different bound.
+const TARGET_GPT_GROUP_BYTES = 4 * 1024^3
 
 """
     default_ngpt_groups(grid_params::RRTMGPGridParams)
 
 How many g-point groups a two-stream solver widens to when the caller names
 none: enough to reach `TARGET_GPT_GROUP_COLUMNS` wide columns, capped at
-`MAX_NGPT_GROUPS`.
+`MAX_NGPT_GROUPS` and at whatever `TARGET_GPT_GROUP_BYTES` affords on this
+grid's level count.
 
 A column count that already fills the device gets one group, and so does a CPU,
 whose driver solves the whole g-point loop per column and ignores the workspaces.
 Both gates matter because the count rises as columns fall, so an ungated default
 would give the smallest runs the widest workspaces. Pass `ngpt_groups` to
-override in either direction.
+override in either direction -- a device whose free memory is smaller than
+`TARGET_GPT_GROUP_BYTES` wants that rather than the default, since nothing here
+polls the device.
 
 Grouping changes the order in which a column's g-points are summed, and
 floating-point addition is not associative, so grouped fluxes differ from a
@@ -64,9 +91,20 @@ grouping does to a sum is the whole of the difference: at one group the g-points
 are taken in the serial order, and the solve is then bit-for-bit with the serial
 one, which is what the tests assert.
 """
-default_ngpt_groups(grid_params::RRTMGPGridParams) =
-    ClimaComms.device(grid_params) isa ClimaComms.AbstractCPUDevice ? 1 :
-    clamp(cld(TARGET_GPT_GROUP_COLUMNS, grid_params.ncol), 1, MAX_NGPT_GROUPS)
+function default_ngpt_groups(grid_params::RRTMGPGridParams)
+    ClimaComms.device(grid_params) isa ClimaComms.AbstractCPUDevice && return 1
+    (; ncol, nlay) = grid_params
+    # `cld`, because the column target is a floor: rounding down would undershoot
+    # the parallelism it names. It can overshoot instead -- by 9.9% at the
+    # high-resolution benchmark's column count -- which costs memory, and that is
+    # what the byte bound is for.
+    wanted = cld(TARGET_GPT_GROUP_COLUMNS, ncol)
+    affordable = fld(
+        TARGET_GPT_GROUP_BYTES,
+        ncol * (nlay + 1) * GPT_GROUP_BYTES_PER_WIDE_COLUMN_LEVEL,
+    )
+    return clamp(min(wanted, affordable), 1, MAX_NGPT_GROUPS)
+end
 
 include("gpt_groups.jl")
 

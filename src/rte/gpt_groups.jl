@@ -2,6 +2,38 @@
 ##### Wide workspaces for a g-point-parallel solve.
 #####
 
+# What the two bands' workspaces have in common: the widened grid parameters,
+# the two partial accumulators, and the mask and cloud tally over wide columns.
+# `planes` is how many flux planes a band accumulates, which is the only shape
+# that differs between them. (`wide` was this variable's name; the review could
+# not read it, and neither could it say what the widening is of.)
+function _gpt_group_workspaces(
+    grid_params::RRTMGPGridParams,
+    ngroups::Int,
+    planes::Int,
+)
+    ngroups >= 1 || error("ngroups must be at least 1, got $ngroups")
+    (; context, ncol, nlay, isothermal_boundary_layer) = grid_params
+    DA = ClimaComms.array_type(grid_params)
+    FT = eltype(grid_params)
+    ncolw = ncol * ngroups
+    # The inner constructor, because `nlay` here is already the total and the
+    # keyword one would add the isothermal layer a second time.
+    wide_grid_params = RRTMGPGridParams{FT, typeof(context)}(
+        context,
+        nlay,
+        ncolw,
+        isothermal_boundary_layer,
+    )
+    return (;
+        wide_grid_params,
+        acc_data = DA{FT}(undef, ncolw, nlay + 1, planes),
+        acc_clear_data = DA{FT}(undef, ncolw, nlay + 1, planes),
+        mask = DA{Bool}(undef, nlay, ncolw),
+        cloudy = DA{Int32}(undef, ncolw),
+    )
+end
+
 """
     LWGptGroups(grid_params::RRTMGPGridParams, ngroups; params)
 
@@ -9,10 +41,14 @@ Workspaces for solving a column's longwave g-point loop in `ngroups`
 independent pieces, covered by one grid rather than by one column's serial
 loop.
 
-At one thread per column the solve fills the device in a single wave of blocks,
-so its tail and the imbalance between columns cannot be absorbed. Splitting the
-g-point loop multiplies the blocks instead, and the scheduler refills a
-multiprocessor as each retires.
+At one thread per column the whole solve fits in a single wave of blocks, so
+nothing is queued behind it: a block that finishes early frees its
+multiprocessor to no one, and the launch lasts as long as its slowest column.
+Columns are not equally expensive -- a column sweeps the cloudy increment only
+where its mask is set, and in the shortwave a night column exits at once (see
+[`SWGptGroups`](@ref)) -- so that difference is paid in idle warps instead of
+being absorbed. Splitting the g-point loop multiplies the blocks, and the
+scheduler refills a multiprocessor as each retires.
 
 Every workspace the solve indexes by column is widened to `ncol * ngroups`, so a
 thread's `(column, group)` pair selects its slice by one index and the kernel
@@ -43,38 +79,24 @@ function LWGptGroups(
     ngroups::Int;
     params,
 )
-    ngroups ≥ 1 || error("ngroups must be at least 1, got $ngroups")
-    (; context, ncol, nlay, isothermal_boundary_layer) = grid_params
-    DA = ClimaComms.array_type(grid_params)
-    FT = eltype(grid_params)
-    nlev = nlay + 1
-    ncolw = ncol * ngroups
-    # The inner constructor, because `nlay` here is already the total and the
-    # keyword one would add the isothermal layer a second time.
-    wide = RRTMGPGridParams{FT, typeof(context)}(
-        context,
-        nlay,
-        ncolw,
-        isothermal_boundary_layer,
-    )
     # Up and down only: the reduction recomputes net from them, so a third
     # plane would be allocated per wide column and never written. The field
     # names match `FluxLW` because that is what these accumulate, but the type
     # does not, which is the point -- a `FluxLW` would carry the net plane.
-    acc_data = DA{FT}(undef, ncolw, nlev, 2)
-    acc_clear_data = DA{FT}(undef, ncolw, nlev, 2)
+    (; wide_grid_params, acc_data, acc_clear_data, mask, cloudy) =
+        _gpt_group_workspaces(grid_params, ngroups, 2)
     # `view(d, :, :, k)` is a contiguous block, so the accumulators index as
     # cheaply as the plain arrays the ungrouped path uses.
     fluxes(d) = (flux_up = view(d, :, :, 1), flux_dn = view(d, :, :, 2))
     return LWGptGroups(
         ngroups,
-        TwoStream(wide),
-        SourceLW2Str(wide; params),
-        FluxLW(wide),
-        DA{Bool}(undef, nlay, ncolw),
+        TwoStream(wide_grid_params),
+        SourceLW2Str(wide_grid_params; params),
+        FluxLW(wide_grid_params),
+        mask,
         fluxes(acc_data),
         fluxes(acc_clear_data),
-        DA{Int32}(undef, ncolw),
+        cloudy,
     )
 end
 
@@ -114,24 +136,10 @@ function SWGptGroups(
     grid_params::RRTMGPGridParams,
     ngroups::Int;
 )
-    ngroups >= 1 || error("ngroups must be at least 1, got $ngroups")
-    (; context, ncol, nlay, isothermal_boundary_layer) = grid_params
-    DA = ClimaComms.array_type(grid_params)
-    FT = eltype(grid_params)
-    nlev = nlay + 1
-    ncolw = ncol * ngroups
-    # The inner constructor, because `nlay` here is already the total and the
-    # keyword one would add the isothermal layer a second time.
-    wide = RRTMGPGridParams{FT, typeof(context)}(
-        context,
-        nlay,
-        ncolw,
-        isothermal_boundary_layer,
-    )
     # Up, down and direct: the reduction recomputes net from up and down, so a
     # net plane would never be written (see `LWGptGroups`).
-    acc_data = DA{FT}(undef, ncolw, nlev, 3)
-    acc_clear_data = DA{FT}(undef, ncolw, nlev, 3)
+    (; wide_grid_params, acc_data, acc_clear_data, mask, cloudy) =
+        _gpt_group_workspaces(grid_params, ngroups, 3)
     fluxes(d) = (
         flux_up = view(d, :, :, 1),
         flux_dn = view(d, :, :, 2),
@@ -139,13 +147,13 @@ function SWGptGroups(
     )
     return SWGptGroups(
         ngroups,
-        TwoStream(wide),
-        SourceSW2Str(wide),
-        FluxSW(wide),
-        DA{Bool}(undef, nlay, ncolw),
+        TwoStream(wide_grid_params),
+        SourceSW2Str(wide_grid_params),
+        FluxSW(wide_grid_params),
+        mask,
         fluxes(acc_data),
         fluxes(acc_clear_data),
-        DA{Int32}(undef, ncolw),
+        cloudy,
     )
 end
 

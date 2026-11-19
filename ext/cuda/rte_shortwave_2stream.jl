@@ -309,18 +309,6 @@ function rte_sw_2stream_solve_both_skies_CUDA!(
     return nothing
 end
 
-@inline function _zero_sw_partials!(acc, acc_clear, wcol, nlev, ::Type{FT}) where {FT}
-    @inbounds for ilev in 1:nlev
-        acc.flux_up[wcol, ilev] = FT(0)
-        acc.flux_dn[wcol, ilev] = FT(0)
-        acc.flux_dn_dir[wcol, ilev] = FT(0)
-        acc_clear.flux_up[wcol, ilev] = FT(0)
-        acc_clear.flux_dn[wcol, ilev] = FT(0)
-        acc_clear.flux_dn_dir[wcol, ilev] = FT(0)
-    end
-    return nothing
-end
-
 #####
 ##### The g-point-grouped shortwave solve, as optics and then sweeps.
 #####
@@ -406,7 +394,7 @@ function _sw_group_sweeps_CUDA!(
         if round == 1
             @inbounds cloudy_count[wcol] = Int32(0)
             (grp > n_gpt || μ₀ <= 0) &&
-                _zero_sw_partials!(acc, acc_clear, wcol, nlev, FT)
+                _zero_partials!(acc, acc_clear, wcol, nlev)
         end
         if igpt <= n_gpt
             @inbounds begin

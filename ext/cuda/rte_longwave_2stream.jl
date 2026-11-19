@@ -288,20 +288,6 @@ end
 ##### The g-point-grouped longwave solve, as optics and then sweeps.
 #####
 
-# Zero a group's slice of the partial accumulators. The reduction reads every
-# slice whether or not a group had work, so a group with none has to write zeros
-# rather than leave whatever the workspace last held. The shortwave counterpart
-# is `_zero_sw_partials!`.
-@inline function _zero_lw_partials!(acc, acc_clear, wcol, nlev, ::Type{FT}) where {FT}
-    @inbounds for ilev in 1:nlev
-        acc.flux_up[wcol, ilev] = FT(0)
-        acc.flux_dn[wcol, ilev] = FT(0)
-        acc_clear.flux_up[wcol, ilev] = FT(0)
-        acc_clear.flux_dn[wcol, ilev] = FT(0)
-    end
-    return nothing
-end
-
 # This round's gas and aerosol optics for every `(column, group)` pair, into
 # the wide `op` and `src` the sweep kernel reads. The cloud mask is not drawn
 # here: the gas and aerosol optics never read it, so it belongs in whichever
@@ -374,7 +360,7 @@ function _lw_group_sweeps_CUDA!(
         igpt = grp + (round - 1) * ngroups
         if round == 1
             @inbounds cloudy_count[wcol] = Int32(0)
-            grp > n_gpt && _zero_lw_partials!(acc, acc_clear, wcol, nlev, FT)
+            grp > n_gpt && _zero_partials!(acc, acc_clear, wcol, nlev)
         end
         if igpt ≤ n_gpt
             @inbounds begin

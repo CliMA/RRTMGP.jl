@@ -18,6 +18,32 @@ const GROUP_BLOCK_THREADS = 128
 @inline _reduce_kernel(::SWGptGroups) = _reduce_sw_groups_CUDA!
 @inline _optics_workspaces(g::LWGptGroups) = (g.op, g.src)
 @inline _optics_workspaces(g::SWGptGroups) = (g.op,)
+
+# Aerosol mask for every column, hoisted out of the grouped solves of both
+# bands, which need it per column rather than per wide column.
+function _aero_mask_CUDA!(aerosol_state::AerosolState, ncol)
+    gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x
+    gcol ≤ ncol && _compute_aero_mask!(aerosol_state, gcol)
+    return nothing
+end
+
+# Zero a group's slice of the partial accumulators. The reduction reads every
+# slice whether or not a group had work, so a group with none has to write
+# zeros rather than leave whatever the workspace last held. One body for both
+# bands: the accumulator is a named tuple of flux planes, two in the longwave
+# and three in the shortwave, and this writes whichever it is handed.
+@inline function _zero_partials!(acc, acc_clear, wcol, nlev)
+    FT = eltype(acc.flux_up)
+    @inbounds for ilev in 1:nlev
+        for plane in acc
+            plane[wcol, ilev] = zero(FT)
+        end
+        for plane in acc_clear
+            plane[wcol, ilev] = zero(FT)
+        end
+    end
+    return nothing
+end
 @inline _cld_cover(::Nothing, _) = nothing
 @inline _cld_cover(cs::CloudState, ::LWGptGroups) = cs.cld_cover_lw
 @inline _cld_cover(cs::CloudState, ::SWGptGroups) = cs.cld_cover_sw
