@@ -44,6 +44,7 @@ end
     end
     return nothing
 end
+
 @inline _cld_cover(::Nothing, _) = nothing
 @inline _cld_cover(cs::CloudState, ::LWGptGroups) = cs.cld_cover_lw
 @inline _cld_cover(cs::CloudState, ::SWGptGroups) = cs.cld_cover_sw

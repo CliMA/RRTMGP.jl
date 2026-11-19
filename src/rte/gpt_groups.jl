@@ -5,8 +5,7 @@
 # What the two bands' workspaces have in common: the widened grid parameters,
 # the two partial accumulators, and the mask and cloud tally over wide columns.
 # `planes` is how many flux planes a band accumulates, which is the only shape
-# that differs between them. (`wide` was this variable's name; the review could
-# not read it, and neither could it say what the widening is of.)
+# that differs between them.
 function _gpt_group_workspaces(
     grid_params::RRTMGPGridParams,
     ngroups::Int,
