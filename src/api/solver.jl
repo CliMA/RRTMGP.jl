@@ -284,7 +284,7 @@ function RRTMGPSolver(
     # state directly and needs none.
     state_cache =
         radiation_method isa GrayRadiation ? nothing :
-        RTE._default_state_cache(grid_params)
+        RTE._default_state_cache(grid_params, as)
     # Checked here rather than in `LWGptGroups`/`SWGptGroups`, which hold the
     # same test: the gates below only reach them above one group, so zero or a
     # negative count would skip the check and quietly build a serial solver.

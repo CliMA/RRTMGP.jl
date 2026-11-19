@@ -26,6 +26,20 @@ _default_state_cache(::ClimaComms.AbstractCPUDevice, gp::RRTMGPGridParams) =
     nothing
 _default_state_cache(::ClimaComms.AbstractDevice, gp::RRTMGPGridParams) =
     TransposedStateCache(gp)
+# With the state in hand, the cache also takes column-first copies of the gas,
+# cloud and aerosol inputs it carries.
+_default_state_cache(gp::RRTMGPGridParams, as::AtmosphericState) =
+    _default_state_cache(ClimaComms.device(gp), gp, as)
+_default_state_cache(
+    ::ClimaComms.AbstractCPUDevice,
+    gp::RRTMGPGridParams,
+    as::AtmosphericState,
+) = nothing
+_default_state_cache(
+    ::ClimaComms.AbstractDevice,
+    gp::RRTMGPGridParams,
+    as::AtmosphericState,
+) = TransposedStateCache(gp, as)
 
 # How many pieces the fused g-point loop is split into. One is the serial loop
 # every other solver uses; above one the solve widens its workspaces to

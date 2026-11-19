@@ -588,7 +588,7 @@ function solve_sw_both_skies!(
         op,
         bcs,
         src,
-        as,
+        AtmosphericStates.kernel_state(state_cache, as),
         state_cache,
         lookup_sw,
         lookup_sw_cld,
