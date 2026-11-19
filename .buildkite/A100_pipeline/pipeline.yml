@@ -1,6 +1,6 @@
 agents:
   queue: clima
-  modules: climacommon/2025_03_18 nsight-systems/2024.6.1
+  modules: climacommon/2026_11_06-1.13.3 nsight-systems/2024.6.1
 
 env:
   OPENBLAS_NUM_THREADS: 1
