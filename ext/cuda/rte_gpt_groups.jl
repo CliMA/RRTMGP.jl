@@ -27,20 +27,26 @@ function _aero_mask_CUDA!(aerosol_state::AerosolState, ncol)
     return nothing
 end
 
+# The planes recurse rather than iterate: a loop over the tuple indexes it with
+# a runtime variable, which forces the tuple to a stack slot and spills the
+# sweeps kernels. Recursion over `Base.tail` unrolls at compile time, because
+# each call takes a shorter tuple type than the one above it.
+@inline function _zero_planes!(planes::Tuple, wcol, ilev)
+    plane = first(planes)
+    @inbounds plane[wcol, ilev] = zero(eltype(plane))
+    return _zero_planes!(Base.tail(planes), wcol, ilev)
+end
+@inline _zero_planes!(::Tuple{}, wcol, ilev) = nothing
+
 # Zero a group's slice of the partial accumulators. The reduction reads every
 # slice whether or not a group had work, so a group with none has to write
 # zeros rather than leave whatever the workspace last held. One body for both
 # bands: the accumulator is a named tuple of flux planes, two in the longwave
 # and three in the shortwave, and this writes whichever it is handed.
 @inline function _zero_partials!(acc, acc_clear, wcol, nlev)
-    FT = eltype(acc.flux_up)
-    @inbounds for ilev in 1:nlev
-        for plane in acc
-            plane[wcol, ilev] = zero(FT)
-        end
-        for plane in acc_clear
-            plane[wcol, ilev] = zero(FT)
-        end
+    for ilev in 1:nlev
+        _zero_planes!(values(acc), wcol, ilev)
+        _zero_planes!(values(acc_clear), wcol, ilev)
     end
     return nothing
 end
