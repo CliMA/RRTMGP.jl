@@ -1,0 +1,31 @@
+<svg width="400" height="400" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="RRTMGP.jl logo">
+  <defs>
+    <marker id="hA" viewBox="0 0 10 10" refX="2" refY="5" markerWidth="2.8" markerHeight="2.8" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#EDB120"/></marker>
+    <marker id="hR" viewBox="0 0 10 10" refX="2" refY="5" markerWidth="2.8" markerHeight="2.8" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#CB3C33"/></marker>
+    <marker id="hP" viewBox="0 0 10 10" refX="2" refY="5" markerWidth="2.8" markerHeight="2.8" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#9558B2"/></marker>
+    <marker id="hG" viewBox="0 0 10 10" refX="2" refY="5" markerWidth="2.8" markerHeight="2.8" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#389826"/></marker>
+  </defs>
+  <circle cx="200" cy="640" r="485" fill="none" stroke="#7A9BF5" stroke-width="16" opacity="0.20"/>
+  <circle cx="200" cy="640" r="450" fill="none" stroke="#7A9BF5" stroke-width="16" opacity="0.38"/>
+  <circle cx="200" cy="640" r="415" fill="none" stroke="#7A9BF5" stroke-width="16" opacity="0.60"/>
+  <circle cx="200" cy="640" r="380" fill="#4063D8"/>
+  <circle cx="76" cy="64" r="26" fill="#EDB120"/>
+  <g stroke="#EDB120" stroke-width="5" stroke-linecap="round">
+    <line x1="76" y1="24" x2="76" y2="12"/>
+    <line x1="76" y1="104" x2="76" y2="116"/>
+    <line x1="36" y1="64" x2="24" y2="64"/>
+    <line x1="116" y1="64" x2="128" y2="64"/>
+    <line x1="48" y1="36" x2="39" y2="27"/>
+    <line x1="104" y1="92" x2="113" y2="101"/>
+    <line x1="48" y1="92" x2="39" y2="101"/>
+    <line x1="104" y1="36" x2="113" y2="27"/>
+  </g>
+  <line x1="100" y1="98" x2="150" y2="225" stroke="#EDB120" stroke-width="9" stroke-linecap="round" marker-end="url(#hA)"/>
+  <path d="M220 258 q-11 -24 0 -48 t0 -48 t0 -48 l0 -22" fill="none" stroke="#CB3C33" stroke-width="9" stroke-linecap="round" marker-end="url(#hR)"/>
+  <g transform="rotate(8 275 266)">
+    <path d="M275 266 q-11 -24 0 -48 t0 -48 l0 -22" fill="none" stroke="#9558B2" stroke-width="9" stroke-linecap="round" marker-end="url(#hP)"/>
+  </g>
+  <g transform="rotate(16 325 280)">
+    <path d="M325 280 q-11 -24 0 -48 l0 -22" fill="none" stroke="#389826" stroke-width="9" stroke-linecap="round" marker-end="url(#hG)"/>
+  </g>
+</svg>
