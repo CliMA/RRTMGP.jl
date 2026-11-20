@@ -147,7 +147,9 @@ end;
 # ``Γ_d = g/c_p``, calculated from the Thermodynamics.jl constants:
 
 Γ_dry = g / cp_d
-println("Dry adiabatic lapse rate g/cₚ = $(round(1000 * Γ_dry; digits = 1)) K/km")
+println(
+    "Dry adiabatic lapse rate g/cₚ = $(round(1000 * Γ_dry; digits = 1)) K/km",
+)
 
 # Moist convection and large-scale eddies hold the observed tropospheric lapse
 # rate to a smaller value. Like Manabe and collaborators, we impose a critical
@@ -263,7 +265,10 @@ function balanced_surface_temperature!(
     Γ = Γ_crit,
     tol = 5e-3,
 )
-    eq(T) = (equilibrate!(solver, T; convection, humidity, Γ); toa_imbalance(solver))
+    eq(T) = (
+        equilibrate!(solver, T; convection, humidity, Γ);
+        toa_imbalance(solver)
+    )
     N1 = eq(T1)
     N2 = eq(T2)
     while abs(N2) > tol && abs(T2 - T1) > 1e-3
@@ -290,7 +295,9 @@ println("Equilibrium Tₛ (1 × CO₂): $(round(Ts_1x; digits = 2)) K")
 # is implicit in the RCE calculation.
 
 sfc_convective_flux(solver) = -RRTMGP.net_flux(solver)[1, 1]
-println("Implied surface convective flux: $(round(sfc_convective_flux(solver); digits = 1)) W/m²")
+println(
+    "Implied surface convective flux: $(round(sfc_convective_flux(solver); digits = 1)) W/m²",
+)
 
 # The figures below mark a column's ground temperature with a dot at the surface
 # pressure, in the color of that column's curve. The center of the lowest layer
@@ -299,7 +306,8 @@ println("Implied surface convective flux: $(round(sfc_convective_flux(solver); d
 # above it.
 
 p_sfc_hPa = Array(RRTMGP.level_pressure(solver))[1, 1] / 100
-mark_ground!(ax, curve, T_sfc) = scatter!(ax, [T_sfc], [p_sfc_hPa]; color = curve.color, markersize = 9)
+mark_ground!(ax, curve, T_sfc) =
+    scatter!(ax, [T_sfc], [p_sfc_hPa]; color = curve.color, markersize = 9)
 
 # ## Radiative equilibrium versus radiative-convective equilibrium
 #
@@ -312,7 +320,13 @@ mark_ground!(ax, curve, T_sfc) = scatter!(ax, [T_sfc], [p_sfc_hPa]; color = curv
 
 function balanced_prescribed_humidity(; convection)
     slv = RRTMGP.solve(profile; lookups = solver.lookups, setup...).solver
-    Ts = balanced_surface_temperature!(slv, FT(285), FT(300); convection, humidity = false)
+    Ts = balanced_surface_temperature!(
+        slv,
+        FT(285),
+        FT(300);
+        convection,
+        humidity = false,
+    )
     return Ts, copy(Array(RRTMGP.layer_temperature(slv))), slv
 end
 
@@ -321,8 +335,12 @@ Ts_re, T_re, solver_re = balanced_prescribed_humidity(; convection = false)
 println("Equilibrium Tₛ (radiative-convective): $(round(Ts_rc; digits = 1)) K")
 println("Equilibrium Tₛ (radiative):            $(round(Ts_re; digits = 1)) K")
 T_bot_re = Array(RRTMGP.level_temperature(solver_re))[1, 1]
-println("Bottom-face air temperature (radiative): $(round(T_bot_re; digits = 1)) K")
-println("Implied surface convective flux (radiative): $(round(sfc_convective_flux(solver_re); digits = 2)) W/m²")
+println(
+    "Bottom-face air temperature (radiative): $(round(T_bot_re; digits = 1)) K",
+)
+println(
+    "Implied surface convective flux (radiative): $(round(sfc_convective_flux(solver_re); digits = 2)) W/m²",
+)
 
 # Radiative equilibrium *without* convection leads to a surface 25 K warmer,
 # with a profile that departs from the observed atmosphere (here, the idealized
@@ -350,7 +368,14 @@ ax = Axis(
     limits = (nothing, nothing, nothing, 1050),
     title = "Radiative vs. radiative-convective equilibrium",
 )
-obs = lines!(ax, T_obs, p_lay[:, 1] ./ 100; color = :gray, linestyle = :dot, label = "standard atmosphere")
+obs = lines!(
+    ax,
+    T_obs,
+    p_lay[:, 1] ./ 100;
+    color = :gray,
+    linestyle = :dot,
+    label = "standard atmosphere",
+)
 re = lines!(ax, T_re[:, 1], p_lay[:, 1] ./ 100; label = "radiative equilibrium")
 rc = lines!(ax, T_rc[:, 1], p_lay[:, 1] ./ 100; label = "RCE (Γ = 6.5 K/km)")
 mark_ground!(ax, obs, profile.t_sfc[1])
@@ -379,7 +404,9 @@ function tropopause_height(solver, T_sfc; Γ = Γ_crit)
     k = findlast(abs.(T .- T_sfc .* (p ./ p_sfc) .^ (Γ * R_d / g)) .< 0.5)
     return (T_sfc - T[k]) / Γ
 end
-println("Tropopause height ≈ $(round(tropopause_height(solver, Ts_1x) / 1000; digits = 1)) km")
+println(
+    "Tropopause height ≈ $(round(tropopause_height(solver, Ts_1x) / 1000; digits = 1)) km",
+)
 
 # Now scale the CO₂ and re-balance. `balanced_co2` builds a fresh column with a
 # scaled CO₂ concentration, starts it from the 1 × CO₂ equilibrium, and finds
@@ -401,8 +428,10 @@ end
 
 Ts_2x_rh, T_2x_rh = balanced_co2(2)
 Ts_4x_rh, T_4x_rh = balanced_co2(4; bracket = (Ts_1x + 3, Ts_1x + 7))
-Ts_2x_ah, T_2x_ah = balanced_co2(2; fixed_rh = false, bracket = (Ts_1x, Ts_1x + 2))
-Ts_4x_ah, T_4x_ah = balanced_co2(4; fixed_rh = false, bracket = (Ts_1x + 1, Ts_1x + 4));
+Ts_2x_ah, T_2x_ah =
+    balanced_co2(2; fixed_rh = false, bracket = (Ts_1x, Ts_1x + 2))
+Ts_4x_ah, T_4x_ah =
+    balanced_co2(4; fixed_rh = false, bracket = (Ts_1x + 1, Ts_1x + 4));
 
 # Collect the surface temperatures into a table. Comparing the fixed-RH and
 # fixed-AH warming at the same forcing isolates the water-vapor feedback:
@@ -513,7 +542,8 @@ function rce_without(absorber, T1, T2)
     slv = RRTMGP.solve(prof; lookups = solver.lookups, setup...).solver
     absorber === :o3 && (RRTMGP.volume_mixing_ratio(slv, "o3") .= 0)
     absorber === :h2o && (RRTMGP.volume_mixing_ratio(slv, "h2o") .= 0)
-    Ts = balanced_surface_temperature!(slv, T1, T2; humidity = absorber !== :h2o)
+    Ts =
+        balanced_surface_temperature!(slv, T1, T2; humidity = absorber !== :h2o)
     return Ts, copy(Array(RRTMGP.layer_temperature(slv)))
 end
 

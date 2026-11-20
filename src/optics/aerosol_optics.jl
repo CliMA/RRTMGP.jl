@@ -135,7 +135,7 @@ end
 """
     compute_lookup_aerosol(lkp_aero, ibnd::Int, aero_mass, aero_size, rh::FT, glay) where {FT}
 
-Compute cumulative aerosol optical properties for various aerosol particles given the aerosol lookup table (`lkp_aero`), 
+Compute cumulative aerosol optical properties for various aerosol particles given the aerosol lookup table (`lkp_aero`),
 band number (`ibnd`), aerosol mass (`aeromass`), aerosol size (`aerosize`), and relative humidity (`rh`).
 """
 function compute_lookup_aerosol(
@@ -237,7 +237,7 @@ end
 """
     compute_lookup_dust_props(lkp_aero, ibnd, aeromass::FT, aerosize::FT) where {FT}
 
-Compute aerosol optical properties for dust particles given the aerosol lookup table (`lkp_aero`), 
+Compute aerosol optical properties for dust particles given the aerosol lookup table (`lkp_aero`),
 band number (`ibnd`), aerosol mass (`aeromass`) and aerosol size (`aerosize`).
 """
 function compute_lookup_dust_props(
@@ -259,7 +259,7 @@ end
 """
     compute_lookup_sea_salt_props(lkp_aero, ibnd, aeromass::FT, aerosize::FT, rh::FT) where {FT}
 
-Compute aerosol optical properties for sea salt particles given the aerosol lookup table (`lkp_aero`), 
+Compute aerosol optical properties for sea salt particles given the aerosol lookup table (`lkp_aero`),
 band number (`ibnd`), aerosol mass (`aeromass`), aerosol size (`aerosize`), and relative humidity (`rh`).
 """
 function compute_lookup_sea_salt_props(
@@ -295,7 +295,7 @@ end
 """
     compute_lookup_sulfate_props(lkp_aero, ibnd, aeromass::FT, rh::FT) where {FT}
 
-Compute aerosol optical properties for sulfate particles given the aerosol lookup table (`lkp_aero`), 
+Compute aerosol optical properties for sulfate particles given the aerosol lookup table (`lkp_aero`),
 band number (`ibnd`), aerosol mass (`aeromass`), and relative humidity (`rh`).
 """
 function compute_lookup_sulfate_props(
@@ -329,7 +329,7 @@ end
 """
     compute_lookup_black_carbon_props(lkp_aero, ibnd, aeromass::FT) where {FT}
 
-Compute aerosol optical properties for hydrophobic black carbon particles given the aerosol lookup table (`lkp_aero`), 
+Compute aerosol optical properties for hydrophobic black carbon particles given the aerosol lookup table (`lkp_aero`),
 band number (`ibnd`), and aerosol mass (`aeromass`).
 """
 function compute_lookup_black_carbon_props(
@@ -349,7 +349,7 @@ end
 """
     compute_lookup_black_carbon_props(lkp_aero, ibnd, aeromass::FT, rh::FT) where {FT}
 
-Compute aerosol optical properties for hydrophilic black carbon particles given the aerosol lookup table (`lkp_aero`), 
+Compute aerosol optical properties for hydrophilic black carbon particles given the aerosol lookup table (`lkp_aero`),
 band number (`ibnd`), aerosol mass (`aeromass`), and relative humidity (`rh`).
 """
 function compute_lookup_black_carbon_props(
@@ -383,7 +383,7 @@ end
 """
     compute_lookup_organic_carbon_props(lkp_aero, ibnd, aeromass)
 
-Compute aerosol optical properties for hydrophobic organic carbon particles given the aerosol lookup table (`lkp_aero`), 
+Compute aerosol optical properties for hydrophobic organic carbon particles given the aerosol lookup table (`lkp_aero`),
 band number (`ibnd`), and aerosol mass (`aeromass`).
 """
 function compute_lookup_organic_carbon_props(lkp_aero, ibnd, aeromass)
@@ -399,7 +399,7 @@ end
 """
     compute_lookup_organic_carbon_props(lkp_aero, ibnd, aeromass::FT, rh::FT) where {FT}
 
-Compute aerosol optical properties for hydrophilic organic carbon particles given the aerosol lookup table (`lkp_aero`), 
+Compute aerosol optical properties for hydrophilic organic carbon particles given the aerosol lookup table (`lkp_aero`),
 band number (`ibnd`), aerosol mass (`aeromass`), and relative humidity (`rh`).
 """
 function compute_lookup_organic_carbon_props(

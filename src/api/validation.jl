@@ -36,7 +36,8 @@ _check_vmr(vmr::VolumeMixingRatios.VmrGM) = begin
     _check(_nonnegative_finite, vmr.vmr_o3, :vmr_o3)
     _check(_nonnegative_finite, vmr.vmr, :vmr)
 end
-_check_vmr(vmr::VolumeMixingRatios.Vmr) = _check(_nonnegative_finite, vmr.vmr, :vmr)
+_check_vmr(vmr::VolumeMixingRatios.Vmr) =
+    _check(_nonnegative_finite, vmr.vmr, :vmr)
 
 """
     validate_inputs(s::RRTMGPSolver)
@@ -61,14 +62,18 @@ function validate_inputs(s::RRTMGPSolver)
     _check(_positive_finite, getview_t_lay(as), :layer_temperature)
     _check(_positive_finite, as.t_sfc, :surface_temperature)
     _check(_in_cos_range, s.sws.bcs.cos_zenith, :cos_zenith)
-    _check(
-        _nonnegative_finite,
-        s.sws.bcs.toa_flux,
-        :toa_sw_flux_dn,
-    )
+    _check(_nonnegative_finite, s.sws.bcs.toa_flux, :toa_sw_flux_dn)
     _check(_in_unit_interval, s.lws.bcs.sfc_emis, :surface_emissivity)
-    _check(_in_unit_interval, s.sws.bcs.sfc_alb_direct, :direct_sw_surface_albedo)
-    _check(_in_unit_interval, s.sws.bcs.sfc_alb_diffuse, :diffuse_sw_surface_albedo)
+    _check(
+        _in_unit_interval,
+        s.sws.bcs.sfc_alb_direct,
+        :direct_sw_surface_albedo,
+    )
+    _check(
+        _in_unit_interval,
+        s.sws.bcs.sfc_alb_diffuse,
+        :diffuse_sw_surface_albedo,
+    )
     hasproperty(as, :vmr) && _check_vmr(as.vmr)
     return nothing
 end

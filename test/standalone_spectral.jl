@@ -34,18 +34,19 @@ using NCDatasets
     # TOA downwelling shortwave is the solar constant times cos(zenith)
     @test Array(out.sw_flux_dn)[end, 1] ≈ 1361 * 0.5 rtol = 1e-3
     # the direct beam never exceeds the total downwelling flux
-    @test all(Array(out.sw_direct_flux_dn) .<= Array(out.sw_flux_dn) .* (1 + eps(FT)))
+    @test all(
+        Array(out.sw_direct_flux_dn) .<= Array(out.sw_flux_dn) .* (1 + eps(FT)),
+    )
 
     # reusing the lookup tables skips the NetCDF re-read; a warmer atmosphere
     # emits more
     lookups = out.solver.lookups
-    olr_of(kind) =
-        Array(
-            RRTMGP.solve(RRTMGP.standard_atmosphere(FT; kind); lookups).lw_flux_up,
-        )[
-            end,
-            1,
-        ]
+    olr_of(kind) = Array(
+        RRTMGP.solve(RRTMGP.standard_atmosphere(FT; kind); lookups).lw_flux_up,
+    )[
+        end,
+        1,
+    ]
     @test olr_of(:tropical) > olr_of(:subarctic_winter)
 
     # Float32 runs end-to-end (its own lookups: the tables are FT-typed)

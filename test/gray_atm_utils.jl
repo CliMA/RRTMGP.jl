@@ -181,7 +181,7 @@ function gray_atmos_sw_test(
         lat = DA{FT}(range(FT(-90), FT(90), length = ncol)) # latitude
     end
 
-    cos_zenith .= cos(deg2rad * 52.95) # corresponding to ~52.95 deg zenith angle    
+    cos_zenith .= cos(deg2rad * 52.95) # corresponding to ~52.95 deg zenith angle
     toa_flux .= FT(1407.679)
     sfc_alb_direct .= FT(0.1)
     sfc_alb_diffuse .= FT(0.1)

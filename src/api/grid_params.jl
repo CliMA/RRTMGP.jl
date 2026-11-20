@@ -58,5 +58,3 @@ Base.eltype(s::RRTMGPGridParams{FT}) where {FT} = FT
 ClimaComms.device(s::RRTMGPGridParams) = ClimaComms.device(s.context)
 ClimaComms.array_type(s::RRTMGPGridParams) =
     ClimaComms.array_type(ClimaComms.device(s))
-
-

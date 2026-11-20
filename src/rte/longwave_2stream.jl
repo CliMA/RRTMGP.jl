@@ -169,7 +169,7 @@ approximation.
     # Equations are developed in Meador and Weaver, 1980,
     #    doi:10.1175/1520-0469(1980)037<0630:TSATRT>2.0.CO;2
     #
-    # -------------------------------------------------------------------------------------------------    
+    # -------------------------------------------------------------------------------------------------
     # setting references
     k_min = Numerics.k_min(FT)
     lw_diff_sec = FT(1.66) # Fu et al. 1997 diffusivity secant
@@ -288,7 +288,7 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
             lw_2stream_coeffs(τ_lay, ssa_lay, g_lay, lev_src_bot, lev_src_top)
         denom = FT(1) / (FT(1) - Rdif * albedo_ilev)  # Eq 10
         albedo_ilevplus1 = Rdif + Tdif * Tdif * albedo_ilev * denom # Equation 9
-        # 
+        #
         # Equation 11 -- source is emitted upward radiation at top of layer plus
         # radiation emitted at bottom of layer,
         # transmitted through the layer and reflected from layers below (Tdiff*src*albedo)

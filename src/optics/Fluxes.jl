@@ -32,7 +32,8 @@ lazy_transpose(x::AbstractArray{T, 3}) where {T} =
 # Unwrap a PermutedDimsArray whose permutation is the identity swap — avoids
 # double-wrapping when the CPU uses transposed physical layout.
 lazy_transpose(x::PermutedDimsArray{T, 2, (2, 1), (2, 1)}) where {T} = parent(x)
-lazy_transpose(x::PermutedDimsArray{T, 3, (2, 1, 3), (2, 1, 3)}) where {T} = parent(x)
+lazy_transpose(x::PermutedDimsArray{T, 3, (2, 1, 3), (2, 1, 3)}) where {T} =
+    parent(x)
 
 # _coalesced_2d(DA, FT, ncol, nlev_or_nlay): allocate a 2D compute buffer that
 # the kernels index as `(ncol, nlev)`. The physical layout is chosen per device
@@ -51,8 +52,7 @@ _coalesced_2d(::Type{Array}, ::Type{FT}, d1, d2) where {FT} =
 # _coalesced_3d(DA, FT, ncol, nlev_or_nlay, nfld): 3D variant of `_coalesced_2d`
 # for field-packed buffers: indexed `(ncol, nlev, nfld)` on both devices; stored
 # `(nlev, ncol, nfld)` on the CPU.
-_coalesced_3d(DA, ::Type{FT}, d1, d2, d3) where {FT} =
-    DA{FT}(undef, d1, d2, d3)
+_coalesced_3d(DA, ::Type{FT}, d1, d2, d3) where {FT} = DA{FT}(undef, d1, d2, d3)
 _coalesced_3d(::Type{Array}, ::Type{FT}, d1, d2, d3) where {FT} =
     PermutedDimsArray{FT, 3, (2, 1, 3), (2, 1, 3), Array{FT, 3}}(
         Array{FT, 3}(undef, d2, d1, d3),
@@ -286,9 +286,9 @@ end
     apply_metric_scaling!(flux::Union{FluxLW, FluxSW}, metric_scaling)
 
 Apply the metric scaling factor to radiative fluxes (longwave or shortwave; for a `FluxSW` the
-direct beam `flux_dn_dir` is scaled too). This accounts for geometric expansion of 
+direct beam `flux_dn_dir` is scaled too). This accounts for geometric expansion of
 grid columns with increasing altitude when deep-atmosphere metric terms are used. Requires
-`flux_up`, `flux_dn` and `flux_net` to be available in `flux`. The metric scaling factor is 
+`flux_up`, `flux_dn` and `flux_net` to be available in `flux`. The metric scaling factor is
 an optional argument that has a value `nothing` when shallow atmosphere approximations
 are used (in which case this function returns nothing).
 """
@@ -393,8 +393,10 @@ end
 # GPU / generic path: transpose from (ncol, nlev) to (nlev, ncol).
 _copy_transposed!(dest, src) = transpose_into!(dest, src)
 # CPU dual-layout path: the PermutedDimsArray's parent is already (nlev, ncol).
-_copy_transposed!(dest::Array{FT, 2}, src::PermutedDimsArray{FT, 2, (2, 1), (2, 1), Matrix{FT}}) where {FT} =
-    (copyto!(dest, parent(src)); nothing)
+_copy_transposed!(
+    dest::Array{FT, 2},
+    src::PermutedDimsArray{FT, 2, (2, 1), (2, 1), Matrix{FT}},
+) where {FT} = (copyto!(dest, parent(src)); nothing)
 
 """
     transpose_into!(dest, src)

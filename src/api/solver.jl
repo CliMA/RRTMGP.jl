@@ -286,7 +286,14 @@ function RRTMGPSolver(
         RTE._default_state_cache(grid_params)
     sws =
         op_sw isa OneScalar ?
-        RTE.NoScatSWRTE(context, op_sw, bcs_sw, fluxb_sw, flux_sw, state_cache) :
+        RTE.NoScatSWRTE(
+            context,
+            op_sw,
+            bcs_sw,
+            fluxb_sw,
+            flux_sw,
+            state_cache,
+        ) :
         RTE.TwoStreamSWRTE(
             context,
             op_sw,
@@ -345,4 +352,3 @@ function RRTMGPSolver(
         clear_flux_acc_sw,
     )
 end
-
