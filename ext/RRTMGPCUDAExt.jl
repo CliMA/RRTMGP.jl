@@ -44,9 +44,12 @@ import RRTMGP.RTESolver: lw_noscat_gpt_col!, lw_2stream_gpt_col!
 import RRTMGP.RTESolver: sw_noscat_gpt_col!, sw_2stream_gpt_col!
 import RRTMGP.RTESolver: _compute_aero_mask!, _build_cloud_mask!
 import RRTMGP.RTESolver: rte_lw_2stream_solve_both_skies!
+import RRTMGP.RTE: LWGptGroups, SWGptGroups, n_gpt_groups
 import RRTMGP.RTESolver: lw_2stream_gpt_col_both_skies!
 import RRTMGP.RTESolver: rte_sw_2stream_solve_both_skies!
 import RRTMGP.RTESolver: sw_2stream_gpt_col_both_skies!
+# the post-optics halves, for the split grouped solves
+import RRTMGP.RTESolver: lw_2stream_gpt_col_sweeps!, sw_2stream_gpt_col_sweeps!
 import CUDA: threadIdx, blockIdx, blockDim, @cuda
 
 _max_threads_cuda() = 256
@@ -67,5 +70,6 @@ include(joinpath("cuda", "rte_shortwave_noscat.jl"))
 include(joinpath("cuda", "gray_atmosphere.jl"))
 include(joinpath("cuda", "rte_shortwave_2stream.jl"))
 include(joinpath("cuda", "rte_longwave_noscat.jl"))
+include(joinpath("cuda", "rte_gpt_groups.jl"))
 
 end
