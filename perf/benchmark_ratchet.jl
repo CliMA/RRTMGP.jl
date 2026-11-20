@@ -138,6 +138,18 @@ function write_baseline(path, results; kind = "baseline")
     return path
 end
 
+# `read_baseline` drops the comment lines, so the recorded toolchain is read
+# separately: a Julia upgrade moves register counts, and a baseline from another
+# version is not a like comparison.
+function baseline_julia(path)
+    isfile(path) || return nothing
+    for line in eachline(path)
+        m = match(r"^#\s*julia:\s*(\S+)", line)
+        isnothing(m) || return m.captures[1]
+    end
+    return nothing
+end
+
 const tol = parse(Float64, get(ENV, "RRTMGP_BENCH_TOL_PCT", "20")) / 100
 const write_mode = get(ENV, "RRTMGP_BENCH_WRITE_BASELINE", "0") == "1"
 const path = baseline_path(device_key())
@@ -162,6 +174,11 @@ write_baseline(measured_path, results; kind = "measurement")
 
 println("\ndevice: $(CUDA.name(CUDA.device())) (key: $(device_key()))")
 println("tolerance: +$(round(Int, 100 * tol))% over baseline\n")
+const recorded_julia = baseline_julia(path)
+if !isnothing(recorded_julia) && recorded_julia != string(VERSION)
+    @warn "baseline recorded on a different Julia version; re-record with RRTMGP_BENCH_WRITE_BASELINE=1 if the toolchain is the difference" recorded_julia running =
+        string(VERSION)
+end
 @printf(
     "%-40s %14s %14s %9s\n",
     "case",
