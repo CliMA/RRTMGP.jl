@@ -7,7 +7,6 @@ using ..VolumeMixingRatios
 import ..pow_fast
 using ..LookUpTables
 using ..AtmosphericStates
-import ..AtmosphericStates: _mask_column
 import ..RRTMGPGridParams
 using ..Sources
 using ..AngularDiscretizations

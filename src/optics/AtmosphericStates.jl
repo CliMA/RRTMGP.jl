@@ -8,7 +8,6 @@ using ..VolumeMixingRatios
 
 export AbstractAtmosphericState,
     AtmosphericState,
-    WideMask,
     GrayAtmosphericState,
     CloudState,
     AerosolState,
@@ -28,35 +27,6 @@ spectral (correlated-``k``) methods and [`GrayAtmosphericState`](@ref) for
 gray radiation.
 """
 abstract type AbstractAtmosphericState end
-
-"""
-    WideMask(data)
-
-A cloud mask over the wide columns of a g-point-grouped solve, stored
-`(ncolw, nlay)` so that one layer's bytes are contiguous across a warp.
-
-The store it stands in for is `(nlay, ncol)`, and both are two-dimensional
-`Bool` arrays, so the layout cannot be recovered from the element type or the
-rank. [`_mask_column`](@ref) is the only reader, and wrapping the wide one is
-what lets it slice each correctly.
-"""
-struct WideMask{A <: AbstractArray}
-    data::A
-end
-Adapt.@adapt_structure WideMask
-
-"""
-    _mask_column(mask_store, wcol)
-
-The `wcol`th column of a mask store, as a vector over layers.
-
-A thread owns a column and a warp spans `wcol`, so the wide store is sliced
-along its slow axis on purpose: the column is strided and the warp's threads
-land on one layer, which is the access that coalesces.
-"""
-@inline _mask_column(mask_store, wcol) = view(mask_store, :, wcol)
-@inline _mask_column(mask_store::WideMask, wcol) =
-    view(mask_store.data, wcol, :)
 
 include("gray_atmospheric_states.jl")
 

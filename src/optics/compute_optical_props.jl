@@ -438,8 +438,7 @@ end
 
 # Solving over wide columns writes `op` at `wcol`, which only means anything
 # beside a mask store sized the same way (`LWGptGroups.mask`). Neither has a
-# default, and `WideMask` carries the wide store's layout, so a wide index
-# cannot arrive next to a narrow mask and be sliced as one.
+# default, so the wide index cannot arrive next to the narrow mask.
 @inline function add_cloud_optics_lw!(
     op::TwoStream,
     as::AtmosphericState,
@@ -456,7 +455,7 @@ end
             view(op.τ, wcol, :),
             view(op.ssa, wcol, :),
             view(op.g, wcol, :),
-            _mask_column(mask_store, wcol),
+            view(mask_store, :, wcol),
             view(cloud_state.cld_r_eff_liq, :, gcol),
             view(cloud_state.cld_r_eff_ice, :, gcol),
             view(cloud_state.cld_path_liq, :, gcol),
@@ -521,7 +520,7 @@ end
             view(op.τ, wcol, :),
             view(op.ssa, wcol, :),
             view(op.g, wcol, :),
-            _mask_column(mask_store, wcol),
+            view(mask_store, :, wcol),
             view(cloud_state.cld_r_eff_liq, :, gcol),
             view(cloud_state.cld_r_eff_ice, :, gcol),
             view(cloud_state.cld_path_liq, :, gcol),
