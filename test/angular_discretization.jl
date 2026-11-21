@@ -42,12 +42,7 @@ const ΤS = (0.05, 0.2, 0.5, 1.0, 2.0, 5.0)
 
 @testset "quadrature weights and secants" begin
     context = ClimaComms.context()
-    gp = RRTMGP.RRTMGPGridParams(
-        Float64;
-        context,
-        domain_nlay = 1,
-        ncol = 1,
-    )
+    gp = RRTMGP.RRTMGPGridParams(Float64; context, domain_nlay = 1, ncol = 1)
     for n in 1:4
         ad = AngularDiscretization(gp, n)
         w = Array(ad.gauss_wts)
@@ -71,12 +66,7 @@ end
 # angle. The single-angle case is the diffusivity approximation.
 @testset "more angles integrate the hemisphere better" begin
     context = ClimaComms.context()
-    gp = RRTMGP.RRTMGPGridParams(
-        Float64;
-        context,
-        domain_nlay = 1,
-        ncol = 1,
-    )
+    gp = RRTMGP.RRTMGPGridParams(Float64; context, domain_nlay = 1, ncol = 1)
     worst = map(1:4) do n
         ad = AngularDiscretization(gp, n)
         w, D = Array(ad.gauss_wts), Array(ad.gauss_Ds)

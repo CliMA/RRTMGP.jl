@@ -130,7 +130,7 @@ end
 """
     solve_lw!((; context, flux, src, bcs, op, angle_disc)::NoScatLWRTE, as::GrayAtmosphericState, metric_scaling::M = nothing)
 
-Non-scattering RTE solver for the longwave problem, using gray optics. 
+Non-scattering RTE solver for the longwave problem, using gray optics.
 The optional `metric_scaling` argument scales the fluxes to account for column expansion
 in `deep-atmosphere` configurations.
 """

@@ -515,7 +515,8 @@ state was built with; `nothing` for lookup-table (non-gray) radiation, which has
 parameter.
 """
 optical_thickness_parameter(s::RRTMGPSolver) =
-    hasproperty(_atmospheric_state(s), :otp) ? _atmospheric_state(s).otp : nothing
+    hasproperty(_atmospheric_state(s), :otp) ? _atmospheric_state(s).otp :
+    nothing
 
 """
     isothermal_boundary_layer(s::RRTMGPSolver)
@@ -523,7 +524,8 @@ optical_thickness_parameter(s::RRTMGPSolver) =
 Return whether the solver carries an internal isothermal boundary layer above the
 physical domain (which every getter masks off).
 """
-isothermal_boundary_layer(s::RRTMGPSolver) = s.grid_params.isothermal_boundary_layer
+isothermal_boundary_layer(s::RRTMGPSolver) =
+    s.grid_params.isothermal_boundary_layer
 
 """
     aerosol_radius(s::RRTMGPSolver, name::AbstractString)
@@ -535,12 +537,15 @@ $(_aerosol_names_docs())
 """
 function aerosol_radius(s::RRTMGPSolver, name::AbstractString)
     lookups = _require_aerosol_lookups(s) # informative error before field access
-    return _domain_view(s, view(
-        s.as.aerosol_state.aero_size,
-        lookups.idx_aerosol_sw[canonical_aerosol_name(name)],
-        :,
-        :
-    ))
+    return _domain_view(
+        s,
+        view(
+            s.as.aerosol_state.aero_size,
+            lookups.idx_aerosol_sw[canonical_aerosol_name(name)],
+            :,
+            :,
+        ),
+    )
 end
 
 """
@@ -553,12 +558,15 @@ $(_aerosol_names_docs())
 """
 function aerosol_column_mass_density(s::RRTMGPSolver, name::AbstractString)
     lookups = _require_aerosol_lookups(s) # informative error before field access
-    return _domain_view(s, view(
-        s.as.aerosol_state.aero_mass,
-        lookups.idx_aerosol_sw[canonical_aerosol_name(name)],
-        :,
-        :
-    ))
+    return _domain_view(
+        s,
+        view(
+            s.as.aerosol_state.aero_mass,
+            lookups.idx_aerosol_sw[canonical_aerosol_name(name)],
+            :,
+            :,
+        ),
+    )
 end
 
 """
@@ -600,7 +608,7 @@ gas_names_sw() = [
     "hfc32",
     "n2o",
     "cf4",
-    "hfc125"
+    "hfc125",
 ]
 _gas_names_sw_docs() = map(x->"`$x`", gas_names_sw())
 
@@ -636,8 +644,11 @@ function _volume_mixing_ratio(
     # view would scalar-index the GPU when read.)
     return only(Array(view(vmr.vmr, idx:idx)))
 end
-_volume_mixing_ratio(s::RRTMGPSolver, vmr::VolumeMixingRatios.Vmr, name::AbstractString) =
-    _domain_view(s, view(vmr.vmr, _lookup_tables(s).idx_gases_sw[name], :, :))
+_volume_mixing_ratio(
+    s::RRTMGPSolver,
+    vmr::VolumeMixingRatios.Vmr,
+    name::AbstractString,
+) = _domain_view(s, view(vmr.vmr, _lookup_tables(s).idx_gases_sw[name], :, :))
 
 """
     set_volume_mixing_ratio!(s::RRTMGPSolver, name::AbstractString, value)
@@ -682,4 +693,7 @@ _set_volume_mixing_ratio!(
     vmr::VolumeMixingRatios.Vmr,
     name::AbstractString,
     value,
-) = (_domain_view(s, view(vmr.vmr, _lookup_tables(s).idx_gases_sw[name], :, :)) .= value; value)
+) = (
+    _domain_view(s, view(vmr.vmr, _lookup_tables(s).idx_gases_sw[name], :, :)) .= value;
+    value
+)

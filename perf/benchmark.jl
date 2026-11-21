@@ -96,15 +96,16 @@ toler_lw_noscat = Dict(Float64 => Float64(1e-5), Float32 => Float32(0.05))
 toler_lw_2stream = Dict(Float64 => Float64(5), Float32 => Float32(5))
 toler_sw = Dict(Float64 => Float64(1e-5), Float32 => Float32(0.06))
 
-(; slv_lw, slv_sw, as, lookup_sw, lookup_sw_cld, lookup_lw, lookup_lw_cld) = cloudy_sky(
-    ClimaComms.context(),
-    TwoStreamLWRTE,
-    TwoStreamSWRTE,
-    FT,
-    toler_lw_2stream,
-    toler_sw;
-    cldfrac = FT(1),
-)
+(; slv_lw, slv_sw, as, lookup_sw, lookup_sw_cld, lookup_lw, lookup_lw_cld) =
+    cloudy_sky(
+        ClimaComms.context(),
+        TwoStreamLWRTE,
+        TwoStreamSWRTE,
+        FT,
+        toler_lw_2stream,
+        toler_sw;
+        cldfrac = FT(1),
+    )
 
 solve_sw!(slv_sw, as, lookup_sw, lookup_sw_cld) # compile first
 solve_lw!(slv_lw, as, lookup_lw, lookup_lw_cld) # compile first

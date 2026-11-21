@@ -73,4 +73,3 @@ function TwoStream(grid_params::RRTMGPGridParams)
         view(layerdata, :, :, 3),
     )
 end
-

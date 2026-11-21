@@ -79,7 +79,12 @@ end
 
 #------------------------------------------------------------------
 # Clear-sky (RFMIP state): gas optics + LW (noscat and 2-stream) + SW 2-stream.
-function clear_sky_fluxes(context, ::Type{FT}, ::Type{SLVLW}; ncol) where {FT, SLVLW}
+function clear_sky_fluxes(
+    context,
+    ::Type{FT},
+    ::Type{SLVLW};
+    ncol,
+) where {FT, SLVLW}
     overrides =
         (; grav = 9.80665, molmass_dryair = 0.028964, molmass_water = 0.018016)
     param_set = RRTMGPParameters(FT, overrides)
@@ -111,7 +116,8 @@ function clear_sky_fluxes(context, ::Type{FT}, ::Type{SLVLW}; ncol) where {FT, S
     nlay, _ = AtmosphericStates.get_dims(as)
     grid_params = RRTMGPGridParams(FT; context, domain_nlay = nlay, ncol)
 
-    slv_lw = SLVLW(grid_params; params = param_set, sfc_emis, inc_flux = nothing)
+    slv_lw =
+        SLVLW(grid_params; params = param_set, sfc_emis, inc_flux = nothing)
     sfc_alb_diffuse = DA{FT, 2}(deepcopy(sfc_alb_direct))
     slv_sw = TwoStreamSWRTE(
         grid_params;
@@ -134,7 +140,12 @@ end
 
 #------------------------------------------------------------------
 # Cloudy sky (cldfrac = 1 → deterministic McICA mask): cloud optics + δ-scaling.
-function cloudy_sky_fluxes(context, ::Type{FT}, ::Type{SLVLW}; ncol) where {FT, SLVLW}
+function cloudy_sky_fluxes(
+    context,
+    ::Type{FT},
+    ::Type{SLVLW};
+    ncol,
+) where {FT, SLVLW}
     overrides =
         (; grav = 9.80665, molmass_dryair = 0.028964, molmass_water = 0.018016)
     param_set = RRTMGPParameters(FT, overrides)
@@ -174,7 +185,8 @@ function cloudy_sky_fluxes(context, ::Type{FT}, ::Type{SLVLW}; ncol) where {FT, 
     nlay, ncol = AtmosphericStates.get_dims(as)
     grid_params = RRTMGPGridParams(FT; context, domain_nlay = nlay, ncol)
 
-    slv_lw = SLVLW(grid_params; params = param_set, sfc_emis, inc_flux = nothing)
+    slv_lw =
+        SLVLW(grid_params; params = param_set, sfc_emis, inc_flux = nothing)
     slv_sw = TwoStreamSWRTE(
         grid_params;
         cos_zenith,

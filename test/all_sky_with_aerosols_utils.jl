@@ -35,7 +35,7 @@ function all_sky_with_aerosols(
     ::Type{FT},
     toler_lw,
     toler_sw;
-    ncol = 128,# repeats col#1 ncol times per RRTMGP example 
+    ncol = 128,# repeats col#1 ncol times per RRTMGP example
     cldfrac = FT(1),
 ) where {FT <: AbstractFloat, SLVLW, SLVSW}
     overrides =
@@ -188,24 +188,42 @@ function all_sky_with_aerosols(
         fused_all_sw = copy(Array(parent(solver.sws.flux.flux_net)))
 
         RTESolver.solve_lw!(
-            solver.lws, as, lkps.lookup_lw, nothing, lkps.lookup_lw_aero, ms,
+            solver.lws,
+            as,
+            lkps.lookup_lw,
+            nothing,
+            lkps.lookup_lw_aero,
+            ms,
         )
         @test Array(parent(solver.lws.flux.flux_net)) == fused_clear_lw
         RTESolver.solve_lw!(
-            solver.lws, as, lkps.lookup_lw, lkps.lookup_lw_cld,
-            lkps.lookup_lw_aero, ms,
+            solver.lws,
+            as,
+            lkps.lookup_lw,
+            lkps.lookup_lw_cld,
+            lkps.lookup_lw_aero,
+            ms,
         )
         two_all_lw = Array(parent(solver.lws.flux.flux_net))
         @test maximum(abs, two_all_lw .- fused_all_lw) <=
               1e-6 * maximum(abs, two_all_lw)
 
         RTESolver.solve_sw!(
-            solver.sws, as, lkps.lookup_sw, nothing, lkps.lookup_sw_aero, ms,
+            solver.sws,
+            as,
+            lkps.lookup_sw,
+            nothing,
+            lkps.lookup_sw_aero,
+            ms,
         )
         @test Array(parent(solver.sws.flux.flux_net)) == fused_clear_sw
         RTESolver.solve_sw!(
-            solver.sws, as, lkps.lookup_sw, lkps.lookup_sw_cld,
-            lkps.lookup_sw_aero, ms,
+            solver.sws,
+            as,
+            lkps.lookup_sw,
+            lkps.lookup_sw_cld,
+            lkps.lookup_sw_aero,
+            ms,
         )
         two_all_sw = Array(parent(solver.sws.flux.flux_net))
         @test maximum(abs, two_all_sw .- fused_all_sw) <=
@@ -222,8 +240,12 @@ function all_sky_with_aerosols(
         RRTMGP.update_lw_fluxes!(solver, fused_key)
         part_fused_lw = copy(Array(parent(solver.lws.flux.flux_net)))
         RTESolver.solve_lw!(
-            solver.lws, as, lkps.lookup_lw, lkps.lookup_lw_cld,
-            lkps.lookup_lw_aero, ms,
+            solver.lws,
+            as,
+            lkps.lookup_lw,
+            lkps.lookup_lw_cld,
+            lkps.lookup_lw_aero,
+            ms,
         )
         part_two_lw = Array(parent(solver.lws.flux.flux_net))
         @test maximum(abs, part_two_lw .- part_fused_lw) <=
@@ -232,8 +254,12 @@ function all_sky_with_aerosols(
         RRTMGP.update_sw_fluxes!(solver, fused_key)
         part_fused_sw = copy(Array(parent(solver.sws.flux.flux_net)))
         RTESolver.solve_sw!(
-            solver.sws, as, lkps.lookup_sw, lkps.lookup_sw_cld,
-            lkps.lookup_sw_aero, ms,
+            solver.sws,
+            as,
+            lkps.lookup_sw,
+            lkps.lookup_sw_cld,
+            lkps.lookup_sw_aero,
+            ms,
         )
         part_two_sw = Array(parent(solver.sws.flux.flux_net))
         @test maximum(abs, part_two_sw .- part_fused_sw) <=
@@ -510,13 +536,21 @@ function all_sky_with_aerosols(
         # The clear-sky half of a fused or fallback solve must equal a standalone
         # clear-sky solve bit for bit -- it involves no cloud sampling at all.
         RTESolver.solve_lw!(
-            slv.lws, as, prebuilt_lookups.lookup_lw, nothing,
-            prebuilt_lookups.lookup_lw_aero, nothing,
+            slv.lws,
+            as,
+            prebuilt_lookups.lookup_lw,
+            nothing,
+            prebuilt_lookups.lookup_lw_aero,
+            nothing,
         )
         @test Array(parent(slv.lws.flux.flux_net)) == clear_lw_a
         RTESolver.solve_sw!(
-            slv.sws, as, prebuilt_lookups.lookup_sw, nothing,
-            prebuilt_lookups.lookup_sw_aero, nothing,
+            slv.sws,
+            as,
+            prebuilt_lookups.lookup_sw,
+            nothing,
+            prebuilt_lookups.lookup_sw_aero,
+            nothing,
         )
         @test Array(parent(slv.sws.flux.flux_net)) == clear_sw_a
     end
@@ -548,7 +582,7 @@ function all_sky_with_aerosols(
     @test maximum(
         abs.(
             Array(RRTMGP.clear_net_flux(solver)) .-
-            Array(RRTMGP.net_flux(solver))
+            Array(RRTMGP.net_flux(solver)),
         ),
     ) > 0
 

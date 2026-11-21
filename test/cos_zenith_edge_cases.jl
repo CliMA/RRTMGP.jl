@@ -137,7 +137,7 @@ function test_cos_zenith_edge_cases(
     # Test edge case cos_zenith values
     # Column 1: cos_zenith = 0.5 (normal positive, reference case)
     # Column 2: cos_zenith = 0 (sun exactly at horizon)
-    # Column 3: cos_zenith = very small positive (sun just above horizon)  
+    # Column 3: cos_zenith = very small positive (sun just above horizon)
     # Column 4: cos_zenith = negative (nighttime)
     cos_zenith_test = DA([FT(0.5), FT(0), FT(1e-10), FT(-0.5)])
 
