@@ -4,6 +4,8 @@
 
 # What the two bands' workspaces have in common: the widened grid parameters,
 # the two partial accumulators, and the mask and cloud tally over wide columns.
+# The mask is column-fast like the accumulators beside it, which is what
+# `WideMask` marks.
 # `planes` is how many flux planes a band accumulates, which is the only shape
 # that differs between them.
 function _gpt_group_workspaces(
@@ -28,7 +30,7 @@ function _gpt_group_workspaces(
         wide_grid_params,
         acc_data = DA{FT}(undef, ncolw, nlay + 1, planes),
         acc_clear_data = DA{FT}(undef, ncolw, nlay + 1, planes),
-        mask = DA{Bool}(undef, nlay, ncolw),
+        mask = WideMask(DA{Bool}(undef, ncolw, nlay)),
         cloudy = DA{Int32}(undef, ncolw),
     )
 end

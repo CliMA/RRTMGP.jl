@@ -7,6 +7,7 @@ import ..Numerics
 using ..AngularDiscretizations
 using ..VolumeMixingRatios
 using ..AtmosphericStates
+import ..AtmosphericStates: _mask_column
 using ..Fluxes
 using ..BCs
 using ..Sources

@@ -23,7 +23,7 @@
     mask_store = getproperty(cloud_state, S),
     wcol = gcol,
 ) where {S}
-    mask = view(mask_store, :, wcol)
+    mask = _mask_column(mask_store, wcol)
     # The band is part of the key: the two bands sample independently, and
     # without this they would draw the same mask for a given column and g-point.
     band_key =
