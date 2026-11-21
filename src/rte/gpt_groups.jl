@@ -75,11 +75,7 @@ struct LWGptGroups{OP, SL, FB, MK, FX, CT}
 end
 Adapt.@adapt_structure LWGptGroups
 
-function LWGptGroups(
-    grid_params::RRTMGPGridParams,
-    ngroups::Int;
-    params,
-)
+function LWGptGroups(grid_params::RRTMGPGridParams, ngroups::Int; params)
     # Up and down only: the reduction recomputes net from them, so a third
     # plane would be allocated per wide column and never written. The field
     # names match `FluxLW` because that is what these accumulate, but the type
@@ -133,10 +129,7 @@ struct SWGptGroups{OP, SS, FB, MK, FX, CT}
 end
 Adapt.@adapt_structure SWGptGroups
 
-function SWGptGroups(
-    grid_params::RRTMGPGridParams,
-    ngroups::Int;
-)
+function SWGptGroups(grid_params::RRTMGPGridParams, ngroups::Int)
     # Up, down and direct: the reduction recomputes net from up and down, so a
     # net plane would never be written (see `LWGptGroups`).
     (; wide_grid_params, acc_data, acc_clear_data, mask, cloudy) =

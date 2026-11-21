@@ -346,11 +346,11 @@ function all_sky_with_aerosols(
         # every g-point is cloudy in both. The partial fraction is the pass
         # that can fail on either.
         for cf in (nothing, FT(0.5))
-            as.cloud_state.cld_frac .=
-                isnothing(cf) ? base_cld_frac : cf
+            as.cloud_state.cld_frac .= isnothing(cf) ? base_cld_frac : cf
             RRTMGP.update_lw_fluxes!(solver, fused_key)
             serial_all = copy(Array(parent(solver.lws.flux.flux_net)))
-            serial_clear = copy(Array(parent(solver.clear_flux_acc_lw.flux_net)))
+            serial_clear =
+                copy(Array(parent(solver.clear_flux_acc_lw.flux_net)))
             serial_cover =
                 track_cover ? copy(Array(as.cloud_state.cld_cover_lw)) : nothing
             (lws_one, clear_one) = one_group_lw()
@@ -373,13 +373,12 @@ function all_sky_with_aerosols(
                 @test n_gpt_groups(grouped.lws.gpt_groups) == ng
                 RRTMGP.update_lw_fluxes!(grouped, fused_key)
                 grouped_all = Array(parent(grouped.lws.flux.flux_net))
-                grouped_clear = Array(parent(grouped.clear_flux_acc_lw.flux_net))
+                grouped_clear =
+                    Array(parent(grouped.clear_flux_acc_lw.flux_net))
                 grouped_cover =
                     track_cover ? Array(as.cloud_state.cld_cover_lw) : nothing
-                for (g, ser) in (
-                    (grouped_all, serial_all),
-                    (grouped_clear, serial_clear),
-                )
+                for (g, ser) in
+                    ((grouped_all, serial_all), (grouped_clear, serial_clear))
                     @test maximum(abs, g .- ser) <= 1e-5 * maximum(abs, ser)
                 end
                 # The cover is a count of cloudy g-points summed over the groups, so
@@ -417,12 +416,12 @@ function all_sky_with_aerosols(
         # every g-point is cloudy in both. The partial fraction is the pass
         # that can fail on either.
         for cf in (nothing, FT(0.5))
-            as.cloud_state.cld_frac .=
-                isnothing(cf) ? base_cld_frac : cf
+            as.cloud_state.cld_frac .= isnothing(cf) ? base_cld_frac : cf
             RRTMGP.update_sw_fluxes!(solver, fused_key)
             serial_all = copy(Array(parent(solver.sws.flux.flux_net)))
             serial_dir = copy(Array(parent(solver.sws.flux.flux_dn_dir)))
-            serial_clear = copy(Array(parent(solver.clear_flux_acc_sw.flux_net)))
+            serial_clear =
+                copy(Array(parent(solver.clear_flux_acc_sw.flux_net)))
             serial_cover =
                 track_cover ? copy(Array(as.cloud_state.cld_cover_sw)) : nothing
             serial_aod_ext = copy(Array(as.aerosol_state.aod_sw_ext))
@@ -456,7 +455,8 @@ function all_sky_with_aerosols(
                 RRTMGP.update_sw_fluxes!(grouped, fused_key)
                 grouped_all = Array(parent(grouped.sws.flux.flux_net))
                 grouped_dir = Array(parent(grouped.sws.flux.flux_dn_dir))
-                grouped_clear = Array(parent(grouped.clear_flux_acc_sw.flux_net))
+                grouped_clear =
+                    Array(parent(grouped.clear_flux_acc_sw.flux_net))
                 grouped_cover =
                     track_cover ? Array(as.cloud_state.cld_cover_sw) : nothing
                 for (g, ser) in (

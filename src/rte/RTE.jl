@@ -245,8 +245,8 @@ function TwoStreamLWRTE(
     flux = FluxLW(grid_params)
     # Only the fused both-skies solve reads these; the others ignore them.
     gpt_groups =
-        ngpt_groups > 1 ?
-        LWGptGroups(grid_params, ngpt_groups; params) : nothing
+        ngpt_groups > 1 ? LWGptGroups(grid_params, ngpt_groups; params) :
+        nothing
     return TwoStreamLWRTE(
         context,
         op,
@@ -391,8 +391,7 @@ function TwoStreamSWRTE(
     flux = FluxSW(grid_params)
     # Only the fused both-skies solve reads these; the others ignore them.
     gpt_groups =
-        ngpt_groups > 1 ?
-        SWGptGroups(grid_params, ngpt_groups) : nothing
+        ngpt_groups > 1 ? SWGptGroups(grid_params, ngpt_groups) : nothing
     return TwoStreamSWRTE(
         context,
         op,

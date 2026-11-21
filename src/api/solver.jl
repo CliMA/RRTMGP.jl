@@ -288,8 +288,7 @@ function RRTMGPSolver(
     # Checked here rather than in `LWGptGroups`/`SWGptGroups`, which hold the
     # same test: the gates below only reach them above one group, so zero or a
     # negative count would skip the check and quietly build a serial solver.
-    ngpt_groups ≥ 1 ||
-        error("ngpt_groups must be at least 1, got $ngpt_groups")
+    ngpt_groups ≥ 1 || error("ngpt_groups must be at least 1, got $ngpt_groups")
     # Workspaces for the g-point-grouped fused shortwave solve, allocated on the
     # same terms as the longwave ones below.
     gpt_groups_sw =
@@ -331,8 +330,7 @@ function RRTMGPSolver(
             !(op_lw isa OneScalar) &&
             isnothing(band_flux_lw) &&
             ngpt_groups > 1
-        ) ? RTE.LWGptGroups(grid_params, ngpt_groups; params) :
-        nothing
+        ) ? RTE.LWGptGroups(grid_params, ngpt_groups; params) : nothing
     lws =
         op_lw isa OneScalar ?
         RTE.NoScatLWRTE(

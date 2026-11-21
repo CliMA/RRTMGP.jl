@@ -350,8 +350,7 @@ function _sw_group_optics_CUDA!(
                 # one of its own band: exactly one thread writes the 550 nm
                 # optical depth, and it is the g-point the ungrouped loop
                 # leaves standing.
-                igpt == n_gpt ||
-                major_gpt2bnd[igpt + 1] != major_gpt2bnd[igpt],
+                igpt == n_gpt || major_gpt2bnd[igpt + 1] != major_gpt2bnd[igpt],
             )
         end
     end

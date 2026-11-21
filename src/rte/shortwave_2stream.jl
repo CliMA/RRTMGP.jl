@@ -345,8 +345,7 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
     #   compute albedo and source of upward radiation
     albedo_ilev, src_ilev = surface_albedo, sfc_source
     @inbounds for ilev in 1:nlay
-        τ_ilev, ssa_ilev, g_ilev =
-            τ[wcol, ilev], ssa[wcol, ilev], g[wcol, ilev]
+        τ_ilev, ssa_ilev, g_ilev = τ[wcol, ilev], ssa[wcol, ilev], g[wcol, ilev]
         (Rdir, Tdir, _, Rdif, Tdif) =
             sw_2stream_coeffs(τ_ilev, ssa_ilev, g_ilev, μ₀)
         denom = FT(1) / (FT(1) - Rdif * albedo_ilev)  # Eq 10
@@ -359,8 +358,7 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
         src_up_ilev = Rdir * flux_dn_dir_ilevplus1
         src_dn_ilev = Tdir * flux_dn_dir_ilevplus1
         src_ilevplus1 =
-            src_up_ilev +
-            Tdif * denom * (src_ilev + albedo_ilev * src_dn_ilev)
+            src_up_ilev + Tdif * denom * (src_ilev + albedo_ilev * src_dn_ilev)
         albedo[wcol, ilev + 1], src[wcol, ilev + 1] =
             albedo_ilevplus1, src_ilevplus1
         albedo_ilev = albedo_ilevplus1
@@ -377,8 +375,7 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
 
     ilev = nlay
     @inbounds while ilev ≥ 1
-        τ_ilev, ssa_ilev, g_ilev =
-            τ[wcol, ilev], ssa[wcol, ilev], g[wcol, ilev]
+        τ_ilev, ssa_ilev, g_ilev = τ[wcol, ilev], ssa[wcol, ilev], g[wcol, ilev]
         albedo_ilev, src_ilev = albedo[wcol, ilev], src[wcol, ilev]
         (_, Tdir, _, Rdif, Tdif) =
             sw_2stream_coeffs(τ_ilev, ssa_ilev, g_ilev, μ₀)
@@ -507,17 +504,19 @@ end
     if μ₀ > 0
         @inbounds solar_frac = lookup_sw.solar_src_scaled[igpt]
         rte_sw_2stream!(
-            op, src_sw, bcs_sw, flux, solar_frac, igpt, n_gpt, ibnd, nlev,
-            gcol, wcol,
-        )
-        _accumulate_fluxes!(
-            flux_sw_clear,
+            op,
+            src_sw,
+            bcs_sw,
             flux,
-            wcol,
-            nlev,
+            solar_frac,
             igpt,
-            first_igpt,
+            n_gpt,
+            ibnd,
+            nlev,
+            gcol,
+            wcol,
         )
+        _accumulate_fluxes!(flux_sw_clear, flux, wcol, nlev, igpt, first_igpt)
     end
     # Add the cloud increment to the same optics and sweep again
     if !isnothing(lookup_sw_cld)
@@ -535,8 +534,17 @@ end
     if μ₀ > 0
         @inbounds solar_frac = lookup_sw.solar_src_scaled[igpt]
         rte_sw_2stream!(
-            op, src_sw, bcs_sw, flux, solar_frac, igpt, n_gpt, ibnd, nlev,
-            gcol, wcol,
+            op,
+            src_sw,
+            bcs_sw,
+            flux,
+            solar_frac,
+            igpt,
+            n_gpt,
+            ibnd,
+            nlev,
+            gcol,
+            wcol,
         )
         _accumulate_fluxes!(flux_sw, flux, wcol, nlev, igpt, first_igpt)
         accumulate_band_flux!(

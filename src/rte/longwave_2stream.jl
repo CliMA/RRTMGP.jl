@@ -284,15 +284,9 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
     @inbounds lev_src_bot = lev_source[wcol, 1]
     @inbounds for ilev in 1:nlay
         lev_src_top = lev_source[wcol, ilev + 1]
-        τ_lay, ssa_lay, g_lay =
-            τ[wcol, ilev], ssa[wcol, ilev], g[wcol, ilev]
-        Rdif, Tdif, src_up, src_dn = lw_2stream_coeffs(
-            τ_lay,
-            ssa_lay,
-            g_lay,
-            lev_src_bot,
-            lev_src_top,
-        )
+        τ_lay, ssa_lay, g_lay = τ[wcol, ilev], ssa[wcol, ilev], g[wcol, ilev]
+        Rdif, Tdif, src_up, src_dn =
+            lw_2stream_coeffs(τ_lay, ssa_lay, g_lay, lev_src_bot, lev_src_top)
         denom = FT(1) / (FT(1) - Rdif * albedo_ilev)  # Eq 10
         albedo_ilevplus1 = Rdif + Tdif * Tdif * albedo_ilev * denom # Equation 9
         #
@@ -318,15 +312,9 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
     @inbounds while ilev ≥ 1
         lev_src_bot, albedo_ilev, src_ilev =
             lev_source[wcol, ilev], albedo[wcol, ilev], src[wcol, ilev]
-        τ_lay, ssa_lay, g_lay =
-            τ[wcol, ilev], ssa[wcol, ilev], g[wcol, ilev]
-        Rdif, Tdif, _, src_dn = lw_2stream_coeffs(
-            τ_lay,
-            ssa_lay,
-            g_lay,
-            lev_src_bot,
-            lev_src_top,
-        )
+        τ_lay, ssa_lay, g_lay = τ[wcol, ilev], ssa[wcol, ilev], g[wcol, ilev]
+        Rdif, Tdif, _, src_dn =
+            lw_2stream_coeffs(τ_lay, ssa_lay, g_lay, lev_src_bot, lev_src_top)
 
         denom = FT(1) / (FT(1) - Rdif * albedo_ilev)  # Eq 10
         flux_dn_ilev =
@@ -452,7 +440,18 @@ end
     first_igpt,
     wcol,
 )
-    rte_lw_2stream!(op, flux, src_lw, bcs_lw, gcol, igpt, ibnd, nlev, ncol, wcol)
+    rte_lw_2stream!(
+        op,
+        flux,
+        src_lw,
+        bcs_lw,
+        gcol,
+        igpt,
+        ibnd,
+        nlev,
+        ncol,
+        wcol,
+    )
     _accumulate_fluxes!(flux_lw_clear, flux, wcol, nlev, igpt, first_igpt)
     # Add the cloud increment on top of the same optics and sweep again
     if !isnothing(lookup_lw_cld)
@@ -467,11 +466,29 @@ end
             mask_store,
         )
     end
-    rte_lw_2stream!(op, flux, src_lw, bcs_lw, gcol, igpt, ibnd, nlev, ncol, wcol)
+    rte_lw_2stream!(
+        op,
+        flux,
+        src_lw,
+        bcs_lw,
+        gcol,
+        igpt,
+        ibnd,
+        nlev,
+        ncol,
+        wcol,
+    )
     _accumulate_fluxes!(flux_lw, flux, wcol, nlev, igpt, first_igpt)
     # `band_flux` has no group axis, so a grouped caller must pass none; its
     # driver solves the ungrouped path whenever one is being kept.
-    accumulate_band_flux!(band_flux, flux.flux_up, flux.flux_dn, gcol, ibnd, nlev)
+    accumulate_band_flux!(
+        band_flux,
+        flux.flux_up,
+        flux.flux_dn,
+        gcol,
+        ibnd,
+        nlev,
+    )
     return nothing
 end
 
