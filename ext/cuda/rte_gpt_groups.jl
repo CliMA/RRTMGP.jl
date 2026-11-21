@@ -2,10 +2,34 @@
 ##### One grid over `ncol * ngroups` threads, for either band.
 #####
 
-# Both halves of a round launch narrower than the solve's usual 256 threads, so
-# that their register counts (156 in the optics, 140 in the longwave sweeps)
-# reach 12 warps per multiprocessor rather than the 8 they get at 256.
+# Both halves of a round launch narrower than the solve's usual 256 threads,
+# so that a capped register count reaches more warps per multiprocessor than
+# the same count would at 256.
 const GROUP_BLOCK_THREADS = 128
+
+# The register budget each half of a round is compiled to. Shedding
+# registers off these kernels buys warps, and the warps pay for
+# themselves: each count below is the one its own kernel measured
+# fastest at, over an interleaved sweep four occupancy steps deep.
+# The budgets are per kernel because the two halves compose -- a
+# matched pair landed within a few hundredths of a point of the sum
+# of its two single-kernel effects at every cap measured -- so a band
+# whose halves bottom out at different counts takes both.
+# results/radiation-register-cap.toml has the sweep, and these are
+# the counts it chose:
+# lw optics: 156 registers naturally, -11.41% at 96.
+# lw sweeps: 140 registers naturally, -8.02% at 72.
+# sw optics: 124 registers naturally, -4.65% at 96.
+# sw sweeps: 117 registers naturally, -5.51% at 64.
+const LW_OPTICS_MAXREGS = 96
+const LW_SWEEPS_MAXREGS = 72
+const SW_OPTICS_MAXREGS = 96
+const SW_SWEEPS_MAXREGS = 64
+
+@inline _optics_maxregs(::LWGptGroups) = LW_OPTICS_MAXREGS
+@inline _optics_maxregs(::SWGptGroups) = SW_OPTICS_MAXREGS
+@inline _sweeps_maxregs(::LWGptGroups) = LW_SWEEPS_MAXREGS
+@inline _sweeps_maxregs(::SWGptGroups) = SW_SWEEPS_MAXREGS
 
 # What the two bands do not share: the kernels a round launches, the source the
 # longwave optics writes and the shortwave has none of, and the cloud-cover
@@ -149,6 +173,16 @@ function _solve_both_skies_grouped!(
     return nothing
 end
 
+# One launch of a round's half, at the band's block shape and register
+# budget. `maxregs` is a compiler keyword, so a round's two halves compile
+# once each at their own budget and the loop below launches what it is given.
+@inline function _launch_round_half!(f, args, tx, bx, budget)
+    @cuda always_inline = true maxregs = budget threads = (tx) blocks = (bx) f(
+        args...,
+    )
+    return nothing
+end
+
 # One round of the grouped g-point loop is two launches: every thread's gas and
 # aerosol optics, then every thread's sweeps over the optics now in `op`. The
 # round index replaces a thread's own `for igpt in grp:ngroups:n_gpt`, so round
@@ -171,6 +205,8 @@ function _grouped_rounds!(
     tx, bx = _configure_threadblock(GROUP_BLOCK_THREADS, nwide)
     optics! = _optics_kernel(groups)
     sweeps! = _sweeps_kernel(groups)
+    optics_maxregs = _optics_maxregs(groups)
+    sweeps_maxregs = _sweeps_maxregs(groups)
     for round in 1:cld(n_gpt, ngroups)
         optics_args = (
             _optics_workspaces(groups)...,
@@ -183,9 +219,7 @@ function _grouped_rounds!(
             n_gpt,
             round,
         )
-        @cuda always_inline = true threads = (tx) blocks = (bx) optics!(
-            optics_args...,
-        )
+        _launch_round_half!(optics!, optics_args, tx, bx, optics_maxregs)
         sweeps_args = (
             groups.fluxb,
             groups.acc,
@@ -205,9 +239,7 @@ function _grouped_rounds!(
             n_gpt,
             round,
         )
-        @cuda always_inline = true threads = (tx) blocks = (bx) sweeps!(
-            sweeps_args...,
-        )
+        _launch_round_half!(sweeps!, sweeps_args, tx, bx, sweeps_maxregs)
     end
     return nothing
 end
