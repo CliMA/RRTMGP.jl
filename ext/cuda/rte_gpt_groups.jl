@@ -46,62 +46,12 @@ const SW_SWEEPS_MAXREGS = 64
 # alone. The longwave has no such thread: every column emits.
 @inline _optics_zenith(::LWGptGroups, bcs) = ()
 @inline _optics_zenith(::SWGptGroups, bcs) = (bcs.cos_zenith,)
-@inline _collects_aod(::LWGptGroups) = false
-@inline _collects_aod(::SWGptGroups) = true
 
 # Aerosol mask for every column, hoisted out of the grouped solves of both
 # bands, which need it per column rather than per wide column.
 function _aero_mask_CUDA!(aerosol_state::AerosolState, ncol)
     gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x
     gcol ≤ ncol && _compute_aero_mask!(aerosol_state, gcol)
-    return nothing
-end
-
-# The 550 nm aerosol optical depth, for every column of the shortwave. It is a
-# diagnostic of the aerosol state alone: it needs neither the gas optics nor
-# the sun to be up, and only the one band. Collecting it here rather than in
-# the optics kernel is what leaves that kernel free to skip a night column.
-function _aod_550nm_CUDA!(
-    aerosol_state::AerosolState,
-    state_cache::Union{TransposedStateCache, Nothing},
-    as::AtmosphericState,
-    lookup_aero::LookUpAerosolMerra,
-    nlay,
-    ncol,
-)
-    gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x
-    if gcol ≤ ncol
-        @inbounds begin
-            (; iband_550nm) = lookup_aero
-            aero_mask = view(aerosol_state.aero_mask, :, gcol)
-            aero_size = view(aerosol_state.aero_size, :, :, gcol)
-            aero_mass = view(aerosol_state.aero_mass, :, :, gcol)
-            rel_hum = AtmosphericStates.rel_hum_view(state_cache, as, gcol)
-            # Summed in layer order and through the same memory location as
-            # the per-g-point accumulation in `add_aerosol_optics_2stream!`,
-            # which is what keeps the pair unchanged to the bit: a register
-            # accumulator lets the backend contract a multiply into the add,
-            # and a global load and store does not.
-            aod_ext = view(aerosol_state.aod_sw_ext, gcol)
-            aod_sca = view(aerosol_state.aod_sw_sca, gcol)
-            aod_ext[] = 0
-            aod_sca[] = 0
-            for glay in 1:nlay
-                if aero_mask[glay]
-                    τ_aero, τ_ssa_aero, _ = Optics.compute_lookup_aerosol(
-                        lookup_aero,
-                        iband_550nm,
-                        aero_mass,
-                        aero_size,
-                        rel_hum[glay],
-                        glay,
-                    )
-                    aod_ext[] += τ_aero
-                    aod_sca[] += τ_ssa_aero
-                end
-            end
-        end
-    end
     return nothing
 end
 
@@ -158,13 +108,14 @@ stateless draw in `(key, column, g-point, layer)`.
 
 Two things are specific to the shortwave. The partials carry a direct-beam
 profile as well as up and down, so the reduction sums three. And a night column
-is left out of both halves of a round: the optics kernel returns without filling
+is left out of nearly all of a round: the optics kernel returns without filling
 `op`, and the sweeps kernel zeroes that thread's slice rather than leaving
 whatever the workspace last held, so the reduction sums zeros to the same result.
-That leaves the 550 nm aerosol optical depth, which every column has whether or
-not the sun is up and which no group may accumulate -- it is a read-modify-write
-on one per-column address. `_aod_550nm_CUDA!` computes it once per column, over
-the one band it belongs to, ahead of the rounds.
+The exception is the 550 nm aerosol optical depth, which every column has
+whether or not the sun is up. It is a read-modify-write on one per-column
+address that concurrent groups would interleave, so the kernel nominates one
+g-point as its only writer -- and that one thread runs for a dark column too,
+being the only thing such a column still owes. It is 1 g-point in 224.
 """
 function _solve_both_skies_grouped!(
     groups::Union{LWGptGroups, SWGptGroups},
@@ -190,22 +141,6 @@ function _solve_both_skies_grouped!(
         atx, abx = _configure_threadblock(ncol)
         @cuda always_inline = true threads = (atx) blocks = (abx) _aero_mask_CUDA!(
             aerosol_state,
-            ncol,
-        )
-    end
-
-    # One thread per column for the 550 nm optical depth, after the mask it
-    # reads and before the rounds that no longer collect it.
-    if _collects_aod(groups) &&
-       aerosol_state isa AerosolState &&
-       lookup_aero isa LookUpAerosolMerra
-        dtx, dbx = _configure_threadblock(ncol)
-        @cuda always_inline = true threads = (dtx) blocks = (dbx) _aod_550nm_CUDA!(
-            aerosol_state,
-            state_cache,
-            as,
-            lookup_aero,
-            nlay,
             ncol,
         )
     end

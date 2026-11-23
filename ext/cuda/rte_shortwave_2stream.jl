@@ -314,7 +314,11 @@ end
 #####
 
 # This round's gas and aerosol optics for every `(column, group)` pair whose sun
-# is up. `_aod_550nm_CUDA!` owns the one quantity a dark column still needs.
+# is up, and for the one thread per dark column that owes it a 550 nm optical
+# depth.
+@inline _is_550nm_band(::Nothing, ibnd) = false
+@inline _is_550nm_band(lkp::LookUpAerosolMerra, ibnd) = ibnd == lkp.iband_550nm
+
 function _sw_group_optics_CUDA!(
     op::TwoStream,
     as::AtmosphericState,
@@ -328,29 +332,41 @@ function _sw_group_optics_CUDA!(
     cos_zenith,
 )
     wcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x
+    (; major_gpt2bnd) = lookup_sw.band_data
     if wcol <= ncol * ngroups
         gcol = (wcol - 1) % ncol + 1
         grp = (wcol - 1) ÷ ncol + 1
         igpt = grp + (round - 1) * ngroups
-        # Nothing reads a night column's optics: every use of `op` in the
-        # sweeps is behind the same test, and the aerosol optical depth it
-        # would otherwise have collected is its own kernel's now. Consecutive
-        # threads are consecutive columns and day and night are spatially
-        # coherent, so a warp mostly goes one way or the other.
-        if igpt <= n_gpt && (@inbounds cos_zenith[gcol]) > 0
-            @inbounds compute_optical_props!(
-                op,
-                as,
-                state_cache,
-                gcol,
-                igpt,
-                lookup_sw,
-                nothing,
-                lookup_sw_aero,
-                nothing,
-                wcol,
-                false,
-            )
+        if igpt <= n_gpt
+            @inbounds begin
+                ibnd = major_gpt2bnd[igpt]
+                # G-points are contiguous within a band, so this is the last
+                # one of its own band: exactly one thread writes the 550 nm
+                # optical depth, and it is the g-point the ungrouped loop
+                # leaves standing.
+                collect_aod = igpt == n_gpt || major_gpt2bnd[igpt + 1] != ibnd
+                # Nothing else reads a dark column's optics: its thread in the
+                # sweeps zeroes the partials instead of sweeping, and the cloud
+                # increment is behind the same test. So of that column's 224
+                # g-points only the one owing it an optical depth runs. `igpt`
+                # is uniform across a block, so a block skips or runs whole.
+                if cos_zenith[gcol] > 0 ||
+                   (collect_aod && _is_550nm_band(lookup_sw_aero, ibnd))
+                    compute_optical_props!(
+                        op,
+                        as,
+                        state_cache,
+                        gcol,
+                        igpt,
+                        lookup_sw,
+                        nothing,
+                        lookup_sw_aero,
+                        nothing,
+                        wcol,
+                        collect_aod,
+                    )
+                end
+            end
         end
     end
     return nothing
