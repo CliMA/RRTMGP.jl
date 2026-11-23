@@ -239,18 +239,11 @@ end
         )
     end
     if !isnothing(lkp_cld) # clouds need TwoStream optics
-        # Only the narrow space reaches here: the grouped optics kernel passes
-        # no cloud lookup, and the grouped sweeps add the increment themselves.
-        add_cloud_optics_lw!(
-            op,
-            as,
-            gcol,
-            lkp_cld,
-            ibnd,
-            lkp_precip,
-            wcol,
-            as.cloud_state.mask_lw,
-        )
+        # The narrow method, indexed by the column alone, because the mask store
+        # it reads is the one sized for `gcol` and a wide `wcol` beside it would
+        # read that mask past its end. The grouped optics kernel passes no cloud
+        # lookup; the grouped sweeps add the increment with the wide mask.
+        add_cloud_optics_lw!(op, as, gcol, lkp_cld, ibnd, lkp_precip)
     end
     return nothing
 end
@@ -386,18 +379,11 @@ end
         )
     end
     if !isnothing(lkp_cld) # clouds need TwoStream optics
-        # Only the narrow space reaches here: the grouped optics kernel passes
-        # no cloud lookup, and the grouped sweeps add the increment themselves.
-        add_cloud_optics_sw!(
-            op,
-            as,
-            gcol,
-            lkp_cld,
-            ibnd,
-            lkp_precip,
-            wcol,
-            as.cloud_state.mask_sw,
-        )
+        # The narrow method, indexed by the column alone, because the mask store
+        # it reads is the one sized for `gcol` and a wide `wcol` beside it would
+        # read that mask past its end. The grouped optics kernel passes no cloud
+        # lookup; the grouped sweeps add the increment with the wide mask.
+        add_cloud_optics_sw!(op, as, gcol, lkp_cld, ibnd, lkp_precip)
     end
     return nothing
 end
@@ -437,8 +423,9 @@ could drift apart without anything noticing.
 end
 
 # Solving over wide columns writes `op` at `wcol`, which only means anything
-# beside a mask store sized the same way (`LWGptGroups.mask`). Neither has a
-# default, so the wide index cannot arrive next to the narrow mask.
+# beside a mask store sized the same way (`LWGptGroups.mask`). Both are
+# positional and neither has a default, so a caller holding only the narrow mask
+# takes the method above instead of pairing it with a wide index.
 @inline function add_cloud_optics_lw!(
     op::TwoStream,
     as::AtmosphericState,
@@ -502,8 +489,9 @@ and the longwave one does not.
 end
 
 # Solving over wide columns writes `op` at `wcol`, which only means anything
-# beside a mask store sized the same way (`SWGptGroups.mask`). Neither has a
-# default, so the wide index cannot arrive next to the narrow mask.
+# beside a mask store sized the same way (`SWGptGroups.mask`). Both are
+# positional and neither has a default, so a caller holding only the narrow mask
+# takes the method above instead of pairing it with a wide index.
 @inline function add_cloud_optics_sw!(
     op::TwoStream,
     as::AtmosphericState,

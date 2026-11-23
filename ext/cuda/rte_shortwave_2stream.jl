@@ -348,8 +348,9 @@ function _sw_group_optics_CUDA!(
                 # Nothing else reads a dark column's optics: its thread in the
                 # sweeps zeroes the partials instead of sweeping, and the cloud
                 # increment is behind the same test. So of that column's 224
-                # g-points only the one owing it an optical depth runs. `igpt`
-                # is uniform across a block, so a block skips or runs whole.
+                # g-points only the one owing it an optical depth runs. The test
+                # is per column, so what skips together is a warp of night
+                # columns; a warp holding one lit column pays for the whole 32.
                 if cos_zenith[gcol] > 0 ||
                    (collect_aod && _is_550nm_band(lookup_sw_aero, ibnd))
                     compute_optical_props!(

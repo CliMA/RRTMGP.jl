@@ -49,10 +49,11 @@ const MAX_NGPT_GROUPS = 16
 # planes in the longwave and three in the shortwave.
 const TARGET_GPT_GROUP_COLUMNS = 393216
 
-# Device bytes one wide column of workspace costs per level, both bands
-# together: 53 in the longwave and 61 in the shortwave, measured by building
-# them and reading the free-memory delta, of which the two partial accumulators
-# are the bulk. A coupled run builds both, so the default prices both.
+# Device bytes one wide column of workspace costs per level at `Float32`, both
+# bands together: 53 in the longwave and 61 in the shortwave, measured by
+# building them and reading the free-memory delta, of which the two partial
+# accumulators are the bulk. A coupled run builds both, so the default prices
+# both.
 const GPT_GROUP_BYTES_PER_WIDE_COLUMN_LEVEL = 114
 
 # The most device memory the default will commit to those workspaces. The
@@ -68,10 +69,10 @@ const TARGET_GPT_GROUP_BYTES = 4 * 1024^3
 """
     default_ngpt_groups(grid_params::RRTMGPGridParams)
 
-How many g-point groups a two-stream solver widens to when the caller names
-none: enough to reach `TARGET_GPT_GROUP_COLUMNS` wide columns, capped at
+How many g-point groups `RRTMGPSolver` widens a two-stream solve to when the
+caller names none: enough to reach `TARGET_GPT_GROUP_COLUMNS` wide columns, capped at
 `MAX_NGPT_GROUPS` and at whatever `TARGET_GPT_GROUP_BYTES` affords on this
-grid's level count.
+grid's level count and float type.
 
 A column count that already fills the device gets one group, and so does a CPU,
 whose driver solves the whole g-point loop per column and ignores the workspaces.
@@ -99,10 +100,14 @@ function default_ngpt_groups(grid_params::RRTMGPGridParams)
     # high-resolution benchmark's column count -- which costs memory, and that is
     # what the byte bound is for.
     wanted = cld(TARGET_GPT_GROUP_COLUMNS, ncol)
-    affordable = fld(
-        TARGET_GPT_GROUP_BYTES,
-        ncol * (nlay + 1) * GPT_GROUP_BYTES_PER_WIDE_COLUMN_LEVEL,
-    )
+    # The byte figure is a `Float32` measurement and every widened workspace but
+    # the mask holds the grid's own float type, so a wider one has to be charged
+    # for it: unscaled, a `Float64` grid commits about twice the bound it is
+    # being checked against. `cld`, so the mask's byte is never undercharged.
+    per_level =
+        GPT_GROUP_BYTES_PER_WIDE_COLUMN_LEVEL *
+        cld(sizeof(eltype(grid_params)), sizeof(Float32))
+    affordable = fld(TARGET_GPT_GROUP_BYTES, ncol * (nlay + 1) * per_level)
     return clamp(min(wanted, affordable), 1, MAX_NGPT_GROUPS)
 end
 
@@ -235,15 +240,19 @@ function TwoStreamLWRTE(
     sfc_emis,
     inc_flux,
     state_cache = _default_state_cache(grid_params),
-    ngpt_groups::Int = default_ngpt_groups(grid_params),
+    ngpt_groups::Int = 1,
 )
+    _check_ngpt_groups(ngpt_groups)
     (; context) = grid_params
     op = TwoStream(grid_params)
     src = SourceLW2Str(grid_params; params)
     bcs = LwBCs(sfc_emis, inc_flux)
     fluxb = FluxLW(grid_params)
     flux = FluxLW(grid_params)
-    # Only the fused both-skies solve reads these; the others ignore them.
+    # Only the fused both-skies solve reads these, and only `RRTMGPSolver` knows
+    # whether a radiation method reaches it, so grouping is asked for here rather
+    # than defaulted: a solver built for `solve_lw!` would otherwise carry
+    # workspaces linear in `ncol * ngroups * nlev` and never read a byte.
     gpt_groups =
         ngpt_groups > 1 ? LWGptGroups(grid_params, ngpt_groups; params) :
         nothing
@@ -375,8 +384,9 @@ function TwoStreamSWRTE(
     inc_flux_diffuse,
     sfc_alb_diffuse,
     state_cache = _default_state_cache(grid_params),
-    ngpt_groups::Int = default_ngpt_groups(grid_params),
+    ngpt_groups::Int = 1,
 )
+    _check_ngpt_groups(ngpt_groups)
     (; context) = grid_params
     op = TwoStream(grid_params)
     src = SourceSW2Str(grid_params)
@@ -389,7 +399,10 @@ function TwoStreamSWRTE(
     )
     fluxb = FluxSW(grid_params)
     flux = FluxSW(grid_params)
-    # Only the fused both-skies solve reads these; the others ignore them.
+    # Only the fused both-skies solve reads these, and only `RRTMGPSolver` knows
+    # whether a radiation method reaches it, so grouping is asked for here rather
+    # than defaulted: a solver built for `solve_sw!` would otherwise carry
+    # workspaces linear in `ncol * ngroups * nlev` and never read a byte.
     gpt_groups =
         ngpt_groups > 1 ? SWGptGroups(grid_params, ngpt_groups) : nothing
     return TwoStreamSWRTE(

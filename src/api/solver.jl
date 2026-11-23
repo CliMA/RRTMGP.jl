@@ -285,10 +285,9 @@ function RRTMGPSolver(
     state_cache =
         radiation_method isa GrayRadiation ? nothing :
         RTE._default_state_cache(grid_params)
-    # Checked here rather than in `LWGptGroups`/`SWGptGroups`, which hold the
-    # same test: the gates below only reach them above one group, so zero or a
-    # negative count would skip the check and quietly build a serial solver.
-    ngpt_groups ≥ 1 || error("ngpt_groups must be at least 1, got $ngpt_groups")
+    # The gates below reach the workspaces only above one group, so this is
+    # where a count of zero or less is caught.
+    RTE._check_ngpt_groups(ngpt_groups)
     # Workspaces for the g-point-grouped fused shortwave solve, allocated on the
     # same terms as the longwave ones below.
     gpt_groups_sw =

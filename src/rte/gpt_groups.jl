@@ -2,6 +2,15 @@
 ##### Wide workspaces for a g-point-parallel solve.
 #####
 
+# Every group count a caller names goes through here. A count below one would
+# pass every `ngpt_groups > 1` gate by failing it, leaving a serial solver where
+# a grouped one was asked for, so it is an error rather than a clamp.
+@inline function _check_ngpt_groups(ngpt_groups::Int)
+    ngpt_groups >= 1 ||
+        error("ngpt_groups must be at least 1, got $ngpt_groups")
+    return nothing
+end
+
 # What the two bands' workspaces have in common: the widened grid parameters,
 # the two partial accumulators, and the mask and cloud tally over wide columns.
 # `planes` is how many flux planes a band accumulates, which is the only shape
@@ -11,7 +20,7 @@ function _gpt_group_workspaces(
     ngroups::Int,
     planes::Int,
 )
-    ngroups >= 1 || error("ngroups must be at least 1, got $ngroups")
+    _check_ngpt_groups(ngroups)
     (; context, ncol, nlay, isothermal_boundary_layer) = grid_params
     DA = ClimaComms.array_type(grid_params)
     FT = eltype(grid_params)
