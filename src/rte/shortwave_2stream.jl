@@ -518,8 +518,10 @@ end
         )
         _accumulate_fluxes!(flux_sw_clear, flux, wcol, nlev, igpt, first_igpt)
     end
-    # Add the cloud increment to the same optics and sweep again
-    if !isnothing(lookup_sw_cld)
+    # Add the cloud increment to the same optics and sweep again. A dark column
+    # skips it: every reader of `op` is behind the same test, and in the grouped
+    # solve the optics kernel leaves `op` unfilled for such a thread.
+    if μ₀ > 0 && !isnothing(lookup_sw_cld)
         add_cloud_optics_sw!(
             op,
             as,

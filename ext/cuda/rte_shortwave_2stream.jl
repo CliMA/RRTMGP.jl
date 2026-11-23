@@ -313,10 +313,8 @@ end
 ##### The g-point-grouped shortwave solve, as optics and then sweeps.
 #####
 
-# This round's gas and aerosol optics for every `(column, group)` pair. It runs
-# for a night column too: the 550 nm aerosol optical depth is collected here
-# and does not depend on the sun being up, which is also why the ungrouped
-# kernel computes the optics before it tests the zenith angle.
+# This round's gas and aerosol optics for every `(column, group)` pair whose sun
+# is up. `_aod_550nm_CUDA!` owns the one quantity a dark column still needs.
 function _sw_group_optics_CUDA!(
     op::TwoStream,
     as::AtmosphericState,
@@ -327,14 +325,19 @@ function _sw_group_optics_CUDA!(
     ngroups,
     n_gpt,
     round,
+    cos_zenith,
 )
     wcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x
-    (; major_gpt2bnd) = lookup_sw.band_data
     if wcol <= ncol * ngroups
         gcol = (wcol - 1) % ncol + 1
         grp = (wcol - 1) ÷ ncol + 1
         igpt = grp + (round - 1) * ngroups
-        if igpt <= n_gpt
+        # Nothing reads a night column's optics: every use of `op` in the
+        # sweeps is behind the same test, and the aerosol optical depth it
+        # would otherwise have collected is its own kernel's now. Consecutive
+        # threads are consecutive columns and day and night are spatially
+        # coherent, so a warp mostly goes one way or the other.
+        if igpt <= n_gpt && (@inbounds cos_zenith[gcol]) > 0
             @inbounds compute_optical_props!(
                 op,
                 as,
@@ -346,11 +349,7 @@ function _sw_group_optics_CUDA!(
                 lookup_sw_aero,
                 nothing,
                 wcol,
-                # G-points are contiguous within a band, so this is the last
-                # one of its own band: exactly one thread writes the 550 nm
-                # optical depth, and it is the g-point the ungrouped loop
-                # leaves standing.
-                igpt == n_gpt || major_gpt2bnd[igpt + 1] != major_gpt2bnd[igpt],
+                false,
             )
         end
     end
