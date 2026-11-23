@@ -77,10 +77,15 @@ function _aod_550nm_CUDA!(
             aero_size = view(aerosol_state.aero_size, :, :, gcol)
             aero_mass = view(aerosol_state.aero_mass, :, :, gcol)
             rel_hum = AtmosphericStates.rel_hum_view(state_cache, as, gcol)
-            aod_ext = zero(eltype(aerosol_state.aod_sw_ext))
-            aod_sca = aod_ext
-            # Summed in layer order, as the per-g-point accumulation it
-            # replaces was, so the pair is unchanged to the bit.
+            # Summed in layer order and through the same memory location as
+            # the per-g-point accumulation in `add_aerosol_optics_2stream!`,
+            # which is what keeps the pair unchanged to the bit: a register
+            # accumulator lets the backend contract a multiply into the add,
+            # and a global load and store does not.
+            aod_ext = view(aerosol_state.aod_sw_ext, gcol)
+            aod_sca = view(aerosol_state.aod_sw_sca, gcol)
+            aod_ext[] = 0
+            aod_sca[] = 0
             for glay in 1:nlay
                 if aero_mask[glay]
                     τ_aero, τ_ssa_aero, _ = Optics.compute_lookup_aerosol(
@@ -91,12 +96,10 @@ function _aod_550nm_CUDA!(
                         rel_hum[glay],
                         glay,
                     )
-                    aod_ext += τ_aero
-                    aod_sca += τ_ssa_aero
+                    aod_ext[] += τ_aero
+                    aod_sca[] += τ_ssa_aero
                 end
             end
-            aerosol_state.aod_sw_ext[gcol] = aod_ext
-            aerosol_state.aod_sw_sca[gcol] = aod_sca
         end
     end
     return nothing
