@@ -49,38 +49,41 @@ const MAX_NGPT_GROUPS = 16
 # planes in the longwave and three in the shortwave.
 const TARGET_GPT_GROUP_COLUMNS = 393216
 
-# Device bytes one wide column of workspace costs per level at `Float32`, both
-# bands together: 53 in the longwave and 61 in the shortwave, measured by
-# building them and reading the free-memory delta, of which the two partial
-# accumulators are the bulk. A coupled run builds both, so the default prices
-# both.
-const GPT_GROUP_BYTES_PER_WIDE_COLUMN_LEVEL = 114
+# What fraction of a device's memory the default will commit to those
+# workspaces. The column target above is a floor on how wide the solve wants to
+# be, not a licence to allocate: `nlev` is in the workspace's size and not in
+# that target, so without a byte bound the same column count commits four times
+# the memory on a 128-level grid as on a 32-level one, and a run can fail to
+# allocate at a default it never chose. A sixteenth is inert at every resolution
+# measured: on an 80 GiB device it first binds above 80 layers at the
+# benchmark's column count.
+const GPT_GROUP_MEMORY_DIVISOR = 16
 
-# The most device memory the default will commit to those workspaces. The
-# column target above is a floor on how wide the solve wants to be, not a
-# licence to allocate: `nlev` is in the workspace's size and not in that target,
-# so without this bound the same column count commits four times the memory on
-# a 128-level grid as on a 32-level one, and a run can fail to allocate at a
-# default it never chose. This is inert at every resolution measured -- it first
-# binds above 80 layers at the benchmark's column count -- and a device too
-# small for it wants an explicit `ngpt_groups` rather than a different bound.
-const TARGET_GPT_GROUP_BYTES = 4 * 1024^3
+# The bound itself, which is a property of the device. It is a share of TOTAL
+# memory rather than of what is free, because the group count decides the order
+# a column's g-points are summed: pricing against free memory would let that
+# order, and so the fluxes, depend on whatever the host had allocated when the
+# solver was built. The CUDA extension reads the device's figure; this fallback
+# is the fixed bound the default carried before it was derived, and a device
+# smaller than it wants an explicit `ngpt_groups` instead.
+_gpt_group_byte_bound(::ClimaComms.AbstractDevice) = 4 * 1024^3
 
 """
     default_ngpt_groups(grid_params::RRTMGPGridParams)
 
 How many g-point groups `RRTMGPSolver` widens a two-stream solve to when the
-caller names none: enough to reach `TARGET_GPT_GROUP_COLUMNS` wide columns, capped at
-`MAX_NGPT_GROUPS` and at whatever `TARGET_GPT_GROUP_BYTES` affords on this
-grid's level count and float type.
+caller names none: enough to reach `TARGET_GPT_GROUP_COLUMNS` wide columns, capped
+at `MAX_NGPT_GROUPS` and at what a `GPT_GROUP_MEMORY_DIVISOR`th of the device's
+memory affords on this grid's level count and float type, which
+[`gpt_group_bytes`](@ref) counts.
 
 A column count that already fills the device gets one group, and so does a CPU,
 whose driver solves the whole g-point loop per column and ignores the workspaces.
 Both gates matter because the count rises as columns fall, so an ungated default
 would give the smallest runs the widest workspaces. Pass `ngpt_groups` to
-override in either direction -- a device whose free memory is smaller than
-`TARGET_GPT_GROUP_BYTES` wants that rather than the default, since nothing here
-polls the device.
+override in either direction -- a device whose free memory is smaller than its
+share of its own total wants that rather than the default, since the bound is on
+the total.
 
 Grouping changes the order in which a column's g-points are summed, and
 floating-point addition is not associative, so grouped fluxes differ from a
@@ -93,21 +96,18 @@ are taken in the serial order, and the solve is then bit-for-bit with the serial
 one, which is what the tests assert.
 """
 function default_ngpt_groups(grid_params::RRTMGPGridParams)
-    ClimaComms.device(grid_params) isa ClimaComms.AbstractCPUDevice && return 1
+    device = ClimaComms.device(grid_params)
+    device isa ClimaComms.AbstractCPUDevice && return 1
     (; ncol, nlay) = grid_params
     # `cld`, because the column target is a floor: rounding down would undershoot
     # the parallelism it names. It can overshoot instead -- by 9.9% at the
     # high-resolution benchmark's column count -- which costs memory, and that is
     # what the byte bound is for.
     wanted = cld(TARGET_GPT_GROUP_COLUMNS, ncol)
-    # The byte figure is a `Float32` measurement and every widened workspace but
-    # the mask holds the grid's own float type, so a wider one has to be charged
-    # for it: unscaled, a `Float64` grid commits about twice the bound it is
-    # being checked against. `cld`, so the mask's byte is never undercharged.
-    per_level =
-        GPT_GROUP_BYTES_PER_WIDE_COLUMN_LEVEL *
-        cld(sizeof(eltype(grid_params)), sizeof(Float32))
-    affordable = fld(TARGET_GPT_GROUP_BYTES, ncol * (nlay + 1) * per_level)
+    affordable = fld(
+        _gpt_group_byte_bound(device),
+        gpt_group_bytes(eltype(grid_params), ncol, nlay, 1),
+    )
     return clamp(min(wanted, affordable), 1, MAX_NGPT_GROUPS)
 end
 

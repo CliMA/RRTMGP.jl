@@ -14,9 +14,9 @@ const GROUP_BLOCK_THREADS = 128
 # The budgets are per kernel because the two halves compose -- a
 # matched pair landed within a few hundredths of a point of the sum
 # of its two single-kernel effects at every cap measured -- so a band
-# whose halves bottom out at different counts takes both.
-# results/radiation-register-cap.toml has the sweep, and these are
-# the counts it chose:
+# whose halves bottom out at different counts takes both. The sweep
+# is a profiling run against a coupled model and lives outside this
+# repo; the counts it chose:
 # lw optics: 156 registers naturally, -11.41% at 96.
 # lw sweeps: 140 registers naturally, -8.02% at 72.
 # sw optics: 124 registers naturally, -4.65% at 96.
@@ -55,10 +55,11 @@ function _aero_mask_CUDA!(aerosol_state::AerosolState, ncol)
     return nothing
 end
 
-# The planes recurse rather than iterate: a loop over the tuple indexes it with
-# a runtime variable, which forces the tuple to a stack slot and spills the
-# sweeps kernels. Recursion over `Base.tail` unrolls at compile time, because
-# each call takes a shorter tuple type than the one above it.
+# The planes recurse rather than iterate: a loop indexes the tuple with a
+# runtime variable, which defeats SROA -- a tuple indexed that way has to exist
+# somewhere addressable, so it lands in a stack slot and the sweeps kernels
+# spill. Recursion over `Base.tail` indexes by type instead and unrolls, which
+# is only a fixed depth because a band accumulates two flux planes or three.
 @inline function _zero_planes!(planes::Tuple, wcol, ilev)
     plane = first(planes)
     @inbounds plane[wcol, ilev] = zero(eltype(plane))

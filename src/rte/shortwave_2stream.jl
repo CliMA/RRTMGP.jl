@@ -423,19 +423,19 @@ function rte_sw_2stream_solve_both_skies! end
     ibnd,
     n_gpt,
     nlev,
-    mask_store = as.cloud_state isa CloudState ? as.cloud_state.mask_sw :
-                 nothing,
-    first_igpt = 1,
-    wcol = gcol,
-    collect_aod = true,
 )
+    # One column per thread, so the column's own index is the wide one, the
+    # g-point loop runs from the first and this thread collects the aerosol
+    # optical depth. `sw_2stream_gpt_col_sweeps!` is where those come apart.
+    mask_store =
+        as.cloud_state isa CloudState ? as.cloud_state.mask_sw : nothing
     cloudy = _build_cloud_mask!(
         as.cloud_state,
         Val(:mask_sw),
         gcol,
         igpt,
         mask_store,
-        wcol,
+        gcol,
     )
     # Gas and aerosol only: the clear sky, and the half both skies share
     compute_optical_props!(
@@ -448,8 +448,8 @@ function rte_sw_2stream_solve_both_skies! end
         nothing,
         lookup_sw_aero,
         nothing,
-        wcol,
-        collect_aod,
+        gcol,
+        true,
     )
     sw_2stream_gpt_col_sweeps!(
         igpt,
@@ -470,8 +470,8 @@ function rte_sw_2stream_solve_both_skies! end
         n_gpt,
         nlev,
         mask_store,
-        first_igpt,
-        wcol,
+        1,
+        gcol,
     )
     return cloudy
 end
