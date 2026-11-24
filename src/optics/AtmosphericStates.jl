@@ -162,10 +162,14 @@ function refresh_transposed_state!(
 end
 
 # Device arrays: `permutedims!` maps to a single native transpose kernel.
-_transpose_into!(dest::AbstractArray{T, 3}, src::AbstractArray{T, 3}) where {T} =
-    (permutedims!(dest, src, (3, 2, 1)); nothing)
-_transpose_into!(dest::AbstractArray{T, 2}, src::AbstractArray{T, 2}) where {T} =
-    (permutedims!(dest, src, (2, 1)); nothing)
+_transpose_into!(
+    dest::AbstractArray{T, 3},
+    src::AbstractArray{T, 3},
+) where {T} = (permutedims!(dest, src, (3, 2, 1)); nothing)
+_transpose_into!(
+    dest::AbstractArray{T, 2},
+    src::AbstractArray{T, 2},
+) where {T} = (permutedims!(dest, src, (2, 1)); nothing)
 # Host arrays: explicit loops (`permutedims!` allocates a few bytes on
 # Julia ≤ 1.11, tripping the zero-allocation tests).
 function _transpose_into!(dest::Array{T, 3}, src::Array{T, 3}) where {T}

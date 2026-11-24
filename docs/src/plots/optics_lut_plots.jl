@@ -284,8 +284,7 @@ function build_lut_2d_figure(fig_title, specs; nr = 300)
         # crisp, with NaN (transparent/white) outside [r_lwr, r_upr].
         r_edges = filter(
             r ->
-                abs(r - r_lwr) > 1e-7 * r_lwr &&
-                    abs(r - r_upr) > 1e-7 * r_upr,
+                abs(r - r_lwr) > 1e-7 * r_lwr && abs(r - r_upr) > 1e-7 * r_upr,
             base_r,
         )
         append!(r_edges, (Float64(r_lwr), Float64(r_upr)))

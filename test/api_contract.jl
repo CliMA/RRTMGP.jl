@@ -11,7 +11,12 @@ import Serialization
 
 # Small gray problem shared by these tests (the gray path needs no lookup
 # tables, so every case here runs after a bare `using RRTMGP`).
-function _gray_pieces(FT; nlay = 20, ncol = 4, isothermal_boundary_layer = false)
+function _gray_pieces(
+    FT;
+    nlay = 20,
+    ncol = 4,
+    isothermal_boundary_layer = false,
+)
     context = ClimaComms.context()
     DA = ClimaComms.array_type(ClimaComms.device(context))
     gp = RRTMGP.RRTMGPGridParams(
@@ -266,8 +271,7 @@ end
 @testset "constructor defines boundary-layer rows of geometry inputs" begin
     for FT in (Float32, Float64)
         nlay, ncol = 20, 4
-        pieces =
-            _gray_pieces(FT; nlay, ncol, isothermal_boundary_layer = true)
+        pieces = _gray_pieces(FT; nlay, ncol, isothermal_boundary_layer = true)
         (; gp, DA) = pieces
         @test gp.nlay == nlay + 1
         # Seed only the physical domain; poison the boundary-layer rows.

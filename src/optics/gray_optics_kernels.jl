@@ -232,7 +232,7 @@ end
         p,
         rest...,
     ) where {FT}
- 
+
 Calculate the optical thickness from pressure for a gray atmosphere.
 
 See O'Gorman 2008, Journal of Climate Vol 21, Page(s): 3815–3832.

@@ -43,8 +43,7 @@ printstyled("==========================\n\n", color = color1)
 @testset "RRTMGP clear-sky tests" begin
     context = ClimaComms.context()
 
-    toler_lw_noscat =
-        Dict(Float64 => Float64(1e-4), Float32 => Float32(5e-3))
+    toler_lw_noscat = Dict(Float64 => Float64(1e-4), Float32 => Float32(5e-3))
     toler_lw_2stream = Dict(Float64 => Float64(4.5), Float32 => Float32(4.5))
     toler_sw = Dict(Float64 => Float64(1e-3), Float32 => Float32(0.04))
 
@@ -77,8 +76,7 @@ printstyled("=================================\n\n", color = color1)
 @testset "RRTMGP cloudy-sky (gas + clouds) tests" begin
     context = ClimaComms.context()
 
-    toler_lw_noscat =
-        Dict(Float64 => Float64(1e-5), Float32 => Float32(5e-3))
+    toler_lw_noscat = Dict(Float64 => Float64(1e-5), Float32 => Float32(5e-3))
     toler_lw_2stream = Dict(Float64 => Float64(5), Float32 => Float32(5))
     toler_sw = Dict(Float64 => Float64(1e-5), Float32 => Float32(0.06))
 
@@ -135,8 +133,7 @@ printstyled("=================================\n\n", color = color1)
 @testset "RRTMGP all-sky (gas + clouds + aerosols) tests" begin
     context = ClimaComms.context()
 
-    toler_lw_noscat =
-        Dict(Float64 => Float64(1e-5), Float32 => Float32(5e-3))
+    toler_lw_noscat = Dict(Float64 => Float64(1e-5), Float32 => Float32(5e-3))
     toler_lw_2stream = Dict(Float64 => Float64(5), Float32 => Float32(5))
     toler_sw = Dict(Float64 => Float64(1e-5), Float32 => Float32(0.06))
 

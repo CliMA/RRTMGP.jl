@@ -41,3 +41,4 @@ docs/src/tutorials/
 
 # Temporary benchmark measurements
 perf/benchmark_baselines/measured_*.txt
+/.dev/format/Manifest.toml

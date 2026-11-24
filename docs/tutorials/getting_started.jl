@@ -92,8 +92,11 @@ out_wellmixed = RRTMGP.solve(
     method = RRTMGP.GrayRadiation(),
     optical_thickness = GrayOpticalThicknessSchneider2004(Float64; α = 1.0),
 );
-println("surface net flux, α = 1: ",
-        round(Array(out_wellmixed.net_flux)[1, 1]; digits = 1), " W/m²")
+println(
+    "surface net flux, α = 1: ",
+    round(Array(out_wellmixed.net_flux)[1, 1]; digits = 1),
+    " W/m²",
+)
 
 # ([`solve_gray`](@ref RRTMGP.solve_gray) is a related single-call entry point
 # that builds an analytic, latitude-dependent gray column internally instead of
@@ -119,11 +122,11 @@ out_cs = RRTMGP.solve(profile);
 # top level:
 
 olr(kind, lookups) = Array(
-    RRTMGP.solve(
-        RRTMGP.standard_atmosphere(Float64; kind);
-        lookups,
-    ).lw_flux_up,
-)[end, 1]
+    RRTMGP.solve(RRTMGP.standard_atmosphere(Float64; kind); lookups).lw_flux_up,
+)[
+    end,
+    1,
+]
 
 lookups = out_cs.solver.lookups
 for kind in (:tropical, :midlatitude_summer, :subarctic_winter)
