@@ -2,7 +2,8 @@ using Test
 import ClimaComms
 @static pkgversion(ClimaComms) >= v"0.6" && ClimaComms.@import_required_backends
 import RRTMGP
-import RRTMGP.RTE: LWGptGroups, SWGptGroups, gpt_group_bytes
+import RRTMGP.RTE:
+    LWGptGroups, SWGptGroups, default_ngpt_groups, gpt_group_bytes
 
 # `default_ngpt_groups` bounds the group count by what the widened workspaces
 # cost, and `gpt_group_bytes` counts that cost from the planes the constructors
@@ -29,6 +30,22 @@ function workspace_bytes(x, seen = Base.IdSet{Any}())
             (total += workspace_bytes(getfield(x, name), seen))
     end
     return total
+end
+
+# The byte bound is a device property, and CUDA reports memory unsigned, so the
+# count can come back a `UInt64` on a GPU and nowhere else -- where it no longer
+# matches the `ngpt_groups::Int` keyword it is the default for. This runs on
+# whatever device the tests are on, which is the only way to see that.
+@testset "the default group count is an Int" begin
+    context = ClimaComms.context()
+    grid_params = RRTMGP.RRTMGPGridParams(
+        Float32;
+        context,
+        domain_nlay = 80,
+        ncol = 2048,
+        isothermal_boundary_layer = false,
+    )
+    @test default_ngpt_groups(grid_params) isa Int
 end
 
 # The workspaces are built on the CPU whatever the test device is: `sizeof` of a

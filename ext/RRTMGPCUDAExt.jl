@@ -56,8 +56,10 @@ import CUDA: threadIdx, blockIdx, blockDim, @cuda
 
 # The share of this device's memory the default g-point group count may commit.
 # Total rather than free, for the reason given where the fallback is defined.
+# `Int`, because CUDA reports memory as a `UInt64` and the count this bound
+# feeds is a keyword typed `Int`.
 _gpt_group_byte_bound(::ClimaComms.CUDADevice) =
-    fld(CUDA.totalmem(CUDA.device()), GPT_GROUP_MEMORY_DIVISOR)
+    fld(Int(CUDA.totalmem(CUDA.device())), GPT_GROUP_MEMORY_DIVISOR)
 
 _max_threads_cuda() = 256
 

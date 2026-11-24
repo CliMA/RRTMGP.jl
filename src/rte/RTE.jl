@@ -95,7 +95,11 @@ grouping does to a sum is the whole of the difference: at one group the g-points
 are taken in the serial order, and the solve is then bit-for-bit with the serial
 one, which is what the tests assert.
 """
-function default_ngpt_groups(grid_params::RRTMGPGridParams)
+# `::Int`, and not incidentally: the byte bound comes from the device through a
+# hook, CUDA reports memory as a `UInt64`, and an unsigned count here does not
+# match the `ngpt_groups::Int` keyword this defaults -- which fails at every
+# solver construction, on a GPU only.
+function default_ngpt_groups(grid_params::RRTMGPGridParams)::Int
     device = ClimaComms.device(grid_params)
     device isa ClimaComms.AbstractCPUDevice && return 1
     (; ncol, nlay) = grid_params
