@@ -1,10 +1,13 @@
 #=
-GPU benchmark ratchet for the high-resolution solver kernels.
+GPU benchmark ratchet for the solver kernels.
 
-Measures the minimum wall time of `solve_lw!`/`solve_sw!` at high resolution
-for the three production configurations (clear sky, all sky, all sky with
-aerosols; two-stream longwave and shortwave) in both precisions, and compares
-each against a recorded per-GPU baseline:
+Measures the minimum wall time of two things in both precisions, and compares
+each against a recorded per-GPU baseline: `solve_lw!`/`solve_sw!` at high
+resolution for the three production configurations (clear sky, all sky, all sky
+with aerosols; two-stream longwave and shortwave), and one `update_fluxes!` on
+an `RRTMGPSolver` at the grid and flags ClimaAtmos's AMIP benchmark runs. The
+second is the call a coupled model makes, and it is the only one that reaches
+the solver constructor's own defaults:
 
     perf/benchmark_baselines/<device_key>.txt
 
@@ -55,45 +58,63 @@ const test_dir = joinpath(dirname(@__DIR__), "test")
 include(joinpath(test_dir, "clear_sky_highres_gpu_benchmark.jl"))
 include(joinpath(test_dir, "cloudy_sky_highres_gpu_benchmark.jl"))
 include(joinpath(test_dir, "all_sky_with_aerosols_highres_gpu_benchmark.jl"))
+include(joinpath(test_dir, "amip_solver_gpu_benchmark.jl"))
 
-# One measured case: production two-stream solvers across identical uniform
-# high-resolution grids. Each `run` returns (trial_lw, trial_sw) from
-# BenchmarkTools.
+# Each `run` returns its BenchmarkTools trials named, and the name goes into the
+# baseline key: the high-resolution cases time a band each, and the AMIP case
+# times one call that does both bands at once.
+two_bands(f) = function (FT)
+    trial_lw, trial_sw = f(FT)
+    return (; lw = trial_lw, sw = trial_sw)
+end
+
 cases = [
     (
         key = "clear_sky",
-        run = FT -> benchmark_clear_sky(
-            context,
-            TwoStreamLWRTE,
-            TwoStreamSWRTE,
-            VmrGM,
-            FT;
-            ncol = highres_ncol(),
-            nlay = highres_nlay,
+        run = two_bands(
+            FT -> benchmark_clear_sky(
+                context,
+                TwoStreamLWRTE,
+                TwoStreamSWRTE,
+                VmrGM,
+                FT;
+                ncol = highres_ncol(),
+                nlay = highres_nlay,
+            ),
         ),
     ),
     (
         key = "all_sky",
-        run = FT -> benchmark_all_sky(
-            context,
-            TwoStreamLWRTE,
-            TwoStreamSWRTE,
-            FT;
-            ncol = highres_ncol(),
-            nlay = highres_nlay,
-            cldfrac = FT(1),
+        run = two_bands(
+            FT -> benchmark_all_sky(
+                context,
+                TwoStreamLWRTE,
+                TwoStreamSWRTE,
+                FT;
+                ncol = highres_ncol(),
+                nlay = highres_nlay,
+                cldfrac = FT(1),
+            ),
         ),
     ),
     (
         key = "all_sky_with_aerosols",
-        run = FT -> benchmark_all_sky_with_aerosols(
-            context,
-            TwoStreamLWRTE,
-            TwoStreamSWRTE,
-            FT;
-            ncol = highres_ncol(),
-            nlay = highres_nlay,
+        run = two_bands(
+            FT -> benchmark_all_sky_with_aerosols(
+                context,
+                TwoStreamLWRTE,
+                TwoStreamSWRTE,
+                FT;
+                ncol = highres_ncol(),
+                nlay = highres_nlay,
+            ),
         ),
+    ),
+    (
+        # The one case that goes through the public constructor, so the one that
+        # measures what a coupled model's defaults choose.
+        key = "amip",
+        run = FT -> (; update_fluxes = benchmark_amip_solver(context, FT)),
     ),
 ]
 
@@ -121,7 +142,7 @@ end
 function write_baseline(path, results; kind = "baseline")
     mkpath(dirname(path))
     open(path, "w") do io
-        println(io, "# RRTMGP high-resolution GPU benchmark $kind (minimum ns)")
+        println(io, "# RRTMGP GPU benchmark $kind (minimum ns)")
         println(io, "# device: $(CUDA.name(CUDA.device()))")
         println(io, "# julia: $(VERSION)")
         println(
@@ -156,14 +177,14 @@ const baseline = read_baseline(path)
 
 results = Dict{String, Float64}()
 for FT in (Float32, Float64), case in cases
-    @info "benchmark_ratchet: running $(case.key) ($FT) at high resolution"
-    trial_lw, trial_sw = case.run(FT)
+    @info "benchmark_ratchet: running $(case.key) ($FT)"
     # `minimum` is the recommended timing statistic: it is the most resilient to
     # GC/scheduler noise on a shared cluster (CliMA DeveloperGuides,
     # performance/allocation_debugging.md §5), which also makes the ratchet
     # threshold reliable.
-    results[string(case.key, "_lw_", FT)] = minimum(trial_lw).time # ns
-    results[string(case.key, "_sw_", FT)] = minimum(trial_sw).time # ns
+    for (name, trial) in pairs(case.run(FT))
+        results[string(case.key, "_", name, "_", FT)] = minimum(trial).time # ns
+    end
 end
 
 # Always persist the measured minima as an artifact, whatever the mode.
