@@ -145,3 +145,19 @@ steps:
           slurm_ntasks: 1
           slurm_gpus: 1
           slurm_exclusive:
+
+      # The baselines in perf/benchmark_baselines/ are keyed by GPU and by the
+      # Julia the baseline was recorded on, and the one committed is this
+      # queue's A100 at this queue's toolchain -- the only pair the ratchet can
+      # compare. Soft-fail: it flags regressions without blocking merges; see
+      # the header of perf/benchmark_ratchet.jl.
+      - label: "GPU high-resolution benchmark ratchet"
+        command: "julia --color=yes --project=test perf/benchmark_ratchet.jl"
+        soft_fail: true
+        artifact_paths: "perf/benchmark_baselines/*"
+        env:
+          CLIMACOMMS_DEVICE: "CUDA"
+        agents:
+          slurm_ntasks: 1
+          slurm_gpus: 1
+          slurm_exclusive:
