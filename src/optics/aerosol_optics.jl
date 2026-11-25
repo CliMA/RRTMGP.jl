@@ -147,6 +147,9 @@ function compute_lookup_aerosol(
     glay,
 ) where {FT}
     τ_cum, τ_ssa_cum, τ_ssag_cum = FT(0), FT(0), FT(0)
+    # Every humidity-dependent species interpolates the same `rh` over the same
+    # levels, so the search runs once here rather than once per species.
+    @inbounds loc, factor = interp1d_loc_factor(rh, lkp_aero.rh_levels)
 
     for i_aero_size in (1, 8, 9, 10, 11)
         if aero_mass[i_aero_size, glay] > FT(0)
@@ -169,7 +172,8 @@ function compute_lookup_aerosol(
                 ibnd,
                 aero_mass[i_aero_size, glay],
                 aero_size[i_aero_size, glay],
-                rh,
+                loc,
+                factor,
             )
             τ_cum += τ
             τ_ssa_cum += τ_ssa
@@ -178,8 +182,13 @@ function compute_lookup_aerosol(
     end
 
     if aero_mass[3, glay] > FT(0)
-        τ, τ_ssa, τ_ssag =
-            compute_lookup_sulfate_props(lkp_aero, ibnd, aero_mass[3, glay], rh)
+        τ, τ_ssa, τ_ssag = compute_lookup_sulfate_props(
+            lkp_aero,
+            ibnd,
+            aero_mass[3, glay],
+            loc,
+            factor,
+        )
         τ_cum += τ
         τ_ssa_cum += τ_ssa
         τ_ssag_cum += τ_ssag
@@ -190,7 +199,8 @@ function compute_lookup_aerosol(
             lkp_aero,
             ibnd,
             aero_mass[4, glay],
-            rh,
+            loc,
+            factor,
         )
         τ_cum += τ
         τ_ssa_cum += τ_ssa
@@ -213,7 +223,8 @@ function compute_lookup_aerosol(
             lkp_aero,
             ibnd,
             aero_mass[6, glay],
-            rh,
+            loc,
+            factor,
         )
         τ_cum += τ
         τ_ssa_cum += τ_ssa
@@ -257,22 +268,23 @@ function compute_lookup_dust_props(
 end
 
 """
-    compute_lookup_sea_salt_props(lkp_aero, ibnd, aeromass::FT, aerosize::FT, rh::FT) where {FT}
+    compute_lookup_sea_salt_props(lkp_aero, ibnd, aeromass::FT, aerosize::FT, loc, factor::FT) where {FT}
 
 Compute aerosol optical properties for sea salt particles given the aerosol lookup table (`lkp_aero`),
-band number (`ibnd`), aerosol mass (`aeromass`), aerosol size (`aerosize`), and relative humidity (`rh`).
+band number (`ibnd`), aerosol mass (`aeromass`), aerosol size (`aerosize`), and the humidity
+interpolation weights (`loc`, `factor`) from `interp1d_loc_factor`.
 """
 function compute_lookup_sea_salt_props(
     lkp_aero,
     ibnd,
     aeromass::FT,
     aerosize::FT,
-    rh::FT,
+    loc,
+    factor::FT,
 ) where {FT}
-    (; size_bin_limits, rh_levels, sea_salt) = lkp_aero
+    (; size_bin_limits, sea_salt) = lkp_aero
     @inbounds begin
         bin = locate_merra_size_bin(size_bin_limits, aerosize)
-        loc, factor = interp1d_loc_factor(rh, rh_levels)
         τ =
             aeromass * (
                 sea_salt[1, loc, bin, ibnd] * (FT(1) - factor) +
@@ -293,20 +305,21 @@ function compute_lookup_sea_salt_props(
 end
 
 """
-    compute_lookup_sulfate_props(lkp_aero, ibnd, aeromass::FT, rh::FT) where {FT}
+    compute_lookup_sulfate_props(lkp_aero, ibnd, aeromass::FT, loc, factor::FT) where {FT}
 
 Compute aerosol optical properties for sulfate particles given the aerosol lookup table (`lkp_aero`),
-band number (`ibnd`), aerosol mass (`aeromass`), and relative humidity (`rh`).
+band number (`ibnd`), aerosol mass (`aeromass`), and the humidity interpolation weights
+(`loc`, `factor`) from `interp1d_loc_factor`.
 """
 function compute_lookup_sulfate_props(
     lkp_aero,
     ibnd,
     aeromass::FT,
-    rh::FT,
+    loc,
+    factor::FT,
 ) where {FT}
-    (; rh_levels, sulfate) = lkp_aero
+    (; sulfate) = lkp_aero
     @inbounds begin
-        loc, factor = interp1d_loc_factor(rh, rh_levels)
         τ =
             aeromass * (
                 sulfate[1, loc, ibnd] * (FT(1) - factor) +
@@ -347,20 +360,21 @@ function compute_lookup_black_carbon_props(
 end
 
 """
-    compute_lookup_black_carbon_props(lkp_aero, ibnd, aeromass::FT, rh::FT) where {FT}
+    compute_lookup_black_carbon_props(lkp_aero, ibnd, aeromass::FT, loc, factor::FT) where {FT}
 
 Compute aerosol optical properties for hydrophilic black carbon particles given the aerosol lookup table (`lkp_aero`),
-band number (`ibnd`), aerosol mass (`aeromass`), and relative humidity (`rh`).
+band number (`ibnd`), aerosol mass (`aeromass`), and the humidity interpolation weights
+(`loc`, `factor`) from `interp1d_loc_factor`.
 """
 function compute_lookup_black_carbon_props(
     lkp_aero,
     ibnd,
     aeromass::FT,
-    rh::FT,
+    loc,
+    factor::FT,
 ) where {FT}
-    (; rh_levels, black_carbon_rh) = lkp_aero
+    (; black_carbon_rh) = lkp_aero
     @inbounds begin
-        loc, factor = interp1d_loc_factor(rh, rh_levels)
         τ =
             aeromass * (
                 black_carbon_rh[1, loc, ibnd] * (FT(1) - factor) +
@@ -397,20 +411,21 @@ function compute_lookup_organic_carbon_props(lkp_aero, ibnd, aeromass)
 end
 
 """
-    compute_lookup_organic_carbon_props(lkp_aero, ibnd, aeromass::FT, rh::FT) where {FT}
+    compute_lookup_organic_carbon_props(lkp_aero, ibnd, aeromass::FT, loc, factor::FT) where {FT}
 
 Compute aerosol optical properties for hydrophilic organic carbon particles given the aerosol lookup table (`lkp_aero`),
-band number (`ibnd`), aerosol mass (`aeromass`), and relative humidity (`rh`).
+band number (`ibnd`), aerosol mass (`aeromass`), and the humidity interpolation weights
+(`loc`, `factor`) from `interp1d_loc_factor`.
 """
 function compute_lookup_organic_carbon_props(
     lkp_aero,
     ibnd,
     aeromass::FT,
-    rh::FT,
+    loc,
+    factor::FT,
 ) where {FT}
-    (; rh_levels, organic_carbon_rh) = lkp_aero
+    (; organic_carbon_rh) = lkp_aero
     @inbounds begin
-        loc, factor = interp1d_loc_factor(rh, rh_levels)
         τ =
             aeromass * (
                 organic_carbon_rh[1, loc, ibnd] * (FT(1) - factor) +

@@ -259,6 +259,7 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
     ibnd::Int,
     nlev::Int,
     ncol::Int,
+    wcol::Int = gcol,
 ) where {SL, BCL}
     nlay = nlev - 1
     # setting references
@@ -270,20 +271,20 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
     FT = eltype(τ)
     @inbounds flux_dn_ilevplus1 =
         isnothing(inc_flux) ? FT(0) : inc_flux[gcol, igpt]
-    @inbounds flux_dn[gcol, nlev] = flux_dn_ilevplus1
+    @inbounds flux_dn[wcol, nlev] = flux_dn_ilevplus1
     # Albedo of lowest level is the surface albedo...
     @inbounds albedo_ilev = FT(1) - sfc_emis[ibnd, gcol]
-    @inbounds albedo[gcol, 1] = albedo_ilev
+    @inbounds albedo[wcol, 1] = albedo_ilev
     # ... and source of diffuse radiation is surface emission
-    @inbounds src_ilev = FT(π) * sfc_emis[ibnd, gcol] * sfc_source[gcol]
-    @inbounds src[gcol, 1] = src_ilev#FT(π) * sfc_emis[ibnd, gcol] * sfc_source[gcol]
+    @inbounds src_ilev = FT(π) * sfc_emis[ibnd, gcol] * sfc_source[wcol]
+    @inbounds src[wcol, 1] = src_ilev#FT(π) * sfc_emis[ibnd, gcol] * sfc_source[wcol]
 
     # From bottom to top of atmosphere --
     #   compute albedo and source of upward radiation
-    @inbounds lev_src_bot = lev_source[gcol, 1]
+    @inbounds lev_src_bot = lev_source[wcol, 1]
     @inbounds for ilev in 1:nlay
-        lev_src_top = lev_source[gcol, ilev + 1]
-        τ_lay, ssa_lay, g_lay = τ[gcol, ilev], ssa[gcol, ilev], g[gcol, ilev]
+        lev_src_top = lev_source[wcol, ilev + 1]
+        τ_lay, ssa_lay, g_lay = τ[wcol, ilev], ssa[wcol, ilev], g[wcol, ilev]
         Rdif, Tdif, src_up, src_dn =
             lw_2stream_coeffs(τ_lay, ssa_lay, g_lay, lev_src_bot, lev_src_top)
         denom = FT(1) / (FT(1) - Rdif * albedo_ilev)  # Eq 10
@@ -294,24 +295,24 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
         # transmitted through the layer and reflected from layers below (Tdiff*src*albedo)
         src_ilevplus1 =
             src_up + Tdif * denom * (src_ilev + albedo_ilev * src_dn)
-        albedo[gcol, ilev + 1], src[gcol, ilev + 1] =
+        albedo[wcol, ilev + 1], src[wcol, ilev + 1] =
             albedo_ilevplus1, src_ilevplus1
         lev_src_bot = lev_src_top
         albedo_ilev, src_ilev = albedo_ilevplus1, src_ilevplus1
     end
 
     # Eq 12, at the top of the domain upwelling diffuse is due to ...
-    @inbounds flux_up[gcol, nlev] =
-        flux_dn_ilevplus1 * albedo[gcol, nlev] + # ... reflection of incident diffuse and
-        src[gcol, nlev]                          # scattering by the direct beam below
+    @inbounds flux_up[wcol, nlev] =
+        flux_dn_ilevplus1 * albedo[wcol, nlev] + # ... reflection of incident diffuse and
+        src[wcol, nlev]                          # scattering by the direct beam below
 
     # From the top of the atmosphere downward -- compute fluxes
-    @inbounds lev_src_top = lev_source[gcol, nlay + 1]
+    @inbounds lev_src_top = lev_source[wcol, nlay + 1]
     ilev = nlay
     @inbounds while ilev ≥ 1
         lev_src_bot, albedo_ilev, src_ilev =
-            lev_source[gcol, ilev], albedo[gcol, ilev], src[gcol, ilev]
-        τ_lay, ssa_lay, g_lay = τ[gcol, ilev], ssa[gcol, ilev], g[gcol, ilev]
+            lev_source[wcol, ilev], albedo[wcol, ilev], src[wcol, ilev]
+        τ_lay, ssa_lay, g_lay = τ[wcol, ilev], ssa[wcol, ilev], g[wcol, ilev]
         Rdif, Tdif, _, src_dn =
             lw_2stream_coeffs(τ_lay, ssa_lay, g_lay, lev_src_bot, lev_src_top)
 
@@ -320,10 +321,10 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
             (Tdif * flux_dn_ilevplus1 + # Equation 13
              Rdif * src_ilev +
              src_dn) * denom
-        flux_up[gcol, ilev] =
+        flux_up[wcol, ilev] =
             flux_dn_ilev * albedo_ilev + # Equation 12
             src_ilev
-        flux_dn[gcol, ilev] = flux_dn_ilev
+        flux_dn[wcol, ilev] = flux_dn_ilev
         flux_dn_ilevplus1 = flux_dn_ilev
         lev_src_top = lev_src_bot
         ilev -= 1
@@ -364,7 +365,19 @@ function rte_lw_2stream_solve_both_skies! end
     nlev,
     ncol,
 )
-    cloudy = _build_cloud_mask!(as.cloud_state, Val(:mask_lw), gcol, igpt)
+    # One column per thread, so the column's own index is the wide one and the
+    # g-point loop runs from the first. `lw_2stream_gpt_col_sweeps!` is where
+    # those come apart.
+    mask_store =
+        as.cloud_state isa CloudState ? as.cloud_state.mask_lw : nothing
+    cloudy = _build_cloud_mask!(
+        as.cloud_state,
+        Val(:mask_lw),
+        gcol,
+        igpt,
+        mask_store,
+        gcol,
+    )
     # Gas and aerosol only: this is the clear sky, and the shared half
     compute_optical_props!(
         op,
@@ -376,9 +389,70 @@ function rte_lw_2stream_solve_both_skies! end
         lookup_lw,
         nothing,
         lookup_lw_aero,
+        nothing,
+        gcol,
     )
-    rte_lw_2stream!(op, flux, src_lw, bcs_lw, gcol, igpt, ibnd, nlev, ncol)
-    _accumulate_fluxes!(flux_lw_clear, flux, gcol, nlev, igpt)
+    lw_2stream_gpt_col_sweeps!(
+        igpt,
+        gcol,
+        flux,
+        flux_lw,
+        flux_lw_clear,
+        band_flux,
+        src_lw,
+        bcs_lw,
+        op,
+        as,
+        lookup_lw_cld,
+        lookup_lw_precip,
+        ibnd,
+        nlev,
+        ncol,
+        mask_store,
+        1,
+        gcol,
+    )
+    return cloudy
+end
+
+# Everything the body above does once the gas and aerosol optics are in `op`:
+# the clear-sky sweep, the cloud increment on those same optics, the all-sky
+# sweep, and both accumulations. It reads `op` and writes fluxes, so it needs
+# nothing the optics half left in a register and can be a kernel of its own --
+# which is what `_grouped_rounds!` in ext/cuda builds from it.
+@inline function lw_2stream_gpt_col_sweeps!(
+    igpt,
+    gcol,
+    flux,
+    flux_lw,
+    flux_lw_clear,
+    band_flux,
+    src_lw,
+    bcs_lw,
+    op,
+    as,
+    lookup_lw_cld,
+    lookup_lw_precip,
+    ibnd,
+    nlev,
+    ncol,
+    mask_store,
+    first_igpt,
+    wcol,
+)
+    rte_lw_2stream!(
+        op,
+        flux,
+        src_lw,
+        bcs_lw,
+        gcol,
+        igpt,
+        ibnd,
+        nlev,
+        ncol,
+        wcol,
+    )
+    _accumulate_fluxes!(flux_lw_clear, flux, wcol, nlev, igpt, first_igpt)
     # Add the cloud increment on top of the same optics and sweep again
     if !isnothing(lookup_lw_cld)
         add_cloud_optics_lw!(
@@ -388,10 +462,25 @@ function rte_lw_2stream_solve_both_skies! end
             lookup_lw_cld,
             ibnd,
             lookup_lw_precip,
+            wcol,
+            mask_store,
         )
     end
-    rte_lw_2stream!(op, flux, src_lw, bcs_lw, gcol, igpt, ibnd, nlev, ncol)
-    _accumulate_fluxes!(flux_lw, flux, gcol, nlev, igpt)
+    rte_lw_2stream!(
+        op,
+        flux,
+        src_lw,
+        bcs_lw,
+        gcol,
+        igpt,
+        ibnd,
+        nlev,
+        ncol,
+        wcol,
+    )
+    _accumulate_fluxes!(flux_lw, flux, wcol, nlev, igpt, first_igpt)
+    # `band_flux` has no group axis, so a grouped caller must pass none; its
+    # driver solves the ungrouped path whenever one is being kept.
     accumulate_band_flux!(
         band_flux,
         flux.flux_up,
@@ -400,7 +489,7 @@ function rte_lw_2stream_solve_both_skies! end
         ibnd,
         nlev,
     )
-    return cloudy
+    return nothing
 end
 
 """
@@ -431,6 +520,7 @@ function solve_lw_both_skies!(
         bcs,
         op,
         state_cache,
+        gpt_groups,
     )::TwoStreamLWRTE,
     flux_lw_clear::FluxLW,
     as::AtmosphericState,
@@ -457,6 +547,7 @@ function solve_lw_both_skies!(
         lookup_lw_cld,
         lookup_lw_aero,
         lookup_lw_precip,
+        gpt_groups,
     )
     apply_metric_scaling!(flux, metric_scaling)
     apply_metric_scaling!(flux_lw_clear, metric_scaling)
@@ -483,6 +574,7 @@ function rte_lw_2stream_solve_both_skies!(
     lookup_lw_cld::Union{LookUpCld, Nothing},
     lookup_lw_aero::Union{LookUpAerosolMerra, Nothing},
     lookup_lw_precip::Union{LookUpPrecip, Nothing} = nothing,
+    gpt_groups = nothing,
 )
     nlay, ncol = AtmosphericStates.get_dims(as)
     nlev = nlay + 1
