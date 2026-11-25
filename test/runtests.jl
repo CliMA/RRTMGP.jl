@@ -22,6 +22,10 @@ end
     include("api_contract.jl")
 end
 
+@testset "Grouped g-point workspace sizes" begin
+    include("gpt_group_workspaces.jl")
+end
+
 @testset "Public API surface" begin
     include("public_api.jl")
 end
