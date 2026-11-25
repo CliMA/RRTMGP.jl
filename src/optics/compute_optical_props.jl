@@ -6,8 +6,8 @@
         as::AtmosphericState{FT},
         state_cache::Union{TransposedStateCache, Nothing},
         sf::AbstractSourceLW{FT},
-        gcol::Int,
-        igpt::Int,
+        gcol::Integer,
+        igpt::Integer,
         lkp::LookUpLW{FT},
         lkp_cld::Union{LookUpCld,Nothing} = nothing,
         lkp_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
@@ -23,8 +23,8 @@ GPU access) when one is provided, and from `as` directly otherwise.
     as::AtmosphericState,
     state_cache::Union{TransposedStateCache, Nothing},
     sf::SourceLWNoScat,
-    gcol::Int,
-    igpt::Int,
+    gcol::Integer,
+    igpt::Integer,
     lkp::LookUpLW,
     lkp_cld::Union{LookUpCld, Nothing} = nothing,
     lkp_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
@@ -145,13 +145,13 @@ end
     as::AtmosphericState,
     state_cache::Union{TransposedStateCache, Nothing},
     sf::SourceLW2Str,
-    gcol::Int,
-    igpt::Int,
+    gcol::Integer,
+    igpt::Integer,
     lkp::LookUpLW,
     lkp_cld::Union{LookUpCld, Nothing} = nothing,
     lkp_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
     lkp_precip::Union{LookUpPrecip, Nothing} = nothing,
-    wcol::Int = gcol,
+    wcol::Integer = gcol,
 )
     nlay = AtmosphericStates.get_nlay(as)
     (; vmr) = as
@@ -253,8 +253,8 @@ end
         op::AbstractOpticalProps,
         as::AtmosphericState,
         state_cache::Union{TransposedStateCache, Nothing},
-        gcol::Int,
-        igpt::Int,
+        gcol::Integer,
+        igpt::Integer,
         lkp::LookUpSW,
         lkp_cld::Union{LookUpCld, Nothing} = nothing,
         lkp_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
@@ -269,8 +269,8 @@ is provided, and from `as` directly otherwise.
     op::OneScalar,
     as::AtmosphericState,
     state_cache::Union{TransposedStateCache, Nothing},
-    gcol::Int,
-    igpt::Int,
+    gcol::Integer,
+    igpt::Integer,
     lkp::LookUpSW,
     ::Nothing,
 )
@@ -307,13 +307,13 @@ end
     op::TwoStream,
     as::AtmosphericState,
     state_cache::Union{TransposedStateCache, Nothing},
-    gcol::Int,
-    igpt::Int,
+    gcol::Integer,
+    igpt::Integer,
     lkp::LookUpSW,
     lkp_cld::Union{LookUpCld, Nothing} = nothing,
     lkp_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
     lkp_precip::Union{LookUpPrecip, Nothing} = nothing,
-    wcol::Int = gcol,
+    wcol::Integer = gcol,
     collect_aod::Bool = true,
 )
     nlay = AtmosphericStates.get_nlay(as)
@@ -403,9 +403,9 @@ could drift apart without anything noticing.
 @inline function add_cloud_optics_lw!(
     op::TwoStream,
     as::AtmosphericState,
-    gcol::Int,
+    gcol::Integer,
     lkp_cld::LookUpCld,
-    ibnd::Int,
+    ibnd::Integer,
     lkp_precip::Union{LookUpPrecip, Nothing} = nothing,
 )
     # The narrow column space: `op` is indexed by the column itself, and the
@@ -429,11 +429,11 @@ end
 @inline function add_cloud_optics_lw!(
     op::TwoStream,
     as::AtmosphericState,
-    gcol::Int,
+    gcol::Integer,
     lkp_cld::LookUpCld,
-    ibnd::Int,
+    ibnd::Integer,
     lkp_precip::Union{LookUpPrecip, Nothing},
-    wcol::Int,
+    wcol::Integer,
     mask_store,
 )
     cloud_state = as.cloud_state
@@ -469,9 +469,9 @@ and the longwave one does not.
 @inline function add_cloud_optics_sw!(
     op::TwoStream,
     as::AtmosphericState,
-    gcol::Int,
+    gcol::Integer,
     lkp_cld::LookUpCld,
-    ibnd::Int,
+    ibnd::Integer,
     lkp_precip::Union{LookUpPrecip, Nothing} = nothing,
 )
     # The narrow column space: `op` is indexed by the column itself, and the
@@ -495,11 +495,11 @@ end
 @inline function add_cloud_optics_sw!(
     op::TwoStream,
     as::AtmosphericState,
-    gcol::Int,
+    gcol::Integer,
     lkp_cld::LookUpCld,
-    ibnd::Int,
+    ibnd::Integer,
     lkp_precip::Union{LookUpPrecip, Nothing},
-    wcol::Int,
+    wcol::Integer,
     mask_store,
 )
     cloud_state = as.cloud_state

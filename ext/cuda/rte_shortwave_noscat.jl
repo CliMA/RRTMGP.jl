@@ -7,9 +7,9 @@ function rte_sw_noscat_solve!(
 )
     nlay, ncol = AtmosphericStates.get_dims(as)
     tx, bx = _configure_threadblock(ncol)
-    args = (flux_sw, op, bcs_sw, nlay, ncol, as)
+    args = (flux_sw, op, bcs_sw, Int32(nlay), Int32(ncol), as)
     @cuda always_inline = true threads = (tx) blocks = (bx) rte_sw_noscat_solve_CUDA!(
-        args...,
+        int32_arrays(args)...,
     )
     return nothing
 end
@@ -22,8 +22,8 @@ function rte_sw_noscat_solve_CUDA!(
     ncol,
     as::GrayAtmosphericState,
 )
-    gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
-    nlev = nlay + 1
+    gcol = threadIdx().x + (blockIdx().x - 1i32) * blockDim().x # global id
+    nlev = nlay + 1i32
     n_gpt, igpt = 1, 1
     FT = eltype(bcs_sw.cos_zenith)
     solar_frac = FT(1)
@@ -63,9 +63,19 @@ function rte_sw_noscat_solve!(
 )
     nlay, ncol = AtmosphericStates.get_dims(as)
     tx, bx = _configure_threadblock(ncol)
-    args = (flux, flux_sw, op, bcs_sw, nlay, ncol, as, state_cache, lookup_sw)
+    args = (
+        flux,
+        flux_sw,
+        op,
+        bcs_sw,
+        Int32(nlay),
+        Int32(ncol),
+        as,
+        state_cache,
+        lookup_sw,
+    )
     @cuda always_inline = true threads = (tx) blocks = (bx) rte_sw_noscat_solve_CUDA!(
-        args...,
+        int32_arrays(args)...,
     )
     return nothing
 end
@@ -81,14 +91,14 @@ function rte_sw_noscat_solve_CUDA!(
     state_cache::Union{TransposedStateCache, Nothing},
     lookup_sw::LookUpSW,
 )
-    gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
-    nlev = nlay + 1
-    n_gpt = length(lookup_sw.solar_src_scaled)
+    gcol = threadIdx().x + (blockIdx().x - 1i32) * blockDim().x # global id
+    nlev = nlay + 1i32
+    n_gpt = length(lookup_sw.solar_src_scaled) % Int32
     if gcol ≤ ncol
         μ₀ = @inbounds bcs_sw.cos_zenith[gcol]
         @inbounds begin
             if μ₀ > 0
-                for igpt in 1:n_gpt
+                for igpt in 1i32:n_gpt
                     sw_noscat_gpt_col!(
                         igpt,
                         gcol,

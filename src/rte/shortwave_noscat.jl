@@ -107,8 +107,8 @@ end
         flux::FluxSW,
         op::OneScalar,
         bcs_sw::SwBCs,
-        igpt::Int,
-        n_gpt::Int,
+        igpt::Integer,
+        n_gpt::Integer,
         solar_frac::AbstractFloat,
         gcol,
         nlev,
@@ -121,11 +121,11 @@ No-scattering solver for the shortwave problem.
     flux::FluxSW,
     op::OneScalar,
     bcs_sw::SwBCs,
-    igpt::Int,
-    n_gpt::Int,
+    igpt::Integer,
+    n_gpt::Integer,
     solar_frac::AbstractFloat,
-    gcol::Int,
-    nlev::Int,
+    gcol::Integer,
+    nlev::Integer,
 )
     (; toa_flux, cos_zenith) = bcs_sw
     τ = op.τ

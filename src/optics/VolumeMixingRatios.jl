@@ -81,18 +81,18 @@ Adapt.@adapt_structure Vmr
 """
     get_vmr(
         vmr::VmrGM{FT},
-        ig::Int,
-        ilay::Int,
-        icol::Int,
+        ig::Integer,
+        ilay::Integer,
+        icol::Integer,
     ) where {FT<:AbstractFloat}
 
 Obtain volume mixing ratio of gas `ig` for layer `ilay` of column `icol`.
 """
 @inline function get_vmr(
     vmr::VmrGM{FT},
-    ig::Int,
-    ilay::Int,
-    icol::Int,
+    ig::Integer,
+    ilay::Integer,
+    icol::Integer,
 ) where {FT <: AbstractFloat}
     if ig == 0
         return FT(1)
@@ -108,18 +108,18 @@ end
 """
     get_vmr(
         vmr::Vmr{FT},
-        ig::Int,
-        ilay::Int,
-        icol::Int,
+        ig::Integer,
+        ilay::Integer,
+        icol::Integer,
     ) where {FT<:AbstractFloat}
 
 Obtain volume mixing ratio of gas `ig` for layer `ilay` of column `icol`.
 """
 @inline function get_vmr(
     vmr::Vmr{FT},
-    ig::Int,
-    ilay::Int,
-    icol::Int,
+    ig::Integer,
+    ilay::Integer,
+    icol::Integer,
 ) where {FT <: AbstractFloat}
     if ig == 0
         return FT(1)

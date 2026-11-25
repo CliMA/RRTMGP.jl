@@ -9,9 +9,10 @@ function rte_lw_noscat_solve!(
 )
     nlay, ncol = AtmosphericStates.get_dims(as)
     tx, bx = _configure_threadblock(ncol)
-    args = (flux_lw, src_lw, bcs_lw, op, angle_disc, nlay, ncol, as)
+    args =
+        (flux_lw, src_lw, bcs_lw, op, angle_disc, Int32(nlay), Int32(ncol), as)
     @cuda always_inline = true threads = (tx) blocks = (bx) rte_lw_noscat_solve_CUDA!(
-        args...,
+        int32_arrays(args)...,
     )
     return nothing
 end
@@ -26,8 +27,8 @@ function rte_lw_noscat_solve_CUDA!(
     ncol,
     as::GrayAtmosphericState,
 )
-    gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
-    nlev = nlay + 1
+    gcol = threadIdx().x + (blockIdx().x - 1i32) * blockDim().x # global id
+    nlev = nlay + 1i32
     igpt, ibnd = 1, 1
     Ds = angle_disc.gauss_Ds[1]
     w_μ = angle_disc.gauss_wts[1]
@@ -75,8 +76,8 @@ function rte_lw_noscat_solve!(
         bcs_lw,
         op,
         angle_disc,
-        nlay,
-        ncol,
+        Int32(nlay),
+        Int32(ncol),
         as,
         state_cache,
         lookup_lw,
@@ -85,7 +86,7 @@ function rte_lw_noscat_solve!(
         lookup_lw_precip,
     )
     @cuda always_inline = true threads = (tx) blocks = (bx) rte_lw_noscat_solve_CUDA!(
-        args...,
+        int32_arrays(args)...,
     )
     return nothing
 end
@@ -106,16 +107,16 @@ function rte_lw_noscat_solve_CUDA!(
     lookup_lw_aero::Union{LookUpAerosolMerra, Nothing},
     lookup_lw_precip::Union{LookUpPrecip, Nothing} = nothing,
 )
-    gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
-    nlev = nlay + 1
+    gcol = threadIdx().x + (blockIdx().x - 1i32) * blockDim().x # global id
+    nlev = nlay + 1i32
     (; major_gpt2bnd) = lookup_lw.band_data
-    n_gpt = length(major_gpt2bnd)
+    n_gpt = length(major_gpt2bnd) % Int32
     if gcol ≤ ncol
         (; cloud_state, aerosol_state) = as
         FT = eltype(flux_lw.flux_up)
         _compute_aero_mask!(aerosol_state, gcol)
-        n_cloudy_gpts = 0  # thread-local counter for LW cloud cover
-        @inbounds for igpt in 1:n_gpt
+        n_cloudy_gpts = 0i32  # thread-local counter for LW cloud cover
+        @inbounds for igpt in 1i32:n_gpt
             cloudy = lw_noscat_gpt_col!(
                 igpt,
                 gcol,
@@ -135,7 +136,7 @@ function rte_lw_noscat_solve_CUDA!(
                 nlay,
                 nlev,
             )
-            n_cloudy_gpts += cloudy ? 1 : 0
+            n_cloudy_gpts += Int32(cloudy)
         end
         @inbounds begin
             compute_net_flux!(flux_lw, gcol, nlev)

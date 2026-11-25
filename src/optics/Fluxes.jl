@@ -236,15 +236,15 @@ end
     compute_net_flux!(flux, gcol, size(flux.flux_up, 2))
 
 """
-    set_flux_to_zero!(flux::FluxLW{FT}, gcol::Int, nlev::Int) where {FT<:AbstractFloat}
-    set_flux_to_zero!(flux::FluxLW{FT}, gcol::Int) where {FT<:AbstractFloat}
+    set_flux_to_zero!(flux::FluxLW{FT}, gcol::Integer, nlev::Integer) where {FT<:AbstractFloat}
+    set_flux_to_zero!(flux::FluxLW{FT}, gcol::Integer) where {FT<:AbstractFloat}
 
 Set longwave flux for column `gcol` to zero across `nlev` levels.
 """
 @inline function set_flux_to_zero!(
     flux::FluxLW{FT},
-    gcol::Int,
-    nlev::Int,
+    gcol::Integer,
+    nlev::Integer,
 ) where {FT <: AbstractFloat}
     (; flux_up, flux_dn, flux_net) = flux
     @inbounds for ilev in 1:nlev
@@ -255,19 +255,19 @@ Set longwave flux for column `gcol` to zero across `nlev` levels.
     return nothing
 end
 
-@inline set_flux_to_zero!(flux::FluxLW, gcol::Int) =
+@inline set_flux_to_zero!(flux::FluxLW, gcol::Integer) =
     set_flux_to_zero!(flux, gcol, size(flux.flux_up, 2))
 
 """
-    set_flux_to_zero!(flux::FluxSW{FT}, gcol::Int, nlev::Int) where {FT<:AbstractFloat}
-    set_flux_to_zero!(flux::FluxSW{FT}, gcol::Int) where {FT<:AbstractFloat}
+    set_flux_to_zero!(flux::FluxSW{FT}, gcol::Integer, nlev::Integer) where {FT<:AbstractFloat}
+    set_flux_to_zero!(flux::FluxSW{FT}, gcol::Integer) where {FT<:AbstractFloat}
 
 Set shortwave flux for column `gcol` to zero across `nlev` levels.
 """
 @inline function set_flux_to_zero!(
     flux::FluxSW{FT},
-    gcol::Int,
-    nlev::Int,
+    gcol::Integer,
+    nlev::Integer,
 ) where {FT <: AbstractFloat}
     (; flux_up, flux_dn, flux_net, flux_dn_dir) = flux
     @inbounds for ilev in 1:nlev
@@ -279,7 +279,7 @@ Set shortwave flux for column `gcol` to zero across `nlev` levels.
     return nothing
 end
 
-@inline set_flux_to_zero!(flux::FluxSW, gcol::Int) =
+@inline set_flux_to_zero!(flux::FluxSW, gcol::Integer) =
     set_flux_to_zero!(flux, gcol, size(flux.flux_up, 2))
 
 """

@@ -8,9 +8,9 @@ function rte_sw_2stream_solve!(
 )
     nlay, ncol = AtmosphericStates.get_dims(as)
     tx, bx = _configure_threadblock(ncol)
-    args = (flux_sw, op, bcs_sw, src_sw, nlay, ncol, as)
+    args = (flux_sw, op, bcs_sw, src_sw, Int32(nlay), Int32(ncol), as)
     @cuda always_inline = true threads = (tx) blocks = (bx) rte_sw_2stream_solve_CUDA!(
-        args...,
+        int32_arrays(args)...,
     )
     return nothing
 end
@@ -24,8 +24,8 @@ function rte_sw_2stream_solve_CUDA!(
     ncol,
     as::GrayAtmosphericState,
 )
-    gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
-    nlev = nlay + 1
+    gcol = threadIdx().x + (blockIdx().x - 1i32) * blockDim().x # global id
+    nlev = nlay + 1i32
     n_gpt, igpt, ibnd = 1, 1, 1
     FT = eltype(bcs_sw.cos_zenith)
     solar_frac = FT(1)
@@ -80,8 +80,8 @@ function rte_sw_2stream_solve!(
         op,
         bcs_sw,
         src_sw,
-        nlay,
-        ncol,
+        Int32(nlay),
+        Int32(ncol),
         as,
         state_cache,
         lookup_sw,
@@ -90,7 +90,7 @@ function rte_sw_2stream_solve!(
         lookup_sw_precip,
     )
     @cuda always_inline = true threads = (tx) blocks = (bx) rte_sw_2stream_solve_CUDA!(
-        args...,
+        int32_arrays(args)...,
     )
     return nothing
 end
@@ -111,17 +111,17 @@ function rte_sw_2stream_solve_CUDA!(
     lookup_sw_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
     lookup_sw_precip::Union{LookUpPrecip, Nothing} = nothing,
 )
-    gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
-    nlev = nlay + 1
-    n_gpt = length(lookup_sw.band_data.major_gpt2bnd)
+    gcol = threadIdx().x + (blockIdx().x - 1i32) * blockDim().x # global id
+    nlev = nlay + 1i32
+    n_gpt = length(lookup_sw.band_data.major_gpt2bnd) % Int32
     if gcol ≤ ncol
         FT = eltype(flux_sw.flux_up)
         (; cloud_state, aerosol_state) = as
         μ₀ = @inbounds bcs_sw.cos_zenith[gcol]
-        n_cloudy_gpts = 0  # thread-local counter for cloud cover
+        n_cloudy_gpts = 0i32  # thread-local counter for cloud cover
         @inbounds begin
             _compute_aero_mask!(aerosol_state, gcol)
-            for igpt in 1:n_gpt
+            for igpt in 1i32:n_gpt
                 cloudy = sw_2stream_gpt_col!(
                     igpt,
                     gcol,
@@ -142,7 +142,7 @@ function rte_sw_2stream_solve_CUDA!(
                     n_gpt,
                     nlev,
                 )
-                n_cloudy_gpts += cloudy ? 1 : 0
+                n_cloudy_gpts += Int32(cloudy)
             end
             if μ₀ ≤ 0 # zero out columns with zenith angle ≥ π/2
                 set_flux_to_zero!(flux_sw, gcol, nlev)
@@ -216,8 +216,8 @@ function rte_sw_2stream_solve_both_skies!(
         op,
         bcs_sw,
         src_sw,
-        nlay,
-        ncol,
+        Int32(nlay),
+        Int32(ncol),
         as,
         state_cache,
         lookup_sw,
@@ -226,7 +226,7 @@ function rte_sw_2stream_solve_both_skies!(
         lookup_sw_precip,
     )
     @cuda always_inline = true threads = (tx) blocks = (bx) rte_sw_2stream_solve_both_skies_CUDA!(
-        args...,
+        int32_arrays(args)...,
     )
     return nothing
 end
@@ -257,17 +257,17 @@ function rte_sw_2stream_solve_both_skies_CUDA!(
     lookup_sw_aero::Union{LookUpAerosolMerra, Nothing},
     lookup_sw_precip::Union{LookUpPrecip, Nothing} = nothing,
 )
-    gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
-    nlev = nlay + 1
-    n_gpt = length(lookup_sw.band_data.major_gpt2bnd)
+    gcol = threadIdx().x + (blockIdx().x - 1i32) * blockDim().x # global id
+    nlev = nlay + 1i32
+    n_gpt = length(lookup_sw.band_data.major_gpt2bnd) % Int32
     if gcol ≤ ncol
         FT = eltype(flux_sw.flux_up)
         (; cloud_state, aerosol_state) = as
         μ₀ = @inbounds bcs_sw.cos_zenith[gcol]
-        n_cloudy_gpts = 0  # thread-local counter for cloud cover
+        n_cloudy_gpts = 0i32  # thread-local counter for cloud cover
         @inbounds begin
             _compute_aero_mask!(aerosol_state, gcol)
-            for igpt in 1:n_gpt
+            for igpt in 1i32:n_gpt
                 cloudy = sw_2stream_gpt_col_both_skies!(
                     igpt,
                     gcol,
@@ -289,7 +289,7 @@ function rte_sw_2stream_solve_both_skies_CUDA!(
                     n_gpt,
                     nlev,
                 )
-                n_cloudy_gpts += cloudy ? 1 : 0
+                n_cloudy_gpts += Int32(cloudy)
             end
             # Night columns never swept, so zero both skies rather than leaving
             # whatever the accumulators last held
@@ -331,12 +331,12 @@ function _sw_group_optics_CUDA!(
     round,
     cos_zenith,
 )
-    wcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x
+    wcol = threadIdx().x + (blockIdx().x - 1i32) * blockDim().x
     (; major_gpt2bnd) = lookup_sw.band_data
     if wcol <= ncol * ngroups
-        gcol = (wcol - 1) % ncol + 1
-        grp = (wcol - 1) ÷ ncol + 1
-        igpt = grp + (round - 1) * ngroups
+        gcol = (wcol - 1i32) % ncol + 1i32
+        grp = (wcol - 1i32) ÷ ncol + 1i32
+        igpt = grp + (round - 1i32) * ngroups
         if igpt <= n_gpt
             @inbounds begin
                 ibnd = major_gpt2bnd[igpt]
@@ -344,7 +344,8 @@ function _sw_group_optics_CUDA!(
                 # one of its own band: exactly one thread writes the 550 nm
                 # optical depth, and it is the g-point the ungrouped loop
                 # leaves standing.
-                collect_aod = igpt == n_gpt || major_gpt2bnd[igpt + 1] != ibnd
+                collect_aod =
+                    igpt == n_gpt || major_gpt2bnd[igpt + 1i32] != ibnd
                 # Nothing else reads a dark column's optics: its thread in the
                 # sweeps zeroes the partials instead of sweeping, and the cloud
                 # increment is behind the same test. So of that column's 224
@@ -397,16 +398,16 @@ function _sw_group_sweeps_CUDA!(
     n_gpt,
     round,
 )
-    wcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x
-    nlev = nlay + 1
+    wcol = threadIdx().x + (blockIdx().x - 1i32) * blockDim().x
+    nlev = nlay + 1i32
     (; major_gpt2bnd) = lookup_sw.band_data
     if wcol <= ncol * ngroups
-        gcol = (wcol - 1) % ncol + 1
-        grp = (wcol - 1) ÷ ncol + 1
+        gcol = (wcol - 1i32) % ncol + 1i32
+        grp = (wcol - 1i32) ÷ ncol + 1i32
         FT = eltype(acc.flux_up)
         μ₀ = @inbounds bcs_sw.cos_zenith[gcol]
-        igpt = grp + (round - 1) * ngroups
-        if round == 1
+        igpt = grp + (round - 1i32) * ngroups
+        if round == 1i32
             @inbounds cloudy_count[wcol] = Int32(0)
             (grp > n_gpt || μ₀ <= 0) &&
                 _zero_partials!(acc, acc_clear, wcol, nlev)
@@ -464,15 +465,15 @@ function _reduce_sw_groups_CUDA!(
     ncol,
     nlev,
 )
-    i = threadIdx().x + (blockIdx().x - 1) * blockDim().x
+    i = threadIdx().x + (blockIdx().x - 1i32) * blockDim().x
     if i <= ncol * nlev
-        gcol = (i - 1) % ncol + 1
-        ilev = (i - 1) ÷ ncol + 1
+        gcol = (i - 1i32) % ncol + 1i32
+        ilev = (i - 1i32) ÷ ncol + 1i32
         FT = eltype(flux_sw.flux_up)
         up, dn, dir = FT(0), FT(0), FT(0)
         cup, cdn, cdir = FT(0), FT(0), FT(0)
-        @inbounds for g in 1:ngroups
-            wcol = gcol + (g - 1) * ncol
+        @inbounds for g in 1i32:ngroups
+            wcol = gcol + (g - 1i32) * ncol
             up += acc.flux_up[wcol, ilev]
             dn += acc.flux_dn[wcol, ilev]
             dir += acc.flux_dn_dir[wcol, ilev]
@@ -489,10 +490,10 @@ function _reduce_sw_groups_CUDA!(
             flux_sw_clear.flux_dn[gcol, ilev] = cdn
             flux_sw_clear.flux_dn_dir[gcol, ilev] = cdir
             flux_sw_clear.flux_net[gcol, ilev] = cup - cdn
-            if ilev == 1 && !isnothing(cld_cover_sw)
-                n = 0
-                for g in 1:ngroups
-                    n += cloudy_count[gcol + (g - 1) * ncol]
+            if ilev == 1i32 && !isnothing(cld_cover_sw)
+                n = 0i32
+                for g in 1i32:ngroups
+                    n += cloudy_count[gcol + (g - 1i32) * ncol]
                 end
                 cld_cover_sw[gcol] = FT(n) / n_gpt
             end

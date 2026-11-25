@@ -6,7 +6,7 @@
         op::AbstractOpticalProps,
         as::GrayAtmosphericState,
         sf::AbstractSourceLW,
-        gcol::Int,
+        gcol::Integer,
     )
 
 Compute optical properties for the longwave gray radiation problem.
@@ -15,7 +15,7 @@ function compute_optical_props!(
     op::OneScalar,
     as::GrayAtmosphericState,
     sf::SourceLWNoScat,
-    gcol::Int,
+    gcol::Integer,
 )
     nlay = AtmosphericStates.get_nlay(as)
     (; p_lay, p_lev, t_lay, t_lev, otp) = as
@@ -67,7 +67,7 @@ function compute_optical_props!(
     op::TwoStream,
     as::GrayAtmosphericState,
     sf::SourceLW2Str,
-    gcol::Int,
+    gcol::Integer,
 )
     nlay = AtmosphericStates.get_nlay(as)
     (; p_lay, p_lev, t_lay, t_lev, otp) = as
@@ -119,7 +119,7 @@ end
     compute_optical_props!(
         op::AbstractOpticalProps,
         as::GrayAtmosphericState,
-        gcol::Int,
+        gcol::Integer,
     )
 
 Compute optical properties for the shortwave gray radiation problem.
@@ -127,7 +127,7 @@ Compute optical properties for the shortwave gray radiation problem.
 function compute_optical_props!(
     op::AbstractOpticalProps,
     as::GrayAtmosphericState,
-    gcol::Int,
+    gcol::Integer,
 )
     nlay = AtmosphericStates.get_nlay(as)
     (; p_lay, p_lev, otp) = as
