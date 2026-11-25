@@ -5,23 +5,17 @@ main
 ----
 
 - [#637](https://github.com/CliMA/RRTMGP.jl/pull/637) `TwoStreamLWRTE` and
-  `TwoStreamSWRTE` solve a column's g-point loop in `ngpt_groups` independent
-  pieces covered by one grid, in place of the serial loop each thread ran over
-  its own column, and compute each round's gas and aerosol optics in a kernel
-  of its own before sweeping them. **Default results change at roundoff.** The
-  group count is chosen per grid by `default_ngpt_groups` and is above one on a
-  GPU wherever the column count leaves the device underfilled, which reorders
-  the g-point sum; floating-point addition is not associative, so grouped
-  fluxes differ from a serial solve by about 1e-6 relative in the
-  configurations tested, and the clear-sky half of a both-skies solve no longer
-  equals a standalone clear-sky solve exactly. The cloud-cover tally is a count
-  of g-points and stays exact. Pass `ngpt_groups = 1` to any two-stream
-  constructor where bit-for-bit agreement with the serial order is required;
-  that is also what a CPU gets, whose driver ignores the grouped workspaces.
-  Grouping costs device memory: every widened workspace is linear in the group
-  count, the accumulators being `ncol * ngpt_groups * nlev` by two flux planes
-  in the longwave and three in the shortwave, so a run tight on memory should
-  pass a smaller `ngpt_groups` rather than take the default.
+  `TwoStreamSWRTE` spread a column's g-point loop across `ngpt_groups` pieces
+  covered by one grid, in place of the serial loop each thread ran over its own
+  column, and compute each round's optics in a kernel of its own. **Default
+  results change at roundoff**: `default_ngpt_groups` exceeds one on a GPU
+  wherever the column count leaves the device underfilled, and regrouping a sum
+  of g-points moves fluxes by about 1e-6 relative; the clear-sky half of a
+  both-skies solve no longer equals a standalone clear-sky solve exactly, while
+  the cloud-cover tally is a count and stays exact. `ngpt_groups = 1` restores
+  the serial order, and is what a CPU solves in regardless. The widened
+  workspaces are linear in the group count, so a run tight on device memory
+  should pass fewer than the default.
 
 v1.1.0
 ------
