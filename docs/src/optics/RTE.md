@@ -21,4 +21,5 @@ workspaces that make that possible.
 LWGptGroups
 SWGptGroups
 default_ngpt_groups
+gpt_group_bytes
 ```

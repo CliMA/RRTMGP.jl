@@ -144,6 +144,9 @@ function rte_lw_2stream_solve_CUDA!(
     return nothing
 end
 
+# Duplicated for the CPU in src/rte/longwave_2stream.jl: the cloud-cover tally
+# and net-flux finalize are in both, and the grouped reduction below holds a
+# third copy of the finalize. Change all three.
 """
     rte_lw_2stream_solve_both_skies!(device::CUDADevice, ...)
 
@@ -220,9 +223,6 @@ cloud increment to the same optics and sweeps again. Per-column body is
 `lw_2stream_gpt_col_both_skies!` in `src/rte/longwave_2stream.jl`, shared with the
 CPU driver.
 """
-# Duplicated for the CPU in src/rte/longwave_2stream.jl: the cloud-cover tally
-# and net-flux finalize are in both, and the grouped reduction below holds a
-# third copy of the finalize. Change all three.
 function rte_lw_2stream_solve_both_skies_CUDA!(
     flux::FluxLW,
     flux_lw::FluxLW,

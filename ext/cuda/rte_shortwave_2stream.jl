@@ -160,6 +160,10 @@ function rte_sw_2stream_solve_CUDA!(
     return nothing
 end
 
+# Duplicated for the CPU in src/rte/shortwave_2stream.jl: the cloud-cover tally,
+# net-flux finalize and night-column zeroing are in both, and the grouped
+# reduction below holds a third copy of the finalize and the zeroing. Change all
+# three.
 """
     rte_sw_2stream_solve_both_skies!(device::CUDADevice, ...)
 
@@ -236,10 +240,6 @@ cloud increment to the same optics and sweeps again. Per-column body is
 `sw_2stream_gpt_col_both_skies!` in `src/rte/shortwave_2stream.jl`, shared with the
 CPU driver.
 """
-# Duplicated for the CPU in src/rte/shortwave_2stream.jl: the cloud-cover tally,
-# net-flux finalize and night-column zeroing are in both, and the grouped
-# reduction below holds a third copy of the finalize and the zeroing. Change all
-# three.
 function rte_sw_2stream_solve_both_skies_CUDA!(
     flux::FluxSW,
     flux_sw::FluxSW,
