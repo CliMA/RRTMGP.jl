@@ -1,0 +1,17 @@
+# RRTMGP high-resolution GPU benchmark baseline (minimum ns)
+# device: NVIDIA A100-SXM4-80GB
+# julia: 1.13.3
+# recorded: local run
+# regenerate with RRTMGP_BENCH_WRITE_BASELINE=1
+all_sky_lw_Float32 7.62426414e8
+all_sky_lw_Float64 1.024661056e9
+all_sky_sw_Float32 6.89808278e8
+all_sky_sw_Float64 9.32916797e8
+all_sky_with_aerosols_lw_Float32 8.26842993e8
+all_sky_with_aerosols_lw_Float64 1.107884607e9
+all_sky_with_aerosols_sw_Float32 7.51106012e8
+all_sky_with_aerosols_sw_Float64 9.98204264e8
+clear_sky_lw_Float32 5.07037537e8
+clear_sky_lw_Float64 6.83464792e8
+clear_sky_sw_Float32 4.63103014e8
+clear_sky_sw_Float64 6.20910701e8

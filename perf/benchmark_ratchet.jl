@@ -9,15 +9,14 @@ each against a recorded per-GPU baseline:
     perf/benchmark_baselines/<device_key>.txt
 
 A measurement slower than baseline × (1 + tolerance) fails its `@test`. The
-tolerance (default 20%, chosen for shared-cluster timing noise on the
-Buildkite P100s) can be overridden with the `RRTMGP_BENCH_TOL_PCT` environment
-variable.
+tolerance (default 20%, chosen for shared-cluster timing noise) can be
+overridden with the `RRTMGP_BENCH_TOL_PCT` environment variable.
 
-Baselines:
-- If no baseline file exists for this GPU, the script records one and passes;
-  commit the file (CI uploads it as a Buildkite artifact) to arm the ratchet.
-- To re-baseline intentionally (e.g. after an accepted performance change),
-  run with `RRTMGP_BENCH_WRITE_BASELINE=1` and commit the updated file.
+Baselines are recorded only when asked for, with
+`RRTMGP_BENCH_WRITE_BASELINE=1`, and the file is then committed. Anything else
+is an error: a missing baseline for this GPU, or one recorded on another Julia
+version, leaves nothing to compare against, and recording it silently is how a
+ratchet runs for weeks without ever comparing.
 
 Usage (needs a CUDA device):
 
@@ -138,6 +137,18 @@ function write_baseline(path, results; kind = "baseline")
     return path
 end
 
+# `read_baseline` drops the comment lines, so the recorded toolchain is read
+# separately: a Julia upgrade moves register counts, and a baseline from another
+# version is not a like comparison.
+function baseline_julia(path)
+    isfile(path) || return nothing
+    for line in eachline(path)
+        m = match(r"^#\s*julia:\s*(\S+)", line)
+        isnothing(m) || return m.captures[1]
+    end
+    return nothing
+end
+
 const tol = parse(Float64, get(ENV, "RRTMGP_BENCH_TOL_PCT", "20")) / 100
 const write_mode = get(ENV, "RRTMGP_BENCH_WRITE_BASELINE", "0") == "1"
 const path = baseline_path(device_key())
@@ -180,12 +191,26 @@ for (name, ns) in sort(collect(results); by = first)
     )
 end
 
-if write_mode || isnothing(baseline)
+const recorded_julia = baseline_julia(path)
+
+if write_mode
     write_baseline(path, results)
-    action = write_mode ? "rewrote" : "no baseline found for this GPU; recorded"
-    @info "benchmark_ratchet: $action $path — commit it to arm the ratchet."
+    @info "benchmark_ratchet: rewrote $path — commit it to arm the ratchet."
     println("\n--- baseline file contents ---")
     println(read(path, String))
+elseif isnothing(baseline)
+    error(
+        "no baseline for this GPU at $path; record one with " *
+        "RRTMGP_BENCH_WRITE_BASELINE=1 and commit it. The measured minima are " *
+        "in $measured_path.",
+    )
+elseif !isnothing(recorded_julia) && recorded_julia != string(VERSION)
+    # A toolchain change moves register counts, so the recorded times are not a
+    # like comparison -- and the ratchet has nothing else to compare against.
+    error(
+        "baseline $path was recorded on Julia $recorded_julia and this is " *
+        "$(VERSION); re-record with RRTMGP_BENCH_WRITE_BASELINE=1 and commit it.",
+    )
 else
     @testset "GPU benchmark ratchet ($(device_key()))" begin
         for (name, ns) in sort(collect(results); by = first)
