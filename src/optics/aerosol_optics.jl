@@ -133,6 +133,104 @@ to the existing `TwoStream` optics properties:
 end
 
 """
+    compute_aerosol_band_optics!(
+        τ_aero, ssa_aero, g_aero, aod_ext, aod_sca, aero_mask, aero_size,
+        aero_mass, rel_hum, lkp_aero, ibnd, iband_550nm; delta_scaling = false,
+    )
+
+Compute one column's `TwoStream` aerosol optics for band `ibnd` into the
+per-layer stores `τ_aero`, `ssa_aero` and `g_aero`, without adding them to any
+gas optics.
+
+Aerosol optics depend on the band, the column and the layer but not on the
+g-point, so a solve that keeps them per band computes them once and adds them to
+each of the band's g-points with [`add_aerosol_band_optics!`](@ref). The values
+stored are the ones [`add_aerosol_optics_2stream!`](@ref) hands to
+`increment_2stream`, so the two routes give the same optics bit for bit.
+
+A layer the mask leaves out is not written: the reader tests the same mask.
+"""
+@inline function compute_aerosol_band_optics!(
+    τ_store,
+    ssa_store,
+    g_store,
+    aod_ext,
+    aod_sca,
+    aero_mask,
+    aero_size,
+    aero_mass,
+    rel_hum,
+    lkp_aero,
+    ibnd,
+    iband_550nm;
+    delta_scaling = false,
+)
+    @inbounds begin
+        collect_aod = !isnothing(aod_ext) && (ibnd == iband_550nm)
+        nlay = length(τ_store)
+        FT = eltype(τ_store)
+        collect_aod && (aod_ext[] = 0)
+        collect_aod && (aod_sca[] = 0)
+        for glay in 1:nlay
+            if aero_mask[glay]
+                τ_aero, τ_ssa_aero, τ_ssag_aero = compute_lookup_aerosol(
+                    lkp_aero,
+                    ibnd,
+                    aero_mass,
+                    aero_size,
+                    rel_hum[glay],
+                    glay,
+                )
+                g_aero = τ_ssag_aero / max(eps(FT), τ_ssa_aero)
+                ssa_aero = τ_ssa_aero / max(eps(FT), τ_aero)
+                if collect_aod
+                    aod_ext[] += τ_aero
+                    aod_sca[] += τ_ssa_aero
+                end
+                if delta_scaling # delta scaling is applied for shortwave problem
+                    τ_aero, ssa_aero, g_aero =
+                        delta_scale(τ_aero, ssa_aero, g_aero)
+                end
+                τ_store[glay], ssa_store[glay], g_store[glay] =
+                    τ_aero, ssa_aero, g_aero
+            end
+        end
+    end
+    return nothing
+end
+
+"""
+    add_aerosol_band_optics!(τ, ssa, g, aero_mask, τ_aero, ssa_aero, g_aero)
+
+Add one column's stored band aerosol optics, as
+[`compute_aerosol_band_optics!`](@ref) left them, to the `TwoStream` optics
+`τ`, `ssa` and `g` of one g-point.
+"""
+@inline function add_aerosol_band_optics!(
+    τ,
+    ssa,
+    g,
+    aero_mask,
+    τ_store,
+    ssa_store,
+    g_store,
+)
+    @inbounds for glay in 1:length(τ)
+        if aero_mask[glay]
+            τ[glay], ssa[glay], g[glay] = increment_2stream(
+                τ[glay],
+                ssa[glay],
+                g[glay],
+                τ_store[glay],
+                ssa_store[glay],
+                g_store[glay],
+            )
+        end
+    end
+    return nothing
+end
+
+"""
     compute_lookup_aerosol(lkp_aero, ibnd::Int, aero_mass, aero_size, rh::FT, glay) where {FT}
 
 Compute cumulative aerosol optical properties for various aerosol particles given the aerosol lookup table (`lkp_aero`),

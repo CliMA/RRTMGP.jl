@@ -4,6 +4,20 @@ RRTMGP.jl Release Notes
 main
 ----
 
+- Two-stream solves with aerosols look the aerosol optics up once per band
+  instead of once per g-point. Aerosol optics depend on the band, the column and
+  the layer but not on the g-point, so the lookup was being repeated for each of
+  a band's g-points. `RRTMGPSolver` now gives its two-stream optics a one-band
+  store (`Optics.with_aerosol_band_store`), which the serial solves fill at the
+  first g-point of each band, and gives the g-point-grouped workspaces an
+  all-band store that one kernel fills before the rounds. **Results are
+  unchanged bit for bit**: a store holds exactly what the direct lookup hands to
+  the optics. On a 24,576-column, 64-layer all-sky solve with 15 aerosols on an
+  A100 the grouped solve went from 400 ms to 208 ms. The all-band store costs
+  three `(ncol, nlay)` planes per band, which `gpt_group_bytes` and
+  `default_ngpt_groups` count through their new `naero_bands` argument; the
+  `ngpt_groups` keyword of `RRTMGPSolver` defaults to `nothing`, resolved to
+  that count once the lookup tables are known.
 - [#637](https://github.com/CliMA/RRTMGP.jl/pull/637) `TwoStreamLWRTE` and
   `TwoStreamSWRTE` can spread a column's g-point loop across `ngpt_groups`
   pieces covered by one grid, in place of the serial loop each thread ran over

@@ -325,6 +325,7 @@ function _sw_group_optics_CUDA!(
     state_cache::Union{TransposedStateCache, Nothing},
     lookup_sw::LookUpSW,
     lookup_sw_aero::Union{LookUpAerosolMerra, Nothing},
+    aero::Union{NamedTuple, Nothing},
     ncol,
     ngroups,
     n_gpt,
@@ -351,8 +352,36 @@ function _sw_group_optics_CUDA!(
                 # g-points only the one owing it an optical depth runs. The test
                 # is per column, so what skips together is a warp of night
                 # columns; a warp holding one lit column pays for the whole 32.
-                if cos_zenith[gcol] > 0 ||
-                   (collect_aod && _is_550nm_band(lookup_sw_aero, ibnd))
+                if !isnothing(aero)
+                    # A per-band store: the aerosols are added from it, and
+                    # the kernel that filled it wrote the 550 nm optical depth
+                    # for every column, so a dark one owes nothing here.
+                    if cos_zenith[gcol] > 0
+                        compute_optical_props!(
+                            op,
+                            as,
+                            state_cache,
+                            gcol,
+                            igpt,
+                            lookup_sw,
+                            nothing,
+                            nothing,
+                            nothing,
+                            wcol,
+                            false,
+                        )
+                        Optics.add_aerosol_band_optics!(
+                            view(op.τ, wcol, :),
+                            view(op.ssa, wcol, :),
+                            view(op.g, wcol, :),
+                            view(as.aerosol_state.aero_mask, :, gcol),
+                            view(aero.τ, gcol, :, ibnd),
+                            view(aero.ssa, gcol, :, ibnd),
+                            view(aero.g, gcol, :, ibnd),
+                        )
+                    end
+                elseif cos_zenith[gcol] > 0 ||
+                       (collect_aod && _is_550nm_band(lookup_sw_aero, ibnd))
                     compute_optical_props!(
                         op,
                         as,

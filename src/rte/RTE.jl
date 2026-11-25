@@ -69,13 +69,17 @@ const GPT_GROUP_MEMORY_DIVISOR = 16
 _gpt_group_byte_bound(::ClimaComms.AbstractDevice) = 4 * 1024^3
 
 """
-    default_ngpt_groups(grid_params::RRTMGPGridParams)
+    default_ngpt_groups(grid_params::RRTMGPGridParams; naero_bands = 0)
 
 How many g-point groups `RRTMGPSolver` widens a two-stream solve to when the
 caller names none: enough to reach `TARGET_GPT_GROUP_COLUMNS` wide columns, capped
 at `MAX_NGPT_GROUPS` and at what a `GPT_GROUP_MEMORY_DIVISOR`th of the device's
 memory affords on this grid's level count and float type, which
 [`gpt_group_bytes`](@ref) counts.
+
+`naero_bands` is the number of bands, longwave and shortwave together, a grouped
+solve with aerosols keeps their optics for. That store is paid once whatever the
+group count, so it is taken off the memory bound before the groups are priced.
 
 A column count that already fills the device gets one group, and so does a CPU,
 whose driver solves the whole g-point loop per column and ignores the workspaces.
@@ -95,7 +99,10 @@ grouping does to a sum is the whole of the difference: at one group the g-points
 are taken in the serial order, and the solve is then bit-for-bit with the serial
 one, which is what the tests assert.
 """
-function default_ngpt_groups(grid_params::RRTMGPGridParams)::Int
+function default_ngpt_groups(
+    grid_params::RRTMGPGridParams;
+    naero_bands::Int = 0,
+)::Int
     # The `::Int` is not incidental: the byte bound comes from the device through
     # a hook, CUDA reports memory as a `UInt64`, and an unsigned count here does
     # not match the `ngpt_groups::Int` keyword this defaults -- which fails at
@@ -108,9 +115,14 @@ function default_ngpt_groups(grid_params::RRTMGPGridParams)::Int
     # high-resolution benchmark's column count -- which costs memory, and that is
     # what the byte bound is for.
     wanted = cld(TARGET_GPT_GROUP_COLUMNS, ncol)
+    # The aerosol store is not per group, so it comes off the bound before the
+    # groups are priced against what is left. `Int`, so that a store larger than
+    # the bound leaves a negative remainder and one group, not an unsigned wrap.
+    FT = eltype(grid_params)
+    aerosol_bytes = gpt_group_bytes(FT, ncol, nlay, 0, naero_bands)
     affordable = fld(
-        _gpt_group_byte_bound(device),
-        gpt_group_bytes(eltype(grid_params), ncol, nlay, 1),
+        Int(_gpt_group_byte_bound(device)) - aerosol_bytes,
+        gpt_group_bytes(FT, ncol, nlay, 1),
     )
     return clamp(min(wanted, affordable), 1, MAX_NGPT_GROUPS)
 end

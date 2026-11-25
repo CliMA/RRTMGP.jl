@@ -8,6 +8,7 @@ CurrentModule = RRTMGP.Optics
 AbstractOpticalProps
 OneScalar
 TwoStream
+with_aerosol_band_store
 compute_col_gas!
 compute_relative_humidity!
 compute_optical_props!
@@ -38,6 +39,8 @@ compute_lookup_precip_props
 ```@docs
 add_aerosol_optics_1scalar!
 add_aerosol_optics_2stream!
+compute_aerosol_band_optics!
+add_aerosol_band_optics!
 compute_lookup_aerosol
 compute_lookup_dust_props
 compute_lookup_sea_salt_props

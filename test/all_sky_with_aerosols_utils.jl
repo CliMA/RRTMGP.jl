@@ -295,7 +295,14 @@ function all_sky_with_aerosols(
     # grouped. It is not a fast configuration, launching two kernels per g-point
     # where the serial solve launches one, so `RRTMGPSolver` refuses one group
     # and these build the workspaces directly.
-    one_group_lw() = (
+    #
+    # They are also the exact check on the aerosol stores. `RRTMGPSolver` gives
+    # the serial solve a one-band store, so the reference adds its aerosols from
+    # that. With `naero_bands = 0` these look aerosols up per g-point, the route
+    # with no store at all; with the band count they add them from the all-band
+    # store the grouped solve fills in a kernel of its own. All three have to
+    # agree exactly, because a store holds what the direct route computes.
+    one_group_lw(naero_bands = 0) = (
         TwoStreamLWRTE(
             grid_params.context,
             TwoStream(grid_params),
@@ -305,11 +312,11 @@ function all_sky_with_aerosols(
             FluxLW(grid_params),
             nothing,
             TransposedStateCache(grid_params),
-            LWGptGroups(grid_params, 1; params = param_set),
+            LWGptGroups(grid_params, 1; params = param_set, naero_bands),
         ),
         FluxLW(grid_params),
     )
-    one_group_sw() = (
+    one_group_sw(naero_bands = 0) = (
         TwoStreamSWRTE(
             grid_params.context,
             TwoStream(grid_params),
@@ -319,7 +326,7 @@ function all_sky_with_aerosols(
             FluxSW(grid_params),
             nothing,
             TransposedStateCache(grid_params),
-            SWGptGroups(grid_params, 1),
+            SWGptGroups(grid_params, 1; naero_bands),
         ),
         FluxSW(grid_params),
     )
@@ -353,20 +360,22 @@ function all_sky_with_aerosols(
                 copy(Array(parent(solver.clear_flux_acc_lw.flux_net)))
             serial_cover =
                 track_cover ? copy(Array(as.cloud_state.cld_cover_lw)) : nothing
-            (lws_one, clear_one) = one_group_lw()
-            solve_lw_both_skies!(
-                lws_one,
-                clear_one,
-                as,
-                prebuilt_lookups.lookup_lw,
-                prebuilt_lookups.lookup_lw_cld,
-                prebuilt_lookups.lookup_lw_aero,
-                RRTMGP._deep_atmosphere_inverse_scaling(solver),
-            )
-            @test Array(parent(lws_one.flux.flux_net)) == serial_all
-            @test Array(parent(clear_one.flux_net)) == serial_clear
-            track_cover &&
-                @test Array(as.cloud_state.cld_cover_lw) == serial_cover
+            for naero_bands in (0, prebuilt_lookups.nbnd_lw)
+                (lws_one, clear_one) = one_group_lw(naero_bands)
+                solve_lw_both_skies!(
+                    lws_one,
+                    clear_one,
+                    as,
+                    prebuilt_lookups.lookup_lw,
+                    prebuilt_lookups.lookup_lw_cld,
+                    prebuilt_lookups.lookup_lw_aero,
+                    RRTMGP._deep_atmosphere_inverse_scaling(solver),
+                )
+                @test Array(parent(lws_one.flux.flux_net)) == serial_all
+                @test Array(parent(clear_one.flux_net)) == serial_clear
+                track_cover &&
+                    @test Array(as.cloud_state.cld_cover_lw) == serial_cover
+            end
 
             for ng in (3, 16)
                 grouped = grouped_solver(ng)
@@ -426,28 +435,36 @@ function all_sky_with_aerosols(
                 track_cover ? copy(Array(as.cloud_state.cld_cover_sw)) : nothing
             serial_aod_ext = copy(Array(as.aerosol_state.aod_sw_ext))
             serial_aod_sca = copy(Array(as.aerosol_state.aod_sw_sca))
-            (sws_one, clear_one) = one_group_sw()
-            solve_sw_both_skies!(
-                sws_one,
-                clear_one,
-                as,
-                prebuilt_lookups.lookup_sw,
-                prebuilt_lookups.lookup_sw_cld,
-                prebuilt_lookups.lookup_sw_aero,
-                RRTMGP._deep_atmosphere_inverse_scaling(solver),
-            )
-            # Exactly the serial result, which also pins the two things the
-            # shortwave has to get right on its own: a night column's partials
-            # are zeroed rather than summed from whatever the workspace held,
-            # and the 550 nm optical depth is collected in the optics half while
-            # the sun is tested in the sweeps half.
-            @test Array(parent(sws_one.flux.flux_net)) == serial_all
-            @test Array(parent(sws_one.flux.flux_dn_dir)) == serial_dir
-            @test Array(parent(clear_one.flux_net)) == serial_clear
-            @test Array(as.aerosol_state.aod_sw_ext) == serial_aod_ext
-            @test Array(as.aerosol_state.aod_sw_sca) == serial_aod_sca
-            track_cover &&
-                @test Array(as.cloud_state.cld_cover_sw) == serial_cover
+            for naero_bands in (0, prebuilt_lookups.nbnd_sw)
+                (sws_one, clear_one) = one_group_sw(naero_bands)
+                # The optical depth lives on the shared `as`, where the serial
+                # solve just left the right answer. Clear it, so that matching
+                # below means this solve wrote it.
+                as.aerosol_state.aod_sw_ext .= 0
+                as.aerosol_state.aod_sw_sca .= 0
+                solve_sw_both_skies!(
+                    sws_one,
+                    clear_one,
+                    as,
+                    prebuilt_lookups.lookup_sw,
+                    prebuilt_lookups.lookup_sw_cld,
+                    prebuilt_lookups.lookup_sw_aero,
+                    RRTMGP._deep_atmosphere_inverse_scaling(solver),
+                )
+                # Exactly the serial result, which also pins the two things the
+                # shortwave has to get right on its own: a night column's
+                # partials are zeroed rather than summed from whatever the
+                # workspace held, and the 550 nm optical depth is written for
+                # every column, dark ones included, whichever half or kernel
+                # collects it.
+                @test Array(parent(sws_one.flux.flux_net)) == serial_all
+                @test Array(parent(sws_one.flux.flux_dn_dir)) == serial_dir
+                @test Array(parent(clear_one.flux_net)) == serial_clear
+                @test Array(as.aerosol_state.aod_sw_ext) == serial_aod_ext
+                @test Array(as.aerosol_state.aod_sw_sca) == serial_aod_sca
+                track_cover &&
+                    @test Array(as.cloud_state.cld_cover_sw) == serial_cover
+            end
 
             for ng in (3, 16)
                 grouped = grouped_solver(ng)

@@ -18,9 +18,12 @@ end
 # the longwave and three each in the shortwave.
 const LW_GPT_GROUP_PLANES = 3 + 3 + 3 + 2 * 2
 const SW_GPT_GROUP_PLANES = 3 + 2 + 4 + 2 * 3
+# Planes per band of the aerosol store: optical depth, single scattering albedo
+# and asymmetry parameter.
+const AEROSOL_BAND_PLANES = 3
 
 """
-    gpt_group_bytes(FT, ncol, nlay, ngroups)
+    gpt_group_bytes(FT, ncol, nlay, ngroups, naero_bands = 0)
 
 Device bytes `LWGptGroups` and `SWGptGroups` together commit for `ngroups`
 groups of `ncol` columns on `nlay` layers, which is the quantity
@@ -31,28 +34,66 @@ Each band adds a byte of cloud mask per level and, per wide column, a surface
 source and a cloudy tally. The optics and the mask are over layers rather than
 levels and are charged a level each, which keeps the count on the safe side of
 the bound; `test/gpt_group_workspaces.jl` holds it to exactly that.
+
+`naero_bands` is how many bands, over the longwave and the shortwave together,
+the workspaces keep aerosol optics for. That store is three planes per band over
+the layers of the `ncol` columns themselves: it does not widen with `ngroups`,
+and it is counted exactly.
 """
-function gpt_group_bytes(::Type{FT}, ncol, nlay, ngroups) where {FT}
+function gpt_group_bytes(
+    ::Type{FT},
+    ncol,
+    nlay,
+    ngroups,
+    naero_bands = 0,
+) where {FT}
     planes = LW_GPT_GROUP_PLANES + SW_GPT_GROUP_PLANES
     per_level = planes * sizeof(FT) + 2 * sizeof(Bool)
     per_column = 2 * (sizeof(FT) + sizeof(Int32))
-    return ncol * ngroups * ((nlay + 1) * per_level + per_column)
+    aerosol = AEROSOL_BAND_PLANES * naero_bands * ncol * nlay * sizeof(FT)
+    return ncol * ngroups * ((nlay + 1) * per_level + per_column) + aerosol
 end
 
 # An out-of-memory failure building these names a byte count and nothing about
 # why the solve wanted it. Say what the group count costs and what to pass
 # instead, then rethrow: a run that cannot afford the default wants an explicit
 # `ngpt_groups`, not a quietly narrower solve.
-function _try_gpt_group_alloc(f, grid_params::RRTMGPGridParams, ngroups::Int)
+function _try_gpt_group_alloc(
+    f,
+    grid_params::RRTMGPGridParams,
+    ngroups::Int,
+    naero_bands::Int = 0,
+)
     try
         return f()
     catch
         (; ncol, nlay) = grid_params
-        bytes = gpt_group_bytes(eltype(grid_params), ncol, nlay, ngroups)
+        bytes = gpt_group_bytes(
+            eltype(grid_params),
+            ncol,
+            nlay,
+            ngroups,
+            naero_bands,
+        )
         hint = "pass `ngpt_groups` (1 solves the g-point loop serially)"
         @error "cannot allocate the g-point group workspaces" ngroups ncol nlay bytes hint
         rethrow()
     end
+end
+
+# Per-band aerosol optics for every column, or `nothing` when the solve keeps
+# none. Aerosol optics do not depend on the g-point, so a grouped solve computes
+# them once per band here and adds them to each of the band's g-points, instead
+# of looking them up again for every one. Indexed `[gcol, glay, ibnd]`, so the
+# threads of one group read it coalesced.
+function _aerosol_band_store(grid_params::RRTMGPGridParams, naero_bands::Int)
+    naero_bands > 0 || return nothing
+    (; ncol, nlay) = grid_params
+    DA = ClimaComms.array_type(grid_params)
+    FT = eltype(grid_params)
+    plane() = DA{FT}(undef, ncol, nlay, naero_bands)
+    # `AEROSOL_BAND_PLANES` of them, which is what `gpt_group_bytes` charges.
+    return (; τ = plane(), ssa = plane(), g = plane())
 end
 
 # What the two bands' workspaces have in common: the widened grid parameters,
@@ -111,7 +152,7 @@ group from the wide column index.
 `ngroups > 1` is implemented for CUDA. The CPU driver ignores these workspaces
 and solves the whole g-point loop per column, which is correct either way.
 """
-struct LWGptGroups{OP, SL, FB, MK, FX, CT}
+struct LWGptGroups{OP, SL, FB, MK, FX, CT, AE}
     ngroups::Int
     op::OP
     src::SL
@@ -123,12 +164,19 @@ struct LWGptGroups{OP, SL, FB, MK, FX, CT}
     acc_clear::FX
     "`(ncol * ngroups)`: cloudy g-points seen by each group, summed for the cover"
     cloudy::CT
+    "`(ncol, nlay, nbnd)` aerosol optics per band, or `nothing` to look them up per g-point"
+    aero::AE
 end
 Adapt.@adapt_structure LWGptGroups
 
-function LWGptGroups(grid_params::RRTMGPGridParams, ngroups::Int; params)
+function LWGptGroups(
+    grid_params::RRTMGPGridParams,
+    ngroups::Int;
+    params,
+    naero_bands::Int = 0,
+)
     _check_ngpt_groups(ngroups)
-    _try_gpt_group_alloc(grid_params, ngroups) do
+    _try_gpt_group_alloc(grid_params, ngroups, naero_bands) do
         # Up and down only: the reduction recomputes net from them, so a third
         # plane would be allocated per wide column and never written. The field
         # names match `FluxLW` because that is what these accumulate, but the
@@ -148,6 +196,7 @@ function LWGptGroups(grid_params::RRTMGPGridParams, ngroups::Int; params)
             fluxes(acc_data),
             fluxes(acc_clear_data),
             cloudy,
+            _aerosol_band_store(grid_params, naero_bands),
         )
     end
 end
@@ -169,7 +218,7 @@ a group accumulates three planes rather than two. And the shortwave sweeps only
 where the sun is up, so every group of a night column exits its loop at once,
 which is the imbalance more blocks than one wave can absorb.
 """
-struct SWGptGroups{OP, SS, FB, MK, FX, CT}
+struct SWGptGroups{OP, SS, FB, MK, FX, CT, AE}
     ngroups::Int
     op::OP
     src::SS
@@ -181,12 +230,18 @@ struct SWGptGroups{OP, SS, FB, MK, FX, CT}
     acc_clear::FX
     "`(ncol * ngroups)`: cloudy g-points seen by each group, summed for the cover"
     cloudy::CT
+    "`(ncol, nlay, nbnd)` aerosol optics per band, or `nothing` to look them up per g-point"
+    aero::AE
 end
 Adapt.@adapt_structure SWGptGroups
 
-function SWGptGroups(grid_params::RRTMGPGridParams, ngroups::Int)
+function SWGptGroups(
+    grid_params::RRTMGPGridParams,
+    ngroups::Int;
+    naero_bands::Int = 0,
+)
     _check_ngpt_groups(ngroups)
-    _try_gpt_group_alloc(grid_params, ngroups) do
+    _try_gpt_group_alloc(grid_params, ngroups, naero_bands) do
         # Up, down and direct: the reduction recomputes net from up and down, so
         # a net plane would never be written (see `LWGptGroups`).
         (; wide_grid_params, acc_data, acc_clear_data, mask, cloudy) =
@@ -205,6 +260,7 @@ function SWGptGroups(grid_params::RRTMGPGridParams, ngroups::Int)
             fluxes(acc_data),
             fluxes(acc_clear_data),
             cloudy,
+            _aerosol_band_store(grid_params, naero_bands),
         )
     end
 end

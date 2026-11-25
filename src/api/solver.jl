@@ -159,7 +159,7 @@ function RRTMGPSolver(
     lookups = nothing,
     spectral_fluxes = false,
     n_gauss_angles::Int = 1,
-    ngpt_groups::Int = RTE.default_ngpt_groups(grid_params),
+    ngpt_groups::Union{Int, Nothing} = nothing,
 )
     (; context) = grid_params
 
@@ -221,6 +221,16 @@ function RRTMGPSolver(
     if isnothing(lookups)
         _check_lookup_support(radiation_method)
         lookups = lookup_tables(grid_params, radiation_method)
+    end
+
+    # Aerosol optics do not depend on the g-point, so two-stream optics that
+    # will have aerosols added keep one band's worth and look them up once per
+    # band. Only the store is new: the optics arrays stay the caller's.
+    if op_lw isa Optics.TwoStream && !isnothing(lookups.lookup_lw_aero)
+        op_lw = Optics.with_aerosol_band_store(op_lw)
+    end
+    if op_sw isa Optics.TwoStream && !isnothing(lookups.lookup_sw_aero)
+        op_sw = Optics.with_aerosol_band_store(op_sw)
     end
 
     src_lw =
@@ -287,6 +297,20 @@ function RRTMGPSolver(
         RTE._default_state_cache(grid_params)
     # The gates below reach the workspaces only above one group, so this is
     # where a count of zero or less is caught.
+    # A grouped solve with aerosols keeps their optics per band rather than
+    # looking them up again for every g-point.
+    naero_bands_lw = isnothing(lookups.lookup_lw_aero) ? 0 : lookups.nbnd_lw
+    naero_bands_sw = isnothing(lookups.lookup_sw_aero) ? 0 : lookups.nbnd_sw
+    # The default group count is resolved here rather than in the signature
+    # because it is bounded by memory, and what the aerosol store costs is not
+    # known until the lookup tables are.
+    ngpt_groups = something(
+        ngpt_groups,
+        RTE.default_ngpt_groups(
+            grid_params;
+            naero_bands = naero_bands_lw + naero_bands_sw,
+        ),
+    )
     RTE._check_ngpt_groups(ngpt_groups)
     # Workspaces for the g-point-grouped fused shortwave solve, allocated on the
     # same terms as the longwave ones below.
@@ -296,7 +320,12 @@ function RRTMGPSolver(
             !(op_sw isa OneScalar) &&
             isnothing(band_flux_sw) &&
             ngpt_groups > 1
-        ) ? RTE.SWGptGroups(grid_params, ngpt_groups) : nothing
+        ) ?
+        RTE.SWGptGroups(
+            grid_params,
+            ngpt_groups;
+            naero_bands = naero_bands_sw,
+        ) : nothing
     sws =
         op_sw isa OneScalar ?
         RTE.NoScatSWRTE(
@@ -329,7 +358,13 @@ function RRTMGPSolver(
             !(op_lw isa OneScalar) &&
             isnothing(band_flux_lw) &&
             ngpt_groups > 1
-        ) ? RTE.LWGptGroups(grid_params, ngpt_groups; params) : nothing
+        ) ?
+        RTE.LWGptGroups(
+            grid_params,
+            ngpt_groups;
+            params,
+            naero_bands = naero_bands_lw,
+        ) : nothing
     lws =
         op_lw isa OneScalar ?
         RTE.NoScatLWRTE(

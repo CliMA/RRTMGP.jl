@@ -299,6 +299,7 @@ function _lw_group_optics_CUDA!(
     state_cache::Union{TransposedStateCache, Nothing},
     lookup_lw::LookUpLW,
     lookup_lw_aero::Union{LookUpAerosolMerra, Nothing},
+    aero::Union{NamedTuple, Nothing},
     ncol,
     ngroups,
     n_gpt,
@@ -310,6 +311,8 @@ function _lw_group_optics_CUDA!(
         grp = (wcol - 1) ÷ ncol + 1
         igpt = grp + (round - 1) * ngroups
         if igpt ≤ n_gpt
+            # With a per-band store the aerosols are added from it, and the
+            # lookup the optics would otherwise repeat per g-point is left out.
             @inbounds compute_optical_props!(
                 op,
                 as,
@@ -319,10 +322,24 @@ function _lw_group_optics_CUDA!(
                 igpt,
                 lookup_lw,
                 nothing,
-                lookup_lw_aero,
+                isnothing(aero) ? lookup_lw_aero : nothing,
                 nothing,
                 wcol,
             )
+            if !isnothing(aero)
+                @inbounds begin
+                    ibnd = lookup_lw.band_data.major_gpt2bnd[igpt]
+                    Optics.add_aerosol_band_optics!(
+                        view(op.τ, wcol, :),
+                        view(op.ssa, wcol, :),
+                        view(op.g, wcol, :),
+                        view(as.aerosol_state.aero_mask, :, gcol),
+                        view(aero.τ, gcol, :, ibnd),
+                        view(aero.ssa, gcol, :, ibnd),
+                        view(aero.g, gcol, :, ibnd),
+                    )
+                end
+            end
         end
     end
     return nothing

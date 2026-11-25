@@ -451,3 +451,15 @@ the same ``\tau``-weighted mixing rules as for clouds, delta-scaled in the
 shortwave. In the shortwave band containing 550 nm, the summed extinction and
 scattering aerosol optical depths are retained as diagnostics
 (`aod_sw_extinction`, `aod_sw_scattering`), the standard aerosol optical depth.
+
+Aerosol optics depend on the band, the column and the layer, but not on the
+g-point. The two-stream solves therefore look them up once per band and add the
+stored values to each of the band's g-points
+([`compute_aerosol_band_optics!`](@ref
+RRTMGP.Optics.compute_aerosol_band_optics!) and
+[`add_aerosol_band_optics!`](@ref RRTMGP.Optics.add_aerosol_band_optics!)): the
+serial solves keep one band at a time in the optics workspace
+([`with_aerosol_band_store`](@ref RRTMGP.Optics.with_aerosol_band_store)), and
+the g-point-grouped GPU solve fills a store for every band before its rounds.
+The stored values are the ones the direct lookup would add, so the result is the
+same bit for bit.

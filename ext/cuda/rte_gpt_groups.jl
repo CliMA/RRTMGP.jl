@@ -46,6 +46,8 @@ const SW_SWEEPS_MAXREGS = 64
 # alone. The longwave has no such thread: every column emits.
 @inline _optics_zenith(::LWGptGroups, bcs) = ()
 @inline _optics_zenith(::SWGptGroups, bcs) = (bcs.cos_zenith,)
+@inline only_or_nothing(::Tuple{}) = nothing
+@inline only_or_nothing(t::Tuple{Any}) = t[1]
 
 # Aerosol mask for every column, hoisted out of the grouped solves of both
 # bands, which need it per column rather than per wide column.
@@ -66,6 +68,67 @@ end
     return _zero_planes!(Base.tail(planes), wcol, ilev)
 end
 @inline _zero_planes!(::Tuple{}, wcol, ilev) = nothing
+
+# The store the optics kernels add aerosols from: the band's own, when the
+# workspaces keep one and the solve has aerosols at all.
+@inline _aero_store(groups, ::Nothing) = nothing
+@inline _aero_store(groups, ::LookUpAerosolMerra) = groups.aero
+
+# What the per-band aerosol optics differ in between the bands: the shortwave
+# delta-scales, reports the 550 nm optical depth, and has dark columns.
+@inline _aero_delta_scaling(::LWGptGroups) = false
+@inline _aero_delta_scaling(::SWGptGroups) = true
+@inline _aero_band_550nm(::LWGptGroups, lkp_aero) = nothing
+@inline _aero_band_550nm(::SWGptGroups, lkp_aero) = lkp_aero.iband_550nm
+
+# Aerosol optics for every (column, band) pair, into the store the optics
+# kernels read. One thread per pair, columns fastest, so a block's writes are
+# coalesced. `iband_550nm` is `nothing` in the longwave, which reports no optical
+# depth; `cos_zenith` is `nothing` there too, since every column emits.
+#
+# A dark shortwave column is skipped, as nothing reads its optics, except in the
+# 550 nm band: that optical depth is a diagnostic every column has. Writing it
+# here, once per column, is also what frees the optics kernel from nominating
+# one of a column's concurrent groups as its writer.
+function _aerosol_band_optics_CUDA!(
+    aero::NamedTuple,
+    as::AtmosphericState,
+    state_cache::Union{TransposedStateCache, Nothing},
+    lookup_aero::LookUpAerosolMerra,
+    ncol,
+    nbnd,
+    iband_550nm,
+    cos_zenith,
+    ::Val{delta_scaling},
+) where {delta_scaling}
+    i = threadIdx().x + (blockIdx().x - 1) * blockDim().x
+    if i ≤ ncol * nbnd
+        gcol = (i - 1) % ncol + 1
+        ibnd = (i - 1) ÷ ncol + 1
+        collect_aod = !isnothing(iband_550nm) && ibnd == iband_550nm
+        @inbounds if isnothing(cos_zenith) ||
+                     cos_zenith[gcol] > 0 ||
+                     collect_aod
+            (; aerosol_state) = as
+            Optics.compute_aerosol_band_optics!(
+                view(aero.τ, gcol, :, ibnd),
+                view(aero.ssa, gcol, :, ibnd),
+                view(aero.g, gcol, :, ibnd),
+                collect_aod ? view(aerosol_state.aod_sw_ext, gcol) : nothing,
+                collect_aod ? view(aerosol_state.aod_sw_sca, gcol) : nothing,
+                view(aerosol_state.aero_mask, :, gcol),
+                view(aerosol_state.aero_size, :, :, gcol),
+                view(aerosol_state.aero_mass, :, :, gcol),
+                AtmosphericStates.rel_hum_view(state_cache, as, gcol),
+                lookup_aero,
+                ibnd,
+                iband_550nm;
+                delta_scaling,
+            )
+        end
+    end
+    return nothing
+end
 
 # Zero a group's slice of the partial accumulators. The reduction reads every
 # slice whether or not a group had work, so a group with none has to write
@@ -146,6 +209,25 @@ function _solve_both_skies_grouped!(
         )
     end
 
+    # Aerosol optics do not depend on the g-point, so every band's are computed
+    # once here and the rounds below add them to each g-point from the store.
+    aero = _aero_store(groups, lookup_aero)
+    if !isnothing(aero)
+        nbnd = size(aero.τ, 3)
+        btx, bbx = _configure_threadblock(ncol * nbnd)
+        @cuda always_inline = true threads = (btx) blocks = (bbx) _aerosol_band_optics_CUDA!(
+            aero,
+            as,
+            state_cache,
+            lookup_aero,
+            ncol,
+            nbnd,
+            _aero_band_550nm(groups, lookup_aero),
+            only_or_nothing(_optics_zenith(groups, bcs)),
+            Val(_aero_delta_scaling(groups)),
+        )
+    end
+
     _grouped_rounds!(
         groups,
         bcs,
@@ -222,6 +304,7 @@ function _grouped_rounds!(
             state_cache,
             lookup,
             lookup_aero,
+            _aero_store(groups, lookup_aero),
             ncol,
             ngroups,
             n_gpt,

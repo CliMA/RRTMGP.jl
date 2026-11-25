@@ -62,14 +62,50 @@ end
             isothermal_boundary_layer = false,
         )
         (; nlay) = grid_params
-        built =
-            workspace_bytes(LWGptGroups(grid_params, ngroups; params)) +
-            workspace_bytes(SWGptGroups(grid_params, ngroups))
-        counted = gpt_group_bytes(FT, ncol, nlay, ngroups)
-        # The optics and the mask are over layers and are charged a level each,
-        # which is the whole of the slack: six optics planes and two mask bytes
-        # per wide column. Nothing else may differ, in either direction.
-        slack = ncol * ngroups * (6 * sizeof(FT) + 2 * sizeof(Bool))
-        @test counted - built == slack
+        # With and without the per-band aerosol stores, at band counts that
+        # differ between the two bands as the real ones do.
+        for (nbnd_lw, nbnd_sw) in ((0, 0), (16, 14))
+            built =
+                workspace_bytes(
+                    LWGptGroups(
+                        grid_params,
+                        ngroups;
+                        params,
+                        naero_bands = nbnd_lw,
+                    ),
+                ) + workspace_bytes(
+                    SWGptGroups(grid_params, ngroups; naero_bands = nbnd_sw),
+                )
+            counted =
+                gpt_group_bytes(FT, ncol, nlay, ngroups, nbnd_lw + nbnd_sw)
+            # The optics and the mask are over layers and are charged a level
+            # each, which is the whole of the slack: six optics planes and two
+            # mask bytes per wide column. Nothing else may differ, in either
+            # direction -- the aerosol stores are over layers and counted so.
+            slack = ncol * ngroups * (6 * sizeof(FT) + 2 * sizeof(Bool))
+            @test counted - built == slack
+        end
     end
+end
+
+# The aerosol store is paid once whatever the group count, so it comes off the
+# byte bound before the groups are priced: more bands can only leave fewer
+# groups affordable, and never fewer than the one that needs no workspaces.
+@testset "the aerosol store counts against the default group count" begin
+    context = ClimaComms.context()
+    grid_params = RRTMGP.RRTMGPGridParams(
+        Float32;
+        context,
+        domain_nlay = 80,
+        ncol = 2048,
+        isothermal_boundary_layer = false,
+    )
+    counts = [
+        default_ngpt_groups(grid_params; naero_bands) for
+        naero_bands in (0, 30, 10^4, 10^7)
+    ]
+    @test issorted(counts; rev = true)
+    @test first(counts) == default_ngpt_groups(grid_params)
+    @test last(counts) == 1
+    @test gpt_group_bytes(Float32, 2048, 80, 0, 30) == 3 * 30 * 2048 * 80 * 4
 end

@@ -223,7 +223,10 @@ end
         aero_mass = view(as.aerosol_state.aero_mass, :, :, gcol)
         rel_hum = AtmosphericStates.rel_hum_view(state_cache, as, gcol)
 
-        add_aerosol_optics_2stream!(
+        _add_aerosol_optics_2stream!(
+            op.aero,
+            _starts_band(lkp, igpt, ibnd),
+            gcol,
             τ,
             ssa,
             g,
@@ -236,6 +239,7 @@ end
             lkp_aero,
             ibnd,
             iband_550nm,
+            false,
         )
     end
     if !isnothing(lkp_cld) # clouds need TwoStream optics
@@ -362,7 +366,10 @@ end
         aero_mass = view(as.aerosol_state.aero_mass, :, :, gcol)
         rel_hum = AtmosphericStates.rel_hum_view(state_cache, as, gcol)
 
-        add_aerosol_optics_2stream!(
+        _add_aerosol_optics_2stream!(
+            op.aero,
+            _starts_band(lkp, igpt, ibnd),
+            gcol,
             τ,
             ssa,
             g,
@@ -375,7 +382,7 @@ end
             lkp_aero,
             ibnd,
             iband_550nm,
-            delta_scaling = true,
+            true,
         )
     end
     if !isnothing(lkp_cld) # clouds need TwoStream optics
@@ -522,5 +529,93 @@ end
             delta_scaling = true,
         )
     end
+    return nothing
+end
+
+# Whether `igpt` is the first g-point of its band. G-points are contiguous
+# within a band, and every solve visits a column's g-points in order, so this is
+# where a column's per-band aerosol store is refreshed.
+@inline _starts_band(lkp, igpt, ibnd) =
+    igpt == 1 || @inbounds(lkp.band_data.major_gpt2bnd[igpt - 1]) != ibnd
+
+# Add one column's aerosols to the `TwoStream` optics of one g-point: looked up
+# for this g-point when `op` keeps no per-band store, and otherwise looked up
+# into the store at the band's first g-point and added from it at every one.
+# Both give the same optics bit for bit, since the store holds exactly what the
+# direct route hands to `increment_2stream`.
+@inline _add_aerosol_optics_2stream!(
+    ::Nothing,
+    starts_band,
+    gcol,
+    τ,
+    ssa,
+    g,
+    aod_ext,
+    aod_sca,
+    aero_mask,
+    aero_size,
+    aero_mass,
+    rel_hum,
+    lkp_aero,
+    ibnd,
+    iband_550nm,
+    delta_scaling,
+) = add_aerosol_optics_2stream!(
+    τ,
+    ssa,
+    g,
+    aod_ext,
+    aod_sca,
+    aero_mask,
+    aero_size,
+    aero_mass,
+    rel_hum,
+    lkp_aero,
+    ibnd,
+    iband_550nm;
+    delta_scaling,
+)
+
+@inline function _add_aerosol_optics_2stream!(
+    aero::NamedTuple,
+    starts_band,
+    gcol,
+    τ,
+    ssa,
+    g,
+    aod_ext,
+    aod_sca,
+    aero_mask,
+    aero_size,
+    aero_mass,
+    rel_hum,
+    lkp_aero,
+    ibnd,
+    iband_550nm,
+    delta_scaling,
+)
+    @inbounds begin
+        τ_store = view(aero.τ, gcol, :)
+        ssa_store = view(aero.ssa, gcol, :)
+        g_store = view(aero.g, gcol, :)
+    end
+    # The optical depth the lookup reports is the band's, so it is written
+    # where the band's optics are, once, rather than again by every g-point.
+    starts_band && compute_aerosol_band_optics!(
+        τ_store,
+        ssa_store,
+        g_store,
+        aod_ext,
+        aod_sca,
+        aero_mask,
+        aero_size,
+        aero_mass,
+        rel_hum,
+        lkp_aero,
+        ibnd,
+        iband_550nm;
+        delta_scaling,
+    )
+    add_aerosol_band_optics!(τ, ssa, g, aero_mask, τ_store, ssa_store, g_store)
     return nothing
 end
