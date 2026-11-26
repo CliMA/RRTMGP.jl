@@ -4,6 +4,9 @@ RRTMGP.jl Release Notes
 main
 ----
 
+- [#648](https://github.com/CliMA/RRTMGP.jl/pull/648) The fused two-stream
+  kernels sum their lanes' fluxes with a reduce-scatter, which leaves each
+  level's sum in a lane of its own.
 - [#647](https://github.com/CliMA/RRTMGP.jl/pull/647) The two-stream sweeps
   keep the coefficients of their downward pass from the upward pass instead of
   recomputing them, which changes fluxes at roundoff.

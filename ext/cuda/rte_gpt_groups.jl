@@ -86,8 +86,28 @@ end
 @inline flux_planes(flux::FluxSW) =
     (flux.flux_up, flux.flux_dn, flux.flux_dn_dir)
 
+# The sums over a column's lanes of the `N` values each lane holds, the sum of the
+# `l`-th values ending in lane `l`: a reduce-scatter by recursive halving, in which
+# each lane keeps half of its values and sends its partner the other half. The
+# halves are leading entries of fixed-length tuples, so that the steps unroll.
+@inline function reduce_scatter(v::NTuple{N}, lanes::Val{N}, lane) where {N}
+    Base.Cartesian.@nexprs 5 s -> (v = halve(v, Val(N >> s), lanes, lane))
+    return v[1]
+end
+@inline halve(v::NTuple, ::Val{0}, lanes, lane) = v
+@inline function halve(v::NTuple{N, T}, ::Val{h}, lanes, lane) where {N, T, h}
+    upper = (lane - 1i32) & Int32(h) != 0i32
+    return ntuple(Val(N)) do i
+        i > h && return zero(T)
+        keep, send = upper ? (v[h + i], v[i]) : (v[i], v[h + i])
+        mask = column_lanes(lanes)
+        return keep + CUDA.shfl_xor_sync(mask, send, h % UInt32, N % UInt32)
+    end
+end
+
 # Add the fluxes that a column's lanes left in `fluxb` to the column's fluxes in
-# `acc`, level by level, or overwrite them on the first round.
+# `acc`, or overwrite them on the first round, `N` levels at a time, each summed
+# into its own lane.
 @inline function sum_lanes_into!(
     acc,
     fluxb,
@@ -96,15 +116,22 @@ end
     wcol,
     nlev,
     first,
-    lanes,
+    lanes::Val{N},
     lane,
-)
-    for ilev in 1i32:nlev
-        foreach(flux_planes(acc), flux_planes(fluxb)) do a, b
-            v = active ? (@inbounds b[wcol, ilev]) : zero(eltype(b))
-            v = lane_sum(v, lanes)
-            lane == 1i32 &&
-                (@inbounds a[gcol, ilev] = first ? v : a[gcol, ilev] + v)
+) where {N}
+    for ilev_first in 1i32:Int32(N):nlev
+        map(flux_planes(acc), flux_planes(fluxb)) do a, b
+            @inline
+            v = ntuple(Val(N)) do i
+                level = ilev_first + Int32(i) - 1i32
+                active & (level ≤ nlev) ? (@inbounds b[wcol, level]) :
+                zero(eltype(b))
+            end
+            sum = reduce_scatter(v, lanes, lane)
+            ilev = ilev_first + lane - 1i32
+            ilev ≤ nlev &&
+                (@inbounds a[gcol, ilev] = first ? sum : a[gcol, ilev] + sum)
+            return nothing
         end
     end
     return nothing
