@@ -237,11 +237,11 @@ end
         flux::FluxLW,
         src_lw::SL,
         bcs_lw::BCL,
-        gcol::Int,
-        igpt::Int,
-        ibnd::Int,
-        nlev::Int,
-        ncol::Int,
+        gcol::Integer,
+        igpt::Integer,
+        ibnd::Integer,
+        nlev::Integer,
+        ncol::Integer,
     ) where {SL, BCL}
 
 Two stream solver for the longwave problem.
@@ -254,12 +254,12 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
     flux::FluxLW,
     src_lw::SL,
     bcs_lw::BCL,
-    gcol::Int,
-    igpt::Int,
-    ibnd::Int,
-    nlev::Int,
-    ncol::Int,
-    wcol::Int = gcol,
+    gcol::Integer,
+    igpt::Integer,
+    ibnd::Integer,
+    nlev::Integer,
+    ncol::Integer,
+    wcol::Integer = gcol,
 ) where {SL, BCL}
     nlay = nlev - 1
     # setting references

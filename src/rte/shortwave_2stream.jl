@@ -291,11 +291,11 @@ end
         bcs_sw::SwBCs,
         (; flux_up, flux_dn, flux_dn_dir)::FluxSW,
         solar_frac::FT,
-        igpt::Int,
-        n_gpt::Int,
-        ibnd::Int,
-        nlev::Int,
-        gcol::Int,
+        igpt::Integer,
+        n_gpt::Integer,
+        ibnd::Integer,
+        nlev::Integer,
+        gcol::Integer,
     ) where {FT}
 
 Two stream solver for the shortwave problem.
@@ -309,12 +309,12 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
     bcs_sw::SwBCs,
     (; flux_up, flux_dn, flux_dn_dir)::FluxSW,
     solar_frac::FT,
-    igpt::Int,
-    n_gpt::Int,
-    ibnd::Int,
-    nlev::Int,
-    gcol::Int,
-    wcol::Int = gcol,
+    igpt::Integer,
+    n_gpt::Integer,
+    ibnd::Integer,
+    nlev::Integer,
+    gcol::Integer,
+    wcol::Integer = gcol,
 ) where {FT}
     nlay = nlev - 1
     @inbounds begin

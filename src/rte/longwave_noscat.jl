@@ -215,12 +215,12 @@ end
         op::OneScalar,
         Ds::FT,
         w_μ::FT,
-        gcol::Int,
+        gcol::Integer,
         flux::FluxLW,
-        igpt::Int,
-        ibnd::Int,
-        nlay::Int,
-        nlev::Int,
+        igpt::Integer,
+        ibnd::Integer,
+        nlay::Integer,
+        nlev::Integer,
     ) where {FT}
 
 Transport for no-scattering longwave problem.
@@ -231,12 +231,12 @@ Transport for no-scattering longwave problem.
     op::OneScalar,
     Ds::FT,
     w_μ::FT,
-    gcol::Int,
+    gcol::Integer,
     flux::FluxLW,
-    igpt::Int,
-    ibnd::Int,
-    nlay::Int,
-    nlev::Int,
+    igpt::Integer,
+    ibnd::Integer,
+    nlay::Integer,
+    nlev::Integer,
 ) where {FT}
     # setting references
     (; sfc_source) = src_lw

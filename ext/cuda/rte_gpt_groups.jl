@@ -50,7 +50,7 @@ const SW_SWEEPS_MAXREGS = 64
 # Aerosol mask for every column, hoisted out of the grouped solves of both
 # bands, which need it per column rather than per wide column.
 function _aero_mask_CUDA!(aerosol_state::AerosolState, ncol)
-    gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x
+    gcol = threadIdx().x + (blockIdx().x - 1i32) * blockDim().x
     gcol ≤ ncol && _compute_aero_mask!(aerosol_state, gcol)
     return nothing
 end
@@ -73,7 +73,7 @@ end
 # bands: the accumulator is a named tuple of flux planes, two in the longwave
 # and three in the shortwave, and this writes whichever it is handed.
 @inline function _zero_partials!(acc, acc_clear, wcol, nlev)
-    for ilev in 1:nlev
+    for ilev in 1i32:nlev
         _zero_planes!(values(acc), wcol, ilev)
         _zero_planes!(values(acc_clear), wcol, ilev)
     end
@@ -140,9 +140,9 @@ function _solve_both_skies_grouped!(
     # instead of identically by every group.
     if aerosol_state isa AerosolState
         atx, abx = _configure_threadblock(ncol)
+        aero_args = (aerosol_state, Int32(ncol))
         @cuda always_inline = true threads = (atx) blocks = (abx) _aero_mask_CUDA!(
-            aerosol_state,
-            ncol,
+            int32_arrays(aero_args)...,
         )
     end
 
@@ -169,14 +169,14 @@ function _solve_both_skies_grouped!(
         groups.acc_clear,
         groups.cloudy,
         _cld_cover(cloud_state, groups),
-        ngroups,
-        n_gpt,
-        ncol,
-        nlev,
+        Int32(ngroups),
+        Int32(n_gpt),
+        Int32(ncol),
+        Int32(nlev),
     )
     reduce! = _reduce_kernel(groups)
     @cuda always_inline = true threads = (rtx) blocks = (rbx) reduce!(
-        reduce_args...,
+        int32_arrays(reduce_args)...,
     )
     return nothing
 end
@@ -186,7 +186,7 @@ end
 # once each at their own budget and the loop below launches what it is given.
 @inline function _launch_round_half!(f, args, tx, bx, budget)
     @cuda always_inline = true maxregs = budget threads = (tx) blocks = (bx) f(
-        args...,
+        int32_arrays(args)...,
     )
     return nothing
 end
@@ -222,10 +222,10 @@ function _grouped_rounds!(
             state_cache,
             lookup,
             lookup_aero,
-            ncol,
-            ngroups,
-            n_gpt,
-            round,
+            Int32(ncol),
+            Int32(ngroups),
+            Int32(n_gpt),
+            Int32(round),
             _optics_zenith(groups, bcs)...,
         )
         _launch_round_half!(optics!, optics_args, tx, bx, optics_maxregs)
@@ -238,15 +238,15 @@ function _grouped_rounds!(
             groups.op,
             groups.mask,
             groups.cloudy,
-            nlay,
-            ncol,
+            Int32(nlay),
+            Int32(ncol),
             as,
             lookup,
             lookup_cld,
             lookup_precip,
-            ngroups,
-            n_gpt,
-            round,
+            Int32(ngroups),
+            Int32(n_gpt),
+            Int32(round),
         )
         _launch_round_half!(sweeps!, sweeps_args, tx, bx, sweeps_maxregs)
     end

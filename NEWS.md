@@ -4,6 +4,10 @@ RRTMGP.jl Release Notes
 main
 ----
 
+- [#643](https://github.com/CliMA/RRTMGP.jl/pull/643) GPU kernels compute
+  array indices in 32-bit arithmetic, so the arrays passed to them can have at
+  most `2^31 - 1` elements. On an A100, the flagship AMIP benchmark's radiation
+  solves 8% faster.
 - [#637](https://github.com/CliMA/RRTMGP.jl/pull/637) `TwoStreamLWRTE` and
   `TwoStreamSWRTE` can spread a column's g-point loop across `ngpt_groups`
   pieces covered by one grid, in place of the serial loop each thread ran over

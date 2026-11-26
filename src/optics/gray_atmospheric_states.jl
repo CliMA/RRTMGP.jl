@@ -261,7 +261,7 @@ function setup_gray_as_pr_grid_kernel!(
     r_d::FT,
     grav_::FT,
     nlay::Int,
-    gcol::Int,
+    gcol::Integer,
 ) where {
     FT <: AbstractFloat,
     FTA1D <: AbstractArray{FT, 1},

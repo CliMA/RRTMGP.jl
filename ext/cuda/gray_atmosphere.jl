@@ -16,23 +16,25 @@ function update_profile_lw!(
 )
     tx, bx = _configure_threadblock(ncol)
     @cuda always_inline = true threads = (tx) blocks = (bx) _update_profile_lw_kernel!(
-        sbc,
-        ncol,
-        t_lay,
-        t_lev,
-        hr_lay,
-        flux_dn,
-        flux_net,
-        flux_grad,
-        T_ex_lev,
-        Δt,
-        nlay,
-        nlev,
+        int32_arrays((
+            sbc,
+            Int32(ncol),
+            t_lay,
+            t_lev,
+            hr_lay,
+            flux_dn,
+            flux_net,
+            flux_grad,
+            T_ex_lev,
+            Δt,
+            nlay,
+            nlev,
+        ))...,
     )
 end
 
 function _update_profile_lw_kernel!(sbc, ncol, args...)
-    gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
+    gcol = threadIdx().x + (blockIdx().x - 1i32) * blockDim().x # global id
     if gcol ≤ ncol
         update_profile_lw_kernel!(sbc, args..., gcol)
     end
@@ -52,14 +54,13 @@ function compute_gray_heating_rate!(
     args = (hr_lay, flux_net, p_lev, grav_, cp_d_, nlay)
     tx, bx = _configure_threadblock(ncol)
     @cuda always_inline = true threads = (tx) blocks = (bx) compute_gray_heating_rate_CUDA!(
-        ncol,
-        args...,
+        int32_arrays((Int32(ncol), args...))...,
     )
     return nothing
 end
 
 function compute_gray_heating_rate_CUDA!(ncol, args...)
-    gcol = threadIdx().x + (blockIdx().x - 1) * blockDim().x # global id
+    gcol = threadIdx().x + (blockIdx().x - 1i32) * blockDim().x # global id
     if gcol ≤ ncol
         compute_gray_heating_rate_kernel!(args..., gcol)
     end

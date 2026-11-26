@@ -51,8 +51,9 @@ import RRTMGP.RTESolver: rte_sw_2stream_solve_both_skies!
 import RRTMGP.RTESolver: sw_2stream_gpt_col_both_skies!
 # the post-optics halves, for the split grouped solves
 import RRTMGP.RTESolver: lw_2stream_gpt_col_sweeps!, sw_2stream_gpt_col_sweeps!
+import Adapt
 import CUDA
-import CUDA: threadIdx, blockIdx, blockDim, @cuda
+import CUDA: threadIdx, blockIdx, blockDim, @cuda, i32
 
 # The share of this device's memory the default g-point group count may commit.
 # Total rather than free, for the reason given where the fallback is defined.
@@ -71,6 +72,43 @@ end
 
 _configure_threadblock(nitems) =
     _configure_threadblock(_max_threads_cuda(), nitems)
+
+"""
+    Int32Array(array)
+
+Wrapper of a device array whose linear indices are computed with 32-bit integer
+arithmetic (64-bit integers take two registers and several instructions on
+GPUs), which limits it to `typemax(Int32)` elements. Bounds are only checked for
+the linear indices, by the device array.
+"""
+struct Int32Array{T, N, A <: AbstractArray{T, N}} <: AbstractArray{T, N}
+    array::A
+end
+Adapt.adapt_structure(to, a::Int32Array) = Int32Array(Adapt.adapt(to, a.array))
+Base.size(a::Int32Array) = size(a.array)
+Base.@propagate_inbounds Base.getindex(a::Int32Array, I::Integer...) =
+    a.array[linear_index(a, I)]
+Base.@propagate_inbounds Base.setindex!(a::Int32Array, v, I::Integer...) =
+    (a.array[linear_index(a, I)] = v)
+# The offset from the first element is computed in 32 bits, but the 1 is added in
+# 64 bits, so that it cancels the 1 subtracted from the index of the device array
+# (otherwise, a pointer to the element before the first is kept for every array).
+@inline function linear_index(a, I)
+    offset =
+        length(I) == 1 ? only(I) % Int32 - Int32(1) :
+        offset_32(size(a.array), I)
+    return Int(offset) + 1
+end
+@inline offset_32(_, ::Tuple{}) = Int32(0)
+@inline offset_32(dims, I) =
+    first(I) % Int32 - Int32(1) +
+    first(dims) % Int32 * offset_32(Base.tail(dims), Base.tail(I))
+
+struct Int32Arrays end
+Adapt.adapt_storage(::Int32Arrays, a::CUDA.CuArray) =
+    length(a) <= typemax(Int32) ? Int32Array(a) :
+    throw(ArgumentError("GPU kernels support at most 2^31 - 1 array elements"))
+int32_arrays(args) = Adapt.adapt(Int32Arrays(), args)
 
 include(joinpath("cuda", "gray_atmospheric_states.jl"))
 include(joinpath("cuda", "rte_longwave_2stream.jl"))

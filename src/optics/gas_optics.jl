@@ -22,8 +22,8 @@ function compute_col_gas_kernel!(
     helmert1::FT,
     vmr_h2o::Union{AbstractArray{FT, 2}, Nothing},
     lat::Union{AbstractArray{FT, 1}, Nothing},
-    glay::Int, # global lay id
-    gcol::Int, # global col id
+    glay::Integer, # global lay id
+    gcol::Integer, # global col id
 ) where {FT <: AbstractFloat}
     helmert2 = FT(0.02586)  # second constant of Helmert formula
     m2_to_cm2 = FT(100 * 100) # m^2 to cm^2
@@ -49,8 +49,8 @@ compute_relative_humidity_kernel!(
     mwd::FT,
     t_ref::FT,
     q_lay_min::FT,
-    glay::Int,
-    gcol::Int,
+    glay::Integer,
+    gcol::Integer,
 ) where {FT}
 
 Compute the relative humidity.
@@ -63,8 +63,8 @@ function compute_relative_humidity_kernel!(
     mwd::FT,
     t_ref::FT,
     q_lay_min::FT,
-    glay::Int,
-    gcol::Int,
+    glay::Integer,
+    gcol::Integer,
 ) where {FT}
     # Convert h2o vmr to mmr
     mmr_h2o = vmr_h2o[glay, gcol] * mwd
@@ -424,7 +424,7 @@ end
         jη2::Int,
         fη1::FT,
         fη2::FT,
-        igpt::Int,
+        igpt::Integer,
     ) where {FT<:AbstractFloat}
 
 Compute Rayleigh scattering optical depths for shortwave problem
@@ -439,7 +439,7 @@ Compute Rayleigh scattering optical depths for shortwave problem
     jη2::Int,
     fη1::FT,
     fη2::FT,
-    igpt::Int,
+    igpt::Integer,
 ) where {FT <: AbstractFloat} =
     interp2d(fη1, fη2, ftemp, rayleigh_coeff, jη1, jη2, jtemp) *
     (vmr_h2o + FT(1)) *
