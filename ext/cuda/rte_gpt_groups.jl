@@ -1,122 +1,24 @@
 #####
-##### One grid over `ncol * ngroups` threads, for either band.
+##### The g-point-grouped both-skies solve: one fused kernel per band.
 #####
 
-# Both halves of a round launch narrower than the solve's usual 256 threads,
-# so that a capped register count reaches more warps per multiprocessor than
-# the same count would at 256.
-const GROUP_BLOCK_THREADS = 128
-
-# The register budget each half of a round is compiled to. Shedding
-# registers off these kernels buys warps, and the warps pay for
-# themselves: each count below is the one its own kernel measured
-# fastest at, over an interleaved sweep four occupancy steps deep.
-# The budgets are per kernel because the two halves compose -- a
-# matched pair landed within a few hundredths of a point of the sum
-# of its two single-kernel effects at every cap measured -- so a band
-# whose halves bottom out at different counts takes both. The sweep
-# is a profiling run against a coupled model and lives outside this
-# repo; the counts it chose:
-# lw optics: 156 registers naturally, -11.41% at 96.
-# lw sweeps: 140 registers naturally, -8.02% at 72.
-# sw optics: 124 registers naturally, -4.65% at 96.
-# sw sweeps: 117 registers naturally, -5.51% at 64.
-const LW_OPTICS_MAXREGS = 96
-const LW_SWEEPS_MAXREGS = 72
-const SW_OPTICS_MAXREGS = 96
-const SW_SWEEPS_MAXREGS = 64
-
-@inline _optics_maxregs(::LWGptGroups) = LW_OPTICS_MAXREGS
-@inline _optics_maxregs(::SWGptGroups) = SW_OPTICS_MAXREGS
-@inline _sweeps_maxregs(::LWGptGroups) = LW_SWEEPS_MAXREGS
-@inline _sweeps_maxregs(::SWGptGroups) = SW_SWEEPS_MAXREGS
-
-# What the two bands do not share: the kernels a round launches, the source the
-# longwave optics writes and the shortwave has none of, and the cloud-cover
-# array the reduction fills.
-@inline _optics_kernel(::LWGptGroups) = _lw_group_optics_CUDA!
-@inline _optics_kernel(::SWGptGroups) = _sw_group_optics_CUDA!
-@inline _sweeps_kernel(::LWGptGroups) = _lw_group_sweeps_CUDA!
-@inline _sweeps_kernel(::SWGptGroups) = _sw_group_sweeps_CUDA!
-@inline _reduce_kernel(::LWGptGroups) = _reduce_lw_groups_CUDA!
-@inline _reduce_kernel(::SWGptGroups) = _reduce_sw_groups_CUDA!
-@inline _optics_workspaces(g::LWGptGroups) = (g.op, g.src)
-@inline _optics_workspaces(g::SWGptGroups) = (g.op,)
-# The shortwave optics takes the zenith angle so it can leave a night column
-# alone. The longwave has no such thread: every column emits.
-@inline _optics_zenith(::LWGptGroups, bcs) = ()
-@inline _optics_zenith(::SWGptGroups, bcs) = (bcs.cos_zenith,)
-
-# Aerosol mask for every column, hoisted out of the grouped solves of both
-# bands, which need it per column rather than per wide column.
-function _aero_mask_CUDA!(aerosol_state::AerosolState, ncol)
-    gcol = threadIdx().x + (blockIdx().x - 1i32) * blockDim().x
-    gcol ≤ ncol && _compute_aero_mask!(aerosol_state, gcol)
-    return nothing
-end
-
-# The planes recurse rather than iterate: a loop indexes the tuple with a
-# runtime variable, which defeats SROA -- a tuple indexed that way has to exist
-# somewhere addressable, so it lands in a stack slot and the sweeps kernels
-# spill. Recursion over `Base.tail` indexes by type instead and unrolls, which
-# is only a fixed depth because a band accumulates two flux planes or three.
-@inline function _zero_planes!(planes::Tuple, wcol, ilev)
-    plane = first(planes)
-    @inbounds plane[wcol, ilev] = zero(eltype(plane))
-    return _zero_planes!(Base.tail(planes), wcol, ilev)
-end
-@inline _zero_planes!(::Tuple{}, wcol, ilev) = nothing
-
-# Zero a group's slice of the partial accumulators. The reduction reads every
-# slice whether or not a group had work, so a group with none has to write
-# zeros rather than leave whatever the workspace last held. One body for both
-# bands: the accumulator is a named tuple of flux planes, two in the longwave
-# and three in the shortwave, and this writes whichever it is handed.
-@inline function _zero_partials!(acc, acc_clear, wcol, nlev)
-    for ilev in 1i32:nlev
-        _zero_planes!(values(acc), wcol, ilev)
-        _zero_planes!(values(acc_clear), wcol, ilev)
-    end
-    return nothing
-end
-
-@inline _cld_cover(::Nothing, _) = nothing
-@inline _cld_cover(cs::CloudState, ::LWGptGroups) = cs.cld_cover_lw
-@inline _cld_cover(cs::CloudState, ::SWGptGroups) = cs.cld_cover_sw
+# The fused kernels are register-bound, and capping their registers buys more
+# warps than the spills cost. At this cap, a multiprocessor holds one block of
+# 1024 threads, which was faster than more blocks of fewer threads.
+const FUSED_BLOCK_THREADS = 1024
+const FUSED_MAXREGS = 64
 
 """
     _solve_both_skies_grouped!(groups, flux, flux_clear, bcs, as, state_cache,
-                               lookup, lookup_cld, lookup_aero)
+                               lookup, lookup_cld, lookup_aero, lookup_precip)
 
-Run the fused both-skies solve over `ncol * n_gpt_groups(groups)` threads, each
-taking every `ngroups`-th g-point of one column, then reduce their partial
-fluxes. `groups` is the band: `LWGptGroups` or `SWGptGroups`. Each round of that
-g-point loop is two kernels, the gas and aerosol optics and then the sweeps; see
-`_grouped_rounds!`.
-
-A thread's wide column index is its own id: `wcol = gcol + (grp - 1) * ncol`
-selects its slice of every workspace, and consecutive threads are consecutive
-columns of one group, so the state reads and the scratch writes stay coalesced.
-
-The gain is waves rather than occupancy. A round's kernels are register-bound
-whatever the grid, so what grouping changes is that blocks queue behind them
-instead of a multiprocessor idling until the launch's slowest column is done.
-
-The fluxes are **not** bit-for-bit with the ungrouped solve: summing a column's
-g-points as `ngroups` interleaved partials is a different order of the same sum.
-Which mask each g-point draws is unchanged, since the McICA key indexes a
-stateless draw in `(key, column, g-point, layer)`.
-
-Two things are specific to the shortwave. The partials carry a direct-beam
-profile as well as up and down, so the reduction sums three. And a night column
-is left out of nearly all of a round: the optics kernel returns without filling
-`op`, and the sweeps kernel zeroes that thread's slice rather than leaving
-whatever the workspace last held, so the reduction sums zeros to the same result.
-The exception is the 550 nm aerosol optical depth, which every column has
-whether or not the sun is up. It is a read-modify-write on one per-column
-address that concurrent groups would interleave, so the kernel nominates one
-g-point as its only writer -- and that one thread runs for a dark column too,
-being the only thing such a column still owes. It is 1 g-point in 224.
+Run the both-skies solve of one band (`groups` is an `LWGptGroups` or an
+`SWGptGroups`) with `N = n_gpt_groups(groups)` threads per column, which share a
+warp. Lane `l` of a column takes the column's g-points `l`, `l + N`, ..., into
+its own slice `wcol` of the wide workspaces, and the lanes sum their fluxes over
+each level after every sweep. Summing in that order instead of the serial one
+changes the fluxes at roundoff; the McICA masks are unchanged, being stateless
+draws in `(key, column, g-point, layer)`.
 """
 function _solve_both_skies_grouped!(
     groups::Union{LWGptGroups, SWGptGroups},
@@ -131,124 +33,369 @@ function _solve_both_skies_grouped!(
     lookup_precip::Union{LookUpPrecip, Nothing} = nothing,
 )
     nlay, ncol = AtmosphericStates.get_dims(as)
-    nlev = nlay + 1
-    n_gpt = length(lookup.band_data.major_gpt2bnd)
-    ngroups = n_gpt_groups(groups)
-    (; aerosol_state, cloud_state) = as
-
-    # The aerosol mask depends on the column alone, so it is computed once here
-    # instead of identically by every group.
-    if aerosol_state isa AerosolState
-        atx, abx = _configure_threadblock(ncol)
-        aero_args = (aerosol_state, Int32(ncol))
-        @cuda always_inline = true threads = (atx) blocks = (abx) _aero_mask_CUDA!(
-            int32_arrays(aero_args)...,
-        )
-    end
-
-    _grouped_rounds!(
-        groups,
+    nthreads = ncol * n_gpt_groups(groups)
+    tx, bx = _configure_threadblock(FUSED_BLOCK_THREADS, nthreads)
+    args = (
+        groups.fluxb,
+        groups.src,
         bcs,
+        groups.op,
+        groups.mask,
+        flux,
+        flux_clear,
+        Int32(nlay),
+        Int32(ncol),
+        Val(n_gpt_groups(groups)),
         as,
         state_cache,
         lookup,
         lookup_cld,
         lookup_aero,
         lookup_precip,
-        nlay,
-        ncol,
-        ngroups,
-        n_gpt,
     )
-
-    rtx, rbx = _configure_threadblock(ncol * nlev)
-    reduce_args = (
-        flux,
-        flux_clear,
-        groups.acc,
-        groups.acc_clear,
-        groups.cloudy,
-        _cld_cover(cloud_state, groups),
-        Int32(ngroups),
-        Int32(n_gpt),
-        Int32(ncol),
-        Int32(nlev),
-    )
-    reduce! = _reduce_kernel(groups)
-    @cuda always_inline = true threads = (rtx) blocks = (rbx) reduce!(
-        int32_arrays(reduce_args)...,
-    )
-    return nothing
-end
-
-# One launch of a round's half, at the band's block shape and register
-# budget. `maxregs` is a compiler keyword, so a round's two halves compile
-# once each at their own budget and the loop below launches what it is given.
-@inline function _launch_round_half!(f, args, tx, bx, budget)
-    @cuda always_inline = true maxregs = budget threads = (tx) blocks = (bx) f(
+    @cuda always_inline = true maxregs = FUSED_MAXREGS threads = tx blocks = bx fused_kernel(
+        groups,
+    )(
         int32_arrays(args)...,
     )
     return nothing
 end
 
-# One round of the grouped g-point loop is two launches: every thread's gas and
-# aerosol optics, then every thread's sweeps over the optics now in `op`. The
-# round index replaces a thread's own `for igpt in grp:ngroups:n_gpt`, so round
-# `r` is that loop's `r`th iteration for every group at once.
-function _grouped_rounds!(
-    groups::Union{LWGptGroups, SWGptGroups},
-    bcs,
-    as::AtmosphericState,
-    state_cache::Union{TransposedStateCache, Nothing},
-    lookup,
-    lookup_cld::Union{LookUpCld, Nothing},
-    lookup_aero::Union{LookUpAerosolMerra, Nothing},
-    lookup_precip::Union{LookUpPrecip, Nothing},
-    nlay,
-    ncol,
-    ngroups,
-    n_gpt,
+@inline fused_kernel(::LWGptGroups) = lw_fused_CUDA!
+@inline fused_kernel(::SWGptGroups) = sw_fused_CUDA!
+
+# The lanes of this thread's column: `N` consecutive lanes of its warp, `N` a
+# power of two (ClimaCore's `subwarp_lanes`).
+@inline column_lanes(::Val{N}) where {N} =
+    N == 32 ? CUDA.FULL_MASK :
+    ((one(UInt32) << N) - one(UInt32)) <<
+    ((CUDA.laneid() - 1i32) % UInt32 & ~UInt32(N - 1))
+
+# The sum of `x` over the lanes of a column, in each of them (ClimaCore's
+# `shuffle_reduce`).
+@inline function lane_sum(x, lanes::Val{N}) where {N}
+    for offset in ntuple(n -> one(UInt32) << (n - 1), Val(trailing_zeros(N)))
+        x += CUDA.shfl_xor_sync(column_lanes(lanes), x, offset, N % UInt32)
+    end
+    return x
+end
+
+@inline flux_planes(flux::FluxLW) = (flux.flux_up, flux.flux_dn)
+@inline flux_planes(flux::FluxSW) =
+    (flux.flux_up, flux.flux_dn, flux.flux_dn_dir)
+
+# Add the fluxes that a column's lanes left in `fluxb` to the column's fluxes in
+# `acc`, level by level, or overwrite them on the first round.
+@inline function sum_lanes_into!(
+    acc,
+    fluxb,
+    active,
+    gcol,
+    wcol,
+    nlev,
+    first,
+    lanes,
+    lane,
 )
-    nwide = ncol * ngroups
-    tx, bx = _configure_threadblock(GROUP_BLOCK_THREADS, nwide)
-    optics! = _optics_kernel(groups)
-    sweeps! = _sweeps_kernel(groups)
-    optics_maxregs = _optics_maxregs(groups)
-    sweeps_maxregs = _sweeps_maxregs(groups)
-    for round in 1:cld(n_gpt, ngroups)
-        optics_args = (
-            _optics_workspaces(groups)...,
-            as,
-            state_cache,
-            lookup,
-            lookup_aero,
-            Int32(ncol),
-            Int32(ngroups),
-            Int32(n_gpt),
-            Int32(round),
-            _optics_zenith(groups, bcs)...,
-        )
-        _launch_round_half!(optics!, optics_args, tx, bx, optics_maxregs)
-        sweeps_args = (
-            groups.fluxb,
-            groups.acc,
-            groups.acc_clear,
-            groups.src,
-            bcs,
-            groups.op,
-            groups.mask,
-            groups.cloudy,
-            Int32(nlay),
-            Int32(ncol),
-            as,
-            lookup,
-            lookup_cld,
-            lookup_precip,
-            Int32(ngroups),
-            Int32(n_gpt),
-            Int32(round),
-        )
-        _launch_round_half!(sweeps!, sweeps_args, tx, bx, sweeps_maxregs)
+    for ilev in 1i32:nlev
+        foreach(flux_planes(acc), flux_planes(fluxb)) do a, b
+            v = active ? (@inbounds b[wcol, ilev]) : zero(eltype(b))
+            v = lane_sum(v, lanes)
+            lane == 1i32 &&
+                (@inbounds a[gcol, ilev] = first ? v : a[gcol, ilev] + v)
+        end
     end
     return nothing
 end
+
+# The fused longwave solve: `N` consecutive threads per column, each taking every
+# `N`-th g-point of it into its own slice (`wcol`) of the wide workspaces, and
+# the column's fluxes summed over its lanes after every sweep.
+function lw_fused_CUDA!(
+    fluxb::FluxLW,
+    src_lw::SourceLW2Str,
+    bcs_lw::LwBCs,
+    op::TwoStream,
+    mask,
+    flux_lw::FluxLW,
+    flux_lw_clear::FluxLW,
+    nlay,
+    ncol,
+    lanes::Val{N},
+    as::AtmosphericState,
+    state_cache::Union{TransposedStateCache, Nothing},
+    lookup_lw::LookUpLW,
+    lookup_lw_cld::Union{LookUpCld, Nothing},
+    lookup_lw_aero::Union{LookUpAerosolMerra, Nothing},
+    lookup_lw_precip::Union{LookUpPrecip, Nothing},
+) where {N}
+    nlanes = Int32(N)
+    wcol = threadIdx().x + (blockIdx().x - 1i32) * blockDim().x
+    gcol = ((wcol - 1i32) >> trailing_zeros(nlanes)) + 1i32
+    lane = ((wcol - 1i32) & (nlanes - 1i32)) + 1i32
+    if gcol ≤ ncol
+        nlev = nlay + 1i32
+        (; major_gpt2bnd) = lookup_lw.band_data
+        n_gpt = length(major_gpt2bnd) % Int32
+        (; cloud_state, aerosol_state) = as
+        FT = eltype(flux_lw.flux_up)
+        lane == 1i32 && _compute_aero_mask!(aerosol_state, gcol)
+        CUDA.sync_warp(column_lanes(lanes))
+        n_cloudy = 0i32
+        @inbounds for round in 1i32:cld(n_gpt, nlanes)
+            igpt = (round - 1i32) * nlanes + lane
+            active = igpt ≤ n_gpt
+            first = round == 1i32
+            ibnd = active ? major_gpt2bnd[igpt] : 1
+            if active
+                cloudy = _build_cloud_mask!(
+                    cloud_state,
+                    Val(:mask_lw),
+                    gcol,
+                    igpt,
+                    mask,
+                    wcol,
+                )
+                n_cloudy += Int32(cloudy)
+                compute_optical_props!(
+                    op,
+                    as,
+                    state_cache,
+                    src_lw,
+                    gcol,
+                    igpt,
+                    lookup_lw,
+                    nothing,
+                    lookup_lw_aero,
+                    nothing,
+                    wcol,
+                )
+                rte_lw_2stream!(
+                    op,
+                    fluxb,
+                    src_lw,
+                    bcs_lw,
+                    gcol,
+                    igpt,
+                    ibnd,
+                    nlev,
+                    ncol,
+                    wcol,
+                )
+            end
+            sum_lanes_into!(
+                flux_lw_clear,
+                fluxb,
+                active,
+                gcol,
+                wcol,
+                nlev,
+                first,
+                lanes,
+                lane,
+            )
+            if active
+                isnothing(lookup_lw_cld) || add_cloud_optics_lw!(
+                    op,
+                    as,
+                    gcol,
+                    lookup_lw_cld,
+                    ibnd,
+                    lookup_lw_precip,
+                    wcol,
+                    mask,
+                )
+                rte_lw_2stream!(
+                    op,
+                    fluxb,
+                    src_lw,
+                    bcs_lw,
+                    gcol,
+                    igpt,
+                    ibnd,
+                    nlev,
+                    ncol,
+                    wcol,
+                )
+            end
+            sum_lanes_into!(
+                flux_lw,
+                fluxb,
+                active,
+                gcol,
+                wcol,
+                nlev,
+                first,
+                lanes,
+                lane,
+            )
+        end
+        n_cloudy = lane_sum(n_cloudy, lanes)
+        if lane == 1i32
+            @inbounds compute_net_flux!(flux_lw, gcol, nlev)
+            @inbounds compute_net_flux!(flux_lw_clear, gcol, nlev)
+            if cloud_state isa CloudState &&
+               !isnothing(cloud_state.cld_cover_lw)
+                @inbounds cloud_state.cld_cover_lw[gcol] = FT(n_cloudy) / n_gpt
+            end
+        end
+    end
+    return nothing
+end
+
+# The fused shortwave solve (see `lw_fused_CUDA!`). A night column skips its
+# sweeps and is zeroed at the end, but still draws its cloud masks for the cloud
+# cover, and the last g-point of the 550 nm band still collects the aerosol
+# optical depth.
+function sw_fused_CUDA!(
+    fluxb::FluxSW,
+    src_sw::SourceSW2Str,
+    bcs_sw::SwBCs,
+    op::TwoStream,
+    mask,
+    flux_sw::FluxSW,
+    flux_sw_clear::FluxSW,
+    nlay,
+    ncol,
+    lanes::Val{N},
+    as::AtmosphericState,
+    state_cache::Union{TransposedStateCache, Nothing},
+    lookup_sw::LookUpSW,
+    lookup_sw_cld::Union{LookUpCld, Nothing},
+    lookup_sw_aero::Union{LookUpAerosolMerra, Nothing},
+    lookup_sw_precip::Union{LookUpPrecip, Nothing},
+) where {N}
+    nlanes = Int32(N)
+    wcol = threadIdx().x + (blockIdx().x - 1i32) * blockDim().x
+    gcol = ((wcol - 1i32) >> trailing_zeros(nlanes)) + 1i32
+    lane = ((wcol - 1i32) & (nlanes - 1i32)) + 1i32
+    if gcol ≤ ncol
+        nlev = nlay + 1i32
+        (; major_gpt2bnd) = lookup_sw.band_data
+        n_gpt = length(major_gpt2bnd) % Int32
+        (; cloud_state, aerosol_state) = as
+        FT = eltype(flux_sw.flux_up)
+        μ₀ = @inbounds bcs_sw.cos_zenith[gcol]
+        lane == 1i32 && _compute_aero_mask!(aerosol_state, gcol)
+        CUDA.sync_warp(column_lanes(lanes))
+        n_cloudy = 0i32
+        @inbounds for round in 1i32:cld(n_gpt, nlanes)
+            igpt = (round - 1i32) * nlanes + lane
+            active = igpt ≤ n_gpt
+            first = round == 1i32
+            ibnd = active ? major_gpt2bnd[igpt] : 1
+            if active
+                cloudy = _build_cloud_mask!(
+                    cloud_state,
+                    Val(:mask_sw),
+                    gcol,
+                    igpt,
+                    mask,
+                    wcol,
+                )
+                n_cloudy += Int32(cloudy)
+                collect_aod =
+                    igpt == n_gpt || major_gpt2bnd[igpt + 1i32] != ibnd
+                if μ₀ > 0 ||
+                   (collect_aod && _is_550nm_band(lookup_sw_aero, ibnd))
+                    compute_optical_props!(
+                        op,
+                        as,
+                        state_cache,
+                        gcol,
+                        igpt,
+                        lookup_sw,
+                        nothing,
+                        lookup_sw_aero,
+                        nothing,
+                        wcol,
+                        collect_aod,
+                    )
+                end
+                if μ₀ > 0
+                    solar_frac = lookup_sw.solar_src_scaled[igpt]
+                    rte_sw_2stream!(
+                        op,
+                        src_sw,
+                        bcs_sw,
+                        fluxb,
+                        solar_frac,
+                        igpt,
+                        n_gpt,
+                        ibnd,
+                        nlev,
+                        gcol,
+                        wcol,
+                    )
+                end
+            end
+            μ₀ > 0 && sum_lanes_into!(
+                flux_sw_clear,
+                fluxb,
+                active,
+                gcol,
+                wcol,
+                nlev,
+                first,
+                lanes,
+                lane,
+            )
+            if active && μ₀ > 0
+                isnothing(lookup_sw_cld) || add_cloud_optics_sw!(
+                    op,
+                    as,
+                    gcol,
+                    lookup_sw_cld,
+                    ibnd,
+                    lookup_sw_precip,
+                    wcol,
+                    mask,
+                )
+                solar_frac = lookup_sw.solar_src_scaled[igpt]
+                rte_sw_2stream!(
+                    op,
+                    src_sw,
+                    bcs_sw,
+                    fluxb,
+                    solar_frac,
+                    igpt,
+                    n_gpt,
+                    ibnd,
+                    nlev,
+                    gcol,
+                    wcol,
+                )
+            end
+            μ₀ > 0 && sum_lanes_into!(
+                flux_sw,
+                fluxb,
+                active,
+                gcol,
+                wcol,
+                nlev,
+                first,
+                lanes,
+                lane,
+            )
+        end
+        n_cloudy = lane_sum(n_cloudy, lanes)
+        if lane == 1i32
+            if μ₀ ≤ 0
+                @inbounds set_flux_to_zero!(flux_sw, gcol, nlev)
+                @inbounds set_flux_to_zero!(flux_sw_clear, gcol, nlev)
+            else
+                @inbounds compute_net_flux!(flux_sw, gcol, nlev)
+                @inbounds compute_net_flux!(flux_sw_clear, gcol, nlev)
+            end
+            if cloud_state isa CloudState &&
+               !isnothing(cloud_state.cld_cover_sw)
+                @inbounds cloud_state.cld_cover_sw[gcol] = FT(n_cloudy) / n_gpt
+            end
+        end
+    end
+    return nothing
+end
+
+
+@inline _is_550nm_band(::Nothing, ibnd) = false
+@inline _is_550nm_band(lkp::LookUpAerosolMerra, ibnd) = ibnd == lkp.iband_550nm

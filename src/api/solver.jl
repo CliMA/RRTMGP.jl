@@ -286,7 +286,7 @@ function RRTMGPSolver(
         radiation_method isa GrayRadiation ? nothing :
         RTE._default_state_cache(grid_params)
     # The gates below reach the workspaces only above one group, so this is
-    # where a count of zero or less is caught.
+    # where any other count that is not a power of two up to 32 is caught.
     RTE._check_ngpt_groups(ngpt_groups)
     # Workspaces for the g-point-grouped fused shortwave solve, allocated on the
     # same terms as the longwave ones below.

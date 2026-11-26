@@ -13,6 +13,7 @@ import RRTMGP.BCs: LwBCs, SwBCs
 import RRTMGP.Optics: OneScalar, TwoStream
 import RRTMGP.Optics
 import RRTMGP.Optics: compute_optical_props!
+import RRTMGP.Optics: add_cloud_optics_lw!, add_cloud_optics_sw!
 import RRTMGP.Optics: compute_col_gas!
 import RRTMGP.Optics: compute_col_gas_kernel!
 import RRTMGP.Optics: compute_relative_humidity!
@@ -49,16 +50,11 @@ import RRTMGP.RTE: GPT_GROUP_MEMORY_DIVISOR, _gpt_group_byte_bound
 import RRTMGP.RTESolver: lw_2stream_gpt_col_both_skies!
 import RRTMGP.RTESolver: rte_sw_2stream_solve_both_skies!
 import RRTMGP.RTESolver: sw_2stream_gpt_col_both_skies!
-# the post-optics halves, for the split grouped solves
-import RRTMGP.RTESolver: lw_2stream_gpt_col_sweeps!, sw_2stream_gpt_col_sweeps!
 import Adapt
 import CUDA
 import CUDA: threadIdx, blockIdx, blockDim, @cuda, i32
 
-# The share of this device's memory the default g-point group count may commit.
-# Total rather than free, for the reason given where the fallback is defined.
-# `Int`, because CUDA reports memory as a `UInt64` and the count this bound
-# feeds is a keyword typed `Int`.
+# `Int`, because CUDA reports memory as a `UInt64`.
 _gpt_group_byte_bound(::ClimaComms.CUDADevice) =
     fld(Int(CUDA.totalmem(CUDA.device())), GPT_GROUP_MEMORY_DIVISOR)
 
