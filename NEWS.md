@@ -4,6 +4,9 @@ RRTMGP.jl Release Notes
 main
 ----
 
+- [#647](https://github.com/CliMA/RRTMGP.jl/pull/647) The two-stream sweeps
+  keep the coefficients of their downward pass from the upward pass instead of
+  recomputing them, which changes fluxes at roundoff.
 - [#646](https://github.com/CliMA/RRTMGP.jl/pull/646) The fused two-stream
   kernels compute the aerosol and cloud optics of each band once per column, the
   lanes taking a layer each, instead of once per g-point.

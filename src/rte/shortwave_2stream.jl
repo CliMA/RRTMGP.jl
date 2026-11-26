@@ -361,6 +361,10 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
             src_up_ilev + Tdif * denom * (src_ilev + albedo_ilev * src_dn_ilev)
         albedo[wcol, ilev + 1], src[wcol, ilev + 1] =
             albedo_ilevplus1, src_ilevplus1
+        # Equation 13 below as flux_dn_ilev = a * flux_dn_ilevplus1 + b, with a
+        # and b held in the flux planes, which the downward pass then overwrites
+        flux_up[wcol, ilev] = Tdif * denom
+        flux_dn[wcol, ilev] = (Rdif * src_ilev + src_dn_ilev) * denom
         albedo_ilev = albedo_ilevplus1
         src_ilev = src_ilevplus1
     end
@@ -375,19 +379,10 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
 
     ilev = nlay
     @inbounds while ilev ≥ 1
-        τ_ilev, ssa_ilev, g_ilev = τ[wcol, ilev], ssa[wcol, ilev], g[wcol, ilev]
-        albedo_ilev, src_ilev = albedo[wcol, ilev], src[wcol, ilev]
-        (_, Tdir, _, Rdif, Tdif) =
-            sw_2stream_coeffs(τ_ilev, ssa_ilev, g_ilev, μ₀)
-        denom = FT(1) / (FT(1) - Rdif * albedo_ilev)  # Eq 10
-        src_dn_ilev = Tdir * flux_dn_dir[wcol, ilev + 1]
-        flux_dn_ilev =
-            (Tdif * flux_dn_ilevplus1 + # Equation 13
-             Rdif * src_ilev +
-             src_dn_ilev) * denom
-        flux_up[wcol, ilev] =
-            flux_dn_ilev * albedo_ilev + # Equation 12
-            src_ilev
+        flux_dn_ilev = # Equation 13
+            flux_up[wcol, ilev] * flux_dn_ilevplus1 + flux_dn[wcol, ilev]
+        flux_up[wcol, ilev] = # Equation 12
+            flux_dn_ilev * albedo[wcol, ilev] + src[wcol, ilev]
         flux_dn[wcol, ilev] = flux_dn_ilev + flux_dn_dir[wcol, ilev]
         flux_dn_ilevplus1 = flux_dn_ilev
         ilev -= 1

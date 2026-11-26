@@ -297,6 +297,10 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
             src_up + Tdif * denom * (src_ilev + albedo_ilev * src_dn)
         albedo[wcol, ilev + 1], src[wcol, ilev + 1] =
             albedo_ilevplus1, src_ilevplus1
+        # Equation 13 below as flux_dn_ilev = a * flux_dn_ilevplus1 + b, with a
+        # and b held in the flux planes, which the downward pass then overwrites
+        flux_up[wcol, ilev] = Tdif * denom
+        flux_dn[wcol, ilev] = (Rdif * src_ilev + src_dn) * denom
         lev_src_bot = lev_src_top
         albedo_ilev, src_ilev = albedo_ilevplus1, src_ilevplus1
     end
@@ -307,26 +311,14 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
         src[wcol, nlev]                          # scattering by the direct beam below
 
     # From the top of the atmosphere downward -- compute fluxes
-    @inbounds lev_src_top = lev_source[wcol, nlay + 1]
     ilev = nlay
     @inbounds while ilev ≥ 1
-        lev_src_bot, albedo_ilev, src_ilev =
-            lev_source[wcol, ilev], albedo[wcol, ilev], src[wcol, ilev]
-        τ_lay, ssa_lay, g_lay = τ[wcol, ilev], ssa[wcol, ilev], g[wcol, ilev]
-        Rdif, Tdif, _, src_dn =
-            lw_2stream_coeffs(τ_lay, ssa_lay, g_lay, lev_src_bot, lev_src_top)
-
-        denom = FT(1) / (FT(1) - Rdif * albedo_ilev)  # Eq 10
-        flux_dn_ilev =
-            (Tdif * flux_dn_ilevplus1 + # Equation 13
-             Rdif * src_ilev +
-             src_dn) * denom
-        flux_up[wcol, ilev] =
-            flux_dn_ilev * albedo_ilev + # Equation 12
-            src_ilev
+        flux_dn_ilev = # Equation 13
+            flux_up[wcol, ilev] * flux_dn_ilevplus1 + flux_dn[wcol, ilev]
+        flux_up[wcol, ilev] = # Equation 12
+            flux_dn_ilev * albedo[wcol, ilev] + src[wcol, ilev]
         flux_dn[wcol, ilev] = flux_dn_ilev
         flux_dn_ilevplus1 = flux_dn_ilev
-        lev_src_top = lev_src_bot
         ilev -= 1
     end
 end
@@ -337,8 +329,8 @@ end
 # increment, so the optics they share is computed once and swept twice.
 #
 # Sweeping twice against one optics computation is safe because rte_lw_2stream!
-# writes only `albedo` and `src` as scratch, both recomputed from `lev_source`
-# and `sfc_source`, which only the optics pass writes.
+# writes only its fluxes and `albedo` and `src` as scratch, both recomputed from
+# `lev_source` and `sfc_source`, which only the optics pass writes.
 #
 # The increments are weighted sums applied per component, so applying aerosol
 # before cloud rather than after changes summation order.
