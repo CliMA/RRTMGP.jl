@@ -290,11 +290,9 @@ function all_sky_with_aerosols(
     # One group takes a column's g-points in the serial order, so it
     # reassociates nothing and has to reproduce the serial solve exactly. That
     # is the exact check on the whole grouped path -- the wide indexing, the
-    # accumulators, the reduction, the cover tally and the nominated writer of
-    # the aerosol optical depth -- against a reference that is not itself
-    # grouped. It is not a fast configuration, launching two kernels per g-point
-    # where the serial solve launches one, so `RRTMGPSolver` refuses one group
-    # and these build the workspaces directly.
+    # flux sums, the cover tally and the nominated writer of the aerosol optical
+    # depth -- against a reference that is not itself grouped. `RRTMGPSolver`
+    # builds no workspaces for one group, so these build them directly.
     one_group_lw() = (
         TwoStreamLWRTE(
             grid_params.context,
@@ -326,14 +324,13 @@ function all_sky_with_aerosols(
 
     # --- the g-point-grouped longwave solve, against the serial one ----------
     # Grouping splits a column's g-point loop across the threads of one wider
-    # grid, each accumulating its own partial flux for a reduction to sum, so
-    # the result is a different summation order of the same 256 terms -- close,
+    # grid, whose fluxes are summed across those threads, so the result is a
+    # different summation order of the same 256 terms -- close,
     # but not the exact equality the clear-sky assertion above demands, which
     # is why the solver it uses is pinned to one group. Anything else that
     # went wrong with the split -- a dropped g-point, groups racing on shared
     # scratch, a mask drawn for the wrong g-point -- moves the fluxes far more
-    # than roundoff, and 3 groups is deliberately not a divisor of the g-point
-    # count.
+    # than roundoff. 32 groups fill a warp per column.
     if SLVLW == TwoStreamLWRTE
         # Both arms must draw from the same key, and the cover lives on the
         # shared `as`, so each arm's results are read before the next solve.
@@ -342,7 +339,7 @@ function all_sky_with_aerosols(
         # Run the whole comparison twice. At cldfrac = 1 every mask entry is
         # `true`, so the McICA key is never consulted and a key drawn for the
         # wrong column -- `wcol` where `gcol` was meant -- leaves both arms
-        # identical; so does a g-point dropped from the cover reduction, since
+        # identical; so does a g-point dropped from the cover count, since
         # every g-point is cloudy in both. The partial fraction is the pass
         # that can fail on either.
         for cf in (nothing, FT(0.5))
@@ -368,7 +365,7 @@ function all_sky_with_aerosols(
             track_cover &&
                 @test Array(as.cloud_state.cld_cover_lw) == serial_cover
 
-            for ng in (3, 16)
+            for ng in (2, 32)
                 grouped = grouped_solver(ng)
                 @test n_gpt_groups(grouped.lws.gpt_groups) == ng
                 RRTMGP.update_lw_fluxes!(grouped, fused_key)
@@ -401,8 +398,8 @@ function all_sky_with_aerosols(
     # --- the g-point-grouped shortwave solve, against the serial one ---------
     # Same split as the longwave above, with three shortwave-specific things to
     # assert. The direct beam is a third accumulated profile. A night column
-    # takes neither sweep, so its partials are never assigned and the kernel has
-    # to zero them instead of summing whatever the workspace last held. And the
+    # takes neither sweep, so the kernel has to zero its fluxes instead of
+    # summing whatever the workspace last held. And the
     # 550 nm aerosol optical depth is a per-column read-modify-write, which is
     # bit-for-bit only because one g-point is nominated to write it -- if every
     # group wrote, their partial sums would interleave.
@@ -412,7 +409,7 @@ function all_sky_with_aerosols(
         # Run the whole comparison twice. At cldfrac = 1 every mask entry is
         # `true`, so the McICA key is never consulted and a key drawn for the
         # wrong column -- `wcol` where `gcol` was meant -- leaves both arms
-        # identical; so does a g-point dropped from the cover reduction, since
+        # identical; so does a g-point dropped from the cover count, since
         # every g-point is cloudy in both. The partial fraction is the pass
         # that can fail on either.
         for cf in (nothing, FT(0.5))
@@ -437,10 +434,9 @@ function all_sky_with_aerosols(
                 RRTMGP._deep_atmosphere_inverse_scaling(solver),
             )
             # Exactly the serial result, which also pins the two things the
-            # shortwave has to get right on its own: a night column's partials
+            # shortwave has to get right on its own: a night column's fluxes
             # are zeroed rather than summed from whatever the workspace held,
-            # and the 550 nm optical depth is collected in the optics half while
-            # the sun is tested in the sweeps half.
+            # and the 550 nm optical depth is collected where the sun is down.
             @test Array(parent(sws_one.flux.flux_net)) == serial_all
             @test Array(parent(sws_one.flux.flux_dn_dir)) == serial_dir
             @test Array(parent(clear_one.flux_net)) == serial_clear
@@ -449,7 +445,7 @@ function all_sky_with_aerosols(
             track_cover &&
                 @test Array(as.cloud_state.cld_cover_sw) == serial_cover
 
-            for ng in (3, 16)
+            for ng in (2, 32)
                 grouped = grouped_solver(ng)
                 @test n_gpt_groups(grouped.sws.gpt_groups) == ng
                 RRTMGP.update_sw_fluxes!(grouped, fused_key)

@@ -27,92 +27,43 @@ _default_state_cache(::ClimaComms.AbstractCPUDevice, gp::RRTMGPGridParams) =
 _default_state_cache(::ClimaComms.AbstractDevice, gp::RRTMGPGridParams) =
     TransposedStateCache(gp)
 
-# The most pieces the fused g-point loop may be split into. One is the serial
-# loop every other solver uses; above one the solve widens its workspaces to
-# `ncol * ngroups` and covers them in one launch, so its grid is `ngroups` times
-# the blocks the serial loop would have launched. This ceiling is a memory one:
-# see `TARGET_GPT_GROUP_COLUMNS` for what each group costs.
+# The most g-point groups the default splits a column into, and the wide columns
+# it aims for: the benchmark it was measured on runs 24,576 columns, and 16
+# groups of those is what `MAX_NGPT_GROUPS` allows.
 const MAX_NGPT_GROUPS = 16
-
-# Wide columns the default group count aims for, and where the number comes
-# from: the benchmark it was swept on runs 24,576 columns, and 16 groups of
-# those is what `MAX_NGPT_GROUPS` allows. At the grouped rounds' 128 threads
-# that is a grid of 3,072 blocks, of which the driver holds 3 of the longwave
-# optics kernel resident per multiprocessor and 4 of the shortwave's, so an
-# A100's 108 multiprocessors see about 9 waves in the longwave and 7 in the
-# shortwave where the ungrouped solve launches one.
-#
-# It is not the count past which another group buys nothing: the sweep has most
-# of its gain in by 8 groups and its best at 32, about 2% beyond 16. It is where
-# the workspaces stop being worth that 2%, because every one of them is linear
-# in `ngroups` -- the accumulators alone are `ncol * ngroups * nlev` by two flux
-# planes in the longwave and three in the shortwave.
 const TARGET_GPT_GROUP_COLUMNS = 393216
 
-# What fraction of a device's memory the default will commit to those
-# workspaces. The column target above is a floor on how wide the solve wants to
-# be, not a licence to allocate: `nlev` is in the workspace's size and not in
-# that target, so without a byte bound the same column count commits four times
-# the memory on a 128-level grid as on a 32-level one, and a run can fail to
-# allocate at a default it never chose. A sixteenth is inert at every resolution
-# measured: on an 80 GiB device it first binds above 80 layers at the
-# benchmark's column count.
+# The default commits at most this fraction of a device's total memory (not its
+# free memory, which would make the summation order depend on the host's other
+# allocations). The CUDA extension reads the device's total; this fallback is
+# for other devices.
 const GPT_GROUP_MEMORY_DIVISOR = 16
-
-# The bound itself, which is a property of the device. It is a share of TOTAL
-# memory rather than of what is free, because the group count decides the order
-# a column's g-points are summed: pricing against free memory would let that
-# order, and so the fluxes, depend on whatever the host had allocated when the
-# solver was built. The CUDA extension reads the device's figure; this fallback
-# is the fixed bound the default carried before it was derived, and a device
-# smaller than it wants an explicit `ngpt_groups` instead.
 _gpt_group_byte_bound(::ClimaComms.AbstractDevice) = 4 * 1024^3
 
 """
     default_ngpt_groups(grid_params::RRTMGPGridParams)
 
-How many g-point groups `RRTMGPSolver` widens a two-stream solve to when the
-caller names none: enough to reach `TARGET_GPT_GROUP_COLUMNS` wide columns, capped
-at `MAX_NGPT_GROUPS` and at what a `GPT_GROUP_MEMORY_DIVISOR`th of the device's
-memory affords on this grid's level count and float type, which
-[`gpt_group_bytes`](@ref) counts.
+How many g-point groups `RRTMGPSolver` splits a two-stream solve into when the
+caller names none: the smallest power of two reaching `TARGET_GPT_GROUP_COLUMNS`
+wide columns, capped at `MAX_NGPT_GROUPS` and at what a
+`GPT_GROUP_MEMORY_DIVISOR`th of the device's memory affords (see
+[`gpt_group_bytes`](@ref)), and one on a CPU.
 
-A column count that already fills the device gets one group, and so does a CPU,
-whose driver solves the whole g-point loop per column and ignores the workspaces.
-Both gates matter because the count rises as columns fall, so an ungated default
-would give the smallest runs the widest workspaces. Pass `ngpt_groups` to
-override in either direction -- a device whose free memory is smaller than its
-share of its own total wants that rather than the default, since the bound is on
-the total.
-
-Grouping changes the order in which a column's g-points are summed, and
-floating-point addition is not associative, so grouped fluxes differ from a
-serial solve at roundoff -- about 1e-6 relative in the configurations tested --
-and the clear-sky half of a both-skies solve no longer equals a standalone
-clear-sky solve exactly. Pass `ngpt_groups = 1` where bit-for-bit agreement is
-required. The cloud-cover tally is a count of g-points and stays exact. What
-grouping does to a sum is the whole of the difference: at one group the g-points
-are taken in the serial order, and the solve is then bit-for-bit with the serial
-one, which is what the tests assert.
+Grouping changes the order in which a column's g-points are summed, so grouped
+fluxes differ from a serial solve at roundoff, about 1e-6 relative, and the
+clear-sky half of a both-skies solve no longer equals a standalone clear-sky
+solve exactly. Pass `ngpt_groups = 1` where bit-for-bit agreement is required.
 """
 function default_ngpt_groups(grid_params::RRTMGPGridParams)::Int
-    # The `::Int` is not incidental: the byte bound comes from the device through
-    # a hook, CUDA reports memory as a `UInt64`, and an unsigned count here does
-    # not match the `ngpt_groups::Int` keyword this defaults -- which fails at
-    # every solver construction, on a GPU only.
     device = ClimaComms.device(grid_params)
     device isa ClimaComms.AbstractCPUDevice && return 1
     (; ncol, nlay) = grid_params
-    # `cld`, because the column target is a floor: rounding down would undershoot
-    # the parallelism it names. It can overshoot instead -- by 9.9% at the
-    # high-resolution benchmark's column count -- which costs memory, and that is
-    # what the byte bound is for.
-    wanted = cld(TARGET_GPT_GROUP_COLUMNS, ncol)
+    wanted = nextpow(2, cld(TARGET_GPT_GROUP_COLUMNS, ncol))
     affordable = fld(
         _gpt_group_byte_bound(device),
         gpt_group_bytes(eltype(grid_params), ncol, nlay, 1),
     )
-    return clamp(min(wanted, affordable), 1, MAX_NGPT_GROUPS)
+    return prevpow(2, clamp(min(wanted, affordable), 1, MAX_NGPT_GROUPS))
 end
 
 include("gpt_groups.jl")

@@ -240,9 +240,8 @@ end
     end
     if !isnothing(lkp_cld) # clouds need TwoStream optics
         # The narrow method, indexed by the column alone, because the mask store
-        # it reads is the one sized for `gcol` and a wide `wcol` beside it would
-        # read that mask past its end. The grouped optics kernel passes no cloud
-        # lookup; the grouped sweeps add the increment with the wide mask.
+        # it reads is the one sized for `gcol`. The grouped solve passes no
+        # cloud lookup and adds the increment with its wide mask.
         add_cloud_optics_lw!(op, as, gcol, lkp_cld, ibnd, lkp_precip)
     end
     return nothing
@@ -351,7 +350,7 @@ end
     if !isnothing(lkp_aero)
         (; iband_550nm) = lkp_aero
         # Zeroed and re-accumulated per g-point, so it is a read-modify-write
-        # on one per-column address: concurrent groups would interleave their
+        # on one per-column address: concurrent g-points would interleave their
         # partial sums. `collect_aod` nominates a single writer.
         aod_sw_ext =
             collect_aod ? view(as.aerosol_state.aod_sw_ext, gcol) : nothing
@@ -380,9 +379,8 @@ end
     end
     if !isnothing(lkp_cld) # clouds need TwoStream optics
         # The narrow method, indexed by the column alone, because the mask store
-        # it reads is the one sized for `gcol` and a wide `wcol` beside it would
-        # read that mask past its end. The grouped optics kernel passes no cloud
-        # lookup; the grouped sweeps add the increment with the wide mask.
+        # it reads is the one sized for `gcol`. The grouped solve passes no
+        # cloud lookup and adds the increment with its wide mask.
         add_cloud_optics_sw!(op, as, gcol, lkp_cld, ibnd, lkp_precip)
     end
     return nothing

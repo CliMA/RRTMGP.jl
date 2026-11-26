@@ -42,23 +42,20 @@
 end
 
 # Accumulate one g-point's fluxes into the broadband accumulator for one
-# column: copy on the first g-point, add afterwards. The accumulator is a
-# `FluxLW`/`FluxSW` on the serial path and a NamedTuple of views on the grouped
-# one, so only `flux` selects the band. `flux_net` is not
+# column: copy on the first g-point, add afterwards. `flux_net` is not
 # accumulated — the drivers recompute it from the broadband up/dn once, after
 # the g-point loop. For shortwave, the direct beam is accumulated at every
 # level, so the broadband `flux_dn_dir` is a true per-level profile.
 @inline function _accumulate_fluxes!(
-    flux_acc,
+    flux_acc::FluxLW,
     flux::FluxLW,
     gcol,
     nlev,
     igpt,
-    first_igpt = 1,
 )
     acc_up, acc_dn = flux_acc.flux_up, flux_acc.flux_dn
     up, dn = flux.flux_up, flux.flux_dn
-    if igpt == first_igpt
+    if igpt == 1
         @inbounds for ilev in 1:nlev
             acc_up[gcol, ilev] = up[gcol, ilev]
             acc_dn[gcol, ilev] = dn[gcol, ilev]
@@ -73,17 +70,16 @@ end
 end
 
 @inline function _accumulate_fluxes!(
-    flux_acc,
+    flux_acc::FluxSW,
     flux::FluxSW,
     gcol,
     nlev,
     igpt,
-    first_igpt = 1,
 )
     acc_up, acc_dn, acc_dir =
         flux_acc.flux_up, flux_acc.flux_dn, flux_acc.flux_dn_dir
     up, dn, dir = flux.flux_up, flux.flux_dn, flux.flux_dn_dir
-    if igpt == first_igpt
+    if igpt == 1
         @inbounds for ilev in 1:nlev
             acc_up[gcol, ilev] = up[gcol, ilev]
             acc_dn[gcol, ilev] = dn[gcol, ilev]

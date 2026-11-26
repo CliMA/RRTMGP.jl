@@ -53,7 +53,7 @@ end
 @testset "grouped workspace bytes ($FT)" for FT in (Float32, Float64)
     context = ClimaComms.context(ClimaComms.CPUSingleThreaded())
     params = RRTMGP.default_parameters(FT)
-    for ngroups in (1, 2, 5), (domain_nlay, ncol) in ((10, 16), (31, 48))
+    for ngroups in (1, 2, 4), (domain_nlay, ncol) in ((10, 16), (31, 48))
         grid_params = RRTMGP.RRTMGPGridParams(
             FT;
             context,

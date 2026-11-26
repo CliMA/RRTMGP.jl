@@ -4,6 +4,11 @@ RRTMGP.jl Release Notes
 main
 ----
 
+- [#644](https://github.com/CliMA/RRTMGP.jl/pull/644) The g-point-grouped
+  solves run as one kernel per band, in which a column's groups are lanes of one
+  warp that sum their fluxes with shuffles, so `ngpt_groups` must now be a power
+  of two up to 32. On an A100, the flagship AMIP benchmark's radiation solves
+  22% faster than with #643 alone.
 - [#643](https://github.com/CliMA/RRTMGP.jl/pull/643) GPU kernels compute
   array indices in 32-bit arithmetic, so the arrays passed to them can have at
   most `2^31 - 1` elements. On an A100, the flagship AMIP benchmark's radiation
@@ -11,7 +16,7 @@ main
 - [#637](https://github.com/CliMA/RRTMGP.jl/pull/637) `TwoStreamLWRTE` and
   `TwoStreamSWRTE` can spread a column's g-point loop across `ngpt_groups`
   pieces covered by one grid, in place of the serial loop each thread ran over
-  its own column, and compute each round's optics in a kernel of its own.
+  its own column.
   **`RRTMGPSolver` results change at roundoff**: it defaults `ngpt_groups` to
   `default_ngpt_groups`, which exceeds one on a GPU wherever the column count
   leaves the device underfilled, and regrouping a sum of g-points moves fluxes

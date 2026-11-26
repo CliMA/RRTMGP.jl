@@ -144,9 +144,6 @@ function rte_lw_2stream_solve_CUDA!(
     return nothing
 end
 
-# Duplicated for the CPU in src/rte/longwave_2stream.jl: the cloud-cover tally
-# and net-flux finalize are in both, and the grouped reduction below holds a
-# third copy of the finalize. Change all three.
 """
     rte_lw_2stream_solve_both_skies!(device::CUDADevice, ...)
 
@@ -174,9 +171,7 @@ function rte_lw_2stream_solve_both_skies!(
     nlay, ncol = AtmosphericStates.get_dims(as)
     tx, bx = _configure_threadblock(ncol)
     set_band_flux_to_zero!(band_flux)
-    # The g-point loop splits only when no per-band fluxes are being kept: those
-    # accumulate per g-point too, so they would need per-group partials of their
-    # own and a wider reduction.
+    # Per-band fluxes accumulate per g-point, so only the serial loop keeps them.
     if !isnothing(gpt_groups) && isnothing(band_flux)
         return _solve_both_skies_grouped!(
             gpt_groups,
@@ -223,6 +218,8 @@ cloud increment to the same optics and sweeps again. Per-column body is
 `lw_2stream_gpt_col_both_skies!` in `src/rte/longwave_2stream.jl`, shared with the
 CPU driver.
 """
+# Duplicated for the CPU in src/rte/longwave_2stream.jl: the cloud-cover tally
+# and net-flux finalize are in both. Change both.
 function rte_lw_2stream_solve_both_skies_CUDA!(
     flux::FluxLW,
     flux_lw::FluxLW,
@@ -278,167 +275,6 @@ function rte_lw_2stream_solve_both_skies_CUDA!(
             if cloud_state isa CloudState &&
                !isnothing(cloud_state.cld_cover_lw)
                 cloud_state.cld_cover_lw[gcol] = FT(n_cloudy_gpts) / n_gpt
-            end
-        end
-    end
-    return nothing
-end
-
-#####
-##### The g-point-grouped longwave solve, as optics and then sweeps.
-#####
-
-# This round's gas and aerosol optics for every `(column, group)` pair, into
-# the wide `op` and `src` the sweep kernel reads. The cloud mask is not drawn
-# here: the gas and aerosol optics never read it, so it belongs in whichever
-# half has registers to spare, which is the other one.
-function _lw_group_optics_CUDA!(
-    op::TwoStream,
-    src_lw::SourceLW2Str,
-    as::AtmosphericState,
-    state_cache::Union{TransposedStateCache, Nothing},
-    lookup_lw::LookUpLW,
-    lookup_lw_aero::Union{LookUpAerosolMerra, Nothing},
-    ncol,
-    ngroups,
-    n_gpt,
-    round,
-)
-    wcol = threadIdx().x + (blockIdx().x - 1i32) * blockDim().x
-    if wcol ≤ ncol * ngroups
-        gcol = (wcol - 1i32) % ncol + 1i32
-        grp = (wcol - 1i32) ÷ ncol + 1i32
-        igpt = grp + (round - 1i32) * ngroups
-        if igpt ≤ n_gpt
-            @inbounds compute_optical_props!(
-                op,
-                as,
-                state_cache,
-                src_lw,
-                gcol,
-                igpt,
-                lookup_lw,
-                nothing,
-                lookup_lw_aero,
-                nothing,
-                wcol,
-            )
-        end
-    end
-    return nothing
-end
-
-# The cloud mask and both sweeps for this round, over the optics the kernel
-# above left in `op`. A group with no g-point of its own is zeroed on the first
-# round, because the reduction reads its slice whether it was swept or not.
-function _lw_group_sweeps_CUDA!(
-    flux::FluxLW,
-    acc::NamedTuple,
-    acc_clear::NamedTuple,
-    src_lw::SourceLW2Str,
-    bcs_lw::LwBCs,
-    op::TwoStream,
-    mask,
-    cloudy_count,
-    nlay,
-    ncol,
-    as::AtmosphericState,
-    lookup_lw::LookUpLW,
-    lookup_lw_cld::Union{LookUpCld, Nothing},
-    lookup_lw_precip::Union{LookUpPrecip, Nothing},
-    ngroups,
-    n_gpt,
-    round,
-)
-    wcol = threadIdx().x + (blockIdx().x - 1i32) * blockDim().x
-    nlev = nlay + 1i32
-    (; major_gpt2bnd) = lookup_lw.band_data
-    if wcol ≤ ncol * ngroups
-        gcol = (wcol - 1i32) % ncol + 1i32
-        grp = (wcol - 1i32) ÷ ncol + 1i32
-        FT = eltype(acc.flux_up)
-        igpt = grp + (round - 1i32) * ngroups
-        if round == 1i32
-            @inbounds cloudy_count[wcol] = Int32(0)
-            grp > n_gpt && _zero_partials!(acc, acc_clear, wcol, nlev)
-        end
-        if igpt ≤ n_gpt
-            @inbounds begin
-                cloudy = _build_cloud_mask!(
-                    as.cloud_state,
-                    Val(:mask_lw),
-                    gcol,
-                    igpt,
-                    mask,
-                    wcol,
-                )
-                lw_2stream_gpt_col_sweeps!(
-                    igpt,
-                    gcol,
-                    flux,
-                    acc,
-                    acc_clear,
-                    nothing,
-                    src_lw,
-                    bcs_lw,
-                    op,
-                    as,
-                    lookup_lw_cld,
-                    lookup_lw_precip,
-                    major_gpt2bnd[igpt],
-                    nlev,
-                    ncol,
-                    mask,
-                    grp,
-                    wcol,
-                )
-                cloudy && (cloudy_count[wcol] += Int32(1))
-            end
-        end
-    end
-    return nothing
-end
-
-# Sum the groups' partial fluxes into the broadband ones, finish the net flux,
-# and total the cloud-cover tally. One thread per (column, level).
-function _reduce_lw_groups_CUDA!(
-    flux_lw::FluxLW,
-    flux_lw_clear::FluxLW,
-    acc,
-    acc_clear,
-    cloudy_count,
-    cld_cover_lw,
-    ngroups,
-    n_gpt,
-    ncol,
-    nlev,
-)
-    i = threadIdx().x + (blockIdx().x - 1i32) * blockDim().x
-    if i ≤ ncol * nlev
-        gcol = (i - 1i32) % ncol + 1i32
-        ilev = (i - 1i32) ÷ ncol + 1i32
-        FT = eltype(flux_lw.flux_up)
-        up, dn, cup, cdn = FT(0), FT(0), FT(0), FT(0)
-        @inbounds for g in 1i32:ngroups
-            wcol = gcol + (g - 1i32) * ncol
-            up += acc.flux_up[wcol, ilev]
-            dn += acc.flux_dn[wcol, ilev]
-            cup += acc_clear.flux_up[wcol, ilev]
-            cdn += acc_clear.flux_dn[wcol, ilev]
-        end
-        @inbounds begin
-            flux_lw.flux_up[gcol, ilev] = up
-            flux_lw.flux_dn[gcol, ilev] = dn
-            flux_lw.flux_net[gcol, ilev] = up - dn
-            flux_lw_clear.flux_up[gcol, ilev] = cup
-            flux_lw_clear.flux_dn[gcol, ilev] = cdn
-            flux_lw_clear.flux_net[gcol, ilev] = cup - cdn
-            if ilev == 1i32 && !isnothing(cld_cover_lw)
-                n = 0i32
-                for g in 1i32:ngroups
-                    n += cloudy_count[gcol + (g - 1i32) * ncol]
-                end
-                cld_cover_lw[gcol] = FT(n) / n_gpt
             end
         end
     end

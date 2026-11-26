@@ -424,19 +424,7 @@ function rte_sw_2stream_solve_both_skies! end
     n_gpt,
     nlev,
 )
-    # One column per thread, so the column's own index is the wide one, the
-    # g-point loop runs from the first and this thread collects the aerosol
-    # optical depth. `sw_2stream_gpt_col_sweeps!` is where those come apart.
-    mask_store =
-        as.cloud_state isa CloudState ? as.cloud_state.mask_sw : nothing
-    cloudy = _build_cloud_mask!(
-        as.cloud_state,
-        Val(:mask_sw),
-        gcol,
-        igpt,
-        mask_store,
-        gcol,
-    )
+    cloudy = _build_cloud_mask!(as.cloud_state, Val(:mask_sw), gcol, igpt)
     # Gas and aerosol only: the clear sky, and the half both skies share
     compute_optical_props!(
         op,
@@ -447,60 +435,7 @@ function rte_sw_2stream_solve_both_skies! end
         lookup_sw,
         nothing,
         lookup_sw_aero,
-        nothing,
-        gcol,
-        true,
     )
-    sw_2stream_gpt_col_sweeps!(
-        igpt,
-        gcol,
-        flux,
-        flux_sw,
-        flux_sw_clear,
-        band_flux,
-        op,
-        bcs_sw,
-        src_sw,
-        as,
-        lookup_sw,
-        lookup_sw_cld,
-        lookup_sw_precip,
-        μ₀,
-        ibnd,
-        n_gpt,
-        nlev,
-        mask_store,
-        1,
-        gcol,
-    )
-    return cloudy
-end
-
-# Everything the body above does once the gas and aerosol optics are in `op`.
-# See `lw_2stream_gpt_col_sweeps!`; `_grouped_rounds!` in ext/cuda builds a
-# kernel from this half alone.
-@inline function sw_2stream_gpt_col_sweeps!(
-    igpt,
-    gcol,
-    flux,
-    flux_sw,
-    flux_sw_clear,
-    band_flux,
-    op,
-    bcs_sw,
-    src_sw,
-    as,
-    lookup_sw,
-    lookup_sw_cld,
-    lookup_sw_precip,
-    μ₀,
-    ibnd,
-    n_gpt,
-    nlev,
-    mask_store,
-    first_igpt,
-    wcol,
-)
     if μ₀ > 0
         @inbounds solar_frac = lookup_sw.solar_src_scaled[igpt]
         rte_sw_2stream!(
@@ -514,13 +449,10 @@ end
             ibnd,
             nlev,
             gcol,
-            wcol,
         )
-        _accumulate_fluxes!(flux_sw_clear, flux, wcol, nlev, igpt, first_igpt)
+        _accumulate_fluxes!(flux_sw_clear, flux, gcol, nlev, igpt)
     end
-    # Add the cloud increment to the same optics and sweep again. A dark column
-    # skips it: every reader of `op` is behind the same test, and in the grouped
-    # solve the optics kernel leaves `op` unfilled for such a thread.
+    # Add the cloud increment to the same optics and sweep again
     if μ₀ > 0 && !isnothing(lookup_sw_cld)
         add_cloud_optics_sw!(
             op,
@@ -529,8 +461,6 @@ end
             lookup_sw_cld,
             ibnd,
             lookup_sw_precip,
-            wcol,
-            mask_store,
         )
     end
     if μ₀ > 0
@@ -546,9 +476,8 @@ end
             ibnd,
             nlev,
             gcol,
-            wcol,
         )
-        _accumulate_fluxes!(flux_sw, flux, wcol, nlev, igpt, first_igpt)
+        _accumulate_fluxes!(flux_sw, flux, gcol, nlev, igpt)
         accumulate_band_flux!(
             band_flux,
             flux.flux_up,
@@ -558,7 +487,7 @@ end
             nlev,
         )
     end
-    return nothing
+    return cloudy
 end
 
 """
