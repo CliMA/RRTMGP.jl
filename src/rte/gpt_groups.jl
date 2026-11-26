@@ -22,17 +22,20 @@ const SW_GPT_GROUP_PLANES = 3 + 2 + 4
 Device bytes that `LWGptGroups` and `SWGptGroups` together allocate for
 `ngroups` groups of `ncol` columns on `nlay` layers, which
 [`default_ngpt_groups`](@ref) bounds. Each band adds a byte of cloud mask per
-level and a surface source per wide column; the optics and the mask are over
-layers but are charged a level each.
+level and a surface source per wide column, and the aerosol and cloud optics of
+one band per column; the wide optics and the mask are over layers but are
+charged a level each.
 """
 function gpt_group_bytes(::Type{FT}, ncol, nlay, ngroups) where {FT}
     planes = LW_GPT_GROUP_PLANES + SW_GPT_GROUP_PLANES
     per_level = planes * sizeof(FT) + 2 * sizeof(Bool)
     per_column = 2 * sizeof(FT)
-    return ncol * ngroups * ((nlay + 1) * per_level + per_column)
+    band_optics = 2 * ncol * nlay * 6 * sizeof(FT)
+    return ncol * ngroups * ((nlay + 1) * per_level + per_column) + band_optics
 end
 
-# The widened grid parameters and the mask over wide columns.
+# The widened grid parameters, the mask over wide columns, and the aerosol and
+# cloud optics (`τ`, `ssa` and `g` of each) of one band per column.
 function _gpt_group_workspaces(grid_params::RRTMGPGridParams, ngroups::Int)
     _check_ngpt_groups(ngroups)
     (; context, ncol, nlay, isothermal_boundary_layer) = grid_params
@@ -47,7 +50,8 @@ function _gpt_group_workspaces(grid_params::RRTMGPGridParams, ngroups::Int)
         ncolw,
         isothermal_boundary_layer,
     )
-    return (; wide_grid_params, mask = DA{Bool}(undef, nlay, ncolw))
+    mask = DA{Bool}(undef, nlay, ncolw)
+    return (; wide_grid_params, mask, band = DA{FT}(undef, nlay, 6, ncol))
 end
 
 """
@@ -59,31 +63,43 @@ power of two up to 32, and a type parameter, so that the lanes' reductions
 unroll.
 
 Every workspace the solve indexes by column is widened to `ncol * ngroups`, so a
-thread's `(column, lane)` pair selects its slice by one index. `ngroups > 1` is
-implemented for CUDA; the CPU driver ignores these workspaces.
+thread's `(column, lane)` pair selects its slice by one index, except `band`,
+which holds the aerosol and cloud optics of one band per column, shared by the
+column's lanes. `ngroups > 1` is implemented for CUDA; the CPU driver ignores
+these workspaces.
 """
-struct LWGptGroups{N, OP, SL, FB, MK}
+struct LWGptGroups{N, OP, SL, FB, MK, BA}
     op::OP
     src::SL
     fluxb::FB
     mask::MK
+    band::BA
 end
-LWGptGroups{N}(op::OP, src::SL, fluxb::FB, mask::MK) where {N, OP, SL, FB, MK} =
-    LWGptGroups{N, OP, SL, FB, MK}(op, src, fluxb, mask)
+LWGptGroups{N}(
+    op::OP,
+    src::SL,
+    fluxb::FB,
+    mask::MK,
+    band::BA,
+) where {N, OP, SL, FB, MK, BA} =
+    LWGptGroups{N, OP, SL, FB, MK, BA}(op, src, fluxb, mask, band)
 Adapt.adapt_structure(to, g::LWGptGroups{N}) where {N} = LWGptGroups{N}(
     Adapt.adapt(to, g.op),
     Adapt.adapt(to, g.src),
     Adapt.adapt(to, g.fluxb),
     Adapt.adapt(to, g.mask),
+    Adapt.adapt(to, g.band),
 )
 
 function LWGptGroups(grid_params::RRTMGPGridParams, ngroups::Int; params)
-    (; wide_grid_params, mask) = _gpt_group_workspaces(grid_params, ngroups)
+    (; wide_grid_params, mask, band) =
+        _gpt_group_workspaces(grid_params, ngroups)
     return LWGptGroups{ngroups}(
         TwoStream(wide_grid_params),
         SourceLW2Str(wide_grid_params; params),
         FluxLW(wide_grid_params),
         mask,
+        band,
     )
 end
 
@@ -92,28 +108,38 @@ end
 
 The shortwave counterpart of [`LWGptGroups`](@ref).
 """
-struct SWGptGroups{N, OP, SS, FB, MK}
+struct SWGptGroups{N, OP, SS, FB, MK, BA}
     op::OP
     src::SS
     fluxb::FB
     mask::MK
+    band::BA
 end
-SWGptGroups{N}(op::OP, src::SS, fluxb::FB, mask::MK) where {N, OP, SS, FB, MK} =
-    SWGptGroups{N, OP, SS, FB, MK}(op, src, fluxb, mask)
+SWGptGroups{N}(
+    op::OP,
+    src::SS,
+    fluxb::FB,
+    mask::MK,
+    band::BA,
+) where {N, OP, SS, FB, MK, BA} =
+    SWGptGroups{N, OP, SS, FB, MK, BA}(op, src, fluxb, mask, band)
 Adapt.adapt_structure(to, g::SWGptGroups{N}) where {N} = SWGptGroups{N}(
     Adapt.adapt(to, g.op),
     Adapt.adapt(to, g.src),
     Adapt.adapt(to, g.fluxb),
     Adapt.adapt(to, g.mask),
+    Adapt.adapt(to, g.band),
 )
 
 function SWGptGroups(grid_params::RRTMGPGridParams, ngroups::Int)
-    (; wide_grid_params, mask) = _gpt_group_workspaces(grid_params, ngroups)
+    (; wide_grid_params, mask, band) =
+        _gpt_group_workspaces(grid_params, ngroups)
     return SWGptGroups{ngroups}(
         TwoStream(wide_grid_params),
         SourceSW2Str(wide_grid_params),
         FluxSW(wide_grid_params),
         mask,
+        band,
     )
 end
 

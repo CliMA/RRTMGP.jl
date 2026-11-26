@@ -100,23 +100,19 @@ to the existing `TwoStream` optics properties:
         collect_aod && (aod_sca[] = 0)
         for glay in 1:nlay
             if aero_mask[glay]
-                τ_aero, τ_ssa_aero, τ_ssag_aero = compute_lookup_aerosol(
-                    lkp_aero,
-                    ibnd,
-                    aero_mass,
-                    aero_size,
-                    rel_hum[glay],
-                    glay,
-                )
-                g_aero = τ_ssag_aero / max(eps(FT), τ_ssa_aero)
-                ssa_aero = τ_ssa_aero / max(eps(FT), τ_aero)
+                (τ_aero, ssa_aero, g_aero), (τ_ext, τ_sca) =
+                    aerosol_optics_2stream(
+                        lkp_aero,
+                        ibnd,
+                        aero_mass,
+                        aero_size,
+                        rel_hum[glay],
+                        glay,
+                        delta_scaling,
+                    )
                 if collect_aod
-                    aod_ext[] += τ_aero
-                    aod_sca[] += τ_ssa_aero
-                end
-                if delta_scaling # delta scaling is applied for shortwave problem
-                    τ_aero, ssa_aero, g_aero =
-                        delta_scale(τ_aero, ssa_aero, g_aero)
+                    aod_ext[] += τ_ext
+                    aod_sca[] += τ_sca
                 end
                 τ[glay], ssa[glay], g[glay] = increment_2stream(
                     τ[glay],
@@ -132,15 +128,43 @@ to the existing `TwoStream` optics properties:
     return nothing
 end
 
+# The `TwoStream` aerosol optics of layer `glay` in band `ibnd`, delta-scaled for
+# the shortwave, and the layer's optical depth and scattering optical depth.
+@inline function aerosol_optics_2stream(
+    lkp_aero,
+    ibnd,
+    aero_mass,
+    aero_size,
+    rel_hum,
+    glay,
+    delta_scaling,
+)
+    FT = typeof(rel_hum)
+    τ_aero, τ_ssa_aero, τ_ssag_aero = compute_lookup_aerosol(
+        lkp_aero,
+        ibnd,
+        aero_mass,
+        aero_size,
+        rel_hum,
+        glay,
+    )
+    g_aero = τ_ssag_aero / max(eps(FT), τ_ssa_aero)
+    ssa_aero = τ_ssa_aero / max(eps(FT), τ_aero)
+    optics =
+        delta_scaling ? delta_scale(τ_aero, ssa_aero, g_aero) :
+        (τ_aero, ssa_aero, g_aero)
+    return optics, (τ_aero, τ_ssa_aero)
+end
+
 """
-    compute_lookup_aerosol(lkp_aero, ibnd::Int, aero_mass, aero_size, rh::FT, glay) where {FT}
+    compute_lookup_aerosol(lkp_aero, ibnd::Integer, aero_mass, aero_size, rh::FT, glay) where {FT}
 
 Compute cumulative aerosol optical properties for various aerosol particles given the aerosol lookup table (`lkp_aero`),
 band number (`ibnd`), aerosol mass (`aeromass`), aerosol size (`aerosize`), and relative humidity (`rh`).
 """
 function compute_lookup_aerosol(
     lkp_aero,
-    ibnd::Int,
+    ibnd::Integer,
     aero_mass,
     aero_size,
     rh::FT,

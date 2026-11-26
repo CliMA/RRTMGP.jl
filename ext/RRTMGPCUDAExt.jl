@@ -13,7 +13,6 @@ import RRTMGP.BCs: LwBCs, SwBCs
 import RRTMGP.Optics: OneScalar, TwoStream
 import RRTMGP.Optics
 import RRTMGP.Optics: compute_optical_props!
-import RRTMGP.Optics: add_cloud_optics_lw!, add_cloud_optics_sw!
 import RRTMGP.Optics: compute_col_gas!
 import RRTMGP.Optics: compute_col_gas_kernel!
 import RRTMGP.Optics: compute_relative_humidity!

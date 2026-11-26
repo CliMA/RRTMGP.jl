@@ -149,78 +149,107 @@ liquid and ice before delta-scaling. Rain optics are not yet wired here.
         )
     end
     nlay = length(τ)
-    FT = eltype(τ)
+    @inbounds for glay in 1:nlay
+        if cld_mask[glay]
+            τ_cl, ssa_cl, g_cl = cloud_optics_2stream(
+                cld_r_eff_liq,
+                cld_r_eff_ice,
+                cld_path_liq,
+                cld_path_ice,
+                ice_rgh,
+                lkp_cld,
+                ibnd,
+                glay;
+                lkp_precip,
+                cld_r_eff_sno,
+                cld_path_sno,
+                delta_scaling,
+            )
+            τ[glay], ssa[glay], g[glay] = increment_2stream(
+                τ[glay],
+                ssa[glay],
+                g[glay],
+                τ_cl,
+                ssa_cl,
+                g_cl,
+            )
+        end
+    end
+    return nothing
+end
+
+# The `TwoStream` cloud and snow optics of layer `glay` in band `ibnd`, delta-scaled
+# for the shortwave (see `add_cloud_optics_2stream!`).
+@inline function cloud_optics_2stream(
+    cld_r_eff_liq,
+    cld_r_eff_ice,
+    cld_path_liq,
+    cld_path_ice,
+    ice_rgh,
+    lkp_cld::LookUpCld,
+    ibnd,
+    glay;
+    lkp_precip,
+    cld_r_eff_sno,
+    cld_path_sno,
+    delta_scaling,
+)
+    FT = eltype(cld_path_liq)
     extliq, ssaliq, asyliq = LookUpTables.getview_liqdata(lkp_cld, ibnd)
     extice, ssaice, asyice =
         LookUpTables.getview_icedata(lkp_cld, ibnd, ice_rgh)
     @inbounds _, _, nsize_liq, nsize_ice, _ = lkp_cld.dims
     @inbounds radliq_lwr, radliq_upr, radice_lwr, radice_upr = lkp_cld.bounds
-
     @inbounds begin
-        for glay in 1:nlay
-            if cld_mask[glay]
-                # cloud liquid + ice
-                τl, τl_ssa, τl_ssag = compute_lookup_cld_liq_props(
-                    nsize_liq,
-                    radliq_lwr,
-                    radliq_upr,
-                    extliq,
-                    ssaliq,
-                    asyliq,
-                    cld_r_eff_liq[glay],
-                    cld_path_liq[glay],
-                )
-                τi, τi_ssa, τi_ssag = compute_lookup_cld_ice_props(
-                    nsize_ice,
-                    radice_lwr,
-                    radice_upr,
-                    extice,
-                    ssaice,
-                    asyice,
-                    cld_r_eff_ice[glay],
-                    cld_path_ice[glay],
-                )
-                τ_cl = τl + τi
-                ssa_cl = τl_ssa + τi_ssa      # running Σ τ*ssa
-                ssag_cl = τl_ssag + τi_ssag   # running Σ τ*ssa*g
-                if use_snow
-                    extsno, ssasno, asysno =
-                        LookUpTables.getview_snodata(lkp_precip, ibnd)
-                    nsize_sno = LookUpTables.get_nsize_sno(lkp_precip)
-                    radsno_lwr, radsno_upr =
-                        lkp_precip.bounds[1], lkp_precip.bounds[2]
-                    τs, τs_ssa, τs_ssag = compute_lookup_precip_props(
-                        nsize_sno,
-                        radsno_lwr,
-                        radsno_upr,
-                        extsno,
-                        ssasno,
-                        asysno,
-                        cld_r_eff_sno[glay],
-                        cld_path_sno[glay],
-                    )
-                    τ_cl += τs
-                    ssa_cl += τs_ssa
-                    ssag_cl += τs_ssag
-                end
-                # g = Σ(τ*ssa*g) / Σ(τ*ssa); ssa = Σ(τ*ssa) / Σ(τ)  (same order as before)
-                g_cl = ssag_cl / max(eps(FT), ssa_cl)
-                ssa_cl /= max(eps(FT), τ_cl)
-                if delta_scaling # shortwave only
-                    τ_cl, ssa_cl, g_cl = delta_scale(τ_cl, ssa_cl, g_cl)
-                end
-                τ[glay], ssa[glay], g[glay] = increment_2stream(
-                    τ[glay],
-                    ssa[glay],
-                    g[glay],
-                    τ_cl,
-                    ssa_cl,
-                    g_cl,
-                )
-            end
+        # cloud liquid + ice
+        τl, τl_ssa, τl_ssag = compute_lookup_cld_liq_props(
+            nsize_liq,
+            radliq_lwr,
+            radliq_upr,
+            extliq,
+            ssaliq,
+            asyliq,
+            cld_r_eff_liq[glay],
+            cld_path_liq[glay],
+        )
+        τi, τi_ssa, τi_ssag = compute_lookup_cld_ice_props(
+            nsize_ice,
+            radice_lwr,
+            radice_upr,
+            extice,
+            ssaice,
+            asyice,
+            cld_r_eff_ice[glay],
+            cld_path_ice[glay],
+        )
+        τ_cl = τl + τi
+        ssa_cl = τl_ssa + τi_ssa      # running Σ τ*ssa
+        ssag_cl = τl_ssag + τi_ssag   # running Σ τ*ssa*g
+        if !isnothing(cld_path_sno)
+            extsno, ssasno, asysno =
+                LookUpTables.getview_snodata(lkp_precip, ibnd)
+            nsize_sno = LookUpTables.get_nsize_sno(lkp_precip)
+            radsno_lwr, radsno_upr = lkp_precip.bounds[1], lkp_precip.bounds[2]
+            τs, τs_ssa, τs_ssag = compute_lookup_precip_props(
+                nsize_sno,
+                radsno_lwr,
+                radsno_upr,
+                extsno,
+                ssasno,
+                asysno,
+                cld_r_eff_sno[glay],
+                cld_path_sno[glay],
+            )
+            τ_cl += τs
+            ssa_cl += τs_ssa
+            ssag_cl += τs_ssag
         end
+        # g = Σ(τ*ssa*g) / Σ(τ*ssa); ssa = Σ(τ*ssa) / Σ(τ)  (same order as before)
+        g_cl = ssag_cl / max(eps(FT), ssa_cl)
+        ssa_cl /= max(eps(FT), τ_cl)
     end
-    return nothing
+    return delta_scaling ? delta_scale(τ_cl, ssa_cl, g_cl) :
+           (τ_cl, ssa_cl, g_cl)
 end
 
 """
