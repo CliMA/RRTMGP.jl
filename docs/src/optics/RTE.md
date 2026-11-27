@@ -22,4 +22,5 @@ LWGptGroups
 SWGptGroups
 default_ngpt_groups
 gpt_group_bytes
+check_band_layout
 ```

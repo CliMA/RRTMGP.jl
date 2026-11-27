@@ -214,7 +214,7 @@ doi:10.1175/1520-0469(1980)037<0630:TSATRT>2.0.CO;2
     one_minus_e2kt = om1 * (FT(1) + exp_minusktau)
 
     # Formulated to avoid rounding errors when k, gamma1 are of very different magnitudes
-    RT_term = FT(1) / (k * (FT(1) + exp_minus2ktau) + γ1 * one_minus_e2kt)
+    RT_term = inv(k * (FT(1) + exp_minus2ktau) + γ1 * one_minus_e2kt)
 
     Rdif = RT_term * γ2 * one_minus_e2kt       # Eqn. 25
     Tdif = RT_term * FT(2) * k * exp_minusktau # Eqn. 26
@@ -325,7 +325,7 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
     # Direct-beam profile, computed top-down with an addition-built
     # cumulative optical depth and stored for the two passes below.
     flux_dn_dir_top = toa_flux * solar_frac * μ₀
-    inv_μ₀ = FT(1) / max(μ₀, Numerics.μ₀_min(FT))
+    inv_μ₀ = inv(max(μ₀, Numerics.μ₀_min(FT)))
     @inbounds flux_dn_dir[wcol, nlev] = flux_dn_dir_top
     τ_cum = FT(0)
     @inbounds for ilev in nlay:-1:1
@@ -348,17 +348,21 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
         τ_ilev, ssa_ilev, g_ilev = τ[wcol, ilev], ssa[wcol, ilev], g[wcol, ilev]
         (Rdir, Tdir, _, Rdif, Tdif) =
             sw_2stream_coeffs(τ_ilev, ssa_ilev, g_ilev, μ₀)
-        denom = FT(1) / (FT(1) - Rdif * albedo_ilev)  # Eq 10
-        albedo_ilevplus1 = Rdif + Tdif * Tdif * albedo_ilev * denom # Equation 9
-        #
-        # Equation 11 -- source is emitted upward radiation at top of layer plus
-        # radiation emitted at bottom of layer,
-        # transmitted through the layer and reflected from layers below (Tdiff*src*albedo)
         flux_dn_dir_ilevplus1 = flux_dn_dir[wcol, ilev + 1]
         src_up_ilev = Rdir * flux_dn_dir_ilevplus1
         src_dn_ilev = Tdir * flux_dn_dir_ilevplus1
-        src_ilevplus1 =
-            src_up_ilev + Tdif * denom * (src_ilev + albedo_ilev * src_dn_ilev)
+        # a and b in the flux planes, which the downward pass then overwrites
+        flux_up[wcol, ilev],
+        flux_dn[wcol, ilev],
+        albedo_ilevplus1,
+        src_ilevplus1 = adding_layer(
+            Rdif,
+            Tdif,
+            src_up_ilev,
+            src_dn_ilev,
+            albedo_ilev,
+            src_ilev,
+        )
         albedo[wcol, ilev + 1], src[wcol, ilev + 1] =
             albedo_ilevplus1, src_ilevplus1
         albedo_ilev = albedo_ilevplus1
@@ -375,19 +379,10 @@ Equations are after Shonk and Hogan 2008, doi:10.1175/2007JCLI1940.1 (SH08)
 
     ilev = nlay
     @inbounds while ilev ≥ 1
-        τ_ilev, ssa_ilev, g_ilev = τ[wcol, ilev], ssa[wcol, ilev], g[wcol, ilev]
-        albedo_ilev, src_ilev = albedo[wcol, ilev], src[wcol, ilev]
-        (_, Tdir, _, Rdif, Tdif) =
-            sw_2stream_coeffs(τ_ilev, ssa_ilev, g_ilev, μ₀)
-        denom = FT(1) / (FT(1) - Rdif * albedo_ilev)  # Eq 10
-        src_dn_ilev = Tdir * flux_dn_dir[wcol, ilev + 1]
-        flux_dn_ilev =
-            (Tdif * flux_dn_ilevplus1 + # Equation 13
-             Rdif * src_ilev +
-             src_dn_ilev) * denom
-        flux_up[wcol, ilev] =
-            flux_dn_ilev * albedo_ilev + # Equation 12
-            src_ilev
+        flux_dn_ilev = # Equation 13
+            flux_up[wcol, ilev] * flux_dn_ilevplus1 + flux_dn[wcol, ilev]
+        flux_up[wcol, ilev] = # Equation 12
+            flux_dn_ilev * albedo[wcol, ilev] + src[wcol, ilev]
         flux_dn[wcol, ilev] = flux_dn_ilev + flux_dn_dir[wcol, ilev]
         flux_dn_ilevplus1 = flux_dn_ilev
         ilev -= 1

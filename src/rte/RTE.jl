@@ -59,10 +59,12 @@ function default_ngpt_groups(grid_params::RRTMGPGridParams)::Int
     device isa ClimaComms.AbstractCPUDevice && return 1
     (; ncol, nlay) = grid_params
     wanted = nextpow(2, cld(TARGET_GPT_GROUP_COLUMNS, ncol))
-    affordable = fld(
-        _gpt_group_byte_bound(device),
-        gpt_group_bytes(eltype(grid_params), ncol, nlay, 1),
-    )
+    # The bytes are linear in the group count, with a part (the band workspaces)
+    # that does not scale with it.
+    FT = eltype(grid_params)
+    fixed = gpt_group_bytes(FT, ncol, nlay, 0)
+    per_group = gpt_group_bytes(FT, ncol, nlay, 1) - fixed
+    affordable = fld(max(_gpt_group_byte_bound(device) - fixed, 0), per_group)
     return prevpow(2, clamp(min(wanted, affordable), 1, MAX_NGPT_GROUPS))
 end
 

@@ -297,6 +297,7 @@ function RRTMGPSolver(
             isnothing(band_flux_sw) &&
             ngpt_groups > 1
         ) ? RTE.SWGptGroups(grid_params, ngpt_groups) : nothing
+    isnothing(gpt_groups_sw) || RTE.check_band_layout(lookups.lookup_sw)
     sws =
         op_sw isa OneScalar ?
         RTE.NoScatSWRTE(
@@ -330,6 +331,7 @@ function RRTMGPSolver(
             isnothing(band_flux_lw) &&
             ngpt_groups > 1
         ) ? RTE.LWGptGroups(grid_params, ngpt_groups; params) : nothing
+    isnothing(gpt_groups_lw) || RTE.check_band_layout(lookups.lookup_lw)
     lws =
         op_lw isa OneScalar ?
         RTE.NoScatLWRTE(

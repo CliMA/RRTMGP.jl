@@ -22,6 +22,8 @@
     igpt,
     mask_store = getproperty(cloud_state, S),
     wcol = gcol,
+    bounds = nothing,
+    store = Val(true),
 ) where {S}
     mask = view(mask_store, :, wcol)
     # The band is part of the key: the two bands sample independently, and
@@ -30,15 +32,20 @@
         S === :mask_sw ? AtmosphericStates.MCICA_BAND_SALT_SW :
         AtmosphericStates.MCICA_BAND_SALT_LW
     key = (@inbounds cloud_state.mcica_key[1]) ⊻ band_key
-    Optics.build_cloud_mask!(
+    # With the column's cloudy layers given (as `cloud_layer_bounds` finds
+    # them), only those are set; the caller knows that the others are clear.
+    # With `store = Val(false)` as well, the mask is not set at all, and only
+    # whether the column is cloudy is returned.
+    return Optics.build_cloud_mask!(
         mask,
         view(cloud_state.cld_frac, :, gcol),
         cloud_state.mask_type,
         key,
         gcol,
         igpt,
+        something(bounds, ())...,
+        (isnothing(bounds) ? () : (store,))...,
     )
-    return any(mask)
 end
 
 # Accumulate one g-point's fluxes into the broadband accumulator for one

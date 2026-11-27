@@ -149,78 +149,107 @@ liquid and ice before delta-scaling. Rain optics are not yet wired here.
         )
     end
     nlay = length(τ)
-    FT = eltype(τ)
+    @inbounds for glay in 1:nlay
+        if cld_mask[glay]
+            τ_cl, ssa_cl, g_cl = cloud_optics_2stream(
+                cld_r_eff_liq,
+                cld_r_eff_ice,
+                cld_path_liq,
+                cld_path_ice,
+                ice_rgh,
+                lkp_cld,
+                ibnd,
+                glay;
+                lkp_precip,
+                cld_r_eff_sno,
+                cld_path_sno,
+                delta_scaling,
+            )
+            τ[glay], ssa[glay], g[glay] = increment_2stream(
+                τ[glay],
+                ssa[glay],
+                g[glay],
+                τ_cl,
+                ssa_cl,
+                g_cl,
+            )
+        end
+    end
+    return nothing
+end
+
+# The `TwoStream` cloud and snow optics of layer `glay` in band `ibnd`, delta-scaled
+# for the shortwave (see `add_cloud_optics_2stream!`).
+@inline function cloud_optics_2stream(
+    cld_r_eff_liq,
+    cld_r_eff_ice,
+    cld_path_liq,
+    cld_path_ice,
+    ice_rgh,
+    lkp_cld::LookUpCld,
+    ibnd,
+    glay;
+    lkp_precip,
+    cld_r_eff_sno,
+    cld_path_sno,
+    delta_scaling,
+)
+    FT = eltype(cld_path_liq)
     extliq, ssaliq, asyliq = LookUpTables.getview_liqdata(lkp_cld, ibnd)
     extice, ssaice, asyice =
         LookUpTables.getview_icedata(lkp_cld, ibnd, ice_rgh)
     @inbounds _, _, nsize_liq, nsize_ice, _ = lkp_cld.dims
     @inbounds radliq_lwr, radliq_upr, radice_lwr, radice_upr = lkp_cld.bounds
-
     @inbounds begin
-        for glay in 1:nlay
-            if cld_mask[glay]
-                # cloud liquid + ice
-                τl, τl_ssa, τl_ssag = compute_lookup_cld_liq_props(
-                    nsize_liq,
-                    radliq_lwr,
-                    radliq_upr,
-                    extliq,
-                    ssaliq,
-                    asyliq,
-                    cld_r_eff_liq[glay],
-                    cld_path_liq[glay],
-                )
-                τi, τi_ssa, τi_ssag = compute_lookup_cld_ice_props(
-                    nsize_ice,
-                    radice_lwr,
-                    radice_upr,
-                    extice,
-                    ssaice,
-                    asyice,
-                    cld_r_eff_ice[glay],
-                    cld_path_ice[glay],
-                )
-                τ_cl = τl + τi
-                ssa_cl = τl_ssa + τi_ssa      # running Σ τ*ssa
-                ssag_cl = τl_ssag + τi_ssag   # running Σ τ*ssa*g
-                if use_snow
-                    extsno, ssasno, asysno =
-                        LookUpTables.getview_snodata(lkp_precip, ibnd)
-                    nsize_sno = LookUpTables.get_nsize_sno(lkp_precip)
-                    radsno_lwr, radsno_upr =
-                        lkp_precip.bounds[1], lkp_precip.bounds[2]
-                    τs, τs_ssa, τs_ssag = compute_lookup_precip_props(
-                        nsize_sno,
-                        radsno_lwr,
-                        radsno_upr,
-                        extsno,
-                        ssasno,
-                        asysno,
-                        cld_r_eff_sno[glay],
-                        cld_path_sno[glay],
-                    )
-                    τ_cl += τs
-                    ssa_cl += τs_ssa
-                    ssag_cl += τs_ssag
-                end
-                # g = Σ(τ*ssa*g) / Σ(τ*ssa); ssa = Σ(τ*ssa) / Σ(τ)  (same order as before)
-                g_cl = ssag_cl / max(eps(FT), ssa_cl)
-                ssa_cl /= max(eps(FT), τ_cl)
-                if delta_scaling # shortwave only
-                    τ_cl, ssa_cl, g_cl = delta_scale(τ_cl, ssa_cl, g_cl)
-                end
-                τ[glay], ssa[glay], g[glay] = increment_2stream(
-                    τ[glay],
-                    ssa[glay],
-                    g[glay],
-                    τ_cl,
-                    ssa_cl,
-                    g_cl,
-                )
-            end
+        # cloud liquid + ice
+        τl, τl_ssa, τl_ssag = compute_lookup_cld_liq_props(
+            nsize_liq,
+            radliq_lwr,
+            radliq_upr,
+            extliq,
+            ssaliq,
+            asyliq,
+            cld_r_eff_liq[glay],
+            cld_path_liq[glay],
+        )
+        τi, τi_ssa, τi_ssag = compute_lookup_cld_ice_props(
+            nsize_ice,
+            radice_lwr,
+            radice_upr,
+            extice,
+            ssaice,
+            asyice,
+            cld_r_eff_ice[glay],
+            cld_path_ice[glay],
+        )
+        τ_cl = τl + τi
+        ssa_cl = τl_ssa + τi_ssa      # running Σ τ*ssa
+        ssag_cl = τl_ssag + τi_ssag   # running Σ τ*ssa*g
+        if !isnothing(cld_path_sno)
+            extsno, ssasno, asysno =
+                LookUpTables.getview_snodata(lkp_precip, ibnd)
+            nsize_sno = LookUpTables.get_nsize_sno(lkp_precip)
+            radsno_lwr, radsno_upr = lkp_precip.bounds[1], lkp_precip.bounds[2]
+            τs, τs_ssa, τs_ssag = compute_lookup_precip_props(
+                nsize_sno,
+                radsno_lwr,
+                radsno_upr,
+                extsno,
+                ssasno,
+                asysno,
+                cld_r_eff_sno[glay],
+                cld_path_sno[glay],
+            )
+            τ_cl += τs
+            ssa_cl += τs_ssa
+            ssag_cl += τs_ssag
         end
+        # g = Σ(τ*ssa*g) / Σ(τ*ssa); ssa = Σ(τ*ssa) / Σ(τ)  (same order as before)
+        g_cl = ssag_cl / max(eps(FT), ssa_cl)
+        ssa_cl /= max(eps(FT), τ_cl)
     end
-    return nothing
+    return delta_scaling ? delta_scale(τ_cl, ssa_cl, g_cl) :
+           (τ_cl, ssa_cl, g_cl)
 end
 
 """
@@ -431,7 +460,8 @@ end
 """
     build_cloud_mask!(cld_mask, cld_frac, ::MaxRandomOverlap, key, gcol, igpt)
 
-Build a McICA-sampled cloud mask from cloud fraction data for maximum-random overlap
+Build a McICA-sampled cloud mask from cloud fraction data for maximum-random overlap,
+and return whether any layer is cloudy.
 
 Reference: https://github.com/AER-RC/RRTMG_SW/
 
@@ -443,25 +473,71 @@ index, so each radiation step samples afresh. No `seedval` means a random key pe
 function build_cloud_mask!(
     cld_mask::AbstractArray{Bool, 1},
     cld_frac::AbstractArray{FT, 1},
-    ::MaxRandomOverlap,
+    mask_type::MaxRandomOverlap,
     key::Unsigned,
     gcol::Integer,
     igpt::Integer,
 ) where {FT}
-    nlay = size(cld_frac, 1)
-    start = _get_start(cld_frac) # first cloudy layer
-
+    start, finish = cloud_layer_bounds(cld_frac)
     if start > 0
-        finish = _get_finish(cld_frac) # last cloudy layer
         # set cloud mask for non-cloudy layers
         _mask_outer_non_cloudy_layers!(cld_mask, start, finish)
+    else
+        map!(x -> false, cld_mask, cld_mask)
+    end
+    return build_cloud_mask!(
+        cld_mask,
+        cld_frac,
+        mask_type,
+        key,
+        gcol,
+        igpt,
+        start,
+        finish,
+    )
+end
+
+"""
+    cloud_layer_bounds(cld_frac)
+
+The first and last layers of a column with clouds (`cld_frac > 0`), or `(0, 0)`
+for a clear column.
+"""
+@inline function cloud_layer_bounds(cld_frac)
+    start = _get_start(cld_frac)
+    return start > 0 ? (start, _get_finish(cld_frac)) : (start, start)
+end
+
+"""
+    build_cloud_mask!(cld_mask, cld_frac, ::MaxRandomOverlap, key, gcol, igpt, start, finish, store = Val(true))
+
+Build the cloud mask of the layers from `start` to `finish`, the column's first
+and last cloudy layers (see [`cloud_layer_bounds`](@ref)), leaving the others,
+which are clear, unset; return whether any layer is cloudy. With
+`store = Val(false)`, only return that, without setting the mask, as soon as a
+layer is cloudy.
+"""
+function build_cloud_mask!(
+    cld_mask::AbstractArray{Bool, 1},
+    cld_frac::AbstractArray{FT, 1},
+    ::MaxRandomOverlap,
+    key::Unsigned,
+    gcol::Integer,
+    igpt::Integer,
+    start::Integer,
+    finish::Integer,
+    ::Val{store} = Val(true),
+) where {FT, store}
+    cloudy = false
+    if start > 0
         # RRTMG uses random_arr[finish] > (FT(1) - cld_frac[finish]),
         # we change > to >= to address edge cases
         @inbounds cld_frac_ilayplus1 = cld_frac[finish]
         random_ilayplus1 = _keyed_uniform(FT, key, gcol, igpt, finish)
-        @inbounds cld_mask[finish] =
-            cld_mask_ilayplus1 =
-                random_ilayplus1 >= (FT(1) - cld_frac_ilayplus1)
+        cld_mask_ilayplus1 = random_ilayplus1 >= (FT(1) - cld_frac_ilayplus1)
+        store && @inbounds cld_mask[finish] = cld_mask_ilayplus1
+        cloudy = cld_mask_ilayplus1
+        !store && cloudy && return true
         ilay = finish - 1
         while ilay ≥ start
             @inbounds cld_frac_ilay = cld_frac[ilay]
@@ -478,15 +554,15 @@ function build_cloud_mask!(
             else
                 cld_mask_ilay = false
             end
-            @inbounds cld_mask[ilay] = cld_mask_ilay
+            store && @inbounds cld_mask[ilay] = cld_mask_ilay
+            cloudy |= cld_mask_ilay
+            !store && cloudy && return true
             cld_frac_ilayplus1 = cld_frac_ilay
             cld_mask_ilayplus1 = cld_mask_ilay
             ilay -= 1
         end
-    else
-        map!(x -> false, cld_mask, cld_mask)
     end
-    return nothing
+    return cloudy
 end
 
 function _get_finish(cld_frac)

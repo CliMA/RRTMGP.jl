@@ -23,10 +23,12 @@ compute_interp_frac_press
 compute_interp_frac_η
 compute_gas_optics
 compute_τ_minor
+minor_scaling
 compute_τ_rayleigh
 ```
 
 ```@docs
+cloud_layer_bounds
 build_cloud_mask!
 add_cloud_optics_1scalar!
 add_cloud_optics_2stream!
@@ -39,6 +41,7 @@ compute_lookup_precip_props
 add_aerosol_optics_1scalar!
 add_aerosol_optics_2stream!
 compute_lookup_aerosol
+aerosol_searches
 compute_lookup_dust_props
 compute_lookup_sea_salt_props
 compute_lookup_sulfate_props

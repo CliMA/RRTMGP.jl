@@ -21,13 +21,27 @@ Abstract lookup table for longwave and shortwave problems.
 abstract type AbstractLookUp end
 
 """
+    gpt_table(DA, FT, A, perm)
+
+The lookup table `A`, read with its g-point (or minor contributor) dimension
+first, as an array of type `DA` and element type `FT` that is indexed in the
+dimension order `perm`. On a CPU the table is stored in that order. On a GPU
+(see the CUDA extension) it keeps its g-points first in memory and is only
+indexed in the order `perm`, so that the lanes of a column, which take
+consecutive g-points, read consecutive addresses.
+"""
+gpt_table(::Type{DA}, ::Type{FT}, A, perm) where {DA, FT} =
+    DA{FT}(permutedims(A, perm))
+
+"""
     LookUpMinor{O, G, K}
 
 Lookup table for computing optical properties of minor gases.
 
 # Fields
 - `bnd_st`: Starting index to `idx_gases_minor_lower/upper` for each band `(n_bnd + 1)`.
-- `gpt_st`: Starting index in `kminor_lower/upper` for each g-point `(n_gpt + 1)`.
+- `gpt_sh`: Offset in `kminor_lower/upper` of each minor contributor, whose
+  g-points are consecutive there `(n_min_absrb_lower/upper)`.
 - `gasdata`: Indices for minor gases contributing to absorption in the lower/upper
   atmosphere, indices for scaling gases, whether the minor gas scales with density, and
   whether the minor gas scales by complement; `(4, n_min_absrb_lower/upper)`.
@@ -36,7 +50,7 @@ Lookup table for computing optical properties of minor gases.
 """
 struct LookUpMinor{O, G, K}
     bnd_st::O
-    gpt_st::O
+    gpt_sh::O
     gasdata::G
     kminor::K
 end
@@ -46,12 +60,11 @@ Adapt.@adapt_structure LookUpMinor
 @inline get_n_min_absrb(lkp::LookUpMinor) = size(lkp.gasdata, 2)
 # number of minor contributors in the lower/upper atmosphere
 @inline get_n_contrib(lkp::LookUpMinor) = size(lkp.kminor, 3)
-# get bounds for each g-point
-@inline getbounds(lkp::LookUpMinor, ibnd, igpt) = @inbounds (
-    lkp.bnd_st[ibnd],
-    lkp.gpt_st[igpt],
-    lkp.gpt_st[igpt + 1] - lkp.gpt_st[igpt],
-)
+# the first minor contributor of band `ibnd`, and the band's number of contributors
+@inline minor_bounds(lkp::LookUpMinor, ibnd) =
+    @inbounds (lkp.bnd_st[ibnd], lkp.bnd_st[ibnd + 1] - lkp.bnd_st[ibnd])
+# the index in `kminor` of contributor `i` at the `loc`-th g-point of its band
+@inline kminor_index(lkp::LookUpMinor, i, loc) = @inbounds lkp.gpt_sh[i] + loc
 # returns minor gas index, scaling gas index, minor gas scales with density and minor gas scales by complement at the given `idx`.
 @inline get_minor_gas_data(lkp::LookUpMinor, idx) =
     @inbounds view(lkp.gasdata, :, idx)
