@@ -66,10 +66,10 @@ end
             workspace_bytes(LWGptGroups(grid_params, ngroups; params)) +
             workspace_bytes(SWGptGroups(grid_params, ngroups))
         counted = gpt_group_bytes(FT, ncol, nlay, ngroups)
-        # The optics and the mask are over layers and are charged a level each,
-        # which is the whole of the slack: six optics planes and two mask bytes
-        # per wide column. Nothing else may differ, in either direction.
-        slack = ncol * ngroups * (6 * sizeof(FT) + 2 * sizeof(Bool))
+        # The optics are over layers and are charged a level each, which is the
+        # whole of the slack: six optics planes per wide column. Nothing else may
+        # differ, in either direction.
+        slack = ncol * ngroups * 6 * sizeof(FT)
         @test counted - built == slack
     end
 end

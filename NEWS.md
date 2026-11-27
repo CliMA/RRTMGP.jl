@@ -4,6 +4,14 @@ RRTMGP.jl Release Notes
 main
 ----
 
+- [#646](https://github.com/CliMA/RRTMGP.jl/pull/646) The fused two-stream
+  solves compute what a band's g-points share once per column, compute each
+  g-point's optics during its sweeps, and sum their lanes' fluxes in registers.
+  Every two-stream sweep reuses its upward pass's coefficients in its downward
+  pass, which changes fluxes at roundoff. Lookup tables saved by
+  `save_lookup_tables` before this change must be saved again. On an A100, the
+  flagship AMIP benchmark's radiation solves 4.1 times as fast as with #644
+  alone.
 - [#644](https://github.com/CliMA/RRTMGP.jl/pull/644) The g-point-grouped
   solves run as one kernel per band, in which a column's groups are lanes of one
   warp that sum their fluxes with shuffles, so `ngpt_groups` must now be a power

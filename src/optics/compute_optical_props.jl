@@ -239,9 +239,6 @@ end
         )
     end
     if !isnothing(lkp_cld) # clouds need TwoStream optics
-        # The narrow method, indexed by the column alone, because the mask store
-        # it reads is the one sized for `gcol`. The grouped solve passes no
-        # cloud lookup and adds the increment with its wide mask.
         add_cloud_optics_lw!(op, as, gcol, lkp_cld, ibnd, lkp_precip)
     end
     return nothing
@@ -313,7 +310,6 @@ end
     lkp_aero::Union{LookUpAerosolMerra, Nothing} = nothing,
     lkp_precip::Union{LookUpPrecip, Nothing} = nothing,
     wcol::Integer = gcol,
-    collect_aod::Bool = true,
 )
     nlay = AtmosphericStates.get_nlay(as)
     (; vmr) = as
@@ -349,13 +345,8 @@ end
     # order is observable at roundoff.
     if !isnothing(lkp_aero)
         (; iband_550nm) = lkp_aero
-        # Zeroed and re-accumulated per g-point, so it is a read-modify-write
-        # on one per-column address: concurrent g-points would interleave their
-        # partial sums. `collect_aod` nominates a single writer.
-        aod_sw_ext =
-            collect_aod ? view(as.aerosol_state.aod_sw_ext, gcol) : nothing
-        aod_sw_sca =
-            collect_aod ? view(as.aerosol_state.aod_sw_sca, gcol) : nothing
+        aod_sw_ext = view(as.aerosol_state.aod_sw_ext, gcol)
+        aod_sw_sca = view(as.aerosol_state.aod_sw_sca, gcol)
         aero_mask = view(as.aerosol_state.aero_mask, :, gcol)
         aero_size = view(as.aerosol_state.aero_size, :, :, gcol)
         aero_mass = view(as.aerosol_state.aero_mass, :, :, gcol)
@@ -378,9 +369,6 @@ end
         )
     end
     if !isnothing(lkp_cld) # clouds need TwoStream optics
-        # The narrow method, indexed by the column alone, because the mask store
-        # it reads is the one sized for `gcol`. The grouped solve passes no
-        # cloud lookup and adds the increment with its wide mask.
         add_cloud_optics_sw!(op, as, gcol, lkp_cld, ibnd, lkp_precip)
     end
     return nothing
@@ -406,41 +394,13 @@ could drift apart without anything noticing.
     ibnd::Integer,
     lkp_precip::Union{LookUpPrecip, Nothing} = nothing,
 )
-    # The narrow column space: `op` is indexed by the column itself, and the
-    # mask store is the one sized for it.
-    return add_cloud_optics_lw!(
-        op,
-        as,
-        gcol,
-        lkp_cld,
-        ibnd,
-        lkp_precip,
-        gcol,
-        as.cloud_state.mask_lw,
-    )
-end
-
-# Solving over wide columns writes `op` at `wcol`, which only means anything
-# beside a mask store sized the same way (`LWGptGroups.mask`). Both are
-# positional and neither has a default, so a caller holding only the narrow mask
-# takes the method above instead of pairing it with a wide index.
-@inline function add_cloud_optics_lw!(
-    op::TwoStream,
-    as::AtmosphericState,
-    gcol::Integer,
-    lkp_cld::LookUpCld,
-    ibnd::Integer,
-    lkp_precip::Union{LookUpPrecip, Nothing},
-    wcol::Integer,
-    mask_store,
-)
     cloud_state = as.cloud_state
     @inbounds begin
         add_cloud_optics_2stream!(
-            view(op.τ, wcol, :),
-            view(op.ssa, wcol, :),
-            view(op.g, wcol, :),
-            view(mask_store, :, wcol),
+            view(op.τ, gcol, :),
+            view(op.ssa, gcol, :),
+            view(op.g, gcol, :),
+            view(cloud_state.mask_lw, :, gcol),
             view(cloud_state.cld_r_eff_liq, :, gcol),
             view(cloud_state.cld_r_eff_ice, :, gcol),
             view(cloud_state.cld_path_liq, :, gcol),
@@ -472,41 +432,13 @@ and the longwave one does not.
     ibnd::Integer,
     lkp_precip::Union{LookUpPrecip, Nothing} = nothing,
 )
-    # The narrow column space: `op` is indexed by the column itself, and the
-    # mask store is the one sized for it.
-    return add_cloud_optics_sw!(
-        op,
-        as,
-        gcol,
-        lkp_cld,
-        ibnd,
-        lkp_precip,
-        gcol,
-        as.cloud_state.mask_sw,
-    )
-end
-
-# Solving over wide columns writes `op` at `wcol`, which only means anything
-# beside a mask store sized the same way (`SWGptGroups.mask`). Both are
-# positional and neither has a default, so a caller holding only the narrow mask
-# takes the method above instead of pairing it with a wide index.
-@inline function add_cloud_optics_sw!(
-    op::TwoStream,
-    as::AtmosphericState,
-    gcol::Integer,
-    lkp_cld::LookUpCld,
-    ibnd::Integer,
-    lkp_precip::Union{LookUpPrecip, Nothing},
-    wcol::Integer,
-    mask_store,
-)
     cloud_state = as.cloud_state
     @inbounds begin
         add_cloud_optics_2stream!(
-            view(op.τ, wcol, :),
-            view(op.ssa, wcol, :),
-            view(op.g, wcol, :),
-            view(mask_store, :, wcol),
+            view(op.τ, gcol, :),
+            view(op.ssa, gcol, :),
+            view(op.g, gcol, :),
+            view(cloud_state.mask_sw, :, gcol),
             view(cloud_state.cld_r_eff_liq, :, gcol),
             view(cloud_state.cld_r_eff_ice, :, gcol),
             view(cloud_state.cld_path_liq, :, gcol),

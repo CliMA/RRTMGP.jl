@@ -28,6 +28,18 @@ using RRTMGP.ArtifactPaths
 include("reference_files.jl")
 include("read_all_sky_with_aerosols.jl")
 
+# Whether a one-group fused solve reproduced the serial one. The fused kernels
+# run the serial solve's arithmetic, which a CPU reproduces bit for bit. A GPU
+# compiler contracts multiplies and adds into fused multiply-adds differently in
+# the two kernels, which moves a flux by an ulp or two (at most 2.2e-7 of the
+# largest flux in Float32 and 2.7e-16 in Float64 when this was written), far
+# less than a dropped g-point or a mask drawn for the wrong column would.
+function matches_serial(fused, serial, device)
+    device isa ClimaComms.AbstractCPUDevice && return fused == serial
+    tolerance = 8 * eps(eltype(serial)) * maximum(abs, serial)
+    return maximum(abs, fused .- serial) <= tolerance
+end
+
 function all_sky_with_aerosols(
     context,
     ::Type{SLVLW},
@@ -288,11 +300,13 @@ function all_sky_with_aerosols(
     )
 
     # One group takes a column's g-points in the serial order, so it
-    # reassociates nothing and has to reproduce the serial solve exactly. That
-    # is the exact check on the whole grouped path -- the wide indexing, the
-    # flux sums, the cover tally and the nominated writer of the aerosol optical
-    # depth -- against a reference that is not itself grouped. `RRTMGPSolver`
-    # builds no workspaces for one group, so these build them directly.
+    # reassociates nothing and has to reproduce the serial solve, exactly on a
+    # CPU and to within a GPU compiler's fused multiply-adds (`matches_serial`).
+    # That is the tight check on the whole grouped path -- the wide indexing,
+    # the flux sums, the cover tally and the nominated writer of the aerosol
+    # optical depth -- against a reference that is not itself grouped.
+    # `RRTMGPSolver` builds no workspaces for one group, so these build them
+    # directly.
     one_group_lw() = (
         TwoStreamLWRTE(
             grid_params.context,
@@ -360,8 +374,16 @@ function all_sky_with_aerosols(
                 prebuilt_lookups.lookup_lw_aero,
                 RRTMGP._deep_atmosphere_inverse_scaling(solver),
             )
-            @test Array(parent(lws_one.flux.flux_net)) == serial_all
-            @test Array(parent(clear_one.flux_net)) == serial_clear
+            @test matches_serial(
+                Array(parent(lws_one.flux.flux_net)),
+                serial_all,
+                device,
+            )
+            @test matches_serial(
+                Array(parent(clear_one.flux_net)),
+                serial_clear,
+                device,
+            )
             track_cover &&
                 @test Array(as.cloud_state.cld_cover_lw) == serial_cover
 
@@ -433,13 +455,27 @@ function all_sky_with_aerosols(
                 prebuilt_lookups.lookup_sw_aero,
                 RRTMGP._deep_atmosphere_inverse_scaling(solver),
             )
-            # Exactly the serial result, which also pins the two things the
-            # shortwave has to get right on its own: a night column's fluxes
-            # are zeroed rather than summed from whatever the workspace held,
-            # and the 550 nm optical depth is collected where the sun is down.
-            @test Array(parent(sws_one.flux.flux_net)) == serial_all
-            @test Array(parent(sws_one.flux.flux_dn_dir)) == serial_dir
-            @test Array(parent(clear_one.flux_net)) == serial_clear
+            # The serial result, which also pins the two things the shortwave
+            # has to get right on its own: a night column's fluxes are zeroed
+            # rather than summed from whatever the workspace held, and the
+            # 550 nm optical depth is collected where the sun is down. The
+            # optical depth is summed in layer order from the band workspace,
+            # outside the sweeps, so it is exact on every device.
+            @test matches_serial(
+                Array(parent(sws_one.flux.flux_net)),
+                serial_all,
+                device,
+            )
+            @test matches_serial(
+                Array(parent(sws_one.flux.flux_dn_dir)),
+                serial_dir,
+                device,
+            )
+            @test matches_serial(
+                Array(parent(clear_one.flux_net)),
+                serial_clear,
+                device,
+            )
             @test Array(as.aerosol_state.aod_sw_ext) == serial_aod_ext
             @test Array(as.aerosol_state.aod_sw_sca) == serial_aod_sca
             track_cover &&

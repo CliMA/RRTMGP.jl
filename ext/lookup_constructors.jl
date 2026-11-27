@@ -5,7 +5,7 @@ import RRTMGP.LookUpTables:
     LookUpCld,
     LookUpPrecip,
     LookUpPlanck
-import RRTMGP.LookUpTables: LookUpMinor, ReferencePoints, BandData
+import RRTMGP.LookUpTables: LookUpMinor, ReferencePoints, BandData, gpt_table
 
 # The RTE/optics kernels hard-code the water-vapor and ozone slots of the gas
 # index (`get_vmr` for the global-mean storage maps ig == 1 → vmr_h2o and
@@ -188,11 +188,11 @@ function LookUpLW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
 
     key_species = IA3D(key_species)
 
-    kmajor = FTA4D(permutedims(Array(ds["kmajor"]), [2, 3, 4, 1]))
+    kmajor = gpt_table(DA, FT, Array(ds["kmajor"]), (2, 3, 4, 1))
     kminor_start_lower = IA1D(Array(ds["kminor_start_lower"])) # not currently used
     kminor_start_upper = IA1D(Array(ds["kminor_start_upper"])) # not currently used
     planck_fraction =
-        FTA4D(permutedims(Array(ds["plank_fraction"]), [2, 3, 4, 1]))
+        gpt_table(DA, FT, Array(ds["plank_fraction"]), (2, 3, 4, 1))
     t_planck_data = Array(ds["temperature_Planck"])
     # Some reduced-resolution gas files (the g128 variants) store
     # `temperature_Planck` as an integer INDEX (0…n) rather than Kelvin;
@@ -230,9 +230,6 @@ function LookUpLW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
 
     minor_lower_gpt_sh = Array{Int, 1}(undef, n_min_absrb_lower)
     minor_upper_gpt_sh = Array{Int, 1}(undef, n_min_absrb_upper)
-
-    minor_lower_gpt_st = ones(Int, n_gpt + 1)
-    minor_upper_gpt_st = ones(Int, n_gpt + 1)
 
     minor_lower_gpt_sh[1] = 0
     @inbounds for i in 1:n_min_absrb_lower
@@ -272,48 +269,22 @@ function LookUpLW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
             minor_upper_bnd_st[ibnd] = loc_upp + 1
         end
     end
-    # reorder kminor
-    reorder_minor_lower = zeros(Int, n_contrib_lower)
-    reorder_minor_upper = zeros(Int, n_contrib_upper)
-    loc_lower, loc_upper = 1, 1
-    for ibnd in 1:n_bnd
-        nminorgases_lower =
-            minor_lower_bnd_st[ibnd + 1] - minor_lower_bnd_st[ibnd]
-        nminorgases_upper =
-            minor_upper_bnd_st[ibnd + 1] - minor_upper_bnd_st[ibnd]
-        for (loc_in_bnd, igpt) in
-            enumerate(bnd_lims_gpt[1, ibnd]:bnd_lims_gpt[2, ibnd])
-            minor_lower_gpt_st[igpt + 1] =
-                minor_lower_gpt_st[igpt] + nminorgases_lower
-            minor_upper_gpt_st[igpt + 1] =
-                minor_upper_gpt_st[igpt] + nminorgases_upper
-            for i in minor_lower_bnd_st[ibnd]:(minor_lower_bnd_st[ibnd + 1] - 1)
-                reorder_minor_lower[loc_lower] =
-                    minor_lower_gpt_sh[i] + loc_in_bnd
-                loc_lower += 1
-            end
-            for i in minor_upper_bnd_st[ibnd]:(minor_upper_bnd_st[ibnd + 1] - 1)
-                reorder_minor_upper[loc_upper] =
-                    minor_upper_gpt_sh[i] + loc_in_bnd
-                loc_upper += 1
-            end
+    # The minor absorption tables keep each contributor's g-points together, in
+    # the order of its band's, so that `kminor_index` can locate a g-point by its
+    # place in the band; every contributor must span its whole band.
+    for (lims, bnd) in (
+        (minor_lower_gpt_lims, minor_lower_bnd),
+        (minor_upper_gpt_lims, minor_upper_bnd),
+    )
+        for i in axes(lims, 2)
+            lims[:, i] == bnd_lims_gpt[:, bnd[i]] || error(
+                "minor contributor $i does not span the g-points of band $(bnd[i])",
+            )
         end
     end
 
-    kminor_lower = FTA3D(
-        permutedims(Array(ds["kminor_lower"]), [2, 3, 1])[
-            :,
-            :,
-            reorder_minor_lower,
-        ],
-    )
-    kminor_upper = FTA3D(
-        permutedims(Array(ds["kminor_upper"]), [2, 3, 1])[
-            :,
-            :,
-            reorder_minor_upper,
-        ],
-    )
+    kminor_lower = gpt_table(DA, FT, Array(ds["kminor_lower"]), (2, 3, 1))
+    kminor_upper = gpt_table(DA, FT, Array(ds["kminor_upper"]), (2, 3, 1))
     #-----------------------
     major_gpt2bnd = DA(major_gpt2bnd)
     minor_lower_bnd = DA(minor_lower_bnd)
@@ -355,7 +326,7 @@ function LookUpLW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
     n_η = size(kmajor, 1)
     minor_lower = LookUpMinor(
         DA(minor_lower_bnd_st),
-        DA(minor_lower_gpt_st),
+        DA(minor_lower_gpt_sh),
         DA(
             vcat(
                 idx_gases_minor_lower,
@@ -369,7 +340,7 @@ function LookUpLW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
 
     minor_upper = LookUpMinor(
         DA(minor_upper_bnd_st),
-        DA(minor_upper_gpt_st),
+        DA(minor_upper_gpt_sh),
         DA(
             vcat(
                 idx_gases_minor_upper,
@@ -385,7 +356,7 @@ function LookUpLW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
         LookUpLW{
             FT,
             IA3D,
-            FTA4D,
+            typeof(kmajor),
             typeof(band_data),
             typeof(planck),
             typeof(ref_points),
@@ -509,7 +480,7 @@ function LookUpSW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
 
     key_species = IA3D(key_species)
 
-    kmajor = FTA4D(permutedims(Array(ds["kmajor"]), [2, 3, 4, 1]))
+    kmajor = gpt_table(DA, FT, Array(ds["kmajor"]), (2, 3, 4, 1))
     kminor_start_lower = IA1D(Array(ds["kminor_start_lower"])) # not currently used
     kminor_start_upper = IA1D(Array(ds["kminor_start_upper"])) # not currently used
 
@@ -532,9 +503,6 @@ function LookUpSW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
 
     minor_lower_gpt_sh = Array{Int, 1}(undef, n_min_absrb_lower)
     minor_upper_gpt_sh = Array{Int, 1}(undef, n_min_absrb_upper)
-
-    minor_lower_gpt_st = ones(Int, n_gpt + 1)
-    minor_upper_gpt_st = ones(Int, n_gpt + 1)
 
     minor_lower_gpt_sh[1] = 0
     @inbounds for i in 1:n_min_absrb_lower
@@ -574,48 +542,22 @@ function LookUpSW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
             minor_upper_bnd_st[ibnd] = loc_upp + 1
         end
     end
-    # reorder kminor
-    reorder_minor_lower = zeros(Int, n_contrib_lower)
-    reorder_minor_upper = zeros(Int, n_contrib_upper)
-    loc_lower, loc_upper = 1, 1
-    for ibnd in 1:n_bnd
-        nminorgases_lower =
-            minor_lower_bnd_st[ibnd + 1] - minor_lower_bnd_st[ibnd]
-        nminorgases_upper =
-            minor_upper_bnd_st[ibnd + 1] - minor_upper_bnd_st[ibnd]
-        for (loc_in_bnd, igpt) in
-            enumerate(bnd_lims_gpt[1, ibnd]:bnd_lims_gpt[2, ibnd])
-            minor_lower_gpt_st[igpt + 1] =
-                minor_lower_gpt_st[igpt] + nminorgases_lower
-            minor_upper_gpt_st[igpt + 1] =
-                minor_upper_gpt_st[igpt] + nminorgases_upper
-            for i in minor_lower_bnd_st[ibnd]:(minor_lower_bnd_st[ibnd + 1] - 1)
-                reorder_minor_lower[loc_lower] =
-                    minor_lower_gpt_sh[i] + loc_in_bnd
-                loc_lower += 1
-            end
-            for i in minor_upper_bnd_st[ibnd]:(minor_upper_bnd_st[ibnd + 1] - 1)
-                reorder_minor_upper[loc_upper] =
-                    minor_upper_gpt_sh[i] + loc_in_bnd
-                loc_upper += 1
-            end
+    # The minor absorption tables keep each contributor's g-points together, in
+    # the order of its band's, so that `kminor_index` can locate a g-point by its
+    # place in the band; every contributor must span its whole band.
+    for (lims, bnd) in (
+        (minor_lower_gpt_lims, minor_lower_bnd),
+        (minor_upper_gpt_lims, minor_upper_bnd),
+    )
+        for i in axes(lims, 2)
+            lims[:, i] == bnd_lims_gpt[:, bnd[i]] || error(
+                "minor contributor $i does not span the g-points of band $(bnd[i])",
+            )
         end
     end
 
-    kminor_lower = FTA3D(
-        permutedims(Array(ds["kminor_lower"]), [2, 3, 1])[
-            :,
-            :,
-            reorder_minor_lower,
-        ],
-    )
-    kminor_upper = FTA3D(
-        permutedims(Array(ds["kminor_upper"]), [2, 3, 1])[
-            :,
-            :,
-            reorder_minor_upper,
-        ],
-    )
+    kminor_lower = gpt_table(DA, FT, Array(ds["kminor_lower"]), (2, 3, 1))
+    kminor_upper = gpt_table(DA, FT, Array(ds["kminor_upper"]), (2, 3, 1))
     #------------------------
     major_gpt2bnd = DA(major_gpt2bnd)
     minor_lower_bnd = DA(minor_lower_bnd)
@@ -655,8 +597,8 @@ function LookUpSW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
 
     n_η = size(kmajor, 1)
 
-    rayl_lower = FTA3D(permutedims(Array(ds["rayl_lower"]), [2, 3, 1]))
-    rayl_upper = FTA3D(permutedims(Array(ds["rayl_upper"]), [2, 3, 1]))
+    rayl_lower = gpt_table(DA, FT, Array(ds["rayl_lower"]), (2, 3, 1))
+    rayl_upper = gpt_table(DA, FT, Array(ds["rayl_upper"]), (2, 3, 1))
 
     a_offset = FT(0.1495954)
     b_offset = FT(0.00066696)
@@ -671,7 +613,7 @@ function LookUpSW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
 
     minor_lower = LookUpMinor(
         DA(minor_lower_bnd_st),
-        DA(minor_lower_gpt_st),
+        DA(minor_lower_gpt_sh),
         DA(
             vcat(
                 idx_gases_minor_lower,
@@ -685,7 +627,7 @@ function LookUpSW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
 
     minor_upper = LookUpMinor(
         DA(minor_upper_bnd_st),
-        DA(minor_upper_gpt_st),
+        DA(minor_upper_gpt_sh),
         DA(
             vcat(
                 idx_gases_minor_upper,
@@ -703,8 +645,8 @@ function LookUpSW(ds, ::Type{FT}, ::Type{DA}) where {FT <: AbstractFloat, DA}
             FT,
             IA3D,
             FTA1D,
-            FTA3D,
-            FTA4D,
+            typeof(rayl_lower),
+            typeof(kmajor),
             typeof(band_data),
             typeof(ref_points),
             typeof(minor_lower),

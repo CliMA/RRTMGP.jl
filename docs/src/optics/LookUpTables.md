@@ -6,6 +6,7 @@ CurrentModule = RRTMGP.LookUpTables
 
 ```@docs
 LookUpMinor
+gpt_table
 ReferencePoints
 LookUpPlanck
 BandData

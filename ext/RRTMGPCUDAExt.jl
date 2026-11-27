@@ -13,7 +13,6 @@ import RRTMGP.BCs: LwBCs, SwBCs
 import RRTMGP.Optics: OneScalar, TwoStream
 import RRTMGP.Optics
 import RRTMGP.Optics: compute_optical_props!
-import RRTMGP.Optics: add_cloud_optics_lw!, add_cloud_optics_sw!
 import RRTMGP.Optics: compute_col_gas!
 import RRTMGP.Optics: compute_col_gas_kernel!
 import RRTMGP.Optics: compute_relative_humidity!
@@ -31,7 +30,7 @@ import RRTMGP.GrayAtmosphere: compute_gray_heating_rate!
 import RRTMGP.GrayAtmosphere: compute_gray_heating_rate_kernel!
 import RRTMGP.GrayAtmosphere: update_profile_lw_kernel!
 import RRTMGP.LookUpTables:
-    LookUpLW, LookUpCld, LookUpPrecip, LookUpSW, LookUpAerosolMerra
+    LookUpLW, LookUpCld, LookUpPrecip, LookUpSW, LookUpAerosolMerra, gpt_table
 import RRTMGP.RTESolver: rte_lw_noscat_solve!
 import RRTMGP.RTESolver: rte_lw_noscat_one_angle!
 import RRTMGP.RTESolver: rte_lw_2stream_solve!
@@ -44,8 +43,15 @@ import RRTMGP.RTESolver: rte_sw_noscat_solve!
 import RRTMGP.RTESolver: lw_noscat_gpt_col!, lw_2stream_gpt_col!
 import RRTMGP.RTESolver: sw_noscat_gpt_col!, sw_2stream_gpt_col!
 import RRTMGP.RTESolver: _compute_aero_mask!, _build_cloud_mask!
+import RRTMGP.RTESolver: lw_2stream_coeffs, sw_2stream_coeffs, adding_layer
+import RRTMGP.Numerics
+import RRTMGP.LookUpTables
+import RRTMGP.VolumeMixingRatios: get_vmr
 import RRTMGP.RTESolver: rte_lw_2stream_solve_both_skies!
 import RRTMGP.RTE: LWGptGroups, SWGptGroups, n_gpt_groups
+import RRTMGP.RTE: BAND_AEROSOL, BAND_CLOUD, BAND_GAS_INDICES
+import RRTMGP.RTE: BAND_GAS_FRACTIONS, BAND_PLANCK, BAND_PLANCK_SFC, BAND_MINOR
+import RRTMGP.RTE: BAND_AEROSOL_SEARCHES
 import RRTMGP.RTE: GPT_GROUP_MEMORY_DIVISOR, _gpt_group_byte_bound
 import RRTMGP.RTESolver: lw_2stream_gpt_col_both_skies!
 import RRTMGP.RTESolver: rte_sw_2stream_solve_both_skies!
@@ -105,6 +111,18 @@ Adapt.adapt_storage(::Int32Arrays, a::CUDA.CuArray) =
     length(a) <= typemax(Int32) ? Int32Array(a) :
     throw(ArgumentError("GPU kernels support at most 2^31 - 1 array elements"))
 int32_arrays(args) = Adapt.adapt(Int32Arrays(), args)
+
+# A lookup table keeps its g-points first in GPU memory (see `gpt_table`), with
+# the permutation in its type, as the type of every kernel argument must be.
+function gpt_table(
+    ::Type{<:CUDA.CuArray},
+    ::Type{FT},
+    A,
+    perm::NTuple{N, Int},
+) where {FT, N}
+    table = CUDA.CuArray{FT}(A)
+    return PermutedDimsArray{FT, N, perm, invperm(perm), typeof(table)}(table)
+end
 
 include(joinpath("cuda", "gray_atmospheric_states.jl"))
 include(joinpath("cuda", "rte_longwave_2stream.jl"))

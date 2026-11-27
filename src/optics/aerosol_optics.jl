@@ -100,23 +100,19 @@ to the existing `TwoStream` optics properties:
         collect_aod && (aod_sca[] = 0)
         for glay in 1:nlay
             if aero_mask[glay]
-                τ_aero, τ_ssa_aero, τ_ssag_aero = compute_lookup_aerosol(
-                    lkp_aero,
-                    ibnd,
-                    aero_mass,
-                    aero_size,
-                    rel_hum[glay],
-                    glay,
-                )
-                g_aero = τ_ssag_aero / max(eps(FT), τ_ssa_aero)
-                ssa_aero = τ_ssa_aero / max(eps(FT), τ_aero)
+                (τ_aero, ssa_aero, g_aero), (τ_ext, τ_sca) =
+                    aerosol_optics_2stream(
+                        lkp_aero,
+                        ibnd,
+                        aero_mass,
+                        aero_size,
+                        rel_hum[glay],
+                        glay,
+                        delta_scaling,
+                    )
                 if collect_aod
-                    aod_ext[] += τ_aero
-                    aod_sca[] += τ_ssa_aero
-                end
-                if delta_scaling # delta scaling is applied for shortwave problem
-                    τ_aero, ssa_aero, g_aero =
-                        delta_scale(τ_aero, ssa_aero, g_aero)
+                    aod_ext[] += τ_ext
+                    aod_sca[] += τ_sca
                 end
                 τ[glay], ssa[glay], g[glay] = increment_2stream(
                     τ[glay],
@@ -132,32 +128,130 @@ to the existing `TwoStream` optics properties:
     return nothing
 end
 
+# The `TwoStream` aerosol optics of layer `glay` in band `ibnd`, delta-scaled for
+# the shortwave, and the layer's optical depth and scattering optical depth.
+@inline function aerosol_optics_2stream(
+    lkp_aero,
+    ibnd,
+    aero_mass,
+    aero_size,
+    rel_hum,
+    glay,
+    delta_scaling,
+)
+    return aerosol_optics_2stream(
+        lkp_aero,
+        ibnd,
+        aero_mass,
+        glay,
+        aerosol_searches(lkp_aero, aero_mass, aero_size, rel_hum, glay),
+        delta_scaling,
+    )
+end
+@inline function aerosol_optics_2stream(
+    lkp_aero,
+    ibnd,
+    aero_mass,
+    glay,
+    (loc, factor, bins)::Tuple,
+    delta_scaling,
+)
+    FT = typeof(factor)
+    τ_aero, τ_ssa_aero, τ_ssag_aero = compute_lookup_aerosol(
+        lkp_aero,
+        ibnd,
+        aero_mass,
+        glay,
+        loc,
+        factor,
+        bins,
+    )
+    g_aero = τ_ssag_aero / max(eps(FT), τ_ssa_aero)
+    ssa_aero = τ_ssa_aero / max(eps(FT), τ_aero)
+    optics =
+        delta_scaling ? delta_scale(τ_aero, ssa_aero, g_aero) :
+        (τ_aero, ssa_aero, g_aero)
+    return optics, (τ_aero, τ_ssa_aero)
+end
+
 """
-    compute_lookup_aerosol(lkp_aero, ibnd::Int, aero_mass, aero_size, rh::FT, glay) where {FT}
+    compute_lookup_aerosol(lkp_aero, ibnd::Integer, aero_mass, aero_size, rh::FT, glay) where {FT}
 
 Compute cumulative aerosol optical properties for various aerosol particles given the aerosol lookup table (`lkp_aero`),
 band number (`ibnd`), aerosol mass (`aeromass`), aerosol size (`aerosize`), and relative humidity (`rh`).
 """
 function compute_lookup_aerosol(
     lkp_aero,
-    ibnd::Int,
+    ibnd::Integer,
     aero_mass,
     aero_size,
     rh::FT,
     glay,
 ) where {FT}
-    τ_cum, τ_ssa_cum, τ_ssag_cum = FT(0), FT(0), FT(0)
-    # Every humidity-dependent species interpolates the same `rh` over the same
-    # levels, so the search runs once here rather than once per species.
-    @inbounds loc, factor = interp1d_loc_factor(rh, lkp_aero.rh_levels)
+    return compute_lookup_aerosol(
+        lkp_aero,
+        ibnd,
+        aero_mass,
+        glay,
+        aerosol_searches(lkp_aero, aero_mass, aero_size, rh, glay)...,
+    )
+end
 
-    for i_aero_size in (1, 8, 9, 10, 11)
+# The dust and sea salt species, whose optics depend on their size bin
+const DUST_SPECIES = (1, 8, 9, 10, 11)
+const SEA_SALT_SPECIES = (2, 12, 13, 14, 15)
+
+"""
+    aerosol_searches(lkp_aero, aero_mass, aero_size, rh, glay)
+
+The parts of the aerosol optics of layer `glay` that do not depend on the band:
+the humidity interpolation location and factor, which every humidity-dependent
+species shares, and the size bins of the dust and sea salt species with mass,
+three bits each, dust first.
+"""
+@inline function aerosol_searches(lkp_aero, aero_mass, aero_size, rh, glay)
+    FT = typeof(rh)
+    @inbounds loc, factor = interp1d_loc_factor(rh, lkp_aero.rh_levels)
+    bins = UInt32(0)
+    for (k, i_aero_size) in enumerate((DUST_SPECIES..., SEA_SALT_SPECIES...))
+        @inbounds if aero_mass[i_aero_size, glay] > FT(0)
+            bin = locate_merra_size_bin(
+                lkp_aero.size_bin_limits,
+                aero_size[i_aero_size, glay],
+            )
+            bins |= UInt32(bin) << (3 * (k - 1))
+        end
+    end
+    return loc, factor, bins
+end
+
+# the size bin of the `k`-th of the dust and sea salt species
+@inline size_bin(bins, k) = Int((bins >> (3 * (k - 1))) & 0x7)
+
+"""
+    compute_lookup_aerosol(lkp_aero, ibnd, aero_mass, glay, loc, factor, bins)
+
+The aerosol optics of layer `glay` in band `ibnd`, from the searches of
+[`aerosol_searches`](@ref).
+"""
+function compute_lookup_aerosol(
+    lkp_aero,
+    ibnd::Integer,
+    aero_mass,
+    glay,
+    loc,
+    factor::FT,
+    bins::UInt32,
+) where {FT}
+    τ_cum, τ_ssa_cum, τ_ssag_cum = FT(0), FT(0), FT(0)
+
+    for (k, i_aero_size) in enumerate(DUST_SPECIES)
         if aero_mass[i_aero_size, glay] > FT(0)
-            τ, τ_ssa, τ_ssag = compute_lookup_dust_props(
+            τ, τ_ssa, τ_ssag = dust_props(
                 lkp_aero,
                 ibnd,
                 aero_mass[i_aero_size, glay],
-                aero_size[i_aero_size, glay],
+                size_bin(bins, k),
             )
             τ_cum += τ
             τ_ssa_cum += τ_ssa
@@ -165,13 +259,13 @@ function compute_lookup_aerosol(
         end
     end
 
-    for i_aero_size in (2, 12, 13, 14, 15)
+    for (k, i_aero_size) in enumerate(SEA_SALT_SPECIES)
         if aero_mass[i_aero_size, glay] > FT(0)
-            τ, τ_ssa, τ_ssag = compute_lookup_sea_salt_props(
+            τ, τ_ssa, τ_ssag = sea_salt_props(
                 lkp_aero,
                 ibnd,
                 aero_mass[i_aero_size, glay],
-                aero_size[i_aero_size, glay],
+                size_bin(bins, length(DUST_SPECIES) + k),
                 loc,
                 factor,
             )
@@ -257,8 +351,13 @@ function compute_lookup_dust_props(
     aeromass::FT,
     aerosize::FT,
 ) where {FT}
-    (; size_bin_limits, dust) = lkp_aero
-    bin = locate_merra_size_bin(size_bin_limits, aerosize)
+    bin = locate_merra_size_bin(lkp_aero.size_bin_limits, aerosize)
+    return dust_props(lkp_aero, ibnd, aeromass, bin)
+end
+
+# the dust optics of size bin `bin` in band `ibnd`
+@inline function dust_props(lkp_aero, ibnd, aeromass, bin)
+    (; dust) = lkp_aero
     @inbounds begin
         τ = aeromass * dust[1, bin, ibnd]
         τ_ssa = τ * dust[2, bin, ibnd]
@@ -282,9 +381,16 @@ function compute_lookup_sea_salt_props(
     loc,
     factor::FT,
 ) where {FT}
-    (; size_bin_limits, sea_salt) = lkp_aero
+    bin = locate_merra_size_bin(lkp_aero.size_bin_limits, aerosize)
+    return sea_salt_props(lkp_aero, ibnd, aeromass, bin, loc, factor)
+end
+
+# the sea salt optics of size bin `bin` in band `ibnd`, at the humidity
+# interpolation location `loc` and factor `factor`
+@inline function sea_salt_props(lkp_aero, ibnd, aeromass, bin, loc, factor)
+    FT = typeof(aeromass)
+    (; sea_salt) = lkp_aero
     @inbounds begin
-        bin = locate_merra_size_bin(size_bin_limits, aerosize)
         τ =
             aeromass * (
                 sea_salt[1, loc, bin, ibnd] * (FT(1) - factor) +
